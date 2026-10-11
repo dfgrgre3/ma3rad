@@ -21,6 +21,21 @@ export class CustomerService {
     return this.db.query<Customer>(sql, params);
   }
 
+  public getCustomersPage(search = '', page = 1, pageSize = 25) {
+    const params: any[] = [];
+    let where = '';
+    if (search.trim()) {
+      where = ' WHERE name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?';
+      const term = `%${search.trim()}%`;
+      params.push(term, term, term, term);
+    }
+    return this.db.queryPage<Customer>(
+      `SELECT * FROM customers${where} ORDER BY name ASC`,
+      `SELECT COUNT(*) as total_items FROM customers${where}`,
+      params, page, pageSize,
+    );
+  }
+
   public getCustomerById(id: string): Customer | null {
     const rows = this.db.query<Customer>(`SELECT * FROM customers WHERE id = ?`, [id]);
     return rows.length > 0 ? rows[0] : null;

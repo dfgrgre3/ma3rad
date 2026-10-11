@@ -12,6 +12,7 @@ import { CashierService } from '../services/CashierService';
 import { PrintService } from '../services/PrintService';
 import { Product, Customer, Warehouse, CashShift, PaymentType } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { CeramicCalculatorModal } from './CeramicCalculatorModal';
 
 interface CartItem {
   product: Product;
@@ -44,6 +45,7 @@ export const PosView: React.FC = () => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [successInvoice, setSuccessInvoice] = useState<any | null>(null);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -153,6 +155,35 @@ export const PosView: React.FC = () => {
           quantityM2: defaultM2,
           boxesCount: 1,
           piecesCount: piecesPerBox,
+          unitPrice: product.sellingPriceM2,
+          discountAmount: 0,
+          availableStockM2: available
+        }
+      ]);
+    }
+  };
+
+  const addCalculatedToCart = (product: Product, quantityM2: number, boxesCount: number) => {
+    const piecesPerBox = product.piecesPerBox || 4;
+    const stock = inventoryService.getProductStock(product.id, selectedWarehouseId);
+    const available = stock ? stock.availableM2 : 0;
+
+    const existingIndex = cart.findIndex(item => item.product.id === product.id);
+    if (existingIndex > -1) {
+      const updated = [...cart];
+      updated[existingIndex].quantityM2 = Number((updated[existingIndex].quantityM2 + quantityM2).toFixed(2));
+      updated[existingIndex].boxesCount += boxesCount;
+      updated[existingIndex].piecesCount += boxesCount * piecesPerBox;
+      setCart(updated);
+    } else {
+      setCart([
+        ...cart,
+        {
+          product,
+          soldBy: 'M2',
+          quantityM2,
+          boxesCount,
+          piecesCount: boxesCount * piecesPerBox,
           unitPrice: product.sellingPriceM2,
           discountAmount: 0,
           availableStockM2: available
@@ -284,6 +315,16 @@ export const PosView: React.FC = () => {
               <option key={w.id} value={w.id}>المخزن: {w.name}</option>
             ))}
           </select>
+
+          {/* Ceramic Calculator Button */}
+          <button
+            type="button"
+            onClick={() => setIsCalculatorOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition shrink-0 active:scale-95 shadow-sm"
+          >
+            <Calculator className="w-4 h-4 text-amber-500" />
+            <span>حاسبة السيراميك والمقايسة</span>
+          </button>
         </div>
 
         {/* Product Cards Grid */}
@@ -553,6 +594,14 @@ export const PosView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Ceramic Room & Waste Calculator Modal */}
+      <CeramicCalculatorModal
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        products={products}
+        onAddToCart={addCalculatedToCart}
+      />
     </div>
   );
 };

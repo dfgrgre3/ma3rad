@@ -46,3 +46,56 @@ input[type=number] {
     display: block !important;
   }
 }
+
+/* Shared CeramiSys design tokens and accessible interaction states */
+:root {
+  --cerami-primary: #0284c7;
+  --cerami-surface: #ffffff;
+  --cerami-border: #e2e8f0;
+  --cerami-muted: #64748b;
+}
+
+* { box-sizing: border-box; }
+button, a, input, select, textarea { outline: none; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(14, 165, 233, 0.45);
+  outline-offset: 2px;
+}
+
+.ui-card {
+  border: 1px solid var(--cerami-border);
+  border-radius: 1rem;
+  background: var(--cerami-surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.ui-input {
+  min-height: 2.5rem;
+  border: 1px solid var(--cerami-border);
+  border-radius: 0.75rem;
+  background: var(--cerami-surface);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.ui-input:focus { border-color: var(--cerami-primary); box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12); }
+.ui-btn-primary { border-radius: 0.75rem; background: var(--cerami-primary); color: white; font-weight: 700; transition: filter 150ms, transform 150ms; }
+.ui-btn-primary:hover { filter: brightness(1.08); }
+.ui-btn-primary:active { transform: translateY(1px); }
+
+@media (max-width: 900px) {
+  .desktop-only { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}
+
+.dark .ui-card { --cerami-surface: #0f172a; --cerami-border: #334155; }
+.dark .ui-input { --cerami-surface: #0f172a; --cerami-border: #334155; color: #f8fafc; }
+@media print { .ui-card { box-shadow: none; } }
+
+/* Print Styles */
+@media print {
+  body { background: white !important; color: black !important; overflow: visible !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}

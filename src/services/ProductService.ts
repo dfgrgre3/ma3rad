@@ -35,6 +35,24 @@ export class ProductService {
     return this.db.query<Product>(sql, params);
   }
 
+  public getProductsPage(search = '', categoryId?: string, brandId?: string, page = 1, pageSize = 25) {
+    const filters = ['p.is_active = 1'];
+    const params: any[] = [];
+    if (search.trim()) {
+      filters.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.size LIKE ?)');
+      const term = `%${search.trim()}%`;
+      params.push(term, term, term, term);
+    }
+    if (categoryId) { filters.push('p.category_id = ?'); params.push(categoryId); }
+    if (brandId) { filters.push('p.brand_id = ?'); params.push(brandId); }
+    const where = filters.join(' AND ');
+    return this.db.queryPage<Product>(
+      `SELECT p.*, c.name as categoryName, b.name as brandName FROM products p LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN brands b ON p.brand_id = b.id WHERE ${where} ORDER BY p.name ASC`,
+      `SELECT COUNT(*) as total_items FROM products p WHERE ${where}`,
+      params, page, pageSize,
+    );
+  }
+
   public getProductById(id: string): Product | null {
     const rows = this.db.query<Product>(`
       SELECT p.*, c.name as categoryName, b.name as brandName

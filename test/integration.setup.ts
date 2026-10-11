@@ -10,10 +10,13 @@ const require = createRequire(import.meta.url);
 const initSqlJs = require(path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.js'));
 const wasmPath = path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
 
+const initSqlJsWithDiskWasm = (opts: any = {}) => initSqlJs({ ...opts, locateFile: () => wasmPath });
+
+(globalThis as any).initSqlJs = initSqlJsWithDiskWasm;
 (globalThis as any).window = {
   location: { origin: 'http://localhost' },
   // Emscripten's browser build fetches the wasm via fetch(locateFile(...)); we serve it from disk.
-  initSqlJs: (opts: any) => initSqlJs({ ...opts, locateFile: () => wasmPath }),
+  initSqlJs: initSqlJsWithDiskWasm,
 };
 
 const store: Record<string, string> = {};

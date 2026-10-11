@@ -7,11 +7,22 @@ import { CustomerService } from '../services/CustomerService';
 import { Customer } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 
+const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
+  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs dark:border-slate-800">
+    <span className="text-slate-500">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
+    <div className="flex items-center gap-2"><select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select><button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:opacity-40 dark:border-slate-700">السابق</button><span className="min-w-[70px] text-center font-bold">{page} / {totalPages}</span><button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:opacity-40 dark:border-slate-700">التالي</button></div>
+  </div>
+);
+
 export const CustomersView: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [statement, setStatement] = useState<any | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -40,8 +51,11 @@ export const CustomersView: React.FC = () => {
 
   const loadCustomers = () => {
     try {
-      const data = customerService.getAllCustomers(search);
-      setCustomers(data);
+      const result = customerService.getCustomersPage(search, page, pageSize);
+      setCustomers(result.items);
+      setPage(result.page);
+      setTotalPages(result.totalPages);
+      setTotalItems(result.totalItems);
     } catch (e) {
       console.error(e);
     }
@@ -49,7 +63,9 @@ export const CustomersView: React.FC = () => {
 
   useEffect(() => {
     loadCustomers();
-  }, [search]);
+  }, [search, page, pageSize]);
+
+  useEffect(() => { setPage(1); }, [search]);
 
   const handleOpenStatement = (cust: Customer) => {
     setSelectedCustomer(cust);
@@ -213,6 +229,7 @@ export const CustomersView: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {totalItems > 0 && <CustomerPagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
         </div>
 
         {/* Customer Statement & Action Panel */}

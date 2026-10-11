@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:start": "set ELECTRON_RUN_AS_NODE=&& electron . --disable-gpu --in-process-gpu",
-    "test": "node --import ./test/register-hook.mjs --test test/financials.test.ts test/integration.test.ts"
+    "test": "node --import ./test/register-hook.mjs --import ./test/integration.setup.ts --test test/financials.test.ts test/integration.test.ts"
   },
   "keywords": [
     "ceramics",
@@ -50,4 +50,8 @@
     "crypto-browserify": "^3.12.1",
     "electron": "^34.2.0",
     "postcss": "^8.5.2",
-    "tail
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}

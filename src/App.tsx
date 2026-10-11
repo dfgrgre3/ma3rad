@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
-import { AppRouter } from './router';
 import { AuthService } from './services/AuthService';
 import { PermissionService } from './services/PermissionService';
 import { User } from './types';
@@ -102,15 +101,17 @@ export const App: React.FC = () => {
   }
 
   // ── Main App with Router ────────────────────────────────────────────────────
-  // Using MemoryRouter for Electron (no hash/browser history needed)
+  // HashRouter works under Electron's file:// protocol and, unlike MemoryRouter,
+  // survives reloads and supports deep links (e.g. #/products/123).
+  // The "/" index route redirects to /dashboard.
   return (
-    <MemoryRouter initialEntries={['/dashboard']} initialIndex={0}>
+    <HashRouter>
       <AppRouterWithProps
         currentUser={currentUser}
         darkMode={darkMode}
         onToggleDark={toggleDarkMode}
       />
-    </MemoryRouter>
+    </HashRouter>
   );
 };
 
@@ -153,4 +154,143 @@ const InventoryCountPage     = lazy(() => import('./pages/inventory/InventoryCou
 const InventoryValuationPage = lazy(() => import('./pages/inventory/InventoryValuationPage').then(m => ({ default: m.InventoryValuationPage })));
 const InventoryAdjustmentsPage = lazy(() => import('./pages/inventory/InventoryAdjustmentsPage').then(m => ({ default: m.InventoryAdjustmentsPage })));
 const BranchesPage           = lazy(() => import('./pages/operations/BranchesPage').then(m => ({ default: m.BranchesPage })));
-const WarehousesPage         = lazy(() => import('./pages/operations/WarehousesPage').then(m => ({ default: m.Wareh
+const WarehousesPage         = lazy(() => import('./pages/operations/WarehousesPage').then(m => ({ default: m.WarehousesPage })));
+const CustomersView          = lazy(() => import('./components/CustomersView').then(m => ({ default: m.CustomersView })));
+const CustomerDetailPage     = lazy(() => import('./pages/customers/CustomerDetailPage').then(m => ({ default: m.CustomerDetailPage })));
+const LeadsPage              = lazy(() => import('./pages/crm/LeadsPage').then(m => ({ default: m.LeadsPage })));
+const PipelinePage           = lazy(() => import('./pages/crm/PipelinePage').then(m => ({ default: m.PipelinePage })));
+const CrmActivitiesPage      = lazy(() => import('./pages/crm/CrmActivitiesPage').then(m => ({ default: m.CrmActivitiesPage })));
+const SuppliersView          = lazy(() => import('./components/SuppliersView').then(m => ({ default: m.SuppliersView })));
+const PurchasesView          = lazy(() => import('./components/PurchasesView').then(m => ({ default: m.PurchasesView })));
+const PurchaseRequestsPage   = lazy(() => import('./pages/purchasing/PurchaseRequestsPage').then(m => ({ default: m.PurchaseRequestsPage })));
+const CashierView            = lazy(() => import('./components/CashierView').then(m => ({ default: m.CashierView })));
+const FinanceOverviewPage    = lazy(() => import('./pages/finance/FinanceOverviewPage').then(m => ({ default: m.FinanceOverviewPage })));
+const DebtsDashboardPage     = lazy(() => import('./pages/finance/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
+const InstallmentsPage       = lazy(() => import('./pages/finance/InstallmentsPage').then(m => ({ default: m.InstallmentsPage })));
+const ExpensesPage           = lazy(() => import('./pages/finance/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
+const ProjectsPage           = lazy(() => import('./pages/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
+const ProjectDetailPage      = lazy(() => import('./pages/projects/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
+const DeliveriesPage         = lazy(() => import('./pages/operations/DeliveriesPage').then(m => ({ default: m.DeliveriesPage })));
+const DriversPage            = lazy(() => import('./pages/operations/DriversPage').then(m => ({ default: m.DriversPage })));
+const VehiclesPage           = lazy(() => import('./pages/operations/VehiclesPage').then(m => ({ default: m.VehiclesPage })));
+const EmployeesPage          = lazy(() => import('./pages/operations/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
+const ReportsView            = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
+const ApprovalsPage          = lazy(() => import('./pages/approvals/ApprovalsPage').then(m => ({ default: m.ApprovalsPage })));
+const NotificationsView      = lazy(() => import('./components/NotificationsView').then(m => ({ default: m.NotificationsView })));
+const AuditLogView           = lazy(() => import('./components/AuditLogView').then(m => ({ default: m.AuditLogView })));
+const SettingsView           = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+const UsersView              = lazy(() => import('./components/UsersView').then(m => ({ default: m.UsersView })));
+const BackupPage             = lazy(() => import('./pages/settings/BackupPage').then(m => ({ default: m.BackupPage })));
+const SystemHealthPage       = lazy(() => import('./pages/settings/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
+const CloudSyncPage          = lazy(() => import('./pages/settings/CloudSyncPage').then(m => ({ default: m.CloudSyncPage })));
+
+function S({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+}
+
+const AppRouterWithProps: React.FC<{
+  currentUser: User;
+  darkMode: boolean;
+  onToggleDark: () => void;
+}> = ({ currentUser, darkMode, onToggleDark }) => (
+  <Routes>
+    <Route
+      path="/"
+      element={
+        <MainLayout
+          currentUser={currentUser}
+          darkMode={darkMode}
+          onToggleDark={onToggleDark}
+        />
+      }
+    >
+      <Route index element={<Navigate to="/dashboard" replace />} />
+
+      {/* Dashboard */}
+      <Route path="dashboard" element={<S><DashboardView /></S>} />
+      <Route path="dashboard/executive" element={<S><ExecutiveDashboard /></S>} />
+
+      {/* Sales / POS */}
+      <Route path="pos" element={<S><PosView /></S>} />
+      <Route path="sales" element={<S><SalesView /></S>} />
+      <Route path="quotations" element={<S><QuotationsPage /></S>} />
+      <Route path="orders" element={<S><OrdersPage /></S>} />
+      <Route path="returns" element={<S><ReturnsPage /></S>} />
+
+      {/* Products */}
+      <Route path="products" element={<S><ProductsView /></S>} />
+      <Route path="products/attributes" element={<S><ProductAttributesPage /></S>} />
+      <Route path="products/barcodes" element={<S><BarcodesPrintPage /></S>} />
+      <Route path="products/:id" element={<S><ProductDetailPage /></S>} />
+      <Route path="categories" element={<S><CategoriesView /></S>} />
+      <Route path="brands" element={<S><BrandsView /></S>} />
+
+      {/* Pricing */}
+      <Route path="pricing" element={<S><PricingPage /></S>} />
+      <Route path="promotions" element={<S><PromotionsPage /></S>} />
+
+      {/* Inventory */}
+      <Route path="inventory" element={<S><InventoryView /></S>} />
+      <Route path="inventory/ledger" element={<S><StockLedgerPage /></S>} />
+      <Route path="inventory/transfers" element={<S><StockTransfersView /></S>} />
+      <Route path="inventory/counts" element={<S><InventoryCountPage /></S>} />
+      <Route path="inventory/valuation" element={<S><InventoryValuationPage /></S>} />
+      <Route path="inventory/adjustments" element={<S><InventoryAdjustmentsPage /></S>} />
+
+      {/* Branches / Warehouses */}
+      <Route path="branches" element={<S><BranchesPage /></S>} />
+      <Route path="warehouses" element={<S><WarehousesPage /></S>} />
+
+      {/* CRM */}
+      <Route path="customers" element={<S><CustomersView /></S>} />
+      <Route path="customers/:id" element={<S><CustomerDetailPage /></S>} />
+      <Route path="crm/leads" element={<S><LeadsPage /></S>} />
+      <Route path="crm/pipeline" element={<S><PipelinePage /></S>} />
+      <Route path="crm/activities" element={<S><CrmActivitiesPage /></S>} />
+
+      {/* Purchasing */}
+      <Route path="suppliers" element={<S><SuppliersView /></S>} />
+      <Route path="purchases" element={<S><PurchasesView /></S>} />
+      <Route path="purchases/requests" element={<S><PurchaseRequestsPage /></S>} />
+
+      {/* Finance */}
+      <Route path="cashboxes" element={<S><CashierView /></S>} />
+      <Route path="finance" element={<S><FinanceOverviewPage /></S>} />
+      <Route path="finance/debts" element={<S><DebtsDashboardPage /></S>} />
+      <Route path="finance/installments" element={<S><InstallmentsPage /></S>} />
+      <Route path="finance/expenses" element={<S><ExpensesPage /></S>} />
+
+      {/* Projects */}
+      <Route path="projects" element={<S><ProjectsPage /></S>} />
+      <Route path="projects/:id" element={<S><ProjectDetailPage /></S>} />
+
+      {/* Operations */}
+      <Route path="deliveries" element={<S><DeliveriesPage /></S>} />
+      <Route path="drivers" element={<S><DriversPage /></S>} />
+      <Route path="vehicles" element={<S><VehiclesPage /></S>} />
+      <Route path="employees" element={<S><EmployeesPage /></S>} />
+
+      {/* Reports */}
+      <Route path="reports" element={<S><ReportsView /></S>} />
+
+      {/* Approvals */}
+      <Route path="approvals" element={<S><ApprovalsPage /></S>} />
+
+      {/* Notifications & Audit */}
+      <Route path="notifications" element={<S><NotificationsView /></S>} />
+      <Route path="audit" element={<S><AuditLogView /></S>} />
+
+      {/* Settings */}
+      <Route path="settings" element={<S><SettingsView /></S>} />
+      <Route path="users" element={<S><UsersView /></S>} />
+      <Route path="backup" element={<S><BackupPage /></S>} />
+      <Route path="system-health" element={<S><SystemHealthPage /></S>} />
+      <Route path="cloud-sync" element={<S><CloudSyncPage /></S>} />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Route>
+  </Routes>
+);
+
+export default App;

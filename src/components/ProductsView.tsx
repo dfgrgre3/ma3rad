@@ -8,6 +8,18 @@ import { InventoryService } from '../services/InventoryService';
 import { Product, CeramicGrade, UnitType, Warehouse } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 
+const ListPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
+  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs dark:border-slate-800">
+    <span className="text-slate-500">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
+    <div className="flex items-center gap-2">
+      <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
+      <button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700">السابق</button>
+      <span className="min-w-[70px] text-center font-bold">{page} / {totalPages}</span>
+      <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700">التالي</button>
+    </div>
+  </div>
+);
+
 export const ProductsView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -15,6 +27,12 @@ export const ProductsView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -48,19 +66,29 @@ export const ProductsView: React.FC = () => {
   const inventoryService = new InventoryService();
 
   const loadProducts = () => {
+    setIsLoading(true);
+    setLoadError(null);
     try {
-      const prods = productService.getAllProducts(search, selectedCategory || undefined);
+      const result = productService.getProductsPage(search, selectedCategory || undefined, undefined, page, pageSize);
       const whs = inventoryService.getAllWarehouses();
-      setProducts(prods);
+      setProducts(result.items);
+      setPage(result.page);
+      setTotalPages(result.totalPages);
+      setTotalItems(result.totalItems);
       setWarehouses(whs);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setLoadError(e?.message || 'تعذر تحميل الأصناف');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     loadProducts();
-  }, [search, selectedCategory]);
+  }, [search, selectedCategory, page, pageSize]);
+
+  useEffect(() => { setPage(1); }, [search, selectedCategory]);
 
   const handleOpenAddModal = () => {
     setEditingProduct(null);
@@ -211,7 +239,13 @@ export const ProductsView: React.FC = () => {
 
       {/* Products Table */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-slate-400"><div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-sky-500" /><span className="text-sm">جاري تحميل دليل الأصناف...</span></div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"><AlertTriangle className="h-8 w-8 text-amber-500" /><p className="text-sm font-bold text-slate-700 dark:text-slate-200">تعذر تحميل البيانات</p><p className="text-xs text-slate-400">{loadError}</p><button onClick={loadProducts} className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700">إعادة المحاولة</button></div>
+        ) : products.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"><Package className="h-9 w-9 text-slate-300 dark:text-slate-600" /><p className="text-sm font-bold text-slate-700 dark:text-slate-200">لا توجد أصناف مطابقة</p><p className="text-xs text-slate-400">جرّب تعديل البحث أو أضف صنفًا جديدًا إلى الدليل.</p></div>
+        ) : <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
               <tr>
@@ -323,7 +357,8 @@ export const ProductsView: React.FC = () => {
               )}
             </tbody>
           </table>
-        </div>
+        </div>}
+        {!isLoading && !loadError && totalItems > 0 && <ListPagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
       </div>
 
       {/* Add / Edit Product Modal */}

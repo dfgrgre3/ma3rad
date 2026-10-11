@@ -1,5 +1,5 @@
 import type { Database } from 'sql.js';
-import { SCHEMA_SQL } from './schema';
+import { runMigrations, DEFAULT_BRANCH_ID } from './migrations';
 import bcrypt from 'bcryptjs';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
@@ -23,6 +23,8 @@ export class DatabaseManager {
   private db: Database | null = null;
   private SQL: any = null;
   private transactionDepth = 0;
+  private pageCache = new Map<string, { expiresAt: number; value: any }>();
+  private readonly pageCacheTtlMs = 15000;
 
   private constructor() {}
 
@@ -109,6 +111,7 @@ export class DatabaseManager {
 
     // Check if database exists in localStorage (persistent offline desktop storage)
     const savedDbBase64 = localStorage.getItem(DB_STORAGE_KEY);
+    let isFreshDatabase = true;
 
     if (savedDbBase64) {
       try {
@@ -119,26 +122,33 @@ export class DatabaseManager {
           bytes[i] = binaryString.charCodeAt(i);
         }
         this.db = new this.SQL.Database(bytes);
+        isFreshDatabase = false;
         console.log('✅ Loaded existing SQLite database from local storage.');
       } catch (e) {
         console.error('Failed to load saved database, initializing fresh schema', e);
         this.db = new this.SQL.Database();
-        this.setupFreshDatabase();
       }
     } else {
       console.log('Creating fresh SQLite database and running migrations...');
       this.db = new this.SQL.Database();
-      this.setupFreshDatabase();
+    }
+
+    // Bring the database up to the current schema. This runs on BOTH paths:
+    // a saved database is loaded as an opaque blob, so tables and columns added
+    // since it was created only ever arrive through here.
+    const report = runMigrations(this.getDatabase());
+    if (report.failed.length > 0) {
+      console.error('⚠️ Some migrations did not apply; they will be retried on next launch.', report.failed);
+    }
+
+    // Seed reference data only for a genuinely new database — migrations already
+    // hold everything an existing database needs.
+    if (isFreshDatabase) {
+      this.seedInitialData();
     }
 
     this.saveToStorage();
     return this.getDatabase();
-  }
-
-  private setupFreshDatabase(): void {
-    if (!this.db) return;
-    this.db.exec(SCHEMA_SQL);
-    this.seedInitialData();
   }
 
   private seedInitialData(): void {
@@ -150,50 +160,30 @@ export class DatabaseManager {
 
     // 1. Initial Admin User
     this.db.run(`
-      INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['usr_admin', 'admin', adminHash, 'مدير النظام', 'ADMIN', '01000000000', '1234', 1]);
+      INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, ['usr_admin', 'admin', adminHash, 'مدير النظام', 'ADMIN', '01000000000', '1234', 1, DEFAULT_BRANCH_ID]);
 
-    // 2. Default System Settings
-    const defaultSettings: Record<string, string> = {
-      showroomName: 'معرض الأندلس للسيراميك والبورسلين والتشطيبات',
-      tagline: 'أكبر تشكيلة سيراميك وبورسلين ومواد تشطيب بأفضل الأسعار',
-      phone: '01012345678',
-      phone2: '01234567890',
-      address: 'شارع المعارض الرئيسي - أمام مجمع البنوك',
-      taxNumber: '123-456-789',
-      commercialRecord: 'CR-998877',
-      currency: 'EGP',
-      currencySymbol: 'ج.م',
-      defaultTaxPercentage: '0',
-      isTaxInclusive: '0',
-      enableNegativeStock: '0',
-      costingMethod: 'AVERAGE_COST',
-      receiptHeader: 'معرض الأندلس للسيراميك والبورسلين\nأهلاً بكم ونتشرف بخدمتكم دائماً',
-      receiptFooter: 'البضاعة المباعة ترد خلال 14 يوماً بالحالة الأصلية ومع الفاتورة\nشكراً لزيارتكم',
-      autoBackupIntervalHours: '24'
-    };
-
-    for (const [key, value] of Object.entries(defaultSettings)) {
-      this.db.run(`INSERT INTO system_settings (key, value) VALUES (?, ?)`, [key, value]);
-    }
+    // 2. System settings, default branch, roles and price lists are all seeded by
+    //    migrations (see DEFAULT_SETTINGS and MIGRATIONS in ./migrations) so that
+    //    databases created before a key existed pick it up too.
 
     // 3. Default Warehouse
     this.db.run(`
-      INSERT INTO warehouses (id, name, code, location, is_default, is_active)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, ['wh_main', 'المعرض الرئيسي', 'MAIN-01', 'صالة العرض والمخزن الملحق', 1, 1]);
+      INSERT INTO warehouses (id, name, code, location, is_default, is_active, branch_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, ['wh_main', 'المعرض الرئيسي', 'MAIN-01', 'صالة العرض والمخزن الملحق', 1, 1, DEFAULT_BRANCH_ID]);
 
     this.db.run(`
-      INSERT INTO warehouses (id, name, code, location, is_default, is_active)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, ['wh_ext', 'المخزن الخارجي الرئيسي', 'EXT-01', 'المنطقة الصناعية - عنبر 4', 0, 1]);
+      INSERT INTO warehouses (id, name, code, location, is_default, is_active, branch_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, ['wh_ext', 'المخزن الخارجي الرئيسي', 'EXT-01', 'المنطقة الصناعية - عنبر 4', 0, 1, DEFAULT_BRANCH_ID]);
 
     // 4. Default Cash Register
     this.db.run(`
-      INSERT INTO cash_registers (id, name, current_balance, is_default, is_active)
-      VALUES (?, ?, ?, ?, ?)
-    `, ['cr_main', 'الخزينة الرئيسية (كاشير 1)', 0, 1, 1]);
+      INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, ['cr_main', 'الخزينة الرئيسية (كاشير 1)', 0, 1, 1, DEFAULT_BRANCH_ID]);
 
     // 5. Default Categories
     const categories = [
@@ -268,6 +258,10 @@ export class DatabaseManager {
     return this.db;
   }
 
+  public getDb(): Database {
+    return this.getDatabase();
+  }
+
   /**
    * Collision-proof, transaction-safe sequential document number generator.
    * Example: nextNumber('INV') -> 'INV-2026-000001'
@@ -320,10 +314,31 @@ export class DatabaseManager {
   }
 
   public run(sql: string, params: any[] = []): void {
+    this.pageCache.clear();
     const db = this.getDatabase();
     db.run(sql, params);
     // Do not persist intermediate state that might be rolled back.
     if (this.transactionDepth === 0) this.saveToStorage();
+  }
+
+  /** Execute a bounded list query and its count query without loading all rows. */
+  public queryPage<T = any>(
+    dataSql: string,
+    countSql: string,
+    params: any[] = [],
+    page = 1,
+    pageSize = 25,
+  ): { items: T[]; page: number; pageSize: number; totalItems: number; totalPages: number } {
+    const safePageSize = Math.min(Math.max(Math.floor(pageSize) || 25, 1), 100);
+    const cacheKey = JSON.stringify([dataSql, countSql, params, page, safePageSize]);
+    const cached = this.pageCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    if (cached) this.pageCache.delete(cacheKey);
+    const totalItems = Number(this.query<any>(countSql, params)[0]?.totalItems ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
+    const safePage = Math.min(Math.max(Math.floor(page) || 1, 1), totalPages);
+    const items = this.query<T>(`${dataSql} LIMIT ? OFFSET ?`, [...params, safePageSize, (safePage - 1) * safePageSize]);
+    return { items, page: safePage, pageSize: safePageSize, totalItems, totalPages };
   }
 
   public exportDatabaseBinary(): Uint8Array {
@@ -347,6 +362,9 @@ export class DatabaseManager {
     }
 
     this.db = imported;
+    // A backup can be older than the running build, so bring it up to the
+    // current schema before anything queries it.
+    runMigrations(this.db);
     this.saveToStorage();
   }
 }
