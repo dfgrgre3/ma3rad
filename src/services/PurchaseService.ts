@@ -201,13 +201,178 @@ export class PurchaseService {
         `, [dto.paidAmount]);
       }
 
+      if (dto.paidAmount > 0 && dto.paymentType !== 'CREDIT') {
+        sqliteDb.run(`
+          INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, notes, performed_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          `spay_${uuidv4().substring(0, 8)}`,
+          `PAY-${Date.now().toString().slice(-8)}`,
+          dto.supplierId,
+          dto.paidAmount,
+          dto.paymentType,
+          today,
+          'cr_main',
+          `دفعة مع فاتورة توريد ${invoiceNumber}`,
+          performedBy,
+        ]);
+      }
+
       // 5. Audit Log
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
         VALUES (?, ?, ?, 'إدخال فاتورة مشتريات وتوريد', 'PURCHASES', ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, actor.fullName, purchaseId, JSON.stringify({ invoiceNumber, totalAmount })]);
 
-      return this.getPurchaseById(purchaseId)!;
+      return {
+        id: purchaseId,
+        invoiceNumber,
+        supplierInvoiceNumber: dto.supplierInvoiceNumber,
+        date: today,
+        supplierId: dto.supplierId,
+        warehouseId: dto.warehouseId,
+        subtotal,
+        discountAmount,
+        taxAmount,
+        shippingCost,
+        totalAmount,
+        paidAmount: dto.paidAmount,
+        remainingAmount,
+        paymentType: dto.paymentType,
+        paymentStatus,
+        notes: dto.notes,
+        createdBy: performedBy,
+        createdAt: new Date().toISOString(),
+        items: preparedItems,
+      };
+    });
+  }
+
+  public recordPayment(
+    purchaseId: string,
+    amount: number,
+    paymentType: PaymentType = 'CASH',
+    registerId = 'cr_main',
+    notes = ''
+  ): { id: string; receiptNumber: string; amount: number } {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.update');
+    const invoice = this.getPurchaseById(purchaseId);
+    if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
+    if (invoice.remainingAmount <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
+
+    const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
+    if (value <= 0) throw new Error('أدخل مبلغًا صحيحًا أكبر من صفر.');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const paymentId = `spay_${uuidv4().substring(0, 8)}`;
+
+    return this.db.executeTransaction((db) => {
+      const receiptNumber = db.nextNumber('PAY');
+      const newPaid = round2(invoice.paidAmount + value);
+      const newRemaining = round2(Math.max(0, invoice.remainingAmount - value));
+      const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+
+      db.run(
+        `INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, notes, performed_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [paymentId, receiptNumber, invoice.supplierId, value, paymentType, today, registerId, notes || `سداد دفعة على فاتورة توريد ${invoice.invoiceNumber}`, actor.id]
+      );
+      db.run(
+        `UPDATE purchase_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ? WHERE id = ?`,
+        [newPaid, newRemaining, status, purchaseId]
+      );
+      db.run(
+        `UPDATE suppliers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [value, invoice.supplierId]
+      );
+      if (paymentType === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [value, registerId]);
+      }
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, 'سداد دفعة لمورد', 'PURCHASES', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, purchaseId, JSON.stringify({
+          receiptNumber, invoiceNumber: invoice.invoiceNumber, amount: value, paymentType,
+        })]
+      );
+
+      return { id: paymentId, receiptNumber, amount: value };
+    });
+  }
+
+  public deletePurchase(purchaseId: string, reason: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.delete');
+    const invoice = this.getPurchaseById(purchaseId);
+    if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
+    if (!reason || !reason.trim()) throw new Error('سبب الحذف مطلوب.');
+
+    const returnsCount = this.db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM purchase_returns WHERE original_invoice_id = ?',
+      [purchaseId]
+    )[0]?.count ?? 0;
+    if (returnsCount > 0) throw new Error('لا يمكن حذف فاتورة لها مرتجعات مسجلة. احذف المرتجعات أولًا.');
+
+    this.db.executeTransaction((db) => {
+      for (const item of invoice.items) {
+        db.run(
+          `UPDATE warehouse_stock
+           SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
+           WHERE product_id = ? AND warehouse_id = ?`,
+          [item.quantityM2, item.productId, invoice.warehouseId]
+        );
+        db.run(
+          `INSERT INTO inventory_transactions (
+             id, transaction_number, type, product_id, warehouse_id,
+             quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+             reference_id, notes, performed_by
+           ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ?, ?, 'PURCHASE_DELETE', ?, ?, ?)`,
+          [
+            `tx_${uuidv4().substring(0, 8)}`, db.nextNumber('TX-VOID'),
+            item.productId, invoice.warehouseId, -item.quantityM2, item.boxesCount,
+            item.unitCost, round2(-item.quantityM2 * item.unitCost), purchaseId,
+            `حذف فاتورة توريد ${invoice.invoiceNumber}: ${reason.trim()}`, actor.id,
+          ]
+        );
+      }
+
+      db.run(
+        `UPDATE suppliers SET
+           current_balance = current_balance - ?,
+           total_purchases = total_purchases - ?,
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [invoice.remainingAmount, invoice.totalAmount, invoice.supplierId]
+      );
+
+      const relatedPayments = db.query<any>(
+        `SELECT id, amount, payment_type, register_id FROM supplier_payments
+         WHERE supplier_id = ? AND notes LIKE ?`,
+        [invoice.supplierId, `%${invoice.invoiceNumber}%`]
+      );
+      for (const payment of relatedPayments) {
+        if (payment.payment_type === 'CASH' && payment.register_id) {
+          db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [payment.amount, payment.register_id]);
+        }
+        db.run('DELETE FROM supplier_payments WHERE id = ?', [payment.id]);
+      }
+      if (relatedPayments.length === 0 && invoice.paidAmount > 0 && invoice.paymentType === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE is_default = 1`, [invoice.paidAmount]);
+      }
+
+      db.run('DELETE FROM purchase_invoice_items WHERE purchase_id = ?', [purchaseId]);
+      db.run('DELETE FROM purchase_invoices WHERE id = ?', [purchaseId]);
+
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+         VALUES (?, ?, ?, 'حذف فاتورة توريد', 'PURCHASES', ?, ?, ?)`,
+        [
+          `aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, purchaseId,
+          JSON.stringify({ invoiceNumber: invoice.invoiceNumber, total: invoice.totalAmount, paid: invoice.paidAmount }),
+          JSON.stringify({ reason: reason.trim() }),
+        ]
+      );
     });
   }
 }

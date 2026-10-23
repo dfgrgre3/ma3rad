@@ -67,20 +67,20 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/50 p-4 pt-[12vh] backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 border-b border-slate-200 px-4 dark:border-slate-700">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-white p-4 pt-[12vh] backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl bg-white" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 ">
           <Search className="h-5 w-5 text-sky-500" />
-          <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} placeholder="ابحث في الصفحات والأصناف والعملاء والفواتير..." className="h-14 flex-1 bg-transparent text-sm outline-none dark:text-white" />
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="إغلاق"><X className="h-4 w-4" /></button>
+          <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} placeholder="ابحث في الصفحات والأصناف والعملاء والفواتير..." className="h-14 flex-1 bg-transparent text-sm outline-none text-slate-900" />
+          <button onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="إغلاق"><X className="h-4 w-4" /></button>
         </div>
         <div className="max-h-[52vh] overflow-y-auto p-2">
-          {results.length === 0 ? <div className="px-4 py-12 text-center text-sm text-slate-400">لا توجد نتائج مطابقة</div> : results.map((item, index) => {
+          {results.length === 0 ? <div className="px-4 py-12 text-center text-sm text-slate-500">لا توجد نتائج مطابقة</div> : results.map((item, index) => {
             const Icon = ICONS[item.kind];
-            return <button key={`${item.kind}-${item.path}-${index}`} onMouseEnter={() => setActive(index)} onClick={() => { navigate(item.path); onClose(); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right transition ${index === active ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}><span className="rounded-lg bg-slate-100 p-2 dark:bg-slate-800"><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{item.label}</span><span className="block truncate text-xs text-slate-400">{item.meta}</span></span>{index === active && <CornerDownLeft className="h-4 w-4 text-sky-500" />}</button>;
+            return <button key={`${item.kind}-${item.path}-${index}`} onMouseEnter={() => setActive(index)} onClick={() => { navigate(item.path); onClose(); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right transition ${index === active ? 'bg-sky-50 text-sky-700' : 'text-slate-700 hover:bg-slate-50 '}`}><span className="rounded-lg bg-slate-100 p-2 bg-slate-100"><Icon className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{item.label}</span><span className="block truncate text-xs text-slate-500">{item.meta}</span></span>{index === active && <CornerDownLeft className="h-4 w-4 text-sky-500" />}</button>;
           })}
         </div>
-        <div className="flex items-center gap-4 border-t border-slate-200 px-4 py-2 text-[11px] text-slate-400 dark:border-slate-700"><span><ArrowDown className="ml-1 inline h-3 w-3" /> للتنقل</span><span><ArrowUp className="ml-1 inline h-3 w-3" /> للتنقل</span><span><CornerDownLeft className="ml-1 inline h-3 w-3" /> للفتح</span><span><Command className="ml-1 inline h-3 w-3" /> K للبحث</span></div>
+        <div className="flex items-center gap-4 border-t border-slate-200 px-4 py-2 text-[11px] text-slate-500 "><span><ArrowDown className="ml-1 inline h-3 w-3" /> للتنقل</span><span><ArrowUp className="ml-1 inline h-3 w-3" /> للتنقل</span><span><CornerDownLeft className="ml-1 inline h-3 w-3" /> للفتح</span><span><Command className="ml-1 inline h-3 w-3" /> K للبحث</span></div>
       </div>
     </div>
   );

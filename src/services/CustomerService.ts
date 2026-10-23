@@ -3,6 +3,7 @@ import type { Customer, CustomerPayment, PaymentType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { round2 } from './financials';
 
 export class CustomerService {
   private db = DatabaseManager.getInstance();
@@ -163,6 +164,48 @@ export class CustomerService {
         performedBy: actor.id,
         createdAt: new Date().toISOString()
       };
+    });
+  }
+
+  public deletePayment(paymentId: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'customers.payment');
+    const payment = this.db.query<any>(
+      `SELECT id, receipt_number, customer_id, invoice_id, amount, payment_type, register_id, shift_id
+       FROM customer_payments WHERE id = ?`,
+      [paymentId]
+    )[0];
+    if (!payment) throw new Error('سند القبض غير موجود.');
+    if (payment.invoice_id) throw new Error('سند مرتبط بفاتورة بيع. احذفه من تفاصيل الفاتورة.');
+
+    const installment = this.db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM installments WHERE payment_id = ?',
+      [paymentId]
+    )[0]?.count ?? 0;
+    if (installment > 0) {
+      throw new Error('السند مرتبط بقسط. ألغِ سداد القسط من صفحة الأقساط أولًا.');
+    }
+
+    const amount = round2(payment.amount);
+    this.db.executeTransaction((db) => {
+      db.run(
+        `UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [amount, payment.customer_id]
+      );
+      if (payment.payment_type === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.register_id || 'cr_main']);
+      }
+      if (payment.shift_id) {
+        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shift_id]);
+      }
+      db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)
+         VALUES (?, ?, ?, 'حذف سند تحصيل', 'CUSTOMERS', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, payment.customer_id, JSON.stringify({
+          receiptNumber: payment.receipt_number, amount,
+        })]
+      );
     });
   }
 

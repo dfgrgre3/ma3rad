@@ -3,9 +3,8 @@ import {
   Settings as SettingsIcon, Database, Download, Upload, 
   Printer, Shield, Save, CheckCircle2, AlertTriangle, RefreshCw
 } from 'lucide-react';
-import { DatabaseManager } from '../database/db';
 import { BackupService } from '../services/BackupService';
-import { PrintService } from '../services/PrintService';
+import { SettingsService } from '../services/SettingsService';
 import { SystemSettings } from '../types';
 
 export const SettingsView: React.FC = () => {
@@ -31,18 +30,18 @@ export const SettingsView: React.FC = () => {
   const [backupHistory, setBackupHistory] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  const db = DatabaseManager.getInstance();
   const backupService = new BackupService();
-  const printService = new PrintService();
 
   const loadData = () => {
     try {
-      const s = printService.getSettings();
-      const h = backupService.getBackupHistory();
-      setSettings(s);
-      setBackupHistory(h);
+      setSettings(SettingsService.getSettings());
     } catch (e) {
       console.error(e);
+    }
+    try {
+      setBackupHistory(backupService.getBackupHistory());
+    } catch {
+      setBackupHistory([]);
     }
   };
 
@@ -54,9 +53,7 @@ export const SettingsView: React.FC = () => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      for (const [k, v] of Object.entries(settings)) {
-        db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)`, [k, String(v)]);
-      }
+      SettingsService.update(settings as any);
       alert('تم حفظ إعدادات المعرض والطباعة بنجاح.');
     } catch (err: any) {
       alert(`خطأ في الحفظ: ${err.message || err}`);
@@ -93,14 +90,14 @@ export const SettingsView: React.FC = () => {
     <div className="p-6 space-y-6 overflow-y-auto h-full">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">إعدادات النظام والنسخ الاحتياطي</h2>
+        <h2 className="text-xl font-extrabold text-slate-900">إعدادات النظام والنسخ الاحتياطي</h2>
         <p className="text-xs text-slate-500">تخصيص بيانات المعرض، الفواتير، والنسخ الاحتياطي المحلي لقاعدة البيانات SQLite</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Settings Form */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
             <SettingsIcon className="w-4 h-4 text-sky-600" />
             <span>بيانات المعرض والطباعة</span>
           </h3>
@@ -108,87 +105,87 @@ export const SettingsView: React.FC = () => {
           <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">اسم المعرض الرئيسي *</label>
+                <label className="font-bold text-slate-700 block mb-1">اسم المعرض الرئيسي *</label>
                 <input
                   type="text"
                   required
                   value={settings.showroomName}
                   onChange={(e) => setSettings({ ...settings, showroomName: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">الشعار النصي / الوصف</label>
+                <label className="font-bold text-slate-700 block mb-1">الشعار النصي / الوصف</label>
                 <input
                   type="text"
                   value={settings.tagline}
                   onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"
+                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 "
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">رقم الهاتف الأساسي *</label>
+                <label className="font-bold text-slate-700 block mb-1">رقم الهاتف الأساسي *</label>
                 <input
                   type="text"
                   required
                   value={settings.phone}
                   onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-mono font-bold"
+                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">رقم هاتف إضافي</label>
+                <label className="font-bold text-slate-700 block mb-1">رقم هاتف إضافي</label>
                 <input
                   type="text"
                   value={settings.phone2}
                   onChange={(e) => setSettings({ ...settings, phone2: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">عنوان المعرض *</label>
+              <label className="font-bold text-slate-700 block mb-1">عنوان المعرض *</label>
               <input
                 type="text"
                 required
                 value={settings.address}
                 onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"
+                className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 "
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">الرقم الضريبي</label>
+                <label className="font-bold text-slate-700 block mb-1">الرقم الضريبي</label>
                 <input
                   type="text"
                   value={settings.taxNumber}
                   onChange={(e) => setSettings({ ...settings, taxNumber: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono"
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">السجل التجاري</label>
+                <label className="font-bold text-slate-700 block mb-1">السجل التجاري</label>
                 <input
                   type="text"
                   value={settings.commercialRecord}
                   onChange={(e) => setSettings({ ...settings, commercialRecord: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">تذييل الفاتورة وشروط الاسترجاع</label>
+              <label className="font-bold text-slate-700 block mb-1">تذييل الفاتورة وشروط الاسترجاع</label>
               <textarea
                 rows={3}
                 value={settings.receiptFooter}
                 onChange={(e) => setSettings({ ...settings, receiptFooter: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 leading-relaxed"
+                className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 leading-relaxed"
               />
             </div>
 
@@ -206,9 +203,9 @@ export const SettingsView: React.FC = () => {
         </div>
 
         {/* Database Backup & Restore Box */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
               <Database className="w-4 h-4 text-emerald-600" />
               <span>النسخ الاحتياطي المحلي والأمان</span>
             </h3>
@@ -226,7 +223,7 @@ export const SettingsView: React.FC = () => {
                 <span>تنزيل نسخة احتياطية (SQLite Backup)</span>
               </button>
 
-              <label className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl flex items-center justify-center gap-2 text-xs cursor-pointer border border-dashed border-slate-300 dark:border-slate-600">
+              <label className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 text-xs cursor-pointer border border-dashed border-slate-300">
                 <Upload className="w-4 h-4" />
                 <span>استعادة قاعدة البيانات من ملف</span>
                 <input
@@ -239,7 +236,7 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-700 dark:text-amber-400 flex items-start gap-2">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-700 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>الاستعادة تقوم باستبدال كافة البيانات الحالية. احرص على أخذ نسخة قبل الاستعادة.</span>
           </div>

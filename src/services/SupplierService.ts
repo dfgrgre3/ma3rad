@@ -1,6 +1,8 @@
 import { DatabaseManager } from '../database/db';
 import type { Supplier, SupplierPayment, PaymentType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 
 export class SupplierService {
   private db = DatabaseManager.getInstance();
@@ -25,6 +27,7 @@ export class SupplierService {
   }
 
   public createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }, performedBy = 'usr_admin'): Supplier {
+    PermissionService.require(AuthService.requireAuth(), 'suppliers.create');
     const id = `sup_${uuidv4().substring(0, 8)}`;
     const code = supplier.code || `SUP-${Date.now().toString().slice(-5)}`;
 
@@ -51,6 +54,7 @@ export class SupplierService {
   }
 
   public updateSupplier(id: string, updates: Partial<Supplier>, performedBy = 'usr_admin'): Supplier {
+    PermissionService.require(AuthService.requireAuth(), 'suppliers.update');
     const existing = this.getSupplierById(id);
     if (!existing) throw new Error('المورد غير موجود.');
 
@@ -93,6 +97,7 @@ export class SupplierService {
     notes = '',
     performedBy = 'usr_admin'
   ): SupplierPayment {
+    PermissionService.require(AuthService.requireAuth(), 'suppliers.payment');
     if (amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
 
     const sup = this.getSupplierById(supplierId);

@@ -3,27 +3,33 @@ import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
 import { PermissionService } from './services/PermissionService';
+import { SettingsService } from './services/SettingsService';
 import { User } from './types';
-
-// ─── Stub system user (no login screen yet) ───────────────────────────────────
-const SYSTEM_USER: User = {
-  id: 'usr_admin',
-  username: 'system',
-  fullName: 'مستخدم النظام',
-  role: 'ADMIN',
-  isActive: true,
-  createdAt: '',
-  updatedAt: '',
-};
+import { LoginPage } from './pages/auth/LoginPage';
+import { SetupWizard } from './components/SetupWizard';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './components/ui/Toast';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export const App: React.FC = () => {
   const [dbReady, setDbReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('ceramisys_dark') === 'true';
-  });
-  const [currentUser] = useState<User>(SYSTEM_USER);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    try {
+      const completed = SettingsService.getValue('setup_completed') === '1';
+      const db = DatabaseManager.getInstance();
+      const products = db.query<{ count: number }>('SELECT COUNT(*) AS count FROM products')[0]?.count || 0;
+      const invoices = db.query<{ count: number }>('SELECT COUNT(*) AS count FROM sales_invoices')[0]?.count || 0;
+      setShowSetup(!completed && products === 0 && invoices === 0);
+    } catch {
+      setShowSetup(false);
+    }
+  }, [currentUser?.id]);
 
   // ── DB Init ─────────────────────────────────────────────────────────────────
   const initDb = () => {
@@ -32,8 +38,25 @@ export const App: React.FC = () => {
       .initialize()
       .then(() => {
         PermissionService.seed();
-        AuthService.setCurrentUser(SYSTEM_USER);
+        setCurrentUser(AuthService.restoreSession());
         setDbReady(true);
+        // Scheduled local backups (runs once per configured interval).
+        void import('./services/BackupService').then(({ BackupService }) => {
+          try {
+            const interval = SettingsService.getSettings().autoBackupIntervalHours || 24;
+            void new BackupService().runAutoBackupIfDue(interval);
+          } catch (e) {
+            console.warn('Auto backup skipped:', e);
+          }
+        });
+        // Scheduled business alerts (low stock, dues, pending approvals).
+        void import('./services/NotificationService').then(({ NotificationService }) => {
+          try {
+            new NotificationService().runScheduledChecks();
+          } catch (e) {
+            console.warn('Scheduled notifications skipped:', e);
+          }
+        });
       })
       .catch((err) => {
         console.error('Failed to initialize SQLite Database:', err);
@@ -45,27 +68,62 @@ export const App: React.FC = () => {
     initDb();
   }, []);
 
-  // ── Dark Mode ───────────────────────────────────────────────────────────────
-  const toggleDarkMode = () => {
-    const next = !darkMode;
-    setDarkMode(next);
-    localStorage.setItem('ceramisys_dark', String(next));
-    if (next) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
-
-  // Apply saved dark mode on mount
+  // Ensure the latest snapshot reaches disk before the window closes.
   useEffect(() => {
-    if (darkMode) document.documentElement.classList.add('dark');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const onBeforeUnload = () => {
+      try { void DatabaseManager.getInstance().flush(); } catch { /* ignore */ }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
+  // ── Idle session timeout (configured in Admin → Settings → Security) ────────
+  useEffect(() => {
+    if (!currentUser) return;
+    let lastActivity = Date.now();
+    const bump = () => { lastActivity = Date.now(); };
+    const events: Array<keyof WindowEventMap> = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
+    events.forEach((event) => window.addEventListener(event, bump, { passive: true }));
+
+    const timer = window.setInterval(() => {
+      let limitMinutes = 480;
+      try {
+        limitMinutes = SettingsService.getSettings().sessionTimeoutMinutes ?? 480;
+      } catch {
+        // keep the safe default
+      }
+      if (!limitMinutes || limitMinutes <= 0) return;
+      if (Date.now() - lastActivity >= limitMinutes * 60_000) {
+        AuthService.logout();
+        setCurrentUser(null);
+      }
+    }, 30_000);
+
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, bump));
+      window.clearInterval(timer);
+    };
+  }, [currentUser?.id]);
+
+  // ── Session heartbeat + periodic business alerts ─────────────────────────
+  useEffect(() => {
+    if (!currentUser) return;
+    const heartbeat = window.setInterval(() => AuthService.touchSession(), 5 * 60_000);
+    const alerts = window.setInterval(() => {
+      void import('./services/NotificationService').then(({ NotificationService }) => {
+        try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
+      });
+    }, 30 * 60_000);
+    return () => {
+      window.clearInterval(heartbeat);
+      window.clearInterval(alerts);
+    };
+  }, [currentUser?.id]);
 
   // ── Loading / Error Screen ──────────────────────────────────────────────────
   if (!dbReady) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-white select-none px-4">
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 text-slate-900 select-none px-4">
         {/* Logo */}
         <div className="relative mb-6">
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-2xl shadow-sky-500/30 text-3xl font-black">
@@ -76,12 +134,12 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        <h1 className="text-xl font-black tracking-wide text-white mb-1">CeramiSys ERP</h1>
-        <p className="text-sm text-slate-400 mb-4">نظام إدارة معارض السيراميك ومواد التشطيب</p>
+        <h1 className="text-xl font-black tracking-wide text-slate-900 mb-1">CeramiSys ERP</h1>
+        <p className="text-sm text-slate-600 mb-4">نظام إدارة معارض السيراميك ومواد التشطيب</p>
 
         {initError ? (
           <div className="flex flex-col items-center gap-3">
-            <div className="text-sm text-red-400 bg-red-950/60 border border-red-500/30 px-5 py-3 rounded-xl text-center max-w-sm">
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-5 py-3 rounded-xl text-center max-w-sm">
               {initError}
             </div>
             <button
@@ -92,7 +150,7 @@ export const App: React.FC = () => {
             </button>
           </div>
         ) : (
-          <p className="text-xs text-sky-400 font-medium animate-pulse">
+          <p className="text-xs text-sky-600 font-medium animate-pulse">
             جاري تهيئة قاعدة بيانات SQLite...
           </p>
         )}
@@ -100,18 +158,37 @@ export const App: React.FC = () => {
     );
   }
 
+  // ── Login gate ──────────────────────────────────────────────────────────────
+  if (!currentUser) {
+    return <LoginPage onSuccess={setCurrentUser} />;
+  }
+
+  const handleLogout = () => {
+    AuthService.logout();
+    setCurrentUser(null);
+  };
+
   // ── Main App with Router ────────────────────────────────────────────────────
   // HashRouter works under Electron's file:// protocol and, unlike MemoryRouter,
   // survives reloads and supports deep links (e.g. #/products/123).
   // The "/" index route redirects to /dashboard.
   return (
-    <HashRouter>
-      <AppRouterWithProps
-        currentUser={currentUser}
-        darkMode={darkMode}
-        onToggleDark={toggleDarkMode}
-      />
-    </HashRouter>
+    <ThemeProvider>
+      <ToastProvider>
+        <ErrorBoundary>
+          {showSetup ? (
+            <SetupWizard onComplete={() => setShowSetup(false)} />
+          ) : (
+            <HashRouter>
+              <AppRouterWithProps
+                currentUser={currentUser}
+                onLogout={handleLogout}
+              />
+            </HashRouter>
+          )}
+        </ErrorBoundary>
+      </ToastProvider>
+    </ThemeProvider>
   );
 };
 
@@ -123,19 +200,23 @@ import { MainLayout } from './layouts/MainLayout';
 import { lazy, Suspense } from 'react';
 
 const PageLoader: React.FC = () => (
-  <div className="flex-1 flex items-center justify-center h-full">
-    <div className="flex flex-col items-center gap-3">
-      <div className="w-8 h-8 rounded-xl bg-sky-600 animate-bounce shadow-lg shadow-sky-500/20" />
-      <p className="text-xs text-slate-400 font-medium">جاري التحميل...</p>
-    </div>
-  </div>
+ <div className="flex-1 flex items-center justify-center h-full">
+ <div className="flex flex-col items-center gap-3">
+ <div className="w-8 h-8 rounded-xl bg-sky-600 animate-bounce shadow-lg shadow-sky-500/20" />
+ <p className="text-xs text-slate-500 font-medium">جاري التحميل...</p>
+ </div>
+ </div>
 );
 
 // Lazy pages
-const DashboardView          = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
+const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
 const ExecutiveDashboard     = lazy(() => import('./pages/dashboard/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
 const PosView                = lazy(() => import('./components/PosView').then(m => ({ default: m.PosView })));
 const SalesView              = lazy(() => import('./components/SalesView').then(m => ({ default: m.SalesView })));
+const TodaySalesPage         = lazy(() => import('./pages/daily/DailyPage').then(m => ({ default: m.TodaySalesPage })));
+const TodayPurchasesPage     = lazy(() => import('./pages/daily/DailyPage').then(m => ({ default: m.TodayPurchasesPage })));
+const TodayExpensesPage      = lazy(() => import('./pages/daily/DailyPage').then(m => ({ default: m.TodayExpensesPage })));
+const TodayDebtsPage         = lazy(() => import('./pages/daily/DailyPage').then(m => ({ default: m.TodayDebtsPage })));
 const QuotationsPage         = lazy(() => import('./pages/sales/QuotationsPage').then(m => ({ default: m.QuotationsPage })));
 const OrdersPage             = lazy(() => import('./pages/sales/OrdersPage').then(m => ({ default: m.OrdersPage })));
 const ReturnsPage            = lazy(() => import('./pages/sales/ReturnsPage').then(m => ({ default: m.ReturnsPage })));
@@ -153,6 +234,7 @@ const StockTransfersView     = lazy(() => import('./components/StockTransfersVie
 const InventoryCountPage     = lazy(() => import('./pages/inventory/InventoryCountPage').then(m => ({ default: m.InventoryCountPage })));
 const InventoryValuationPage = lazy(() => import('./pages/inventory/InventoryValuationPage').then(m => ({ default: m.InventoryValuationPage })));
 const InventoryAdjustmentsPage = lazy(() => import('./pages/inventory/InventoryAdjustmentsPage').then(m => ({ default: m.InventoryAdjustmentsPage })));
+const ReservationsPage       = lazy(() => import('./pages/inventory/ReservationsPage').then(m => ({ default: m.ReservationsPage })));
 const BranchesPage           = lazy(() => import('./pages/operations/BranchesPage').then(m => ({ default: m.BranchesPage })));
 const WarehousesPage         = lazy(() => import('./pages/operations/WarehousesPage').then(m => ({ default: m.WarehousesPage })));
 const CustomersView          = lazy(() => import('./components/CustomersView').then(m => ({ default: m.CustomersView })));
@@ -163,11 +245,24 @@ const CrmActivitiesPage      = lazy(() => import('./pages/crm/CrmActivitiesPage'
 const SuppliersView          = lazy(() => import('./components/SuppliersView').then(m => ({ default: m.SuppliersView })));
 const PurchasesView          = lazy(() => import('./components/PurchasesView').then(m => ({ default: m.PurchasesView })));
 const PurchaseRequestsPage   = lazy(() => import('./pages/purchasing/PurchaseRequestsPage').then(m => ({ default: m.PurchaseRequestsPage })));
+const PurchaseOrdersPage     = lazy(() => import('./pages/purchasing/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+const PurchaseReturnsPage    = lazy(() => import('./pages/purchasing/PurchaseReturnsPage').then(m => ({ default: m.PurchaseReturnsPage })));
 const CashierView            = lazy(() => import('./components/CashierView').then(m => ({ default: m.CashierView })));
 const FinanceOverviewPage    = lazy(() => import('./pages/finance/FinanceOverviewPage').then(m => ({ default: m.FinanceOverviewPage })));
 const DebtsDashboardPage     = lazy(() => import('./pages/finance/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
 const InstallmentsPage       = lazy(() => import('./pages/finance/InstallmentsPage').then(m => ({ default: m.InstallmentsPage })));
 const ExpensesPage           = lazy(() => import('./pages/finance/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
+const ChartOfAccountsPage    = lazy(() => import('./pages/finance/ChartOfAccountsPage').then(m => ({ default: m.ChartOfAccountsPage })));
+const JournalEntriesPage     = lazy(() => import('./pages/finance/JournalEntriesPage').then(m => ({ default: m.JournalEntriesPage })));
+const ChequesPage            = lazy(() => import('./pages/finance/ChequesPage').then(m => ({ default: m.ChequesPage })));
+const FixedAssetsPage        = lazy(() => import('./pages/finance/FixedAssetsPage').then(m => ({ default: m.FixedAssetsPage })));
+const TaxReportPage          = lazy(() => import('./pages/reports/TaxReportPage').then(m => ({ default: m.TaxReportPage })));
+const ProfitLossPage         = lazy(() => import('./pages/reports/ProfitLossPage').then(m => ({ default: m.ProfitLossPage })));
+const FinancialStatementsPage = lazy(() => import('./pages/reports/FinancialStatementsPage').then(m => ({ default: m.FinancialStatementsPage })));
+const AttendancePage         = lazy(() => import('./pages/operations/AttendancePage').then(m => ({ default: m.AttendancePage })));
+const PayrollPage            = lazy(() => import('./pages/operations/PayrollPage').then(m => ({ default: m.PayrollPage })));
+const CommissionsPage        = lazy(() => import('./pages/hr/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
+const CampaignsPage          = lazy(() => import('./pages/crm/CampaignsPage').then(m => ({ default: m.CampaignsPage })));
 const ProjectsPage           = lazy(() => import('./pages/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 const ProjectDetailPage      = lazy(() => import('./pages/projects/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
 const DeliveriesPage         = lazy(() => import('./pages/operations/DeliveriesPage').then(m => ({ default: m.DeliveriesPage })));
@@ -183,6 +278,8 @@ const UsersView              = lazy(() => import('./components/UsersView').then(
 const BackupPage             = lazy(() => import('./pages/settings/BackupPage').then(m => ({ default: m.BackupPage })));
 const SystemHealthPage       = lazy(() => import('./pages/settings/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
 const CloudSyncPage          = lazy(() => import('./pages/settings/CloudSyncPage').then(m => ({ default: m.CloudSyncPage })));
+const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
+const SecurityCenterPage     = lazy(() => import('./pages/admin/SecurityCenterPage').then(m => ({ default: m.SecurityCenterPage })));
 
 function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
@@ -190,17 +287,15 @@ function S({ children }: { children: React.ReactNode }) {
 
 const AppRouterWithProps: React.FC<{
   currentUser: User;
-  darkMode: boolean;
-  onToggleDark: () => void;
-}> = ({ currentUser, darkMode, onToggleDark }) => (
+  onLogout: () => void;
+}> = ({ currentUser, onLogout }) => (
   <Routes>
     <Route
       path="/"
       element={
         <MainLayout
           currentUser={currentUser}
-          darkMode={darkMode}
-          onToggleDark={onToggleDark}
+          onLogout={onLogout}
         />
       }
     >
@@ -212,7 +307,11 @@ const AppRouterWithProps: React.FC<{
 
       {/* Sales / POS */}
       <Route path="pos" element={<S><PosView /></S>} />
-      <Route path="sales" element={<S><SalesView /></S>} />
+            <Route path="sales" element={<S><SalesView /></S>} />
+            <Route path="daily/sales" element={<S><TodaySalesPage /></S>} />
+            <Route path="daily/purchases" element={<S><TodayPurchasesPage /></S>} />
+            <Route path="daily/expenses" element={<S><TodayExpensesPage /></S>} />
+            <Route path="daily/debts" element={<S><TodayDebtsPage /></S>} />
       <Route path="quotations" element={<S><QuotationsPage /></S>} />
       <Route path="orders" element={<S><OrdersPage /></S>} />
       <Route path="returns" element={<S><ReturnsPage /></S>} />
@@ -235,7 +334,8 @@ const AppRouterWithProps: React.FC<{
       <Route path="inventory/transfers" element={<S><StockTransfersView /></S>} />
       <Route path="inventory/counts" element={<S><InventoryCountPage /></S>} />
       <Route path="inventory/valuation" element={<S><InventoryValuationPage /></S>} />
-      <Route path="inventory/adjustments" element={<S><InventoryAdjustmentsPage /></S>} />
+          <Route path="inventory/adjustments" element={<S><InventoryAdjustmentsPage /></S>} />
+          <Route path="inventory/reservations" element={<S><ReservationsPage /></S>} />
 
       {/* Branches / Warehouses */}
       <Route path="branches" element={<S><BranchesPage /></S>} />
@@ -247,11 +347,14 @@ const AppRouterWithProps: React.FC<{
       <Route path="crm/leads" element={<S><LeadsPage /></S>} />
       <Route path="crm/pipeline" element={<S><PipelinePage /></S>} />
       <Route path="crm/activities" element={<S><CrmActivitiesPage /></S>} />
+      <Route path="crm/campaigns" element={<S><CampaignsPage /></S>} />
 
       {/* Purchasing */}
       <Route path="suppliers" element={<S><SuppliersView /></S>} />
       <Route path="purchases" element={<S><PurchasesView /></S>} />
       <Route path="purchases/requests" element={<S><PurchaseRequestsPage /></S>} />
+      <Route path="purchases/orders" element={<S><PurchaseOrdersPage /></S>} />
+      <Route path="purchases/returns" element={<S><PurchaseReturnsPage /></S>} />
 
       {/* Finance */}
       <Route path="cashboxes" element={<S><CashierView /></S>} />
@@ -259,6 +362,10 @@ const AppRouterWithProps: React.FC<{
       <Route path="finance/debts" element={<S><DebtsDashboardPage /></S>} />
       <Route path="finance/installments" element={<S><InstallmentsPage /></S>} />
       <Route path="finance/expenses" element={<S><ExpensesPage /></S>} />
+      <Route path="finance/accounts" element={<S><ChartOfAccountsPage /></S>} />
+      <Route path="finance/journal" element={<S><JournalEntriesPage /></S>} />
+      <Route path="finance/cheques" element={<S><ChequesPage /></S>} />
+      <Route path="finance/assets" element={<S><FixedAssetsPage /></S>} />
 
       {/* Projects */}
       <Route path="projects" element={<S><ProjectsPage /></S>} />
@@ -269,16 +376,26 @@ const AppRouterWithProps: React.FC<{
       <Route path="drivers" element={<S><DriversPage /></S>} />
       <Route path="vehicles" element={<S><VehiclesPage /></S>} />
       <Route path="employees" element={<S><EmployeesPage /></S>} />
+      <Route path="employees/attendance" element={<S><AttendancePage /></S>} />
+          <Route path="employees/payroll" element={<S><PayrollPage /></S>} />
+          <Route path="employees/commissions" element={<S><CommissionsPage /></S>} />
 
       {/* Reports */}
       <Route path="reports" element={<S><ReportsView /></S>} />
+      <Route path="reports/tax" element={<S><TaxReportPage /></S>} />
+          <Route path="reports/profit-loss" element={<S><ProfitLossPage /></S>} />
+          <Route path="reports/statements" element={<S><FinancialStatementsPage /></S>} />
 
       {/* Approvals */}
       <Route path="approvals" element={<S><ApprovalsPage /></S>} />
 
       {/* Notifications & Audit */}
       <Route path="notifications" element={<S><NotificationsView /></S>} />
-      <Route path="audit" element={<S><AuditLogView /></S>} />
+          <Route path="audit" element={<S><AuditLogView /></S>} />
+          <Route path="security" element={<S><SecurityCenterPage /></S>} />
+
+      {/* Admin Control Center */}
+      <Route path="admin" element={<S><AdminPage /></S>} />
 
       {/* Settings */}
       <Route path="settings" element={<S><SettingsView /></S>} />

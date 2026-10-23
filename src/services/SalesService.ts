@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../database/db';
-import type { SalesInvoice, SalesInvoiceItem, SalesReturn, SalesReturnItem, PaymentType } from '../types';
+import type { SalesInvoice, SalesInvoiceItem, SalesReturn, SalesReturnItem, PaymentType, CustomerPayment } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
@@ -14,6 +14,8 @@ export interface CreateSaleDTO {
   customerId: string;
   warehouseId: string;
   shiftId?: string;
+  orderId?: string;
+  projectId?: string;
   items: {
     productId: string;
     soldBy: 'M2' | 'BOX' | 'PIECE';
@@ -35,40 +37,109 @@ export interface CreateSaleDTO {
   performedBy?: string;
 }
 
+export interface InvoiceFilters {
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  paymentStatus?: 'ALL' | 'PAID' | 'PARTIAL' | 'UNPAID';
+  invoiceStatus?: 'ALL' | 'COMPLETED' | 'VOID' | 'HOLD' | 'DRAFT';
+  customerId?: string;
+  warehouseId?: string;
+}
+
+export interface InvoiceStats {
+  count: number;
+  totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  returnedAmount: number;
+  totalCost: number;
+  grossProfit: number;
+}
+
+export interface ReturnableItem {
+  productId: string;
+  productName: string;
+  grade: string;
+  size: string;
+  soldM2: number;
+  returnedM2: number;
+  returnableM2: number;
+  unitPrice: number;
+  unitCost: number;
+  boxesCount: number;
+  metersPerBox: number;
+}
+
+export interface ReturnStats {
+  count: number;
+  totalAmount: number;
+  cashRefunded: number;
+  creditedToBalance: number;
+  todayCount: number;
+  todayAmount: number;
+}
+
 export class SalesService {
   private db = DatabaseManager.getInstance();
 
-  public getAllInvoices(search?: string, dateFrom?: string, dateTo?: string): SalesInvoice[] {
-    let sql = `
-      SELECT si.*, c.name as customerName, c.phone as customerPhone, w.name as warehouseName, u.full_name as createdByName
-      FROM sales_invoices si
-      JOIN customers c ON si.customer_id = c.id
-      JOIN warehouses w ON si.warehouse_id = w.id
-      LEFT JOIN users u ON si.created_by = u.id
-      WHERE si.invoice_status != 'VOID'
-    `;
-    const params: any[] = [];
+  // ─── Invoices ───────────────────────────────────────────────────────────────
 
-    if (search && search.trim()) {
-      sql += ` AND (si.invoice_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)`;
-      const term = `%${search.trim()}%`;
-      params.push(term, term, term);
-    }
-    if (dateFrom) {
-      sql += ` AND si.date >= ?`;
-      params.push(dateFrom);
-    }
-    if (dateTo) {
-      sql += ` AND si.date <= ?`;
-      params.push(dateTo);
-    }
-    sql += ` ORDER BY si.created_at DESC`;
-    return this.db.query<SalesInvoice>(sql, params);
+  public getAllInvoices(search?: string, dateFrom?: string, dateTo?: string): SalesInvoice[] {
+    return this.getInvoicesFiltered({ search, dateFrom, dateTo }, false);
+  }
+
+  public getInvoicesFiltered(
+    filters: InvoiceFilters = {},
+    includeVoid = true
+  ): (SalesInvoice & { returnedAmount?: number; itemsCount?: number })[] {
+    const { where, params } = this.buildInvoiceWhere(filters, includeVoid);
+    return this.db.query<SalesInvoice & { returnedAmount?: number; itemsCount?: number }>(
+      `SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
+              w.name as warehouseName, u.full_name as createdByName,
+              (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount
+       FROM sales_invoices si
+       JOIN customers c ON si.customer_id = c.id
+       JOIN warehouses w ON si.warehouse_id = w.id
+       LEFT JOIN users u ON si.created_by = u.id
+       ${where}
+       ORDER BY si.created_at DESC`,
+      params
+    );
+  }
+
+  public getStats(filters: InvoiceFilters = {}, includeVoid = true): InvoiceStats {
+    const { where, params } = this.buildInvoiceWhere(filters, includeVoid);
+    const row = this.db.query<any>(
+      `SELECT
+         COUNT(*) AS count,
+         COALESCE(SUM(si.total_amount), 0) AS totalAmount,
+         COALESCE(SUM(si.paid_amount), 0) AS paidAmount,
+         COALESCE(SUM(si.remaining_amount), 0) AS remainingAmount,
+         COALESCE(SUM(si.returned_amount), 0) AS returnedAmount,
+         COALESCE(SUM(si.total_cost), 0) AS totalCost,
+         COALESCE(SUM(si.gross_profit), 0) AS grossProfit
+       FROM sales_invoices si
+       JOIN customers c ON si.customer_id = c.id
+       JOIN warehouses w ON si.warehouse_id = w.id
+       ${where}`,
+      params
+    )[0] || {};
+    return {
+      count: Number(row.count || 0),
+      totalAmount: Number(row.totalAmount || 0),
+      paidAmount: Number(row.paidAmount || 0),
+      remainingAmount: Number(row.remainingAmount || 0),
+      returnedAmount: Number(row.returnedAmount || 0),
+      totalCost: Number(row.totalCost || 0),
+      grossProfit: Number(row.grossProfit || 0),
+    };
   }
 
   public getInvoiceById(id: string): (SalesInvoice & { items: SalesInvoiceItem[] }) | null {
     const invoices = this.db.query<SalesInvoice>(`
       SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
+             c.current_balance as customerBalance, c.credit_limit as customerCreditLimit,
              w.name as warehouseName, u.full_name as createdByName
       FROM sales_invoices si
       JOIN customers c ON si.customer_id = c.id
@@ -95,8 +166,11 @@ export class SalesService {
     return this.db.executeTransaction((sqliteDb) => {
       let totalLineDiscount = 0;
       const preparedItems: any[] = [];
+      const plannedByProduct = new Map<string, number>();
 
       for (const item of dto.items) {
+        const quantityM2 = round2(Math.max(0, item.quantityM2 || 0));
+        if (quantityM2 <= 0) throw new Error('كمية أحد الأصناف في الفاتورة غير صحيحة.');
         const prod = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
         if (!prod) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
 
@@ -109,20 +183,28 @@ export class SalesService {
           `SELECT quantity_m2, reserved_m2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
           [item.productId, dto.warehouseId]
         )[0] as any;
-        const availableM2 = (stockRow ? stockRow.quantityM2 : 0) - (stockRow?.reservedM2 || 0);
-        if (availableM2 < item.quantityM2) {
+        const availableM2 = (stockRow ? Number(stockRow.quantityM2) : 0) - Number(stockRow?.reservedM2 || 0);
+        const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
+        if (availableM2 - alreadyPlanned < quantityM2) {
           throw new Error(
-            `الرصيد المتاح من الصنف (${prod.name} - فرز ${prod.grade}) غير كافٍ. المتاح: ${availableM2} م²، المطلوب: ${item.quantityM2} م²`
+            `الرصيد المتاح من الصنف (${prod.name} - فرز ${prod.grade}) غير كافٍ. المتاح: ${round2(availableM2 - alreadyPlanned)} م²، المطلوب: ${quantityM2} م²`
           );
         }
+        plannedByProduct.set(item.productId, alreadyPlanned + quantityM2);
 
         const line = computeSaleLine({
-          quantity: item.quantityM2,
+          quantity: quantityM2,
           unitPrice: item.unitPrice,
           unitCost: item.unitCost ?? prod.costPrice ?? 0,
           discountAmount: item.discountAmount || 0,
         });
         totalLineDiscount += line.lineDiscount;
+
+        const metersPerBox = Number(prod.metersPerBox) || 1.44;
+        const piecesPerBox = Number(prod.piecesPerBox) || 4;
+        const boxesCount = item.boxesCount !== undefined && item.boxesCount !== null
+          ? round2(Math.max(0, item.boxesCount))
+          : round2(quantityM2 / metersPerBox);
 
         preparedItems.push({
           id: `item_${uuidv4().substring(0, 8)}`,
@@ -133,18 +215,18 @@ export class SalesService {
           productGrade: prod.grade,
           size: prod.size,
           soldBy: item.soldBy,
-          quantityM2: item.quantityM2,
-          boxesCount: item.boxesCount,
-          piecesCount: item.piecesCount,
+          quantityM2,
+          boxesCount,
+          piecesCount: item.piecesCount || Math.round(boxesCount * piecesPerBox),
           unitPrice: item.unitPrice,
           originalUnitPrice: prod.sellingPriceM2,
-          unitCost: line.lineCost / (item.quantityM2 || 1),
+          unitCost: line.lineCost / (quantityM2 || 1),
           discountAmount: line.lineDiscount,
           totalPrice: line.lineTotal,
           totalCost: line.lineCost,
           profit: line.lineProfit,
-          metersPerBox: prod.metersPerBox || 1.44,
-          piecesPerBox: prod.piecesPerBox || 4,
+          metersPerBox,
+          piecesPerBox,
         });
       }
 
@@ -165,19 +247,36 @@ export class SalesService {
         paidAmount: dto.paidAmount,
       });
 
+      // Credit-limit guard: extensions beyond the customer's limit need approval.
+      if (totals.remainingAmount > 0) {
+        const customer = sqliteDb.query<any>(
+          `SELECT name, credit_limit, current_balance FROM customers WHERE id = ?`,
+          [dto.customerId]
+        )[0];
+        if (!customer) throw new Error('العميل المحدد غير موجود.');
+        const limit = Number(customer.creditLimit || 0);
+        const projected = round2(Number(customer.currentBalance || 0) + totals.remainingAmount);
+        if (limit > 0 && projected > limit && !PermissionService.can(actor, 'sales.approve')) {
+          throw new Error(
+            `تجاوز حد الائتمان للعميل "${customer.name}". الرصيد الحالي ${customer.currentBalance} + الآجل ${totals.remainingAmount} يتجاوز الحد ${limit}.`
+          );
+        }
+      }
+
       const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
       const invoiceNumber = sqliteDb.nextNumber('INV');
       const today = new Date().toISOString().slice(0, 10);
 
       sqliteDb.run(`
         INSERT INTO sales_invoices (
-          id, invoice_number, date, customer_id, warehouse_id, shift_id,
+          id, invoice_number, date, customer_id, warehouse_id, shift_id, order_id, project_id,
           subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
           shipping_cost, total_amount, paid_amount, remaining_amount, payment_type,
-          payment_status, invoice_status, total_cost, gross_profit, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?)
+          payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
       `, [
         invoiceId, invoiceNumber, today, dto.customerId, dto.warehouseId, dto.shiftId || null,
+        dto.orderId || null, dto.projectId || null,
         totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
         totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, dto.paymentType,
         totals.paymentStatus, totals.totalCost, totals.grossProfit, dto.notes || null, actor.id
@@ -198,6 +297,13 @@ export class SalesService {
           item.totalPrice, item.totalCost, item.profit, item.metersPerBox, item.piecesPerBox
         ]);
 
+        const stockUpdate = sqliteDb.query<{ id: string }>(
+          `SELECT id FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+          [item.productId, dto.warehouseId]
+        )[0];
+        if (!stockUpdate) {
+          throw new Error(`لا يوجد رصيد مخزني مسجل للصنف "${item.productName}" في المخزن المحدد.`);
+        }
         sqliteDb.run(`
           UPDATE warehouse_stock
           SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
@@ -246,20 +352,168 @@ export class SalesService {
     });
   }
 
+  /** Collect a payment against an unpaid/partially-paid invoice (brief §68/§220). */
+  public recordInvoicePayment(
+    invoiceId: string,
+    amount: number,
+    paymentType: PaymentType = 'CASH',
+    registerId?: string,
+    shiftId?: string,
+    notes = ''
+  ): CustomerPayment {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'customers.payment');
+    const invoice = this.getInvoiceById(invoiceId);
+    if (!invoice) throw new Error('الفاتورة غير موجودة.');
+    if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن التحصيل على فاتورة ملغاة.');
+    if (invoice.remainingAmount <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
+
+    const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
+    if (value <= 0) throw new Error('يجب أن يكون مبلغ التحصيل أكبر من الصفر.');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
+
+    return this.db.executeTransaction((db) => {
+      const receiptNumber = db.nextNumber('REC');
+      const newPaid = round2(invoice.paidAmount + value);
+      const newRemaining = round2(Math.max(0, invoice.remainingAmount - value));
+      const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+      const register = registerId || 'cr_main';
+
+      db.run(
+        `INSERT INTO customer_payments (
+           id, receipt_number, customer_id, invoice_id, amount, payment_type, date,
+           register_id, shift_id, notes, performed_by
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          paymentId, receiptNumber, invoice.customerId, invoiceId, value, paymentType, today,
+          register, shiftId || null,
+          notes || `تحصيل دفعة على الفاتورة ${invoice.invoiceNumber}`,
+          actor.id,
+        ]
+      );
+
+      db.run(
+        `UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [value, invoice.customerId]
+      );
+
+      db.run(
+        `UPDATE sales_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ?,
+         updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newPaid, newRemaining, status, invoiceId]
+      );
+
+      if (paymentType === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [value, register]);
+      }
+      if (shiftId) {
+        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?`, [value, shiftId]);
+      }
+
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, 'تحصيل دفعة على فاتورة', 'SALES', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoiceId, JSON.stringify({
+          receiptNumber, invoiceNumber: invoice.invoiceNumber, amount: value, paymentType,
+        })]
+      );
+
+      return {
+        id: paymentId,
+        receiptNumber,
+        customerId: invoice.customerId,
+        amount: value,
+        paymentType,
+        date: today,
+        registerId: register,
+        shiftId,
+        notes,
+        performedBy: actor.id,
+        createdAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  public getInvoicePayments(invoiceId: string): CustomerPayment[] {
+    return this.db.query<CustomerPayment>(
+      `SELECT * FROM customer_payments WHERE invoice_id = ? ORDER BY created_at ASC`,
+      [invoiceId]
+    );
+  }
+
+  public deleteInvoicePayment(paymentId: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'customers.payment');
+    const payment = this.db.query<any>(
+      `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id
+       FROM customer_payments WHERE id = ?`,
+      [paymentId]
+    )[0];
+    if (!payment) throw new Error('سند القبض غير موجود.');
+    if (!payment.invoice_id) throw new Error('هذا السند غير مرتبط بفاتورة بيع. احذفه من كشف حساب العميل.');
+    const invoice = this.getInvoiceById(payment.invoice_id);
+    if (!invoice) throw new Error('فاتورة البيع غير موجودة.');
+    if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن حذف دفعة من فاتورة ملغاة.');
+
+    const amount = round2(payment.amount);
+    const newPaid = round2(Math.max(0, invoice.paidAmount - amount));
+    const newRemaining = round2(Math.min(invoice.totalAmount, invoice.remainingAmount + amount));
+    const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
+
+    this.db.executeTransaction((db) => {
+      db.run(
+        `UPDATE sales_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ?,
+         updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newPaid, newRemaining, status, invoice.id]
+      );
+      db.run(
+        `UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [amount, invoice.customerId]
+      );
+      if (payment.payment_type === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.register_id || 'cr_main']);
+      }
+      if (payment.shift_id) {
+        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shift_id]);
+      }
+      db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+         VALUES (?, ?, ?, 'حذف سند تحصيل', 'SALES', ?, ?, ?)`,
+        [
+          `aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoice.id,
+          JSON.stringify({ receiptNumber: payment.receipt_number, amount }),
+          JSON.stringify({ invoiceNumber: invoice.invoiceNumber }),
+        ]
+      );
+    });
+  }
+
+  // ─── Returns ────────────────────────────────────────────────────────────────
+
   public returnSale(
     invoiceId: string,
     returnItems: { productId: string; quantityM2: number; boxesCount: number; unitPrice: number; unitCost: number; reason: string }[],
     refundCash = true,
-    performedBy = 'usr_admin'
+    performedBy = 'usr_admin',
+    options: {
+      registerId?: string;
+      shiftId?: string;
+      refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
+    } = {}
   ): SalesReturn {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.refund');
     const inv = this.getInvoiceById(invoiceId);
     if (!inv) throw new Error('الفاتورة الأصلية غير موجودة.');
     if (inv.invoiceStatus === 'VOID') throw new Error('لا يمكن مرتجعة فاتورة ملغاة.');
+    if (!returnItems || returnItems.length === 0) throw new Error('حدد بنداً واحداً على الأقل للإرجاع.');
 
     // Validate returned quantity per product never exceeds what was originally sold (brief §68).
     for (const rit of returnItems) {
+      if (rit.quantityM2 <= 0) throw new Error('كمية الإرجاع يجب أن تكون أكبر من صفر.');
       const sold = inv.items
         .filter((i) => i.productId === rit.productId)
         .reduce((s, i) => s + i.quantityM2, 0);
@@ -285,13 +539,22 @@ export class SalesService {
         const lineTotal = round2(item.quantityM2 * item.unitPrice);
         totalReturnAmount = round2(totalReturnAmount + lineTotal);
 
+        const product = sqliteDb.query<any>(
+          `SELECT name, grade, meters_per_box, pieces_per_box, size FROM products WHERE id = ?`,
+          [item.productId]
+        )[0];
+        if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
+        const metersPerBox = Number(product.metersPerBox) || 1.44;
+        const boxesCount = item.boxesCount > 0 ? round2(item.boxesCount) : round2(item.quantityM2 / metersPerBox);
+        const unitCost = item.unitCost > 0 ? item.unitCost : 0;
+
         sqliteDb.run(`
           INSERT INTO sales_return_items (
             id, return_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund
-          ) VALUES (?, ?, ?, (SELECT name FROM products WHERE id = ?), (SELECT grade FROM products WHERE id = ?), ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-          `ritem_${uuidv4().substring(0, 8)}`, returnId, item.productId, item.productId, item.productId,
-          item.quantityM2, item.boxesCount, item.unitPrice, item.unitCost, lineTotal
+          `ritem_${uuidv4().substring(0, 8)}`, returnId, item.productId, product.name, product.grade,
+          item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
         ]);
 
         sqliteDb.run(`
@@ -308,28 +571,36 @@ export class SalesService {
           ) VALUES (?, ?, 'SALES_RETURN', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
         `, [
           `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-RET'),
-          item.productId, inv.warehouseId, item.quantityM2, item.boxesCount, item.unitCost,
-          round2(item.quantityM2 * item.unitCost), returnId, `مرتجع مبيعات للفاتورة ${inv.invoiceNumber}`, actor.id
+          item.productId, inv.warehouseId, item.quantityM2, boxesCount, unitCost,
+          round2(item.quantityM2 * unitCost), returnId,
+          `مرتجع مبيعات للفاتورة ${inv.invoiceNumber}`, actor.id
         ]);
       }
 
       // Correct AR / cash accounting (brief §68/§220/§223).
+      // Refunding to the customer's balance is always a credit memo; cash/card
+      // refunds only disburse the portion the customer actually paid.
+      const refundMethod = options.refundMethod || 'CASH';
+      const effectiveRefundCash = refundMethod === 'BALANCE' ? false : refundCash;
       const impact = computeReturnImpact({
         invoiceTotal: inv.totalAmount,
         invoicePaid: inv.paidAmount,
         returnTotal: totalReturnAmount,
-        refundCash,
+        refundCash: effectiveRefundCash,
       });
 
       sqliteDb.run(`
         INSERT INTO sales_returns (
           id, return_number, original_invoice_id, original_invoice_number, customer_id,
-          warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason,
+          register_id, shift_id, refund_method, created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
         inv.warehouseId, today, totalReturnAmount, impact.cashRefund, impact.balanceDelta,
-        returnItems[0]?.reason || 'مرتجع سيراميك', actor.id
+        returnItems[0]?.reason || 'مرتجع سيراميك',
+        options.registerId || (impact.cashRefund > 0 && refundMethod === 'CASH' ? 'cr_main' : null),
+        options.shiftId || null, refundMethod, actor.id,
       ]);
 
       // Reduce customer debt by the credit memo minus the cash portion that settles it,
@@ -343,13 +614,32 @@ export class SalesService {
       `, [impact.balanceDelta, totalReturnAmount, inv.customerId]);
 
       if (impact.cashRefund > 0) {
-        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE is_default = 1`, [impact.cashRefund]);
+        if (refundMethod === 'CASH') {
+          sqliteDb.run(
+            `UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`,
+            [impact.cashRefund, options.registerId || 'cr_main']
+          );
+        }
       }
+      if (options.shiftId) {
+        sqliteDb.run(
+          `UPDATE cash_shifts SET total_refunds = total_refunds + ? WHERE id = ?`,
+          [impact.cashRefund, options.shiftId]
+        );
+      }
+
+      sqliteDb.run(
+        `UPDATE sales_invoices SET returned_amount = COALESCE(returned_amount, 0) + ?,
+         updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [totalReturnAmount, invoiceId]
+      );
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
         VALUES (?, ?, ?, 'مرتجع مبيعات', 'SALES', ?, ?)
-      `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, returnId, JSON.stringify({ returnNumber, totalReturnAmount, cashRefund: impact.cashRefund })]);
+      `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, returnId, JSON.stringify({
+        returnNumber, totalReturnAmount, cashRefund: impact.cashRefund, invoiceNumber: inv.invoiceNumber,
+      })]);
 
       return {
         id: returnId,
@@ -363,6 +653,7 @@ export class SalesService {
         refundedAmount: impact.cashRefund,
         remainingToBalance: impact.balanceDelta,
         reason: returnItems[0]?.reason || 'مرتجع',
+        refundMethod,
         createdBy: actor.id,
         createdAt: new Date().toISOString()
       };
@@ -374,6 +665,7 @@ export class SalesService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.void');
     const inv = this.getInvoiceById(invoiceId);
+    if (!inv) throw new Error('الفاتورة غير موجودة.');
     const returnsCount = this.db.query<{ count: number }>(
       'SELECT COUNT(*) as count FROM sales_returns WHERE original_invoice_id = ?',
       [invoiceId]
@@ -381,8 +673,8 @@ export class SalesService {
     if (returnsCount > 0) {
       throw new Error('لا يمكن إلغاء فاتورة لها مرتجعات مسجلة. سجّل مرتجعاً للكميات المتبقية بدلاً من ذلك.');
     }
-    if (!inv) throw new Error('الفاتورة غير موجودة.');
     if (inv.invoiceStatus === 'VOID') throw new Error('الفاتورة ملغاة بالفعل.');
+    if (!reason || !reason.trim()) throw new Error('يرجى إدخال سبب إلغاء الفاتورة.');
 
     return this.db.executeTransaction((sqliteDb) => {
       for (const item of inv.items) {
@@ -428,5 +720,174 @@ export class SalesService {
 
       return this.getInvoiceById(invoiceId)!;
     });
+  }
+
+  public getReturns(search = '', dateFrom?: string, dateTo?: string): (SalesReturn & { customerName: string; invoiceNumber: string })[] {
+    let sql = `
+      SELECT sr.*, c.name as customerName, sr.original_invoice_number as invoiceNumber
+      FROM sales_returns sr
+      JOIN customers c ON c.id = sr.customer_id
+      WHERE 1 = 1`;
+    const params: any[] = [];
+    if (search.trim()) {
+      sql += ` AND (sr.return_number LIKE ? OR c.name LIKE ? OR sr.original_invoice_number LIKE ?)`;
+      const term = `%${search.trim()}%`;
+      params.push(term, term, term);
+    }
+    if (dateFrom) {
+      sql += ` AND sr.date >= ?`;
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      sql += ` AND sr.date <= ?`;
+      params.push(dateTo);
+    }
+    sql += ` ORDER BY sr.date DESC, sr.created_at DESC`;
+    return this.db.query(sql, params);
+  }
+
+  public getReturnById(id: string): (SalesReturn & { items: SalesReturnItem[]; customerName?: string; invoiceNumber?: string }) | null {
+    const rows = this.db.query<SalesReturn & { customerName: string; invoiceNumber: string }>(
+      `SELECT sr.*, c.name as customerName, sr.original_invoice_number as invoiceNumber
+       FROM sales_returns sr
+       JOIN customers c ON c.id = sr.customer_id
+       WHERE sr.id = ?`,
+      [id]
+    );
+    if (rows.length === 0) return null;
+    return { ...rows[0], items: this.getReturnItems(id) };
+  }
+
+  public getReturnsStats(): ReturnStats {
+    const today = new Date().toISOString().slice(0, 10);
+    const row = this.db.query<any>(
+      `SELECT COUNT(*) AS count,
+              COALESCE(SUM(total_amount), 0) AS totalAmount,
+              COALESCE(SUM(refunded_amount), 0) AS cashRefunded,
+              COALESCE(SUM(remaining_to_balance), 0) AS creditedToBalance,
+              COALESCE(SUM(CASE WHEN date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
+              COALESCE(SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END), 0) AS todayAmount
+       FROM sales_returns`,
+      [today, today]
+    )[0] || {};
+    return {
+      count: Number(row.count || 0),
+      totalAmount: Number(row.totalAmount || 0),
+      cashRefunded: Number(row.cashRefunded || 0),
+      creditedToBalance: Number(row.creditedToBalance || 0),
+      todayCount: Number(row.todayCount || 0),
+      todayAmount: Number(row.todayAmount || 0),
+    };
+  }
+
+  public getTopReturnReasons(limit = 5): { reason: string; count: number; amount: number }[] {
+    return this.db.query<any>(
+      `SELECT reason, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS amount
+       FROM sales_returns
+       GROUP BY reason
+       ORDER BY count DESC, amount DESC
+       LIMIT ?`,
+      [Math.max(1, Math.min(20, limit))]
+    ).map((row) => ({
+      reason: row.reason || 'غير محدد',
+      count: Number(row.count || 0),
+      amount: Number(row.amount || 0),
+    }));
+  }
+
+  public getReturnItems(returnId: string): SalesReturnItem[] {
+    return this.db.query<SalesReturnItem>(
+      `SELECT * FROM sales_return_items WHERE return_id = ?`,
+      [returnId]
+    );
+  }
+
+  /** Remaining returnable quantity per product for an invoice, after prior returns. */
+  public getReturnableItems(invoiceId: string): ReturnableItem[] {
+    const rows = this.db.query<any>(
+      `SELECT product_id, product_name, product_grade, size, quantity_m2, unit_price, unit_cost, boxes_count, meters_per_box
+       FROM sales_invoice_items WHERE invoice_id = ?`,
+      [invoiceId]
+    );
+    const returned = new Map<string, number>();
+    for (const r of this.db.query<any>(
+      `SELECT sri.product_id, COALESCE(SUM(sri.quantity_m2), 0) AS qty
+       FROM sales_return_items sri
+       JOIN sales_returns sr ON sr.id = sri.return_id
+       WHERE sr.original_invoice_id = ?
+       GROUP BY sri.product_id`,
+      [invoiceId]
+    )) {
+      returned.set(r.productId, Number(r.qty || 0));
+    }
+    const map = new Map<string, ReturnableItem>();
+    for (const r of rows) {
+      const existing = map.get(r.productId);
+      if (existing) {
+        existing.soldM2 = round2(existing.soldM2 + Number(r.quantity_m2 || 0));
+        existing.boxesCount = round2(existing.boxesCount + Number(r.boxes_count || 0));
+      } else {
+        map.set(r.productId, {
+          productId: r.productId,
+          productName: r.productName,
+          grade: r.productGrade,
+          size: r.size,
+          soldM2: round2(Number(r.quantity_m2 || 0)),
+          returnedM2: 0,
+          returnableM2: 0,
+          unitPrice: Number(r.unitPrice || 0),
+          unitCost: Number(r.unitCost || 0),
+          boxesCount: Number(r.boxesCount || 0),
+          metersPerBox: Number(r.metersPerBox) || 1.44,
+        });
+      }
+    }
+    return Array.from(map.values()).map((item) => {
+      const returnedM2 = round2(returned.get(item.productId) || 0);
+      return {
+        ...item,
+        returnedM2,
+        returnableM2: round2(Math.max(0, item.soldM2 - returnedM2)),
+      };
+    });
+  }
+
+  private buildInvoiceWhere(filters: InvoiceFilters, includeVoid: boolean): { where: string; params: any[] } {
+    let where = 'WHERE 1 = 1';
+    const params: any[] = [];
+
+    if (filters.invoiceStatus && filters.invoiceStatus !== 'ALL') {
+      where += ` AND si.invoice_status = ?`;
+      params.push(filters.invoiceStatus);
+    } else if (!includeVoid) {
+      where += ` AND si.invoice_status != 'VOID'`;
+    }
+
+    if (filters.paymentStatus && filters.paymentStatus !== 'ALL') {
+      where += ` AND si.payment_status = ?`;
+      params.push(filters.paymentStatus);
+    }
+    if (filters.customerId) {
+      where += ` AND si.customer_id = ?`;
+      params.push(filters.customerId);
+    }
+    if (filters.warehouseId) {
+      where += ` AND si.warehouse_id = ?`;
+      params.push(filters.warehouseId);
+    }
+    if (filters.search && filters.search.trim()) {
+      const term = `%${filters.search.trim()}%`;
+      where += ` AND (si.invoice_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)`;
+      params.push(term, term, term);
+    }
+    if (filters.dateFrom) {
+      where += ` AND si.date >= ?`;
+      params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      where += ` AND si.date <= ?`;
+      params.push(filters.dateTo);
+    }
+    return { where, params };
   }
 }

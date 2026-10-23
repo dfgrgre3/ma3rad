@@ -40,7 +40,7 @@ export class BrandService {
 
   public createBrand(name: string, country?: string): Brand {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.create');
+    PermissionService.require(actor, 'brands.create');
 
     const existing = this.db.query('SELECT id FROM brands WHERE name = ?', [name]);
     if (existing.length > 0) {
@@ -64,7 +64,7 @@ export class BrandService {
 
   public updateBrand(id: string, updates: { name?: string; country?: string }): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.update');
+    PermissionService.require(actor, 'brands.update');
 
     const old = this.getBrandById(id);
     if (!old) throw new Error('الماركة غير موجودة.');
@@ -91,7 +91,7 @@ export class BrandService {
 
   public deleteBrand(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.delete');
+    PermissionService.require(actor, 'brands.delete');
 
     const brand = this.getBrandById(id);
     if (!brand) throw new Error('الماركة غير موجودة.');
@@ -110,3 +110,4 @@ export class BrandService {
     );
   }
 }
+

@@ -1,6 +1,18 @@
 // Database Domain Types & Interfaces
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'SALES' | 'WAREHOUSE' | 'ACCOUNTANT';
+export type BuiltInUserRole = 'ADMIN' | 'MANAGER' | 'CASHIER' | 'SALES' | 'WAREHOUSE' | 'ACCOUNTANT';
+// `(string & {})` preserves autocomplete for the built-ins while allowing
+// admin-defined custom roles without a code change.
+export type UserRole = BuiltInUserRole | (string & {});
+
+export interface Role {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  isSystem: boolean;
+  createdAt?: string;
+}
 
 export interface User {
   id: string;
@@ -64,6 +76,11 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+
+  // Aggregated stock columns returned by list queries
+  totalStockM2?: number;
+  totalStockBoxes?: number;
+  totalStockPieces?: number;
 }
 
 export interface Category {
@@ -208,6 +225,9 @@ export interface SalesInvoice {
   
   totalCost: number; // إجمالي تكلفة البضاعة
   grossProfit: number; // الربح الإجمالي
+  returnedAmount?: number; // إجمالي المرتجعات المرتبطة بالفاتورة
+  orderId?: string | null;
+  projectId?: string | null;
   
   notes?: string;
   createdBy: string;
@@ -258,6 +278,7 @@ export interface SalesReturn {
   refundedAmount: number;
   remainingToBalance: number; // تم إضافته لرصيد العميل
   reason: string;
+  refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
   createdBy: string;
   createdAt: string;
   items?: SalesReturnItem[];
@@ -381,6 +402,7 @@ export interface CustomerPayment {
   id: string;
   receiptNumber: string;
   customerId: string;
+  invoiceId?: string | null;
   customerName?: string;
   amount: number;
   paymentType: PaymentType;
@@ -439,6 +461,28 @@ export interface SystemSettings {
   receiptFooter?: string;
   logoPath?: string;
   autoBackupIntervalHours: number;
+
+  // Branding & appearance (admin control center)
+  brandName?: string;
+  brandShortName?: string;
+  brandLogoDataUrl?: string;
+  brandPrimaryColor?: string;
+  brandAccentColor?: string;
+  themeMode?: 'light' | 'dark' | 'system';
+  fontFamily?: string;
+  showBrandText?: boolean;
+  sidebarStyle?: 'default' | 'compact' | 'hidden';
+
+  // Operational settings surfaced in the admin center
+  lowStockAlertThresholdM2?: number;
+  discountApprovalThresholdPercent?: number;
+  requireApprovalForStockAdjustments?: boolean;
+  requireApprovalForPriceChanges?: boolean;
+  defaultDeliveryFee?: number;
+  installmentGraceDays?: number;
+  sessionTimeoutMinutes?: number;
+  maxFailedLoginAttempts?: number;
+  defaultBranchId?: string;
 }
 
 // ─── HR / Employees ────────────────────────────────────────────────────────────

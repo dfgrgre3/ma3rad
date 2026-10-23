@@ -42,7 +42,7 @@ export class CategoryService {
 
   public createCategory(name: string, parentId?: string, description?: string): Category {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.create');
+    PermissionService.require(actor, 'categories.create');
 
     const existing = this.db.query('SELECT id FROM categories WHERE name = ?', [name]);
     if (existing.length > 0) {
@@ -66,7 +66,7 @@ export class CategoryService {
 
   public updateCategory(id: string, updates: { name?: string; parentId?: string | null; description?: string }): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.update');
+    PermissionService.require(actor, 'categories.update');
 
     const old = this.getCategoryById(id);
     if (!old) throw new Error('التصنيف غير موجود.');
@@ -94,7 +94,7 @@ export class CategoryService {
 
   public deleteCategory(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.delete');
+    PermissionService.require(actor, 'categories.delete');
 
     const category = this.getCategoryById(id);
     if (!category) throw new Error('التصنيف غير موجود.');
@@ -118,3 +118,4 @@ export class CategoryService {
     );
   }
 }
+

@@ -324,16 +324,16 @@ export const InstallmentsPage: React.FC = () => {
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
       {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-            <CalendarDays className="w-5 h-5 text-amber-400" />
+            <CalendarDays className="w-5 h-5 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-base font-black text-white">إدارة الأقساط والتحصيلات المجدولة (Installment Plans)</h1>
-            <p className="text-xs text-slate-400 font-medium">
+            <h1 className="text-base font-black text-slate-900">إدارة الأقساط والتحصيلات المجدولة (Installment Plans)</h1>
+            <p className="text-xs text-slate-500 font-medium">
               جدولة الأقساط الشهرية، تسجيل سندات السداد، ومتابعة المتأخرات مع إدراجها بالخزينة تلقائياً
             </p>
           </div>
@@ -349,30 +349,30 @@ export const InstallmentsPage: React.FC = () => {
       </div>
 
       {/* Metrics Row */}
-      <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-950/80 border-b border-slate-800">
-        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-          <span className="text-[11px] text-slate-400 font-semibold block">إجمالي مبالغ التقسيط</span>
-          <span className="text-sm font-black text-white mt-1 block">{fmt(totalFinancedSum)}</span>
+      <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white border-b border-slate-200">
+        <div className="p-3 bg-white rounded-xl border border-slate-200">
+          <span className="text-[11px] text-slate-500 font-semibold block">إجمالي مبالغ التقسيط</span>
+          <span className="text-sm font-black text-slate-900 mt-1 block">{fmt(totalFinancedSum)}</span>
         </div>
 
-        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-          <span className="text-[11px] text-slate-400 font-semibold block">المحصل من الأقساط</span>
-          <span className="text-sm font-black text-emerald-400 mt-1 block">{fmt(totalPaidSum)}</span>
+        <div className="p-3 bg-white rounded-xl border border-slate-200">
+          <span className="text-[11px] text-slate-500 font-semibold block">المحصل من الأقساط</span>
+          <span className="text-sm font-black text-emerald-600 mt-1 block">{fmt(totalPaidSum)}</span>
         </div>
 
-        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-          <span className="text-[11px] text-slate-400 font-semibold block">المتبقي قيد التحصيل</span>
-          <span className="text-sm font-black text-sky-400 mt-1 block">{fmt(totalFinancedSum - totalPaidSum)}</span>
+        <div className="p-3 bg-white rounded-xl border border-slate-200">
+          <span className="text-[11px] text-slate-500 font-semibold block">المتبقي قيد التحصيل</span>
+          <span className="text-sm font-black text-sky-600 mt-1 block">{fmt(totalFinancedSum - totalPaidSum)}</span>
         </div>
 
-        <div className="p-3 bg-slate-900 rounded-xl border border-slate-800">
-          <span className="text-[11px] text-slate-400 font-semibold block">الأقساط المتأخرة</span>
-          <span className="text-sm font-black text-rose-400 mt-1 block">{overdueCount} أقساط متأخرة</span>
+        <div className="p-3 bg-white rounded-xl border border-slate-200">
+          <span className="text-[11px] text-slate-500 font-semibold block">الأقساط المتأخرة</span>
+          <span className="text-sm font-black text-rose-600 mt-1 block">{overdueCount} أقساط متأخرة</span>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="p-4 bg-slate-900/50 border-b border-slate-800/80 flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <div className="p-4 bg-white border-b border-slate-200/80 flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative flex-1 w-full max-w-md">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
@@ -380,7 +380,7 @@ export const InstallmentsPage: React.FC = () => {
             placeholder="بحث باسم العميل أو رقم الخطة..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-4 pr-10 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition font-medium"
+            className="w-full pl-4 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500/50 transition font-medium"
           />
         </div>
 
@@ -388,7 +388,7 @@ export const InstallmentsPage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
+            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-amber-500"
           >
             <option value="ALL">جميع الحالات</option>
             <option value="OVERDUE">متأخر عن موعده</option>
@@ -404,45 +404,45 @@ export const InstallmentsPage: React.FC = () => {
           {filteredInstallments.map((inst) => (
             <div
               key={inst.id}
-              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 transition flex flex-col justify-between shadow-sm"
+              className="bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 transition flex flex-col justify-between shadow-sm"
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 font-mono font-bold border border-slate-700">
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-mono font-bold border border-slate-300">
                     القسط {inst.sequenceNumber} من {inst.totalInstallments}
                   </span>
 
                   <span
                     className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border ${
-                      inst.status === 'PAID'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                        : inst.status === 'OVERDUE'
-                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse'
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    }`}
+ inst.status === 'PAID'
+ ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+ : inst.status === 'OVERDUE'
+ ? 'bg-rose-500/10 border-rose-500/20 animate-pulse'
+ : 'bg-amber-500/10 border-amber-500/20'
+ }`}
                   >
                     {inst.status === 'PAID' ? 'تم السداد' : inst.status === 'OVERDUE' ? 'متأخر ومستحق' : 'قادم ومستحق'}
                   </span>
                 </div>
 
-                <h3 className="font-bold text-white text-sm mb-1">{inst.customerName}</h3>
-                <span className="text-[11px] text-slate-400 font-mono block mb-3">
+                <h3 className="font-bold text-slate-900 text-sm mb-1">{inst.customerName}</h3>
+                <span className="text-[11px] text-slate-500 font-mono block mb-3">
                   الخطة: {inst.planNumber}
                 </span>
 
-                <div className="space-y-1.5 text-xs text-slate-400 mb-4 bg-slate-950/40 p-3 rounded-xl border border-slate-800/60">
+                <div className="space-y-1.5 text-xs text-slate-500 mb-4 bg-white p-3 rounded-xl border border-slate-200/60">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] text-slate-500 flex items-center gap-1">
                       <Calendar className="w-3 h-3 text-slate-600" />
                       تاريخ الاستحقاق:
                     </span>
-                    <span className={`font-mono font-bold ${inst.status === 'OVERDUE' ? 'text-rose-400' : 'text-slate-300'}`}>
+                    <span className={`font-mono font-bold ${inst.status === 'OVERDUE' ? 'text-rose-600' : 'text-slate-700'}`}>
                       {inst.dueDate}
                     </span>
                   </div>
 
                   {inst.paidAt && (
-                    <div className="flex items-center justify-between text-emerald-400">
+                    <div className="flex items-center justify-between text-emerald-600">
                       <span className="text-[11px] flex items-center gap-1">
                         <Check className="w-3 h-3" />
                         تاريخ السداد:
@@ -452,13 +452,13 @@ export const InstallmentsPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">قيمة القسط:</span>
-                  <span className="text-base font-black text-amber-400">{fmt(inst.amount)}</span>
+                <div className="bg-white rounded-xl p-3 border border-slate-200 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">قيمة القسط:</span>
+                  <span className="text-base font-black text-amber-600">{fmt(inst.amount)}</span>
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-end gap-2">
+              <div className="mt-4 pt-3 border-t border-slate-200/80 flex items-center justify-end gap-2">
                 {inst.status !== 'PAID' ? (
                   <button
                     onClick={() => handlePayInstallment(inst)}
@@ -468,7 +468,7 @@ export const InstallmentsPage: React.FC = () => {
                     تسجيل سداد القسط بالخزينة
                   </button>
                 ) : (
-                  <span className="text-xs text-emerald-400 font-bold flex items-center gap-1 py-1">
+                  <span className="text-xs text-emerald-600 font-bold flex items-center gap-1 py-1">
                     <CheckCircle2 className="w-4 h-4" />
                     تم السداد بالكامل
                   </span>
@@ -482,15 +482,15 @@ export const InstallmentsPage: React.FC = () => {
       {/* Create Plan Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col animate-scaleIn">
-            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col animate-scaleIn">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <CalendarDays className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-black text-white">إنشاء خطة تقسيط جديدة لعميل</h3>
+                <CalendarDays className="w-5 h-5 text-amber-600" />
+                <h3 className="text-base font-black text-slate-900">إنشاء خطة تقسيط جديدة لعميل</h3>
               </div>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-white text-lg font-mono p-1"
+                className="text-slate-500 hover:text-slate-900 text-lg font-mono p-1"
               >
                 ✕
               </button>
@@ -498,11 +498,11 @@ export const InstallmentsPage: React.FC = () => {
 
             <form onSubmit={handleCreatePlan} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">اختر العميل</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">اختر العميل</label>
                 <select
                   value={selectedCustomerId}
                   onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
                 >
                   {customers.map(c => (
                     <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
@@ -512,35 +512,35 @@ export const InstallmentsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">إجمالي قيمة الفاتورة (ج.م)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">إجمالي قيمة الفاتورة (ج.م)</label>
                   <input
                     type="number"
                     min="1000"
                     value={totalFinanced}
                     onChange={(e) => setTotalFinanced(Number(e.target.value) || 0)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">الدفعة المقدمة (مقدماً)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">الدفعة المقدمة (مقدماً)</label>
                   <input
                     type="number"
                     min="0"
                     value={downPayment}
                     onChange={(e) => setDownPayment(Number(e.target.value) || 0)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">عدد الأقساط (شهور)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">عدد الأقساط (شهور)</label>
                   <select
                     value={monthsCount}
                     onChange={(e) => setMonthsCount(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
                   >
                     <option value={3}>3 شهور</option>
                     <option value={6}>6 شهور</option>
@@ -551,12 +551,12 @@ export const InstallmentsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">تاريخ أول قسط</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">تاريخ أول قسط</label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>
               </div>
@@ -564,22 +564,22 @@ export const InstallmentsPage: React.FC = () => {
               {/* Summary Card */}
               <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">المبلغ المتبقي للتمويل:</span>
-                  <span className="font-mono font-bold text-white">{fmt(totalFinanced - downPayment)}</span>
+                  <span className="text-slate-500">المبلغ المتبقي للتمويل:</span>
+                  <span className="font-mono font-bold text-slate-900">{fmt(totalFinanced - downPayment)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">قيمة القسط الشهري المحسوبة:</span>
-                  <span className="font-mono font-black text-amber-400">
+                  <span className="text-slate-500">قيمة القسط الشهري المحسوبة:</span>
+                  <span className="font-mono font-black text-amber-600">
                     {fmt(Math.round((totalFinanced - downPayment) / monthsCount))} / شهر
                   </span>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold"
                 >
                   إلغاء
                 </button>

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
   full_name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('ADMIN', 'MANAGER', 'CASHIER', 'SALES', 'WAREHOUSE', 'ACCOUNTANT')),
+  role TEXT NOT NULL,
   phone TEXT,
   pin_code TEXT,
   is_active INTEGER DEFAULT 1,
@@ -256,6 +256,7 @@ CREATE TABLE IF NOT EXISTS sales_invoices (
   date TEXT NOT NULL,
   customer_id TEXT NOT NULL,
   warehouse_id TEXT NOT NULL,
+  project_id TEXT,
   shift_id TEXT,
   
   subtotal REAL NOT NULL,
@@ -1534,24 +1535,9 @@ CREATE INDEX IF NOT EXISTS idx_login_hist_user ON login_history(user_id, created
 CREATE INDEX IF NOT EXISTS idx_login_hist_created ON login_history(created_at);
 
 -- 32. EMPLOYEES
-CREATE TABLE IF NOT EXISTS employees (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  location TEXT NOT NULL,
-  role TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  email TEXT,
-  base_salary REAL NOT NULL DEFAULT 0,
-  salary_type TEXT NOT NULL DEFAULT 'MONTHLY' CHECK(salary_type IN ('MONTHLY', 'DAILY')),
-  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'ON_LEAVE', 'SUSPENDED')),
-  joined_date TEXT NOT NULL,
-  notes TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
--- The canonical employees table above uses is_active and branch_id; do not
--- create indexes for legacy-only status/location columns here.
+-- The canonical employees table is defined earlier (with full_name, job_title,
+-- hired_at, is_active). The legacy duplicate that used to live here was removed;
+-- migration 010_employee_compat adds the compatibility columns the HR screens read.
 
 -- 33. PAYROLL TRANSACTIONS (سُلف، مكافآت، خصومات، صرف رواتب)
 CREATE TABLE IF NOT EXISTS payroll_transactions (
@@ -1586,7 +1572,48 @@ CREATE TABLE IF NOT EXISTS attendance (
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
 CREATE INDEX IF NOT EXISTS idx_attendance_employee ON attendance(employee_id);
 
--- 35. SCHEMA MIGRATIONS (applied-migration ledger; see migrations.ts)
+-- 35. CHEQUES (post-dated / received / issued cheques)
+CREATE TABLE IF NOT EXISTS cheques (
+  id TEXT PRIMARY KEY,
+  cheque_number TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'RECEIVED' CHECK(type IN ('RECEIVED', 'ISSUED')),
+  party_type TEXT NOT NULL DEFAULT 'OTHER' CHECK(party_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')),
+  party_id TEXT,
+  party_name TEXT NOT NULL,
+  bank_name TEXT,
+  amount REAL NOT NULL DEFAULT 0,
+  due_date TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'DEPOSITED', 'CLEARED', 'BOUNCED', 'CANCELLED')),
+  notes TEXT,
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cheques_due ON cheques(due_date);
+CREATE INDEX IF NOT EXISTS idx_cheques_status ON cheques(status, type);
+
+-- 36. FIXED ASSETS & DEPRECIATION
+CREATE TABLE IF NOT EXISTS fixed_assets (
+  id TEXT PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT DEFAULT 'OTHER',
+  purchase_date TEXT NOT NULL,
+  purchase_cost REAL NOT NULL DEFAULT 0,
+  salvage_value REAL NOT NULL DEFAULT 0,
+  useful_life_years REAL NOT NULL DEFAULT 5,
+  accumulated_depreciation REAL NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'DISPOSED', 'FULLY_DEPRECIATED')),
+  location TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_fixed_assets_status ON fixed_assets(status);
+
+-- 37. SCHEMA MIGRATIONS (applied-migration ledger; see migrations.ts)
 CREATE TABLE IF NOT EXISTS schema_migrations (
   id TEXT PRIMARY KEY,
   description TEXT,

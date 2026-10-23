@@ -55,7 +55,25 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   installmentGraceDays: '3',
   sessionTimeoutMinutes: '480',
   maxFailedLoginAttempts: '5',
+
+  // Branding & appearance — controlled from the Admin Control Center.
+  brandName: 'CeramiSys ERP',
+  brandShortName: 'C',
+  brandLogoDataUrl: '',
+  brandPrimaryColor: '#0284c7',
+  brandAccentColor: '#4f46e5',
+  themeMode: 'light',
+  fontFamily: 'Cairo',
+  showBrandText: '1',
+  sidebarStyle: 'default',
 };
+
+// Keys added after the original settings backfill. Migration 012 inserts any
+// missing key into databases that were created before it existed.
+const EXTENDED_SETTINGS_KEYS = [
+  'brandName', 'brandShortName', 'brandLogoDataUrl', 'brandPrimaryColor',
+  'brandAccentColor', 'themeMode', 'fontFamily', 'showBrandText', 'sidebarStyle',
+];
 
 export const DEFAULT_BRANCH_ID = 'br_main';
 
@@ -356,7 +374,7 @@ export const MIGRATIONS: Migration[] = [
       // Seed initial sync config if not present
       db.run(`
         INSERT OR IGNORE INTO branch_sync_config (id, server_url, api_key, branch_code, branch_name, sync_mode, sync_interval_seconds, last_synced_at, last_sync_status, latency_ms, is_enabled)
-        VALUES ('sync_cfg_main', 'https://cloud.ceramisys-erp.com/api/v1/sync', 'sk_live_demo_sync_token_2026', 'BR-01', 'الفرع والمعرض الرئيسي', 'HYBRID_AUTO', 60, datetime('now'), 'SUCCESS', 38, 1)
+        VALUES ('sync_cfg_main', '', '', 'BR-01', 'الفرع والمعرض الرئيسي', 'OFFLINE', 60, NULL, 'IDLE', 0, 0)
       `);
 
       // Seed standard Chart of Accounts
@@ -386,6 +404,186 @@ export const MIGRATIONS: Migration[] = [
           [id, code, name, type, parent]
         );
       }
+    },
+  },
+
+  {
+    id: '009_project_links',
+    description: 'Link sales invoices to projects for project revenue tracking',
+    up: (db) => {
+      addColumn(db, 'sales_invoices', 'project_id', 'TEXT');
+    },
+  },
+
+  {
+    id: '010_employee_compat',
+    description: 'Add legacy-friendly employee columns used by the HR screens and backfill them from canonical columns',
+    up: (db) => {
+      const added: Record<string, boolean> = {};
+      added.name = addColumn(db, 'employees', 'name', 'TEXT');
+      added.location = addColumn(db, 'employees', 'location', 'TEXT');
+      added.role = addColumn(db, 'employees', 'role', 'TEXT');
+      added.salary_type = addColumn(db, 'employees', 'salary_type', "TEXT DEFAULT 'MONTHLY'");
+      added.status = addColumn(db, 'employees', 'status', "TEXT DEFAULT 'ACTIVE'");
+      added.joined_date = addColumn(db, 'employees', 'joined_date', 'TEXT');
+
+      if (added.name) db.run(`UPDATE employees SET name = full_name WHERE name IS NULL`);
+      if (added.location) db.run(`UPDATE employees SET location = '' WHERE location IS NULL`);
+      if (added.role) db.run(`UPDATE employees SET role = job_title WHERE role IS NULL`);
+      if (added.status) db.run(`UPDATE employees SET status = CASE WHEN is_active = 1 THEN 'ACTIVE' ELSE 'SUSPENDED' END`);
+      if (added.joined_date) db.run(`UPDATE employees SET joined_date = hired_at WHERE joined_date IS NULL`);
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_employees_name ON employees(name)');
+    },
+  },
+
+  {
+    id: '011_sales_pipeline_completion',
+    description: 'Complete the sales pipeline: link quotations/orders to invoices, track returned amounts and invoice payments',
+    up: (db) => {
+      addColumn(db, 'quotations', 'warehouse_id', 'TEXT');
+      addColumn(db, 'quotations', 'converted_invoice_id', 'TEXT');
+      addColumn(db, 'quotations', 'updated_at', 'TEXT');
+      addColumn(db, 'quotation_items', 'discount_amount', 'REAL DEFAULT 0');
+      addColumn(db, 'quotation_items', 'size', 'TEXT');
+      addColumn(db, 'quotation_items', 'sku', 'TEXT');
+      addColumn(db, 'orders', 'invoice_id', 'TEXT');
+      addColumn(db, 'orders', 'quotation_id', 'TEXT');
+      addColumn(db, 'orders', 'branch_id', 'TEXT');
+      addColumn(db, 'orders', 'sales_rep_id', 'TEXT');
+      addColumn(db, 'sales_invoices', 'returned_amount', 'REAL DEFAULT 0');
+      addColumn(db, 'sales_returns', 'register_id', 'TEXT');
+      addColumn(db, 'sales_returns', 'shift_id', 'TEXT');
+      addColumn(db, 'customer_payments', 'invoice_id', 'TEXT');
+
+      db.run(
+        `UPDATE sales_invoices SET returned_amount = COALESCE((
+           SELECT SUM(sr.total_amount) FROM sales_returns sr
+           WHERE sr.original_invoice_id = sales_invoices.id
+         ), 0)
+         WHERE returned_amount IS NULL OR returned_amount = 0`
+      );
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_quote_invoice ON quotations(converted_invoice_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_order_invoice ON orders(invoice_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_customer_payments_invoice ON customer_payments(invoice_id)');
+    },
+  },
+
+  {
+    id: 'seed_walkin_customer',
+    description: 'Seed the default walk-in cash customer used by the POS screen',
+    up: (db) => {
+      db.run(
+        `INSERT OR IGNORE INTO customers (
+           id, code, name, phone, customer_type, credit_limit, current_balance, total_purchases, notes
+         ) VALUES ('cust_cash', 'CASH-001', 'عميل نقدي (بيع مباشر)', '01000000000', 'RETAIL', 0, 0, 0, 'حساب افتراضي لفواتير البيع النقدي السريع من شاشة نقطة البيع')`
+      );
+    },
+  },
+
+  {
+    id: '011_user_permission_effect',
+    description: 'Allow per-user permission overrides to grant OR deny a capability',
+    up: (db) => {
+      addColumn(db, 'user_permissions', 'effect', "TEXT NOT NULL DEFAULT 'GRANT'");
+    },
+  },
+
+  {
+    id: '012_extended_branding_settings',
+    description: 'Insert branding/appearance keys introduced with the admin control center',
+    up: (db) => {
+      for (const key of EXTENDED_SETTINGS_KEYS) {
+        db.run('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)', [
+          key,
+          DEFAULT_SETTINGS[key],
+        ]);
+      }
+    },
+  },
+
+  {
+    id: '013_sales_pages_completion',
+    description: 'Order delivery tracking, status timeline, quotation follow-ups, and return refund methods',
+    up: (db) => {
+      addColumn(db, 'orders', 'delivery_notes', 'TEXT');
+      addColumn(db, 'orders', 'delivered_at', 'TEXT');
+      addColumn(db, 'order_items', 'invoiced_m2', 'REAL DEFAULT 0');
+      addColumn(db, 'order_items', 'notes', 'TEXT');
+
+      addColumn(db, 'quotations', 'follow_up_date', 'TEXT');
+      addColumn(db, 'quotations', 'follow_up_notes', 'TEXT');
+      addColumn(db, 'quotations', 'converted_order_id', 'TEXT');
+      addColumn(db, 'quotations', 'contact_count', 'INTEGER DEFAULT 0');
+      addColumn(db, 'quotations', 'last_contact_at', 'TEXT');
+
+      addColumn(db, 'sales_returns', 'refund_method', "TEXT DEFAULT 'CASH'");
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS order_status_history (
+          id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          from_status TEXT,
+          to_status TEXT NOT NULL,
+          note TEXT,
+          created_by TEXT,
+          created_by_name TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+        );
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_order_history_order ON order_status_history(order_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_quotations_followup ON quotations(follow_up_date)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_quotations_order ON quotations(converted_order_id)');
+    },
+  },
+
+  {
+    id: '014_users_custom_roles',
+    description: 'Drop the built-in-role CHECK constraint so custom roles can be assigned to users',
+    up: (db) => {
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec('DROP TABLE IF EXISTS users_new');
+        db.exec(`
+          CREATE TABLE users_new (
+            id TEXT PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            phone TEXT,
+            pin_code TEXT,
+            branch_id TEXT REFERENCES branches(id),
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        db.exec(`
+          INSERT INTO users_new (id, username, password_hash, full_name, role, phone, pin_code, branch_id, is_active, created_at, updated_at)
+          SELECT id, username, password_hash, full_name, role, phone, pin_code, branch_id, is_active, created_at, updated_at FROM users;
+        `);
+        db.exec('DROP TABLE users');
+        db.exec('ALTER TABLE users_new RENAME TO users');
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
+    },
+  },
+
+  {
+    id: '015_cloud_sync_honest',
+    description: 'Remove the seeded demo sync endpoint and disable sync until a real server is configured',
+    up: (db) => {
+      db.run(`
+        UPDATE branch_sync_config
+        SET server_url = '', api_key = '', is_enabled = 0,
+            last_sync_status = 'IDLE', latency_ms = 0, last_synced_at = NULL
+        WHERE api_key LIKE 'sk_live_demo%'
+           OR server_url LIKE '%cloud.ceramisys-erp.com%'
+      `);
     },
   },
 ];

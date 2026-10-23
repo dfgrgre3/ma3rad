@@ -18,15 +18,15 @@ interface LedgerEntry {
 }
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  PURCHASE:         { label: 'شراء', color: 'text-emerald-400' },
-  SALE:             { label: 'بيع', color: 'text-sky-400' },
-  RETURN_IN:        { label: 'مرتجع وارد', color: 'text-violet-400' },
-  RETURN_OUT:       { label: 'مرتجع صادر', color: 'text-amber-405' },
-  TRANSFER_IN:      { label: 'تحويل وارد', color: 'text-teal-400' },
-  TRANSFER_OUT:     { label: 'تحويل صادر', color: 'text-orange-400' },
+  PURCHASE:         { label: 'شراء', color: 'text-emerald-600' },
+  SALE:             { label: 'بيع', color: 'text-sky-600' },
+  RETURN_IN:        { label: 'مرتجع وارد', color: 'text-violet-600' },
+  RETURN_OUT:       { label: 'مرتجع صادر', color: 'text-amber-600' },
+  TRANSFER_IN:      { label: 'تحويل وارد', color: 'text-teal-600' },
+  TRANSFER_OUT:     { label: 'تحويل صادر', color: 'text-orange-600' },
   ADJUSTMENT:       { label: 'تسوية', color: 'text-yellow-400' },
-  OPENING_BALANCE:  { label: 'رصيد افتتاحي', color: 'text-slate-400' },
-  DAMAGED:          { label: 'تالف', color: 'text-rose-400' },
+  OPENING_BALANCE:  { label: 'رصيد افتتاحي', color: 'text-slate-500' },
+  DAMAGED:          { label: 'تالف', color: 'text-rose-600' },
 };
 
 export const StockLedgerPage: React.FC = () => {
@@ -115,18 +115,18 @@ export const StockLedgerPage: React.FC = () => {
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n);
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
       {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <BookOpen className="w-5 h-5 text-violet-400" />
-          <h1 className="text-base font-black text-white">سجل المخزون (Stock Ledger)</h1>
-          <span className="text-xs bg-violet-500/20 text-violet-400 px-2 py-0.5 rounded-full font-bold">
+          <BookOpen className="w-5 h-5 text-violet-600" />
+          <h1 className="text-base font-black text-slate-900">سجل المخزون (Stock Ledger)</h1>
+          <span className="text-xs bg-violet-500/20 text-violet-600 px-2 py-0.5 rounded-full font-bold">
             {entries.length} حركة
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">
+          <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition">
             <Download className="w-3.5 h-3.5" />
             تصدير
           </button>
@@ -134,21 +134,21 @@ export const StockLedgerPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-900/50 border-b border-slate-800 px-6 py-3 flex items-center gap-3 flex-wrap">
+      <div className="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="بحث بالمنتج أو رقم المرجع..."
-            className="w-full pr-9 pl-4 py-2 bg-slate-800 text-sm text-white placeholder-slate-500 rounded-lg border border-slate-700 focus:border-sky-500 focus:outline-none"
+            className="w-full pr-9 pl-4 py-2 bg-slate-100 text-sm text-slate-900 placeholder-slate-400 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
           />
         </div>
 
         <select
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-800 text-sm text-slate-300 rounded-lg border border-slate-700 focus:border-sky-500 focus:outline-none"
+          className="px-3 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
         >
           <option value="">كل الأنواع</option>
           {Object.entries(TYPE_LABELS).map(([k, v]) => (
@@ -159,7 +159,7 @@ export const StockLedgerPage: React.FC = () => {
         <select
           value={warehouseFilter}
           onChange={e => setWarehouseFilter(e.target.value)}
-          className="px-3 py-2 bg-slate-800 text-sm text-slate-300 rounded-lg border border-slate-700 focus:border-sky-500 focus:outline-none"
+          className="px-3 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
         >
           <option value="">كل المخازن</option>
           {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -179,32 +179,32 @@ export const StockLedgerPage: React.FC = () => {
           </div>
         ) : (
           <table className="w-full text-xs min-w-[900px]">
-            <thead className="bg-slate-900 sticky top-0 z-10">
+            <thead className="bg-white sticky top-0 z-10">
               <tr>
                 {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد م²', 'صادر م²', 'المرجع', 'المستخدم'].map(h => (
-                  <th key={h} className="px-4 py-3 text-right font-bold text-slate-400 border-b border-slate-800">{h}</th>
+                  <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-slate-200/50">
               {paginated.map((r) => {
-                const typeInfo = TYPE_LABELS[r.type] ?? { label: r.type, color: 'text-slate-400' };
+                const typeInfo = TYPE_LABELS[r.type] ?? { label: r.type, color: 'text-slate-500' };
                 return (
-                  <tr key={r.id} className="hover:bg-slate-900/50 transition">
-                    <td className="px-4 py-3 text-slate-400 font-mono whitespace-nowrap">{r.date}</td>
-                    <td className="px-4 py-3 text-white font-medium max-w-[200px] truncate">{r.product}</td>
-                    <td className="px-4 py-3 text-slate-300">{r.warehouse}</td>
+                  <tr key={r.id} className="hover:bg-white transition">
+                    <td className="px-4 py-3 text-slate-500 font-mono whitespace-nowrap">{r.date}</td>
+                    <td className="px-4 py-3 text-slate-900 font-medium max-w-[200px] truncate">{r.product}</td>
+                    <td className="px-4 py-3 text-slate-700">{r.warehouse}</td>
                     <td className="px-4 py-3">
                       <span className={`font-bold ${typeInfo.color}`}>{typeInfo.label}</span>
                     </td>
-                    <td className="px-4 py-3 text-emerald-400 font-bold">
+                    <td className="px-4 py-3 text-emerald-600 font-bold">
                       {r.qtyIn > 0 ? `+${fmt(r.qtyIn)}` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-rose-400 font-bold">
+                    <td className="px-4 py-3 text-rose-600 font-bold">
                       {r.qtyOut > 0 ? `-${fmt(r.qtyOut)}` : '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-400 font-mono">{r.ref || '—'}</td>
-                    <td className="px-4 py-3 text-slate-400">{r.user}</td>
+                    <td className="px-4 py-3 text-slate-500 font-mono">{r.ref || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500">{r.user}</td>
                   </tr>
                 );
               })}
@@ -215,22 +215,22 @@ export const StockLedgerPage: React.FC = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-slate-900 border-t border-slate-800 px-6 py-3 flex items-center justify-between">
-          <span className="text-xs text-slate-400">
+        <div className="bg-white border-t border-slate-200 px-6 py-3 flex items-center justify-between">
+          <span className="text-xs text-slate-500">
             صفحة {page} من {totalPages} — {entries.length} نتيجة
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs disabled:opacity-40 hover:bg-slate-700 transition"
+              className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs disabled:opacity-40 hover:bg-slate-200 transition"
             >
               السابق
             </button>
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-lg text-xs disabled:opacity-40 hover:bg-slate-700 transition"
+              className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs disabled:opacity-40 hover:bg-slate-200 transition"
             >
               التالي
             </button>

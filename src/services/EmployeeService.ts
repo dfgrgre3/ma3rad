@@ -77,7 +77,7 @@ export class EmployeeService {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const sql = `SELECT * FROM employees ${where} ORDER BY name ASC`;
+    const sql = `SELECT * FROM employees ${where} ORDER BY COALESCE(name, full_name) ASC`;
     return this.db.query<Employee>(sql, params);
   }
 
@@ -86,37 +86,51 @@ export class EmployeeService {
     return rows[0] ?? null;
   }
 
-  static create(data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Employee {
+  static create(data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'notes'> & { notes?: string }): Employee {
+    if (!data.name?.trim()) throw new Error('اسم الموظف مطلوب.');
+    if (!data.phone?.trim()) throw new Error('رقم الهاتف مطلوب.');
     const id = `emp_${uuidv4().substring(0, 8)}`;
-    this.db.run(
-      `INSERT INTO employees (id, name, location, role, phone, email, base_salary, salary_type, status, joined_date, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, data.name, data.location, data.role, data.phone, data.email || null,
-       data.baseSalary, data.salaryType, data.status, data.joinedDate, data.notes || null]
-    );
-    return this.getById(id)!;
+    return this.db.executeTransaction((db) => {
+      const code = db.nextNumber('EMP');
+      db.run(
+        `INSERT INTO employees (
+           id, code, full_name, name, phone, email, job_title, role, location,
+           employment_type, hired_at, joined_date, base_salary, salary_type, status, is_active, notes
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'FULL_TIME', ?, ?, ?, ?, ?, ?, ?)`,
+        [id, code, data.name, data.name, data.phone, data.email || null, data.role, data.role,
+         data.location || '', data.joinedDate, data.joinedDate, data.baseSalary,
+         data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes || null]
+      );
+      return this.getById(id)!;
+    });
   }
 
   static update(id: string, data: Partial<Omit<Employee, 'id' | 'createdAt'>>): Employee {
     const existing = this.getById(id);
     if (!existing) throw new Error('الموظف غير موجود.');
+    const nextStatus = data.status ?? existing.status;
     this.db.run(
       `UPDATE employees SET
          name = COALESCE(?, name),
+         full_name = COALESCE(?, full_name),
          location = COALESCE(?, location),
          role = COALESCE(?, role),
+         job_title = COALESCE(?, job_title),
          phone = COALESCE(?, phone),
          email = COALESCE(?, email),
          base_salary = COALESCE(?, base_salary),
          salary_type = COALESCE(?, salary_type),
-         status = COALESCE(?, status),
+         status = ?,
+         is_active = ?,
          joined_date = COALESCE(?, joined_date),
+         hired_at = COALESCE(?, hired_at),
          notes = COALESCE(?, notes),
          updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [data.name ?? null, data.location ?? null, data.role ?? null, data.phone ?? null,
-       data.email ?? null, data.baseSalary ?? null, data.salaryType ?? null,
-       data.status ?? null, data.joinedDate ?? null, data.notes ?? null, id]
+      [data.name ?? null, data.name ?? null, data.location ?? null, data.role ?? null, data.role ?? null,
+       data.phone ?? null, data.email ?? null, data.baseSalary ?? null, data.salaryType ?? null,
+       nextStatus, nextStatus === 'ACTIVE' ? 1 : 0, data.joinedDate ?? null, data.joinedDate ?? null,
+       data.notes ?? null, id]
     );
     return this.getById(id)!;
   }
@@ -185,12 +199,17 @@ export class EmployeeService {
     const bonuses = map['BONUS'] ?? 0;
     const deductions = map['DEDUCTION'] ?? 0;
     const payouts = map['SALARY_PAYOUT'] ?? 0;
-    const netDue = emp.baseSalary + bonuses - advances - deductions - payouts;
+    const monthlySalary = emp.salaryType === 'DAILY' ? emp.baseSalary * 26 : emp.baseSalary;
+    const netDue = monthlySalary + bonuses - advances - deductions - payouts;
 
-    return { baseSalary: emp.baseSalary, advances, bonuses, deductions, payouts, netDue };
+    return { baseSalary: monthlySalary, advances, bonuses, deductions, payouts, netDue };
   }
 
   // ─── Attendance ────────────────────────────────────────────────────────────────
+
+  static getAllAttendance(): Attendance[] {
+    return this.db.query<Attendance>(`SELECT * FROM attendance ORDER BY date DESC`);
+  }
 
   static getAttendanceByDate(date: string): Attendance[] {
     return this.db.query<Attendance>(

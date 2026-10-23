@@ -4,6 +4,33 @@ import bcrypt from 'bcryptjs';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function toUint8Array(value: unknown): Uint8Array | null {
+  if (!value) return null;
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (Array.isArray(value)) return new Uint8Array(value);
+  return null;
+}
+
 // sql.js returns rows keyed by raw DB column names (snake_case). The service
 // layer and the TypeScript interfaces use camelCase, so normalize row keys here.
 function snakeToCamel(s: string): string {
@@ -25,6 +52,10 @@ export class DatabaseManager {
   private transactionDepth = 0;
   private pageCache = new Map<string, { expiresAt: number; value: any }>();
   private readonly pageCacheTtlMs = 15000;
+  private persistQueue: Promise<void> = Promise.resolve();
+  private lastPersistError: string | null = null;
+  private storageBackend: 'file' | 'localStorage' | 'none' = 'none';
+  private migratedLegacyStorage = false;
 
   private constructor() {}
 
@@ -109,21 +140,39 @@ export class DatabaseManager {
       throw err;
     }
 
-    // Check if database exists in localStorage (persistent offline desktop storage)
-    const savedDbBase64 = localStorage.getItem(DB_STORAGE_KEY);
+    // Prefer the real SQLite file managed by the Electron main process. The
+    // previous localStorage snapshot is only used to migrate existing installs.
+    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    let savedBytes: Uint8Array | null = null;
     let isFreshDatabase = true;
 
-    if (savedDbBase64) {
+    if (fileApi?.load) {
       try {
-        const binaryString = atob(savedDbBase64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+        savedBytes = toUint8Array(await fileApi.load());
+        if (savedBytes && savedBytes.length > 0) this.storageBackend = 'file';
+      } catch (e) {
+        console.error('Failed to load SQLite file, falling back to local storage', e);
+      }
+    }
+
+    if (!savedBytes && typeof localStorage !== 'undefined') {
+      const legacy = localStorage.getItem(DB_STORAGE_KEY);
+      if (legacy) {
+        try {
+          savedBytes = base64ToBytes(legacy);
+          this.migratedLegacyStorage = true;
+          console.log('✅ Found legacy database snapshot; migrating it to a file.');
+        } catch (e) {
+          console.error('Failed to decode legacy database snapshot', e);
         }
-        this.db = new this.SQL.Database(bytes);
+      }
+    }
+
+    if (savedBytes && savedBytes.length > 0) {
+      try {
+        this.db = new this.SQL.Database(savedBytes);
         isFreshDatabase = false;
-        console.log('✅ Loaded existing SQLite database from local storage.');
+        console.log(`✅ Loaded existing SQLite database (${this.storageBackend === 'file' ? 'file' : 'legacy storage'}).`);
       } catch (e) {
         console.error('Failed to load saved database, initializing fresh schema', e);
         this.db = new this.SQL.Database();
@@ -131,6 +180,10 @@ export class DatabaseManager {
     } else {
       console.log('Creating fresh SQLite database and running migrations...');
       this.db = new this.SQL.Database();
+    }
+
+    if (!this.storageBackend || this.storageBackend === 'none') {
+      this.storageBackend = fileApi?.save ? 'file' : (typeof localStorage !== 'undefined' ? 'localStorage' : 'none');
     }
 
     // Bring the database up to the current schema. This runs on BOTH paths:
@@ -237,18 +290,61 @@ export class DatabaseManager {
 
   public saveToStorage(): void {
     if (!this.db) return;
+    let snapshot: Uint8Array;
     try {
-      const data = this.db.export();
-      let binary = '';
-      const len = data.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(data[i]);
-      }
-      const base64 = btoa(binary);
-      localStorage.setItem(DB_STORAGE_KEY, base64);
+      snapshot = this.db.export();
     } catch (e) {
-      console.error('Failed to save SQLite database snapshot to localStorage', e);
+      this.lastPersistError = e instanceof Error ? e.message : String(e);
+      console.error('Failed to export SQLite database snapshot', e);
+      return;
     }
+    this.persist(snapshot);
+  }
+
+  /**
+   * Serializes writes so a slow disk (or concurrent transaction) can never
+   * overwrite a newer snapshot with an older one.
+   */
+  private persist(snapshot: Uint8Array): void {
+    this.persistQueue = this.persistQueue
+      .then(async () => {
+        const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+        if (fileApi?.save) {
+          const result = await fileApi.save(snapshot);
+          if (!result?.ok) throw new Error(result?.error || 'فشل حفظ قاعدة البيانات على القرص');
+          this.storageBackend = 'file';
+          this.lastPersistError = null;
+          if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
+            try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
+            this.migratedLegacyStorage = false;
+          }
+          return;
+        }
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(DB_STORAGE_KEY, bytesToBase64(snapshot));
+          this.storageBackend = 'localStorage';
+          this.lastPersistError = null;
+          return;
+        }
+        this.storageBackend = 'none';
+      })
+      .catch((e) => {
+        this.lastPersistError = e instanceof Error ? e.message : String(e);
+        console.error('Failed to persist SQLite database', e);
+      });
+  }
+
+  /** Wait for all pending disk writes (used before shutdown/backup/restore). */
+  public async flush(): Promise<void> {
+    await this.persistQueue;
+  }
+
+  public getStorageBackend(): 'file' | 'localStorage' | 'none' {
+    return this.storageBackend;
+  }
+
+  public getLastPersistError(): string | null {
+    return this.lastPersistError;
   }
 
   public getDatabase(): Database {

@@ -1,4 +1,5 @@
 import { DatabaseManager } from '../database/db';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface AuditLogEntry {
   id: string;
@@ -32,6 +33,40 @@ export interface AuditStats {
 
 export class AuditService {
   private db = DatabaseManager.getInstance();
+
+  /** Append-only audit entry. Never throws — logging must not break a business action. */
+  public log(entry: {
+    userId?: string;
+    userName?: string;
+    action: string;
+    module: string;
+    recordId?: string;
+    oldValues?: string;
+    newValues?: string;
+    ipAddress?: string;
+  }): void {
+    try {
+      this.db.run(
+        `INSERT INTO audit_logs
+           (id, user_id, user_name, action, module, record_id, old_values, new_values, ip_address, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          `aud_${uuidv4().substring(0, 10)}`,
+          entry.userId || 'system',
+          entry.userName || 'النظام',
+          entry.action,
+          entry.module,
+          entry.recordId || null,
+          entry.oldValues || null,
+          entry.newValues || null,
+          entry.ipAddress || null,
+          new Date().toISOString(),
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to write audit log', error);
+    }
+  }
 
   public getAuditLogs(filters: AuditFilters = {}): { logs: AuditLogEntry[]; total: number } {
     let whereClause = 'WHERE 1=1';

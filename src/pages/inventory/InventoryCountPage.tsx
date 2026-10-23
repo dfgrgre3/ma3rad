@@ -303,16 +303,16 @@ export const InventoryCountPage: React.FC = () => {
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
       {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-            <ScanLine className="w-5 h-5 text-violet-400" />
+            <ScanLine className="w-5 h-5 text-violet-600" />
           </div>
           <div>
-            <h1 className="text-base font-black text-white">جرد المخزون (Inventory Count)</h1>
-            <p className="text-xs text-slate-400 font-medium">متابعة ومطابقة الجرد الدوري والمفاجئ للمخازن والمعارض</p>
+            <h1 className="text-base font-black text-slate-900">جرد المخزون (Inventory Count)</h1>
+            <p className="text-xs text-slate-500 font-medium">متابعة ومطابقة الجرد الدوري والمفاجئ للمخازن والمعارض</p>
           </div>
         </div>
         <button
@@ -325,7 +325,7 @@ export const InventoryCountPage: React.FC = () => {
       </div>
 
       {/* Toolbar */}
-      <div className="p-4 bg-slate-900/50 border-b border-slate-900 flex gap-3">
+      <div className="p-4 bg-white border-b border-slate-200 flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
@@ -333,7 +333,7 @@ export const InventoryCountPage: React.FC = () => {
             placeholder="بحث برقم الجلسة، المخزن، أو القائم بالجرد..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-4 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500/50 transition"
+            className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-violet-500/50 transition"
           />
         </div>
       </div>
@@ -350,42 +350,42 @@ export const InventoryCountPage: React.FC = () => {
             <p className="text-sm">لا توجد جلسات جرد سابقة</p>
           </div>
         ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-850 border-b border-slate-800">
+              <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   {['كود الجلسة', 'المخزن المستهدف', 'التاريخ', 'المسؤول', 'الأصناف', 'الفروقات', 'قيمة الفروقات', 'الحالة', 'الخيارات'].map(h => (
-                    <th key={h} className="px-4 py-3 text-right text-xs font-bold text-slate-400">{h}</th>
+                    <th key={h} className="px-4 py-3 text-right text-xs font-bold text-slate-500">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-slate-200">
                 {filtered.map((session) => (
-                  <tr key={session.id} className="hover:bg-slate-800/30 transition">
-                    <td className="px-4 py-3 font-mono text-sky-400 font-bold">{session.code}</td>
-                    <td className="px-4 py-3 text-white font-medium">{session.warehouse}</td>
-                    <td className="px-4 py-3 text-slate-400">{session.startDate}</td>
-                    <td className="px-4 py-3 text-slate-300">{session.countedBy}</td>
-                    <td className="px-4 py-3 text-slate-300 font-bold">{session.itemsCount} صنف</td>
+                  <tr key={session.id} className="hover:bg-slate-100 transition">
+                    <td className="px-4 py-3 font-mono text-sky-600 font-bold">{session.code}</td>
+                    <td className="px-4 py-3 text-slate-900 font-medium">{session.warehouse}</td>
+                    <td className="px-4 py-3 text-slate-500">{session.startDate}</td>
+                    <td className="px-4 py-3 text-slate-700">{session.countedBy}</td>
+                    <td className="px-4 py-3 text-slate-700 font-bold">{session.itemsCount} صنف</td>
                     <td className="px-4 py-3 text-slate-405">
                       {session.status === 'POSTED' ? `${session.itemsWithVariance} أصناف` : '—'}
                     </td>
                     <td className="px-4 py-3 font-mono">
                       {session.status === 'POSTED' ? (
                         session.totalVarianceValue > 0 ? (
-                          <span className="text-rose-450 font-bold">{fmt(session.totalVarianceValue)}</span>
+                          <span className="text-rose-600 font-bold">{fmt(session.totalVarianceValue)}</span>
                         ) : (
-                          <span className="text-emerald-450">مطابق</span>
+                          <span className="text-emerald-600">مطابق</span>
                         )
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       {session.status === 'POSTED' ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1 w-fit">
                           <CheckCircle2 className="w-3 h-3" /> مطابق ومرحل
                         </span>
                       ) : (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/10 text-amber-450 border border-amber-550/20 flex items-center gap-1 w-fit animate-pulse">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1 w-fit animate-pulse">
                           قيد الجرد والتعبئة
                         </span>
                       )}
@@ -393,7 +393,7 @@ export const InventoryCountPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleOpenSession(session)}
-                        className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-bold transition"
+                        className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-bold transition"
                       >
                         <FileText className="w-3.5 h-3.5" />
                         <span>{session.status === 'POSTED' ? 'عرض التقرير' : 'إدخال الجرد'}</span>
@@ -410,32 +410,32 @@ export const InventoryCountPage: React.FC = () => {
 
       {/* Start Session Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <form onSubmit={handleStartSession} className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white backdrop-blur-sm">
+          <form onSubmit={handleStartSession} className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <ScanLine className="w-5 h-5 text-violet-400" />
-                <h3 className="text-base font-black text-white">بدء جلسة جرد مخازن جديدة</h3>
+                <ScanLine className="w-5 h-5 text-violet-600" />
+                <h3 className="text-base font-black text-slate-900">بدء جلسة جرد مخازن جديدة</h3>
               </div>
-              <button type="button" onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white transition">
+              <button type="button" onClick={() => setShowCreateModal(false)} className="text-slate-500 hover:text-slate-900 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
               {errorMsg && (
-                <div className="flex items-center gap-2 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold rounded-xl">
+                <div className="flex items-center gap-2 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-semibold rounded-xl">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-xs text-slate-450 font-bold block">المخزن المراد جرده</label>
+                <label className="text-xs text-slate-500 font-bold block">المخزن المراد جرده</label>
                 <select
                   value={selectedWarehouseId}
                   onChange={(e) => setSelectedWarehouseId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-violet-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                 >
                   {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
@@ -446,7 +446,7 @@ export const InventoryCountPage: React.FC = () => {
                 <select
                   value={countType}
                   onChange={(e) => setCountType(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-violet-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-violet-500"
                 >
                   <option value="FULL">جرد كلي (لكل المنتجات)</option>
                   <option value="PARTIAL">جرد جزئي</option>
@@ -454,16 +454,16 @@ export const InventoryCountPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="text-xs text-slate-400 bg-violet-500/5 p-3 rounded-lg border border-violet-550/10 leading-relaxed">
+              <div className="text-xs text-slate-500 bg-violet-500/5 p-3 rounded-lg border border-violet-500/10 leading-relaxed">
                 * عند الضغط على "بدء الجرد"، سيقوم النظام بتثبيت وحفظ الأرصدة الدفترية الحالية للأصناف لمقارنتها لاحقاً مع الكميات التي ستقوم بعدّها وإدخالها.
               </div>
             </div>
 
-            <div className="bg-slate-850 px-6 py-4 flex justify-end gap-2 border-t border-slate-800">
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-slate-350 rounded-xl text-xs font-bold transition border border-slate-800"
+                className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition border border-slate-200"
               >
                 إلغاء
               </button>
@@ -480,44 +480,44 @@ export const InventoryCountPage: React.FC = () => {
 
       {/* Session Counting & View Modal */}
       {showSessionModal && activeSession && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
-            <div className="bg-slate-850 px-6 py-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white backdrop-blur-sm">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
+            <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-violet-400" />
-                <h3 className="text-base font-black text-white">
+                <ClipboardList className="w-5 h-5 text-violet-600" />
+                <h3 className="text-base font-black text-slate-900">
                   جلسة الجرد: {activeSession.code} ({activeSession.warehouse})
                 </h3>
               </div>
-              <button onClick={() => setShowSessionModal(false)} className="text-slate-400 hover:text-white transition">
+              <button onClick={() => setShowSessionModal(false)} className="text-slate-500 hover:text-slate-900 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-950/40 p-3 rounded-lg border border-slate-800">
-                <div>النوع: <span className="text-white font-bold">{activeSession.status === 'POSTED' ? 'مرحل ومعتمد' : 'قيد الجرد الفعلي'}</span></div>
-                <div>القائم بالجرد: <span className="text-white font-bold">{activeSession.countedBy}</span></div>
-                <div>التاريخ: <span className="text-white font-bold font-mono">{activeSession.startDate}</span></div>
+              <div className="flex items-center justify-between text-xs text-slate-500 bg-white p-3 rounded-lg border border-slate-200">
+                <div>النوع: <span className="text-slate-900 font-bold">{activeSession.status === 'POSTED' ? 'مرحل ومعتمد' : 'قيد الجرد الفعلي'}</span></div>
+                <div>القائم بالجرد: <span className="text-slate-900 font-bold">{activeSession.countedBy}</span></div>
+                <div>التاريخ: <span className="text-slate-900 font-bold font-mono">{activeSession.startDate}</span></div>
               </div>
 
-              <div className="border border-slate-800 rounded-xl overflow-hidden">
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <table className="w-full text-xs">
-                  <thead className="bg-slate-850 sticky top-0">
+                  <thead className="bg-slate-50 sticky top-0">
                     <tr>
                       {['اسم الصنف السيراميك', 'الرصيد الدفتري للنظام', 'الجرد الفعلي م²', 'الفارق م²', 'سعر التكلفة', 'الفارق المالي'].map(h => (
-                        <th key={h} className="px-4 py-3 text-right font-bold text-slate-400 border-b border-slate-800">{h}</th>
+                        <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-slate-200">
                     {sessionItems.map((item, idx) => (
-                      <tr key={item.id} className="hover:bg-slate-850/40 transition">
-                        <td className="px-4 py-3 text-white font-semibold">{item.productName}</td>
-                        <td className="px-4 py-3 font-mono text-slate-400">{item.systemQuantityM2} م²</td>
+                      <tr key={item.id} className="hover:bg-slate-100 transition">
+                        <td className="px-4 py-3 text-slate-900 font-semibold">{item.productName}</td>
+                        <td className="px-4 py-3 font-mono text-slate-500">{item.systemQuantityM2} م²</td>
                         <td className="px-4 py-2">
                           {activeSession.status === 'POSTED' ? (
-                            <span className="font-mono text-white font-bold">{item.countedQuantityM2} م²</span>
+                            <span className="font-mono text-slate-900 font-bold">{item.countedQuantityM2} م²</span>
                           ) : (
                             <input
                               type="number"
@@ -525,16 +525,16 @@ export const InventoryCountPage: React.FC = () => {
                               value={item.countedQuantityM2 ?? ''}
                               onChange={(e) => handleItemCountChange(idx, e.target.value)}
                               placeholder="أدخل الجرد الفعلي"
-                              className="px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono w-32 focus:outline-none focus:border-violet-500 text-white"
+                              className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono w-32 focus:outline-none focus:border-violet-500 text-slate-900"
                             />
                           )}
                         </td>
                         <td className="px-4 py-3 font-mono font-bold">
                           {item.countedQuantityM2 !== null ? (
                             item.varianceM2 > 0 ? (
-                              <span className="text-emerald-450">+{item.varianceM2} م²</span>
+                              <span className="text-emerald-600">+{item.varianceM2} م²</span>
                             ) : item.varianceM2 < 0 ? (
-                              <span className="text-rose-450">{item.varianceM2} م²</span>
+                              <span className="text-rose-600">{item.varianceM2} م²</span>
                             ) : (
                               <span className="text-slate-500">مطابق</span>
                             )
@@ -546,14 +546,14 @@ export const InventoryCountPage: React.FC = () => {
                         <td className="px-4 py-3 font-mono font-bold">
                           {item.countedQuantityM2 !== null ? (
                             item.varianceValue > 0 ? (
-                              <span className="text-emerald-450">+{fmt(item.varianceValue)}</span>
+                              <span className="text-emerald-600">+{fmt(item.varianceValue)}</span>
                             ) : item.varianceValue < 0 ? (
-                              <span className="text-rose-455">{fmt(item.varianceValue)}</span>
+                              <span className="text-rose-600">{fmt(item.varianceValue)}</span>
                             ) : (
                               <span className="text-slate-500">0 ج</span>
                             )
                           ) : (
-                            <span className="text-slate-650">—</span>
+                            <span className="text-slate-500">—</span>
                           )}
                         </td>
                       </tr>
@@ -563,12 +563,12 @@ export const InventoryCountPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-slate-850 px-6 py-4 border-t border-slate-800 flex justify-between shrink-0">
+            <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-between shrink-0">
               <div>
                 {activeSession.status !== 'POSTED' && (
                   <button
                     onClick={handleSaveDraft}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition border border-slate-700"
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition border border-slate-300"
                   >
                     حفظ كمسودة
                   </button>
@@ -577,7 +577,7 @@ export const InventoryCountPage: React.FC = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowSessionModal(false)}
-                  className="px-4 py-2 bg-slate-850 hover:bg-slate-800 text-slate-350 rounded-xl text-xs font-bold transition border border-slate-800"
+                  className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition border border-slate-200"
                 >
                   إغلاق
                 </button>

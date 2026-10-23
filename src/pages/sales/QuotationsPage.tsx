@@ -1,908 +1,806 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  FileText, Plus, Search, Calendar, CheckCircle2, ChevronRight, User,
-  Printer, ArrowRight, Trash2, Calculator, Check, AlertCircle, Sparkles,
-  DollarSign, Clock, ShieldCheck
+  FileText, Plus, Search, Calendar, Printer, Trash2, Check, X, Loader2, Eye,
+  Pencil, Ban, Copy, RefreshCw, FileSpreadsheet, FileDown, ChevronLeft,
+  ChevronRight, Percent, Ban as CancelIcon, Receipt, Clock, CheckCircle2, AlertTriangle,
+  MessageCircle, CalendarClock, ShoppingBag, PhoneCall,
 } from 'lucide-react';
-import { DatabaseManager } from '../../database/db';
+import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../services/QuotationService';
 import { CustomerService } from '../../services/CustomerService';
 import { ProductService } from '../../services/ProductService';
 import { InventoryService } from '../../services/InventoryService';
-import { CloudSyncService } from '../../services/CloudSyncService';
 import { PrintService } from '../../services/PrintService';
-import { Customer, Product, Warehouse } from '../../types';
-import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
+import { Customer, Product, Warehouse, PaymentType } from '../../types';
+import { exportToExcel, buildExportHtml } from '../../utils/export';
+import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 
-interface QuotationItem {
-  id?: string;
-  productId: string;
-  productName: string;
-  size?: string;
-  grade?: string;
-  quantityM2: number;
-  boxesCount: number;
-  unitPrice: number;
-  totalPrice: number;
-  metersPerBox: number;
-}
+const PAGE_SIZE = 12;
 
-interface QuotationRecord {
-  id: string;
-  quotationNumber: string;
-  date: string;
-  validUntil: string;
-  customerId: string;
-  customerName: string;
-  customerPhone?: string;
-  subtotal: number;
-  discountAmount: number;
-  taxAmount: number;
-  totalAmount: number;
-  status: 'PENDING' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
-  notes?: string;
-  items?: QuotationItem[];
-}
-
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  PENDING: { label: 'بانتظار موافقة العميل', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-  CONVERTED: { label: 'تم التحويل لفاتورة مبيعات', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-  EXPIRED: { label: 'منتهي الصلاحية', color: 'bg-slate-700 text-slate-400 border-slate-650' },
-  CANCELLED: { label: 'ملغي', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
+const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> = {
+  PENDING: { label: 'بانتظار الموافقة', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
+  CONVERTED: { label: 'محوّل إلى فاتورة', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+  EXPIRED: { label: 'منتهي الصلاحية', color: 'bg-slate-200 text-slate-500 border-slate-300' },
+  CANCELLED: { label: 'ملغي', color: 'bg-rose-500/10 text-rose-600 border-rose-500/20' },
 };
 
+const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
+
+type Line = { productId: string; quantityM2: number; unitPrice: number; discountAmount: number };
+
+interface FormState {
+  customerId: string;
+  warehouseId: string;
+  validDays: string;
+  discount: string;
+  tax: string;
+  notes: string;
+  lines: Line[];
+}
+
+const emptyForm = (): FormState => ({
+  customerId: '', warehouseId: '', validDays: '15', discount: '', tax: '', notes: '',
+  lines: [{ productId: '', quantityM2: 0, unitPrice: 0, discountAmount: 0 }],
+});
+
 export const QuotationsPage: React.FC = () => {
-  const [quotations, setQuotations] = useState<QuotationRecord[]>([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [isLoading, setIsLoading] = useState(true);
+  const service = useMemo(() => new QuotationService(), []);
+  const customerService = useMemo(() => new CustomerService(), []);
+  const productService = useMemo(() => new ProductService(), []);
+  const inventoryService = useMemo(() => new InventoryService(), []);
+  const printService = useMemo(() => new PrintService(), []);
+  const user = AuthService.getCurrentUser();
+  const canCreate = PermissionService.can(user, 'sales.create');
+  const canApprove = PermissionService.can(user, 'sales.approve');
 
-  // Modal states
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPrintModal, setShowPrintModal] = useState<QuotationRecord | null>(null);
-
-  // Form states
+  const [docPreview, setDocPreview] = useState<{
+    title: string;
+    subtitle?: string;
+    fileName: string;
+    html: string;
+    excel?: () => void;
+  } | null>(null);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [stats, setStats] = useState<QuotationStats | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | QuotationStatus>('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [validDays, setValidDays] = useState(15);
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [quoteNotes, setQuoteNotes] = useState('');
-  const [items, setItems] = useState<QuotationItem[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm());
+  const [saving, setSaving] = useState(false);
 
-  // Item form inside modal
-  const [selectedProdId, setSelectedProdId] = useState('');
-  const [itemQuantityM2, setItemQuantityM2] = useState<number>(14.4);
+  const [detail, setDetail] = useState<Quotation | null>(null);
+  const [convertTarget, setConvertTarget] = useState<Quotation | null>(null);
+  const [convertWarehouse, setConvertWarehouse] = useState('');
+  const [convertPaymentType, setConvertPaymentType] = useState<PaymentType>('CREDIT');
+  const [convertPaid, setConvertPaid] = useState('0');
+  const [convertNotes, setConvertNotes] = useState('');
 
-  const customerService = new CustomerService();
-  const productService = new ProductService();
-  const inventoryService = new InventoryService();
-  const syncService = new CloudSyncService();
-  const printService = new PrintService();
+  const [orderTarget, setOrderTarget] = useState<Quotation | null>(null);
+  const [orderDeliveryDate, setOrderDeliveryDate] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
 
-  const loadData = () => {
-    setIsLoading(true);
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) {
-      setIsLoading(false);
-      return;
-    }
+  const [followUpTarget, setFollowUpTarget] = useState<Quotation | null>(null);
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpNotes, setFollowUpNotes] = useState('');
 
+  const [followUpOnly, setFollowUpOnly] = useState(false);
+
+  const load = () => {
+    setLoading(true);
     try {
-      const allCusts = customerService.getAllCustomers();
-      const allProds = productService.getAllProducts();
-      const allWhs = inventoryService.getAllWarehouses();
-      setCustomers(allCusts);
-      setProducts(allProds);
-      setWarehouses(allWhs);
-
-      if (allCusts.length > 0 && !selectedCustomerId) {
-        setSelectedCustomerId(allCusts[0].id);
-      }
-      if (allProds.length > 0 && !selectedProdId) {
-        setSelectedProdId(allProds[0].id);
-      }
-
-      // Query quotations
-      const res = db.exec(`
-        SELECT q.id, q.quotation_number, q.date, q.valid_until, q.customer_id,
-               c.name as customer_name, c.phone as customer_phone,
-               q.subtotal, q.discount_amount, q.tax_amount, q.total_amount,
-               q.status, q.notes
-        FROM quotations q
-        LEFT JOIN customers c ON q.customer_id = c.id
-        ORDER BY q.date DESC, q.created_at DESC
-      `);
-
-      if (res.length > 0 && res[0].values.length > 0) {
-        const rows = res[0].values.map((r: any[]) => ({
-          id: String(r[0]),
-          quotationNumber: String(r[1]),
-          date: String(r[2]),
-          validUntil: String(r[3]),
-          customerId: String(r[4]),
-          customerName: String(r[5] || 'عميل نقدي'),
-          customerPhone: r[6] ? String(r[6]) : undefined,
-          subtotal: Number(r[7] || 0),
-          discountAmount: Number(r[8] || 0),
-          taxAmount: Number(r[9] || 0),
-          totalAmount: Number(r[10] || 0),
-          status: (r[11] || 'PENDING') as any,
-          notes: r[12] ? String(r[12]) : undefined,
-        }));
-        setQuotations(rows);
-      } else {
-        // Seed initial quotations if none exist
-        if (allCusts.length > 0 && allProds.length > 0) {
-          const cust = allCusts[0];
-          const prod = allProds[0];
-          const today = new Date().toISOString().split('T')[0];
-          const nextWeek = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
-          const seedId = uuidv4();
-          const qM2 = 45;
-          const price = prod.sellingPriceM2 || 180;
-          const total = qM2 * price;
-
-          db.run(`
-            INSERT INTO quotations (id, quotation_number, date, valid_until, customer_id, customer_name, subtotal, total_amount, status, created_by)
-            VALUES (?, 'QTN-2026-001', ?, ?, ?, ?, ?, ?, 'PENDING', 'usr_admin')
-          `, [seedId, today, nextWeek, cust.id, cust.name, total, total]);
-
-          db.run(`
-            INSERT INTO quotation_items (id, quotation_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, total_price)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `, [uuidv4(), seedId, prod.id, prod.name, prod.grade, qM2, Math.ceil(qM2 / (prod.metersPerBox || 1.44)), price, total]);
-
-          DatabaseManager.getInstance().saveToStorage();
-          loadData();
-          return;
-        }
-      }
-    } catch (e) {
-      console.error('Error loading quotations', e);
+      const rows = service.getQuotations({
+        search, status: statusFilter, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
+      });
+      const today = new Date().toISOString().slice(0, 10);
+      setQuotations(
+        followUpOnly
+          ? rows.filter((q) => q.status === 'PENDING' && q.followUpDate && q.followUpDate <= today)
+          : rows
+      );
+      setStats(service.getStats());
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message || 'تعذر تحميل عروض الأسعار.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
 
-  const handleAddItem = () => {
-    const prod = products.find(p => p.id === selectedProdId);
-    if (!prod) return;
+  const totalPages = Math.max(1, Math.ceil(quotations.length / PAGE_SIZE));
+  const pageItems = quotations.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-    const metersPerBox = prod.metersPerBox || 1.44;
-    const boxes = Math.ceil(itemQuantityM2 / metersPerBox);
-    const unitPrice = prod.sellingPriceM2 || 0;
-    const totalPrice = itemQuantityM2 * unitPrice;
-
-    setItems(prev => [
-      ...prev,
-      {
-        productId: prod.id,
-        productName: prod.name,
-        size: prod.size,
-        grade: prod.grade,
-        quantityM2: itemQuantityM2,
-        boxesCount: boxes,
-        unitPrice,
-        totalPrice,
-        metersPerBox,
-      }
-    ]);
+  const loadReferences = () => {
+    setCustomers(customerService.getAllCustomers());
+    setProducts(productService.getAllProducts());
+    const whs = inventoryService.getAllWarehouses();
+    setWarehouses(whs);
+    return whs;
   };
 
-  const handleRemoveItem = (idx: number) => {
-    setItems(prev => prev.filter((_, i) => i !== idx));
+  const openCreate = () => {
+    try {
+      const whs = loadReferences();
+      setEditingId(null);
+      setForm({ ...emptyForm(), warehouseId: service.getDefaultWarehouseId() || whs[0]?.id || '' });
+      setFormOpen(true);
+    } catch (e: any) { alert(e?.message || 'تعذر تحميل البيانات.'); }
   };
 
-  const subtotal = items.reduce((acc, i) => acc + i.totalPrice, 0);
-  const totalAmount = Math.max(0, subtotal - discountAmount);
+  const openEdit = (quotation: Quotation) => {
+    try {
+      loadReferences();
+      const full = service.getQuotation(quotation.id) || quotation;
+      setEditingId(full.id);
+      const days = Math.max(1, Math.round((new Date(full.validUntil).getTime() - Date.now()) / 86400000)) || 15;
+      setForm({
+        customerId: full.customerId,
+        warehouseId: full.warehouseId || '',
+        validDays: String(days),
+        discount: String(full.discountAmount || ''),
+        tax: String(full.taxAmount || ''),
+        notes: full.notes || '',
+        lines: (full.items || []).map((i) => ({
+          productId: i.productId, quantityM2: i.quantityM2, unitPrice: i.unitPrice, discountAmount: i.discountAmount || 0,
+        })),
+      });
+      setFormOpen(true);
+    } catch (e: any) { alert(e?.message || 'تعذر تحميل عرض السعر.'); }
+  };
 
-  const handleCreateQuotation = (e: React.FormEvent) => {
+  const setLine = (idx: number, patch: Partial<Line>) =>
+    setForm((prev) => ({ ...prev, lines: prev.lines.map((l, i) => (i === idx ? { ...l, ...patch } : l)) }));
+
+  const pickProduct = (idx: number, productId: string) => {
+    const p = products.find((x) => x.id === productId);
+    setLine(idx, { productId, unitPrice: p ? (p.sellingPriceM2 || 0) : 0 });
+  };
+
+  const subtotal = form.lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice - (l.discountAmount || 0), 0);
+  const total = Math.max(0, subtotal - (Number(form.discount) || 0) + (Number(form.tax) || 0));
+
+  const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (items.length === 0) {
-      alert('يرجى إضافة بند واحد على الأقل لعرض السعر');
-      return;
-    }
-
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
-
+    const items = form.lines.filter((l) => l.productId && l.quantityM2 > 0);
+    if (!form.customerId) return alert('اختر العميل.');
+    if (items.length === 0) return alert('أضف بنداً واحداً على الأقل بكمية أكبر من صفر.');
+    setSaving(true);
     try {
-      const qId = uuidv4();
-      const qNum = `QTN-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-      const dateStr = new Date().toISOString().split('T')[0];
-      const validUntilStr = new Date(Date.now() + validDays * 86400000).toISOString().split('T')[0];
-
-      const cust = customers.find(c => c.id === selectedCustomerId);
-
-      db.run(`
-        INSERT INTO quotations (id, quotation_number, date, valid_until, customer_id, customer_name, customer_phone, subtotal, discount_amount, total_amount, status, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, 'usr_admin')
-      `, [
-        qId,
-        qNum,
-        dateStr,
-        validUntilStr,
-        selectedCustomerId,
-        cust?.name || 'عميل نقدي',
-        cust?.phone || '',
-        subtotal,
-        discountAmount,
-        totalAmount,
-        quoteNotes
-      ]);
-
-      for (const itm of items) {
-        db.run(`
-          INSERT INTO quotation_items (id, quotation_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, total_price)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          uuidv4(),
-          qId,
-          itm.productId,
-          itm.productName,
-          itm.grade || 'GRADE_1',
-          itm.quantityM2,
-          itm.boxesCount,
-          itm.unitPrice,
-          itm.totalPrice
-        ]);
-      }
-
-      DatabaseManager.getInstance().saveToStorage();
-      syncService.queueChange('quotations', qId, 'INSERT', { quotationNumber: qNum, totalAmount });
-
-      setShowCreateModal(false);
-      setItems([]);
-      setDiscountAmount(0);
-      setQuoteNotes('');
-      loadData();
+      const payload = {
+        customerId: form.customerId,
+        warehouseId: form.warehouseId || undefined,
+        validDays: Number(form.validDays) || 15,
+        discountAmount: Number(form.discount) || 0,
+        taxAmount: Number(form.tax) || 0,
+        notes: form.notes || undefined,
+        items,
+      };
+      if (editingId) service.updateQuotation(editingId, payload);
+      else service.createQuotation(payload);
+      setFormOpen(false);
+      load();
     } catch (err: any) {
-      alert(`خطأ أثناء إنشاء عرض السعر: ${err?.message}`);
+      alert(err?.message || 'تعذر حفظ عرض السعر.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleConvertToInvoice = (quote: QuotationRecord) => {
-    if (quote.status === 'CONVERTED') {
-      alert('تم تحويل هذا العرض إلى فاتورة بالفعل.');
-      return;
-    }
+  const openConvert = (quotation: Quotation) => {
+    const full = service.getQuotation(quotation.id) || quotation;
+    setConvertTarget(full);
+    setConvertWarehouse(full.warehouseId || service.getDefaultWarehouseId() || '');
+    setConvertPaymentType('CREDIT');
+    setConvertPaid('0');
+    setConvertNotes('');
+  };
 
-    const confirmConvert = window.confirm(`هل أنت متأكد من تحويل عرض السعر (${quote.quotationNumber}) إلى فاتورة مبيعات معتمدة؟ سيتم خصم الكميات من المخزن.`);
-    if (!confirmConvert) return;
-
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
-
+  const submitConvert = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!convertTarget) return;
+    setSaving(true);
     try {
-      const whId = warehouses[0]?.id || 'wh_main';
-      const invId = uuidv4();
-      const invNum = `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const nowStr = new Date().toISOString();
-
-      // Retrieve items
-      const itemsRes = db.exec(`
-        SELECT qi.product_id, qi.product_name, qi.quantity_m2, qi.boxes_count, qi.unit_price, qi.total_price,
-               p.sku, p.cost_price, p.meters_per_box, p.pieces_per_box, p.grade, p.size
-        FROM quotation_items qi
-        JOIN products p ON qi.product_id = p.id
-        WHERE qi.quotation_id = ?
-      `, [quote.id]);
-
-      let invoiceItems: any[] = [];
-      let totalCost = 0;
-
-      if (itemsRes.length > 0 && itemsRes[0].values.length > 0) {
-        invoiceItems = itemsRes[0].values.map((r: any[]) => {
-          const cost = Number(r[7] || 0) * Number(r[2] || 0);
-          totalCost += cost;
-          return {
-            id: uuidv4(),
-            productId: String(r[0]),
-            productName: String(r[1]),
-            quantityM2: Number(r[2]),
-            boxesCount: Number(r[3]),
-            unitPrice: Number(r[4]),
-            totalPrice: Number(r[5]),
-            sku: String(r[6]),
-            unitCost: Number(r[7] || 0),
-            metersPerBox: Number(r[8] || 1.44),
-            piecesPerBox: Number(r[9] || 4),
-            grade: String(r[10] || 'GRADE_1'),
-            size: String(r[11] || '60x60'),
-          };
-        });
-      }
-
-      // Insert Sales Invoice
-      db.run(`
-        INSERT INTO sales_invoices (
-          id, invoice_number, date, customer_id, warehouse_id,
-          subtotal, discount_amount, total_amount, paid_amount, remaining_amount,
-          payment_type, payment_status, invoice_status, total_cost, gross_profit,
-          notes, created_by, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CREDIT', 'UNPAID', 'COMPLETED', ?, ?, ?, 'usr_admin', ?, ?)
-      `, [
-        invId,
-        invNum,
-        nowStr.split('T')[0],
-        quote.customerId,
-        whId,
-        quote.subtotal,
-        quote.discountAmount,
-        quote.totalAmount,
-        0,
-        quote.totalAmount,
-        totalCost,
-        quote.totalAmount - totalCost,
-        `تم التحويل من عرض سعر: ${quote.quotationNumber}`,
-        nowStr,
-        nowStr
-      ]);
-
-      // Insert Items and deduct stock
-      for (const item of invoiceItems) {
-        db.run(`
-          INSERT INTO sales_invoice_items (
-            id, invoice_id, product_id, product_name, product_sku, product_grade, size,
-            sold_by, quantity_m2, boxes_count, pieces_count, unit_price, original_unit_price,
-            unit_cost, total_price, total_cost, profit, meters_per_box, pieces_per_box
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'M2', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          item.id,
-          invId,
-          item.productId,
-          item.productName,
-          item.sku,
-          item.grade,
-          item.size,
-          item.quantityM2,
-          item.boxesCount,
-          item.boxesCount * item.piecesPerBox,
-          item.unitPrice,
-          item.unitPrice,
-          item.unitCost,
-          item.totalPrice,
-          item.quantityM2 * item.unitCost,
-          item.totalPrice - (item.quantityM2 * item.unitCost),
-          item.metersPerBox,
-          item.piecesPerBox
-        ]);
-
-        // Deduct warehouse stock
-        db.run(`
-          UPDATE warehouse_stock
-          SET quantity_m2 = quantity_m2 - ?,
-              last_updated = CURRENT_TIMESTAMP
-          WHERE warehouse_id = ? AND product_id = ?
-        `, [item.quantityM2, whId, item.productId]);
-
-        // Add inventory transaction
-        db.run(`
-          INSERT INTO inventory_transactions (
-            id, transaction_number, type, product_id, warehouse_id,
-            quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
-            reference_id, notes, performed_by
-          ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, 'usr_admin')
-        `, [
-          uuidv4(),
-          `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-          item.productId,
-          whId,
-          -item.quantityM2,
-          item.boxesCount,
-          item.unitCost,
-          item.quantityM2 * item.unitCost,
-          invId,
-          `تحويل من عرض سعر ${quote.quotationNumber}`
-        ]);
-      }
-
-      // Update customer balance
-      db.run(`
-        UPDATE customers
-        SET current_balance = current_balance + ?,
-            total_purchases = total_purchases + ?
-        WHERE id = ?
-      `, [quote.totalAmount, quote.totalAmount, quote.customerId]);
-
-      // Mark quote as converted
-      db.run(`UPDATE quotations SET status = 'CONVERTED' WHERE id = ?`, [quote.id]);
-
-      DatabaseManager.getInstance().saveToStorage();
-      syncService.queueChange('sales_invoices', invId, 'INSERT', { invoiceNumber: invNum, totalAmount: quote.totalAmount });
-
-      alert(`✅ تم تحويل عرض السعر بنجاح إلى فاتورة مبيعات معتمدة رقم: ${invNum}\nتم خصم المخزون وتحديث رصيد العميل.`);
-      loadData();
+      const invoice = service.convertToInvoice(convertTarget.id, {
+        warehouseId: convertWarehouse || undefined,
+        paymentType: convertPaymentType,
+        paidAmount: Number(convertPaid) || 0,
+        notes: convertNotes || undefined,
+      });
+      setConvertTarget(null);
+      load();
+      alert(`تم تحويل عرض السعر إلى الفاتورة ${invoice.invoiceNumber} بنجاح.`);
     } catch (err: any) {
-      alert(`خطأ أثناء تحويل العرض: ${err?.message}`);
+      alert(err?.message || 'تعذر تحويل عرض السعر.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleOpenPrint = (quote: QuotationRecord) => {
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
+  const cancelQuotation = (quotation: Quotation) => {
+    if (!window.confirm(`إلغاء عرض السعر ${quotation.quotationNumber}؟`)) return;
+    try { service.setStatus(quotation.id, 'CANCELLED'); load(); setDetail(null); }
+    catch (e: any) { alert(e?.message); }
+  };
 
+  const reopenQuotation = (quotation: Quotation) => {
+    try { service.setStatus(quotation.id, 'PENDING'); load(); setDetail(null); }
+    catch (e: any) { alert(e?.message); }
+  };
+
+  const deleteQuotation = (quotation: Quotation) => {
+    if (!window.confirm(`حذف عرض السعر ${quotation.quotationNumber} نهائياً؟`)) return;
+    try { service.deleteQuotation(quotation.id); load(); setDetail(null); }
+    catch (e: any) { alert(e?.message); }
+  };
+
+  const duplicate = (quotation: Quotation) => {
+    try { service.duplicateQuotation(quotation.id); load(); }
+    catch (e: any) { alert(e?.message); }
+  };
+
+  const shareOnWhatsApp = (quotation: Quotation) => {
+    const phone = (quotation.customerPhone || '').replace(/[^0-9]/g, '');
+    const text = encodeURIComponent(
+      `مرحباً ${quotation.customerName || ''}\nعرض السعر رقم ${quotation.quotationNumber}\n` +
+      `الإجمالي: ${fmt(quotation.totalAmount)}\nصالح حتى: ${quotation.validUntil}\n` +
+      `يسعدنا خدمتكم.`
+    );
+    window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+  };
+
+  const openFollowUp = (quotation: Quotation) => {
+    const full = service.getQuotation(quotation.id) || quotation;
+    setFollowUpTarget(full);
+    setFollowUpDate(full.followUpDate || new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10));
+    setFollowUpNotes(full.followUpNotes || '');
+  };
+
+  const submitFollowUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!followUpTarget) return;
+    setSaving(true);
     try {
-      const itemsRes = db.exec(`
-        SELECT qi.product_name, qi.quantity_m2, qi.boxes_count, qi.unit_price, qi.total_price, p.size, qi.grade
-        FROM quotation_items qi
-        LEFT JOIN products p ON qi.product_id = p.id
-        WHERE qi.quotation_id = ?
-      `, [quote.id]);
-
-      let quoteItems: QuotationItem[] = [];
-      if (itemsRes.length > 0 && itemsRes[0].values.length > 0) {
-        quoteItems = itemsRes[0].values.map((r: any[]) => ({
-          productId: '',
-          productName: String(r[0]),
-          quantityM2: Number(r[1]),
-          boxesCount: Number(r[2]),
-          unitPrice: Number(r[3]),
-          totalPrice: Number(r[4]),
-          size: r[5] ? String(r[5]) : '',
-          grade: r[6] ? String(r[6]) : '',
-          metersPerBox: 1.44,
-        }));
-      }
-
-      setShowPrintModal({ ...quote, items: quoteItems });
-    } catch (e) {
-      console.error(e);
+      service.scheduleFollowUp(followUpTarget.id, followUpDate || null, followUpNotes || null);
+      setFollowUpTarget(null);
+      load();
+    } catch (err: any) {
+      alert(err?.message || 'تعذر حفظ المتابعة.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const filtered = quotations.filter(q => {
-    const matchesSearch =
-      q.quotationNumber.toLowerCase().includes(search.toLowerCase()) ||
-      q.customerName.includes(search) ||
-      (q.customerPhone && q.customerPhone.includes(search));
-    const matchesStatus = statusFilter === 'ALL' || q.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const logContact = (quotation: Quotation) => {
+    try {
+      service.recordContact(quotation.id, `تم التواصل مع العميل بتاريخ ${new Date().toISOString().slice(0, 10)}`);
+      load();
+    } catch (err: any) {
+      alert(err?.message || 'تعذر تسجيل التواصل.');
+    }
+  };
 
-  const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
+  const openConvertOrder = (quotation: Quotation) => {
+    const full = service.getQuotation(quotation.id) || quotation;
+    setOrderTarget(full);
+    setOrderDeliveryDate('');
+    setOrderNotes(`طلب مبيعات من عرض السعر ${quotation.quotationNumber}`);
+  };
+
+  const submitConvertOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orderTarget) return;
+    setSaving(true);
+    try {
+      const order = service.convertToOrder(orderTarget.id, {
+        expectedDeliveryDate: orderDeliveryDate || undefined,
+        notes: orderNotes || undefined,
+      });
+      setOrderTarget(null);
+      setDetail(null);
+      load();
+      alert(`تم إنشاء الطلب ${order.orderNumber} بنجاح.`);
+    } catch (err: any) {
+      alert(err?.message || 'تعذر تحويل عرض السعر إلى طلب.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const doExport = (kind: 'excel' | 'pdf') => {
+    const options = {
+      title: 'سجل عروض الأسعار والمقايسات',
+      subtitle: `عدد العروض: ${quotations.length}`,
+      columns: [
+        { key: 'quotationNumber', label: 'رقم العرض' },
+        { key: 'date', label: 'التاريخ' },
+        { key: 'validUntil', label: 'صالح لغاية' },
+        { key: 'customer', label: 'العميل' },
+        { key: 'phone', label: 'الهاتف' },
+        { key: 'items', label: 'عدد البنود' },
+        { key: 'total', label: 'الإجمالي' },
+        { key: 'status', label: 'الحالة' },
+        { key: 'followUp', label: 'المتابعة القادمة' },
+        { key: 'order', label: 'الطلب' },
+        { key: 'invoice', label: 'الفاتورة' },
+      ],
+      rows: quotations.map((q) => ({
+        quotationNumber: q.quotationNumber, date: q.date, validUntil: q.validUntil,
+        customer: q.customerName || '', phone: q.customerPhone || '',
+        items: q.itemsCount || 0, total: q.totalAmount,
+        status: STATUS_LABELS[q.status].label,
+        followUp: q.followUpDate || '',
+        order: q.convertedOrderNumber || '',
+        invoice: q.convertedInvoiceNumber || '',
+      })),
+      fileName: 'quotations',
+    };
+    setDocPreview({
+      title: 'معاينة سجل عروض الأسعار',
+      subtitle: options.subtitle,
+      fileName: options.fileName,
+      html: buildExportHtml(options),
+      excel: () => exportToExcel(options),
+    });
+  };
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden" dir="rtl">
-      {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-            <FileText className="w-5 h-5 text-amber-400" />
-          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"><FileText className="w-5 h-5 text-amber-600" /></div>
           <div>
-            <h1 className="text-base font-black text-white">إدارة عروض الأسعار والمقايسات (Quotations & Estimates)</h1>
-            <p className="text-xs text-slate-400 font-medium">
-              إنشاء مقايسات السيراميك، طباعة العروض الرسمية، والتحويل المباشر إلى فواتير مبيعات معتمدة
-            </p>
+            <h1 className="text-base font-black text-slate-900">عروض الأسعار والمقايسات</h1>
+            <p className="text-xs text-slate-500 font-medium">إنشاء المقايسات، متابعة صلاحيتها، وتحويلها إلى فواتير مبيعات معتمدة</p>
           </div>
         </div>
-
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-bold transition shrink-0 shadow-lg shadow-amber-600/20 active:scale-95"
-        >
-          <Plus className="w-4 h-4" />
-          إنشاء عرض أسعار جديد
-        </button>
-      </div>
-
-      {/* Toolbar & Filters */}
-      <div className="p-4 bg-slate-900/50 border-b border-slate-800/80 flex flex-col sm:flex-row gap-3 items-center">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            type="text"
-            placeholder="بحث برقم العرض، اسم العميل، أو الهاتف..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-4 pr-10 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition font-medium"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-amber-500"
-          >
-            <option value="ALL">جميع الحالات</option>
-            <option value="PENDING">بانتظار الرد (نشط)</option>
-            <option value="CONVERTED">تم التحويل لفاتورة</option>
-            <option value="EXPIRED">منتهي الصلاحية</option>
-          </select>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel</button>
+          <button onClick={() => doExport('pdf')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileDown className="w-4 h-4 text-rose-600" /> PDF</button>
+          {canCreate && (
+            <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition"><Plus className="w-4 h-4" /> عرض أسعار جديد</button>
+          )}
         </div>
       </div>
 
-      {/* Quotations Cards Grid */}
-      <div className="flex-1 overflow-y-auto p-5">
-        {filtered.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center text-center">
-            <FileText className="w-12 h-12 text-slate-700 mb-2" />
-            <div className="text-sm font-bold text-slate-400">لا توجد عروض أسعار مطابقة للبحث</div>
-            <p className="text-xs text-slate-500 mt-1">اضغط على زر "إنشاء عرض أسعار جديد" لإصدار مقايسة للعميل.</p>
+      <div className="p-4 bg-white border-b border-slate-200 space-y-3">
+        <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
+          <Stat label="إجمالي العروض" value={String(stats?.total ?? 0)} icon={FileText} tone="text-slate-700 bg-slate-50 border-slate-200" />
+          <Stat label="بانتظار الموافقة" value={`${stats?.pending ?? 0} • ${fmt(stats?.pendingValue ?? 0)}`} icon={Clock} tone="text-amber-700 bg-amber-50 border-amber-200" />
+          <Stat label="محوّلة لفواتير" value={`${stats?.converted ?? 0} • ${fmt(stats?.convertedValue ?? 0)}`} icon={CheckCircle2} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
+          <Stat label="منتهية الصلاحية" value={String(stats?.expired ?? 0)} icon={AlertTriangle} tone="text-slate-600 bg-slate-50 border-slate-200" />
+          <Stat label="متابعات مستحقة" value={String(stats?.followUpDue ?? 0)} icon={PhoneCall} tone="text-rose-700 bg-rose-50 border-rose-200" />
+          <Stat label="تنتهي قريباً" value={String(stats?.expiringSoon ?? 0)} icon={CalendarClock} tone="text-violet-700 bg-violet-50 border-violet-200" />
+          <Stat label="إجمالي القيمة" value={fmt(stats?.totalValue ?? 0)} icon={Percent} tone="text-sky-700 bg-sky-50 border-sky-200" />
+        </div>
+
+        <div className="flex flex-col xl:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم العرض أو العميل أو الهاتف أو الفاتورة..." className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-amber-400" />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((q) => {
-              const st = STATUS_LABELS[q.status] || STATUS_LABELS.PENDING;
-              return (
-                <div
-                  key={q.id}
-                  className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 transition flex flex-col justify-between shadow-sm"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">
-                        {q.quotationNumber}
-                      </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>
-                        {st.label}
-                      </span>
-                    </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
+              <span className="text-slate-300">—</span>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-[11px] font-bold outline-none" />
+            </div>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold">
+              <option value="ALL">كل الحالات</option>
+              {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => setFollowUpOnly((v) => !v)}
+              className={`px-3 py-2 rounded-xl text-[11px] font-bold border flex items-center gap-1.5 ${followUpOnly ? 'bg-rose-600 text-white border-rose-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+            >
+              <PhoneCall className="w-3.5 h-3.5" /> متابعات مستحقة
+            </button>
+            <button onClick={load} className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100" title="تحديث"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+          </div>
+        </div>
+      </div>
 
-                    <h3 className="font-bold text-white text-sm mb-1">{q.customerName}</h3>
-                    {q.customerPhone && (
-                      <p className="text-[11px] text-slate-500 mb-3 font-mono">{q.customerPhone}</p>
-                    )}
-
-                    <div className="space-y-1.5 text-xs text-slate-400 mb-4 bg-slate-950/40 p-3 rounded-xl border border-slate-800/60">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-slate-600" />
-                          تاريخ العرض:
-                        </span>
-                        <span className="font-mono text-slate-300">{q.date}</span>
+      <div className="flex-1 overflow-y-auto p-4">
+        {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-amber-500" /></div> : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {pageItems.map((q) => {
+                const st = STATUS_LABELS[q.status];
+                return (
+                  <div key={q.id} className="bg-white border border-slate-200 hover:border-amber-300 rounded-2xl p-5 transition flex flex-col justify-between shadow-sm">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-mono font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/20">{q.quotationNumber}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>{st.label}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-600" />
-                          صالح لغاية:
-                        </span>
-                        <span className="font-mono text-slate-300">{q.validUntil}</span>
+                      <h3 className="font-bold text-slate-900 text-sm">{q.customerName}</h3>
+                      <p className="text-[11px] text-slate-500 mb-3 font-mono">{q.customerPhone || '—'}</p>
+                      <div className="space-y-1.5 text-[11px] text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <div className="flex justify-between"><span>تاريخ العرض</span><span className="font-mono text-slate-700">{q.date}</span></div>
+                        <div className="flex justify-between">
+                          <span>صالح لغاية</span>
+                          <span className="font-mono text-slate-700 flex items-center gap-1.5">
+                            {q.validUntil}
+                            {q.status === 'PENDING' && (() => {
+                              const days = Math.ceil((new Date(q.validUntil).getTime() - Date.now()) / 86400000);
+                              if (days < 0) return <span className="text-[9px] font-bold text-slate-400">(منتهي)</span>;
+                              if (days <= 7) return <span className="text-[9px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded px-1">باقي {days} يوم</span>;
+                              return null;
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between"><span>البنود</span><span className="font-mono text-slate-700">{q.itemsCount || 0} • {Number(q.totalM2 || 0).toFixed(2)} م²</span></div>
+                        {q.followUpDate && (
+                          <div className="flex justify-between">
+                            <span>المتابعة القادمة</span>
+                            <span className={`font-mono ${q.status === 'PENDING' && q.followUpDate <= new Date().toISOString().slice(0, 10) ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>{q.followUpDate}</span>
+                          </div>
+                        )}
+                        {(q.contactCount || 0) > 0 && <div className="flex justify-between"><span>مرات التواصل</span><span className="font-mono text-slate-700">{q.contactCount}</span></div>}
+                        {q.convertedOrderNumber && <div className="flex justify-between"><span>الطلب</span><span className="font-mono text-sky-600">{q.convertedOrderNumber}</span></div>}
+                        {q.convertedInvoiceNumber && <div className="flex justify-between"><span>الفاتورة</span><span className="font-mono text-emerald-600">{q.convertedInvoiceNumber}</span></div>}
+                      </div>
+                      <div className="bg-white rounded-xl p-3 border border-slate-200 flex items-center justify-between mt-3">
+                        <span className="text-xs text-slate-500">إجمالي المقايسة</span>
+                        <span className="text-sm font-black text-emerald-600">{fmt(q.totalAmount)}</span>
                       </div>
                     </div>
-
-                    <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400">إجمالي قيمة المقايسة:</span>
-                      <span className="text-sm font-black text-emerald-400">{fmt(q.totalAmount)}</span>
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-1.5 flex-wrap">
+                      <Btn onClick={() => setDetail(service.getQuotation(q.id))} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
+                      <Btn onClick={() => printService.printQuotation(service.getQuotation(q.id))} tone="slate"><Printer className="w-3.5 h-3.5" /> طباعة</Btn>
+                      <Btn onClick={() => shareOnWhatsApp(q)} tone="slate"><MessageCircle className="w-3.5 h-3.5 text-emerald-600" /> واتساب</Btn>
+                      {canCreate && q.status === 'PENDING' && (
+                        <Btn onClick={() => openFollowUp(q)} tone="sky"><CalendarClock className="w-3.5 h-3.5" /> متابعة</Btn>
+                      )}
+                      {canCreate && q.status === 'PENDING' && (
+                        <Btn onClick={() => logContact(q)} tone="slate"><PhoneCall className="w-3.5 h-3.5" /> تواصل</Btn>
+                      )}
+                      {canCreate && ['PENDING', 'EXPIRED'].includes(q.status) && (
+                        <Btn onClick={() => openEdit(q)} tone="sky"><Pencil className="w-3.5 h-3.5" /> تعديل</Btn>
+                      )}
+                      {canCreate && q.status === 'PENDING' && !q.convertedOrderNumber && (
+                        <Btn onClick={() => openConvertOrder(q)} tone="sky"><ShoppingBag className="w-3.5 h-3.5" /> طلب</Btn>
+                      )}
+                      {canCreate && q.status === 'PENDING' && (
+                        <Btn onClick={() => openConvert(q)} tone="emerald"><Check className="w-3.5 h-3.5" /> فاتورة</Btn>
+                      )}
                     </div>
                   </div>
+                );
+              })}
+              {quotations.length === 0 && (
+                <div className="col-span-full py-16 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-white">لا توجد عروض أسعار مطابقة.</div>
+              )}
+            </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => handleOpenPrint(q)}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      معاينة وطباعة
-                    </button>
-
-                    {q.status === 'PENDING' && (
-                      <button
-                        onClick={() => handleConvertToInvoice(q)}
-                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        تحويل لفاتورة
-                      </button>
-                    )}
-                  </div>
+            {quotations.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between mt-4 text-xs text-slate-500">
+                <span>{(page - 1) * PAGE_SIZE + 1} — {Math.min(page * PAGE_SIZE, quotations.length)} من {quotations.length}</span>
+                <div className="flex items-center gap-1">
+                  <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+                  <span className="px-3 font-bold">{page} / {totalPages}</span>
+                  <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="p-1.5 rounded-lg border border-slate-200 bg-white disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Create Quotation Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-scaleIn">
-            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
-              <div className="flex items-center gap-2.5">
-                <FileText className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-black text-white">إصدار مقايسة وعرض أسعار سيراميك جديد</h3>
-              </div>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-white text-lg font-mono p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateQuotation} className="p-6 overflow-y-auto space-y-5 flex-1">
-              {/* Customer & Validity */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">العميل المستهدف</label>
-                  <select
-                    value={selectedCustomerId}
-                    onChange={(e) => setSelectedCustomerId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                  >
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">مدة صلاحية العرض (أيام)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="90"
-                    value={validDays}
-                    onChange={(e) => setValidDays(Number(e.target.value) || 15)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Add Item Row */}
-              <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80 space-y-3">
-                <span className="text-xs font-bold text-slate-300 block">إضافة أصناف السيراميك إلى المقايسة</span>
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                  <div className="sm:col-span-7">
-                    <label className="block text-[11px] text-slate-400 mb-1">الصنف</label>
-                    <select
-                      value={selectedProdId}
-                      onChange={(e) => setSelectedProdId(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                    >
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({p.size}) - {p.sellingPriceM2} ج/م²
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <label className="block text-[11px] text-slate-400 mb-1">الكمية بالمتر (م²)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.1"
-                      value={itemQuantityM2}
-                      onChange={(e) => setItemQuantityM2(parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <button
-                      type="button"
-                      onClick={handleAddItem}
-                      className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      إضافة
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <div>
-                <span className="text-xs font-bold text-slate-300 block mb-2">بنود المقايسة المضافة ({items.length})</span>
-                {items.length === 0 ? (
-                  <div className="p-6 rounded-2xl bg-slate-950/40 border border-slate-800/60 text-center text-xs text-slate-500">
-                    لم يتم إضافة أي أصناف بعد. اختر صنفاً وأضفه أعلاه.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-800">
-                    <table className="w-full text-right text-xs">
-                      <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
-                        <tr>
-                          <th className="p-2.5">الصنف</th>
-                          <th className="p-2.5">المقاس والفرز</th>
-                          <th className="p-2.5">الكمية (م²)</th>
-                          <th className="p-2.5">الكراتين</th>
-                          <th className="p-2.5">سعر المتر</th>
-                          <th className="p-2.5">الإجمالي</th>
-                          <th className="p-2.5 text-center">إجراء</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/50 bg-slate-900/40">
-                        {items.map((itm, idx) => (
-                          <tr key={idx} className="hover:bg-slate-850/40">
-                            <td className="p-2.5 font-bold text-white">{itm.productName}</td>
-                            <td className="p-2.5 text-slate-400">{itm.size || '60x60'} - فرز أول</td>
-                            <td className="p-2.5 font-mono text-amber-400">{itm.quantityM2} م²</td>
-                            <td className="p-2.5 font-mono text-slate-300">{itm.boxesCount} كرتونة</td>
-                            <td className="p-2.5 font-mono text-slate-300">{fmt(itm.unitPrice)}</td>
-                            <td className="p-2.5 font-mono font-bold text-emerald-400">{fmt(itm.totalPrice)}</td>
-                            <td className="p-2.5 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveItem(idx)}
-                                className="text-rose-400 hover:text-rose-300 p-1"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Discount & Notes */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">الخصم الإجمالي (ج.م)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={discountAmount}
-                    onChange={(e) => setDiscountAmount(Number(e.target.value) || 0)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">شروط وملاحظات المقايسة</label>
-                  <input
-                    type="text"
-                    placeholder="مثال: الأسعار شاملة المشال والنقل لأرض الموقع"
-                    value={quoteNotes}
-                    onChange={(e) => setQuoteNotes(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* Total Summary */}
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-300">صافي قيمة المقايسة النهائية:</span>
-                <span className="text-base font-black text-emerald-400">{fmt(totalAmount)}</span>
-              </div>
-
-              {/* Actions */}
-              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-amber-600/20 transition active:scale-95"
-                >
-                  حفظ وتأكيد عرض السعر
-                </button>
-              </div>
-            </form>
+      {/* Create / edit modal */}
+      {formOpen && (
+        <Modal onClose={() => setFormOpen(false)} wide>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-2"><FileText className="w-5 h-5 text-amber-600" /> {editingId ? 'تعديل عرض السعر' : 'إصدار عرض أسعار جديد'}</h3>
+            <button onClick={() => setFormOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
           </div>
-        </div>
-      )}
-
-      {/* Print Preview Modal */}
-      {showPrintModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[95vh] animate-scaleIn">
-            <div className="bg-slate-100 px-6 py-4 border-b border-slate-200 flex items-center justify-between no-print">
-              <div className="flex items-center gap-2">
-                <Printer className="w-5 h-5 text-slate-700" />
-                <span className="text-sm font-bold text-slate-800">معاينة طباعة المقايسة الرسمية A4</span>
+          <form onSubmit={submitForm} className="space-y-3 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">العميل *</label>
+                <select required value={form.customerId} onChange={(e) => setForm((p) => ({ ...p, customerId: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <option value="">— اختر العميل —</option>
+                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>)}
+                </select>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold"
-                >
-                  طباعة الآن
-                </button>
-                <button
-                  onClick={() => setShowPrintModal(null)}
-                  className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-semibold font-mono"
-                >
-                  ✕
-                </button>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">المخزن المرجعي</label>
+                <select value={form.warehouseId} onChange={(e) => setForm((p) => ({ ...p, warehouseId: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <option value="">— بدون —</option>
+                  {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">صلاحية العرض (أيام)</label>
+                <input type="number" min={1} max={365} value={form.validDays} onChange={(e) => setForm((p) => ({ ...p, validDays: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
               </div>
             </div>
 
-            <div className="p-8 overflow-y-auto space-y-6 flex-1 text-slate-900" id="quotation-print-sheet">
-              {/* Showroom Header */}
-              <div className="flex items-start justify-between border-b-2 border-slate-900 pb-5">
-                <div>
-                  <h1 className="text-xl font-black text-slate-900">معرض الأندلس للسيراميك والبورسلين</h1>
-                  <p className="text-xs text-slate-600 mt-1">كافة أنواع السيراميك والبورسلين والتشطيبات الفاخرة</p>
-                  <p className="text-xs text-slate-500 mt-0.5">الهاتف: 01012345678 - 01234567890 | الرقم الضريبي: 123-456-789</p>
-                </div>
-                <div className="text-left font-mono">
-                  <div className="text-sm font-black text-slate-900">عرض أسعار رسمي</div>
-                  <div className="text-xs font-bold text-sky-700 mt-1">{showPrintModal.quotationNumber}</div>
-                  <div className="text-[11px] text-slate-500 mt-1">التاريخ: {showPrintModal.date}</div>
-                </div>
-              </div>
-
-              {/* Customer Box */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-slate-500 block">السيد / السادة المحترمون:</span>
-                  <span className="text-sm font-bold text-slate-900">{showPrintModal.customerName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">صالح لغاية:</span>
-                  <span className="font-bold font-mono text-slate-800">{showPrintModal.validUntil}</span>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              <table className="w-full text-right text-xs border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-900 bg-slate-100">
-                    <th className="p-2">#</th>
-                    <th className="p-2">بيان الصنف والمقاس</th>
-                    <th className="p-2">الكمية (م²)</th>
-                    <th className="p-2">الكراتين</th>
-                    <th className="p-2">سعر المتر</th>
-                    <th className="p-2">الإجمالي</th>
-                  </tr>
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-right text-[11px]">
+                <thead className="bg-slate-50 text-slate-500 font-bold">
+                  <tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-24">الكمية (م²)</th><th className="px-3 py-2 w-28">سعر المتر</th><th className="px-3 py-2 w-28">خصم البند</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {showPrintModal.items?.map((itm, i) => (
-                    <tr key={i}>
-                      <td className="p-2 font-mono">{i + 1}</td>
-                      <td className="p-2 font-bold">{itm.productName} ({itm.size || '60x60'})</td>
-                      <td className="p-2 font-mono">{itm.quantityM2} م²</td>
-                      <td className="p-2 font-mono">{itm.boxesCount}</td>
-                      <td className="p-2 font-mono">{fmt(itm.unitPrice)}</td>
-                      <td className="p-2 font-mono font-bold">{fmt(itm.totalPrice)}</td>
+                <tbody className="divide-y divide-slate-100">
+                  {form.lines.map((l, idx) => (
+                    <tr key={idx}>
+                      <td className="px-3 py-2">
+                        <select value={l.productId} onChange={(e) => pickProduct(idx, e.target.value)} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold">
+                          <option value="">— اختر الصنف —</option>
+                          {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.size} — {p.grade}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                      <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.unitPrice || ''} onChange={(e) => setLine(idx, { unitPrice: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                      <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.discountAmount || ''} onChange={(e) => setLine(idx, { discountAmount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                      <td className="px-3 py-2 font-bold text-slate-700">{fmt(l.quantityM2 * l.unitPrice - (l.discountAmount || 0))}</td>
+                      <td className="px-3 py-2"><button type="button" onClick={() => setForm((p) => ({ ...p, lines: p.lines.length > 1 ? p.lines.filter((_, i) => i !== idx) : p.lines }))} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-
-              {/* Total Calculation */}
-              <div className="flex justify-end pt-4 border-t-2 border-slate-900">
-                <div className="w-64 space-y-2 text-xs">
-                  <div className="flex justify-between text-slate-600">
-                    <span>الإجمالي قبل الخصم:</span>
-                    <span className="font-mono font-bold">{fmt(showPrintModal.subtotal)}</span>
-                  </div>
-                  {showPrintModal.discountAmount > 0 && (
-                    <div className="flex justify-between text-rose-600">
-                      <span>الخصم الممنوح:</span>
-                      <span className="font-mono font-bold">-{fmt(showPrintModal.discountAmount)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-black border-t pt-2 border-slate-300">
-                    <span>الصافي المطلوب:</span>
-                    <span className="font-mono text-sky-800">{fmt(showPrintModal.totalAmount)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Signatures */}
-              <div className="pt-10 grid grid-cols-2 gap-8 text-center text-xs text-slate-600">
-                <div>
-                  <p className="font-bold mb-8">توقيع المستلم / العميل بالقبول</p>
-                  <p className="border-b border-dashed border-slate-400 w-48 mx-auto"></p>
-                </div>
-                <div>
-                  <p className="font-bold mb-8">إدارة المبيعات / المعرض</p>
-                  <p className="border-b border-dashed border-slate-400 w-48 mx-auto"></p>
-                </div>
+              <div className="p-2 border-t border-slate-100">
+                <button type="button" onClick={() => setForm((p) => ({ ...p, lines: [...p.lines, { productId: '', quantityM2: 0, unitPrice: 0, discountAmount: 0 }] }))} className="text-[11px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة بند</button>
               </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <NumField label="خصم إجمالي (ج)" value={form.discount} onChange={(v) => setForm((p) => ({ ...p, discount: v }))} />
+              <NumField label="ضريبة (ج)" value={form.tax} onChange={(v) => setForm((p) => ({ ...p, tax: v }))} />
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">شروط وملاحظات</label>
+                <input value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" placeholder="الأسعار شاملة النقل..." />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <span className="text-xs font-bold text-amber-700">صافي قيمة المقايسة</span>
+              <span className="text-lg font-black text-emerald-600">{fmt(total)}</span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button type="button" onClick={() => setFormOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
+              <button type="submit" disabled={saving} className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {editingId ? 'حفظ التعديلات' : 'حفظ عرض السعر'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Detail modal */}
+      {detail && (
+        <Modal onClose={() => setDetail(null)} wide>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="text-base font-black text-slate-900">عرض سعر {detail.quotationNumber}</h3>
+              <p className="text-[11px] text-slate-500 mt-1">{detail.date} • صالح لغاية {detail.validUntil} • {STATUS_LABELS[detail.status].label}</p>
+            </div>
+            <button onClick={() => setDetail(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
           </div>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <Info label="العميل" value={detail.customerName || '—'} sub={detail.customerPhone || ''} />
+            <Info label="المخزن المرجعي" value={warehouses.find((w) => w.id === detail.warehouseId)?.name || '—'} sub={detail.convertedInvoiceNumber ? `الفاتورة: ${detail.convertedInvoiceNumber}` : 'لم تُفوتر بعد'} />
+            <Info label="القيمة" value={fmt(detail.totalAmount)} sub={`${detail.items?.length || 0} بند`} />
+          </div>
+          <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
+            <table className="w-full text-right text-[11px] min-w-[560px]">
+              <thead className="bg-slate-50 text-slate-500 font-bold"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">السعر</th><th className="px-3 py-2">الخصم</th><th className="px-3 py-2">الإجمالي</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {(detail.items || []).map((i) => (
+                  <tr key={i.id}>
+                    <td className="px-3 py-2 font-bold text-slate-800">{i.productName}<div className="text-[9px] text-slate-400 font-normal">{i.size} • {i.grade}</div></td>
+                    <td className="px-3 py-2 font-mono">{i.quantityM2} م²</td>
+                    <td className="px-3 py-2 font-mono">{i.boxesCount}</td>
+                    <td className="px-3 py-2 font-mono">{fmt(i.unitPrice)}</td>
+                    <td className="px-3 py-2 font-mono text-rose-600">{i.discountAmount ? `-${fmt(i.discountAmount)}` : '—'}</td>
+                    <td className="px-3 py-2 font-bold">{fmt(i.totalPrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {detail.notes && <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 mb-4"><b>ملاحظات:</b> {detail.notes}</div>}
+          {(detail.followUpDate || detail.followUpNotes || detail.convertedOrderNumber) && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <Info label="المتابعة القادمة" value={detail.followUpDate || '—'} sub={detail.followUpNotes || ''} />
+              <Info label="مرات التواصل" value={String(detail.contactCount || 0)} sub={detail.lastContactAt ? `آخر تواصل ${detail.lastContactAt.slice(0, 10)}` : 'لم يتم تسجيل تواصل'} />
+              <Info label="الطلب المرتبط" value={detail.convertedOrderNumber || '—'} sub={detail.convertedInvoiceNumber ? `الفاتورة ${detail.convertedInvoiceNumber}` : ''} />
+            </div>
+          )}
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <button onClick={() => printService.printQuotation(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> طباعة</button>
+            <button onClick={() => shareOnWhatsApp(detail)} className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> واتساب</button>
+            {canCreate && detail.status === 'PENDING' && (
+              <button onClick={() => { setDetail(null); openFollowUp(detail); }} className="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" /> جدولة متابعة</button>
+            )}
+            {canCreate && <button onClick={() => duplicate(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> نسخ</button>}
+            {canCreate && ['PENDING', 'EXPIRED'].includes(detail.status) && (
+              <button onClick={() => { setDetail(null); openEdit(detail); }} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5" /> تعديل</button>
+            )}
+            {canCreate && detail.status === 'PENDING' && !detail.convertedOrderNumber && (
+              <button onClick={() => { setDetail(null); openConvertOrder(detail); }} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><ShoppingBag className="w-3.5 h-3.5" /> تحويل لطلب</button>
+            )}
+            {canCreate && detail.status === 'PENDING' && (
+              <button onClick={() => { setDetail(null); openConvert(detail); }} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> تحويل لفاتورة</button>
+            )}
+            {canCreate && detail.status === 'EXPIRED' && (
+              <button onClick={() => reopenQuotation(detail)} className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5" /> إعادة فتح</button>
+            )}
+            {canApprove && detail.status === 'PENDING' && (
+              <button onClick={() => cancelQuotation(detail)} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><CancelIcon className="w-3.5 h-3.5" /> إلغاء</button>
+            )}
+            {canCreate && detail.status !== 'CONVERTED' && (
+              <button onClick={() => deleteQuotation(detail)} className="px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><Trash2 className="w-3.5 h-3.5" /> حذف</button>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Follow-up modal */}
+      {followUpTarget && (
+        <Modal onClose={() => setFollowUpTarget(null)}>
+          <form onSubmit={submitFollowUp} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2"><CalendarClock className="w-5 h-5 text-sky-600" /> متابعة عرض السعر {followUpTarget.quotationNumber}</h3>
+              <button type="button" onClick={() => setFollowUpTarget(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex items-center justify-between">
+              <span className="text-slate-500">العميل</span>
+              <span className="font-bold text-slate-800">{followUpTarget.customerName} • {fmt(followUpTarget.totalAmount)}</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ المتابعة</label>
+                <input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono" />
+              </div>
+              <div className="flex items-end">
+                <button type="button" onClick={() => setFollowUpDate('')} className="w-full px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold">إلغاء المتابعة المجدولة</button>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">ملاحظات المتابعة</label>
+              <textarea rows={3} value={followUpNotes} onChange={(e) => setFollowUpNotes(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" placeholder="مثال: العميل يطلب خصم إضافي / سيحدد موعد الرد..." />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setFollowUpTarget(null)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">إلغاء</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} حفظ المتابعة</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Convert to order modal */}
+      {orderTarget && (
+        <Modal onClose={() => setOrderTarget(null)}>
+          <form onSubmit={submitConvertOrder} className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2"><ShoppingBag className="w-5 h-5 text-sky-600" /> تحويل العرض {orderTarget.quotationNumber} إلى طلب</h3>
+              <button type="button" onClick={() => setOrderTarget(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex items-center justify-between">
+              <span className="text-slate-500">قيمة العرض</span><span className="font-black text-sky-700">{fmt(orderTarget.totalAmount)}</span>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ التسليم المتوقع</label>
+              <input type="date" value={orderDeliveryDate} onChange={(e) => setOrderDeliveryDate(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">ملاحظات الطلب</label>
+              <input value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
+            </div>
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-[11px] text-sky-800 flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> سيتم حجز الكميات من المخزن كطلب مبيعات، ويمكن لاحقاً إصدار الفاتورة أو تسجيل التسليم.</div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setOrderTarget(null)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">إلغاء</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء الطلب</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Convert modal */}
+      {convertTarget && (
+        <Modal onClose={() => setConvertTarget(null)}>
+          <form onSubmit={submitConvert} className="space-y-4">
+            <div className="flex items-center gap-2 text-emerald-600"><Receipt className="w-5 h-5" /><h3 className="text-base font-black">تحويل العرض {convertTarget.quotationNumber} إلى فاتورة</h3></div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex items-center justify-between">
+              <span className="text-slate-500">قيمة العرض</span><span className="font-black text-emerald-700">{fmt(convertTarget.totalAmount)}</span>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">المخزن المنصرف منه *</label>
+              <select required value={convertWarehouse} onChange={(e) => setConvertWarehouse(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+                <option value="">— اختر المخزن —</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">طريقة الدفع</label>
+                <select value={convertPaymentType} onChange={(e) => setConvertPaymentType(e.target.value as PaymentType)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+                  <option value="CREDIT">آجل بالكامل</option>
+                  <option value="CASH">نقدي بالكامل</option>
+                  <option value="CARD">بطاقة</option>
+                  <option value="BANK_TRANSFER">تحويل بنكي</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">المبلغ المدفوع مقدماً</label>
+                <input type="number" min={0} step="0.01" value={convertPaid} onChange={(e) => setConvertPaid(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">ملاحظات الفاتورة</label>
+              <input value={convertNotes} onChange={(e) => setConvertNotes(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" placeholder="اختياري" />
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /> سيتم خصم الكميات من المخزن مباشرة وإصدار فاتورة ضريبية معتمدة.</div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setConvertTarget(null)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">إلغاء</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} تحويل وإصدار</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {docPreview && (
+        <DocumentPreviewModal
+          title={docPreview.title}
+          subtitle={docPreview.subtitle}
+          fileName={docPreview.fileName}
+          html={docPreview.html}
+          onClose={() => setDocPreview(null)}
+          onDownloadExcel={docPreview.excel}
+        />
       )}
     </div>
   );
 };
+
+const Stat: React.FC<{ label: string; value: string; icon: React.ElementType; tone: string }> = ({ label, value, icon: Icon, tone }) => (
+  <div className={`rounded-xl border px-3 py-2.5 ${tone}`}>
+    <div className="flex items-center justify-between gap-2"><span className="text-[10px] font-bold opacity-80">{label}</span><Icon className="w-4 h-4 opacity-70" /></div>
+    <div className="text-sm font-black mt-1 truncate">{value}</div>
+  </div>
+);
+
+const Btn: React.FC<{ onClick: () => void; tone: 'slate' | 'sky' | 'emerald'; children: React.ReactNode }> = ({ onClick, tone, children }) => {
+  const styles: Record<string, string> = {
+    slate: 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200',
+    sky: 'bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200',
+    emerald: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600',
+  };
+  return <button onClick={onClick} className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${styles[tone]}`}>{children}</button>;
+};
+
+const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; wide?: boolean }> = ({ children, onClose, wide }) => (
+  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-lg'} p-6 max-h-[92vh] overflow-y-auto`}>{children}</div>
+  </div>
+);
+
+const NumField: React.FC<{ label: string; value: string; onChange: (v: string) => void }> = ({ label, value, onChange }) => (
+  <div>
+    <label className="font-bold text-slate-700 block mb-1">{label}</label>
+    <input type="number" min={0} step="0.01" value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+  </div>
+);
+
+const Info: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
+  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+    <div className="text-[10px] font-bold text-slate-400">{label}</div>
+    <div className="text-xs font-black text-slate-800 mt-0.5">{value}</div>
+    {sub && <div className="text-[10px] text-slate-500 font-mono mt-0.5">{sub}</div>}
+  </div>
+);

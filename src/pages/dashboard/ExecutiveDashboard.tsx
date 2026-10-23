@@ -134,7 +134,7 @@ export const ExecutiveDashboard: React.FC = () => {
           trend: parseFloat(salesTrend) >= 0 ? 'up' : 'down',
           trendValue: `${salesTrend}% مقارنة بالأمس`,
           icon: ShoppingCart,
-          color: 'text-sky-400',
+          color: 'text-sky-600',
           bg: 'bg-sky-500/10 border-sky-500/20',
         },
         {
@@ -143,7 +143,7 @@ export const ExecutiveDashboard: React.FC = () => {
           sub: `هامش ${margin}%`,
           trend: profit >= 0 ? 'up' : 'down',
           icon: TrendingUp,
-          color: 'text-emerald-400',
+          color: 'text-emerald-600',
           bg: 'bg-emerald-500/10 border-emerald-500/20',
         },
         {
@@ -152,7 +152,7 @@ export const ExecutiveDashboard: React.FC = () => {
           sub: 'نقدي وشبكة',
           trend: 'neutral',
           icon: DollarSign,
-          color: 'text-violet-400',
+          color: 'text-violet-600',
           bg: 'bg-violet-500/10 border-violet-500/20',
         },
         {
@@ -161,7 +161,7 @@ export const ExecutiveDashboard: React.FC = () => {
           sub: 'بضاعة واردة',
           trend: 'neutral',
           icon: Package,
-          color: 'text-amber-400',
+          color: 'text-amber-600',
           bg: 'bg-amber-500/10 border-amber-500/20',
         },
         {
@@ -170,7 +170,7 @@ export const ExecutiveDashboard: React.FC = () => {
           sub: 'ذمم العملاء',
           trend: totalDebt > 50000 ? 'down' : 'neutral',
           icon: AlertTriangle,
-          color: 'text-rose-400',
+          color: 'text-rose-600',
           bg: 'bg-rose-500/10 border-rose-500/20',
         },
       ]);
@@ -298,19 +298,19 @@ export const ExecutiveDashboard: React.FC = () => {
     new Intl.NumberFormat('ar-EG', { style: 'decimal', maximumFractionDigits: 0 }).format(n) + ' ج';
 
   const paymentStatusLabel: Record<string, { label: string; cls: string }> = {
-    PAID:        { label: 'مدفوع', cls: 'bg-emerald-500/20 text-emerald-400' },
-    PARTIAL:     { label: 'جزئي', cls: 'bg-amber-500/20 text-amber-400' },
-    UNPAID:      { label: 'آجل', cls: 'bg-rose-500/20 text-rose-400' },
+    PAID:        { label: 'مدفوع', cls: 'bg-emerald-500/20 text-emerald-600' },
+    PARTIAL:     { label: 'جزئي', cls: 'bg-amber-500/20 text-amber-600' },
+    UNPAID:      { label: 'آجل', cls: 'bg-rose-500/20 text-rose-600' },
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full overflow-y-auto bg-slate-950 text-slate-100 p-5 space-y-5" dir="rtl">
+    <div className="h-full overflow-y-auto bg-slate-50 text-slate-900 p-5 space-y-5" dir="rtl">
       {/* ── Header ────────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-black text-white">Executive Dashboard</h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h1 className="text-xl font-black text-slate-900">Executive Dashboard</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
             آخر تحديث: {format(lastRefresh, 'HH:mm:ss')}
           </p>
         </div>
@@ -327,10 +327,10 @@ export const ExecutiveDashboard: React.FC = () => {
               key={r.id}
               onClick={() => setRange(r.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                range === r.id
-                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/25'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
-              }`}
+ range === r.id
+ ? 'bg-sky-600 text-slate-900 shadow-md shadow-sky-600/25'
+ : 'bg-slate-100 hover:bg-slate-200 hover:text-slate-900'
+ }`}
             >
               {r.label}
             </button>
@@ -340,7 +340,7 @@ export const ExecutiveDashboard: React.FC = () => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition"
+            className="p-2 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition"
             title="تحديث"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -352,7 +352,7 @@ export const ExecutiveDashboard: React.FC = () => {
         <div className="flex items-center justify-center h-64">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-sky-600 animate-bounce" />
-            <p className="text-sm text-slate-400">جاري تحميل البيانات...</p>
+            <p className="text-sm text-slate-500">جاري تحميل البيانات...</p>
           </div>
         </div>
       ) : (
@@ -369,21 +369,21 @@ export const ExecutiveDashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <Icon className={`w-5 h-5 ${kpi.color}`} />
                     {kpi.trend === 'up' && (
-                      <div className="flex items-center gap-1 text-emerald-400 text-[10px] font-bold">
+                      <div className="flex items-center gap-1 text-emerald-600 text-[10px] font-bold">
                         <ArrowUpRight className="w-3 h-3" />
                         {kpi.trendValue}
                       </div>
                     )}
                     {kpi.trend === 'down' && (
-                      <div className="flex items-center gap-1 text-rose-400 text-[10px] font-bold">
+                      <div className="flex items-center gap-1 text-rose-600 text-[10px] font-bold">
                         <ArrowDownRight className="w-3 h-3" />
                         {kpi.trendValue}
                       </div>
                     )}
                   </div>
                   <div>
-                    <div className="text-xl font-black text-white leading-tight">{kpi.value}</div>
-                    <div className="text-[11px] text-slate-400 font-medium mt-0.5">{kpi.label}</div>
+                    <div className="text-xl font-black text-slate-900 leading-tight">{kpi.value}</div>
+                    <div className="text-[11px] text-slate-500 font-medium mt-0.5">{kpi.label}</div>
                     {kpi.sub && <div className="text-[10px] text-slate-500 mt-0.5">{kpi.sub}</div>}
                   </div>
                 </div>
@@ -394,8 +394,8 @@ export const ExecutiveDashboard: React.FC = () => {
           {/* ── Charts Row ──────────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Sales Line Chart — 2/3 width */}
-            <div className="lg:col-span-2 bg-slate-900 rounded-xl border border-slate-800 p-4">
-              <h3 className="text-sm font-bold text-white mb-4">المبيعات والأرباح — آخر 30 يوم</h3>
+            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4">
+              <h3 className="text-sm font-bold text-slate-900 mb-4">المبيعات والأرباح — آخر 30 يوم</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={dailySales} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -414,8 +414,8 @@ export const ExecutiveDashboard: React.FC = () => {
             </div>
 
             {/* Branch Pie — 1/3 width */}
-            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-              <h3 className="text-sm font-bold text-white mb-4">توزيع المبيعات بالفروع</h3>
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <h3 className="text-sm font-bold text-slate-900 mb-4">توزيع المبيعات بالفروع</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
@@ -439,8 +439,8 @@ export const ExecutiveDashboard: React.FC = () => {
                 {branchData.map((b, i) => (
                   <div key={i} className="flex items-center gap-2 text-xs">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                    <span className="text-slate-400 truncate">{b.name}</span>
-                    <span className="text-slate-300 font-semibold mr-auto">{formatCurrency(b.value)}</span>
+                    <span className="text-slate-500 truncate">{b.name}</span>
+                    <span className="text-slate-700 font-semibold mr-auto">{formatCurrency(b.value)}</span>
                   </div>
                 ))}
               </div>
@@ -450,8 +450,8 @@ export const ExecutiveDashboard: React.FC = () => {
           {/* ── Bottom Tables Row ────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Top Products Bar Chart */}
-            <div className="lg:col-span-1 bg-slate-900 rounded-xl border border-slate-800 p-4">
-              <h3 className="text-sm font-bold text-white mb-4">أكثر المنتجات مبيعاً</h3>
+            <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+              <h3 className="text-sm font-bold text-slate-900 mb-4">أكثر المنتجات مبيعاً</h3>
               {topProducts.length === 0 ? (
                 <div className="text-center text-slate-500 text-sm py-8">لا توجد بيانات</div>
               ) : (
@@ -471,23 +471,23 @@ export const ExecutiveDashboard: React.FC = () => {
             </div>
 
             {/* Recent Invoices */}
-            <div className="lg:col-span-1 bg-slate-900 rounded-xl border border-slate-800 p-4">
-              <h3 className="text-sm font-bold text-white mb-3">آخر الفواتير</h3>
+            <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+              <h3 className="text-sm font-bold text-slate-900 mb-3">آخر الفواتير</h3>
               <div className="space-y-2">
                 {recentInvoices.length === 0 ? (
                   <p className="text-slate-500 text-xs text-center py-6">لا توجد فواتير</p>
                 ) : recentInvoices.map((inv) => {
-                  const statusInfo = paymentStatusLabel[inv.status] ?? { label: inv.status, cls: 'bg-slate-700 text-slate-300' };
+                  const statusInfo = paymentStatusLabel[inv.status] ?? { label: inv.status, cls: 'bg-slate-200 text-slate-700' };
                   return (
-                    <div key={inv.id} className="flex items-center gap-2 py-1.5 border-b border-slate-800 last:border-0">
+                    <div key={inv.id} className="flex items-center gap-2 py-1.5 border-b border-slate-200 last:border-0">
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-white truncate">{inv.customer}</div>
+                        <div className="text-xs font-semibold text-slate-900 truncate">{inv.customer}</div>
                         <div className="text-[10px] text-slate-500 flex items-center gap-1">
                           <Clock className="w-2.5 h-2.5" />{inv.date}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className="text-xs font-bold text-sky-400">{formatCurrency(inv.amount)}</div>
+                        <div className="text-xs font-bold text-sky-600">{formatCurrency(inv.amount)}</div>
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${statusInfo.cls}`}>
                           {statusInfo.label}
                         </span>
@@ -499,10 +499,10 @@ export const ExecutiveDashboard: React.FC = () => {
             </div>
 
             {/* Top Debt Customers */}
-            <div className="lg:col-span-1 bg-slate-900 rounded-xl border border-slate-800 p-4">
+            <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-white">أعلى الديون</h3>
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                <h3 className="text-sm font-bold text-slate-900">أعلى الديون</h3>
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
               </div>
               <div className="space-y-2.5">
                 {debtCustomers.length === 0 ? (
@@ -513,10 +513,10 @@ export const ExecutiveDashboard: React.FC = () => {
                   return (
                     <div key={i}>
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-300 font-medium truncate">{c.name}</span>
-                        <span className="text-rose-400 font-bold shrink-0 mr-2">{formatCurrency(c.debt)}</span>
+                        <span className="text-slate-700 font-medium truncate">{c.name}</span>
+                        <span className="text-rose-600 font-bold shrink-0 mr-2">{formatCurrency(c.debt)}</span>
                       </div>
-                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-rose-500 rounded-full transition-all"
                           style={{ width: `${pct}%` }}

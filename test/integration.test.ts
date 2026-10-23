@@ -9,6 +9,8 @@ import { CustomerService } from '../src/services/CustomerService.ts';
 import { PurchaseService } from '../src/services/PurchaseService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { InventoryService } from '../src/services/InventoryService.ts';
+import { QuotationService } from '../src/services/QuotationService.ts';
+import { OrderService } from '../src/services/OrderService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -85,6 +87,52 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 0, 'balance unchanged after paid return');
   assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 0, 'cash register refunded to 0');
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 300, 'stock restored to 300 after paid return');
+
+  // --- Quotation → order → delivery → invoice pipeline ---
+  const quotation = new QuotationService().createQuotation({
+    customerId: created.id,
+    validDays: 15,
+    items: [{ productId: pid, quantityM2: 20, unitPrice: 300 }],
+  });
+  assert.equal(quotation.status, 'PENDING');
+  assert.equal(quotation.totalAmount, 6000);
+
+  new QuotationService().scheduleFollowUp(quotation.id, '2026-12-01', 'متابعة العميل');
+  assert.equal(q('SELECT follow_up_date FROM quotations WHERE id=?', [quotation.id])[0].followUpDate, '2026-12-01');
+
+  const order = new QuotationService().convertToOrder(quotation.id, { warehouseId: 'wh_main' });
+  assert.equal(q('SELECT converted_order_id FROM quotations WHERE id=?', [quotation.id])[0].convertedOrderId, order.id);
+  assert.equal(q('SELECT follow_up_date FROM quotations WHERE id=?', [quotation.id])[0].followUpDate, null);
+  assert.equal(q('SELECT reserved_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].reservedM2, 20);
+
+  const orderSvc = new OrderService();
+  orderSvc.updateStatus(order.id, 'CONFIRMED');
+  orderSvc.updateStatus(order.id, 'PROCESSING');
+  const firstDelivery = orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 10 }], 'تسليم أول');
+  assert.equal(firstDelivery.status, 'PARTIAL');
+  assert.equal(firstDelivery.items![0].deliveredM2, 10);
+  orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 10 }], 'تسليم ثانٍ');
+  assert.equal(orderSvc.getOrder(order.id)!.items![0].deliveredM2, 20);
+  assert.equal(orderSvc.getStatusHistory(order.id).length, 5, 'create + 2 status changes + 2 deliveries');
+
+  const orderInvoice = orderSvc.convertToInvoice(order.id, { paymentType: 'CASH' });
+  assert.equal(orderInvoice.totalAmount, 6000);
+  assert.equal(q('SELECT status FROM orders WHERE id=?', [order.id])[0].status, 'COMPLETED');
+  assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 280);
+  assert.equal(q('SELECT reserved_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].reservedM2, 0);
+
+  // --- Refund to customer balance instead of cash ---
+  const balanceReturn = new SalesService().returnSale(
+    orderInvoice.id,
+    [{ productId: pid, quantityM2: 20, boxesCount: box(20), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع كامل' }],
+    true,
+    undefined,
+    { refundMethod: 'BALANCE' }
+  );
+  assert.equal(balanceReturn.refundMethod, 'BALANCE');
+  assert.equal(balanceReturn.refundedAmount, 0, 'no cash leaves the register');
+  assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 6000, 'balance refund leaves the cash register untouched');
+  assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, -6000, 'full value credited to the customer balance');
 
   // --- RBAC: a CASHIER cannot adjust inventory (brief §108) ---
   AuthService.logout();

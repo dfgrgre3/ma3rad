@@ -65,16 +65,16 @@ export const BackupPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-y-auto" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto" dir="rtl">
       {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sticky top-0 z-10 shadow-lg">
+      <div className="bg-white border-b border-slate-200 px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sticky top-0 z-10 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600">
             <Download className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base font-black text-white">النسخ الاحتياطي واستعادة البيانات (Backup & Recovery)</h1>
-            <p className="text-xs text-slate-400 font-medium">
+            <h1 className="text-base font-black text-slate-900">النسخ الاحتياطي واستعادة البيانات (Backup & Recovery)</h1>
+            <p className="text-xs text-slate-500 font-medium">
               تصدير ملفات SQLite المشفرة وحفظها خارجياً واسترجاعها بأمان
             </p>
           </div>
@@ -92,59 +92,59 @@ export const BackupPage: React.FC = () => {
       {message && (
         <div
           className={`mx-6 mt-4 p-3.5 rounded-xl text-xs flex items-center justify-between ${
-            message.isError
-              ? 'bg-rose-500/10 border border-rose-500/30 text-rose-300'
-              : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
-          }`}
+ message.isError
+ ? 'bg-rose-500/10 border border-rose-500/30 text-rose-700'
+ : 'bg-emerald-500/10 border text-emerald-700'
+ }`}
         >
           <div className="flex items-center gap-2">
             {message.isError ? (
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             )}
             <span>{message.text}</span>
           </div>
-          <button onClick={() => setMessage(null)} className="font-mono text-slate-400 hover:text-white">✕</button>
+          <button onClick={() => setMessage(null)} className="font-mono text-slate-500 hover:text-slate-900">✕</button>
         </div>
       )}
 
       {/* Cards Grid */}
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Export Card */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 mb-4">
               <HardDrive className="w-6 h-6" />
             </div>
-            <h2 className="text-base font-bold text-white mb-1.5">تصدير قاعدة بيانات SQLite كاملة</h2>
-            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+            <h2 className="text-base font-bold text-slate-900 mb-1.5">تصدير قاعدة بيانات SQLite كاملة</h2>
+            <p className="text-xs text-slate-500 leading-relaxed mb-4">
               يقوم النظام بتصدير لقطة (Snapshot) فورية مطابقة تماماً لكافة بيانات المعرض: المنتجات، العملاء، فواتير المبيعات، المخازن، والقيود المالية بصيغة ملف SQLite ثنائي يمكن تشغيله على أي جهاز.
             </p>
           </div>
 
           <button
             onClick={handleDownloadBackup}
-            className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 flex items-center justify-center gap-2 transition"
+            className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl text-xs font-bold border border-slate-300 flex items-center justify-center gap-2 transition"
           >
-            <Download className="w-4 h-4 text-sky-400" />
+            <Download className="w-4 h-4 text-sky-600" />
             تحميل ملف النسخة الاحتياطية (.sqlite)
           </button>
         </div>
 
         {/* Restore Card */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 mb-4">
               <Upload className="w-6 h-6" />
             </div>
-            <h2 className="text-base font-bold text-white mb-1.5">استرجاع قاعدة البيانات من ملف</h2>
-            <p className="text-xs text-slate-400 leading-relaxed mb-4">
+            <h2 className="text-base font-bold text-slate-900 mb-1.5">استرجاع قاعدة البيانات من ملف</h2>
+            <p className="text-xs text-slate-500 leading-relaxed mb-4">
               استيراد ملف قاعدة بيانات SQLite سابق لاستعادة كافة الفواتير والمخازن إلى نقطة زمنية سابقة في حال تلف الجهاز أو نقل النظام إلى حاسوب جديد.
             </p>
           </div>
 
-          <label className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
+          <label className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
             <Upload className="w-4 h-4" />
             <span>{isRestoring ? 'جاري الاستيراد...' : 'اختيار ملف النسخة الاحتياطية (.sqlite)'}</span>
             <input
@@ -160,10 +160,10 @@ export const BackupPage: React.FC = () => {
 
       {/* Backup History Table */}
       <div className="px-6 pb-6">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-400" />
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-3">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-slate-500" />
               سجل النسخ الاحتياطية السابقة
             </h3>
             <span className="text-xs text-slate-500">{history.length} عمليات مسجلة</span>
@@ -177,7 +177,7 @@ export const BackupPage: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-right text-xs">
                 <thead>
-                  <tr className="text-slate-400 border-b border-slate-800">
+                  <tr className="text-slate-500 border-b border-slate-200">
                     <th className="pb-2.5">اسم الملف</th>
                     <th className="pb-2.5">حجم الملف</th>
                     <th className="pb-2.5">نوع النسخ</th>
@@ -185,18 +185,18 @@ export const BackupPage: React.FC = () => {
                     <th className="pb-2.5">التاريخ والوقت</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/40">
+                <tbody className="divide-y divide-slate-200/40">
                   {history.map((row: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-800/30 transition">
-                      <td className="py-2.5 font-mono text-slate-300 font-bold">{row.file_name}</td>
-                      <td className="py-2.5 font-mono text-slate-400">{formatSize(row.file_size_bytes)}</td>
-                      <td className="py-2.5 text-slate-400">{row.backup_type}</td>
+                    <tr key={i} className="hover:bg-slate-100 transition">
+                      <td className="py-2.5 font-mono text-slate-700 font-bold">{row.file_name}</td>
+                      <td className="py-2.5 font-mono text-slate-500">{formatSize(row.file_size_bytes)}</td>
+                      <td className="py-2.5 text-slate-500">{row.backup_type}</td>
                       <td className="py-2.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-600">
                           {row.status}
                         </span>
                       </td>
-                      <td className="py-2.5 font-mono text-slate-400">{row.created_at}</td>
+                      <td className="py-2.5 font-mono text-slate-500">{row.created_at}</td>
                     </tr>
                   ))}
                 </tbody>

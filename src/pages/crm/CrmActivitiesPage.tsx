@@ -1,142 +1,217 @@
-import React, { useState } from 'react';
-import { Activity, Plus, Search, Calendar, CheckCircle2, Clock, Phone, AlertCircle, User, MessageSquare } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Activity, Plus, Search, Calendar, CheckCircle2, Clock, Phone, AlertCircle, User, MessageSquare, X, Loader2 } from 'lucide-react';
+import { CrmService, CrmActivity } from '../../services/CrmService';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 
-interface CrmActivity {
-  id: string;
-  leadName: string;
-  type: 'CALL' | 'MEETING' | 'VISIT' | 'QUOTATION' | 'NOTE';
-  summary: string;
-  dateTime: string;
-  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
-  notes: string;
-}
-
-const INITIAL_ACTIVITIES: CrmActivity[] = [
-  { id: '1', leadName: 'أحمد محمد علي', type: 'CALL', summary: 'مكالمة لمناقشة تعديلات عرض السعر', dateTime: '2026-08-21 11:30', status: 'PENDING', notes: 'العميل يطلب خصم إضافي 3% على كميات البورسلين الكبيرة.' },
-  { id: '2', leadName: 'سارة إبراهيم', type: 'MEETING', summary: 'اجتماع في المعرض لاختيار الموديلات', dateTime: '2026-08-20 14:00', status: 'COMPLETED', notes: 'تم الاستقرار على الموديلات الإسبانية وتم تسليم كتالوجات الحمامات.' },
-  { id: '3', leadName: 'طارق فتحي', type: 'VISIT', summary: 'زيارة موقع الفيلا لمعاينة المقاسات', dateTime: '2026-08-19 10:00', status: 'COMPLETED', notes: 'المقاسات الفعلية مطابقة للمخطط الهندسي.' },
-  { id: '4', leadName: 'كريم عبدالله', type: 'QUOTATION', summary: 'إرسال عرض السعر الأول عبر الواتساب', dateTime: '2026-08-21 09:00', status: 'COMPLETED', notes: 'العرض صالح لمدة 15 يوماً.' },
-  { id: '5', leadName: 'نورا حسن', type: 'CALL', summary: 'مكالمة ترحيبية وتعريفية بالمعرض', dateTime: '2026-08-22 12:00', status: 'PENDING', notes: 'متابعة أولية لمعرفة موعد استلام الشقة.' },
-];
-
-const TYPE_CONFIG: Record<CrmActivity['type'], { label: string; color: string; icon: React.ElementType }> = {
-  CALL: { label: 'اتصال هاتف', color: 'text-sky-400 bg-sky-500/10 border-sky-500/20', icon: Phone },
-  MEETING: { label: 'اجتماع', color: 'text-violet-400 bg-violet-500/10 border-violet-500/20', icon: User },
-  VISIT: { label: 'زيارة موقع', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icon: Calendar },
-  QUOTATION: { label: 'عرض سعر', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', icon: Activity },
-  NOTE: { label: 'ملاحظة', color: 'text-slate-400 bg-slate-500/10 border-slate-500/20', icon: MessageSquare },
+const TYPE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  CALL: { label: 'اتصال هاتف', color: 'text-sky-600 bg-sky-50 border-sky-200', icon: Phone },
+  MEETING: { label: 'اجتماع', color: 'text-violet-600 bg-violet-50 border-violet-200', icon: User },
+  VISIT: { label: 'زيارة موقع', color: 'text-amber-600 bg-amber-50 border-amber-200', icon: Calendar },
+  WHATSAPP: { label: 'واتساب', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: MessageSquare },
+  EMAIL: { label: 'بريد إلكتروني', color: 'text-indigo-600 bg-indigo-50 border-indigo-200', icon: MessageSquare },
+  QUOTATION_SENT: { label: 'عرض سعر', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: Activity },
+  SAMPLE_GIVEN: { label: 'تسليم عينة', color: 'text-teal-600 bg-teal-50 border-teal-200', icon: Activity },
+  NOTE: { label: 'ملاحظة', color: 'text-slate-600 bg-slate-100 border-slate-200', icon: MessageSquare },
+  STAGE_CHANGE: { label: 'تغيير مرحلة', color: 'text-orange-600 bg-orange-50 border-orange-200', icon: Activity },
 };
 
 export const CrmActivitiesPage: React.FC = () => {
-  const [activities, setActivities] = useState<CrmActivity[]>(INITIAL_ACTIVITIES);
-  const [search, setSearch] = useState('');
+  const service = new CrmService();
+  const user = AuthService.getCurrentUser();
+  const canCreate = PermissionService.can(user, 'crm.create');
+  const canUpdate = PermissionService.can(user, 'crm.update');
 
-  const filteredActivities = activities.filter(act => 
-    act.leadName.includes(search) || act.summary.includes(search) || act.notes.includes(search)
-  );
+  const [activities, setActivities] = useState<CrmActivity[]>([]);
+  const [leads, setLeads] = useState<Array<{ id: string; name: string; phone: string }>>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    leadId: '', activityType: 'CALL', subject: '', scheduledAt: '', body: '',
+  });
+
+  const load = () => {
+    setLoading(true);
+    try {
+      setActivities(service.getActivities(search));
+      setLeads(service.getActiveLeadsForSelect());
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message || 'تعذر تحميل الأنشطة.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.leadId) { alert('يرجى اختيار العميل المحتمل.'); return; }
+    setSaving(true);
+    try {
+      service.createActivity({
+        leadId: form.leadId,
+        activityType: form.activityType,
+        subject: form.subject,
+        body: form.body || undefined,
+        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
+      });
+      setModalOpen(false);
+      setForm({ leadId: '', activityType: 'CALL', subject: '', scheduledAt: '', body: '' });
+      load();
+    } catch (err: any) {
+      alert(err?.message || 'تعذر إضافة النشاط.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const markDone = (id: string) => {
+    try { service.completeActivity(id); load(); } catch (err: any) { alert(err?.message); }
+  };
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden" dir="rtl">
-      {/* Header */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-            <Activity className="w-5 h-5 text-violet-400" />
+          <div className="w-10 h-10 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-center">
+            <Activity className="w-5 h-5 text-violet-600" />
           </div>
           <div>
-            <h1 className="text-base font-black text-white">الأنشطة والمتابعات</h1>
-            <p className="text-xs text-slate-400">سجل وتخطيط الفعاليات والمتابعات مع العملاء</p>
+            <h1 className="text-base font-black text-slate-900">الأنشطة والمتابعات</h1>
+            <p className="text-xs text-slate-500">سجل وتخطيط الفعاليات والمتابعات مع العملاء</p>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto">
-          <Plus className="w-4 h-4" />
-          جدولة نشاط جديد
-        </button>
+        {canCreate && (
+          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0 self-start sm:self-auto">
+            <Plus className="w-4 h-4" /> جدولة نشاط جديد
+          </button>
+        )}
       </div>
 
-      {/* Filters */}
-      <div className="p-4 bg-slate-900/50 border-b border-slate-900 flex gap-3">
-        <div className="relative flex-1">
+      <div className="p-4 bg-white border-b border-slate-200 flex gap-3">
+        <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="بحث باسم العميل، الوصف، الملاحظات..."
+            placeholder="بحث باسم العميل، الوصف، الملاحظات ثم Enter..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-4 pr-10 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500/50 transition"
+            className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-violet-400 transition"
           />
-        </div>
+        </form>
       </div>
 
-      {/* Content split in Timeline & Details */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-3xl mx-auto space-y-6 relative before:absolute before:right-6 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
-          {filteredActivities.map((act) => {
-            const config = TYPE_CONFIG[act.type];
-            const Icon = config.icon;
-            return (
-              <div key={act.id} className="relative pr-12 group">
-                {/* Timeline node icon */}
-                <div className={`absolute right-3.5 top-1.5 w-6 h-6 rounded-full border-2 border-slate-950 flex items-center justify-center z-10 ${
-                  act.status === 'COMPLETED' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                }`}>
-                  {act.status === 'COMPLETED' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-                </div>
-
-                {/* Card Container */}
-                <div className="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-xl p-4 transition">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-white">{act.leadName}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${config.color} flex items-center gap-1`}>
-                        <Icon className="w-3 h-3" />
-                        {config.label}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1 sm:self-auto self-start">
-                      <Clock className="w-3 h-3" />
-                      {act.dateTime}
-                    </span>
+        {error && <div className="max-w-3xl mx-auto mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {loading ? (
+          <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-violet-500" /></div>
+        ) : (
+          <div className="max-w-3xl mx-auto space-y-6 relative before:absolute before:right-6 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            {activities.map((act) => {
+              const config = TYPE_CONFIG[act.activityType] || TYPE_CONFIG.NOTE;
+              const Icon = config.icon;
+              return (
+                <div key={act.id} className="relative pr-12 group">
+                  <div className={`absolute right-3.5 top-1.5 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center z-10 ${act.status === 'COMPLETED' ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                    {act.status === 'COMPLETED' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
                   </div>
 
-                  <h4 className="text-sm font-bold text-slate-200 mb-1.5">{act.summary}</h4>
-                  {act.notes && (
-                    <p className="text-xs text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/40 leading-relaxed">
-                      {act.notes}
-                    </p>
-                  )}
-
-                  {/* Quick actions for Pending items */}
-                  {act.status === 'PENDING' && (
-                    <div className="mt-3 flex gap-2">
-                      <button 
-                        onClick={() => {
-                          setActivities(prev => prev.map(a => a.id === act.id ? { ...a, status: 'COMPLETED' } : a));
-                        }}
-                        className="px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-bold transition"
-                      >
-                        تحديد كمكتمل
-                      </button>
-                      <button 
-                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition"
-                      >
-                        تعديل الموعد
-                      </button>
+                  <div className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-4 transition">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-black text-slate-900">{act.leadName || '—'}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${config.color} flex items-center gap-1`}>
+                          <Icon className="w-3 h-3" /> {config.label}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1 sm:self-auto self-start">
+                        <Clock className="w-3 h-3" />
+                        {(act.scheduledAt || act.createdAt)?.replace('T', ' ').slice(0, 16)}
+                      </span>
                     </div>
-                  )}
+
+                    <h4 className="text-sm font-bold text-slate-800 mb-1.5">{act.subject}</h4>
+                    {act.body && (
+                      <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">{act.body}</p>
+                    )}
+
+                    {act.status === 'PENDING' && canUpdate && (
+                      <div className="mt-3">
+                        <button onClick={() => markDone(act.id)} className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg text-[10px] font-bold transition">
+                          تحديد كمكتمل
+                        </button>
+                      </div>
+                    )}
+                    {act.status !== 'PENDING' && (
+                      <span className={`mt-3 inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${act.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                        {act.status === 'COMPLETED' ? 'مكتمل' : 'ملغي'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {activities.length === 0 && (
+              <div className="py-16 text-center text-slate-500 border-2 border-dashed border-slate-200 rounded-2xl bg-white">
+                <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm">لا توجد أنشطة مجدولة أو مسجلة حالياً</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {modalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-extrabold text-slate-900">جدولة نشاط جديد</h3>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            </div>
+            <form onSubmit={handleCreate} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">العميل المحتمل *</label>
+                <select required value={form.leadId} onChange={(e) => setForm({ ...form, leadId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <option value="">— اختر —</option>
+                  {leads.map((l) => <option key={l.id} value={l.id}>{l.name} — {l.phone}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">نوع النشاط</label>
+                  <select value={form.activityType} onChange={(e) => setForm({ ...form, activityType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                    {Object.entries(TYPE_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">الموعد</label>
+                  <input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                 </div>
               </div>
-            );
-          })}
-
-          {filteredActivities.length === 0 && (
-            <div className="py-16 text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl">
-              <AlertCircle className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-              <p className="text-sm">لا توجد أنشطة مجدولة أو مسجلة حالياً</p>
-            </div>
-          )}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">العنوان *</label>
+                <input required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">تفاصيل / ملاحظات</label>
+                <textarea rows={3} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
+                <button type="submit" disabled={saving} className="px-5 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-2">
+                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} حفظ
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

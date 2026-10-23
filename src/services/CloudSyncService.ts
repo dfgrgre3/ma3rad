@@ -69,16 +69,16 @@ export class CloudSyncService {
     if (!db) {
       return {
         id: 'sync_cfg_main',
-        serverUrl: 'https://cloud.ceramisys-erp.com/api/v1/sync',
-        apiKey: 'sk_live_demo_sync_token_2026',
+        serverUrl: '',
+        apiKey: '',
         branchCode: 'BR-01',
         branchName: 'الفرع والمعرض الرئيسي',
         syncMode: 'HYBRID_AUTO',
         syncIntervalSeconds: 60,
-        lastSyncedAt: new Date().toISOString(),
-        lastSyncStatus: 'SUCCESS',
-        latencyMs: 38,
-        isEnabled: true,
+        lastSyncedAt: null,
+        lastSyncStatus: 'IDLE',
+        latencyMs: 0,
+        isEnabled: false,
         autoResolveConflicts: 'SERVER_WINS',
       };
     }
@@ -112,16 +112,16 @@ export class CloudSyncService {
 
     return {
       id: 'sync_cfg_main',
-      serverUrl: 'https://cloud.ceramisys-erp.com/api/v1/sync',
-      apiKey: 'sk_live_demo_sync_token_2026',
+      serverUrl: '',
+      apiKey: '',
       branchCode: 'BR-01',
       branchName: 'الفرع الرئيسي - المعرض',
       syncMode: 'HYBRID_AUTO',
       syncIntervalSeconds: 60,
-      lastSyncedAt: new Date().toISOString(),
+      lastSyncedAt: null,
       lastSyncStatus: 'IDLE',
-      latencyMs: 42,
-      isEnabled: true,
+      latencyMs: 0,
+      isEnabled: false,
       autoResolveConflicts: 'SERVER_WINS',
     };
   }
@@ -132,14 +132,23 @@ export class CloudSyncService {
 
     const current = this.getConfig();
     const updated = { ...current, ...patch };
+    updated.isEnabled = patch.isEnabled ?? Boolean(updated.serverUrl.trim() && updated.apiKey.trim());
 
     db.run(
-      `UPDATE branch_sync_config
-       SET server_url = ?, api_key = ?, branch_code = ?, branch_name = ?,
-           sync_mode = ?, sync_interval_seconds = ?, latency_ms = ?,
-           is_enabled = ?, auto_resolve_conflicts = ?
-       WHERE id = ?`,
+      `INSERT INTO branch_sync_config (
+         id, server_url, api_key, branch_code, branch_name, sync_mode,
+         sync_interval_seconds, latency_ms, is_enabled, auto_resolve_conflicts,
+         last_synced_at, last_sync_status
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         server_url = excluded.server_url, api_key = excluded.api_key,
+         branch_code = excluded.branch_code, branch_name = excluded.branch_name,
+         sync_mode = excluded.sync_mode, sync_interval_seconds = excluded.sync_interval_seconds,
+         latency_ms = excluded.latency_ms, is_enabled = excluded.is_enabled,
+         auto_resolve_conflicts = excluded.auto_resolve_conflicts,
+         last_synced_at = excluded.last_synced_at, last_sync_status = excluded.last_sync_status`,
       [
+        updated.id,
         updated.serverUrl,
         updated.apiKey,
         updated.branchCode,
@@ -149,7 +158,8 @@ export class CloudSyncService {
         updated.latencyMs,
         updated.isEnabled ? 1 : 0,
         updated.autoResolveConflicts,
-        updated.id,
+        updated.lastSyncedAt,
+        updated.lastSyncStatus,
       ]
     );
     DatabaseManager.getInstance().saveToStorage();
@@ -209,48 +219,30 @@ export class CloudSyncService {
   }
 
   public getConnectedBranches(): ConnectedBranchStatus[] {
-    return [
-      {
-        branchCode: 'BR-01',
-        branchName: 'الفرع والمعرض الرئيسي (الجهاز الحالي)',
-        lastSeen: 'الآن (متصل ومباشر)',
-        status: 'ONLINE',
-        pendingChanges: this.getPendingOutboxCount(),
-        syncHealth: 'EXCELLENT',
-      },
-      {
-        branchCode: 'BR-02',
-        branchName: 'فرع ومعرض مدينة نصر - طريق النصر',
-        lastSeen: 'منذ دقيقتين',
-        status: 'ONLINE',
-        pendingChanges: 2,
-        syncHealth: 'EXCELLENT',
-      },
-      {
-        branchCode: 'WH-01',
-        branchName: 'مستودع العاشر من رمضان المركزي',
-        lastSeen: 'منذ 5 دقائق',
-        status: 'ONLINE',
-        pendingChanges: 0,
-        syncHealth: 'EXCELLENT',
-      },
-      {
-        branchCode: 'BR-03',
-        branchName: 'فرع التجمع الخامس - التسعين الشمالي',
-        lastSeen: 'منذ 15 دقيقة',
-        status: 'ONLINE',
-        pendingChanges: 5,
-        syncHealth: 'GOOD',
-      },
-      {
-        branchCode: 'BR-04',
-        branchName: 'معرض الساحل الشمالي - مارينا (موسمي)',
-        lastSeen: 'منذ يومين (أوفلاين)',
-        status: 'OFFLINE',
-        pendingChanges: 18,
-        syncHealth: 'LAGGING',
-      },
-    ];
+    try {
+      const config = this.getConfig();
+      const pending = this.getPendingOutboxCount();
+      const rows = DatabaseManager.getInstance().query<{ code: string; name: string; is_main: number }>(
+        `SELECT code, name, is_main FROM branches WHERE is_active = 1 ORDER BY is_main DESC, name`
+      );
+      return rows.map((row) => {
+        const isLocal = row.code === config.branchCode || (!config.branchCode && row.is_main === 1);
+        return {
+          branchCode: row.code,
+          branchName: isLocal ? `${row.name} (الجهاز الحالي)` : row.name,
+          lastSeen: isLocal
+            ? 'الآن'
+            : config.lastSyncedAt
+              ? `آخر مزامنة ${new Date(config.lastSyncedAt).toLocaleString('ar-EG')}`
+              : 'غير معروف',
+          status: isLocal ? 'ONLINE' : 'OFFLINE',
+          pendingChanges: isLocal ? pending : 0,
+          syncHealth: isLocal ? (pending > 50 ? 'LAGGING' : 'EXCELLENT') : 'GOOD',
+        };
+      });
+    } catch {
+      return [];
+    }
   }
 
   public getSyncConflictLogs(): SyncConflictLog[] {
@@ -282,63 +274,130 @@ export class CloudSyncService {
 
   public async triggerSync(): Promise<SyncResult> {
     const db = this.getDb();
-    if (!db) {
-      return {
-        success: false,
-        pushedCount: 0,
-        pulledCount: 0,
-        conflictsResolved: 0,
-        latencyMs: 0,
-        message: 'قاعدة البيانات غير مهيأة',
-        timestamp: new Date().toISOString(),
-      };
+    const manager = DatabaseManager.getInstance();
+    const failed = (message: string): SyncResult => ({
+      success: false,
+      pushedCount: 0,
+      pulledCount: 0,
+      conflictsResolved: 0,
+      latencyMs: 0,
+      message,
+      timestamp: new Date().toISOString(),
+    });
+
+    if (!db) return failed('قاعدة البيانات غير مهيأة');
+
+    const config = this.getConfig();
+    if (!config.isEnabled || config.syncMode === 'OFFLINE') {
+      return failed('المزامنة معطلة. فعّل المزامنة وأدخل عنوان الخادم ومفتاح API أولًا.');
+    }
+    if (!config.serverUrl || !config.apiKey) {
+      return failed('لم يتم ضبط عنوان خادم المزامنة أو مفتاح API.');
+    }
+    try {
+      const url = new URL(config.serverUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('invalid');
+    } catch {
+      return failed('عنوان خادم المزامنة غير صالح.');
     }
 
-    // Set status to SYNCING
     db.run(`UPDATE branch_sync_config SET last_sync_status = 'SYNCING'`);
-
-    // Simulate network latency / handshake
-    await new Promise(r => setTimeout(r, 600));
+    const startedAt = Date.now();
 
     try {
-      // Find pending items
-      const pendingRes = db.exec(`SELECT COUNT(*) FROM sync_outbox WHERE status = 'PENDING'`);
-      const pendingCount = Number(pendingRes[0]?.values[0]?.[0] || 0);
-
-      // Mark pending items as ACKNOWLEDGED
-      db.run(`UPDATE sync_outbox SET status = 'ACKNOWLEDGED' WHERE status = 'PENDING'`);
-
-      // Update config
-      const latency = Math.floor(25 + Math.random() * 25);
-      const nowStr = new Date().toISOString();
-      db.run(
-        `UPDATE branch_sync_config
-         SET last_synced_at = ?, last_sync_status = 'SUCCESS', latency_ms = ?`,
-        [nowStr, latency]
+      const pending = manager.query<any>(
+        `SELECT id, entity_table, entity_id, action, payload_json, created_at
+         FROM sync_outbox WHERE status = 'PENDING' ORDER BY created_at LIMIT 200`
       );
+      if (pending.length === 0) {
+        const now = new Date().toISOString();
+        db.run(
+          `UPDATE branch_sync_config SET last_synced_at = ?, last_sync_status = 'SUCCESS', latency_ms = ?`,
+          [now, Date.now() - startedAt]
+        );
+        manager.saveToStorage();
+        return {
+          success: true, pushedCount: 0, pulledCount: 0, conflictsResolved: 0,
+          latencyMs: Date.now() - startedAt, message: 'لا توجد تغييرات معلّقة للمزامنة.', timestamp: now,
+        };
+      }
 
-      DatabaseManager.getInstance().saveToStorage();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      let response: Response;
+      try {
+        response = await fetch(config.serverUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Api-Key': config.apiKey,
+            Authorization: `Bearer ${config.apiKey}`,
+          },
+          body: JSON.stringify({
+            branchCode: config.branchCode,
+            branchName: config.branchName,
+            sentAt: new Date().toISOString(),
+            items: pending.map((item) => ({
+              id: item.id,
+              table: item.entity_table,
+              entityId: item.entity_id,
+              action: item.action,
+              payload: item.payload_json,
+              createdAt: item.created_at,
+            })),
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.message || `رفض الخادم الطلب (HTTP ${response.status}).`);
+      }
+
+      const acknowledged: string[] = Array.isArray(data?.acknowledged)
+        ? data.acknowledged.map(String)
+        : pending.map((item) => String(item.id));
+
+      for (const id of acknowledged) {
+        db.run(
+          `UPDATE sync_outbox SET status = 'ACKNOWLEDGED', error_message = NULL WHERE id = ?`,
+          [id]
+        );
+      }
+
+      const latency = Date.now() - startedAt;
+      const now = new Date().toISOString();
+      db.run(
+        `UPDATE branch_sync_config SET last_synced_at = ?, last_sync_status = 'SUCCESS', latency_ms = ?`,
+        [now, latency]
+      );
+      manager.saveToStorage();
+
+      const pulled = Number(data?.pulledCount) || 0;
+      const conflicts = Number(data?.conflictsResolved) || 0;
       return {
         success: true,
-        pushedCount: pendingCount,
-        pulledCount: Math.floor(Math.random() * 4) + 1,
-        conflictsResolved: 0,
+        pushedCount: acknowledged.length,
+        pulledCount: pulled,
+        conflictsResolved: conflicts,
         latencyMs: latency,
-        message: `تمت المزامنة السحابية بنجاح! تم رفع ${pendingCount} حركة وتحديث البيانات من الفروع المركزية.`,
-        timestamp: nowStr,
+        message: `تمت المزامنة: رُفعت ${acknowledged.length} حركة${pulled ? ` واستُلمت ${pulled} تحديثًا` : ''}${conflicts ? ` وحُلّت ${conflicts} تعارضات` : ''}.`,
+        timestamp: now,
       };
     } catch (err: any) {
+      const message = err?.name === 'AbortError'
+        ? 'انتهت مهلة الاتصال بخادم المزامنة (15 ثانية).'
+        : err?.message || 'تعذر الاتصال بخادم المزامنة.';
       db.run(`UPDATE branch_sync_config SET last_sync_status = 'ERROR'`);
-      return {
-        success: false,
-        pushedCount: 0,
-        pulledCount: 0,
-        conflictsResolved: 0,
-        latencyMs: 0,
-        message: err?.message || 'فشلت عملية المزامنة مع السحابة',
-        timestamp: new Date().toISOString(),
-      };
+      db.run(
+        `UPDATE sync_outbox SET retry_count = retry_count + 1, error_message = ? WHERE status = 'PENDING'`,
+        [message]
+      );
+      manager.saveToStorage();
+      return failed(message);
     }
   }
 }

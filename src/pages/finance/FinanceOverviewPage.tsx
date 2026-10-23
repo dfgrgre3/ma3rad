@@ -232,55 +232,55 @@ export const FinanceOverviewPage: React.FC = () => {
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n) + ' ج';
 
   const cards = [
-    { label: 'إيرادات المبيعات (الشهر)', value: fmt(metrics.totalRevenue), icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
-    { label: 'المصروفات والتشغيل (الشهر)', value: fmt(metrics.totalExpenses), icon: TrendingDown, color: 'text-rose-400', bg: 'bg-rose-500/10 border-rose-500/20' },
-    { label: 'صافي أرباح المعرض', value: fmt(metrics.netProfit), icon: DollarSign, color: metrics.netProfit >= 0 ? 'text-sky-400' : 'text-rose-400', bg: 'bg-sky-500/10 border-sky-500/20' },
-    { label: 'الذمم المدينة (حقوقنا لدى العملاء)', value: fmt(metrics.totalReceivables), icon: ArrowUpRight, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
-    { label: 'الذمم الدائنة (مستحقات المصانع)', value: fmt(metrics.totalPayables), icon: ArrowDownRight, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
-    { label: 'رصيد الخزائن النقدية', value: fmt(metrics.cashBalance), icon: Wallet, color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' },
+    { label: 'إيرادات المبيعات (الشهر)', value: fmt(metrics.totalRevenue), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+    { label: 'المصروفات والتشغيل (الشهر)', value: fmt(metrics.totalExpenses), icon: TrendingDown, color: 'text-rose-600', bg: 'bg-rose-500/10 border-rose-500/20' },
+    { label: 'صافي أرباح المعرض', value: fmt(metrics.netProfit), icon: DollarSign, color: metrics.netProfit >= 0 ? 'text-sky-600' : 'text-rose-600', bg: 'bg-sky-500/10 border-sky-500/20' },
+    { label: 'الذمم المدينة (حقوقنا لدى العملاء)', value: fmt(metrics.totalReceivables), icon: ArrowUpRight, color: 'text-amber-600', bg: 'bg-amber-500/10 border-amber-500/20' },
+    { label: 'الذمم الدائنة (مستحقات المصانع)', value: fmt(metrics.totalPayables), icon: ArrowDownRight, color: 'text-violet-600', bg: 'bg-violet-500/10 border-violet-500/20' },
+    { label: 'رصيد الخزائن النقدية', value: fmt(metrics.cashBalance), icon: Wallet, color: 'text-teal-600', bg: 'bg-teal-500/10 border-teal-500/20' },
   ];
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-950 text-slate-100 p-6 space-y-6" dir="rtl">
+    <div className="h-full overflow-y-auto bg-slate-50 text-slate-900 p-6 space-y-6" dir="rtl">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-white">المركز المالي والمحاسبة العامة (General Ledger & Finance)</h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h1 className="text-xl font-black text-slate-900">المركز المالي والمحاسبة العامة (General Ledger & Finance)</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
             شجرة الحسابات، قيود اليومية، ميزان المراجعة، ومؤشرات الأرباح والخسائر
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Tabs */}
-          <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs">
+          <div className="flex bg-white border border-slate-200 rounded-xl p-1 text-xs">
             <button
               onClick={() => setActiveTab('OVERVIEW')}
               className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                activeTab === 'OVERVIEW'
-                  ? 'bg-sky-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+ activeTab === 'OVERVIEW'
+ ? 'bg-sky-600 text-slate-900 shadow'
+ : 'text-slate-500 hover:text-slate-900'
+ }`}
             >
               نظرة عامة والرسوم
             </button>
             <button
               onClick={() => setActiveTab('CHART_OF_ACCOUNTS')}
               className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                activeTab === 'CHART_OF_ACCOUNTS'
-                  ? 'bg-sky-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+ activeTab === 'CHART_OF_ACCOUNTS'
+ ? 'bg-sky-600 text-slate-900 shadow'
+ : 'text-slate-500 hover:text-slate-900'
+ }`}
             >
               شجرة الحسابات ({accounts.length})
             </button>
             <button
               onClick={() => setActiveTab('JOURNAL_ENTRIES')}
               className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                activeTab === 'JOURNAL_ENTRIES'
-                  ? 'bg-sky-600 text-white shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+ activeTab === 'JOURNAL_ENTRIES'
+ ? 'bg-sky-600 text-slate-900 shadow'
+ : 'text-slate-500 hover:text-slate-900'
+ }`}
             >
               دفتر قيود اليومية ({journalEntries.length})
             </button>
@@ -289,7 +289,7 @@ export const FinanceOverviewPage: React.FC = () => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition"
+            className="p-2.5 rounded-xl bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300 transition"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -306,20 +306,20 @@ export const FinanceOverviewPage: React.FC = () => {
                 <div key={c.label} className={`rounded-2xl border p-4 ${c.bg} shadow-sm`}>
                   <Icon className={`w-5 h-5 ${c.color} mb-2`} />
                   <div className={`text-base font-black ${c.color}`}>{c.value}</div>
-                  <div className="text-[11px] text-slate-400 mt-1">{c.label}</div>
+                  <div className="text-[11px] text-slate-500 mt-1">{c.label}</div>
                 </div>
               );
             })}
           </div>
 
           {/* 6-Month Chart */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-sky-400" />
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-sky-600" />
                 تحليل الإيرادات والمصروفات الشهرية (آخر 6 أشهر)
               </h3>
-              <span className="text-xs text-slate-400">تحديث فوري من فواتير المبيعات والمصروفات</span>
+              <span className="text-xs text-slate-500">تحديث فوري من فواتير المبيعات والمصروفات</span>
             </div>
 
             <ResponsiveContainer width="100%" height={260}>
@@ -340,14 +340,14 @@ export const FinanceOverviewPage: React.FC = () => {
       )}
 
       {activeTab === 'CHART_OF_ACCOUNTS' && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
-              <h2 className="text-base font-black text-white flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-400" />
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Layers className="w-5 h-5 text-indigo-600" />
                 دليل وشجرة الحسابات العامة (Chart of Accounts)
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">تصنيف الأصول والخصوم وحقوق الملكية والإيرادات والمصروفات</p>
+              <p className="text-xs text-slate-500 mt-0.5">تصنيف الأصول والخصوم وحقوق الملكية والإيرادات والمصروفات</p>
             </div>
 
             <button
@@ -359,9 +359,9 @@ export const FinanceOverviewPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-right text-xs">
-              <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
+              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                 <tr>
                   <th className="p-3">كود الحساب</th>
                   <th className="p-3">اسم الحساب المحاسبي</th>
@@ -370,28 +370,28 @@ export const FinanceOverviewPage: React.FC = () => {
                   <th className="p-3">الحالة</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/40">
+              <tbody className="divide-y divide-slate-200/40">
                 {accounts.map(acc => (
-                  <tr key={acc.id} className="hover:bg-slate-850/30 transition">
-                    <td className="p-3 font-mono font-bold text-sky-400">{acc.code}</td>
-                    <td className="p-3 font-bold text-white">{acc.name}</td>
+                  <tr key={acc.id} className="hover:bg-slate-100 transition">
+                    <td className="p-3 font-mono font-bold text-sky-600">{acc.code}</td>
+                    <td className="p-3 font-bold text-slate-900">{acc.name}</td>
                     <td className="p-3">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        acc.type === 'ASSET' ? 'bg-emerald-500/10 text-emerald-400' :
-                        acc.type === 'LIABILITY' ? 'bg-amber-500/10 text-amber-400' :
-                        acc.type === 'EQUITY' ? 'bg-indigo-500/10 text-indigo-400' :
-                        acc.type === 'REVENUE' ? 'bg-teal-500/10 text-teal-400' :
-                        'bg-rose-500/10 text-rose-400'
-                      }`}>
+ acc.type === 'ASSET' ? 'bg-emerald-500/10 text-emerald-600' :
+ acc.type === 'LIABILITY' ? 'bg-amber-500/10 text-amber-600' :
+ acc.type === 'EQUITY' ? 'bg-indigo-500/10 text-indigo-600' :
+ acc.type === 'REVENUE' ? 'bg-teal-500/10 text-teal-600' :
+ 'bg-rose-500/10 text-rose-600'
+ }`}>
                         {acc.type === 'ASSET' ? 'أصول' :
                          acc.type === 'LIABILITY' ? 'خصوم والتزامات' :
                          acc.type === 'EQUITY' ? 'حقوق ملكية' :
                          acc.type === 'REVENUE' ? 'إيرادات' : 'مصروفات'}
                       </span>
                     </td>
-                    <td className="p-3 font-mono font-black text-slate-200">{fmt(acc.balance)}</td>
+                    <td className="p-3 font-mono font-black text-slate-800">{fmt(acc.balance)}</td>
                     <td className="p-3">
-                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">نشط</span>
+                      <span className="text-[10px] text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded">نشط</span>
                     </td>
                   </tr>
                 ))}
@@ -402,14 +402,14 @@ export const FinanceOverviewPage: React.FC = () => {
       )}
 
       {activeTab === 'JOURNAL_ENTRIES' && (
-        <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
-              <h2 className="text-base font-black text-white flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-amber-400" />
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-amber-600" />
                 دفتر القيود اليومية المحاسبية (Journal Entries)
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">توثيق القيود المزدوجة المتوازنة (مدين = دائن) المعتمدة</p>
+              <p className="text-xs text-slate-500 mt-0.5">توثيق القيود المزدوجة المتوازنة (مدين = دائن) المعتمدة</p>
             </div>
 
             <button
@@ -421,9 +421,9 @@ export const FinanceOverviewPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-right text-xs">
-              <thead className="bg-slate-950 text-slate-400 border-b border-slate-800">
+              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                 <tr>
                   <th className="p-3">رقم القيد</th>
                   <th className="p-3">التاريخ</th>
@@ -433,16 +433,16 @@ export const FinanceOverviewPage: React.FC = () => {
                   <th className="p-3">الحالة والتوازن</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/40">
+              <tbody className="divide-y divide-slate-200/40">
                 {journalEntries.map(je => (
-                  <tr key={je.id} className="hover:bg-slate-850/30 transition">
-                    <td className="p-3 font-mono font-bold text-amber-400">{je.entryNumber}</td>
-                    <td className="p-3 font-mono text-slate-300">{je.date}</td>
-                    <td className="p-3 text-white font-medium">{je.description}</td>
-                    <td className="p-3 font-mono font-black text-emerald-400">{fmt(je.totalDebit)}</td>
-                    <td className="p-3 font-mono font-black text-sky-400">{fmt(je.totalCredit)}</td>
+                  <tr key={je.id} className="hover:bg-slate-100 transition">
+                    <td className="p-3 font-mono font-bold text-amber-600">{je.entryNumber}</td>
+                    <td className="p-3 font-mono text-slate-700">{je.date}</td>
+                    <td className="p-3 text-slate-900 font-medium">{je.description}</td>
+                    <td className="p-3 font-mono font-black text-emerald-600">{fmt(je.totalDebit)}</td>
+                    <td className="p-3 font-mono font-black text-sky-600">{fmt(je.totalCredit)}</td>
                     <td className="p-3">
-                      <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-bold flex items-center gap-1 w-max">
+                      <span className="text-[10px] text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded font-bold flex items-center gap-1 w-max">
                         <CheckCircle2 className="w-3 h-3" />
                         متوازن ومرحّل
                       </span>
@@ -458,39 +458,39 @@ export const FinanceOverviewPage: React.FC = () => {
       {/* Add Account Modal */}
       {showAddAccountModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 space-y-4 animate-scaleIn">
-            <h3 className="text-sm font-black text-white">إضافة حساب محاسبي جديد</h3>
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 space-y-4 animate-scaleIn">
+            <h3 className="text-sm font-black text-slate-900">إضافة حساب محاسبي جديد</h3>
             <form onSubmit={handleCreateAccount} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">كود الحساب (مثال: 1106)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">كود الحساب (مثال: 1106)</label>
                 <input
                   type="text"
                   required
                   placeholder="مثال: 1106"
                   value={newAccCode}
                   onChange={(e) => setNewAccCode(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">اسم الحساب</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">اسم الحساب</label>
                 <input
                   type="text"
                   required
                   placeholder="مثال: البنك الأهلي المصري - حساب جاري"
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">تصنيف الحساب</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">تصنيف الحساب</label>
                 <select
                   value={newAccType}
                   onChange={(e: any) => setNewAccType(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                 >
                   <option value="ASSET">أصول (Assets)</option>
                   <option value="LIABILITY">خصوم والتزامات (Liabilities)</option>
@@ -500,11 +500,11 @@ export const FinanceOverviewPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-800">
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowAddAccountModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs"
                 >
                   إلغاء
                 </button>
@@ -523,28 +523,28 @@ export const FinanceOverviewPage: React.FC = () => {
       {/* Add Journal Entry Modal */}
       {showAddEntryModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 space-y-4 animate-scaleIn">
-            <h3 className="text-sm font-black text-white">تسجيل قيد يومية محاسبي مزدوج</h3>
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-lg p-6 space-y-4 animate-scaleIn">
+            <h3 className="text-sm font-black text-slate-900">تسجيل قيد يومية محاسبي مزدوج</h3>
             <form onSubmit={handleCreateJournalEntry} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">البيان / الوصف</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">البيان / الوصف</label>
                 <input
                   type="text"
                   required
                   placeholder="مثال: سداد دفعة إيجار المعرض من الخزينة الرئيسية"
                   value={entryDesc}
                   onChange={(e) => setEntryDesc(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">حساب المدين (من حـ/)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">حساب المدين (من حـ/)</label>
                   <select
                     value={debitAccId}
                     onChange={(e) => setDebitAccId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                   >
                     {accounts.map(a => (
                       <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
@@ -553,11 +553,11 @@ export const FinanceOverviewPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">حساب الدائن (إلى حـ/)</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">حساب الدائن (إلى حـ/)</label>
                   <select
                     value={creditAccId}
                     onChange={(e) => setCreditAccId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                   >
                     {accounts.map(a => (
                       <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
@@ -567,30 +567,30 @@ export const FinanceOverviewPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">مبلغ القيد (ج.م)</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">مبلغ القيد (ج.م)</label>
                 <input
                   type="number"
                   min="1"
                   required
                   value={entryAmount}
                   onChange={(e) => setEntryAmount(Number(e.target.value) || 0)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-mono"
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+              <div className="p-3 rounded-xl bg-white border border-slate-200 text-[11px] text-slate-500 space-y-1">
                 <div className="flex justify-between">
                   <span>الطرف المدين: {fmt(entryAmount)}</span>
                   <span>الطرف الدائن: {fmt(entryAmount)}</span>
                 </div>
-                <div className="text-emerald-400 font-bold">القيد متوازن تماماً (Difference = 0)</div>
+                <div className="text-emerald-600 font-bold">القيد متوازن تماماً (Difference = 0)</div>
               </div>
 
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-800">
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setShowAddEntryModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs"
                 >
                   إلغاء
                 </button>

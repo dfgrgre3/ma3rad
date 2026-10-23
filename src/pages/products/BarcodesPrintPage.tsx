@@ -56,16 +56,16 @@ export const BarcodesPrintPage: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden" dir="rtl">
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
       {/* Header (Hidden when printing) */}
-      <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+          <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600">
             <Barcode className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base font-black text-white">استوديو طباعة باركود وملصقات السيراميك (Barcode Studio)</h1>
-            <p className="text-xs text-slate-400 font-medium">
+            <h1 className="text-base font-black text-slate-900">استوديو طباعة باركود وملصقات السيراميك (Barcode Studio)</h1>
+            <p className="text-xs text-slate-500 font-medium">
               تصميم وتجهيز باركود الكراتين والعينات مع المقاس والفرز والأسعار للطابعات الحرارية
             </p>
           </div>
@@ -81,12 +81,12 @@ export const BarcodesPrintPage: React.FC = () => {
       </div>
 
       {/* Main Body */}
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-6 p-6">
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-6">
         {/* Left Controls (Hidden on print) */}
         <div className="w-full lg:w-96 space-y-5 overflow-y-auto no-print">
           {/* Select Product */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <label className="block text-xs font-bold text-slate-300">اختر صنف السيراميك</label>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+            <label className="block text-xs font-bold text-slate-700">اختر صنف السيراميك</label>
             <div className="relative">
               <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
@@ -94,7 +94,7 @@ export const BarcodesPrintPage: React.FC = () => {
                 placeholder="بحث بالاسم أو الكود..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-3 pr-9 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-sky-500"
+                className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-sky-500"
               />
             </div>
 
@@ -105,10 +105,10 @@ export const BarcodesPrintPage: React.FC = () => {
                   onClick={() => setSelectedProductId(p.id)}
                   type="button"
                   className={`w-full text-right p-2.5 rounded-xl border text-xs transition ${
-                    selectedProductId === p.id
-                      ? 'bg-sky-500/15 border-sky-500/40 text-sky-300 font-bold'
-                      : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700'
-                  }`}
+ selectedProductId === p.id
+ ? 'bg-sky-500/15 border-sky-500/40 text-sky-700 font-bold'
+ : 'bg-white hover:border-slate-300'
+ }`}
                 >
                   <div className="truncate">{p.name}</div>
                   <div className="text-[10px] text-slate-500 font-mono mt-0.5">
@@ -120,17 +120,17 @@ export const BarcodesPrintPage: React.FC = () => {
           </div>
 
           {/* Label Dimensions Preset */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <label className="block text-xs font-bold text-slate-300">مقاس الملصق الحراري</label>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+            <label className="block text-xs font-bold text-slate-700">مقاس الملصق الحراري</label>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => setSettings(s => ({ ...s, labelSize: '60x40' }))}
                 className={`p-2.5 rounded-xl border font-bold transition text-center ${
-                  settings.labelSize === '60x40'
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                    : 'bg-slate-950/60 text-slate-400 border-slate-800'
-                }`}
+ settings.labelSize === '60x40'
+ ? 'bg-sky-500/20 text-sky-700 border-sky-500/40'
+ : 'bg-white border-slate-200'
+ }`}
               >
                 60 × 40 مم (كراتين)
               </button>
@@ -138,10 +138,10 @@ export const BarcodesPrintPage: React.FC = () => {
                 type="button"
                 onClick={() => setSettings(s => ({ ...s, labelSize: '50x30' }))}
                 className={`p-2.5 rounded-xl border font-bold transition text-center ${
-                  settings.labelSize === '50x30'
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                    : 'bg-slate-950/60 text-slate-400 border-slate-800'
-                }`}
+ settings.labelSize === '50x30'
+ ? 'bg-sky-500/20 text-sky-700 border-sky-500/40'
+ : 'bg-white border-slate-200'
+ }`}
               >
                 50 × 30 مم (أرفف)
               </button>
@@ -149,10 +149,10 @@ export const BarcodesPrintPage: React.FC = () => {
                 type="button"
                 onClick={() => setSettings(s => ({ ...s, labelSize: '80x50' }))}
                 className={`p-2.5 rounded-xl border font-bold transition text-center ${
-                  settings.labelSize === '80x50'
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                    : 'bg-slate-950/60 text-slate-400 border-slate-800'
-                }`}
+ settings.labelSize === '80x50'
+ ? 'bg-sky-500/20 text-sky-700 border-sky-500/40'
+ : 'bg-white border-slate-200'
+ }`}
               >
                 80 × 50 مم (عينات)
               </button>
@@ -160,10 +160,10 @@ export const BarcodesPrintPage: React.FC = () => {
                 type="button"
                 onClick={() => setSettings(s => ({ ...s, labelSize: 'A4_SHEET' }))}
                 className={`p-2.5 rounded-xl border font-bold transition text-center ${
-                  settings.labelSize === 'A4_SHEET'
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                    : 'bg-slate-950/60 text-slate-400 border-slate-800'
-                }`}
+ settings.labelSize === 'A4_SHEET'
+ ? 'bg-sky-500/20 text-sky-700 border-sky-500/40'
+ : 'bg-white border-slate-200'
+ }`}
               >
                 ورقة A4 (24 ملصق)
               </button>
@@ -171,45 +171,45 @@ export const BarcodesPrintPage: React.FC = () => {
           </div>
 
           {/* Toggle Display Elements */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <label className="block text-xs font-bold text-slate-300">عناصر الملصق الظاهرة</label>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+            <label className="block text-xs font-bold text-slate-700">عناصر الملصق الظاهرة</label>
             <div className="space-y-2 text-xs">
-              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.showPriceM2}
                   onChange={(e) => setSettings(s => ({ ...s, showPriceM2: e.target.checked }))}
-                  className="rounded border-slate-700 bg-slate-950 text-sky-500"
+                  className="rounded border-slate-300 bg-slate-50 text-sky-500"
                 />
                 <span>سعر المتر المربع (ج/م²)</span>
               </label>
 
-              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.showPriceBox}
                   onChange={(e) => setSettings(s => ({ ...s, showPriceBox: e.target.checked }))}
-                  className="rounded border-slate-700 bg-slate-950 text-sky-500"
+                  className="rounded border-slate-300 bg-slate-50 text-sky-500"
                 />
                 <span>سعر الكرتونة</span>
               </label>
 
-              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.showGrade}
                   onChange={(e) => setSettings(s => ({ ...s, showGrade: e.target.checked }))}
-                  className="rounded border-slate-700 bg-slate-950 text-sky-500"
+                  className="rounded border-slate-300 bg-slate-50 text-sky-500"
                 />
                 <span>درجة الفرز (فرز أول / ثاني)</span>
               </label>
 
-              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-slate-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.showSize}
                   onChange={(e) => setSettings(s => ({ ...s, showSize: e.target.checked }))}
-                  className="rounded border-slate-700 bg-slate-950 text-sky-500"
+                  className="rounded border-slate-300 bg-slate-50 text-sky-500"
                 />
                 <span>المقاس (مثال: 60×120)</span>
               </label>
@@ -217,23 +217,23 @@ export const BarcodesPrintPage: React.FC = () => {
           </div>
 
           {/* Quantity */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-            <label className="block text-xs font-bold text-slate-300 mb-2">عدد النسخ المطلوبة للطباعة</label>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4">
+            <label className="block text-xs font-bold text-slate-700 mb-2">عدد النسخ المطلوبة للطباعة</label>
             <input
               type="number"
               min="1"
               max="100"
               value={labelCopies}
               onChange={(e) => setLabelCopies(parseInt(e.target.value) || 1)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-mono"
             />
           </div>
         </div>
 
         {/* Right: Live Label Preview Sheet */}
-        <div className="flex-1 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-start overflow-y-auto">
-          <div className="text-xs font-bold text-slate-400 mb-4 flex items-center gap-2 no-print self-start">
-            <Eye className="w-4 h-4 text-sky-400" />
+        <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-6 flex flex-col items-center justify-start overflow-y-auto">
+          <div className="text-xs font-bold text-slate-500 mb-4 flex items-center gap-2 no-print self-start">
+            <Eye className="w-4 h-4 text-sky-600" />
             معاينة الملصق المباشرة (جاهز للطباعة الحرارية)
           </div>
 
@@ -242,7 +242,7 @@ export const BarcodesPrintPage: React.FC = () => {
               {Array.from({ length: labelCopies }).map((_, idx) => (
                 <div
                   key={idx}
-                  className="bg-white text-slate-900 rounded-xl border-2 border-slate-900 p-3.5 flex flex-col justify-between shadow-md print-label"
+                  className="bg-white text-slate-900 rounded-xl border-2 border-slate-200 p-3.5 flex flex-col justify-between shadow-md print-label"
                   style={{
                     width: settings.labelSize === '50x30' ? '240px' : settings.labelSize === '80x50' ? '320px' : '280px',
                     minHeight: settings.labelSize === '50x30' ? '140px' : settings.labelSize === '80x50' ? '190px' : '165px',
@@ -255,7 +255,7 @@ export const BarcodesPrintPage: React.FC = () => {
                         معرض الأندلس للسيراميك
                       </span>
                       {settings.showGrade && (
-                        <span className="text-[10px] font-black px-1.5 py-0.2 bg-slate-900 text-white rounded">
+                        <span className="text-[10px] font-black px-1.5 py-0.2 bg-white text-slate-900 rounded">
                           {selectedProduct.grade === 'GRADE_1' ? 'فرز أول' : selectedProduct.grade === 'GRADE_2' ? 'فرز ثان' : 'تجاري'}
                         </span>
                       )}
@@ -281,7 +281,7 @@ export const BarcodesPrintPage: React.FC = () => {
                         {[3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 3, 1, 2, 4, 1, 3, 1, 2, 3, 4, 1, 2].map((w, i) => (
                           <div
                             key={i}
-                            className="bg-slate-900 h-full"
+                            className="bg-white h-full"
                             style={{ width: `${w * 1.5}px` }}
                           />
                         ))}
@@ -311,7 +311,7 @@ export const BarcodesPrintPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-slate-400">لا يوجد منتج محدد</div>
+            <div className="text-sm text-slate-500">لا يوجد منتج محدد</div>
           )}
         </div>
       </div>
