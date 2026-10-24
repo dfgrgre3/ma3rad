@@ -882,25 +882,7 @@ export const ProductsView: React.FC = () => {
         { key: 'warehouse', label: 'المخزن' },
         { key: 'openingBoxes', label: 'كراتين افتتاحية' },
       ],
-      rows: [{
-        name: 'سيراميك رويال 60×60 رمادي',
-        category: categories[0]?.name || 'سيراميك',
-        brand: brands[0]?.name || 'رويال',
-        barcode: '622000000001',
-        sku: 'TILE-000001',
-        grade: 'فرز أول',
-        size: '60x60',
-        color: 'رمادي',
-        finish: 'لامع',
-        piecesPerBox: 4,
-        metersPerBox: 1.44,
-        costPrice: 150,
-        sellingPriceM2: 220,
-        wholesalePriceM2: 190,
-        minStockLevel: 20,
-        warehouse: warehouses[0]?.name || 'المخزن الرئيسي',
-        openingBoxes: 10,
-      }],
+      rows: [],
     });
   };
 

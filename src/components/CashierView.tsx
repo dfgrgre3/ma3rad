@@ -25,13 +25,13 @@ export const CashierView: React.FC = () => {
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   // Form States
-  const [openingBalance, setOpeningBalance] = useState(500);
+  const [openingBalance, setOpeningBalance] = useState(0);
   const [actualEndingCash, setActualEndingCash] = useState(0);
   const [closingNotes, setClosingNotes] = useState('');
 
   const [expenseData, setExpenseData] = useState({
     category: '',
-    amount: 150,
+    amount: 0,
     recipient: '',
     description: '',
     paymentType: 'CASH' as PaymentType
@@ -61,7 +61,6 @@ export const CashierView: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
-      // Simulate async behavior if service is sync but heavy, or just wrap for consistency
       const regs = cashierService.getAllRegisters();
       const shift = cashierService.getActiveShift();
       const exps = cashierService.getAllExpenses();
@@ -141,7 +140,7 @@ export const CashierView: React.FC = () => {
       );
       setIsExpenseModalOpen(false);
       // Reset form partially
-      setExpenseData(prev => ({ ...prev, amount: 150, description: '', recipient: '' }));
+      setExpenseData(prev => ({ ...prev, amount: 0, description: '', recipient: '' }));
       await loadData();
       showNotification('success', 'تم تسجيل سند الصرف وخصمه من الخزينة.');
     } catch (err: any) {

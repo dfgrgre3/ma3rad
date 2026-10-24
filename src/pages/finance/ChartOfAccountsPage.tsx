@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BookOpen, Plus, Search, Loader2, X, Trash2, Power } from 'lucide-react';
+import { BookOpen, Plus, Search, Loader2, X, Trash2, Power, Pencil } from 'lucide-react';
 import { FinanceExtrasService, Account, AccountType } from '../../services/FinanceExtrasService';
 
 const TYPE_LABELS: Record<AccountType, string> = {
@@ -26,6 +26,7 @@ export const ChartOfAccountsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
+  const [editing, setEditing] = useState<Account | null>(null);
   const [form, setForm] = useState({ code: '', name: '', type: 'ASSET' as AccountType, parentCode: '', notes: '' });
 
   const load = () => {
@@ -52,11 +53,25 @@ export const ChartOfAccountsPage: React.FC = () => {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      service.createAccount({ code: form.code, name: form.name, type: form.type, parentCode: form.parentCode || undefined, notes: form.notes });
+      if (editing) service.updateAccount(editing.id, { name: form.name, notes: form.notes });
+      else service.createAccount({ code: form.code, name: form.name, type: form.type, parentCode: form.parentCode || undefined, notes: form.notes });
       setModal(false);
+      setEditing(null);
       setForm({ code: '', name: '', type: 'ASSET', parentCode: '', notes: '' });
       load();
     } catch (err: any) { alert(err?.message || 'تعذر حفظ الحساب.'); }
+  };
+
+  const openNew = () => {
+    setEditing(null);
+    setForm({ code: '', name: '', type: 'ASSET', parentCode: '', notes: '' });
+    setModal(true);
+  };
+
+  const openEdit = (account: Account) => {
+    setEditing(account);
+    setForm({ code: account.code, name: account.name, type: account.type, parentCode: account.parentCode || '', notes: account.notes || '' });
+    setModal(true);
   };
 
   const toggle = (a: Account) => {
@@ -80,7 +95,7 @@ export const ChartOfAccountsPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">هيكل الحسابات المحاسبية وأرصدتها المستخرجة من القيود</p>
           </div>
         </div>
-        <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-bold transition shrink-0">
           <Plus className="w-4 h-4" /> إضافة حساب
         </button>
       </div>
@@ -115,7 +130,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                 {filtered.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3 font-mono font-bold text-slate-700">{a.code}</td>
-                    <td className="px-4 py-3 font-bold text-slate-800">{a.name}</td>
+                    <td className={`px-4 py-3 font-bold text-slate-800 ${a.parentCode ? 'pr-9' : ''}`}>{a.name}</td>
                     <td className="px-4 py-3"><span className={`text-[10px] px-2 py-1 rounded border font-bold ${TYPE_COLORS[a.type]}`}>{TYPE_LABELS[a.type]}</span></td>
                     <td className="px-4 py-3 text-slate-500 font-mono">{a.parentCode || '—'}</td>
                     <td className="px-4 py-3 font-mono font-black text-slate-800">{fmt(Number(a.computedBalance ?? a.balance ?? 0))}</td>
@@ -123,6 +138,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
                         <button onClick={() => toggle(a)} title="تفعيل/إيقاف" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><Power className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => openEdit(a)} title="Edit account" className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => remove(a)} title="حذف" className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </td>
@@ -139,25 +155,20 @@ export const ChartOfAccountsPage: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold">إضافة حساب جديد</h3>
+              <h3 className="text-base font-extrabold">{editing ? '\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u062d\u0633\u0627\u0628' : '\u0625\u0636\u0627\u0641\u0629 \u062d\u0633\u0627\u0628 \u062c\u062f\u064a\u062f'}</h3>
               <button onClick={() => setModal(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={submit} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="font-bold text-slate-700 block mb-1">الكود *</label><input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" placeholder="1106" /></div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">النوع *</label>
-                  <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                    {(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div><label className="font-bold text-slate-700 block mb-1">اسم الحساب *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
-              <div><label className="font-bold text-slate-700 block mb-1">كود الحساب الأب</label><input value={form.parentCode} onChange={(e) => setForm({ ...form, parentCode: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
-              <div><label className="font-bold text-slate-700 block mb-1">ملاحظات</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+              {!editing && <div className="grid grid-cols-2 gap-2">
+                <div><label className="font-bold text-slate-700 block mb-1">{'\u0627\u0644\u0643\u0648\u062F'} *</label><input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" placeholder="1106" /></div>
+                <div><label className="font-bold text-slate-700 block mb-1">{'\u0627\u0644\u0646\u0648\u0639'} *</label><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">{(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</select></div>
+              </div>}
+              <div><label className="font-bold text-slate-700 block mb-1">{'\u0627\u0633\u0645 \u0627\u0644\u062d\u0633\u0627\u0628'} *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+              {!editing && <div><label className="font-bold text-slate-700 block mb-1">{'\u0627\u0644\u062d\u0633\u0627\u0628 \u0627\u0644\u0623\u0628'}</label><select value={form.parentCode} onChange={(e) => setForm({ ...form, parentCode: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"><option value="">{'\u062d\u0633\u0627\u0628 \u0631\u0626\u064a\u0633\u064a'}</option>{accounts.filter((a) => a.isActive && a.type === form.type).map((a) => <option key={a.id} value={a.code}>{a.code} — {a.name}</option>)}</select></div>}
+              <div><label className="font-bold text-slate-700 block mb-1">{'\u0645\u0644\u0627\u062d\u0638\u0627\u062a'}</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onClick={() => setModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-                <button type="submit" className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl">حفظ</button>
+                <button type="button" onClick={() => setModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">{'\u0625\u0644\u063a\u0627\u0621'}</button>
+                <button type="submit" className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl">{'\u062d\u0641\u0638'}</button>
               </div>
             </form>
           </div>

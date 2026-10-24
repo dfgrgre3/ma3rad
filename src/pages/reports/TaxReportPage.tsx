@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ReceiptText, Loader2, Download, CalendarDays } from 'lucide-react';
 import { FinanceExtrasService } from '../../services/FinanceExtrasService';
+import { localDateString } from '../../utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 
 export const TaxReportPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);

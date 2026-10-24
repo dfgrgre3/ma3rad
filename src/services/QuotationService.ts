@@ -6,6 +6,7 @@ import { SalesService } from './SalesService';
 import { OrderService, type Order } from './OrderService';
 import { round2 } from './financials';
 import type { PaymentType, SalesInvoice } from '../types';
+import { addLocalDays, localDateString } from '../utils/date';
 
 export type QuotationStatus = 'PENDING' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
 
@@ -113,7 +114,7 @@ export class QuotationService {
 
   /** Flip overdue pending quotations to EXPIRED. Cheap idempotent UPDATE. */
   public expireOverdue(): void {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     this.db.run(
       `UPDATE quotations
        SET status = 'EXPIRED', updated_at = CURRENT_TIMESTAMP
@@ -214,8 +215,8 @@ export class QuotationService {
     const taxAmount = round2(Math.max(0, input.taxAmount || 0));
     const totalAmount = round2(Math.max(0, subtotal - headerDiscount + taxAmount));
     const validDays = Math.max(1, Math.min(365, Number(input.validDays) || 15));
-    const today = new Date().toISOString().slice(0, 10);
-    const validUntil = new Date(Date.now() + validDays * 86400000).toISOString().slice(0, 10);
+    const today = localDateString();
+    const validUntil = localDateString(addLocalDays(new Date(), validDays));
     const id = `qtn_${uuidv4().substring(0, 8)}`;
 
     return this.db.executeTransaction((db) => {
@@ -275,7 +276,7 @@ export class QuotationService {
     const taxAmount = round2(Math.max(0, input.taxAmount || 0));
     const totalAmount = round2(Math.max(0, subtotal - headerDiscount + taxAmount));
     const validDays = Math.max(1, Math.min(365, Number(input.validDays) || 15));
-    const validUntil = new Date(Date.now() + validDays * 86400000).toISOString().slice(0, 10);
+    const validUntil = localDateString(addLocalDays(new Date(), validDays));
 
     return this.db.executeTransaction((db) => {
       if (headerDiscount > 0 || prepared.some((i) => i.discountAmount > 0)) {
@@ -336,7 +337,7 @@ export class QuotationService {
       [
         status,
         status,
-        new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
+        localDateString(addLocalDays(new Date(), 15)),
         id,
       ]
     );

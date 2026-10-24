@@ -15,6 +15,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { Customer, Product, Warehouse, PaymentType } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
+import { addLocalDays, localDateString } from '../../utils/date';
 
 const PAGE_SIZE = 12;
 
@@ -102,7 +103,7 @@ export const QuotationsPage: React.FC = () => {
       const rows = service.getQuotations({
         search, status: statusFilter, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
       });
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateString();
       setQuotations(
         followUpOnly
           ? rows.filter((q) => q.status === 'PENDING' && q.followUpDate && q.followUpDate <= today)
@@ -264,7 +265,7 @@ export const QuotationsPage: React.FC = () => {
   const openFollowUp = (quotation: Quotation) => {
     const full = service.getQuotation(quotation.id) || quotation;
     setFollowUpTarget(full);
-    setFollowUpDate(full.followUpDate || new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10));
+    setFollowUpDate(full.followUpDate || localDateString(addLocalDays(new Date(), 2)));
     setFollowUpNotes(full.followUpNotes || '');
   };
 
@@ -285,7 +286,7 @@ export const QuotationsPage: React.FC = () => {
 
   const logContact = (quotation: Quotation) => {
     try {
-      service.recordContact(quotation.id, `تم التواصل مع العميل بتاريخ ${new Date().toISOString().slice(0, 10)}`);
+      service.recordContact(quotation.id, `تم التواصل مع العميل بتاريخ ${localDateString()}`);
       load();
     } catch (err: any) {
       alert(err?.message || 'تعذر تسجيل التواصل.');
@@ -448,7 +449,7 @@ export const QuotationsPage: React.FC = () => {
                         {q.followUpDate && (
                           <div className="flex justify-between">
                             <span>المتابعة القادمة</span>
-                            <span className={`font-mono ${q.status === 'PENDING' && q.followUpDate <= new Date().toISOString().slice(0, 10) ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>{q.followUpDate}</span>
+                            <span className={`font-mono ${q.status === 'PENDING' && q.followUpDate <= localDateString() ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>{q.followUpDate}</span>
                           </div>
                         )}
                         {(q.contactCount || 0) > 0 && <div className="flex justify-between"><span>مرات التواصل</span><span className="font-mono text-slate-700">{q.contactCount}</span></div>}

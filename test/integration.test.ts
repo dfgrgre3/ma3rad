@@ -16,6 +16,21 @@ function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
 }
 
+test('database initialization enables SQLite foreign key enforcement', async () => {
+  const manager = DatabaseManager.getInstance();
+  const db = await manager.initialize();
+  assert.equal(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0], 1);
+  assert.equal(q("SELECT id FROM schema_migrations WHERE id = '014_users_custom_roles'").length, 1);
+  manager.exportDatabaseBinary();
+  assert.equal(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0], 1);
+  assert.throws(() => {
+    db.run(
+      'INSERT INTO user_permissions (user_id, permission_code) VALUES (?, ?)',
+      ['missing_user', 'test.permission']
+    );
+  }, /FOREIGN KEY constraint failed/);
+});
+
 test('end-to-end: weighted-average costing, sale, and return accounting', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 import { round2 } from './financials';
 
 export type PurchaseRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ORDERED' | 'CANCELLED';
@@ -91,7 +92,7 @@ export class PurchaseRequestService {
           needed_by, priority, status, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
         [
-          id, requestNumber, new Date().toISOString().slice(0, 10), input.branchId || null,
+          id, requestNumber, localDateString(), input.branchId || null,
           input.warehouseId || null, actor.id, input.neededBy || null,
           input.priority || 'NORMAL', input.notes || null,
         ]

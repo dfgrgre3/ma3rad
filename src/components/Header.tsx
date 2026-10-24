@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronUp, Bell, Menu, X,
@@ -196,8 +197,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* ── Mobile Menu ───────────────────────────────────────────────────────── */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-16 z-50 overflow-y-auto bg-white dark:bg-slate-900">
+      {mobileMenuOpen && createPortal(
+        <div className="lg:hidden fixed top-16 right-0 bottom-0 left-0 z-[100] overflow-y-auto overscroll-contain bg-white dark:bg-slate-900">
           <nav className="p-4 space-y-2" dir="rtl">
             <button
               onClick={() => { setMobileMenuOpen(false); navigate('/dashboard'); }}
@@ -228,6 +229,7 @@ export const Header: React.FC<HeaderProps> = ({
                           <NavLink
                             key={item.to + item.label}
                             to={item.to}
+                          onClick={() => setMobileMenuOpen(false)}
                             className={({ isActive }) =>
                               `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
                                 isActive
@@ -246,7 +248,8 @@ export const Header: React.FC<HeaderProps> = ({
               );
             })}
           </nav>
-        </div>
+        </div>,
+        document.body,
       )}
     </header>
   );

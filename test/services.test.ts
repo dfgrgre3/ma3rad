@@ -14,10 +14,15 @@ import { ApprovalService } from '../src/services/ApprovalService.ts';
 import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
 import { AccountingService } from '../src/services/AccountingService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
+import { localDateString } from '../src/utils/date.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
 }
+
+test('business date uses the local calendar day', () => {
+  assert.equal(localDateString(new Date(2026, 9, 24, 0, 0, 0)), '2026-10-24');
+});
 
 test('dashboard metrics handle an empty database without a top customer', async () => {
   await DatabaseManager.getInstance().initialize();
@@ -184,7 +189,14 @@ test('supplier lifecycle supports edit, archive, reactivation, payments and stat
   assert.ok(service.getAllSuppliers(undefined, true).some((row) => row.id === supplier.id));
 
   service.updateSupplier(supplier.id, { isActive: 1 });
-  service.recordPayment(supplier.id, 30, 'BANK_TRANSFER', undefined, 'دفعة اختبار');
+  const registerBefore = q('SELECT current_balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].currentBalance;
+  const payment = service.recordPayment(supplier.id, 30, 'CASH', undefined, 'دفعة اختبار');
+  const registerAfter = q('SELECT current_balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].currentBalance;
+  assert.equal(registerAfter, registerBefore - 30);
+  assert.equal(q(
+    `SELECT id FROM audit_logs WHERE record_id = ? AND action = 'سداد دفعة لمورد' AND module = 'SUPPLIERS'`,
+    [payment.id]
+  ).length, 1);
   const statement = service.getSupplierStatement(supplier.id);
   assert.equal(statement.openingBalance, 100);
   assert.equal(statement.closingBalance, 70);

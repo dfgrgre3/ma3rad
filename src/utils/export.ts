@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { localDateString } from './date';
 
 export interface ExportColumn {
   key: string;
@@ -13,7 +14,7 @@ export interface ExportOptions {
   fileName: string;
 }
 
-const stamp = () => new Date().toISOString().slice(0, 10);
+const stamp = () => localDateString();
 
 function safeName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '-');
@@ -135,4 +136,3 @@ export function exportToExcel({ title, subtitle, columns, rows, fileName }: Expo
 export function exportToPdf(options: ExportOptions): void {
   printHtml(buildExportHtml(options, true));
 }
-

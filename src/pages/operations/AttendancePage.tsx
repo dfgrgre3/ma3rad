@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarCheck, Loader2, CheckCheck, Users, Search } from 'lucide-react';
 import { EmployeeService, Employee, AttendanceStatus } from '../../services/EmployeeService';
 import { AuthService } from '../../services/AuthService';
+import { localDateString } from '../../utils/date';
 
 const STATUS_LABELS: Record<AttendanceStatus, string> = { PRESENT: 'حاضر', LATE: 'متأخر', ABSENT: 'غائب', LEAVE: 'إجازة' };
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
@@ -10,7 +11,7 @@ const STATUS_COLORS: Record<AttendanceStatus, string> = {
   ABSENT: 'bg-rose-50 text-rose-700 border-rose-200',
   LEAVE: 'bg-sky-50 text-sky-700 border-sky-200',
 };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 
 export const AttendancePage: React.FC = () => {
   const [date, setDate] = useState(today());

@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 import { round2 } from './financials';
 
 export interface ReturnablePurchaseItem {
@@ -156,7 +157,7 @@ export class PurchaseReturnService {
     if (prepared.length === 0 || total <= 0) throw new Error('لم يتم تحديد كميات صحيحة للمرتجع.');
 
     const returnId = `pret_${uuidv4().substring(0, 8)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const isCash = dto.refundMethod === 'CASH';
 
     return this.db.executeTransaction((db) => {

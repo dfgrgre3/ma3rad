@@ -2,8 +2,6 @@
 
 export const SCHEMA_SQL = `
 -- PRAGMAS
-PRAGMA foreign_keys = ON;
-
 -- 1. USERS & ROLES
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

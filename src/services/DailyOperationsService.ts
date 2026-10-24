@@ -1,5 +1,6 @@
 import { DatabaseManager } from '../database/db';
 import { round2 } from './financials';
+import { localDateString } from '../utils/date';
 
 export interface DailySalesRow {
   id: string;
@@ -113,14 +114,14 @@ export interface DailyDebtResult {
   summary: { newDebt: number; invoicedCredit: number; collectedToday: number; netChange: number; totalOutstanding: number; dueInstallments: number };
 }
 
-const dateOnly = (value?: string | null) => value || new Date().toISOString().slice(0, 10);
+const dateOnly = (value?: string | null) => value || localDateString();
 const num = (value: unknown) => Number(value) || 0;
 
 export class DailyOperationsService {
   private db = DatabaseManager.getInstance();
 
   public today(): string {
-    return new Date().toISOString().slice(0, 10);
+    return localDateString();
   }
 
   public getSales(date = this.today()): DailySalesResult {

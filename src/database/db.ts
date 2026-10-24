@@ -292,7 +292,7 @@ export class DatabaseManager {
     if (!this.db) return;
     let snapshot: Uint8Array;
     try {
-      snapshot = this.db.export();
+      snapshot = this.exportSnapshot();
     } catch (e) {
       this.lastPersistError = e instanceof Error ? e.message : String(e);
       console.error('Failed to export SQLite database snapshot', e);
@@ -438,8 +438,18 @@ export class DatabaseManager {
   }
 
   public exportDatabaseBinary(): Uint8Array {
+    return this.exportSnapshot();
+  }
+
+  private exportSnapshot(): Uint8Array {
     const db = this.getDatabase();
-    return db.export();
+    const snapshot = db.export();
+    db.run('PRAGMA foreign_keys = ON');
+    const foreignKeysEnabled = Number(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0]) === 1;
+    if (!foreignKeysEnabled) {
+      throw new Error('SQLite foreign key enforcement could not be restored after database export.');
+    }
+    return snapshot;
   }
 
   public importDatabaseBinary(bytes: Uint8Array): void {

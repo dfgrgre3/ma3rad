@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { AuditService } from './AuditService';
+import { localDateString } from '../utils/date';
 
 export class BackupService {
   private db = DatabaseManager.getInstance();
@@ -19,7 +20,7 @@ export class BackupService {
     const blob = new Blob([binary as any], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const fileName = `ceramics_erp_backup_${new Date().toISOString().slice(0, 10)}_${Date.now().toString().slice(-4)}.sqlite`;
+    const fileName = `ceramics_erp_backup_${localDateString()}_${Date.now().toString().slice(-4)}.sqlite`;
     a.href = url;
     a.download = fileName;
     a.click();

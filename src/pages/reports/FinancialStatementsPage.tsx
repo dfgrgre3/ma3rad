@@ -5,9 +5,10 @@ import {
 } from '../../services/FinancialStatementsService';
 import { exportToExcel } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
+import { localDateString } from '../../utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 const yearStart = () => `${new Date().getFullYear()}-01-01`;
 
 type Tab = 'balance' | 'cash' | 'aging' | 'ledger';

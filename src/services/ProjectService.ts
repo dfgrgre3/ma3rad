@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 
 export type ProjectStatus = 'PLANNED' | 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
 export type ProjectType = 'BUILDING' | 'VILLA' | 'APARTMENT' | 'COMPOUND' | 'COMMERCIAL' | 'OTHER';
@@ -179,7 +180,7 @@ export class ProjectService {
         patch.contractorPhone ?? null, patch.engineerName ?? null, patch.engineerPhone ?? null,
         patch.address ?? null, patch.city ?? null, patch.startDate ?? null,
         patch.expectedEndDate ?? null,
-        patch.status === 'COMPLETED' ? new Date().toISOString().slice(0, 10) : existing.actualEndDate ?? null,
+        patch.status === 'COMPLETED' ? localDateString() : existing.actualEndDate ?? null,
         patch.contractValue ?? null, patch.totalPaid ?? null, patch.outstandingAmount ?? null,
         patch.status ?? null, patch.notes ?? null, new Date().toISOString(), id,
       ]

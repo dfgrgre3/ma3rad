@@ -1,5 +1,6 @@
 import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
+import { addLocalDays, localDateString } from '../utils/date';
 
 export type NotificationType = 'LOW_STOCK' | 'PAYMENT_DUE' | 'SHIFT_REMINDER' | 'SYSTEM' | 'STOCK_ALERT' | 'INVOICE_CREATED' | 'EXPENSE_RECORDED';
 
@@ -164,8 +165,8 @@ export class NotificationService {
     try {
       this.checkLowStockAlerts();
 
-      const today = new Date().toISOString().slice(0, 10);
-      const horizon = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+      const today = localDateString();
+      const horizon = localDateString(addLocalDays(new Date(), 3));
 
       const dueInstallments = this.db.query<any>(`
         SELECT i.id, i.sequence_number AS seq, i.due_date AS dueDate, i.remaining_amount AS remaining,

@@ -3,6 +3,7 @@ import type { Supplier, SupplierPayment, PaymentType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 
 export class SupplierService {
   private db = DatabaseManager.getInstance();
@@ -30,8 +31,9 @@ export class SupplierService {
     return rows.length > 0 ? rows[0] : null;
   }
 
-  public createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }, performedBy = 'usr_admin'): Supplier {
-    PermissionService.require(AuthService.requireAuth(), 'suppliers.create');
+  public createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }): Supplier {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'suppliers.create');
     const id = `sup_${uuidv4().substring(0, 8)}`;
     const code = supplier.code || `SUP-${Date.now().toString().slice(-5)}`;
 
@@ -50,15 +52,16 @@ export class SupplierService {
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-        VALUES (?, ?, 'المدير', 'إضافة مورد / مصنع جديد', 'SUPPLIERS', ?, ?)
-      `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id, JSON.stringify(supplier)]);
+        VALUES (?, ?, ?, 'إضافة مورد / مصنع جديد', 'SUPPLIERS', ?, ?)
+      `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(supplier)]);
 
       return this.getSupplierById(id)!;
     });
   }
 
-  public updateSupplier(id: string, updates: Partial<Supplier>, performedBy = 'usr_admin'): Supplier {
-    PermissionService.require(AuthService.requireAuth(), 'suppliers.update');
+  public updateSupplier(id: string, updates: Partial<Supplier>): Supplier {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'suppliers.update');
     const existing = this.getSupplierById(id);
     if (!existing) throw new Error('المورد غير موجود.');
 
@@ -87,8 +90,8 @@ export class SupplierService {
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
-        VALUES (?, ?, 'المدير', 'تعديل بيانات مورد', 'SUPPLIERS', ?, ?, ?)
-      `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id, JSON.stringify(existing), JSON.stringify(updates)]);
+        VALUES (?, ?, ?, 'تعديل بيانات مورد', 'SUPPLIERS', ?, ?, ?)
+      `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(existing), JSON.stringify(updates)]);
 
       return this.getSupplierById(id)!;
     });
@@ -98,11 +101,11 @@ export class SupplierService {
     supplierId: string,
     amount: number,
     paymentType: PaymentType = 'CASH',
-    registerId?: string,
-    notes = '',
-    performedBy = 'usr_admin'
+    registerId = 'cr_main',
+    notes = ''
   ): SupplierPayment {
-    PermissionService.require(AuthService.requireAuth(), 'suppliers.payment');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'suppliers.payment');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
 
     const sup = this.getSupplierById(supplierId);
@@ -110,7 +113,7 @@ export class SupplierService {
 
     const paymentId = `spay_${uuidv4().substring(0, 8)}`;
     const receiptNumber = `PAY-${Date.now().toString().slice(-6)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
       // 1. Insert Payment Receipt
@@ -118,7 +121,7 @@ export class SupplierService {
         INSERT INTO supplier_payments (
           id, receipt_number, supplier_id, amount, payment_type, date, register_id, notes, performed_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [paymentId, receiptNumber, supplierId, amount, paymentType, today, registerId || 'cr_main', notes, performedBy]);
+      `, [paymentId, receiptNumber, supplierId, amount, paymentType, today, registerId, notes, actor.id]);
 
       // 2. Reduce supplier balance
       sqliteDb.run(`
@@ -126,11 +129,22 @@ export class SupplierService {
       `, [amount, supplierId]);
 
       // 3. Deduct from Cash register if cash
-      if (paymentType === 'CASH' && registerId) {
+      if (paymentType === 'CASH') {
         sqliteDb.run(`
           UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?
         `, [amount, registerId]);
       }
+
+      sqliteDb.run(`
+        INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+        VALUES (?, ?, ?, 'سداد دفعة لمورد', 'SUPPLIERS', ?, ?)
+      `, [
+        `aud_${uuidv4().substring(0, 8)}`,
+        actor.id,
+        actor.fullName,
+        paymentId,
+        JSON.stringify({ supplierId, receiptNumber, amount, paymentType, registerId }),
+      ]);
 
       return {
         id: paymentId,
@@ -141,7 +155,7 @@ export class SupplierService {
         date: today,
         registerId,
         notes,
-        performedBy,
+        performedBy: actor.id,
         createdAt: new Date().toISOString()
       };
     });

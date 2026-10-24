@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { round2 } from './financials';
+import { localDateString } from '../utils/date';
 
 export class CustomerService {
   private db = DatabaseManager.getInstance();
@@ -125,7 +126,7 @@ export class CustomerService {
     if (!cust) throw new Error('العميل غير موجود.');
 
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
-    const today = paymentDate || new Date().toISOString().slice(0, 10);
+    const today = paymentDate || localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
       const prior = idempotencyKey ? sqliteDb.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`,[idempotencyKey])[0] : null;

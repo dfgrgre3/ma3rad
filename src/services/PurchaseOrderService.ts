@@ -2,6 +2,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 import { round2 } from './financials';
 import { PurchaseService } from './PurchaseService';
 import { CustomerSupplyService } from './CustomerSupplyService';
@@ -120,7 +121,7 @@ export class PurchaseOrderService {
     if (lines.length === 0) throw new Error('يجب إضافة صنف واحد على الأقل.');
 
     const orderId = `po_${uuidv4().substring(0, 8)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
 
     return this.db.executeTransaction((db) => {
       const orderNumber = db.nextNumber('PO');
@@ -268,4 +269,3 @@ export class PurchaseOrderService {
     this.updateStatus(id, 'CANCELLED');
   }
 }
-

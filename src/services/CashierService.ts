@@ -3,6 +3,7 @@ import type { CashRegister, CashShift, Expense, ExpenseCategory, PaymentType } f
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
@@ -133,7 +134,7 @@ export class CashierService {
     if (amount <= 0) throw new Error('مبلغ المصروف يجب أن يكون أكبر من الصفر.');
 
     const expId = `exp_${uuidv4().substring(0, 8)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
       // 1. Insert Expense

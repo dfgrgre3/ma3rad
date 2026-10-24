@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Wallet, Loader2, X, Plus, Trash2, Users, Banknote } from 'lucide-react';
 import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, EmployeeFinancials } from '../../services/EmployeeService';
 import { AuthService } from '../../services/AuthService';
+import { localDateString } from '../../utils/date';
 
 const TX_LABELS: Record<PayrollTxType, string> = { SALARY_PAYOUT: 'صرف راتب', ADVANCE: 'سلفة', BONUS: 'مكافأة', DEDUCTION: 'خصم' };
 const TX_COLORS: Record<PayrollTxType, string> = {
@@ -11,7 +12,7 @@ const TX_COLORS: Record<PayrollTxType, string> = {
   DEDUCTION: 'bg-rose-50 text-rose-700 border-rose-200',
 };
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 
 export const PayrollPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);

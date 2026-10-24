@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { PieChart, Loader2, Download, CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
 import { AccountingService } from '../../services/AccountingService';
+import { localDateString } from '../../utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 
 type PnL = { revenue: number; costOfGoodsSold: number; grossProfit: number; expenses: number; netProfit: number; margin: number };
 

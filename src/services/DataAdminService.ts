@@ -1,5 +1,6 @@
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
+import { localDateString } from '../utils/date';
 import { PermissionService } from './PermissionService';
 import { AuditService } from './AuditService';
 
@@ -115,7 +116,7 @@ export class DataAdminService {
     if (!IDENTIFIER.test(table)) throw new Error('اسم الجدول غير صالح.');
     const rows = this.db.query(`SELECT * FROM "${table}"`);
     return {
-      fileName: `${table}_${new Date().toISOString().slice(0, 10)}.json`,
+      fileName: `${table}_${localDateString()}.json`,
       content: JSON.stringify(rows, null, 2),
     };
   }
@@ -128,7 +129,7 @@ export class DataAdminService {
       payload[table.name] = this.db.query(`SELECT * FROM "${table.name}"`);
     }
     return {
-      fileName: `ceramisys_full_export_${new Date().toISOString().slice(0, 10)}.json`,
+      fileName: `ceramisys_full_export_${localDateString()}.json`,
       content: JSON.stringify(payload, null, 2),
     };
   }

@@ -5,6 +5,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { computeWeightedAverageCost, round2 } from './financials';
 import { CustomerSupplyService } from './CustomerSupplyService';
+import { localDateString } from '../utils/date';
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -84,7 +85,7 @@ export class PurchaseService {
     PermissionService.require(actor, 'purchases.create');
 
     const purchaseId = `pur_${uuidv4().substring(0, 8)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const performedBy = actor.id;
 
     const invoice = this.db.executeTransaction((sqliteDb) => {
@@ -262,7 +263,7 @@ export class PurchaseService {
     notes = ''
   ): { id: string; receiptNumber: string; amount: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.update');
+    PermissionService.require(actor, 'suppliers.payment');
     const invoice = this.getPurchaseById(purchaseId);
     if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
     if (invoice.remainingAmount <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
@@ -270,7 +271,7 @@ export class PurchaseService {
     const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
     if (value <= 0) throw new Error('أدخل مبلغًا صحيحًا أكبر من صفر.');
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const paymentId = `spay_${uuidv4().substring(0, 8)}`;
 
     return this.db.executeTransaction((db) => {

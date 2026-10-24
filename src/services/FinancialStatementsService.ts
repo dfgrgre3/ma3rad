@@ -1,5 +1,11 @@
 import { DatabaseManager } from '../database/db';
 import { round2 } from './financials';
+import { localDateString } from '../utils/date';
+
+function calendarDayNumber(value: string): number {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  return Date.UTC(year, month - 1, day) / 86_400_000;
+}
 
 export interface StatementLine {
   label: string;
@@ -59,7 +65,7 @@ export class FinancialStatementsService {
 
   // ── Balance sheet ────────────────────────────────────────────────────────
   public getBalanceSheet(asOf?: string): BalanceSheet {
-    const date = asOf || new Date().toISOString().slice(0, 10);
+    const date = asOf || localDateString();
 
     const cash = this.scalar(`SELECT COALESCE(SUM(current_balance), 0) FROM cash_registers WHERE is_active = 1`);
     const receivables = this.scalar(`SELECT COALESCE(SUM(current_balance), 0) FROM customers WHERE current_balance > 0`);
@@ -137,8 +143,8 @@ export class FinancialStatementsService {
 
   // ── Cash flow (simplified direct method) ─────────────────────────────────
   public getCashFlow(dateFrom?: string, dateTo?: string): { months: CashFlowMonth[]; totals: CashFlowMonth } {
-    const from = dateFrom || new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
-    const to = dateTo || new Date().toISOString().slice(0, 10);
+    const from = dateFrom || localDateString(new Date(new Date().getFullYear(), 0, 1));
+    const to = dateTo || localDateString();
 
     const rows = this.db.query<any>(`
       SELECT month, SUM(inflow) AS inflow, SUM(outflow) AS outflow FROM (
@@ -183,7 +189,7 @@ export class FinancialStatementsService {
 
   // ── AR / AP aging ────────────────────────────────────────────────────────
   public getCustomerAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
-    const date = asOf || new Date().toISOString().slice(0, 10);
+    const date = asOf || localDateString();
     return this.buildAging(`
       SELECT c.id, c.name, c.phone, si.date AS docDate, si.remaining_amount AS remaining
       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
@@ -192,7 +198,7 @@ export class FinancialStatementsService {
   }
 
   public getSupplierAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
-    const date = asOf || new Date().toISOString().slice(0, 10);
+    const date = asOf || localDateString();
     return this.buildAging(`
       SELECT s.id, s.name, s.phone, pi.date AS docDate, pi.remaining_amount AS remaining
       FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id
@@ -201,7 +207,7 @@ export class FinancialStatementsService {
   }
 
   private buildAging(sql: string, params: any[], asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
-    const reference = new Date(asOf || new Date().toISOString().slice(0, 10));
+    const reference = calendarDayNumber(asOf || localDateString());
     const docs = this.db.query<any>(sql, params);
     const map = new Map<string, AgingRow>();
 
@@ -210,7 +216,7 @@ export class FinancialStatementsService {
         id: doc.id, name: doc.name, phone: doc.phone,
         current: 0, days30: 0, days60: 0, days90: 0, over90: 0, total: 0,
       };
-      const days = Math.max(0, Math.floor((reference.getTime() - new Date(doc.docDate).getTime()) / 86_400_000));
+      const days = Math.max(0, reference - calendarDayNumber(doc.docDate));
       const amount = Number(doc.remaining) || 0;
       if (days <= 30) row.current += amount;
       else if (days <= 60) row.days30 += amount;

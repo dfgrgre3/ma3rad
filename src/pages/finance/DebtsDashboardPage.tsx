@@ -6,6 +6,7 @@ import { CustomerService } from '../../services/CustomerService';
 import { SupplierService } from '../../services/SupplierService';
 import { CashierService } from '../../services/CashierService';
 import { AuthService } from '../../services/AuthService';
+import { localDateString } from '../../utils/date';
 import { PermissionService } from '../../services/PermissionService';
 import { SalesService } from '../../services/SalesService';
 import { useNavigate } from 'react-router-dom';
@@ -32,7 +33,7 @@ export const DebtsDashboardPage: React.FC = () => {
   const [invoiceOptions, setInvoiceOptions] = useState<Array<{ id: string; invoiceNumber: string; remaining: number }>>([]);
   const [allocationAmounts, setAllocationAmounts] = useState<Record<string, string>>({});
   const [paymentType, setPaymentType] = useState<'CASH' | 'CARD' | 'BANK_TRANSFER'>('CASH');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState(localDateString());
   const [paymentReference, setPaymentReference] = useState('');
   const [paymentGroupKey, setPaymentGroupKey] = useState('');
   const [promiseCustomerId, setPromiseCustomerId] = useState<string|null>(null);
@@ -109,7 +110,7 @@ export const DebtsDashboardPage: React.FC = () => {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   const openPayment = (d: DebtRow) => {
-    setTarget(d); setAmount(String(d.amount)); setAllocationAmounts({}); setPaymentDate(new Date().toISOString().slice(0, 10)); setPaymentReference(''); setPaymentGroupKey(`ui-${uuidv4()}`);
+    setTarget(d); setAmount(String(d.amount)); setAllocationAmounts({}); setPaymentDate(localDateString()); setPaymentReference(''); setPaymentGroupKey(`ui-${uuidv4()}`);
     if (d.type === 'CUSTOMER_RECEIVABLE') {
       const options = DatabaseManager.getInstance().query<{ id: string; invoiceNumber: string; remaining: number }>(
         `SELECT id, invoice_number AS invoiceNumber, remaining_amount AS remaining FROM sales_invoices WHERE customer_id=? AND invoice_status <> 'VOID' AND remaining_amount > 0.009 ORDER BY date`, [d.id]);
@@ -134,7 +135,7 @@ export const DebtsDashboardPage: React.FC = () => {
         if (invoiceOptions.length) new SalesService().recordCustomerPaymentAllocations(target.id, allocations, paymentType, registerId, paymentDate, paymentReference, '', undefined, paymentGroupKey);
         else new CustomerService().recordPayment(target.id, value, paymentType, registerId, undefined, paymentReference, AuthService.getCurrentUser()?.id || 'usr_admin', paymentDate, paymentGroupKey);
       } else {
-        new SupplierService().recordPayment(target.id, value, paymentType, registerId, paymentReference, AuthService.getCurrentUser()?.id || 'usr_admin');
+        new SupplierService().recordPayment(target.id, value, paymentType, registerId, paymentReference);
       }
       setTarget(null);
       load();

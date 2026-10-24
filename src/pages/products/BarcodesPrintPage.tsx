@@ -3,6 +3,7 @@ import {
   Barcode, Printer, Search, Check, Layers, Sliders, RefreshCw, Eye, Tag, FileText, CheckCircle2
 } from 'lucide-react';
 import { ProductService } from '../../services/ProductService';
+import { SettingsService } from '../../services/SettingsService';
 import { Product } from '../../types';
 
 interface LabelSettings {
@@ -46,6 +47,7 @@ export const BarcodesPrintPage: React.FC = () => {
   }, []);
 
   const selectedProduct = products.find(p => p.id === selectedProductId) || products[0];
+  const showroomName = SettingsService.getSettings().showroomName;
 
   const filteredProducts = products.filter(p =>
     p.name.includes(search) || p.barcode.includes(search) || p.sku.includes(search)
@@ -252,11 +254,11 @@ export const BarcodesPrintPage: React.FC = () => {
                     {/* Header: Company & Grade */}
                     <div className="flex items-start justify-between border-b border-slate-300 pb-1.5 mb-1.5">
                       <span className="text-[11px] font-black tracking-tight text-slate-800 truncate">
-                        معرض الأندلس للسيراميك
+                        {showroomName}
                       </span>
                       {settings.showGrade && (
                         <span className="text-[10px] font-black px-1.5 py-0.2 bg-white text-slate-900 rounded">
-                          {selectedProduct.grade === 'GRADE_1' ? 'فرز أول' : selectedProduct.grade === 'GRADE_2' ? 'فرز ثان' : 'تجاري'}
+                          {({ GRADE_1: 'فرز أول', GRADE_2: 'فرز ثان', GRADE_3: 'فرز ثالث', COMMERCIAL: 'تجاري' } as Record<string, string>)[selectedProduct.grade] || selectedProduct.grade}
                         </span>
                       )}
                     </div>
@@ -273,22 +275,12 @@ export const BarcodesPrintPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Barcode Graphic Simulation */}
+                  {/* Show the registered barcode value without drawing a fake barcode. */}
                   <div className="my-1 text-center">
                     <div className="inline-block py-1 px-3 bg-slate-50 border border-slate-200 rounded">
-                      {/* Barcode lines */}
-                      <div className="h-8 flex items-end justify-center gap-[2px]">
-                        {[3, 1, 2, 4, 1, 3, 2, 1, 4, 2, 3, 1, 2, 4, 1, 3, 1, 2, 3, 4, 1, 2].map((w, i) => (
-                          <div
-                            key={i}
-                            className="bg-white h-full"
-                            style={{ width: `${w * 1.5}px` }}
-                          />
-                        ))}
-                      </div>
                       {settings.showBarcodeNumber && (
                         <span className="text-[10px] font-mono tracking-widest text-slate-900 block mt-0.5">
-                          {selectedProduct.barcode}
+                          {selectedProduct.barcode || 'لا يوجد باركود مسجل'}
                         </span>
                       )}
                     </div>

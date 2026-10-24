@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 
 export interface PriceList {
   id: string;
@@ -153,7 +154,7 @@ export class PricingService {
       params.push(term, term, term);
     }
     sql += ` ORDER BY starts_at DESC`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     return this.db.query<Promotion>(sql, params).map((p) => ({
       ...p,
       isActive: Boolean(p.isActive),
@@ -243,7 +244,7 @@ export class PricingService {
   } {
     const product = this.db.query<any>(`SELECT selling_price_m2 AS basePrice, category_id AS categoryId, brand_id AS brandId FROM products WHERE id = ?`, [productId])[0];
     const basePrice = Number(product?.basePrice) || 0;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
 
     if (customerId) {
       const override = this.db.query<any>(
@@ -294,7 +295,7 @@ export class PricingService {
   }
 
   public getBestPromotion(product: { productId: string; categoryId?: string | null; brandId?: string | null }, subtotal = 0, quantity = 0): { name: string; discount: number; code: string } | null {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const rows = this.db.query<any>(
       `SELECT * FROM promotions
        WHERE is_active = 1 AND starts_at <= ? AND ends_at >= ?

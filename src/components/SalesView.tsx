@@ -16,6 +16,7 @@ import { SalesInvoice, SalesInvoiceItem, CustomerPayment, PaymentType, Customer,
 import { CeramicMath } from '../utils/ceramicMath';
 import { exportToExcel, buildExportHtml } from '../utils/export';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { localDateString } from '../utils/date';
 
 type InvoiceRow = SalesInvoice & { itemsCount?: number; returnedAmount?: number };
 
@@ -105,7 +106,7 @@ export const SalesView: React.FC = () => {
 
   const applyPreset = (preset: 'today' | 'yesterday' | 'week' | 'month' | 'clear') => {
     const today = new Date();
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const iso = (d: Date) => localDateString(d);
     if (preset === 'clear') { setDateFrom(''); setDateTo(''); return; }
     if (preset === 'today') { setDateFrom(iso(today)); setDateTo(iso(today)); return; }
     if (preset === 'yesterday') {

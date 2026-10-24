@@ -5,6 +5,7 @@ import { useToast } from '../../components/ui/Toast';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { exportToExcel, exportToPdf } from '../../utils/export';
+import { localDateString } from '../../utils/date';
 
 type IncomingOrder = PurchaseOrderRow & { items: PurchaseOrderItem[] };
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
@@ -31,7 +32,7 @@ export const IncomingProductsPage: React.FC = () => {
     setOrders(rows.map((row) => service.getOrderById(row.id)).filter((row): row is IncomingOrder => Boolean(row)));
   };
   useEffect(() => { load(); }, [service]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   const filtered = orders.filter((o) => `${o.orderNumber} ${o.supplierName || ''} ${o.warehouseName || ''} ${o.items.map((i) => `${i.productName} ${i.productCode || ''} ${i.barcode || ''}`).join(' ')}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) && (!overdueOnly || Boolean(o.expectedDate && o.expectedDate < today)) && (!supplierFilter || o.supplierId === supplierFilter) && (!warehouseFilter || o.warehouseId === warehouseFilter) && (statusFilter === 'ALL' || o.status === statusFilter) && (!dateFrom || Boolean(o.expectedDate && o.expectedDate >= dateFrom)) && (!dateTo || Boolean(o.expectedDate && o.expectedDate <= dateTo)));
   const canUpdate = PermissionService.can(AuthService.getCurrentUser(), 'purchases.update');
   const updateFollowUp = (order: IncomingOrder, date: string, notes: string) => { try { service.updateFollowUp(order.id, date || null, notes); load(); toast.success('تم تحديث متابعة التوريد.'); } catch (e: any) { toast.error(e?.message || 'تعذر تحديث المتابعة.'); } };

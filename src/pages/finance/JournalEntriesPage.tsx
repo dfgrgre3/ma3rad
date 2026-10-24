@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Plus, Loader2, X, Trash2, Scale, Search, ChevronDown } from 'lucide-react';
 import { FinanceExtrasService, Account, JournalEntry, JournalLine } from '../../services/FinanceExtrasService';
 import { AuthService } from '../../services/AuthService';
+import { localDateString } from '../../utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 type DraftLine = { accountId: string; debit: string; credit: string; description: string };
@@ -19,7 +20,7 @@ export const JournalEntriesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), description: '' });
+  const [form, setForm] = useState({ date: localDateString(), description: '' });
   const [draft, setDraft] = useState<DraftLine[]>([emptyLine(), emptyLine()]);
   const [saving, setSaving] = useState(false);
 
@@ -61,7 +62,7 @@ export const JournalEntriesPage: React.FC = () => {
         lines: draft.map((l) => ({ accountId: l.accountId, debit: Number(l.debit || 0), credit: Number(l.credit || 0), description: l.description })),
       });
       setModal(false);
-      setForm({ date: new Date().toISOString().slice(0, 10), description: '' });
+      setForm({ date: localDateString(), description: '' });
       setDraft([emptyLine(), emptyLine()]);
       load();
     } catch (err: any) { alert(err?.message || 'تعذر حفظ القيد.'); }

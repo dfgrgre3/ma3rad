@@ -3,6 +3,7 @@ import type { SalesInvoice, SalesInvoiceItem, SalesReturn, SalesReturnItem, Paym
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 import {
   computeSaleLine,
   computeSaleTotals,
@@ -273,10 +274,10 @@ export class SalesService {
 
       const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
       const invoiceNumber = sqliteDb.nextNumber('INV');
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateString();
       const termsDays = Number(sqliteDb.query<{ paymentTermsDays: number }>('SELECT payment_terms_days AS paymentTermsDays FROM customers WHERE id=?',[dto.customerId])[0]?.paymentTermsDays || 0);
       let dueDate: string | null = null;
-      if (totals.remainingAmount > 0 && termsDays > 0) { const due = new Date(`${today}T12:00:00`); due.setDate(due.getDate()+termsDays); dueDate=due.toISOString().slice(0,10); }
+      if (totals.remainingAmount > 0 && termsDays > 0) { const due = new Date(`${today}T00:00:00`); due.setDate(due.getDate()+termsDays); dueDate=localDateString(due); }
 
       sqliteDb.run(`
         INSERT INTO sales_invoices (
@@ -382,7 +383,7 @@ export class SalesService {
     const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
     if (value <= 0) throw new Error('يجب أن يكون مبلغ التحصيل أكبر من الصفر.');
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
 
     return this.db.executeTransaction((db) => {
@@ -453,7 +454,7 @@ export class SalesService {
     allocations: Array<{ invoiceId: string; amount: number }>,
     paymentType: PaymentType = 'CASH',
     registerId = 'cr_main',
-    date = new Date().toISOString().slice(0, 10),
+    date = localDateString(),
     reference = '',
     notes = '',
     shiftId?: string,
@@ -607,7 +608,7 @@ export class SalesService {
     }
 
     const returnId = `ret_${uuidv4().substring(0, 8)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
       const returnNumber = sqliteDb.nextNumber('RET');
@@ -845,7 +846,7 @@ export class SalesService {
   }
 
   public getReturnsStats(): ReturnStats {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const row = this.db.query<any>(
       `SELECT COUNT(*) AS count,
               COALESCE(SUM(total_amount), 0) AS totalAmount,

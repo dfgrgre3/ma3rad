@@ -1,4 +1,5 @@
 import { DatabaseManager } from '../database/db';
+import { localDateString } from '../utils/date';
 
 export interface DebtRow {
   id: string;
@@ -38,7 +39,7 @@ export class DebtService {
        ${search.trim() ? `AND (c.name LIKE ? OR c.phone LIKE ? OR c.code LIKE ? OR EXISTS (SELECT 1 FROM sales_invoices si WHERE si.customer_id=c.id AND si.invoice_number LIKE ?))` : ''}
        ORDER BY c.current_balance DESC`,
       search.trim() ? [term,term,term,term] : []
-    ).map((c) => ({ ...c, type: 'CUSTOMER_RECEIVABLE' as const, overdue: Boolean(c.oldestDueDate && c.oldestDueDate < new Date().toISOString().slice(0,10)) }));
+    ).map((c) => ({ ...c, type: 'CUSTOMER_RECEIVABLE' as const, overdue: Boolean(c.oldestDueDate && c.oldestDueDate < localDateString()) }));
 
     const suppliers = this.db.query<DebtRow>(
       `SELECT id, name, phone, current_balance AS amount, 0 AS creditLimit, updated_at AS updatedAt

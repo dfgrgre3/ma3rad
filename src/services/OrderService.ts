@@ -5,6 +5,7 @@ import { PermissionService } from './PermissionService';
 import { SalesService } from './SalesService';
 import { round2 } from './financials';
 import type { PaymentType, SalesInvoice } from '../types';
+import { localDateString } from '../utils/date';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED';
 
@@ -232,7 +233,7 @@ export class OrderService {
           total_amount, paid_amount, remaining_amount, status, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'PENDING', ?, ?)`,
         [
-          id, orderNumber, new Date().toISOString().slice(0, 10), input.customerId, warehouse,
+          id, orderNumber, localDateString(), input.customerId, warehouse,
           input.quotationId || null, input.expectedDeliveryDate || null,
           totals.subtotal, totals.discountAmount, totals.taxAmount, totals.shippingCost,
           totals.totalAmount, totals.totalAmount, input.notes || null, actor.id,

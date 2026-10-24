@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Plus, Search, Calendar, Tag, Loader2, X, Power, Trash2 } from 'lucide-react';
 import { PricingService, Promotion } from '../../services/PricingService';
+import { localDateString } from '../../utils/date';
 
 const TYPE_LABELS: Record<Promotion['promotionType'], string> = {
   PERCENTAGE: 'نسبة خصم %',
@@ -26,7 +27,7 @@ export const PromotionsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   const [form, setForm] = useState({
     name: '', promotionType: 'PERCENTAGE', discountPercentage: '', discountAmount: '',
     buyQuantity: '', getQuantity: '', minOrderAmount: '', appliesTo: 'ALL',

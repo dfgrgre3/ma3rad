@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
 
 export interface Branch {
   id: string;
@@ -304,7 +305,7 @@ export class OperationsService {
           address, city, scheduled_at, delivery_fee, status, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
         [
-          id, deliveryNumber, input.date || new Date().toISOString().slice(0, 10), input.customerId,
+          id, deliveryNumber, input.date || localDateString(), input.customerId,
           warehouse.id, input.driverId || null, input.vehicleId || null, input.address.trim(),
           input.city || null, input.scheduledAt || null, input.deliveryFee || 0, input.notes || null, actor.id,
         ]

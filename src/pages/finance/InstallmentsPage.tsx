@@ -185,7 +185,13 @@ export const InstallmentsPage: React.FC = () => {
 
     try {
       const planId = uuidv4();
-      const planNum = `PLN-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+      const year = new Date().getFullYear();
+      const planSequence = db.query<{ nextNumber: number }>(
+        `SELECT COALESCE(MAX(CAST(SUBSTR(plan_number, 10) AS INTEGER)), 0) + 1 AS nextNumber
+         FROM installment_plans WHERE plan_number LIKE ?`,
+        [`PLN-${year}-%`]
+      )[0]?.nextNumber ?? 1;
+      const planNum = `PLN-${year}-${String(planSequence).padStart(4, '0')}`;
       const financed = Math.max(0, totalFinanced - downPayment);
       const monthlyAmount = Math.round(financed / monthsCount);
 
@@ -251,7 +257,13 @@ export const InstallmentsPage: React.FC = () => {
 
     try {
       const nowStr = new Date().toISOString();
-      const receiptNum = `RCP-INST-${Math.floor(1000 + Math.random() * 9000)}`;
+      const year = new Date().getFullYear();
+      const receiptSequence = db.query<{ nextNumber: number }>(
+        `SELECT COALESCE(MAX(CAST(SUBSTR(receipt_number, 15) AS INTEGER)), 0) + 1 AS nextNumber
+         FROM customer_payments WHERE receipt_number LIKE ?`,
+        [`RCP-INST-${year}-%`]
+      )[0]?.nextNumber ?? 1;
+      const receiptNum = `RCP-INST-${year}-${String(receiptSequence).padStart(5, '0')}`;
 
       // 1. Mark installment as PAID
       db.run(`

@@ -1,4 +1,5 @@
 import { DatabaseManager } from '../database/db';
+import { localDateString } from '../utils/date';
 
 export interface DashboardMetrics {
   todaySales: number;
@@ -27,7 +28,7 @@ export class AccountingService {
   private db = DatabaseManager.getInstance();
 
   public getDashboardMetrics(): DashboardMetrics {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
 
     // Previous month for comparison
@@ -156,7 +157,7 @@ export class AccountingService {
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(now.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = localDateString(d);
 
       const row = this.db.query<any>(`
         SELECT SUM(total_amount) as sales, SUM(gross_profit) as profit

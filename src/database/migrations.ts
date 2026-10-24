@@ -114,6 +114,7 @@ function addColumn(db: Database, table: string, column: string, definition: stri
 export interface Migration {
   id: string;
   description: string;
+  disableForeignKeys?: boolean;
   up: (db: Database) => void;
 }
 
@@ -272,8 +273,8 @@ export const MIGRATIONS: Migration[] = [
       db.exec(`
         CREATE TABLE IF NOT EXISTS branch_sync_config (
           id TEXT PRIMARY KEY,
-          server_url TEXT NOT NULL DEFAULT 'https://cloud.ceramisys-erp.com/api/v1/sync',
-          api_key TEXT DEFAULT 'sk_live_demo_sync_token_2026',
+          server_url TEXT NOT NULL DEFAULT '',
+          api_key TEXT DEFAULT '',
           branch_code TEXT NOT NULL DEFAULT 'BR-01',
           branch_name TEXT NOT NULL DEFAULT 'الفرع الرئيسي - المعرض',
           sync_mode TEXT NOT NULL DEFAULT 'HYBRID_AUTO' CHECK(sync_mode IN ('OFFLINE', 'HYBRID_AUTO', 'CLOUD_CENTRAL')),
@@ -550,6 +551,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: '014_users_custom_roles',
     description: 'Drop the built-in-role CHECK constraint so custom roles can be assigned to users',
+    disableForeignKeys: true,
     up: (db) => {
       db.exec('PRAGMA foreign_keys = OFF');
       try {
@@ -639,6 +641,22 @@ export const MIGRATIONS: Migration[] = [
       addColumn(db, 'suppliers', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
     },
   },
+  {
+    id: '023_fixed_asset_depreciation_accounts',
+    description: 'Add standard accumulated depreciation and depreciation expense accounts',
+    up: (db) => {
+      const accounts: Array<[string, string, string, string]> = [
+        ['acc_1602', '1602', 'Accumulated depreciation', 'ASSET'],
+        ['acc_5205', '5205', 'Depreciation expense', 'EXPENSE'],
+      ];
+      for (const [id, code, name, type] of accounts) {
+        db.run(
+          'INSERT OR IGNORE INTO chart_of_accounts (id, code, name, type, parent_code, balance, is_active) VALUES (?, ?, ?, ?, NULL, 0, 1)',
+          [id, code, name, type]
+        );
+      }
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -664,6 +682,14 @@ function appliedIds(db: Database): Set<string> {
 export function runMigrations(db: Database): MigrationReport {
   const report: MigrationReport = { applied: [], skipped: [], failed: [] };
 
+  // PRAGMA foreign_keys is connection-scoped and SQLite ignores changes made
+  // inside a transaction, so configure it before executing schema/migrations.
+  db.run('PRAGMA foreign_keys = ON');
+  const foreignKeysEnabled = Number(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0]) === 1;
+  if (!foreignKeysEnabled) {
+    throw new Error('SQLite foreign key enforcement could not be enabled.');
+  }
+
   // 1. Create anything missing atomically. Every statement is IF NOT EXISTS,
   //    so this is a no-op on an up-to-date database.
   db.run('BEGIN TRANSACTION');
@@ -683,8 +709,11 @@ export function runMigrations(db: Database): MigrationReport {
       report.skipped.push(migration.id);
       continue;
     }
-    db.run('BEGIN TRANSACTION');
+    if (migration.disableForeignKeys) {
+      db.run('PRAGMA foreign_keys = OFF');
+    }
     try {
+      db.run('BEGIN TRANSACTION');
       migration.up(db);
       db.run('INSERT OR REPLACE INTO schema_migrations (id, description) VALUES (?, ?)', [
         migration.id,
@@ -697,6 +726,12 @@ export function runMigrations(db: Database): MigrationReport {
       const message = error instanceof Error ? error.message : String(error);
       report.failed.push({ id: migration.id, error: message });
       console.error(`❌ Migration ${migration.id} failed:`, message);
+    } finally {
+      db.run('PRAGMA foreign_keys = ON');
+      const enabled = Number(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0]) === 1;
+      if (!enabled) {
+        throw new Error(`SQLite foreign key enforcement was not restored after migration ${migration.id}.`);
+      }
     }
   }
 

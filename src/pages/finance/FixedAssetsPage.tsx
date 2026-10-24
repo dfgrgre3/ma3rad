@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building, Plus, Loader2, X, Trash2, TrendingDown, Search } from 'lucide-react';
 import { FinanceExtrasService, FixedAsset } from '../../services/FinanceExtrasService';
+import { localDateString } from '../../utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 const CATEGORY_LABELS: Record<string, string> = {
@@ -18,7 +19,7 @@ export const FixedAssetsPage: React.FC = () => {
   const [editing, setEditing] = useState<FixedAsset | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    name: '', category: 'EQUIPMENT', purchaseDate: new Date().toISOString().slice(0, 10),
+    name: '', category: 'EQUIPMENT', purchaseDate: localDateString(),
     purchaseCost: '', salvageValue: '0', usefulLifeYears: '5', location: '', notes: '',
   });
 
@@ -40,7 +41,7 @@ export const FixedAssetsPage: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', category: 'EQUIPMENT', purchaseDate: new Date().toISOString().slice(0, 10), purchaseCost: '', salvageValue: '0', usefulLifeYears: '5', location: '', notes: '' });
+    setForm({ name: '', category: 'EQUIPMENT', purchaseDate: localDateString(), purchaseCost: '', salvageValue: '0', usefulLifeYears: '5', location: '', notes: '' });
     setModal(true);
   };
 

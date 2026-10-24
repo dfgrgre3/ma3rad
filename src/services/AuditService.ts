@@ -1,5 +1,6 @@
 import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
+import { localDateString } from '../utils/date';
 
 export interface AuditLogEntry {
   id: string;
@@ -121,7 +122,7 @@ export class AuditService {
     const totalResult = this.db.query<any>('SELECT COUNT(*) as total FROM audit_logs')[0];
     const totalLogs = totalResult?.total || 0;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateString();
     const todayResult = this.db.query<any>(
       'SELECT COUNT(*) as cnt FROM audit_logs WHERE created_at LIKE ?',
       [`${today}%`]

@@ -267,9 +267,9 @@ export const ExecutiveDashboard: React.FC = () => {
       }) ?? [];
       setDebtCustomers(debtData);
 
-      // ── Branch distribution (mock if no branches table yet) ───────────────────
+      // Branch sales from recorded invoices.
       const branchRow = db.exec(
-        `SELECT COALESCE(w.name,'المعرض الرئيسي') as branch,
+        `SELECT COALESCE(w.name,'غير محدد') as branch,
                 COALESCE(SUM(si.total_amount),0) as total
          FROM sales_invoices si
          LEFT JOIN warehouses w ON w.id = si.warehouse_id
@@ -284,7 +284,7 @@ export const ExecutiveDashboard: React.FC = () => {
           value: Math.round(Number(v)),
         };
       }) ?? [];
-      setBranchData(branchSales.length > 0 ? branchSales : [{ name: 'المعرض الرئيسي', value: Math.round(total) }]);
+      setBranchData(branchSales);
 
       // ── Low Stock Alerts ─────────────────────────────────────────────────────
       const lowStockRow = db.exec(

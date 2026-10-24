@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CreditCard, Plus, Loader2, X, Trash2, Search, ArrowDownLeft, ArrowUpRight, AlertTriangle } from 'lucide-react';
 import { FinanceExtrasService, Cheque, ChequeStatus, ChequeType } from '../../services/FinanceExtrasService';
 import { AuthService } from '../../services/AuthService';
+import { addLocalDays, localDateString } from '../../utils/date';
 
 const TYPE_LABELS: Record<ChequeType, string> = { RECEIVED: 'شيك وارد (لنا)', ISSUED: 'شيك صادر (علينا)' };
 const STATUS_LABELS: Record<ChequeStatus, string> = {
@@ -15,7 +16,7 @@ const STATUS_COLORS: Record<ChequeStatus, string> = {
   CANCELLED: 'bg-slate-100 text-slate-500 border-slate-200',
 };
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 
 export const ChequesPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
@@ -48,7 +49,7 @@ export const ChequesPage: React.FC = () => {
   const totals = useMemo(() => {
     const incoming = rows.filter((r) => r.type === 'RECEIVED' && r.status !== 'CANCELLED' && r.status !== 'BOUNCED').reduce((s, r) => s + Number(r.amount), 0);
     const outgoing = rows.filter((r) => r.type === 'ISSUED' && r.status !== 'CANCELLED' && r.status !== 'BOUNCED').reduce((s, r) => s + Number(r.amount), 0);
-    const soon = rows.filter((r) => r.status === 'PENDING' && r.dueDate <= new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)).length;
+    const soon = rows.filter((r) => r.status === 'PENDING' && r.dueDate <= localDateString(addLocalDays(new Date(), 7))).length;
     return { incoming, outgoing, soon };
   }, [rows]);
 
