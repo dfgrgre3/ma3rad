@@ -192,6 +192,7 @@ export class DatabaseManager {
     const report = runMigrations(this.getDatabase());
     if (report.failed.length > 0) {
       console.error('⚠️ Some migrations did not apply; they will be retried on next launch.', report.failed);
+      throw new Error(`Database migration failed (${report.failed[0].id}): ${report.failed[0].error}`);
     }
 
     // Seed reference data only for a genuinely new database — migrations already
@@ -470,7 +471,10 @@ export class DatabaseManager {
       }
       // Migrate and validate the candidate in isolation so failed restores
       // cannot replace the database currently used by this session.
-      runMigrations(candidate);
+      const migrationReport = runMigrations(candidate);
+      if (migrationReport.failed.length > 0) {
+        throw new Error(`Database migration failed (${migrationReport.failed[0].id}): ${migrationReport.failed[0].error}`);
+      }
       const migratedIntegrity = candidate.exec('PRAGMA integrity_check');
       if (migratedIntegrity[0]?.values[0]?.[0] !== 'ok') {
         throw new Error('Restored database failed SQLite integrity_check after migrations.');

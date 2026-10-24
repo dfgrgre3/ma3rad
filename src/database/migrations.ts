@@ -1,6 +1,8 @@
 import type { Database } from 'sql.js';
+import { v4 as uuidv4 } from 'uuid';
 import { SCHEMA_SQL } from './schema';
 import { paymentAccountCode, postLedgerEntry, queryLedgerRows } from './ledger';
+import { localDateString } from '../utils/date';
 
 /**
  * Schema migration engine.
@@ -42,7 +44,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   defaultTaxPercentage: '0',
   isTaxInclusive: '0',
   enableNegativeStock: '0',
-  costingMethod: 'AVERAGE_COST',
+  costingMethod: 'FIFO',
   receiptHeader: 'معرض الأندلس للسيراميك والبورسلين\nأهلاً بكم ونتشرف بخدمتكم دائماً',
   receiptFooter: 'البضاعة المباعة ترد خلال 14 يوماً بالحالة الأصلية ومع الفاتورة\nشكراً لزيارتكم',
   autoBackupIntervalHours: '24',
@@ -353,59 +355,7 @@ export const MIGRATIONS: Migration[] = [
     id: '008_cloud_sync_and_accounting',
     description: 'Add cloud/hybrid sync tables, chart of accounts, journal entries, and ceramic batch tracking',
     up: (db) => {
-      // 1. Cloud & Branch Sync
       db.exec(`
-        CREATE TABLE IF NOT EXISTS branch_sync_config (
-          id TEXT PRIMARY KEY,
-          server_url TEXT NOT NULL DEFAULT '',
-          api_key TEXT DEFAULT '',
-          branch_code TEXT NOT NULL DEFAULT 'BR-01',
-          branch_name TEXT NOT NULL DEFAULT 'الفرع الرئيسي - المعرض',
-          sync_mode TEXT NOT NULL DEFAULT 'HYBRID_AUTO' CHECK(sync_mode IN ('OFFLINE', 'HYBRID_AUTO', 'CLOUD_CENTRAL')),
-          sync_interval_seconds INTEGER NOT NULL DEFAULT 60,
-          last_synced_at TEXT,
-          last_sync_status TEXT DEFAULT 'IDLE' CHECK(last_sync_status IN ('IDLE', 'SYNCING', 'SUCCESS', 'ERROR')),
-          latency_ms INTEGER DEFAULT 45,
-          is_enabled INTEGER DEFAULT 1,
-          auto_resolve_conflicts TEXT DEFAULT 'SERVER_WINS' CHECK(auto_resolve_conflicts IN ('SERVER_WINS', 'LOCAL_WINS', 'MANUAL'))
-        );
-
-        CREATE TABLE IF NOT EXISTS sync_outbox (
-          id TEXT PRIMARY KEY,
-          entity_table TEXT NOT NULL,
-          entity_id TEXT NOT NULL,
-          action TEXT NOT NULL CHECK(action IN ('INSERT', 'UPDATE', 'DELETE')),
-          payload_json TEXT NOT NULL,
-          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'IN_TRANSIT', 'ACKNOWLEDGED', 'FAILED')),
-          retry_count INTEGER DEFAULT 0,
-          error_message TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS sync_inbox (
-          id TEXT PRIMARY KEY,
-          origin_branch_code TEXT NOT NULL,
-          entity_table TEXT NOT NULL,
-          entity_id TEXT NOT NULL,
-          action TEXT NOT NULL,
-          payload_json TEXT NOT NULL,
-          received_at TEXT DEFAULT CURRENT_TIMESTAMP,
-          status TEXT DEFAULT 'APPLIED' CHECK(status IN ('PENDING', 'APPLIED', 'CONFLICT', 'IGNORED'))
-        );
-
-        CREATE TABLE IF NOT EXISTS sync_conflict_logs (
-          id TEXT PRIMARY KEY,
-          entity_table TEXT NOT NULL,
-          entity_id TEXT NOT NULL,
-          origin_branch TEXT NOT NULL,
-          conflict_type TEXT NOT NULL,
-          local_data TEXT,
-          remote_data TEXT,
-          resolved_action TEXT,
-          resolved_at TEXT DEFAULT CURRENT_TIMESTAMP
-        );
-
-        -- 2. General Ledger / Chart of Accounts
         CREATE TABLE IF NOT EXISTS chart_of_accounts (
           id TEXT PRIMARY KEY,
           code TEXT UNIQUE NOT NULL,
@@ -459,15 +409,8 @@ export const MIGRATIONS: Migration[] = [
         );
 
         CREATE INDEX IF NOT EXISTS idx_batches_product ON product_batches(product_id, warehouse_id);
-        CREATE INDEX IF NOT EXISTS idx_sync_outbox_status ON sync_outbox(status);
         CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(date);
         CREATE INDEX IF NOT EXISTS idx_journal_lines_account ON journal_entry_lines(account_id);
-      `);
-
-      // Seed initial sync config if not present
-      db.run(`
-        INSERT OR IGNORE INTO branch_sync_config (id, server_url, api_key, branch_code, branch_name, sync_mode, sync_interval_seconds, last_synced_at, last_sync_status, latency_ms, is_enabled)
-        VALUES ('sync_cfg_main', '', '', 'BR-01', 'الفرع والمعرض الرئيسي', 'OFFLINE', 60, NULL, 'IDLE', 0, 0)
       `);
 
       // Seed standard Chart of Accounts
@@ -668,19 +611,6 @@ export const MIGRATIONS: Migration[] = [
   },
 
   {
-    id: '015_cloud_sync_honest',
-    description: 'Remove the seeded demo sync endpoint and disable sync until a real server is configured',
-    up: (db) => {
-      db.run(`
-        UPDATE branch_sync_config
-        SET server_url = '', api_key = '', is_enabled = 0,
-            last_sync_status = 'IDLE', latency_ms = 0, last_synced_at = NULL
-        WHERE api_key LIKE 'sk_live_demo%'
-           OR server_url LIKE '%cloud.ceramisys-erp.com%'
-      `);
-    },
-  },
-  {
     id: '017_custom_product_units',
     description: 'Store custom labels for product units',
     up: (db) => {
@@ -758,7 +688,20 @@ export const MIGRATIONS: Migration[] = [
       }
 
       const actorId = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM users ORDER BY created_at, id LIMIT 1')[0]?.id;
-      if (!actorId) return;
+      if (!actorId) {
+        const transactionCount = queryLedgerRows<{ count: number }>(db, `
+          SELECT
+            (SELECT COUNT(*) FROM sales_invoices WHERE invoice_status != 'VOID') +
+            (SELECT COUNT(*) FROM purchase_invoices) +
+            (SELECT COUNT(*) FROM customer_payments) +
+            (SELECT COUNT(*) FROM supplier_payments) +
+            (SELECT COUNT(*) FROM expenses) +
+            (SELECT COUNT(*) FROM sales_returns) +
+            (SELECT COUNT(*) FROM purchase_returns) AS count
+        `)[0]?.count ?? 0;
+        if (Number(transactionCount) > 0) throw new Error('Cannot backfill the general ledger without a valid user.');
+        return;
+      }
 
       const sales = queryLedgerRows<{
         id: string; date: string; invoice_number: string; subtotal: number; discount_amount: number;
@@ -915,6 +858,514 @@ export const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: '027_correct_historical_invoice_receipts',
+    description: 'Correct historical invoice postings that included receipts posted separately',
+    up: (db) => {
+      const invoices = queryLedgerRows<{
+        id: string; date: string; invoice_number: string; created_by: string;
+        paid_amount: number; payment_type: string;
+      }>(db, `
+        SELECT si.id, si.date, si.invoice_number, si.created_by, si.paid_amount, si.payment_type
+        FROM sales_invoices si
+        JOIN journal_entries je ON je.reference_type = 'SALES_INVOICE' AND je.reference_id = si.id
+        WHERE si.invoice_status != 'VOID'
+          AND EXISTS (SELECT 1 FROM customer_payments cp WHERE cp.invoice_id = si.id)
+        ORDER BY si.date, si.created_at, si.id
+      `);
+      const actorId = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM users ORDER BY created_at, id LIMIT 1')[0]?.id;
+      if (!actorId && invoices.some((invoice) => !invoice.created_by)) {
+        throw new Error('Cannot correct historical invoice postings without a valid user.');
+      }
+      for (const invoice of invoices) {
+        const linkedReceipts = queryLedgerRows<{ amount: number }>(db,
+          'SELECT COALESCE(SUM(amount), 0) AS amount FROM customer_payments WHERE invoice_id = ?', [invoice.id])[0]?.amount ?? 0;
+        const correction = Math.round(Math.min(Number(invoice.paid_amount) || 0, Number(linkedReceipts) || 0) * 100) / 100;
+        if (correction <= 0) continue;
+        postLedgerEntry(db, {
+          date: invoice.date,
+          description: `Correct duplicated receipts on sale ${invoice.invoice_number}`,
+          referenceType: 'SALES_INVOICE_RECEIPT_CORRECTION',
+          referenceId: invoice.id,
+          createdBy: invoice.created_by || actorId!,
+          lines: [
+            { accountCode: '1103', debit: correction, credit: 0 },
+            { accountCode: paymentAccountCode(invoice.payment_type), debit: 0, credit: correction },
+          ],
+        });
+      }
+    },
+  },
+  {
+    id: '028_supplier_payment_allocations',
+    description: 'Allocate supplier payments to purchase invoices for historical payable reporting',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS supplier_payment_allocations (
+          id TEXT PRIMARY KEY,
+          payment_id TEXT NOT NULL,
+          purchase_invoice_id TEXT NOT NULL,
+          amount REAL NOT NULL CHECK(amount > 0),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(payment_id, purchase_invoice_id),
+          FOREIGN KEY(payment_id) REFERENCES supplier_payments(id) ON DELETE CASCADE,
+          FOREIGN KEY(purchase_invoice_id) REFERENCES purchase_invoices(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_supplier_payment_allocations_invoice
+          ON supplier_payment_allocations(purchase_invoice_id);
+      `);
+      const payments = queryLedgerRows<{ id: string; supplier_id: string; amount: number; date: string; notes: string | null }>(
+        db, `SELECT id,supplier_id,amount,date,notes FROM supplier_payments ORDER BY date,created_at,id`);
+      for (const payment of payments) {
+        if (queryLedgerRows(db, `SELECT id FROM supplier_payment_allocations WHERE payment_id=?`, [payment.id]).length) continue;
+        const invoices = queryLedgerRows<{ id: string; invoice_number: string; total_amount: number; paid_amount: number; remaining_amount: number }>(db, `
+          SELECT id,invoice_number,total_amount,paid_amount,remaining_amount FROM purchase_invoices
+          WHERE supplier_id=? AND date<=? ORDER BY date,created_at,id
+        `, [payment.supplier_id, payment.date]);
+        const noteInvoice = payment.notes
+          ? invoices.find((invoice) => payment.notes!.includes(invoice.invoice_number))
+          : undefined;
+        const ordered = noteInvoice ? [noteInvoice, ...invoices.filter((invoice) => invoice.id !== noteInvoice.id)] : invoices;
+        let unapplied = Math.round((Number(payment.amount) || 0) * 100) / 100;
+        for (const invoice of ordered) {
+          if (unapplied <= 0.009) break;
+          const allocated = Number(queryLedgerRows<{ amount: number }>(db,
+            `SELECT COALESCE(SUM(amount),0) AS amount FROM supplier_payment_allocations WHERE purchase_invoice_id=?`, [invoice.id])[0]?.amount || 0);
+          const returns = Number(queryLedgerRows<{ amount: number }>(db,
+            `SELECT COALESCE(SUM(remaining_to_balance),0) AS amount FROM purchase_returns WHERE original_purchase_id=? AND date<=?`, [invoice.id, payment.date])[0]?.amount || 0);
+          const open = Math.max(0, Number(invoice.total_amount) - allocated - returns);
+          const value = Math.round(Math.min(unapplied, open) * 100) / 100;
+          if (value <= 0) continue;
+          db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+            [`spa_${uuidv4().substring(0, 8)}`, payment.id, invoice.id, value]);
+          if (!noteInvoice) {
+            const paid = Math.round((Number(invoice.paid_amount) + value) * 100) / 100;
+            const remaining = Math.max(0, Math.round((Number(invoice.remaining_amount) - value) * 100) / 100);
+            db.run(`UPDATE purchase_invoices SET paid_amount=?,remaining_amount=?,payment_status=? WHERE id=?`,
+              [paid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', invoice.id]);
+            invoice.paid_amount = paid;
+            invoice.remaining_amount = remaining;
+          }
+          unapplied = Math.round((unapplied - value) * 100) / 100;
+        }
+      }
+    },
+  },
+  {
+    id: '029_fixed_asset_acquisition_ledger',
+    description: 'Backfill fixed asset acquisition cost into the general ledger',
+    up: (db) => {
+      const assets = queryLedgerRows<{ id: string; code: string; name: string; purchase_date: string; purchase_cost: number }>(
+        db, 'SELECT id,code,name,purchase_date,purchase_cost FROM fixed_assets ORDER BY purchase_date,id');
+      if (assets.length === 0) return;
+      const actorId = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM users ORDER BY created_at,id LIMIT 1')[0]?.id;
+      if (!actorId) throw new Error('Cannot backfill fixed assets without a valid user.');
+      for (const asset of assets) {
+        if (queryLedgerRows<{ id: string }>(db, `SELECT id FROM journal_entries WHERE reference_type='ASSET_ACQUISITION' AND reference_id=?`, [asset.id]).length) continue;
+        const cost = Math.round((Number(asset.purchase_cost) || 0) * 100) / 100;
+        if (cost <= 0) continue;
+        postLedgerEntry(db, {
+          date: asset.purchase_date,
+          description: `Historical fixed asset acquisition ${asset.code}: ${asset.name}`,
+          referenceType: 'ASSET_ACQUISITION', referenceId: asset.id, createdBy: actorId,
+          lines: [
+            { accountCode: '1601', debit: cost, credit: 0 },
+            { accountCode: '3102', debit: 0, credit: cost },
+          ],
+        });
+      }
+    },
+  },
+  {
+    id: '030_payroll_and_inventory_accounts',
+    description: 'Add payroll liability and inventory adjustment accounts, then backfill commission entries',
+    up: (db) => {
+      const accounts: Array<[string, string, string, string]> = [
+        ['acc_2103', '2103', 'Commission payable', 'LIABILITY'],
+        ['acc_4190', '4190', 'Inventory adjustment gains', 'REVENUE'],
+        ['acc_5290', '5290', 'Inventory shrinkage and damage', 'EXPENSE'],
+      ];
+      for (const [id, code, name, type] of accounts) {
+        db.run('INSERT OR IGNORE INTO chart_of_accounts (id,code,name,type,parent_code,balance,is_active) VALUES (?,?,?, ?,NULL,0,1)', [id, code, name, type]);
+      }
+      const commissions = queryLedgerRows<{ id: string; commission_amount: number; status: string; paid_at: string | null; created_by: string }>(
+        db, `SELECT id,commission_amount,status,paid_at,created_by FROM commissions WHERE status IN ('APPROVED','PAID') ORDER BY created_at,id`);
+      const fallbackActor = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM users ORDER BY created_at,id LIMIT 1')[0]?.id;
+      for (const commission of commissions) {
+        const amount = Math.round((Number(commission.commission_amount) || 0) * 100) / 100;
+        if (amount <= 0) continue;
+        const createdBy = commission.created_by || fallbackActor;
+        if (!createdBy) throw new Error('Cannot backfill commission accounting without a valid user.');
+        if (!queryLedgerRows(db, `SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [commission.id]).length) {
+          postLedgerEntry(db, {
+            date: (commission.paid_at || localDateString()).slice(0, 10),
+            description: `Commission accrual ${commission.id}`,
+            referenceType: 'COMMISSION_APPROVAL', referenceId: commission.id, createdBy,
+            lines: [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2103', debit: 0, credit: amount }],
+          });
+        }
+        if (commission.status === 'PAID' && !queryLedgerRows(db, `SELECT id FROM journal_entries WHERE reference_type='COMMISSION_PAYMENT' AND reference_id=?`, [commission.id]).length) {
+          postLedgerEntry(db, {
+            date: (commission.paid_at || localDateString()).slice(0, 10),
+            description: `Commission payment ${commission.id}`,
+            referenceType: 'COMMISSION_PAYMENT', referenceId: commission.id, createdBy,
+            lines: [{ accountCode: '2103', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }],
+          });
+          db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, 'cr_main']);
+        }
+      }
+    },
+  },
+  {
+    id: '031_inventory_adjustment_ledger',
+    description: 'Post historical inventory adjustments to the general ledger',
+    up: (db) => {
+      const rows = queryLedgerRows<{ id: string; adjustment_number: string; date: string; adjustment_type: string; total_value: number; created_by: string }>(
+        db, `SELECT id,adjustment_number,date,adjustment_type,total_value,created_by FROM stock_adjustments WHERE status='POSTED' ORDER BY date,id`);
+      const fallbackActor = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM users ORDER BY created_at,id LIMIT 1')[0]?.id;
+      for (const adjustment of rows) {
+        const amount = Math.round((Number(adjustment.total_value) || 0) * 100) / 100;
+        if (amount <= 0 || queryLedgerRows(db, `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' AND reference_id=?`, [adjustment.id]).length) continue;
+        const createdBy = adjustment.created_by || fallbackActor;
+        if (!createdBy) throw new Error('Cannot backfill inventory adjustments without a valid user.');
+        const add = adjustment.adjustment_type === 'ADD' || adjustment.adjustment_type === 'OPENING_BALANCE';
+        const lines = adjustment.adjustment_type === 'OPENING_BALANCE'
+          ? [{ accountCode: '1104', debit: amount, credit: 0 }, { accountCode: '3102', debit: 0, credit: amount }]
+          : add
+            ? [{ accountCode: '1104', debit: amount, credit: 0 }, { accountCode: '4190', debit: 0, credit: amount }]
+            : [{ accountCode: '5290', debit: amount, credit: 0 }, { accountCode: '1104', debit: 0, credit: amount }];
+        postLedgerEntry(db, {
+          date: adjustment.date, description: `Inventory adjustment ${adjustment.adjustment_number}`,
+          referenceType: 'INVENTORY_ADJUSTMENT', referenceId: adjustment.id, createdBy, lines,
+        });
+      }
+    },
+  },
+  {
+    id: '032_payroll_transaction_accounting',
+    description: 'Record payroll cash movements and compensation accruals in the general ledger',
+    up: (db) => {
+      addColumn(db, 'payroll_transactions', 'register_id', 'TEXT');
+      db.run(`INSERT OR IGNORE INTO chart_of_accounts (id,code,name,type,parent_code,balance,is_active) VALUES ('acc_1202','1202','Employee advances','ASSET',NULL,0,1)`);
+      db.run(`INSERT OR IGNORE INTO chart_of_accounts (id,code,name,type,parent_code,balance,is_active) VALUES ('acc_2104','2104','Payroll payable','LIABILITY',NULL,0,1)`);
+      const rows = queryLedgerRows<{ id: string; employee_id: string; type: string; amount: number; date: string; created_by: string | null; register_id: string | null }>(
+        db, `SELECT id,employee_id,type,amount,date,created_by,register_id FROM payroll_transactions ORDER BY date,id`);
+      const fallbackActor = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM users ORDER BY created_at,id LIMIT 1')[0]?.id;
+      for (const row of rows) {
+        if (queryLedgerRows(db, `SELECT id FROM journal_entries WHERE reference_type='PAYROLL_TRANSACTION' AND reference_id=?`, [row.id]).length) continue;
+        const createdBy = row.created_by || fallbackActor;
+        if (!createdBy) throw new Error('Cannot backfill payroll without a valid user.');
+        const amount = Math.round((Number(row.amount) || 0) * 100) / 100;
+        if (amount <= 0) continue;
+        const date = row.date || localDateString();
+        const registerId = row.register_id || 'cr_main';
+        const lines = row.type === 'ADVANCE'
+          ? [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }]
+          : row.type === 'BONUS'
+            ? [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2104', debit: 0, credit: amount }]
+            : row.type === 'DEDUCTION'
+              ? [{ accountCode: '2104', debit: amount, credit: 0 }, { accountCode: '5202', debit: 0, credit: amount }]
+              : [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
+        postLedgerEntry(db, {
+          date, description: `Payroll ${row.type} for employee ${row.employee_id}`,
+          referenceType: 'PAYROLL_TRANSACTION', referenceId: row.id, createdBy, lines,
+        });
+        if (row.type === 'ADVANCE' || row.type === 'SALARY_PAYOUT') {
+          db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, registerId]);
+        }
+      }
+    },
+  },
+  {
+    id: '033_customer_payment_allocations',
+    description: 'Allocate customer receipts to invoices for historical receivable reports',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS customer_payment_allocations (
+          id TEXT PRIMARY KEY,
+          payment_id TEXT NOT NULL,
+          sales_invoice_id TEXT NOT NULL,
+          amount REAL NOT NULL CHECK(amount > 0),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(payment_id,sales_invoice_id),
+          FOREIGN KEY(payment_id) REFERENCES customer_payments(id) ON DELETE CASCADE,
+          FOREIGN KEY(sales_invoice_id) REFERENCES sales_invoices(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_customer_payment_allocations_invoice ON customer_payment_allocations(sales_invoice_id);
+      `);
+      const payments = queryLedgerRows<{ id: string; customer_id: string; invoice_id: string | null; amount: number; date: string }>(
+        db, `SELECT id,customer_id,invoice_id,amount,date FROM customer_payments ORDER BY date,created_at,id`);
+      for (const payment of payments) {
+        if (payment.invoice_id) {
+          if (!queryLedgerRows(db, 'SELECT id FROM sales_invoices WHERE id=?', [payment.invoice_id]).length) continue;
+          db.run(`INSERT OR IGNORE INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+            [`cpa_${uuidv4().substring(0, 8)}`, payment.id, payment.invoice_id, payment.amount]);
+          continue;
+        }
+        let unapplied = Math.round((Number(payment.amount) || 0) * 100) / 100;
+        const invoices = queryLedgerRows<{ id: string; total_amount: number; paid_amount: number; remaining_amount: number }>(db, `
+          SELECT id,total_amount,paid_amount,remaining_amount FROM sales_invoices
+          WHERE customer_id=? AND invoice_status!='VOID' AND date<=? ORDER BY date,created_at,id
+        `, [payment.customer_id, payment.date]);
+        for (const invoice of invoices) {
+          if (unapplied <= 0.009) break;
+          const allocated = Number(queryLedgerRows<{ amount: number }>(db,
+            `SELECT COALESCE(SUM(amount),0) AS amount FROM customer_payment_allocations WHERE sales_invoice_id=?`, [invoice.id])[0]?.amount || 0);
+          const returns = Number(queryLedgerRows<{ amount: number }>(db,
+            `SELECT COALESCE(SUM(remaining_to_balance),0) AS amount FROM sales_returns WHERE original_invoice_id=? AND date<=?`, [invoice.id, payment.date])[0]?.amount || 0);
+          const open = Math.max(0, Number(invoice.total_amount) - allocated - returns);
+          const value = Math.round(Math.min(unapplied, open) * 100) / 100;
+          if (value <= 0) continue;
+          db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+            [`cpa_${uuidv4().substring(0, 8)}`, payment.id, invoice.id, value]);
+          const paid = Math.round((Number(invoice.paid_amount) + value) * 100) / 100;
+          const remaining = Math.max(0, Math.round((Number(invoice.remaining_amount) - value) * 100) / 100);
+          db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+            [paid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', invoice.id]);
+          invoice.paid_amount = paid;
+          invoice.remaining_amount = remaining;
+          unapplied = Math.round((unapplied - value) * 100) / 100;
+        }
+      }
+    },
+  },
+  {
+    id: '034_fixed_asset_payable_account',
+    description: 'Add a dedicated liability account for asset acquisitions made on credit',
+    up: (db) => {
+      db.run(`INSERT OR IGNORE INTO chart_of_accounts (id,code,name,type,parent_code,balance,is_active) VALUES ('acc_2201','2201','Fixed asset payable','LIABILITY',NULL,0,1)`);
+    },
+  },
+  {
+    id: '035_installment_down_payment_link',
+    description: 'Keep the down payment receipt linked to its installment plan',
+    up: (db) => addColumn(db, 'installment_plans', 'down_payment_payment_id', 'TEXT'),
+  },
+  {
+    id: '036_apply_accounting_policy_choices',
+    description: 'Reclassify historical asset and inventory adjustment entries to the approved clearing and expense accounts',
+    up: (db) => {
+      const fallbackActor = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM users ORDER BY created_at,id LIMIT 1')[0]?.id;
+      const assets = queryLedgerRows<{ id: string }>(db, 'SELECT id FROM fixed_assets ORDER BY id');
+      for (const asset of assets) {
+        if (queryLedgerRows(db, `SELECT id FROM journal_entries WHERE reference_type='ASSET_CLEARING_POLICY' AND reference_id=?`, [asset.id]).length) continue;
+        const acquisition = queryLedgerRows<{ id: string; date: string; created_by: string }>(
+          db, `SELECT id,date,created_by FROM journal_entries WHERE reference_type='ASSET_ACQUISITION' AND reference_id=?`, [asset.id]
+        )[0];
+        if (!acquisition) continue;
+        const equityCredit = Number(queryLedgerRows<{ amount: number }>(db, `
+          SELECT COALESCE(SUM(l.credit),0) AS amount FROM journal_entry_lines l
+          JOIN chart_of_accounts a ON a.id=l.account_id
+          WHERE l.entry_id=? AND a.code='3102'
+        `, [acquisition.id])[0]?.amount || 0);
+        if (equityCredit <= 0) continue;
+        const createdBy = acquisition.created_by || fallbackActor;
+        if (!createdBy) throw new Error('Cannot reclassify fixed asset acquisition without a valid user.');
+        const amount = Math.round(equityCredit * 100) / 100;
+        postLedgerEntry(db, {
+          date: acquisition.date,
+          description: `Reclassify fixed asset acquisition ${asset.id} to payable`,
+          referenceType: 'ASSET_CLEARING_POLICY',
+          referenceId: asset.id,
+          createdBy,
+          lines: [
+            { accountCode: '3102', debit: amount, credit: 0 },
+            { accountCode: '2201', debit: 0, credit: amount },
+          ],
+        });
+      }
+
+      const adjustments = queryLedgerRows<{ id: string; adjustment_type: string }>(
+        db, `SELECT id,adjustment_type FROM stock_adjustments WHERE status='POSTED' ORDER BY id`
+      );
+      for (const adjustment of adjustments) {
+        if (adjustment.adjustment_type === 'OPENING_BALANCE') continue;
+        if (queryLedgerRows(db, `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT_POLICY' AND reference_id=?`, [adjustment.id]).length) continue;
+        const entry = queryLedgerRows<{ id: string; date: string; created_by: string }>(
+          db, `SELECT id,date,created_by FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' AND reference_id=?`, [adjustment.id]
+        )[0];
+        if (!entry) continue;
+        const gain = Number(queryLedgerRows<{ amount: number }>(db, `
+          SELECT COALESCE(SUM(l.credit),0) AS amount FROM journal_entry_lines l
+          JOIN chart_of_accounts a ON a.id=l.account_id
+          WHERE l.entry_id=? AND a.code='4190'
+        `, [entry.id])[0]?.amount || 0);
+        const loss = Number(queryLedgerRows<{ amount: number }>(db, `
+          SELECT COALESCE(SUM(l.debit),0) AS amount FROM journal_entry_lines l
+          JOIN chart_of_accounts a ON a.id=l.account_id
+          WHERE l.entry_id=? AND a.code='5290'
+        `, [entry.id])[0]?.amount || 0);
+        const amount = Math.round((gain || loss) * 100) / 100;
+        if (amount <= 0) continue;
+        const createdBy = entry.created_by || fallbackActor;
+        if (!createdBy) throw new Error('Cannot reclassify inventory adjustments without a valid user.');
+        const lines = gain > 0
+          ? [
+            { accountCode: '4190', debit: amount, credit: 0 },
+            { accountCode: '1104', debit: amount, credit: 0 },
+            { accountCode: '1104', debit: 0, credit: amount },
+            { accountCode: '5201', debit: 0, credit: amount },
+          ]
+          : [
+            { accountCode: '1104', debit: amount, credit: 0 },
+            { accountCode: '5290', debit: 0, credit: amount },
+            { accountCode: '5201', debit: amount, credit: 0 },
+            { accountCode: '1104', debit: 0, credit: amount },
+          ];
+        postLedgerEntry(db, {
+          date: entry.date,
+          description: `Reclassify inventory adjustment ${adjustment.id}`,
+          referenceType: 'INVENTORY_ADJUSTMENT_POLICY',
+          referenceId: adjustment.id,
+          createdBy,
+          lines,
+        });
+      }
+    },
+  },
+  {
+    id: '037_remove_network_sync',
+    description: 'Remove obsolete network synchronization configuration and queues',
+    up: (db) => {
+      db.exec(`
+        DROP TABLE IF EXISTS sync_conflict_logs;
+        DROP TABLE IF EXISTS sync_inbox;
+        DROP TABLE IF EXISTS sync_outbox;
+        DROP TABLE IF EXISTS branch_sync_config;
+      `);
+    },
+  },
+  {
+    id: '038_inventory_cost_layers',
+    description: 'Create FIFO inventory cost layers and seed an estimated opening layer for existing stock',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS inventory_cost_layers (
+          id TEXT PRIMARY KEY,
+          product_id TEXT NOT NULL,
+          warehouse_id TEXT NOT NULL,
+          source_transaction_id TEXT,
+          source_type TEXT NOT NULL,
+          source_id TEXT,
+          received_at TEXT NOT NULL,
+          quantity_received REAL NOT NULL CHECK(quantity_received > 0),
+          quantity_remaining REAL NOT NULL CHECK(quantity_remaining >= 0),
+          unit_cost REAL NOT NULL CHECK(unit_cost >= 0),
+          is_estimated INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(product_id) REFERENCES products(id),
+          FOREIGN KEY(warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY(source_transaction_id) REFERENCES inventory_transactions(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_inventory_cost_layers_fifo
+          ON inventory_cost_layers(product_id, warehouse_id, received_at, created_at, id);
+        CREATE INDEX IF NOT EXISTS idx_inventory_cost_layers_source
+          ON inventory_cost_layers(source_type, source_id);
+        CREATE TABLE IF NOT EXISTS inventory_cost_allocations (
+          id TEXT PRIMARY KEY,
+          outbound_transaction_id TEXT NOT NULL,
+          layer_id TEXT NOT NULL,
+          quantity REAL NOT NULL CHECK(quantity > 0),
+          quantity_restored REAL NOT NULL DEFAULT 0 CHECK(quantity_restored >= 0 AND quantity_restored <= quantity),
+          unit_cost REAL NOT NULL CHECK(unit_cost >= 0),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY(outbound_transaction_id) REFERENCES inventory_transactions(id),
+          FOREIGN KEY(layer_id) REFERENCES inventory_cost_layers(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_inventory_cost_allocations_transaction
+          ON inventory_cost_allocations(outbound_transaction_id);
+      `);
+
+      const stocks = queryLedgerRows<{ product_id: string; warehouse_id: string; quantity_m2: number; cost_price: number }>(db, `
+        SELECT ws.product_id,ws.warehouse_id,ws.quantity_m2,p.cost_price
+        FROM warehouse_stock ws JOIN products p ON p.id=ws.product_id
+        WHERE ws.quantity_m2>0
+      `);
+      for (const stock of stocks) {
+        const hasLayers = Number(queryLedgerRows<{ count: number }>(db,
+          `SELECT COUNT(*) AS count FROM inventory_cost_layers WHERE product_id=? AND warehouse_id=?`,
+          [stock.product_id, stock.warehouse_id])[0]?.count || 0);
+        if (hasLayers) continue;
+        db.run(`INSERT INTO inventory_cost_layers
+          (id,product_id,warehouse_id,source_type,source_id,received_at,quantity_received,quantity_remaining,unit_cost,is_estimated)
+          VALUES (?,?,?,?,?,?,?,?,?,1)`, [
+          `icl_open_${uuidv4().replace(/-/g, '').slice(0, 12)}`, stock.product_id, stock.warehouse_id,
+          'OPENING_ESTIMATE', null, '0001-01-01', stock.quantity_m2, stock.quantity_m2,
+          Math.max(0, Number(stock.cost_price) || 0),
+        ]);
+      }
+      db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','FIFO')`);
+    },
+  },
+  {
+    id: '039_fifo_allocation_order',
+    description: 'Preserve FIFO lot order on issue allocations for accurate returns',
+    up: (db) => addColumn(db, 'inventory_cost_allocations', 'allocation_order', 'INTEGER NOT NULL DEFAULT 0'),
+  },
+  {
+    id: '040_enable_fifo_costing',
+    description: 'Initialize estimated opening cost layers and enable FIFO for new inventory movements',
+    up: (db) => {
+      const stocks = queryLedgerRows<{ product_id: string; warehouse_id: string; quantity_m2: number; cost_price: number }>(db, `
+        SELECT ws.product_id,ws.warehouse_id,ws.quantity_m2,p.cost_price
+        FROM warehouse_stock ws JOIN products p ON p.id=ws.product_id
+        WHERE ws.quantity_m2>0 AND NOT EXISTS (
+          SELECT 1 FROM inventory_cost_layers l WHERE l.product_id=ws.product_id AND l.warehouse_id=ws.warehouse_id
+        )
+      `);
+      for (const stock of stocks) {
+        db.run(`INSERT INTO inventory_cost_layers
+          (id,product_id,warehouse_id,source_type,received_at,quantity_received,quantity_remaining,unit_cost,is_estimated)
+          VALUES (?,?,?,'OPENING_ESTIMATE','0001-01-01',?,?,?,1)`, [
+          `icl_open_${uuidv4().replace(/-/g, '').slice(0, 12)}`,stock.product_id,stock.warehouse_id,
+          stock.quantity_m2,stock.quantity_m2,Math.max(0,Number(stock.cost_price)||0),
+        ]);
+      }
+      db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','FIFO')`);
+    },
+  },
+  {
+    id: '041_backfill_legacy_fifo_returns',
+    description: 'Create estimated reversible FIFO allocations for sales posted before lot tracking',
+    up: (db) => {
+      const issues = queryLedgerRows<{
+        id: string; reference_id: string; product_id: string; warehouse_id: string;
+        quantity: number; unit_cost: number; created_at: string; invoice_status: string;
+      }>(db, `
+        SELECT tx.id,tx.reference_id,tx.product_id,tx.warehouse_id,ABS(tx.quantity_m2) AS quantity,
+               tx.unit_cost,tx.created_at,si.invoice_status
+        FROM inventory_transactions tx
+        JOIN sales_invoices si ON si.id=tx.reference_id
+        WHERE tx.reference_type='INVOICE' AND tx.type='SALE'
+        ORDER BY tx.created_at,tx.rowid
+      `);
+      for (const issue of issues) {
+        if (queryLedgerRows(db, `SELECT id FROM inventory_cost_allocations WHERE outbound_transaction_id=? LIMIT 1`, [issue.id]).length) continue;
+        const returned = Number(queryLedgerRows<{ quantity: number }>(db, `
+          SELECT COALESCE(SUM(sri.quantity_m2),0) AS quantity FROM sales_return_items sri
+          JOIN sales_returns sr ON sr.id=sri.return_id
+          WHERE sr.original_invoice_id=? AND sri.product_id=?
+        `, [issue.reference_id,issue.product_id])[0]?.quantity || 0);
+        const restored = issue.invoice_status === 'VOID'
+          ? Number(issue.quantity)
+          : Math.min(Number(issue.quantity), Math.max(0,returned));
+        const layerId = `icl_legacy_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+        db.run(`INSERT INTO inventory_cost_layers
+          (id,product_id,warehouse_id,source_transaction_id,source_type,source_id,received_at,
+           quantity_received,quantity_remaining,unit_cost,is_estimated)
+          VALUES (?,?,?,?,?,?,?,?,0,?,1)`, [
+          layerId,issue.product_id,issue.warehouse_id,issue.id,'LEGACY_SALE_RETURN',issue.id,
+          String(issue.created_at || '').slice(0,10) || '0001-01-01',issue.quantity,Number(issue.unit_cost)||0,
+        ]);
+        db.run(`INSERT INTO inventory_cost_allocations
+          (id,outbound_transaction_id,layer_id,allocation_order,quantity,quantity_restored,unit_cost)
+          VALUES (?,?,?,?,?,?,?)`, [
+          `icla_legacy_${uuidv4().replace(/-/g, '').slice(0, 12)}`,issue.id,layerId,0,
+          issue.quantity,restored,Number(issue.unit_cost)||0,
+        ]);
+      }
+    },
+  },
 ];
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
@@ -933,9 +1384,8 @@ function appliedIds(db: Database): Set<string> {
  * Brings any database — brand new or years old — up to the current schema.
  * Call on every startup, before any service issues a query.
  *
- * A migration that throws is left unrecorded so it retries on the next launch,
- * and the remaining migrations still run: one broken step must not brick the
- * app or block the others, which are independent.
+ * A migration that throws is left unrecorded. Later migrations depend on earlier
+ * schema and data invariants, so stop immediately and retry on the next launch.
  */
 export function runMigrations(db: Database): MigrationReport {
   const report: MigrationReport = { applied: [], skipped: [], failed: [] };
@@ -984,6 +1434,7 @@ export function runMigrations(db: Database): MigrationReport {
       const message = error instanceof Error ? error.message : String(error);
       report.failed.push({ id: migration.id, error: message });
       console.error(`❌ Migration ${migration.id} failed:`, message);
+      break;
     } finally {
       db.run('PRAGMA foreign_keys = ON');
       const enabled = Number(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0]) === 1;

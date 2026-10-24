@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
-import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
+import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
@@ -201,6 +201,24 @@ export class CashierService {
 
     const registerId = patch.registerId || current.register_id || 'cr_main';
     this.db.executeTransaction((db) => {
+      const ledgerDb = db.getDatabase();
+      const currentPosting = ledgerDb.exec(`
+        SELECT id FROM journal_entries
+        WHERE ((reference_type = 'EXPENSE' AND reference_id = ?)
+           OR (reference_type = 'EXPENSE_EDIT' AND reference_id LIKE ?))
+          AND NOT EXISTS (
+            SELECT 1 FROM journal_entries reversal
+            WHERE reversal.reference_type = 'EXPENSE_REVERSAL'
+              AND reversal.reference_id LIKE journal_entries.id || ':%'
+          )
+        ORDER BY created_at DESC, id DESC LIMIT 1
+      `, [id, `${id}:%`])[0]?.values[0]?.[0];
+      if (currentPosting) {
+        reverseLedgerEntry(ledgerDb, String(currentPosting), {
+          date: localDateString(), description: `Reverse expense ${current.description}`,
+          referenceType: 'EXPENSE_REVERSAL', referenceId: `${currentPosting}:${uuidv4()}`, createdBy: actor.id,
+        });
+      }
       if (current.payment_type === 'CASH') {
         db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [current.amount, current.register_id]);
         if (current.shift_id) {
@@ -218,6 +236,14 @@ export class CashierService {
          WHERE id = ?`,
         [patch.category, patch.amount, patch.description.trim(), patch.recipient || null, patch.paymentType, registerId, id]
       );
+      postLedgerEntry(ledgerDb, {
+        date: localDateString(), description: patch.description.trim(),
+        referenceType: 'EXPENSE_EDIT', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
+        lines: [
+          { accountCode: '5201', debit: patch.amount, credit: 0 },
+          { accountCode: paymentAccountCode(patch.paymentType), debit: 0, credit: patch.amount },
+        ],
+      });
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
          VALUES (?, ?, ?, 'تعديل مصروف', 'CASHIER', ?, ?, ?)`,
@@ -237,6 +263,24 @@ export class CashierService {
     if (!expense) throw new Error('المصروف غير موجود.');
 
     this.db.executeTransaction((db) => {
+      const ledgerDb = db.getDatabase();
+      const currentPosting = ledgerDb.exec(`
+        SELECT id FROM journal_entries
+        WHERE ((reference_type = 'EXPENSE' AND reference_id = ?)
+           OR (reference_type = 'EXPENSE_EDIT' AND reference_id LIKE ?))
+          AND NOT EXISTS (
+            SELECT 1 FROM journal_entries reversal
+            WHERE reversal.reference_type = 'EXPENSE_REVERSAL'
+              AND reversal.reference_id LIKE journal_entries.id || ':%'
+          )
+        ORDER BY created_at DESC, id DESC LIMIT 1
+      `, [id, `${id}:%`])[0]?.values[0]?.[0];
+      if (currentPosting) {
+        reverseLedgerEntry(ledgerDb, String(currentPosting), {
+          date: localDateString(), description: `Reverse deleted expense ${expense.description}`,
+          referenceType: 'EXPENSE_REVERSAL', referenceId: `${currentPosting}:${uuidv4()}`, createdBy: actor.id,
+        });
+      }
       if (expense.payment_type === 'CASH') {
         db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [expense.amount, expense.register_id]);
         if (expense.shift_id) {

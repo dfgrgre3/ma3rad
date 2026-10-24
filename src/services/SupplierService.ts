@@ -124,6 +124,21 @@ export class SupplierService {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [paymentId, receiptNumber, supplierId, amount, paymentType, today, registerId, notes, actor.id]);
 
+      let unapplied = amount;
+      const invoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount FROM purchase_invoices WHERE supplier_id=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [supplierId]);
+      for (const invoice of invoices) {
+        if (unapplied <= 0.009) break;
+        const allocated = Math.round(Math.min(unapplied, Number(invoice.remainingAmount)) * 100) / 100;
+        if (allocated <= 0) continue;
+        sqliteDb.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+          [`spa_${uuidv4().substring(0, 8)}`, paymentId, invoice.id, allocated]);
+        const paid = Math.round((Number(invoice.paidAmount) + allocated) * 100) / 100;
+        const remaining = Math.max(0, Math.round((Number(invoice.remainingAmount) - allocated) * 100) / 100);
+        sqliteDb.run(`UPDATE purchase_invoices SET paid_amount=?,remaining_amount=?,payment_status=? WHERE id=?`,
+          [paid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', invoice.id]);
+        unapplied = Math.round((unapplied - allocated) * 100) / 100;
+      }
+
       // 2. Reduce supplier balance
       sqliteDb.run(`
         UPDATE suppliers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?

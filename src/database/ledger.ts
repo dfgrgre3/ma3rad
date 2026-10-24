@@ -120,3 +120,30 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
 
   return entryId;
 }
+
+/** Post an auditable, balanced reversal of an existing journal entry. */
+export function reverseLedgerEntry(
+  db: Database,
+  entryId: string,
+  posting: Omit<LedgerPosting, 'lines'> & { referenceType: string; referenceId: string }
+): string | null {
+  const original = queryLedgerRows<{ id: string }>(db,
+    'SELECT id FROM journal_entries WHERE id = ? AND is_posted = 1', [entryId])[0];
+  if (!original) return null;
+  const originalLines = queryLedgerRows<{ code: string; debit: number; credit: number; description: string | null }>(db, `
+    SELECT coa.code, jel.debit, jel.credit, jel.description
+    FROM journal_entry_lines jel
+    JOIN chart_of_accounts coa ON coa.id = jel.account_id
+    WHERE jel.entry_id = ? ORDER BY jel.id
+  `, [entryId]);
+  if (originalLines.length < 2) throw new Error(`Cannot reverse incomplete journal entry ${entryId}.`);
+  return postLedgerEntry(db, {
+    ...posting,
+    lines: originalLines.map((line) => ({
+      accountCode: line.code,
+      debit: Number(line.credit),
+      credit: Number(line.debit),
+      description: line.description || undefined,
+    })),
+  });
+}

@@ -3,6 +3,7 @@ import type { Product, WarehouseStock, InventoryTransaction } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { InventoryCostingService } from './InventoryCostingService';
 
 export interface ProductQueryOptions {
   brandId?: string;
@@ -214,6 +215,11 @@ export class ProductService {
           (initialStock.quantityM2 * (initialStock.unitCost || product.costPrice)),
           performedBy
         ]);
+        InventoryCostingService.addLayer(sqliteDb, {
+          productId: id, warehouseId: initialStock.warehouseId, sourceTransactionId: txId,
+          sourceType: 'OPENING_BALANCE', sourceId: txId, date: new Date().toISOString().slice(0, 10),
+          quantity: initialStock.quantityM2, unitCost: initialStock.unitCost || product.costPrice,
+        });
       }
 
       // Log Audit

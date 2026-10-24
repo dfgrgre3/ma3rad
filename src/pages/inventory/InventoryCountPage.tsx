@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { ScanLine, Plus, Search, CheckCircle2, AlertTriangle, FileText, ChevronRight, X, Play, ClipboardList } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from '../../services/AuthService';
+import { postLedgerEntry } from '../../database/ledger';
+import { localDateString } from '../../utils/date';
+import { InventoryCostingService } from '../../services/InventoryCostingService';
 
 interface CountSession {
   id: string;
@@ -233,6 +237,7 @@ export const InventoryCountPage: React.FC = () => {
 
     const db = DatabaseManager.getInstance();
     try {
+      const actor = AuthService.requireAuth();
       db.executeTransaction((txDb) => {
         let varianceCount = 0;
         let totalVarianceVal = 0;
@@ -263,28 +268,52 @@ export const InventoryCountPage: React.FC = () => {
             const txId = `tx_${uuidv4().substring(0, 8)}`;
             const txType = diffM2 > 0 ? 'ADJUSTMENT_ADD' : 'ADJUSTMENT_SUB';
             const boxesCount = Number((diffM2 / 1.44).toFixed(2)); // Default approximation
+            const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
+            const fifoPlan = fifoEnabled && diffM2 < 0
+              ? InventoryCostingService.planFifo(txDb, item.productId, activeSession.warehouseId, Math.abs(diffM2))
+              : null;
+            const unitCost = fifoPlan?.unitCost ?? Number(item.unitCost);
+            const value = Math.round(Math.abs(diffM2 * unitCost) * 100) / 100;
 
             txDb.run(`
               INSERT INTO inventory_transactions (
                 id, transaction_number, type, product_id, warehouse_id,
                 quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
                 notes, performed_by, created_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'STOCK_COUNT', ?, ?, 'usr_admin', CURRENT_TIMESTAMP)
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'STOCK_COUNT', ?, ?, ?, CURRENT_TIMESTAMP)
             `, [
               txId, activeSession.code, txType, item.productId, activeSession.warehouseId,
-              diffM2, boxesCount, item.unitCost, Math.abs(item.varianceValue), activeSession.id,
-              `تسوية فروقات الجرد (${activeSession.code})`
+              diffM2, boxesCount, unitCost, value, activeSession.id,
+              `تسوية فروقات الجرد (${activeSession.code})`, actor.id,
             ]);
+            if (fifoPlan) InventoryCostingService.consumeFifo(txDb, txId, fifoPlan);
+            else if (fifoEnabled && diffM2 > 0) InventoryCostingService.addLayer(txDb, {
+              productId: item.productId, warehouseId: activeSession.warehouseId, sourceTransactionId: txId,
+              sourceType: 'STOCK_COUNT_GAIN', sourceId: activeSession.id, date: localDateString(),
+              quantity: diffM2, unitCost,
+            });
+            if (value > 0) {
+              postLedgerEntry(txDb.getDatabase(), {
+                date: localDateString(),
+                description: `Stock count adjustment ${activeSession.code}`,
+                referenceType: 'INVENTORY_ADJUSTMENT',
+                referenceId: txId,
+                createdBy: actor.id,
+                lines: diffM2 > 0
+                  ? [{ accountCode: '1104', debit: value, credit: 0 }, { accountCode: '5201', debit: 0, credit: value }]
+                  : [{ accountCode: '5201', debit: value, credit: 0 }, { accountCode: '1104', debit: 0, credit: value }],
+              });
+            }
           }
         }
 
         // 4. Close session status
         txDb.run(`
           UPDATE stock_counts
-          SET status = 'POSTED', posted_at = CURRENT_TIMESTAMP, posted_by = 'usr_admin',
+          SET status = 'POSTED', posted_at = CURRENT_TIMESTAMP, posted_by = ?,
               items_with_variance = ?, total_variance_value = ?
           WHERE id = ?
-        `, [varianceCount, totalVarianceVal, activeSession.id]);
+        `, [actor.id, varianceCount, totalVarianceVal, activeSession.id]);
       });
 
       setShowSessionModal(false);

@@ -2,6 +2,8 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { localDateString } from '../utils/date';
+import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
@@ -378,8 +380,8 @@ export class FinanceExtrasService {
     return this.db.query<FixedAsset>('SELECT * FROM fixed_assets ORDER BY code ASC');
   }
 
-  saveFixedAsset(input: Partial<FixedAsset> & { name: string; purchaseDate: string; purchaseCost: number }): void {
-    this.requireManage();
+  saveFixedAsset(input: Partial<FixedAsset> & { name: string; purchaseDate: string; purchaseCost: number; paymentType?: string; registerId?: string }): void {
+    const actor = this.requireManage();
     if (!input.name.trim()) throw new Error('اسم الأصل مطلوب.');
     if (!(Number(input.purchaseCost) > 0)) throw new Error('تكلفة الشراء يجب أن تكون أكبر من صفر.');
     if (!input.purchaseDate) throw new Error('تاريخ الشراء مطلوب.');
@@ -395,6 +397,12 @@ export class FinanceExtrasService {
       input.notes || null,
     ];
     if (input.id) {
+      const posted = this.db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='ASSET_ACQUISITION' AND reference_id=?`, [input.id])[0];
+      const existing = this.db.query<any>('SELECT purchase_date,purchase_cost FROM fixed_assets WHERE id=?', [input.id])[0];
+      if (!existing) throw new Error('Fixed asset not found.');
+      if (posted && (existing.purchase_date !== input.purchaseDate || Math.abs(Number(existing.purchase_cost) - Number(input.purchaseCost)) > 0.009)) {
+        throw new Error('The acquisition date and cost cannot be edited after posting. Dispose and re-enter the asset to correct it.');
+      }
       this.db.run(
         `UPDATE fixed_assets SET name = ?, category = ?, purchase_date = ?, purchase_cost = ?, salvage_value = ?,
            useful_life_years = ?, status = ?, location = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -405,12 +413,34 @@ export class FinanceExtrasService {
       const maxCode = this.db.query<{ code: string }>('SELECT code FROM fixed_assets ORDER BY code DESC LIMIT 1')[0]?.code;
       const lastNumber = maxCode ? Number(String(maxCode).replace(/\D/g, '')) : 0;
       const next = Number.isFinite(lastNumber) ? lastNumber + 1 : 1;
-      this.db.run(
-        `INSERT INTO fixed_assets (id, code, name, category, purchase_date, purchase_cost, salvage_value,
-           useful_life_years, status, location, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, `FA-${String(next).padStart(4, '0')}`, ...values]
-      );
+      const paymentType = input.paymentType || 'CREDIT';
+      const registerId = input.registerId || 'cr_main';
+      this.db.executeTransaction((db) => {
+        db.run(
+          `INSERT INTO fixed_assets (id, code, name, category, purchase_date, purchase_cost, salvage_value,
+             useful_life_years, status, location, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, `FA-${String(next).padStart(4, '0')}`, ...values]
+        );
+        const cashAccount = paymentType === 'CREDIT' ? '2201' : paymentAccountCode(paymentType);
+        if (paymentType === 'CASH') {
+          const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0];
+          if (!register) throw new Error('The selected cash register is unavailable.');
+          db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [Number(input.purchaseCost), registerId]);
+        }
+        postLedgerEntry(db.getDatabase(), {
+          date: input.purchaseDate,
+          description: `Fixed asset acquisition: ${input.name.trim()}`,
+          referenceType: 'ASSET_ACQUISITION', referenceId: id, createdBy: actor.id,
+          lines: [
+            { accountCode: '1601', debit: Number(input.purchaseCost), credit: 0 },
+            { accountCode: cashAccount, debit: 0, credit: Number(input.purchaseCost) },
+          ],
+        });
+        db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
+          [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, 'Record fixed asset acquisition', 'FINANCE', id,
+            JSON.stringify({ purchaseCost: input.purchaseCost, purchaseDate: input.purchaseDate, paymentType, registerId })]);
+      });
     }
   }
 
@@ -420,7 +450,8 @@ export class FinanceExtrasService {
     if (!asset) throw new Error('الأصل غير موجود.');
     if (asset.status !== 'ACTIVE') throw new Error('لا يمكن إهلاك أصل غير نشط.');
 
-    const month = new Date().toISOString().slice(0, 7);
+    const today = localDateString();
+    const month = today.slice(0, 7);
     const referenceId = `${id}:${month}`;
     if (this.db.query('SELECT id FROM journal_entries WHERE reference_type = ? AND reference_id = ?', ['ASSET_DEPRECIATION', referenceId]).length) {
       throw new Error('تم ترحيل إهلاك هذا الأصل لهذا الشهر بالفعل.');
@@ -439,7 +470,7 @@ export class FinanceExtrasService {
     this.db.executeTransaction((db) => {
       const entryId = `jv_${uuidv4().substring(0, 8)}`;
       const entryNumber = db.nextNumber('JV');
-      const date = `${month}-${new Date().toISOString().slice(8, 10)}`;
+      const date = today;
       db.run(
         `INSERT INTO journal_entries (id, entry_number, date, description, reference_type, reference_id, total_debit, total_credit, is_posted, created_by)
          VALUES (?, ?, ?, ?, 'ASSET_DEPRECIATION', ?, ?, ?, 1, ?)`,
@@ -461,10 +492,23 @@ export class FinanceExtrasService {
     return this.db.query<{ id: string }>('SELECT id FROM chart_of_accounts WHERE code = ? AND type = ? AND is_active = 1', [code, type])[0];
   }
   deleteFixedAsset(id: string): void {
-    this.requireManage();
+    const actor = this.requireManage();
     if (this.db.query('SELECT id FROM journal_entries WHERE reference_type = ? AND reference_id LIKE ?', ['ASSET_DEPRECIATION', `${id}:%`]).length) {
       throw new Error('لا يمكن حذف أصل له قيود إهلاك مرحّلة.');
     }
-    this.db.run('DELETE FROM fixed_assets WHERE id = ?', [id]);
+    const asset = this.db.query<any>('SELECT * FROM fixed_assets WHERE id=?', [id])[0];
+    if (!asset) return;
+    const acquisition = this.db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='ASSET_ACQUISITION' AND reference_id=?`, [id])[0];
+    this.db.executeTransaction((db) => {
+      if (acquisition) {
+        const cashLine = db.query<any>(`SELECT 1 AS found FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id=l.account_id WHERE l.entry_id=? AND a.code='1101' AND l.credit>0`, [acquisition.id])[0];
+        reverseLedgerEntry(db.getDatabase(), acquisition.id, {
+          date: localDateString(), description: `Reverse fixed asset acquisition ${asset.code}`,
+          referenceType: 'ASSET_ACQUISITION_VOID', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
+        });
+        if (cashLine) db.run('UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?', [asset.purchase_cost, 'cr_main']);
+      }
+      db.run('DELETE FROM fixed_assets WHERE id=?', [id]);
+    });
   }
 }

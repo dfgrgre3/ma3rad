@@ -5,6 +5,7 @@ import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 import { postLedgerEntry } from '../database/ledger';
 import { round2 } from './financials';
+import { InventoryCostingService } from './InventoryCostingService';
 
 export interface ReturnablePurchaseItem {
   productId: string;
@@ -189,16 +190,21 @@ export class PurchaseReturnService {
           WHERE product_id = ? AND warehouse_id = ?
         `, [item.quantityM2, item.productId, purchase.warehouseId]);
 
+        const returnTransactionId = `tx_${uuidv4().substring(0, 8)}`;
+        const fifoPlan = InventoryCostingService.costingMethod(db) === 'FIFO'
+          ? InventoryCostingService.getSourceLayerPlan(db, item.productId, purchase.warehouseId, 'PURCHASE', purchase.id, item.quantityM2)
+          : null;
         db.run(`
           INSERT INTO inventory_transactions (
             id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count,
             unit_cost, total_cost, reference_type, reference_id, notes, performed_by
           ) VALUES (?, ?, 'PURCHASE_RETURN', ?, ?, ?, ?, ?, ?, 'PURCHASE_RETURN', ?, ?, ?)
         `, [
-          `tx_${uuidv4().substring(0, 8)}`, db.nextNumber('TX-PRET'), item.productId,
+          returnTransactionId, db.nextNumber('TX-PRET'), item.productId,
           purchase.warehouseId, -item.quantityM2, -item.boxesCount, item.unitCost, item.totalRefund,
           returnId, `مرتجع مشتريات بموجب ${returnNumber}`, actor.id,
         ]);
+        if (fifoPlan) InventoryCostingService.consumeFifo(db, returnTransactionId, fifoPlan);
       }
 
       if (isCash) {

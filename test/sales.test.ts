@@ -84,7 +84,7 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   db.importDatabaseBinary(persistedBytes);
   const restoredDb = db.getDatabase();
   assert.equal(restoredDb.exec('PRAGMA integrity_check')[0]?.values[0]?.[0], 'ok');
-  assert.equal(restoredDb.exec('PRAGMA foreign_key_check')[0]?.values.length, 0);
+  assert.equal(restoredDb.exec('PRAGMA foreign_key_check')[0]?.values.length ?? 0, 0);
   assert.equal(restoredDb.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0], 1);
   const reopenedInvoice = svc.getInvoiceById(invoice.id)!;
   assert.equal(reopenedInvoice.id, invoice.id);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { EmployeeService } from '../../services/EmployeeService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { localDateString } from '../../utils/date';
 import {
   HardHat, Plus, Search, Mail, Phone, Calendar, Landmark,
   TrendingUp, TrendingDown, DollarSign, UserCheck, Clock,
@@ -65,6 +66,7 @@ export const EmployeesPage: React.FC = () => {
   // --- Database State ---
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [payrollPayables, setPayrollPayables] = useState<{ employeeId: string | null; employeeName: string; balance: number }[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
@@ -76,6 +78,7 @@ export const EmployeesPage: React.FC = () => {
       setTransactions(canManageEmployees
         ? EmployeeService.getTransactions() as unknown as FinancialTransaction[]
         : []);
+      setPayrollPayables(canManageEmployees ? EmployeeService.getPayrollPayables() : []);
       setAttendance(EmployeeService.getAllAttendance() as unknown as AttendanceRecord[]);
       setDbError(null);
     } catch (e: any) {
@@ -114,18 +117,19 @@ export const EmployeesPage: React.FC = () => {
     baseSalary: 6000,
     salaryType: 'MONTHLY' as Employee['salaryType'],
     status: 'ACTIVE' as Employee['status'],
-    joinedDate: new Date().toISOString().split('T')[0]
+    joinedDate: localDateString()
   });
 
   const [txForm, setTxForm] = useState({
     type: 'ADVANCE' as FinancialTransaction['type'],
     amount: 100,
-    date: new Date().toISOString().split('T')[0],
+    date: localDateString(),
     notes: ''
   });
 
   // --- Attendance State ---
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceDate, setAttendanceDate] = useState(localDateString());
+  const [payrollPeriod, setPayrollPeriod] = useState(localDateString().slice(0, 7));
 
   // --- Calculations helper ---
   const getEmployeeFinancials = (empId: string) => {
@@ -163,7 +167,7 @@ export const EmployeesPage: React.FC = () => {
       baseSalary: 6000,
       salaryType: 'MONTHLY',
       status: 'ACTIVE',
-      joinedDate: new Date().toISOString().split('T')[0]
+      joinedDate: localDateString()
     });
     setIsEmployeeModalOpen(true);
   };
@@ -230,12 +234,22 @@ export const EmployeesPage: React.FC = () => {
       setTxForm({
         type: 'ADVANCE',
         amount: 100,
-        date: new Date().toISOString().split('T')[0],
+        date: localDateString(),
         notes: ''
       });
       loadAll();
     } catch (err: any) {
       alert(err?.message || 'تعذر تسجيل الحركة المالية.');
+    }
+  };
+
+  const handleAccruePayroll = () => {
+    try {
+      const result = EmployeeService.accrueMonthlyPayroll(payrollPeriod);
+      alert(`تم ترحيل استحقاق الرواتب: ${result.created} موظف، مع تخطي ${result.skipped} قيدًا موجودًا.`);
+      loadAll();
+    } catch (err: any) {
+      alert(err?.message || 'تعذر ترحيل استحقاق الرواتب.');
     }
   };
 
@@ -487,6 +501,47 @@ export const EmployeesPage: React.FC = () => {
           {/* TAB 2: WAGES & FINANCES (أجور وحسابات العمال) */}
           {activeTab === 'finance' && (
             <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                <label className="text-xs font-bold text-slate-600">
+                  فترة الاستحقاق
+                  <input
+                    type="month"
+                    value={payrollPeriod}
+                    onChange={(e) => setPayrollPeriod(e.target.value)}
+                    className="mt-1 block px-3 py-2 rounded-lg border border-slate-200 bg-slate-50"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAccruePayroll}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  ترحيل استحقاق الرواتب
+                </button>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-slate-200">
+                  <h3 className="text-sm font-black text-slate-800">أرصدة الرواتب المستحقة في دفتر الأستاذ حسب الموظف</h3>
+                  <p className="text-xs text-slate-500 mt-1">من قيود حساب 2104، وتشمل الاستحقاق والسلف والخصومات والصرف والقيود العكسية.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-sm">
+                    <thead className="bg-slate-50 text-xs text-slate-500">
+                      <tr><th className="p-3">الموظف</th><th className="p-3 text-left">الرصيد المستحق</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {payrollPayables.length ? payrollPayables.map((row) => (
+                        <tr key={row.employeeId || 'unassigned'}>
+                          <td className="p-3 font-bold">{row.employeeName}</td>
+                          <td className="p-3 text-left font-mono">{fmtCurrency(row.balance)}</td>
+                        </tr>
+                      )) : <tr><td colSpan={2} className="p-5 text-center text-slate-500">لا توجد مستحقات رواتب مفتوحة في دفتر الأستاذ.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
               {/* Financial Quick Summaries */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

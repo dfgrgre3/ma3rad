@@ -441,6 +441,15 @@ export const ProductsView: React.FC = () => {
     )));
   };
 
+  const updateSizeDimension = (dimension: 0 | 1, value: string) => {
+    const [width = '', height = ''] = (formData.size || '').split(/[x×*]/i);
+    const dimensions = dimension === 0 ? [value, height] : [width, value];
+    const size = dimensions[0] && dimensions[1]
+      ? `${dimensions[0]}x${dimensions[1]}`
+      : dimensions[0] || dimensions[1];
+    handleSizeChange(size);
+  };
+
   const handlePiecesPerBoxChange = (pieces: number) => {
     const nextPieces = pieces || 1;
     const autoMeters = calcMetersFromSize(formData.size, nextPieces);
@@ -1407,8 +1416,12 @@ export const ProductsView: React.FC = () => {
                   <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Ruler className="w-4 h-4 text-sky-600" /> المقاس والمواصفات</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Field label="المقاس (سم)" hint={autoMeters !== null ? `المساحة المحسوبة: ${autoMeters} م²/كرتونة` : 'مثال: 60x60'}>
-                        <input value={formData.size} onChange={(e) => handleSizeChange(e.target.value)} placeholder="60x60" className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
+                      <Field label="المقاس (سم)" hint={autoMeters !== null ? `المساحة المحسوبة: ${autoMeters} م²/كرتونة` : 'أدخل الطول والعرض بالسنتيمتر'}>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min="0" step="any" aria-label="الطول بالسنتيمتر" value={(formData.size || '').split(/[x×*]/i)[0] || ''} onChange={(e) => updateSizeDimension(0, e.target.value)} placeholder="60" className="w-full min-w-0 px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
+                          <span className="text-slate-400">×</span>
+                          <input type="number" min="0" step="any" aria-label="العرض بالسنتيمتر" value={(formData.size || '').split(/[x×*]/i)[1] || ''} onChange={(e) => updateSizeDimension(1, e.target.value)} placeholder="120" className="w-full min-w-0 px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
+                        </div>
                       </Field>
                       <Field label="السمك (مم)">
                         <input type="number" step="0.1" value={formData.thickness} onChange={(e) => setFormData({ ...formData, thickness: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
@@ -1521,7 +1534,7 @@ export const ProductsView: React.FC = () => {
                 <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-amber-800"><Boxes className="w-4 h-4" /> المخزون الافتتاحي (عدد / كمية / مترات)</div>
-                    {!editingProduct && <button type="button" onClick={addOpeningRow} className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100">+ مخزن آخر</button>}
+                    {!editingProduct && <button type="button" onClick={addOpeningRow} disabled={openingRows.length >= warehouses.length} className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50">+ مخزن آخر</button>}
                   </div>
 
                   {editingProduct ? (
@@ -1542,7 +1555,7 @@ export const ProductsView: React.FC = () => {
                         <div key={index} className={`grid grid-cols-2 items-end gap-2 rounded-xl border border-amber-200 bg-white p-3 ${formData.productType === 'CERAMIC' ? 'md:grid-cols-5' : 'md:grid-cols-3'}`}>
                           <Field label="المخزن">
                             <select value={row.warehouseId} onChange={(e) => setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, warehouseId: e.target.value } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold">
-                              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                              {warehouses.filter((w) => w.id === row.warehouseId || !openingRows.some((other, otherIndex) => otherIndex !== index && other.warehouseId === w.id)).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                             </select>
                           </Field>
                           {formData.productType === 'CERAMIC' && <Field label="عدد الكراتين">
@@ -1559,6 +1572,7 @@ export const ProductsView: React.FC = () => {
                       ))}
                       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-[11px]">
                         <span className="font-bold text-slate-600">قيمة المخزون الافتتاحي: <span className="text-amber-700">{CeramicMath.formatCurrency(stockValue)}</span></span>
+                        {formData.productType === 'CERAMIC' && <span className="font-bold text-slate-600">إجمالي الكراتين: <span className="text-amber-700">{round(openingRows.reduce((s, r) => s + r.boxes, 0), 3)}</span> · القطع: <span className="text-amber-700">{Math.round(openingRows.reduce((s, r) => s + r.pieces, 0))}</span></span>}
                         <span className="font-bold text-slate-600">إجمالي المترات: <span className="text-amber-700">{round(openingRows.reduce((s, r) => s + r.meters, 0), 3)} {unitLabel}</span></span>
                       </div>
                     </>

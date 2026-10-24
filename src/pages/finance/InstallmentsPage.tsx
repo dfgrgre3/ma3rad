@@ -43,10 +43,18 @@ interface InstallmentPlanRecord {
   startDate: string;
 }
 
+interface InstallmentInvoiceOption {
+  id: string;
+  invoiceNumber: string;
+  customerId: string;
+  remainingAmount: number;
+}
+
 export const InstallmentsPage: React.FC = () => {
   const [installments, setInstallments] = useState<InstallmentRow[]>([]);
   const [plans, setPlans] = useState<InstallmentPlanRecord[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [openInvoices, setOpenInvoices] = useState<InstallmentInvoiceOption[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [activeTab, setActiveTab] = useState<'INSTALLMENTS' | 'PLANS'>('INSTALLMENTS');
@@ -54,8 +62,9 @@ export const InstallmentsPage: React.FC = () => {
   // Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [totalFinanced, setTotalFinanced] = useState<number>(36000);
-  const [downPayment, setDownPayment] = useState<number>(6000);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+  const [totalFinanced, setTotalFinanced] = useState<number>(0);
+  const [downPayment, setDownPayment] = useState<number>(0);
   const [monthsCount, setMonthsCount] = useState<number>(6);
   const [startDate, setStartDate] = useState(localDateString());
 
@@ -80,6 +89,21 @@ export const InstallmentsPage: React.FC = () => {
       setCustomers(allCusts);
       if (allCusts.length > 0 && !selectedCustomerId) {
         setSelectedCustomerId(allCusts[0].id);
+      }
+      const invoiceRes = db.exec(`SELECT id,invoice_number,customer_id,remaining_amount FROM sales_invoices WHERE invoice_status!='VOID' AND remaining_amount>0.009 ORDER BY date DESC,created_at DESC`);
+      const invoiceOptions: InstallmentInvoiceOption[] = (invoiceRes[0]?.values || []).map((r: any[]) => ({
+        id: String(r[0]), invoiceNumber: String(r[1]), customerId: String(r[2]), remainingAmount: Number(r[3] || 0),
+      }));
+      setOpenInvoices(invoiceOptions);
+      if (!selectedInvoiceId) {
+        const firstCustomerId = selectedCustomerId || allCusts[0]?.id || '';
+        const firstInvoice = invoiceOptions.find((invoice) => invoice.customerId === firstCustomerId);
+        if (firstInvoice) {
+          setSelectedCustomerId(firstCustomerId);
+          setSelectedInvoiceId(firstInvoice.id);
+          setTotalFinanced(firstInvoice.remainingAmount);
+          setDownPayment(0);
+        }
       }
 
       // Check if plans exist
@@ -117,6 +141,7 @@ export const InstallmentsPage: React.FC = () => {
           FROM installments i
           JOIN installment_plans ip ON i.plan_id = ip.id
           LEFT JOIN customers c ON ip.customer_id = c.id
+          WHERE ip.status != 'CANCELLED'
           ORDER BY i.due_date ASC
         `);
 
@@ -159,14 +184,16 @@ export const InstallmentsPage: React.FC = () => {
   const handleCreatePlan = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { planNumber } = installmentService.createPlan({ customerId: selectedCustomerId, totalAmount: totalFinanced, downPayment, installmentsCount: monthsCount, startDate });
-      alert(`تم إنشاء خطة التقسيط رقم ${planNumber} بنجاح (${monthsCount} أقساط شهرية)!`);
+      const { planNumber, downPaymentReceipt } = installmentService.createPlan({ customerId: selectedCustomerId, invoiceId: selectedInvoiceId, totalAmount: totalFinanced, downPayment, installmentsCount: monthsCount, startDate });
+      alert(`تم إنشاء خطة التقسيط رقم ${planNumber} بنجاح (${monthsCount} أقساط شهرية).${downPaymentReceipt ? ` إيصال المقدم: ${downPaymentReceipt}` : ''}`);
       setShowCreateModal(false);
       loadData();
     } catch (err: any) {
       alert(`خطأ أثناء إنشاء خطة التقسيط: ${err?.message}`);
     }
   };
+
+  const customerInvoices = openInvoices.filter((invoice) => invoice.customerId === selectedCustomerId);
 
   const handlePayInstallment = (inst: InstallmentRow) => {
     if (inst.status === 'PAID') { alert('هذا القسط مسدد بالفعل.'); return; }
@@ -178,6 +205,30 @@ export const InstallmentsPage: React.FC = () => {
       loadData();
     } catch (err: any) {
       alert(`خطأ أثناء سداد القسط: ${err?.message}`);
+    }
+  };
+
+  const handleReverseInstallment = (inst: InstallmentRow) => {
+    if (!canManage || inst.status !== 'PAID') return;
+    if (!window.confirm(`عكس سند سداد القسط ${inst.sequenceNumber} من خطة ${inst.planNumber}؟ سيتم إعادة الدين إلى رصيد العميل.`)) return;
+    try {
+      const result = installmentService.reverseInstallmentPayment(inst.id);
+      alert(`تم عكس الإيصال ${result.receiptNumber} وإعادة ${fmt(result.amount)} إلى رصيد العميل.`);
+      loadData();
+    } catch (err: any) {
+      alert(`تعذر عكس سداد القسط: ${err?.message}`);
+    }
+  };
+
+  const handleCancelPlan = (inst: InstallmentRow) => {
+    if (!canManage || inst.sequenceNumber !== 1) return;
+    if (!window.confirm(`إلغاء خطة ${inst.planNumber}؟ يجب عكس الأقساط المحصلة أولًا.`)) return;
+    try {
+      const result = installmentService.cancelPlan(inst.planId);
+      alert(`تم إلغاء خطة ${result.planNumber} وعكس المقدم إن وجد.`);
+      loadData();
+    } catch (err: any) {
+      alert(`تعذر إلغاء الخطة: ${err?.message}`);
     }
   };
 
@@ -344,8 +395,12 @@ export const InstallmentsPage: React.FC = () => {
                 ) : (
                   <span className="text-xs text-emerald-600 font-bold flex items-center gap-1 py-1">
                     <CheckCircle2 className="w-4 h-4" />
+                    <button onClick={() => handleReverseInstallment(inst)} disabled={!canManage} className="mr-3 text-[11px] text-rose-600 hover:text-rose-700 font-bold disabled:opacity-40">عكس السداد</button>
                     تم السداد بالكامل
                   </span>
+                )}
+                {inst.sequenceNumber === 1 && canManage && (
+                  <button onClick={() => handleCancelPlan(inst)} className="text-[11px] text-rose-600 hover:text-rose-700 font-bold">إلغاء الخطة</button>
                 )}
               </div>
             </div>
@@ -375,11 +430,39 @@ export const InstallmentsPage: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">اختر العميل</label>
                 <select
                   value={selectedCustomerId}
-                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  onChange={(e) => {
+                    const customerId = e.target.value;
+                    const invoice = openInvoices.find((item) => item.customerId === customerId);
+                    setSelectedCustomerId(customerId);
+                    setSelectedInvoiceId(invoice?.id || '');
+                    setTotalFinanced(invoice?.remainingAmount || 0);
+                    setDownPayment(0);
+                  }}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
                 >
                   {customers.map(c => (
                     <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">اختر الفاتورة ذات الرصيد المستحق</label>
+                <select
+                  value={selectedInvoiceId}
+                  onChange={(e) => {
+                    const invoice = customerInvoices.find((item) => item.id === e.target.value);
+                    setSelectedInvoiceId(e.target.value);
+                    setTotalFinanced(invoice?.remainingAmount || 0);
+                    setDownPayment(0);
+                  }}
+                  required
+                  disabled={customerInvoices.length === 0}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                >
+                  <option value="">{customerInvoices.length ? 'اختر الفاتورة' : 'لا توجد فواتير مستحقة لهذا العميل'}</option>
+                  {customerInvoices.map((invoice) => (
+                    <option key={invoice.id} value={invoice.id}>{invoice.invoiceNumber} — متبقي {fmt(invoice.remainingAmount)}</option>
                   ))}
                 </select>
               </div>
@@ -391,7 +474,7 @@ export const InstallmentsPage: React.FC = () => {
                     type="number"
                     min="1000"
                     value={totalFinanced}
-                    onChange={(e) => setTotalFinanced(Number(e.target.value) || 0)}
+                    readOnly
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>

@@ -4,7 +4,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
-import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
+import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
+import { InventoryCostingService } from './InventoryCostingService';
+import { SettingsService } from './SettingsService';
 import {
   computeSaleLine,
   computeSaleTotals,
@@ -169,6 +171,8 @@ export class SalesService {
       let totalLineDiscount = 0;
       const preparedItems: any[] = [];
       const plannedByProduct = new Map<string, number>();
+      const plannedFifoByLayer = new Map<string, number>();
+      const costingMethod = SettingsService.getSettings().costingMethod;
 
       for (const item of dto.items) {
         const quantityM2 = round2(Math.max(0, item.quantityM2 || 0));
@@ -198,10 +202,16 @@ export class SalesService {
         }
         plannedByProduct.set(item.productId, alreadyPlanned + quantityM2);
 
+        const fifoPlan = costingMethod === 'FIFO'
+          ? InventoryCostingService.planFifo(sqliteDb, item.productId, dto.warehouseId, quantityM2, plannedFifoByLayer)
+          : null;
+        for (const allocation of fifoPlan?.allocations || []) {
+          plannedFifoByLayer.set(allocation.layerId, round2((plannedFifoByLayer.get(allocation.layerId) || 0) + allocation.quantity));
+        }
         const line = computeSaleLine({
           quantity: quantityM2,
           unitPrice: item.unitPrice,
-          unitCost: item.unitCost ?? prod.costPrice ?? 0,
+          unitCost: fifoPlan ? fifoPlan.totalCost / quantityM2 : (item.unitCost ?? prod.costPrice ?? 0),
           discountAmount: item.discountAmount || 0,
         });
         totalLineDiscount += line.lineDiscount;
@@ -231,6 +241,7 @@ export class SalesService {
           totalPrice: line.lineTotal,
           totalCost: line.lineCost,
           profit: line.lineProfit,
+          fifoPlan,
           metersPerBox,
           piecesPerBox,
         });
@@ -335,6 +346,7 @@ export class SalesService {
           -item.quantityM2, -item.boxesCount, round2(item.unitCost), item.totalCost,
           invoiceId, `بيع بموجب فاتورة ${invoiceNumber}`, actor.id
         ]);
+        if (costingMethod === 'FIFO') InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan);
       }
 
       sqliteDb.run(`
@@ -446,6 +458,8 @@ export class SalesService {
           actor.id,
         ]
       );
+      db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+        [`cpa_${uuidv4().substring(0, 8)}`, paymentId, invoiceId, value]);
 
       db.run(
         `UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -534,8 +548,11 @@ export class SalesService {
         const newPaid = round2(Number(invoice.paidAmount) + amount);
         const remaining = round2(Math.max(0, Number(invoice.remainingAmount) - amount));
         const paymentNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
+        const paymentId = `cpay_${uuidv4().slice(0, 8)}`;
         db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,notes,performed_by)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [`cpay_${uuidv4().slice(0, 8)}`, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, paymentNotes, actor.id]);
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, paymentNotes, actor.id]);
+        db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+          [`cpa_${uuidv4().substring(0, 8)}`, paymentId, allocation.invoiceId, amount]);
         db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
           [newPaid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', allocation.invoiceId]);
         receipts.push(receiptNumber); total = round2(total + amount);
@@ -578,8 +595,23 @@ export class SalesService {
     if (!payment) throw new Error('سند القبض غير موجود.');
     if (payment.paymentGroupId) {
       const group = this.db.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [payment.paymentGroupId]);
+      for (const row of group) {
+        const protectedPayment = this.db.query<any>('SELECT COUNT(*) AS count FROM installments WHERE payment_id=?', [row.id])[0]?.count || 0;
+        const linkedPlan = this.db.query<any>(`SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`, [row.invoiceId])[0]?.count || 0;
+        if (protectedPayment || linkedPlan) throw new Error('This receipt belongs to an installment plan. Reverse the plan payment from the installments screen.');
+      }
       this.db.executeTransaction((db) => {
+        const groupEntry = db.getDatabase().exec(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT_GROUP' AND reference_id=?`, [payment.paymentGroupId])[0]?.values[0]?.[0];
+        if (groupEntry) reverseLedgerEntry(db.getDatabase(), String(groupEntry), {
+          date: localDateString(), description: `Reverse customer receipt group ${payment.paymentGroupId}`,
+          referenceType: 'CUSTOMER_PAYMENT_GROUP_VOID', referenceId: `${payment.paymentGroupId}:${uuidv4()}`, createdBy: actor.id,
+        });
         for (const row of group) {
+          const paymentEntry = db.getDatabase().exec(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`, [row.id])[0]?.values[0]?.[0];
+          if (paymentEntry) reverseLedgerEntry(db.getDatabase(), String(paymentEntry), {
+            date: localDateString(), description: `Reverse customer receipt ${row.receiptNumber}`,
+            referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${row.id}:${uuidv4()}`, createdBy: actor.id,
+          });
           const invoice = db.query<any>(`SELECT id,customer_id,paid_amount,total_amount,remaining_amount,invoice_status FROM sales_invoices WHERE id=?`, [row.invoiceId])[0];
           if (!invoice || invoice.invoiceStatus === 'VOID') throw new Error('تعذر عكس الدفعة المرتبطة بفاتورة غير متاحة.');
           const value = round2(row.amount); const paid = round2(Math.max(0, invoice.paidAmount - value)); const remaining = round2(Math.min(invoice.totalAmount, invoice.remainingAmount + value));
@@ -595,6 +627,9 @@ export class SalesService {
       return;
     }
     if (!payment.invoiceId) throw new Error('هذا السند غير مرتبط بفاتورة بيع. احذفه من كشف حساب العميل.');
+    const protectedPayment = this.db.query<any>('SELECT COUNT(*) AS count FROM installments WHERE payment_id=?', [paymentId])[0]?.count || 0;
+    const linkedPlan = this.db.query<any>(`SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`, [payment.invoiceId])[0]?.count || 0;
+    if (protectedPayment || linkedPlan) throw new Error('This receipt belongs to an installment plan. Reverse the plan payment from the installments screen.');
     const invoice = this.getInvoiceById(payment.invoiceId);
     if (!invoice) throw new Error('فاتورة البيع غير موجودة.');
     if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن حذف دفعة من فاتورة ملغاة.');
@@ -605,6 +640,11 @@ export class SalesService {
     const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
 
     this.db.executeTransaction((db) => {
+      const paymentEntry = db.getDatabase().exec(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`, [paymentId])[0]?.values[0]?.[0];
+      if (paymentEntry) reverseLedgerEntry(db.getDatabase(), String(paymentEntry), {
+        date: localDateString(), description: `Reverse customer receipt ${payment.receiptNumber}`,
+        referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${paymentId}:${uuidv4()}`, createdBy: actor.id,
+      });
       db.run(
         `UPDATE sales_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ?,
          updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
@@ -675,53 +715,10 @@ export class SalesService {
 
     return this.db.executeTransaction((sqliteDb) => {
       const returnNumber = sqliteDb.nextNumber('RET');
-      let totalReturnAmount = 0;
-
-      for (const item of returnItems) {
-        const lineTotal = round2(item.quantityM2 * item.unitPrice);
-        totalReturnAmount = round2(totalReturnAmount + lineTotal);
-
-        const product = sqliteDb.query<any>(
-          `SELECT name, grade, meters_per_box, pieces_per_box, size FROM products WHERE id = ?`,
-          [item.productId]
-        )[0];
-        if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
-        const metersPerBox = Number(product.metersPerBox) || 1.44;
-        const boxesCount = item.boxesCount > 0 ? round2(item.boxesCount) : round2(item.quantityM2 / metersPerBox);
-        const unitCost = item.unitCost > 0 ? item.unitCost : 0;
-
-        sqliteDb.run(`
-          INSERT INTO sales_return_items (
-            id, return_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          `ritem_${uuidv4().substring(0, 8)}`, returnId, item.productId, product.name, product.grade,
-          item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
-        ]);
-
-        sqliteDb.run(`
-          UPDATE warehouse_stock
-          SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
-          WHERE product_id = ? AND warehouse_id = ?
-        `, [item.quantityM2, item.productId, inv.warehouseId]);
-
-        sqliteDb.run(`
-          INSERT INTO inventory_transactions (
-            id, transaction_number, type, product_id, warehouse_id,
-            quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
-            reference_id, notes, performed_by
-          ) VALUES (?, ?, 'SALES_RETURN', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
-        `, [
-          `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-RET'),
-          item.productId, inv.warehouseId, item.quantityM2, boxesCount, unitCost,
-          round2(item.quantityM2 * unitCost), returnId,
-          `مرتجع مبيعات للفاتورة ${inv.invoiceNumber}`, actor.id
-        ]);
-      }
-
-      // Correct AR / cash accounting (brief §68/§220/§223).
-      // Refunding to the customer's balance is always a credit memo; cash/card
-      // refunds only disburse the portion the customer actually paid.
+      const totalReturnAmount = round2(returnItems.reduce(
+        (sum, item) => sum + round2(item.quantityM2 * item.unitPrice),
+        0
+      ));
       const refundMethod = options.refundMethod || 'CASH';
       const effectiveRefundCash = refundMethod === 'BALANCE' ? false : refundCash;
       const impact = computeReturnImpact({
@@ -745,6 +742,55 @@ export class SalesService {
         options.shiftId || null, refundMethod, actor.id,
       ]);
 
+      let fifoReturnedCost = 0;
+      const fifoEnabled = SettingsService.getSettings().costingMethod === 'FIFO';
+      for (const item of returnItems) {
+        const lineTotal = round2(item.quantityM2 * item.unitPrice);
+
+        const product = sqliteDb.query<any>(
+          `SELECT name, grade, meters_per_box, pieces_per_box, size FROM products WHERE id = ?`,
+          [item.productId]
+        )[0];
+        if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
+        const metersPerBox = Number(product.metersPerBox) || 1.44;
+        const boxesCount = item.boxesCount > 0 ? round2(item.boxesCount) : round2(item.quantityM2 / metersPerBox);
+        let unitCost = item.unitCost > 0 ? item.unitCost : 0;
+        if (fifoEnabled) {
+          const actualCost = InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2);
+          unitCost = round2(actualCost / item.quantityM2);
+          fifoReturnedCost = round2(fifoReturnedCost + actualCost);
+        }
+
+        sqliteDb.run(`
+          INSERT INTO sales_return_items (
+            id, return_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          `ritem_${uuidv4().substring(0, 8)}`, returnId, item.productId, product.name, product.grade,
+          item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
+        ]);
+
+        sqliteDb.run(`
+          UPDATE warehouse_stock
+          SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
+          WHERE product_id = ? AND warehouse_id = ?
+        `, [item.quantityM2, item.productId, inv.warehouseId]);
+
+        const returnTransactionId = `tx_${uuidv4().substring(0, 8)}`;
+        sqliteDb.run(`
+          INSERT INTO inventory_transactions (
+            id, transaction_number, type, product_id, warehouse_id,
+            quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+            reference_id, notes, performed_by
+          ) VALUES (?, ?, 'SALES_RETURN', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
+        `, [
+          returnTransactionId, sqliteDb.nextNumber('TX-RET'),
+          item.productId, inv.warehouseId, item.quantityM2, boxesCount, unitCost,
+          round2(item.quantityM2 * unitCost), returnId,
+          `مرتجع مبيعات للفاتورة ${inv.invoiceNumber}`, actor.id
+        ]);
+      }
+
       // Reduce customer debt by the credit memo minus the cash portion that settles it,
       // and reduce total purchases by the returned value.
       sqliteDb.run(`
@@ -763,7 +809,7 @@ export class SalesService {
           );
         }
       }
-      const returnedCost = round2(returnItems.reduce(
+      const returnedCost = fifoEnabled ? fifoReturnedCost : round2(returnItems.reduce(
         (sum, item) => sum + Number(item.quantityM2) * Number(item.unitCost || 0),
         0
       ));
@@ -848,11 +894,20 @@ export class SalesService {
         'SELECT COUNT(*) AS count FROM customer_payments WHERE invoice_id = ?',
         [invoiceId]
       )[0]?.count ?? 0;
+      const linkedPlan = sqliteDb.query<any>(`SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`, [invoiceId])[0]?.count || 0;
+      if (linkedPlan) throw new Error('Cancel the linked installment plan before voiding this invoice.');
       if (linkedPayments > 0) {
         throw new Error('لا يمكن إلغاء فاتورة عليها سندات قبض. اعكس سندات القبض أولاً أو سجّل مرتجعاً.');
       }
 
       for (const item of inv.items) {
+        if (SettingsService.getSettings().costingMethod === 'FIFO') {
+          const issue = sqliteDb.query<any>(`SELECT id FROM inventory_transactions
+            WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE'
+            ORDER BY created_at,id LIMIT 1`, [invoiceId, item.productId])[0];
+          if (!issue) throw new Error('The original FIFO sale issue is missing; reconcile the invoice before voiding it.');
+          InventoryCostingService.restoreIssue(sqliteDb, issue.id);
+        }
         sqliteDb.run(`
           UPDATE warehouse_stock
           SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP

@@ -12,7 +12,7 @@
     "check": "npm run typecheck && npm test && npm run build",
     "electron:pack": "npm run build && electron-builder --dir",
     "electron:dist": "npm run build && electron-builder --win nsis",
-    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/dynamic-data.test.ts",
+    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/dynamic-data.test.ts test/financial-statements-ui.test.ts",
     "electron:dist:mac": "npm run build && electron-builder --mac",
     "electron:dist:linux": "npm run build && electron-builder --linux"
   },
@@ -105,7 +105,9 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
     "@types/bcryptjs": "^2.4.6",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^22.13.4",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
@@ -116,6 +118,7 @@
     "crypto-browserify": "^3.12.1",
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0",
+    "jsdom": "^30.1.3",
     "postcss": "^8.5.2",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",

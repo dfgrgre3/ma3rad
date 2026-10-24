@@ -92,7 +92,6 @@ export const PosView: React.FC = () => {
   const [taxPercentage, setTaxPercentage] = useState<number>(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
-  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const [notes, setNotes] = useState('');
 
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
@@ -215,13 +214,6 @@ export const PosView: React.FC = () => {
       setHeldOrders([]);
     }
   }, [loadInitialData]);
-
-  useEffect(() => {
-    const update = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', update);
-    window.addEventListener('offline', update);
-    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
-  }, []);
 
   useEffect(() => {
     if (selectedWarehouseId) loadStock(selectedWarehouseId);
@@ -852,7 +844,6 @@ export const PosView: React.FC = () => {
             <div>
               <h1 className="text-sm font-black text-slate-900 leading-tight">نقطة البيع السريعة</h1>
               <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                <span className={isOnline ? "flex items-center gap-1 font-bold text-emerald-600" : "flex items-center gap-1 font-bold text-amber-600"} title={isOnline ? "قاعدة البيانات المحلية متاحة" : "العمل محلي؛ قد لا تتوفر المزامنة الخارجية"}><span className={isOnline ? "w-2 h-2 rounded-full bg-emerald-500" : "w-2 h-2 rounded-full bg-amber-500"} />{isOnline ? "متصل" : "دون اتصال"}</span>
                 {activeShift ? (
                   <>
                     <span className="flex items-center gap-1 text-emerald-600 font-bold">

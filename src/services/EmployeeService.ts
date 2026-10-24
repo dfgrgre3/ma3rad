@@ -2,6 +2,8 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
+import { localDateString } from '../utils/date';
 
 export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
 export type SalaryType = 'MONTHLY' | 'DAILY';
@@ -53,6 +55,12 @@ export interface EmployeeFinancials {
   deductions: number;
   payouts: number;
   netDue: number;
+}
+
+export interface EmployeePayrollPayable {
+  employeeId: string | null;
+  employeeName: string;
+  balance: number;
 }
 
 export class EmployeeService {
@@ -200,21 +208,179 @@ export class EmployeeService {
     date: string;
     notes: string;
     createdBy?: string;
+    registerId?: string;
   }): PayrollTransaction {
     const actor = this.requireManage();
     if (!this.getById(data.employeeId)) throw new Error('الموظف غير موجود.');
     const id = `ptx_${uuidv4().substring(0, 8)}`;
-    this.db.run(
-      `INSERT INTO payroll_transactions (id, employee_id, type, amount, date, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, data.employeeId, data.type, data.amount, data.date, data.notes, actor.id]
-    );
+    const amount = Math.round(Number(data.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payroll amount must be greater than zero.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date) || Number.isNaN(Date.parse(`${data.date}T00:00:00`))) throw new Error('Payroll date is invalid.');
+    const registerId = data.registerId || 'cr_main';
+    this.db.executeTransaction((db) => {
+      if (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') {
+        if (!db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0]) throw new Error('The selected cash register is unavailable.');
+      }
+      db.run(`INSERT INTO payroll_transactions (id,employee_id,type,amount,date,notes,created_by,register_id) VALUES (?,?,?,?,?,?,?,?)`,
+        [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, registerId]);
+      if (data.type === 'DEDUCTION' || data.type === 'SALARY_PAYOUT') {
+        const period = data.date.slice(0, 7);
+        const accrualRef = `${data.employeeId}:${period}`;
+        const accrued = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_SALARY_ACCRUAL' AND reference_id=?`, [accrualRef])[0];
+        if (!accrued) {
+          const employee = db.query<any>('SELECT name,base_salary,salary_type FROM employees WHERE id=?', [data.employeeId])[0];
+          const salary = Math.round((Number(employee?.baseSalary || 0) * (employee?.salaryType === 'DAILY' ? 26 : 1)) * 100) / 100;
+          if (salary > 0) postLedgerEntry(db.getDatabase(), {
+            date: `${period}-01`, description: `Salary accrual for ${employee?.name || data.employeeId} (${period})`,
+            referenceType: 'PAYROLL_SALARY_ACCRUAL', referenceId: accrualRef, createdBy: actor.id,
+            lines: [{ accountCode: '5202', debit: salary, credit: 0 }, { accountCode: '2104', debit: 0, credit: salary }],
+          });
+        }
+      }
+      if (data.type === 'SALARY_PAYOUT') {
+        const period = data.date.slice(0, 7);
+        const advanceRef = `${data.employeeId}:${period}`;
+        if (!db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_ADVANCE_APPLICATION' AND reference_id=?`, [advanceRef])[0]) {
+          const advances = Number(db.query<any>(`SELECT COALESCE(SUM(amount),0) AS amount FROM payroll_transactions WHERE employee_id=? AND type='ADVANCE' AND substr(date,1,7)=?`, [data.employeeId, period])[0]?.amount || 0);
+          if (advances > 0) postLedgerEntry(db.getDatabase(), {
+            date: data.date, description: `Apply employee advances to salary (${period})`,
+            referenceType: 'PAYROLL_ADVANCE_APPLICATION', referenceId: advanceRef, createdBy: actor.id,
+            lines: [{ accountCode: '2104', debit: advances, credit: 0 }, { accountCode: '1202', debit: 0, credit: advances }],
+          });
+        }
+      }
+      const payable = data.type === 'SALARY_PAYOUT'
+        ? Number(db.query<any>(`
+            SELECT COALESCE(SUM(l.credit-l.debit),0) AS amount
+            FROM journal_entry_lines l
+            JOIN journal_entries e ON e.id=l.entry_id AND e.is_posted=1
+            JOIN chart_of_accounts a ON a.id=l.account_id
+            WHERE a.code='2104' AND (
+              (e.reference_type IN ('PAYROLL_SALARY_ACCRUAL','PAYROLL_ADVANCE_APPLICATION') AND e.reference_id=?)
+              OR (e.reference_type='PAYROLL_TRANSACTION' AND e.reference_id IN (
+                SELECT id FROM payroll_transactions
+                WHERE employee_id=? AND substr(date,1,7)=? AND type IN ('BONUS','DEDUCTION','SALARY_PAYOUT')
+              ))
+            )
+          `, [`${data.employeeId}:${data.date.slice(0, 7)}`, data.employeeId, data.date.slice(0, 7)])[0]?.amount || 0)
+        : 0;
+      if (data.type === 'SALARY_PAYOUT' && amount > payable + 0.009) throw new Error(`Salary payout exceeds accrued payroll payable (${payable}).`);
+      const payablePortion = Math.min(amount, Math.max(0, payable));
+      const lines = data.type === 'ADVANCE'
+        ? [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }]
+        : data.type === 'BONUS'
+          ? [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2104', debit: 0, credit: amount }]
+          : data.type === 'DEDUCTION'
+            ? [{ accountCode: '2104', debit: amount, credit: 0 }, { accountCode: '5202', debit: 0, credit: amount }]
+            : [{ accountCode: '2104', debit: payablePortion, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
+      postLedgerEntry(db.getDatabase(), {
+        date: data.date, description: `Payroll ${data.type} for ${this.getById(data.employeeId)?.name || data.employeeId}`,
+        referenceType: 'PAYROLL_TRANSACTION', referenceId: id, createdBy: actor.id, lines,
+      });
+      if (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') {
+        db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, registerId]);
+      }
+      db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, `Payroll ${data.type}`, 'HR', id,
+          JSON.stringify({ employeeId: data.employeeId, amount, date: data.date })]);
+    });
     return this.getTransactions(data.employeeId).find(t => t.id === id)!;
   }
 
-  static deleteTransaction(id: string): void {
+  static accrueMonthlyPayroll(period: string): { created: number; skipped: number } {
+    const actor = this.requireManage();
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('Payroll period must be YYYY-MM.');
+    if (period > localDateString().slice(0, 7)) throw new Error('Future payroll periods cannot be accrued.');
+    const year = Number(period.slice(0, 4));
+    const month = Number(period.slice(5, 7));
+    const periodEnd = localDateString(new Date(year, month, 0));
+    const employees = this.db.query<{ id: string; name: string; baseSalary: number; salaryType: SalaryType }>(
+      `SELECT id, name, base_salary AS baseSalary, salary_type AS salaryType
+       FROM employees WHERE joined_date <= ? AND status != 'SUSPENDED' ORDER BY id`,
+      [periodEnd]
+    );
+    let created = 0;
+    let skipped = 0;
+    this.db.executeTransaction((db) => {
+      for (const employee of employees) {
+        const referenceId = `${employee.id}:${period}`;
+        if (db.query(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_SALARY_ACCRUAL' AND reference_id=?`, [referenceId]).length) {
+          skipped++;
+          continue;
+        }
+        const salary = Math.round(Number(employee.baseSalary || 0) * (employee.salaryType === 'DAILY' ? 26 : 1) * 100) / 100;
+        if (salary <= 0) continue;
+        postLedgerEntry(db.getDatabase(), {
+          date: `${period}-01`,
+          description: `Salary accrual for ${employee.name} (${period})`,
+          referenceType: 'PAYROLL_SALARY_ACCRUAL',
+          referenceId,
+          createdBy: actor.id,
+          lines: [
+            { accountCode: '5202', debit: salary, credit: 0 },
+            { accountCode: '2104', debit: 0, credit: salary },
+          ],
+        });
+        created++;
+      }
+      db.run(
+        `INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values)
+         VALUES (?,?,?,?,?,?,?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, 'Accrue monthly payroll', 'HR', period,
+          JSON.stringify({ created, skipped })]
+      );
+    });
+    return { created, skipped };
+  }
+
+  static getPayrollPayables(): EmployeePayrollPayable[] {
     this.requireManage();
-    this.db.run(`DELETE FROM payroll_transactions WHERE id = ?`, [id]);
+    return this.db.query<EmployeePayrollPayable>(`
+      WITH payroll_lines AS (
+        SELECT
+          CASE
+            WHEN e.reference_type IN ('PAYROLL_SALARY_ACCRUAL','PAYROLL_ADVANCE_APPLICATION')
+              THEN substr(e.reference_id, 1, instr(e.reference_id, ':') - 1)
+            WHEN e.reference_type = 'PAYROLL_TRANSACTION' THEN tx.employee_id
+            WHEN e.reference_type = 'PAYROLL_REVERSAL' THEN reversed_tx.employee_id
+            ELSE NULL
+          END AS employee_id,
+          l.credit - l.debit AS balance
+        FROM journal_entry_lines l
+        JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1
+        JOIN chart_of_accounts a ON a.id = l.account_id AND a.code = '2104'
+        LEFT JOIN payroll_transactions tx
+          ON e.reference_type = 'PAYROLL_TRANSACTION' AND tx.id = e.reference_id
+        LEFT JOIN payroll_transactions reversed_tx
+          ON e.reference_type = 'PAYROLL_REVERSAL'
+          AND substr(e.reference_id, 1, length(reversed_tx.id) + 1) = reversed_tx.id || ':'
+      )
+      SELECT p.employee_id AS employeeId,
+             COALESCE(emp.name, 'قيود رواتب غير موزعة') AS employeeName,
+             ROUND(SUM(p.balance), 2) AS balance
+      FROM payroll_lines p
+      LEFT JOIN employees emp ON emp.id = p.employee_id
+      GROUP BY p.employee_id, emp.name
+      HAVING ABS(SUM(p.balance)) > 0.009
+      ORDER BY employeeName
+    `);
+  }
+
+  static deleteTransaction(id: string): void {
+    const actor = this.requireManage();
+    const row = this.db.query<any>('SELECT * FROM payroll_transactions WHERE id=?', [id])[0];
+    if (!row) return;
+    this.db.executeTransaction((db) => {
+      const entry = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_TRANSACTION' AND reference_id=?`, [id])[0];
+      if (entry) reverseLedgerEntry(db.getDatabase(), entry.id, {
+        date: localDateString(), description: `Reverse payroll transaction ${id}`,
+        referenceType: 'PAYROLL_REVERSAL', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
+      });
+      if (row.type === 'ADVANCE' || row.type === 'SALARY_PAYOUT') {
+        db.run('UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?', [row.amount, row.register_id || 'cr_main']);
+      }
+      db.run('DELETE FROM payroll_transactions WHERE id=?', [id]);
+    });
   }
 
   static getEmployeeFinancials(employeeId: string): EmployeeFinancials {

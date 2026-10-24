@@ -140,6 +140,20 @@ export class CustomerService {
           id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, notes, performed_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, register, shiftId || null, notes, actor.id]);
+      let unapplied = round2(amount);
+      const openInvoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount,total_amount FROM sales_invoices WHERE customer_id=? AND invoice_status!='VOID' AND date<=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [customerId, today]);
+      for (const invoice of openInvoices) {
+        if (unapplied <= 0.009) break;
+        const allocated = round2(Math.min(unapplied, Number(invoice.remainingAmount)));
+        if (allocated <= 0) continue;
+        sqliteDb.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
+          [`cpa_${uuidv4().substring(0, 8)}`, paymentId, invoice.id, allocated]);
+        const paidAmount = round2(Number(invoice.paidAmount) + allocated);
+        const remainingAmount = round2(Math.max(0, Number(invoice.remainingAmount) - allocated));
+        sqliteDb.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+          [paidAmount, remainingAmount, remainingAmount <= 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]);
+        unapplied = round2(unapplied - allocated);
+      }
       // 2. Reduce customer debt balance
       sqliteDb.run(`
         UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
@@ -205,6 +219,11 @@ export class CustomerService {
       throw new Error('السند مرتبط بقسط. ألغِ سداد القسط من صفحة الأقساط أولًا.');
     }
 
+    const downPaymentPlan = this.db.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM installment_plans WHERE down_payment_payment_id=? AND status!='CANCELLED'`, [paymentId]
+    )[0]?.count ?? 0;
+    if (downPaymentPlan) throw new Error('This receipt is the down payment for an installment plan. Cancel the plan from the installments screen first.');
+
     const amount = round2(payment.amount);
     this.db.executeTransaction((db) => {
       db.run(
@@ -228,6 +247,15 @@ export class CustomerService {
           { accountCode: paymentAccountCode(payment.paymentType), debit: 0, credit: amount },
         ],
       });
+      const allocations = db.query<any>(`SELECT sales_invoice_id,amount FROM customer_payment_allocations WHERE payment_id=?`, [paymentId]);
+      for (const allocation of allocations) {
+        const invoice = db.query<any>('SELECT id,paid_amount,total_amount,remaining_amount FROM sales_invoices WHERE id=?', [allocation.salesInvoiceId])[0];
+        if (!invoice) continue;
+        const paid = round2(Math.max(0, Number(invoice.paidAmount) - Number(allocation.amount)));
+        const remaining = round2(Math.min(Number(invoice.totalAmount), Number(invoice.remainingAmount) + Number(allocation.amount)));
+        db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+          [paid, remaining, remaining <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]);
+      }
       db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)

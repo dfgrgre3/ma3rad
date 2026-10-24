@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { round2 } from './financials';
+import { localDateString } from '../utils/date';
+import { postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 
 export interface CommissionRow {
   id: string;
@@ -82,7 +84,8 @@ export class CommissionService {
 
   /** Generates pending commissions for all sales invoices of a month (idempotent). */
   public generateForMonth(month: string): { created: number; skipped: number; amount: number } {
-    PermissionService.require(AuthService.requireAuth(), 'employees.manage');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.manage');
     if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
 
     const invoices = this.db.query<any>(`
@@ -97,8 +100,6 @@ export class CommissionService {
     let created = 0;
     let skipped = 0;
     let amount = 0;
-    const actor = AuthService.requireAuth();
-
     this.db.executeTransaction((db) => {
       for (const invoice of invoices) {
         const employeeId = invoice.salesRepId || invoice.assignedRepId;
@@ -141,15 +142,50 @@ export class CommissionService {
   public setStatus(id: string, status: 'APPROVED' | 'PAID' | 'CANCELLED'): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'employees.manage');
-    const row = this.db.query<any>(`SELECT status FROM commissions WHERE id = ?`, [id])[0];
+    const row = this.db.query<any>(`SELECT status, commission_amount AS amount, employee_id AS employee_id FROM commissions WHERE id = ?`, [id])[0];
     if (!row) throw new Error('العمولة غير موجودة.');
     if (row.status === 'PAID') throw new Error('العمولة مدفوعة بالفعل.');
     if (status === 'APPROVED' && row.status !== 'PENDING') throw new Error('لا يمكن اعتماد عمولة بهذه الحالة.');
     if (status === 'PAID' && row.status !== 'APPROVED') throw new Error('يجب اعتماد العمولة قبل صرفها.');
 
+    const amount = round2(Number(row.amount));
+    if (amount <= 0) throw new Error('Commission amount must be greater than zero.');
+    const today = localDateString();
+    this.db.executeTransaction((db) => {
+      if (status === 'APPROVED') {
+        postLedgerEntry(db.getDatabase(), {
+          date: today, description: `Accrue commission for employee ${row.employeeId}`,
+          referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id,
+          lines: [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2103', debit: 0, credit: amount }],
+        });
+      } else if (status === 'PAID') {
+        const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', ['cr_main'])[0];
+        if (!register) throw new Error('The main cash register is unavailable.');
+        const accrued = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];
+        if (!accrued) postLedgerEntry(db.getDatabase(), {
+          date: today, description: `Accrue commission before payment ${id}`,
+          referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id,
+          lines: [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2103', debit: 0, credit: amount }],
+        });
+        postLedgerEntry(db.getDatabase(), {
+          date: today, description: `Pay commission ${id}`,
+          referenceType: 'COMMISSION_PAYMENT', referenceId: id, createdBy: actor.id,
+          lines: [{ accountCode: '2103', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }],
+        });
+        db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, register.id]);
+        const shift = db.query<any>(`SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND status='OPEN' ORDER BY opened_at DESC LIMIT 1`, [actor.id, register.id])[0];
+        if (shift) db.run('UPDATE cash_shifts SET total_expenses=total_expenses+? WHERE id=?', [amount, shift.id]);
+      } else if (row.status === 'APPROVED') {
+        const approval = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];
+        if (approval) reverseLedgerEntry(db.getDatabase(), approval.id, {
+          date: today, description: `Reverse cancelled commission ${id}`,
+          referenceType: 'COMMISSION_CANCELLATION', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
+        });
+      }
+    });
     this.db.run(
       `UPDATE commissions SET status = ?, paid_at = ? WHERE id = ?`,
-      [status, status === 'PAID' ? new Date().toISOString() : null, id]
+      [status, status === 'PAID' ? today : null, id]
     );
     this.db.run(
       `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
@@ -163,10 +199,18 @@ export class CommissionService {
   }
 
   public deleteCommission(id: string): void {
-    PermissionService.require(AuthService.requireAuth(), 'employees.manage');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.manage');
     const row = this.db.query<any>(`SELECT status FROM commissions WHERE id = ?`, [id])[0];
     if (!row) throw new Error('العمولة غير موجودة.');
     if (row.status === 'PAID') throw new Error('لا يمكن حذف عمولة مدفوعة.');
-    this.db.run(`DELETE FROM commissions WHERE id = ?`, [id]);
+    this.db.executeTransaction((db) => {
+      const accrual = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];
+      if (accrual) reverseLedgerEntry(db.getDatabase(), accrual.id, {
+        date: localDateString(), description: `Reverse deleted commission ${id}`,
+        referenceType: 'COMMISSION_CANCELLATION', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
+      });
+      db.run(`DELETE FROM commissions WHERE id = ?`, [id]);
+    });
   }
 }

@@ -270,9 +270,10 @@ export const AdminSettingsTab: React.FC = () => {
             <Field label="طريقة التكلفة">
               <select value={settings.costingMethod} onChange={(e) => set('costingMethod', e.target.value as SystemSettings['costingMethod'])} className={inputCls}>
                 <option value="AVERAGE_COST">متوسط التكلفة المرجح</option>
-                <option value="FIFO">الوارد أولاً صادر أولاً (FIFO)</option>
+                <option value="FIFO">FIFO (الوارد أولاً يصرف أولاً)</option>
               </select>
             </Field>
+            <p className="text-xs text-amber-700 md:col-span-2">الرصيد الموجود عند تفعيل FIFO يبدأ بطبقة افتتاحية تقديرية حسب تكلفة الصنف الحالية؛ الدقة الفعلية للدفعات الجديدة تبدأ من تاريخ التفعيل.</p>
             <Field label="السماح بالمخزون السالب">
               <Toggle checked={settings.enableNegativeStock} onChange={(v) => set('enableNegativeStock', v)} label={settings.enableNegativeStock ? 'مسموح' : 'ممنوع'} />
             </Field>

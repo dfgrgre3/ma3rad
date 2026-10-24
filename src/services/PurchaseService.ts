@@ -7,6 +7,8 @@ import { computeWeightedAverageCost, round2 } from './financials';
 import { CustomerSupplyService } from './CustomerSupplyService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
+import { InventoryCostingService } from './InventoryCostingService';
+import { SettingsService } from './SettingsService';
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -31,8 +33,7 @@ export class PurchaseService {
   private db = DatabaseManager.getInstance();
 
   private costingMethod(): string {
-    const row = this.db.query<{ value: string }>("SELECT value FROM system_settings WHERE key = 'costingMethod'")[0];
-    return row?.value || 'AVERAGE_COST';
+    return SettingsService.getSettings().costingMethod;
   }
 
   public getAllPurchases(search?: string): PurchaseInvoice[] {
@@ -175,6 +176,7 @@ export class PurchaseService {
         sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
 
         // Inventory Transaction
+        const inventoryTransactionId = `tx_${uuidv4().substring(0, 8)}`;
         sqliteDb.run(`
           INSERT INTO inventory_transactions (
             id, transaction_number, type, product_id, warehouse_id,
@@ -182,10 +184,15 @@ export class PurchaseService {
             reference_id, notes, performed_by
           ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, ?)
         `, [
-          `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-PUR'),
+          inventoryTransactionId, sqliteDb.nextNumber('TX-PUR'),
           item.productId, dto.warehouseId, item.quantityM2, item.boxesCount, item.unitCost,
           item.totalCost, purchaseId, `شراء توريد سيراميك بموجب فاتورة ${invoiceNumber}`, performedBy
         ]);
+        InventoryCostingService.addLayer(sqliteDb, {
+          productId: item.productId, warehouseId: dto.warehouseId,
+          sourceTransactionId: inventoryTransactionId, sourceType: 'PURCHASE', sourceId: purchaseId,
+          date: today, quantity: item.quantityM2, unitCost: item.unitCost,
+        });
       }
 
       // 3. Update Supplier Balance & Total Purchases
@@ -221,6 +228,8 @@ export class PurchaseService {
           `دفعة مع فاتورة توريد ${invoiceNumber}`,
           performedBy,
         ]);
+        sqliteDb.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+          [`spa_${uuidv4().substring(0, 8)}`, paymentId, purchaseId, dto.paidAmount]);
         postLedgerEntry(sqliteDb.getDatabase(), {
           date: today,
           description: `Supplier payment ${receiptNumber}`,
@@ -319,6 +328,8 @@ export class PurchaseService {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [paymentId, receiptNumber, invoice.supplierId, value, paymentType, today, registerId, notes || `سداد دفعة على فاتورة توريد ${invoice.invoiceNumber}`, actor.id]
       );
+      db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+        [`spa_${uuidv4().substring(0, 8)}`, paymentId, purchaseId, value]);
       db.run(
         `UPDATE purchase_invoices SET paid_amount = ?, remaining_amount = ?, payment_status = ? WHERE id = ?`,
         [newPaid, newRemaining, status, purchaseId]
@@ -367,6 +378,11 @@ export class PurchaseService {
     if (returnsCount > 0) throw new Error('لا يمكن حذف فاتورة لها مرتجعات مسجلة. احذف المرتجعات أولًا.');
 
     this.db.executeTransaction((db) => {
+      if (InventoryCostingService.costingMethod(db) === 'FIFO'
+        && !db.query<any>(`SELECT id FROM inventory_cost_layers WHERE source_type='PURCHASE' AND source_id=? LIMIT 1`, [purchaseId]).length) {
+        throw new Error('This legacy purchase has no traceable FIFO lot. Do not delete it while FIFO is active; reconcile the stock through a documented inventory adjustment.');
+      }
+      InventoryCostingService.removeUnusedSource(db, 'PURCHASE', purchaseId);
       for (const item of invoice.items) {
         db.run(
           `UPDATE warehouse_stock

@@ -100,12 +100,12 @@ export class FinancialStatementsService {
     const inputTax = round2(accountBalance('1201', 'ASSET'));
     const payables = round2(accountBalance('2101', 'LIABILITY'));
     const taxPayable = round2(accountBalance('2102', 'LIABILITY'));
-    const payrollPayable = round2(accountBalance('2103', 'LIABILITY'));
+    const payrollPayable = round2(accountBalance('2104', 'LIABILITY'));
     const otherAssets = round2(accounts
       .filter((row) => row.type === 'ASSET' && !['1101', '1102', '1103', '1104', '1105', '1106', '1201', '1601', '1602'].includes(row.code))
       .reduce((sum, row) => sum + assetBalance(row), 0));
     const otherLiabilities = round2(accounts
-      .filter((row) => row.type === 'LIABILITY' && !['2101', '2102', '2103'].includes(row.code))
+      .filter((row) => row.type === 'LIABILITY' && !['2101', '2102', '2104'].includes(row.code))
       .reduce((sum, row) => sum + creditBalance(row), 0));
     const totalAssets = round2(cash + receivables + inventory + fixedAssets + chequesReceived + inputTax + otherAssets);
     const totalLiabilities = round2(payables + taxPayable + payrollPayable + otherLiabilities + customerAdvances);
@@ -196,19 +196,53 @@ export class FinancialStatementsService {
   public getCustomerAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
     const date = asOf || localDateString();
     return this.buildAging(`
-      SELECT c.id, c.name, c.phone, si.date AS docDate, si.remaining_amount AS remaining
+      SELECT c.id, c.name, c.phone, si.date AS docDate,
+        MAX(0, si.total_amount
+          - MAX(0, si.paid_amount - COALESCE((SELECT SUM(cpa0.amount) FROM customer_payment_allocations cpa0
+              WHERE cpa0.sales_invoice_id = si.id), 0))
+          - COALESCE((SELECT SUM(cpa.amount) FROM customer_payment_allocations cpa
+              JOIN customer_payments cp ON cp.id=cpa.payment_id
+              WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?), 0)
+          - COALESCE((SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
+              WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0)
+        ) AS remaining
       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
-      WHERE si.remaining_amount > 0.009 AND si.invoice_status != 'VOID' AND si.date <= ?
-    `, [date]);
+      WHERE si.invoice_status != 'VOID' AND si.date <= ?
+        AND si.total_amount
+          - MAX(0, si.paid_amount - COALESCE((SELECT SUM(cpa0.amount) FROM customer_payment_allocations cpa0
+              WHERE cpa0.sales_invoice_id = si.id), 0))
+          - COALESCE((SELECT SUM(cpa.amount) FROM customer_payment_allocations cpa
+              JOIN customer_payments cp ON cp.id=cpa.payment_id
+              WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?), 0)
+          - COALESCE((SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
+              WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0) > 0.009
+    `, [date, date, date, date, date], date);
   }
 
   public getSupplierAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
     const date = asOf || localDateString();
     return this.buildAging(`
-      SELECT s.id, s.name, s.phone, pi.date AS docDate, pi.remaining_amount AS remaining
+      SELECT s.id, s.name, s.phone, pi.date AS docDate,
+        MAX(0, pi.total_amount
+          - MAX(0, pi.paid_amount - COALESCE((SELECT SUM(spa0.amount) FROM supplier_payment_allocations spa0
+              WHERE spa0.purchase_invoice_id = pi.id), 0))
+          - COALESCE((SELECT SUM(spa.amount) FROM supplier_payment_allocations spa
+              JOIN supplier_payments sp ON sp.id=spa.payment_id
+              WHERE spa.purchase_invoice_id = pi.id AND sp.date <= ?), 0)
+          - COALESCE((SELECT SUM(pr.remaining_to_balance) FROM purchase_returns pr
+              WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0)
+        ) AS remaining
       FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id
-      WHERE pi.remaining_amount > 0.009 AND pi.date <= ?
-    `, [date], date);
+      WHERE pi.date <= ?
+        AND pi.total_amount
+          - MAX(0, pi.paid_amount - COALESCE((SELECT SUM(spa0.amount) FROM supplier_payment_allocations spa0
+              WHERE spa0.purchase_invoice_id = pi.id), 0))
+          - COALESCE((SELECT SUM(spa.amount) FROM supplier_payment_allocations spa
+              JOIN supplier_payments sp ON sp.id=spa.payment_id
+              WHERE spa.purchase_invoice_id = pi.id AND sp.date <= ?), 0)
+          - COALESCE((SELECT SUM(pr.remaining_to_balance) FROM purchase_returns pr
+              WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0) > 0.009
+    `, [date, date, date, date, date], date);
   }
 
   private buildAging(sql: string, params: any[], asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {

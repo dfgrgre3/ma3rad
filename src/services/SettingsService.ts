@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { AuditService } from './AuditService';
 import type { SystemSettings, User } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 export type SettingsPatch = Partial<Record<string, string | number | boolean | null | undefined>>;
 
@@ -125,7 +126,22 @@ export class SettingsService {
 
     if (Object.keys(after).length === 0) return SettingsService.getSettings();
 
-    db.executeTransaction(() => {
+    db.executeTransaction((tx) => {
+      if (after.costingMethod === 'FIFO' && before.costingMethod !== 'FIFO') {
+        tx.run('DELETE FROM inventory_cost_allocations');
+        tx.run('DELETE FROM inventory_cost_layers');
+        const openingRows = tx.query<any>(`SELECT ws.product_id AS productId,ws.warehouse_id AS warehouseId,
+          ws.quantity_m2 AS quantity,p.cost_price AS unitCost FROM warehouse_stock ws
+          JOIN products p ON p.id=ws.product_id WHERE ws.quantity_m2>0`);
+        for (const row of openingRows) {
+          tx.run(`INSERT INTO inventory_cost_layers
+            (id,product_id,warehouse_id,source_type,source_id,received_at,quantity_received,quantity_remaining,unit_cost,is_estimated)
+            VALUES (?,?,?,'FIFO_ACTIVATION',NULL,'0001-01-01',?,?,?,?,1)`, [
+            `icl_${uuidv4().replace(/-/g, '').slice(0, 12)}`, row.productId,row.warehouseId,
+            row.quantity,row.quantity,Math.max(0,Number(row.unitCost)||0),
+          ]);
+        }
+      }
       for (const [key, value] of Object.entries(after)) {
         db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [key, value]);
       }
@@ -183,7 +199,7 @@ export class SettingsService {
           out[key] = value;
           break;
         case 'costingMethod':
-          if (!['AVERAGE_COST', 'FIFO'].includes(value)) throw new Error('طريقة التكلفة غير صالحة.');
+          if (!['AVERAGE_COST', 'FIFO'].includes(value)) throw new Error('Invalid inventory costing method.');
           out[key] = value;
           break;
         case 'showroomName':

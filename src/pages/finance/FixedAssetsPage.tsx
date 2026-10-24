@@ -20,7 +20,7 @@ export const FixedAssetsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: '', category: 'EQUIPMENT', purchaseDate: localDateString(),
-    purchaseCost: '', salvageValue: '0', usefulLifeYears: '5', location: '', notes: '',
+    purchaseCost: '', paymentType: 'CREDIT', salvageValue: '0', usefulLifeYears: '5', location: '', notes: '',
   });
 
   const load = () => {
@@ -41,7 +41,7 @@ export const FixedAssetsPage: React.FC = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ name: '', category: 'EQUIPMENT', purchaseDate: localDateString(), purchaseCost: '', salvageValue: '0', usefulLifeYears: '5', location: '', notes: '' });
+    setForm({ name: '', category: 'EQUIPMENT', purchaseDate: localDateString(), purchaseCost: '', paymentType: 'CREDIT', salvageValue: '0', usefulLifeYears: '5', location: '', notes: '' });
     setModal(true);
   };
 
@@ -49,6 +49,7 @@ export const FixedAssetsPage: React.FC = () => {
     setEditing(row);
     setForm({
       name: row.name, category: row.category, purchaseDate: row.purchaseDate, purchaseCost: String(row.purchaseCost),
+      paymentType: 'CASH',
       salvageValue: String(row.salvageValue), usefulLifeYears: String(row.usefulLifeYears), location: row.location || '', notes: row.notes || '',
     });
     setModal(true);
@@ -64,6 +65,7 @@ export const FixedAssetsPage: React.FC = () => {
         category: form.category,
         purchaseDate: form.purchaseDate,
         purchaseCost: Number(form.purchaseCost),
+        paymentType: form.paymentType,
         salvageValue: Number(form.salvageValue || 0),
         usefulLifeYears: Number(form.usefulLifeYears || 5),
         location: form.location,
@@ -193,6 +195,7 @@ export const FixedAssetsPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">تكلفة الشراء *</label><input required type="number" min={0.01} step="0.01" value={form.purchaseCost} onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
+                {!editing && <div><label className="font-bold text-slate-700 block mb-1">طريقة تمويل الاقتناء *</label><select value={form.paymentType} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200"><option value="CASH">الخزينة نقدًا</option><option value="BANK_TRANSFER">البنك</option><option value="CREDIT">التزام اقتناء أصل</option></select></div>}
                 <div><label className="font-bold text-slate-700 block mb-1">قيمة الإنقاذ</label><input type="number" min={0} step="0.01" value={form.salvageValue} onChange={(e) => setForm({ ...form, salvageValue: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
               </div>
               <div className="grid grid-cols-2 gap-2">

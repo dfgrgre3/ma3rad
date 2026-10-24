@@ -9,7 +9,11 @@ function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
 }
 
-function makeUser(id: string, role: string): any {
+function makeUser(db: DatabaseManager, id: string, role: string): any {
+  db.run(
+    'INSERT INTO users (id, username, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)',
+    [id, id, 'test-only', id, role]
+  );
   return { id, username: id, fullName: id, role, phone: null, isActive: true, createdAt: '', updatedAt: '' };
 }
 
@@ -28,7 +32,7 @@ test('permissions: admin has everything, limited role is denied, override grants
   const role = PermissionService.createRole({ code: 'test_viewer', name: 'عارض اختبار' }, admin);
   PermissionService.setRolePermissions(role.code, ['reports.view'], admin);
 
-  const limited = makeUser('usr_limited_test', role.code);
+  const limited = makeUser(db, 'usr_limited_test', role.code);
   assert.equal(PermissionService.can(limited, 'reports.view'), true);
   assert.equal(PermissionService.can(limited, 'sales.create'), false);
   assert.throws(() => PermissionService.require(limited, 'sales.create'), /غير مصرح/);
@@ -56,7 +60,7 @@ test('permissions: user-level DENY beats role wildcards (sales.* and *)', async 
   const admin = AuthService.login('admin', 'admin123');
 
   const role = PermissionService.createRole({ code: 'test_wildcard', name: 'اختبار wildcard' }, admin);
-  const w = makeUser('usr_wildcard_test', role.code);
+  const w = makeUser(db, 'usr_wildcard_test', role.code);
 
   // role grants sales.* — user DENY on one code must win
   PermissionService.setRolePermissions(role.code, ['sales.*'], admin);
@@ -78,6 +82,7 @@ test('permissions: user-level DENY beats role wildcards (sales.* and *)', async 
   assert.equal(PermissionService.can(w, 'sales.create'), false);
 
   PermissionService.clearUserOverrides(w.id, admin);
+  db.run('DELETE FROM users WHERE id = ?', [w.id]);
   PermissionService.deleteRole(role.id, admin);
 });
 

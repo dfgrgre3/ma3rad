@@ -12,6 +12,9 @@ import { InventoryService } from '../src/services/InventoryService.ts';
 import { QuotationService } from '../src/services/QuotationService.ts';
 import { OrderService } from '../src/services/OrderService.ts';
 import { runMigrations } from '../src/database/migrations.ts';
+import { postLedgerEntry } from '../src/database/ledger.ts';
+import { localDateString } from '../src/utils/date.ts';
+import { InventoryCostingService } from '../src/services/InventoryCostingService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -32,9 +35,115 @@ test('database initialization enables SQLite foreign key enforcement', async () 
   }, /FOREIGN KEY constraint failed/);
 });
 
+test('accounting policy migration reclassifications balance and reruns safely', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  const db = manager.getDatabase();
+  const actorId = q('SELECT id FROM users ORDER BY created_at,id LIMIT 1')[0].id;
+  const assetId = 'fa_policy_migration_test';
+  const adjustmentId = 'adj_policy_migration_test';
+  const date = localDateString();
+
+  db.run(
+    `INSERT INTO fixed_assets
+       (id,code,name,purchase_date,purchase_cost,salvage_value,useful_life_years,status)
+     VALUES (?,?,?,?,?,0,5,'ACTIVE')`,
+    [assetId, 'FA-POLICY-TEST', 'Migration policy test asset', date, 500]
+  );
+  postLedgerEntry(db, {
+    date,
+    description: 'Legacy fixed asset acquisition',
+    referenceType: 'ASSET_ACQUISITION',
+    referenceId: assetId,
+    createdBy: actorId,
+    lines: [
+      { accountCode: '1601', debit: 500, credit: 0 },
+      { accountCode: '3102', debit: 0, credit: 500 },
+    ],
+  });
+  db.run(
+    `INSERT INTO stock_adjustments
+       (id,adjustment_number,warehouse_id,date,adjustment_type,reason,status,total_quantity_m2,total_value,created_by)
+     VALUES (?,?,?,?,'ADD',?,'POSTED',?, ?,?)`,
+    [adjustmentId, 'ADJ-POLICY-TEST', 'wh_main', date, 'Migration policy test', 1, 100, actorId]
+  );
+  postLedgerEntry(db, {
+    date,
+    description: 'Legacy inventory adjustment',
+    referenceType: 'INVENTORY_ADJUSTMENT',
+    referenceId: adjustmentId,
+    createdBy: actorId,
+    lines: [
+      { accountCode: '1104', debit: 100, credit: 0 },
+      { accountCode: '4190', debit: 0, credit: 100 },
+    ],
+  });
+
+  db.run(`DELETE FROM schema_migrations WHERE id='036_apply_accounting_policy_choices'`);
+  const rerun = runMigrations(db);
+  assert.ok(rerun.applied.includes('036_apply_accounting_policy_choices'));
+  for (const reference of [
+    ['ASSET_CLEARING_POLICY', assetId],
+    ['INVENTORY_ADJUSTMENT_POLICY', adjustmentId],
+  ]) {
+    const entry = q(
+      'SELECT total_debit,total_credit FROM journal_entries WHERE reference_type=? AND reference_id=?',
+      reference
+    )[0];
+    assert.ok(entry);
+    assert.equal(entry.totalDebit, entry.totalCredit);
+  }
+  assert.equal(
+    q(`SELECT COUNT(*) AS count FROM journal_entries WHERE reference_type='ASSET_CLEARING_POLICY' AND reference_id=?`, [assetId])[0].count,
+    1
+  );
+  assert.equal(
+    q(`SELECT COUNT(*) AS count FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT_POLICY' AND reference_id=?`, [adjustmentId])[0].count,
+    1
+  );
+
+  const secondRun = runMigrations(db);
+  assert.ok(secondRun.skipped.includes('036_apply_accounting_policy_choices'));
+  assert.ok(secondRun.skipped.includes('037_remove_network_sync'));
+});
+
+test('FIFO sales post layer cost and a sales return restores the original lot', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const db = manager;
+  const productId = 'prod_fifo_sale_test';
+  db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
+    pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`,
+    [productId,'FIFO-S','FIFO-S','FIFO sale test','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,15,100,90,0,0]);
+  db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2) VALUES (?,?,?,?,0)`,
+    ['stk_fifo_sale_test','wh_main',productId,10]);
+  InventoryCostingService.addLayer(db,{productId,warehouseId:'wh_main',sourceType:'TEST',sourceId:'lot1',date:'2026-01-01',quantity:5,unitCost:10});
+  InventoryCostingService.addLayer(db,{productId,warehouseId:'wh_main',sourceType:'TEST',sourceId:'lot2',date:'2026-02-01',quantity:5,unitCost:20});
+  db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','FIFO')`);
+  const cashBefore = q(`SELECT current_balance AS balance FROM cash_registers WHERE id='cr_main'`)[0].balance;
+  const customer = new CustomerService().createCustomer({name:'FIFO test customer',phone:'0199000001',customerType:'RETAIL',creditLimit:0});
+  const sales = new SalesService();
+  const invoice = sales.createSale({customerId:customer.id,warehouseId:'wh_main',items:[{
+    productId,soldBy:'M2',quantityM2:7,boxesCount:5,piecesCount:20,unitPrice:100,
+  }],paidAmount:700,paymentType:'CASH'});
+  assert.equal(invoice.totalCost,90);
+  const issue = q(`SELECT id FROM inventory_transactions WHERE reference_type='INVOICE' AND reference_id=? AND type='SALE'`,[invoice.id])[0];
+  sales.returnSale(invoice.id,[{productId,quantityM2:2,boxesCount:1,unitPrice:100,unitCost:15,reason:'FIFO test'}],false);
+  db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','AVERAGE_COST')`);
+  assert.equal(q(`SELECT SUM(l.debit) AS cost FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id=l.account_id
+    JOIN journal_entries e ON e.id=l.entry_id WHERE e.reference_type='SALES_INVOICE' AND e.reference_id=? AND a.code='5101'`,[invoice.id])[0].cost,90);
+  assert.equal(db.query<any>(`SELECT quantity_remaining AS quantity FROM inventory_cost_layers WHERE source_id='lot1'`)[0].quantity,2);
+  assert.equal(q(`SELECT quantity_restored AS quantity FROM inventory_cost_allocations WHERE outbound_transaction_id=?`,[issue.id])[0].quantity,2);
+  db.run(`UPDATE cash_registers SET current_balance=? WHERE id='cr_main'`,[cashBefore]);
+});
+
 test('end-to-end: weighted-average costing, sale, and return accounting', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
+  db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','AVERAGE_COST')`);
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
 
@@ -172,6 +281,20 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(balanceReturn.refundedAmount, 0, 'no cash leaves the register');
   assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 6000, 'balance refund leaves the cash register untouched');
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, -6000, 'full value credited to the customer balance');
+
+  new InventoryService().adjustStock(pid, 'wh_main', 279, 'تسوية اختبار');
+  const adjustmentEntry = q(
+    `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' ORDER BY created_at DESC LIMIT 1`
+  )[0];
+  assert.ok(adjustmentEntry, 'inventory adjustments should post to the ledger');
+  const adjustmentLines = q(
+    `SELECT a.code, l.debit, l.credit FROM journal_entry_lines l
+     JOIN chart_of_accounts a ON a.id=l.account_id WHERE l.entry_id=?`,
+    [adjustmentEntry.id]
+  );
+  assert.deepEqual(adjustmentLines.map((line) => line.code).sort(), ['1104', '5201']);
+  assert.equal(adjustmentLines.reduce((sum, line) => sum + line.debit, 0),
+    adjustmentLines.reduce((sum, line) => sum + line.credit, 0));
 
   // --- RBAC: a CASHIER cannot adjust inventory (brief §108) ---
   AuthService.logout();

@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Wrench, Plus, Search, FileText, CheckCircle2, ChevronRight, X, AlertTriangle } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
+import { localDateString } from '../../utils/date';
+import { postLedgerEntry } from '../../database/ledger';
+import { InventoryCostingService } from '../../services/InventoryCostingService';
 
 interface Adjustment {
   id: string;
@@ -140,24 +145,35 @@ export const InventoryAdjustmentsPage: React.FC = () => {
 
     const db = DatabaseManager.getInstance();
     try {
+      const actor = AuthService.requireAuth();
+      PermissionService.require(actor, 'inventory.adjust');
       db.executeTransaction((txDb) => {
         // 1. Calculate values
-        const unitCost = prod.costPrice || 0;
+        const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
+        const fifoPlan = fifoEnabled && adjType !== 'ADD'
+          ? InventoryCostingService.planFifo(txDb, selectedProductId, selectedWarehouseId, qtyM2)
+          : null;
+        const unitCost = fifoPlan?.unitCost ?? (prod.costPrice || 0);
         const totalVal = qtyM2 * unitCost;
+        if (!(totalVal > 0)) throw new Error('Set a positive product cost before posting an inventory adjustment.');
         const boxesCount = Number((qtyM2 / (prod.metersPerBox || 1.44)).toFixed(2));
         const adjId = `adj_${uuidv4().substring(0, 8)}`;
         const adjNum = txDb.nextNumber('ADJ');
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDateString();
+        const stockBefore = txDb.query<any>('SELECT quantity_m2 AS quantityM2,reserved_m2 AS reservedM2 FROM warehouse_stock WHERE warehouse_id=? AND product_id=?', [selectedWarehouseId, selectedProductId])[0];
+        if (adjType !== 'ADD' && Number(stockBefore?.quantityM2 || 0) - Number(stockBefore?.reservedM2 || 0) < qtyM2) {
+          throw new Error('The adjustment cannot reduce available stock below the reserved quantity.');
+        }
 
         // 2. Insert into stock_adjustments
         txDb.run(`
           INSERT INTO stock_adjustments (
             id, adjustment_number, warehouse_id, date, adjustment_type,
             reason, status, total_quantity_m2, total_value, notes, created_by, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?, 'usr_admin', CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?, ?, CURRENT_TIMESTAMP)
         `, [
           adjId, adjNum, selectedWarehouseId, today, adjType,
-          reason, qtyM2, totalVal, notes
+          reason, qtyM2, totalVal, notes, actor.id
         ]);
 
         // 3. Insert into stock_adjustment_items
@@ -203,12 +219,26 @@ export const InventoryAdjustmentsPage: React.FC = () => {
             id, transaction_number, type, product_id, warehouse_id,
             quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
             notes, performed_by, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?, 'usr_admin', CURRENT_TIMESTAMP)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?, '${actor.id}', CURRENT_TIMESTAMP)
         `, [
           txId, adjNum, txType, selectedProductId, selectedWarehouseId,
           txQty, txBoxes, unitCost, totalVal, adjId,
           `تسوية مخزنية (${reason})`
         ]);
+        if (fifoPlan) InventoryCostingService.consumeFifo(txDb, txId, fifoPlan);
+        else if (fifoEnabled && adjType === 'ADD') InventoryCostingService.addLayer(txDb, {
+          productId: selectedProductId, warehouseId: selectedWarehouseId, sourceTransactionId: txId,
+          sourceType: 'INVENTORY_ADJUSTMENT', sourceId: adjId, date: today, quantity: qtyM2, unitCost,
+        });
+        if (totalVal > 0) {
+          const lines = adjType === 'ADD'
+            ? [{ accountCode: '1104', debit: totalVal, credit: 0 }, { accountCode: '5201', debit: 0, credit: totalVal }]
+            : [{ accountCode: '5201', debit: totalVal, credit: 0 }, { accountCode: '1104', debit: 0, credit: totalVal }];
+          postLedgerEntry(txDb.getDatabase(), {
+            date: today, description: `Inventory adjustment ${adjNum}: ${reason}`,
+            referenceType: 'INVENTORY_ADJUSTMENT', referenceId: adjId, createdBy: actor.id, lines,
+          });
+        }
       });
 
       // Reset form & Close
@@ -522,7 +552,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                 type="submit"
                 className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold transition"
               >
-                حفظ التسوية والمزامنة
+                حفظ التسوية
               </button>
             </div>
           </form>

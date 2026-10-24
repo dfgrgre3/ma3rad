@@ -1,4 +1,5 @@
 import { DatabaseManager } from '../database/db';
+import { InventoryCostingService } from './InventoryCostingService';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
@@ -148,7 +149,11 @@ export class ReservationService {
         throw new Error('المخزون الفعلي غير كافٍ لتنفيذ الحجز.');
       }
       const product = db.query<any>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [row.productId])[0];
-      const unitCost = Number(product?.costPrice) || 0;
+      const fifoPlan = InventoryCostingService.costingMethod(db) === 'FIFO'
+        ? InventoryCostingService.planFifo(db, row.productId, row.warehouseId, Number(row.quantity))
+        : null;
+      const unitCost = fifoPlan?.unitCost ?? (Number(product?.costPrice) || 0);
+      const transactionId = `itx_${uuidv4().substring(0, 8)}`;
       db.run(
         `UPDATE warehouse_stock SET quantity_m2 = quantity_m2 - ?, reserved_m2 = MAX(0, reserved_m2 - ?),
            last_updated = CURRENT_TIMESTAMP WHERE product_id = ? AND warehouse_id = ?`,
@@ -159,11 +164,12 @@ export class ReservationService {
            quantity_m2, unit_cost, total_cost, reference_type, reference_id, notes, performed_by)
          VALUES (?, ?, ?, ?, 'ADJUSTMENT_SUB', ?, ?, ?, 'RESERVATION', ?, ?, ?)`,
         [
-          `itx_${uuidv4().substring(0, 8)}`, db.nextNumber('ITX'), row.productId, row.warehouseId,
+          transactionId, db.nextNumber('ITX'), row.productId, row.warehouseId,
           Number(row.quantity), unitCost, round2(Number(row.quantity) * unitCost),
           row.id, `تنفيذ حجز ${row.referenceType} ${row.referenceId || ''}`.trim(), actor.id,
         ]
       );
+      if (fifoPlan) InventoryCostingService.consumeFifo(db, transactionId, fifoPlan);
       db.run(
         `UPDATE stock_reservations SET status = 'CONSUMED', released_at = ? WHERE id = ?`,
         [new Date().toISOString(), id]
