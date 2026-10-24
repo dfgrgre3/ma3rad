@@ -4,10 +4,11 @@ import { SCHEMA_SQL } from './schema';
 /**
  * Schema migration engine.
  *
- * The database lives as a binary blob in localStorage and is loaded back
- * verbatim, so `SCHEMA_SQL` used to run exactly once — on the very first
- * launch. Every table, index or column added afterwards never reached an
- * existing install, and any query touching it failed with "no such table".
+ * The database is stored as a SQLite binary file in the user's application
+ * data directory (older browser builds used a localStorage snapshot) and is
+ * loaded back verbatim, so `SCHEMA_SQL` used to run exactly once — on the very
+ * first launch. Every table, index or column added afterwards never reached
+ * an existing install, and any query touching it failed with "no such table".
  *
  * `runMigrations()` closes that gap and is safe to call on every startup:
  *
