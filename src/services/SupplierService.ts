@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
+import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 
 export class SupplierService {
   private db = DatabaseManager.getInstance();
@@ -134,6 +135,17 @@ export class SupplierService {
           UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?
         `, [amount, registerId]);
       }
+      postLedgerEntry(sqliteDb.getDatabase(), {
+        date: today,
+        description: `Supplier payment ${receiptNumber}`,
+        referenceType: 'SUPPLIER_PAYMENT',
+        referenceId: paymentId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: '2101', debit: amount, credit: 0 },
+          { accountCode: paymentAccountCode(paymentType), debit: 0, credit: amount },
+        ],
+      });
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)

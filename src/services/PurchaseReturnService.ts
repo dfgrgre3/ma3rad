@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
+import { postLedgerEntry } from '../database/ledger';
 import { round2 } from './financials';
 
 export interface ReturnablePurchaseItem {
@@ -208,6 +209,18 @@ export class PurchaseReturnService {
             updated_at = CURRENT_TIMESTAMP WHERE id = ?
         `, [total, total, purchase.supplierId]);
       }
+
+      postLedgerEntry(db.getDatabase(), {
+        date: today,
+        description: `Purchase return ${returnNumber}`,
+        referenceType: 'PURCHASE_RETURN',
+        referenceId: returnId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: isCash ? '1101' : '2101', debit: total, credit: 0 },
+          { accountCode: '1104', debit: 0, credit: total },
+        ],
+      });
 
       db.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)

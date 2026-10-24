@@ -11,6 +11,7 @@ import { SalesService } from '../src/services/SalesService.ts';
 import { InventoryService } from '../src/services/InventoryService.ts';
 import { QuotationService } from '../src/services/QuotationService.ts';
 import { OrderService } from '../src/services/OrderService.ts';
+import { runMigrations } from '../src/database/migrations.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -83,9 +84,32 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 250, 'stock after sale = 250');
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 15000, 'credit balance = 15000');
 
-  new SalesService().returnSale(sale1.id, [{ productId: pid, quantityM2: 50, boxesCount: box(50), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع' }], true);
+  const return1 = new SalesService().returnSale(
+    sale1.id,
+    [{ productId: pid, quantityM2: 50, boxesCount: box(50), unitPrice: 300, unitCost: avgCost, reason: 'إرجاع' }],
+    true
+  );
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, 0, 'balance back to 0 after unpaid return');
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 300, 'stock restored to 300');
+  const returnEntry = q(
+    'SELECT total_debit, total_credit FROM journal_entries WHERE reference_type=? AND reference_id=?',
+    ['SALES_RETURN', return1.id]
+  )[0];
+  assert.ok(returnEntry, 'sales return should post to the ledger');
+  assert.equal(returnEntry.totalDebit, returnEntry.totalCredit, 'sales return journal entry should balance');
+
+  db.run(
+    `DELETE FROM journal_entries WHERE reference_type='SALES_RETURN' AND reference_id=?`,
+    [return1.id]
+  );
+  db.run(`DELETE FROM schema_migrations WHERE id='025_backfill_return_ledger_entries'`);
+  const migrationReport = runMigrations(db.getDatabase());
+  assert.ok(migrationReport.applied.includes('025_backfill_return_ledger_entries'));
+  assert.equal(
+    q('SELECT COUNT(*) AS count FROM journal_entries WHERE reference_type=? AND reference_id=?', ['SALES_RETURN', return1.id])[0].count,
+    1,
+    'return backfill should restore exactly one idempotent journal entry'
+  );
 
   // --- Cash sale (paid in full) then full return ---
   const sale2 = new SalesService().createSale({

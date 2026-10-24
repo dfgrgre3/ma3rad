@@ -66,77 +66,90 @@ export class FinancialStatementsService {
   // ── Balance sheet ────────────────────────────────────────────────────────
   public getBalanceSheet(asOf?: string): BalanceSheet {
     const date = asOf || localDateString();
-
-    const cash = this.scalar(`SELECT COALESCE(SUM(current_balance), 0) FROM cash_registers WHERE is_active = 1`);
-    const receivables = this.scalar(`SELECT COALESCE(SUM(current_balance), 0) FROM customers WHERE current_balance > 0`);
-    const inventory = this.scalar(`
-      SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0)
-      FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
-    `);
-    const fixedAssets = this.scalar(`
-      SELECT COALESCE(SUM(purchase_cost - accumulated_depreciation), 0)
-      FROM fixed_assets WHERE status != 'DISPOSED'
-    `);
-    const chequesReceived = this.scalar(`
-      SELECT COALESCE(SUM(amount), 0) FROM cheques
-      WHERE type = 'RECEIVED' AND status IN ('PENDING', 'DEPOSITED') AND due_date <= ?
+    const accounts = this.db.query<{
+      code: string;
+      name: string;
+      type: string;
+      debit: number;
+      credit: number;
+    }>(`
+      SELECT a.code, a.name, a.type,
+             COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.debit ELSE 0 END), 0) AS debit,
+             COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.credit ELSE 0 END), 0) AS credit
+      FROM chart_of_accounts a
+      LEFT JOIN journal_entry_lines l ON l.account_id = a.id
+      LEFT JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1 AND e.date <= ?
+      GROUP BY a.id
     `, [date]);
-
-    const payables = this.scalar(`SELECT COALESCE(SUM(current_balance), 0) FROM suppliers WHERE current_balance > 0`);
-    const chequesIssued = this.scalar(`
-      SELECT COALESCE(SUM(amount), 0) FROM cheques
-      WHERE type = 'ISSUED' AND status IN ('PENDING', 'DEPOSITED')
-    `);
-    const taxPayable = Math.max(0, round2(
-      this.scalar(`SELECT COALESCE(SUM(tax_amount), 0) FROM sales_invoices WHERE invoice_status != 'VOID' AND date <= ?`, [date]) -
-      this.scalar(`SELECT COALESCE(SUM(tax_amount), 0) FROM purchase_invoices WHERE date <= ?`, [date])
-    ));
-    const customerAdvances = this.scalar(`SELECT COALESCE(SUM(ABS(current_balance)), 0) FROM customers WHERE current_balance < 0`);
-
-    const totalAssets = round2(cash + receivables + inventory + fixedAssets + chequesReceived);
-    const totalLiabilities = round2(payables + chequesIssued + taxPayable + customerAdvances);
-    const netWorth = round2(totalAssets - totalLiabilities);
-
-    const capital = this.scalar(`
-      SELECT COALESCE(SUM(l.credit - l.debit), 0)
-      FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id = l.account_id
-      WHERE a.type = 'EQUITY'
-    `);
-    const manualRetained = this.scalar(`
-      SELECT COALESCE(SUM(l.credit - l.debit), 0)
-      FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id = l.account_id
-      WHERE a.type IN ('REVENUE', 'EXPENSE')
-    `);
-    const residual = round2(netWorth - capital - manualRetained);
+    const accountBalance = (code: string, type: string) => {
+      const account = accounts.find((row) => row.code === code);
+      if (!account) return 0;
+      const debit = Number(account.debit) || 0;
+      const credit = Number(account.credit) || 0;
+      return type === 'ASSET' || type === 'EXPENSE' ? debit - credit : credit - debit;
+    };
+    const assetBalance = (row: typeof accounts[number]) => round2(Number(row.debit || 0) - Number(row.credit || 0));
+    const creditBalance = (row: typeof accounts[number]) => round2(Number(row.credit || 0) - Number(row.debit || 0));
+    const cash = round2(['1101', '1102', '1106'].reduce((sum, code) => sum + accountBalance(code, 'ASSET'), 0));
+    const receivableBalance = accountBalance('1103', 'ASSET');
+    const receivables = round2(Math.max(0, receivableBalance));
+    const customerAdvances = round2(Math.max(0, -receivableBalance));
+    const inventory = round2(accountBalance('1104', 'ASSET'));
+    const fixedAssets = round2(accountBalance('1601', 'ASSET') + accountBalance('1602', 'ASSET'));
+    const chequesReceived = round2(accountBalance('1105', 'ASSET'));
+    const inputTax = round2(accountBalance('1201', 'ASSET'));
+    const payables = round2(accountBalance('2101', 'LIABILITY'));
+    const taxPayable = round2(accountBalance('2102', 'LIABILITY'));
+    const payrollPayable = round2(accountBalance('2103', 'LIABILITY'));
+    const otherAssets = round2(accounts
+      .filter((row) => row.type === 'ASSET' && !['1101', '1102', '1103', '1104', '1105', '1106', '1201', '1601', '1602'].includes(row.code))
+      .reduce((sum, row) => sum + assetBalance(row), 0));
+    const otherLiabilities = round2(accounts
+      .filter((row) => row.type === 'LIABILITY' && !['2101', '2102', '2103'].includes(row.code))
+      .reduce((sum, row) => sum + creditBalance(row), 0));
+    const totalAssets = round2(cash + receivables + inventory + fixedAssets + chequesReceived + inputTax + otherAssets);
+    const totalLiabilities = round2(payables + taxPayable + payrollPayable + otherLiabilities + customerAdvances);
+    const capital = round2(accounts
+      .filter((row) => row.type === 'EQUITY')
+      .reduce((sum, row) => sum + creditBalance(row), 0));
+    const revenue = round2(accounts
+      .filter((row) => row.type === 'REVENUE')
+      .reduce((sum, row) => sum + creditBalance(row), 0));
+    const expenses = round2(accounts
+      .filter((row) => row.type === 'EXPENSE')
+      .reduce((sum, row) => sum + assetBalance(row), 0));
+    const netIncome = round2(revenue - expenses);
+    const totalEquity = round2(capital + netIncome);
 
     return {
       asOf: date,
       assets: [
-        { label: 'النقدية وأرصدة الخزائن', amount: round2(cash) },
-        { label: 'مديونيات العملاء (ذمم مدينة)', amount: round2(receivables) },
-        { label: 'قيمة المخزون بسعر التكلفة', amount: round2(inventory) },
-        { label: 'الأصول الثابتة (بعد الإهلاك)', amount: round2(fixedAssets) },
-        { label: 'شيكات واردة تحت التحصيل', amount: round2(chequesReceived) },
+        { label: 'النقدية والبنوك والمقاصة', amount: cash },
+        { label: 'مديونيات العملاء (ذمم مدينة)', amount: receivables },
+        { label: 'قيمة المخزون بسعر التكلفة', amount: inventory },
+        { label: 'الأصول الثابتة (بعد الإهلاك)', amount: fixedAssets },
+        { label: 'شيكات تحت التحصيل', amount: chequesReceived },
+        { label: 'ضريبة مدخلات وأصول أخرى', amount: round2(inputTax + otherAssets) },
         { label: 'إجمالي الأصول', amount: totalAssets, emphasis: true },
       ],
       liabilities: [
-        { label: 'مديونيات الموردين (ذمم دائنة)', amount: round2(payables) },
-        { label: 'شيكات صادرة مستحقة', amount: round2(chequesIssued) },
-        { label: 'ضريبة قيمة مضافة مستحقة (تقديري)', amount: round2(taxPayable) },
-        { label: 'دفعات مقدمة من العملاء', amount: round2(customerAdvances) },
+        { label: 'مديونيات الموردين (ذمم دائنة)', amount: payables },
+        { label: 'ضريبة قيمة مضافة مستحقة', amount: taxPayable },
+        { label: 'مستحقات الرواتب', amount: payrollPayable },
+        { label: 'دفعات مقدمة من العملاء', amount: customerAdvances },
+        { label: 'التزامات أخرى', amount: otherLiabilities },
         { label: 'إجمالي الالتزامات', amount: totalLiabilities, emphasis: true },
       ],
       equity: [
-        { label: 'رأس المال والاحتياطيات (من القيود)', amount: round2(capital) },
-        { label: 'أرباح محتجزة / نتائج أعمال (من القيود)', amount: round2(manualRetained) },
-        { label: 'صافي الفرق التشغيلي غير المُرحّل', amount: residual, indent: true },
-        { label: 'صافي حقوق الملكية', amount: netWorth, emphasis: true },
+        { label: 'رأس المال والأرباح المرحلة', amount: capital },
+        { label: 'صافي نتيجة الأعمال من القيود', amount: netIncome },
+        { label: 'إجمالي حقوق الملكية', amount: totalEquity, emphasis: true },
       ],
       totals: {
         assets: totalAssets,
         liabilities: totalLiabilities,
-        equity: netWorth,
-        difference: round2(totalAssets - totalLiabilities - netWorth),
+        equity: totalEquity,
+        difference: round2(totalAssets - totalLiabilities - totalEquity),
       },
     };
   }
@@ -147,25 +160,17 @@ export class FinancialStatementsService {
     const to = dateTo || localDateString();
 
     const rows = this.db.query<any>(`
-      SELECT month, SUM(inflow) AS inflow, SUM(outflow) AS outflow FROM (
-        SELECT substr(date, 1, 7) AS month, amount AS inflow, 0 AS outflow
-        FROM customer_payments
-        WHERE date >= ? AND date <= ? AND payment_type != 'CREDIT'
-        UNION ALL
-        SELECT substr(date, 1, 7) AS month, 0 AS inflow, amount AS outflow
-        FROM supplier_payments
-        WHERE date >= ? AND date <= ? AND payment_type != 'CREDIT'
-        UNION ALL
-        SELECT substr(date, 1, 7) AS month, 0 AS inflow, amount AS outflow
-        FROM expenses
-        WHERE date >= ? AND date <= ?
-        UNION ALL
-        SELECT substr(date, 1, 7) AS month, 0 AS inflow, amount AS outflow
-        FROM payroll_transactions
-        WHERE date >= ? AND date <= ? AND type IN ('SALARY_PAYOUT', 'ADVANCE', 'BONUS')
-      )
-      GROUP BY month ORDER BY month ASC
-    `, [from, to, from, to, from, to, from, to]);
+      SELECT substr(e.date, 1, 7) AS month,
+             SUM(l.debit) AS inflow,
+             SUM(l.credit) AS outflow
+      FROM journal_entries e
+      JOIN journal_entry_lines l ON l.entry_id = e.id
+      JOIN chart_of_accounts a ON a.id = l.account_id
+      WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+        AND a.code IN ('1101', '1102', '1106')
+      GROUP BY substr(e.date, 1, 7)
+      ORDER BY month ASC
+    `, [from, to]);
 
     const months: CashFlowMonth[] = rows.map((r) => ({
       month: r.month,
@@ -265,14 +270,14 @@ export class FinancialStatementsService {
     const opening = this.scalar(`
       SELECT COALESCE(SUM(l.debit - l.credit), 0)
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
-      WHERE l.account_id = ? AND e.date < ?
+      WHERE l.account_id = ? AND e.is_posted = 1 AND e.date < ?
     `, [accountId, from]);
 
     const rows = this.db.query<any>(`
       SELECT e.date, e.entry_number AS entryNumber, e.description,
              l.debit, l.credit, l.description AS lineDescription
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
-      WHERE l.account_id = ? AND e.date >= ? AND e.date <= ?
+      WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ?
       ORDER BY e.date ASC, e.created_at ASC
     `, [accountId, from, to]);
 

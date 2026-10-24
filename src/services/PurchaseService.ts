@@ -6,6 +6,7 @@ import { PermissionService } from './PermissionService';
 import { computeWeightedAverageCost, round2 } from './financials';
 import { CustomerSupplyService } from './CustomerSupplyService';
 import { localDateString } from '../utils/date';
+import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -204,12 +205,14 @@ export class PurchaseService {
       }
 
       if (dto.paidAmount > 0 && dto.paymentType !== 'CREDIT') {
+        const paymentId = `spay_${uuidv4().substring(0, 8)}`;
+        const receiptNumber = `PAY-${Date.now().toString().slice(-8)}`;
         sqliteDb.run(`
           INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, notes, performed_by)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-          `spay_${uuidv4().substring(0, 8)}`,
-          `PAY-${Date.now().toString().slice(-8)}`,
+          paymentId,
+          receiptNumber,
           dto.supplierId,
           dto.paidAmount,
           dto.paymentType,
@@ -218,7 +221,38 @@ export class PurchaseService {
           `دفعة مع فاتورة توريد ${invoiceNumber}`,
           performedBy,
         ]);
+        postLedgerEntry(sqliteDb.getDatabase(), {
+          date: today,
+          description: `Supplier payment ${receiptNumber}`,
+          referenceType: 'SUPPLIER_PAYMENT',
+          referenceId: paymentId,
+          createdBy: performedBy,
+          lines: [
+            { accountCode: '2101', debit: dto.paidAmount, credit: 0 },
+            { accountCode: paymentAccountCode(dto.paymentType), debit: 0, credit: dto.paidAmount },
+          ],
+        });
       }
+
+      const inventoryCost = round2(preparedItems.reduce((sum, item) => sum + Number(item.totalCost), 0));
+      const purchaseAdjustment = round2(totalAmount - inventoryCost - taxAmount);
+      postLedgerEntry(sqliteDb.getDatabase(), {
+        date: today,
+        description: `Purchase ${invoiceNumber}`,
+        referenceType: 'PURCHASE_INVOICE',
+        referenceId: purchaseId,
+        createdBy: performedBy,
+        lines: [
+          ...(inventoryCost > 0 ? [{ accountCode: '1104', debit: inventoryCost, credit: 0 }] : []),
+          ...(taxAmount > 0 ? [{ accountCode: '1201', debit: taxAmount, credit: 0 }] : []),
+          ...(purchaseAdjustment > 0.009
+            ? [{ accountCode: '5201', debit: purchaseAdjustment, credit: 0 }]
+            : purchaseAdjustment < -0.009
+              ? [{ accountCode: '5201', debit: 0, credit: -purchaseAdjustment }]
+              : []),
+          { accountCode: '2101', debit: 0, credit: totalAmount },
+        ],
+      });
 
       // 5. Audit Log
       sqliteDb.run(`
@@ -296,6 +330,17 @@ export class PurchaseService {
       if (paymentType === 'CASH') {
         db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [value, registerId]);
       }
+      postLedgerEntry(db.getDatabase(), {
+        date: today,
+        description: `Supplier payment ${receiptNumber}`,
+        referenceType: 'SUPPLIER_PAYMENT',
+        referenceId: paymentId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: '2101', debit: value, credit: 0 },
+          { accountCode: paymentAccountCode(paymentType), debit: 0, credit: value },
+        ],
+      });
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
          VALUES (?, ?, ?, 'سداد دفعة لمورد', 'PURCHASES', ?, ?)`,
@@ -359,6 +404,17 @@ export class PurchaseService {
         [invoice.supplierId, `%${invoice.invoiceNumber}%`]
       );
       for (const payment of relatedPayments) {
+        postLedgerEntry(db.getDatabase(), {
+          date: localDateString(),
+          description: `Reverse supplier payment ${payment.id}`,
+          referenceType: 'SUPPLIER_PAYMENT_VOID',
+          referenceId: payment.id,
+          createdBy: actor.id,
+          lines: [
+            { accountCode: paymentAccountCode(payment.payment_type), debit: Number(payment.amount), credit: 0 },
+            { accountCode: '2101', debit: 0, credit: Number(payment.amount) },
+          ],
+        });
         if (payment.payment_type === 'CASH' && payment.register_id) {
           db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [payment.amount, payment.register_id]);
         }
@@ -367,6 +423,26 @@ export class PurchaseService {
       if (relatedPayments.length === 0 && invoice.paidAmount > 0 && invoice.paymentType === 'CASH') {
         db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE is_default = 1`, [invoice.paidAmount]);
       }
+
+      const inventoryCost = round2(invoice.items.reduce((sum, item) => sum + Number(item.totalCost), 0));
+      const purchaseAdjustment = round2(invoice.totalAmount - inventoryCost - invoice.taxAmount);
+      postLedgerEntry(db.getDatabase(), {
+        date: localDateString(),
+        description: `Void purchase ${invoice.invoiceNumber}`,
+        referenceType: 'PURCHASE_VOID',
+        referenceId: purchaseId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: '2101', debit: invoice.totalAmount, credit: 0 },
+          ...(inventoryCost > 0 ? [{ accountCode: '1104', debit: 0, credit: inventoryCost }] : []),
+          ...(invoice.taxAmount > 0 ? [{ accountCode: '1201', debit: 0, credit: invoice.taxAmount }] : []),
+          ...(purchaseAdjustment > 0.009
+            ? [{ accountCode: '5201', debit: 0, credit: purchaseAdjustment }]
+            : purchaseAdjustment < -0.009
+              ? [{ accountCode: '5201', debit: -purchaseAdjustment, credit: 0 }]
+              : []),
+        ],
+      });
 
       db.run('DELETE FROM purchase_invoice_items WHERE purchase_id = ?', [purchaseId]);
       db.run('DELETE FROM purchase_invoices WHERE id = ?', [purchaseId]);

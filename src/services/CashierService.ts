@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
+import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
@@ -130,7 +131,8 @@ export class CashierService {
     recipient = '',
     performedBy = 'usr_admin'
   ): Expense {
-    PermissionService.require(AuthService.requireAuth(), 'cashier.expense');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'cashier.expense');
     if (amount <= 0) throw new Error('مبلغ المصروف يجب أن يكون أكبر من الصفر.');
 
     const expId = `exp_${uuidv4().substring(0, 8)}`;
@@ -148,6 +150,22 @@ export class CashierService {
       if (paymentType === 'CASH') {
         sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, registerId]);
       }
+      postLedgerEntry(sqliteDb.getDatabase(), {
+        date: today,
+        description,
+        referenceType: 'EXPENSE',
+        referenceId: expId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: '5201', debit: amount, credit: 0 },
+          { accountCode: paymentAccountCode(paymentType), debit: 0, credit: amount },
+        ],
+      });
+      sqliteDb.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, 'تسجيل مصروف', 'CASHIER', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, expId, JSON.stringify({ category, amount, description, paymentType })]
+      );
 
       // 3. Update shift if active
       if (shiftId) {

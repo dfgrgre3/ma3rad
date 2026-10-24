@@ -4,9 +4,12 @@ import {
   User, CreditCard, DollarSign, Clock, Check, Printer, FileText, ArrowUpRight
 } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
+import { InstallmentService } from '../../services/InstallmentService';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 import { CustomerService } from '../../services/CustomerService';
 import { Customer } from '../../types';
-import { v4 as uuidv4 } from 'uuid';
+import { localDateString } from '../../utils/date';
 
 interface InstallmentRow {
   id: string;
@@ -54,11 +57,21 @@ export const InstallmentsPage: React.FC = () => {
   const [totalFinanced, setTotalFinanced] = useState<number>(36000);
   const [downPayment, setDownPayment] = useState<number>(6000);
   const [monthsCount, setMonthsCount] = useState<number>(6);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(localDateString());
 
   const customerService = new CustomerService();
+  const installmentService = new InstallmentService();
+  const actor = AuthService.getCurrentUser();
+  const canManage = PermissionService.can(actor, 'finance.installments.manage');
 
   const loadData = () => {
+    const currentActor = AuthService.getCurrentUser();
+    if (!PermissionService.can(currentActor, 'finance.installments.view') && !PermissionService.can(currentActor, 'finance.installments.manage')) {
+      setPlans([]);
+      setInstallments([]);
+      setCustomers([]);
+      return;
+    }
     const db = DatabaseManager.getInstance().getDb();
     if (!db) return;
 
@@ -112,7 +125,7 @@ export const InstallmentsPage: React.FC = () => {
             const dueDate = String(r[10]);
             let status = String(r[12] || 'UPCOMING');
             const isPaid = status === 'PAID';
-            const isOverdue = !isPaid && new Date(dueDate) < new Date();
+            const isOverdue = !isPaid && dueDate < localDateString();
             if (isOverdue) status = 'OVERDUE';
 
             return {
@@ -133,41 +146,6 @@ export const InstallmentsPage: React.FC = () => {
           });
           setInstallments(iRows);
         }
-      } else {
-        // Seed default plan if empty
-        if (allCusts.length > 0) {
-          const cust = allCusts[0];
-          const planId = uuidv4();
-          const planNum = 'PLN-2026-001';
-          const tot = 30000;
-          const down = 6000;
-          const fin = tot - down;
-          const count = 6;
-          const monthly = fin / count;
-          const today = new Date();
-
-          db.run(`
-            INSERT INTO installment_plans (
-              id, plan_number, customer_id, total_amount, down_payment, financed_amount,
-              installments_count, installment_amount, start_date, paid_amount, remaining_amount, status, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', 'usr_admin')
-          `, [planId, planNum, cust.id, tot, down, fin, count, monthly, today.toISOString().split('T')[0], fin]);
-
-          for (let seq = 1; seq <= count; seq++) {
-            const due = new Date();
-            due.setMonth(due.getMonth() + seq - 1);
-            const dueStr = due.toISOString().split('T')[0];
-            const isPassed = seq === 1 && due < new Date();
-
-            db.run(`
-              INSERT INTO installments (id, plan_id, sequence_number, due_date, amount, paid_amount, remaining_amount, status)
-              VALUES (?, ?, ?, ?, ?, 0, ?, ?)
-            `, [uuidv4(), planId, seq, dueStr, monthly, monthly, isPassed ? 'OVERDUE' : 'UPCOMING']);
-          }
-
-          DatabaseManager.getInstance().saveToStorage();
-          loadData();
-        }
       }
     } catch (e) {
       console.error('Error loading installments', e);
@@ -180,62 +158,9 @@ export const InstallmentsPage: React.FC = () => {
 
   const handleCreatePlan = (e: React.FormEvent) => {
     e.preventDefault();
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
-
     try {
-      const planId = uuidv4();
-      const year = new Date().getFullYear();
-      const planSequence = db.query<{ nextNumber: number }>(
-        `SELECT COALESCE(MAX(CAST(SUBSTR(plan_number, 10) AS INTEGER)), 0) + 1 AS nextNumber
-         FROM installment_plans WHERE plan_number LIKE ?`,
-        [`PLN-${year}-%`]
-      )[0]?.nextNumber ?? 1;
-      const planNum = `PLN-${year}-${String(planSequence).padStart(4, '0')}`;
-      const financed = Math.max(0, totalFinanced - downPayment);
-      const monthlyAmount = Math.round(financed / monthsCount);
-
-      db.run(`
-        INSERT INTO installment_plans (
-          id, plan_number, customer_id, total_amount, down_payment, financed_amount,
-          installments_count, installment_amount, start_date, paid_amount, remaining_amount, status, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', 'usr_admin')
-      `, [
-        planId,
-        planNum,
-        selectedCustomerId,
-        totalFinanced,
-        downPayment,
-        financed,
-        monthsCount,
-        monthlyAmount,
-        startDate,
-        financed
-      ]);
-
-      // Generate monthly installments
-      const baseDate = new Date(startDate);
-      for (let i = 1; i <= monthsCount; i++) {
-        const d = new Date(baseDate);
-        d.setMonth(d.getMonth() + i);
-        const dueStr = d.toISOString().split('T')[0];
-
-        db.run(`
-          INSERT INTO installments (
-            id, plan_id, sequence_number, due_date, amount, paid_amount, remaining_amount, status
-          ) VALUES (?, ?, ?, ?, ?, 0, ?, 'UPCOMING')
-        `, [
-          uuidv4(),
-          planId,
-          i,
-          dueStr,
-          monthlyAmount,
-          monthlyAmount
-        ]);
-      }
-
-      DatabaseManager.getInstance().saveToStorage();
-      alert(`✅ تم إنشاء خطة التقسيط رقم ${planNum} بنجاح (${monthsCount} أقساط شهرية)!`);
+      const { planNumber } = installmentService.createPlan({ customerId: selectedCustomerId, totalAmount: totalFinanced, downPayment, installmentsCount: monthsCount, startDate });
+      alert(`تم إنشاء خطة التقسيط رقم ${planNumber} بنجاح (${monthsCount} أقساط شهرية)!`);
       setShowCreateModal(false);
       loadData();
     } catch (err: any) {
@@ -244,76 +169,12 @@ export const InstallmentsPage: React.FC = () => {
   };
 
   const handlePayInstallment = (inst: InstallmentRow) => {
-    if (inst.status === 'PAID') {
-      alert('هذا القسط مسدد بالفعل.');
-      return;
-    }
-
+    if (inst.status === 'PAID') { alert('هذا القسط مسدد بالفعل.'); return; }
     const confirmPay = window.confirm(`تأكيد استلام وسداد القسط رقم (${inst.sequenceNumber} من ${inst.totalInstallments}) بقيمة ${inst.amount} ج من العميل: ${inst.customerName}؟`);
     if (!confirmPay) return;
-
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
-
     try {
-      const nowStr = new Date().toISOString();
-      const year = new Date().getFullYear();
-      const receiptSequence = db.query<{ nextNumber: number }>(
-        `SELECT COALESCE(MAX(CAST(SUBSTR(receipt_number, 15) AS INTEGER)), 0) + 1 AS nextNumber
-         FROM customer_payments WHERE receipt_number LIKE ?`,
-        [`RCP-INST-${year}-%`]
-      )[0]?.nextNumber ?? 1;
-      const receiptNum = `RCP-INST-${year}-${String(receiptSequence).padStart(5, '0')}`;
-
-      // 1. Mark installment as PAID
-      db.run(`
-        UPDATE installments
-        SET status = 'PAID',
-            paid_amount = ?,
-            remaining_amount = 0,
-            paid_at = ?
-        WHERE id = ?
-      `, [inst.amount, nowStr, inst.id]);
-
-      // 2. Record Customer Payment Receipt
-      db.run(`
-        INSERT INTO customer_payments (
-          id, receipt_number, customer_id, amount, payment_type, date, notes, performed_by
-        ) VALUES (?, ?, ?, ?, 'CASH', ?, ?, 'usr_admin')
-      `, [
-        uuidv4(),
-        receiptNum,
-        inst.customerId,
-        inst.amount,
-        nowStr.split('T')[0],
-        `سداد قسط رقم ${inst.sequenceNumber}/${inst.totalInstallments} لخطة ${inst.planNumber}`
-      ]);
-
-      // 3. Update customer balance
-      db.run(`
-        UPDATE customers
-        SET current_balance = current_balance - ?
-        WHERE id = ?
-      `, [inst.amount, inst.customerId]);
-
-      // 4. Update Plan totals
-      db.run(`
-        UPDATE installment_plans
-        SET paid_amount = paid_amount + ?,
-            remaining_amount = remaining_amount - ?
-        WHERE id = ?
-      `, [inst.amount, inst.amount, inst.planId]);
-
-      // 5. Update Cash Register
-      db.run(`
-        UPDATE cash_registers
-        SET current_balance = current_balance + ?
-        WHERE is_default = 1 OR is_active = 1
-        LIMIT 1
-      `, [inst.amount]);
-
-      DatabaseManager.getInstance().saveToStorage();
-      alert(`✅ تم تسجيل سداد القسط بنجاح!\nرقم الإيصال: ${receiptNum}\nتم إضافة ${inst.amount} ج إلى الخزينة وتخفيض مديونية العميل.`);
+      const result = installmentService.payInstallment(inst.id);
+      alert(`تم تسجيل سداد القسط بنجاح!\nرقم الإيصال: ${result.receiptNumber}\nتم إضافة ${result.amount} ج إلى الخزينة.`);
       loadData();
     } catch (err: any) {
       alert(`خطأ أثناء سداد القسط: ${err?.message}`);
@@ -352,7 +213,7 @@ export const InstallmentsPage: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => setShowCreateModal(true)} disabled={!canManage}
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white rounded-xl text-xs font-bold transition shrink-0 shadow-lg shadow-amber-600/20 active:scale-95"
         >
           <Plus className="w-4 h-4" />
@@ -474,6 +335,7 @@ export const InstallmentsPage: React.FC = () => {
                 {inst.status !== 'PAID' ? (
                   <button
                     onClick={() => handlePayInstallment(inst)}
+                    disabled={!canManage}
                     className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95"
                   >
                     <CreditCard className="w-3.5 h-3.5" />

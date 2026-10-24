@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
+import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 import {
   computeSaleLine,
   computeSaleTotals,
@@ -355,6 +356,46 @@ export class SalesService {
         }
       }
 
+      const ledgerLines = [
+        ...(totals.paidAmount > 0 ? [{
+          accountCode: paymentAccountCode(dto.paymentType),
+          debit: totals.paidAmount,
+          credit: 0,
+        }] : []),
+        ...(totals.remainingAmount > 0 ? [{
+          accountCode: '1103',
+          debit: totals.remainingAmount,
+          credit: 0,
+        }] : []),
+        {
+          accountCode: '4101',
+          debit: 0,
+          credit: round2(totals.subtotal - totals.discountAmount),
+        },
+        ...(totals.shippingCost > 0 ? [{
+          accountCode: '4102',
+          debit: 0,
+          credit: totals.shippingCost,
+        }] : []),
+        ...(totals.taxAmount > 0 ? [{
+          accountCode: '2102',
+          debit: 0,
+          credit: totals.taxAmount,
+        }] : []),
+        ...(totals.totalCost > 0 ? [
+          { accountCode: '5101', debit: totals.totalCost, credit: 0 },
+          { accountCode: '1104', debit: 0, credit: totals.totalCost },
+        ] : []),
+      ];
+      postLedgerEntry(sqliteDb.getDatabase(), {
+        date: today,
+        description: `Sale ${invoiceNumber}`,
+        referenceType: 'SALES_INVOICE',
+        referenceId: invoiceId,
+        createdBy: actor.id,
+        lines: ledgerLines,
+      });
+
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
         VALUES (?, ?, ?, 'إصدار فاتورة مبيعات', 'SALES', ?, ?)
@@ -420,6 +461,17 @@ export class SalesService {
       if (paymentType === 'CASH') {
         db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [value, register]);
       }
+      postLedgerEntry(db.getDatabase(), {
+        date: today,
+        description: `Customer receipt ${receiptNumber}`,
+        referenceType: 'CUSTOMER_PAYMENT',
+        referenceId: paymentId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: paymentAccountCode(paymentType), debit: value, credit: 0 },
+          { accountCode: '1103', debit: 0, credit: value },
+        ],
+      });
       if (shiftId) {
         db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?`, [value, shiftId]);
       }
@@ -490,6 +542,17 @@ export class SalesService {
       }
       db.run(`UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [total, customerId]);
       if (paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?`, [total, registerId]);
+      postLedgerEntry(db.getDatabase(), {
+        date,
+        description: `Customer receipt group ${groupId}`,
+        referenceType: 'CUSTOMER_PAYMENT_GROUP',
+        referenceId: groupId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: paymentAccountCode(paymentType), debit: total, credit: 0 },
+          { accountCode: '1103', debit: 0, credit: total },
+        ],
+      });
       if (shiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments+? WHERE id=?`, [total, shiftId]);
       db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
         [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'تحصيل دفعة موزعة على فواتير', 'SALES', groupId, JSON.stringify({ customerId, allocations: entries, total, date, reference, receipts })]);
@@ -700,6 +763,31 @@ export class SalesService {
           );
         }
       }
+      const returnedCost = round2(returnItems.reduce(
+        (sum, item) => sum + Number(item.quantityM2) * Number(item.unitCost || 0),
+        0
+      ));
+      const taxReduction = inv.totalAmount > 0
+        ? round2(totalReturnAmount * Number(inv.taxAmount || 0) / inv.totalAmount)
+        : 0;
+      const refundAccount = impact.cashRefund > 0 ? paymentAccountCode(refundMethod) : undefined;
+      postLedgerEntry(sqliteDb.getDatabase(), {
+        date: today,
+        description: `Sales return ${returnNumber}`,
+        referenceType: 'SALES_RETURN',
+        referenceId: returnId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: '4101', debit: round2(totalReturnAmount - taxReduction), credit: 0 },
+          ...(taxReduction > 0 ? [{ accountCode: '2102', debit: taxReduction, credit: 0 }] : []),
+          ...(impact.balanceDelta > 0 ? [{ accountCode: '1103', debit: 0, credit: impact.balanceDelta }] : []),
+          ...(refundAccount ? [{ accountCode: refundAccount, debit: 0, credit: impact.cashRefund }] : []),
+          ...(returnedCost > 0 ? [
+            { accountCode: '1104', debit: returnedCost, credit: 0 },
+            { accountCode: '5101', debit: 0, credit: returnedCost },
+          ] : []),
+        ],
+      });
       if (options.shiftId) {
         sqliteDb.run(
           `UPDATE cash_shifts SET total_refunds = total_refunds + ? WHERE id = ?`,
@@ -797,6 +885,30 @@ export class SalesService {
       if (inv.paidAmount > 0 && inv.paymentType === 'CASH') {
         sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE is_default = 1`, [inv.paidAmount]);
       }
+
+      const invoiceCost = round2(inv.items.reduce((sum, item) => sum + Number(item.totalCost || 0), 0));
+      postLedgerEntry(sqliteDb.getDatabase(), {
+        date: localDateString(),
+        description: `Void sale ${inv.invoiceNumber}`,
+        referenceType: 'SALES_VOID',
+        referenceId: invoiceId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: '4101', debit: round2(inv.subtotal - inv.discountAmount), credit: 0 },
+          ...(inv.shippingCost > 0 ? [{ accountCode: '4102', debit: inv.shippingCost, credit: 0 }] : []),
+          ...(inv.taxAmount > 0 ? [{ accountCode: '2102', debit: inv.taxAmount, credit: 0 }] : []),
+          ...(inv.paidAmount > 0 ? [{
+            accountCode: paymentAccountCode(inv.paymentType),
+            debit: 0,
+            credit: inv.paidAmount,
+          }] : []),
+          ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),
+          ...(invoiceCost > 0 ? [
+            { accountCode: '1104', debit: invoiceCost, credit: 0 },
+            { accountCode: '5101', debit: 0, credit: invoiceCost },
+          ] : []),
+        ],
+      });
 
       sqliteDb.run(`UPDATE sales_invoices SET invoice_status = 'VOID', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [invoiceId]);
 

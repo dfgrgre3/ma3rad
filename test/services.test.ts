@@ -15,6 +15,7 @@ import { DailyOperationsService } from '../src/services/DailyOperationsService.t
 import { AccountingService } from '../src/services/AccountingService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
 import { localDateString } from '../src/utils/date.ts';
+import { postLedgerEntry } from '../src/database/ledger.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -100,6 +101,45 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
   assert.ok((receivables?.amount || 0) >= 2600, 'receivables should include the open invoice');
   assert.ok(sheet.totals.assets > 0, 'assets should be positive');
   assert.ok(Math.abs(sheet.totals.difference) < 0.01, 'balance sheet should balance');
+});
+
+test('financial statements use posted ledger balances as of the requested date', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  const db = manager.getDatabase();
+  const statements = new FinancialStatementsService();
+  const priorDate = q('SELECT MAX(date) AS date FROM journal_entries')[0]?.date || localDateString();
+  const entryDate = new Date(`${priorDate}T00:00:00`);
+  entryDate.setDate(entryDate.getDate() + 1);
+  const postingDate = localDateString(entryDate);
+  entryDate.setDate(entryDate.getDate() - 1);
+  const asOfBefore = localDateString(entryDate);
+  const actorId = q('SELECT id FROM users ORDER BY created_at, id LIMIT 1')[0]?.id;
+  assert.ok(actorId, 'a user is required to create a journal entry');
+
+  db.run('BEGIN TRANSACTION');
+  try {
+    const before = statements.getBalanceSheet(asOfBefore);
+    postLedgerEntry(db, {
+      date: postingDate,
+      description: 'Financial statement as-of test',
+      referenceType: 'TEST_FINANCIAL_STATEMENT',
+      referenceId: 'as_of_ledger_posting',
+      createdBy: actorId,
+      lines: [
+        { accountCode: '1101', debit: 321.45, credit: 0 },
+        { accountCode: '4101', debit: 0, credit: 321.45 },
+      ],
+    });
+    const after = statements.getBalanceSheet(postingDate);
+    const flow = statements.getCashFlow(postingDate, postingDate);
+
+    assert.equal(after.assets[0].amount, before.assets[0].amount + 321.45);
+    assert.equal(flow.totals.inflows, 321.45);
+    assert.ok(Math.abs(after.totals.difference) < 0.01, 'posted entries should remain balanced');
+  } finally {
+    db.run('ROLLBACK');
+  }
 });
 
 test('commissions and stock reservations lifecycle', async () => {

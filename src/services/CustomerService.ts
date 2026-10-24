@@ -5,6 +5,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
+import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 
 export class CustomerService {
   private db = DatabaseManager.getInstance();
@@ -127,6 +128,7 @@ export class CustomerService {
 
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
     const today = paymentDate || localDateString();
+    const register = registerId || 'cr_main';
 
     return this.db.executeTransaction((sqliteDb) => {
       const prior = idempotencyKey ? sqliteDb.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`,[idempotencyKey])[0] : null;
@@ -137,18 +139,29 @@ export class CustomerService {
         INSERT INTO customer_payments (
           id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, notes, performed_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, registerId || 'cr_main', shiftId || null, notes, actor.id]);
+      `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, register, shiftId || null, notes, actor.id]);
       // 2. Reduce customer debt balance
       sqliteDb.run(`
         UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
       `, [amount, customerId]);
 
       // 3. Update cash register balance if cash
-      if (paymentType === 'CASH' && registerId) {
+      if (paymentType === 'CASH') {
         sqliteDb.run(`
           UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?
-        `, [amount, registerId]);
+        `, [amount, register]);
       }
+      postLedgerEntry(sqliteDb.getDatabase(), {
+        date: today,
+        description: `Customer receipt ${receiptNumber}`,
+        referenceType: 'CUSTOMER_PAYMENT',
+        referenceId: paymentId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: paymentAccountCode(paymentType), debit: amount, credit: 0 },
+          { accountCode: '1103', debit: 0, credit: amount },
+        ],
+      });
 
       // 4. If active shift, update shift total
       if (shiftId) {
@@ -164,7 +177,7 @@ export class CustomerService {
         amount,
         paymentType,
         date: today,
-        registerId,
+        registerId: register,
         shiftId,
         notes,
         performedBy: actor.id,
@@ -204,6 +217,17 @@ export class CustomerService {
       if (payment.shiftId) {
         db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
       }
+      postLedgerEntry(db.getDatabase(), {
+        date: localDateString(),
+        description: `Reverse customer receipt ${payment.receiptNumber}`,
+        referenceType: 'CUSTOMER_PAYMENT_VOID',
+        referenceId: paymentId,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: '1103', debit: amount, credit: 0 },
+          { accountCode: paymentAccountCode(payment.paymentType), debit: 0, credit: amount },
+        ],
+      });
       db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)
