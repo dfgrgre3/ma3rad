@@ -130,4 +130,17 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   svc.voidInvoice(invoice2.id, 'خطأ في الإدخال');
   assert.equal(svc.getInvoiceById(invoice2.id)!.invoiceStatus, 'VOID');
   assert.throws(() => svc.recordInvoicePayment(invoice2.id, 50), /ملغاة/);
+
+  // Voiding after a separate receipt would otherwise leave its cash/register
+  // and receipt record unreversed. Reject it without changing the invoice.
+  const invoice3 = svc.createSale({
+    customerId: customer.id, warehouseId: 'wh_main',
+    items: [{ productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 2, boxesCount: 2, piecesCount: 0, unitPrice: 300 }],
+    paidAmount: 0, paymentType: 'CREDIT',
+  });
+  svc.recordInvoicePayment(invoice3.id, 100);
+  const stockBeforeRejectedVoid = q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0].q;
+  assert.throws(() => svc.voidInvoice(invoice3.id, 'خطأ في الإدخال'), /سندات قبض/);
+  assert.equal(svc.getInvoiceById(invoice3.id)!.invoiceStatus, 'COMPLETED');
+  assert.equal(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0].q, stockBeforeRejectedVoid);
 });

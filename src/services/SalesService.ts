@@ -755,6 +755,14 @@ export class SalesService {
     if (!reason || !reason.trim()) throw new Error('يرجى إدخال سبب إلغاء الفاتورة.');
 
     return this.db.executeTransaction((sqliteDb) => {
+      const linkedPayments = sqliteDb.query<{ count: number }>(
+        'SELECT COUNT(*) AS count FROM customer_payments WHERE invoice_id = ?',
+        [invoiceId]
+      )[0]?.count ?? 0;
+      if (linkedPayments > 0) {
+        throw new Error('لا يمكن إلغاء فاتورة عليها سندات قبض. اعكس سندات القبض أولاً أو سجّل مرتجعاً.');
+      }
+
       for (const item of inv.items) {
         sqliteDb.run(`
           UPDATE warehouse_stock

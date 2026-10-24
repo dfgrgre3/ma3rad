@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EmployeeService } from '../../services/EmployeeService';
 import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 import {
   HardHat, Plus, Search, Mail, Phone, Calendar, Landmark,
   TrendingUp, TrendingDown, DollarSign, UserCheck, Clock,
@@ -60,6 +61,7 @@ const TX_TYPES = {
 };
 
 export const EmployeesPage: React.FC = () => {
+  const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'employees.manage');
   // --- Database State ---
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -71,7 +73,9 @@ export const EmployeesPage: React.FC = () => {
     setLoading(true);
     try {
       setEmployees(EmployeeService.getAll() as unknown as Employee[]);
-      setTransactions(EmployeeService.getTransactions() as unknown as FinancialTransaction[]);
+      setTransactions(canManageEmployees
+        ? EmployeeService.getTransactions() as unknown as FinancialTransaction[]
+        : []);
       setAttendance(EmployeeService.getAllAttendance() as unknown as AttendanceRecord[]);
       setDbError(null);
     } catch (e: any) {
@@ -309,6 +313,7 @@ export const EmployeesPage: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('finance')}
+          disabled={!canManageEmployees}
           className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'finance' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
  }`}
         >
@@ -325,6 +330,7 @@ export const EmployeesPage: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('analytics')}
+          disabled={!canManageEmployees}
           className={`px-4 py-2 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'analytics' ? 'bg-orange-600 text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-800 bg-white'
  }`}
         >
@@ -428,14 +434,10 @@ export const EmployeesPage: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <DollarSign className="w-3.5 h-3.5 text-slate-550" />
                           <span>
-                            الأجر الأساسي:{' '}
-                            <span className="text-emerald-600 font-bold">
-                              {fmtCurrency(emp.baseSalary)}
-                            </span>
-                            <span className="text-[10px] text-slate-500">
-                              {' '}
-                              ({emp.salaryType === 'MONTHLY' ? 'شهرياً' : 'يومي'})
-                            </span>
+                            {canManageEmployees ? (
+                              <>الأجر الأساسي: <span className="text-emerald-600 font-bold">{fmtCurrency(emp.baseSalary)}</span>
+                                <span className="text-[10px] text-slate-500"> ({emp.salaryType === 'MONTHLY' ? 'شهرياً' : 'يومي'})</span></>
+                            ) : 'بيانات الراتب محمية'}
                           </span>
                         </div>
                       </div>
@@ -564,10 +566,7 @@ export const EmployeesPage: React.FC = () => {
                               </div>
                             </td>
                             <td className="p-4 font-bold text-slate-600">
-                              {fmtCurrency(emp.baseSalary)}
-                              <span className="text-[10px] text-slate-500 block font-normal">
-                                {emp.salaryType === 'MONTHLY' ? 'شهري' : 'يومي'}
-                              </span>
+                              {canManageEmployees ? <>{fmtCurrency(emp.baseSalary)}<span className="text-[10px] text-slate-500 block font-normal">{emp.salaryType === 'MONTHLY' ? 'شهري' : 'يومي'}</span></> : '—'}
                             </td>
                             <td className="p-4 font-bold text-amber-500">{fmtCurrency(fin.advances)}</td>
                             <td className="p-4 font-bold text-emerald-500">{fmtCurrency(fin.bonuses)}</td>

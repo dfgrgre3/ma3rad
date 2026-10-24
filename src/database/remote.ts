@@ -12,6 +12,7 @@ import type { User } from '../types';
 
 const TOKEN_KEY = 'ceramisys_remote_token';
 const SESSION_KEY = 'ceramisys_session_user_id';
+let activeTransactionId: string | null = null;
 
 function readToken(): string {
   try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
@@ -90,11 +91,11 @@ export function remoteLogout(): void {
 /** Minimal sql.js-shaped shim over HTTP for the ~20 raw `db.exec(...)` call sites. */
 class RemoteDatabaseShim {
   public exec(sql: string): Array<{ columns: string[]; values: unknown[][] }> {
-    const res = request('/api/db/query', { mode: 'exec', sql, params: [] });
+    const res = request('/api/db/query', { mode: 'exec', sql, params: [], transactionId: activeTransactionId });
     return res.result || [];
   }
   public run(sql: string, params: any[] = []): void {
-    request('/api/db/query', { mode: 'run', sql, params });
+    request('/api/db/query', { mode: 'run', sql, params, transactionId: activeTransactionId });
   }
 }
 
@@ -129,12 +130,12 @@ export class RemoteDatabaseManager {
   }
 
   public query<T = any>(sql: string, params: any[] = []): T[] {
-    const res = request('/api/db/query', { mode: 'query', sql, params });
+    const res = request('/api/db/query', { mode: 'query', sql, params, transactionId: activeTransactionId });
     return (res.rows || []) as T[];
   }
 
   public run(sql: string, params: any[] = []): void {
-    request('/api/db/query', { mode: 'run', sql, params });
+    request('/api/db/query', { mode: 'run', sql, params, transactionId: activeTransactionId });
   }
 
   public queryPage<T = any>(
@@ -162,14 +163,18 @@ export class RemoteDatabaseManager {
   }
 
   public executeTransaction<T>(callback: (db: RemoteDatabaseManager) => T): T {
-    this.run('BEGIN TRANSACTION;');
+    if (activeTransactionId) throw new Error('A remote database transaction is already active in this tab.');
+    activeTransactionId = `rtx_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     try {
+      this.run('BEGIN TRANSACTION;');
       const result = callback(this);
       this.run('COMMIT;');
       return result;
     } catch (error) {
       try { this.run('ROLLBACK;'); } catch { /* ignore */ }
       throw error;
+    } finally {
+      activeTransactionId = null;
     }
   }
 
@@ -198,12 +203,12 @@ export class RemoteDatabaseManager {
   }
 
   public exportDatabaseBinary(): Uint8Array {
-    const res = request('/api/db/query', { mode: 'export' });
+    const res = request('/api/db/query', { mode: 'export', transactionId: activeTransactionId });
     return base64ToBytes(res.base64);
   }
 
   public importDatabaseBinary(bytes: Uint8Array): void {
-    request('/api/db/query', { mode: 'import', base64: bytesToBase64(bytes) });
+    request('/api/db/query', { mode: 'import', base64: bytesToBase64(bytes), transactionId: activeTransactionId });
     this.ready = true;
   }
 }

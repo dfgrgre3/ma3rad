@@ -664,9 +664,16 @@ function appliedIds(db: Database): Set<string> {
 export function runMigrations(db: Database): MigrationReport {
   const report: MigrationReport = { applied: [], skipped: [], failed: [] };
 
-  // 1. Create anything missing. Every statement is IF NOT EXISTS, so this is
-  //    a no-op on an up-to-date database.
-  db.exec(SCHEMA_SQL);
+  // 1. Create anything missing atomically. Every statement is IF NOT EXISTS,
+  //    so this is a no-op on an up-to-date database.
+  db.run('BEGIN TRANSACTION');
+  try {
+    db.exec(SCHEMA_SQL);
+    db.run('COMMIT');
+  } catch (error) {
+    db.run('ROLLBACK');
+    throw error;
+  }
 
   // 2. Apply the ordered migration list.
   const done = appliedIds(db);
@@ -676,14 +683,17 @@ export function runMigrations(db: Database): MigrationReport {
       report.skipped.push(migration.id);
       continue;
     }
+    db.run('BEGIN TRANSACTION');
     try {
       migration.up(db);
       db.run('INSERT OR REPLACE INTO schema_migrations (id, description) VALUES (?, ?)', [
         migration.id,
         migration.description,
       ]);
+      db.run('COMMIT');
       report.applied.push(migration.id);
     } catch (error) {
+      try { db.run('ROLLBACK'); } catch { /* transaction may already be closed */ }
       const message = error instanceof Error ? error.message : String(error);
       report.failed.push({ id: migration.id, error: message });
       console.error(`❌ Migration ${migration.id} failed:`, message);

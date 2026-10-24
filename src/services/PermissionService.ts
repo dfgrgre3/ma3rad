@@ -256,6 +256,9 @@ export class PermissionService {
   /** Idempotently populate the permissions catalog and seed built-in roles. */
   public static seed(): void {
     const db = DatabaseManager.getInstance();
+    // The LAN host owns schema and permission seeding. A browser client must
+    // never attempt to initialize catalogs through the remote SQL bridge.
+    if ((db as any).getStorageBackend?.() === 'remote') return;
 
     const existing = new Set(db.query<{ code: string }>('SELECT code FROM permissions').map((r) => r.code));
     for (const p of PERMISSIONS) {

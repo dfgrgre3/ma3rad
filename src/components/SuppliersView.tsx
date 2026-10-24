@@ -354,7 +354,7 @@ export const SuppliersView: React.FC = () => {
         </div>
 
         {/* Statement Panel */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        <div className="supplier-statement-print-area bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           {selectedSupplier && statement ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -362,7 +362,7 @@ export const SuppliersView: React.FC = () => {
                   <h3 className="font-extrabold text-sm text-slate-900">{selectedSupplier.name}</h3>
                   <p className="text-[11px] text-slate-500 font-mono">{selectedSupplier.phone}</p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 no-print">
                 {canUpdate && <button
                   title="تعديل بيانات المورد"
                   onClick={() => openEditSupplier(selectedSupplier)}
@@ -396,12 +396,12 @@ export const SuppliersView: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div className="text-xs font-bold text-slate-500">سجل حركات كشف الحساب:</div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 no-print">
                     <button onClick={exportStatement} title="تصدير كشف الحساب" className="p-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100"><Download className="w-4 h-4" /></button>
                     <button onClick={() => window.print()} title="طباعة كشف الحساب" className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"><Printer className="w-4 h-4" /></button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 no-print">
                   <label className="text-[10px] font-bold text-slate-500">
                     من تاريخ
                     <span className="relative mt-1 block">

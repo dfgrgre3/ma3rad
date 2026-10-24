@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import { DatabaseManager } from '../../database/db';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { v4 as uuidv4 } from 'uuid';
+import { FinanceExtrasService } from '../../services/FinanceExtrasService';
 
 interface AccountRecord {
   id: string;
@@ -31,8 +31,10 @@ interface JournalEntryRecord {
 }
 
 export const FinanceOverviewPage: React.FC = () => {
+  const financeService = new FinanceExtrasService();
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'CHART_OF_ACCOUNTS' | 'JOURNAL_ENTRIES'>('OVERVIEW');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState({
     totalRevenue: 0,
     totalExpenses: 0,
@@ -61,18 +63,22 @@ export const FinanceOverviewPage: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError(null);
     const db = DatabaseManager.getInstance().getDb();
     if (!db) { setLoading(false); return; }
 
     try {
-      const thisMonth = { from: startOfMonth(new Date()).toISOString(), to: endOfMonth(new Date()).toISOString() };
+      const thisMonth = {
+        from: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+        to: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+      };
 
       const revRow = db.exec(
-        `SELECT COALESCE(SUM(total_amount),0) FROM sales_invoices WHERE created_at BETWEEN ? AND ? AND status != 'CANCELLED'`,
+        `SELECT COALESCE(SUM(total_amount),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
         [thisMonth.from, thisMonth.to]
       );
       const expRow = db.exec(
-        `SELECT COALESCE(SUM(amount),0) FROM expenses WHERE created_at BETWEEN ? AND ?`,
+        `SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN ? AND ?`,
         [thisMonth.from, thisMonth.to]
       );
       const receivRow = db.exec(`SELECT COALESCE(SUM(current_balance),0) FROM customers WHERE current_balance > 0`);
@@ -86,11 +92,16 @@ export const FinanceOverviewPage: React.FC = () => {
 
       const rev = Number(revRow[0]?.values[0]?.[0] || 0);
       const exp = Number(expRow[0]?.values[0]?.[0] || 0);
+      const grossProfitRow = db.exec(
+        `SELECT COALESCE(SUM(gross_profit),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
+        [thisMonth.from, thisMonth.to]
+      );
+      const grossProfit = Number(grossProfitRow[0]?.values[0]?.[0] || 0);
 
       setMetrics({
         totalRevenue: rev,
         totalExpenses: exp,
-        netProfit: rev - exp,
+        netProfit: grossProfit - exp,
         totalReceivables: Number(receivRow[0]?.values[0]?.[0] || 0),
         totalPayables: Number(payRow[0]?.values[0]?.[0] || 0),
         cashBalance: Number(cashRow[0]?.values[0]?.[0] || 0),
@@ -102,10 +113,10 @@ export const FinanceOverviewPage: React.FC = () => {
       for (let i = 5; i >= 0; i--) {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
-        const from = startOfMonth(d).toISOString();
-        const to = endOfMonth(d).toISOString();
-        const rRow = db.exec(`SELECT COALESCE(SUM(total_amount),0) FROM sales_invoices WHERE created_at BETWEEN ? AND ? AND status != 'CANCELLED'`, [from, to]);
-        const eRow = db.exec(`SELECT COALESCE(SUM(amount),0) FROM expenses WHERE created_at BETWEEN ? AND ?`, [from, to]);
+        const from = format(startOfMonth(d), 'yyyy-MM-dd');
+        const to = format(endOfMonth(d), 'yyyy-MM-dd');
+        const rRow = db.exec(`SELECT COALESCE(SUM(total_amount),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`, [from, to]);
+        const eRow = db.exec(`SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN ? AND ?`, [from, to]);
         sixMonths.push({
           month: format(d, 'MMM'),
           revenue: Number(rRow[0]?.values[0]?.[0] || 0),
@@ -115,47 +126,18 @@ export const FinanceOverviewPage: React.FC = () => {
       setMonthlyData(sixMonths);
 
       // Load Chart of Accounts
-      const accRes = db.exec(`SELECT id, code, name, type, balance FROM chart_of_accounts ORDER BY code ASC`);
-      if (accRes.length > 0 && accRes[0].values.length > 0) {
-        const accs: AccountRecord[] = accRes[0].values.map((r: any[]) => ({
-          id: String(r[0]),
-          code: String(r[1]),
-          name: String(r[2]),
-          type: String(r[3]) as any,
-          balance: Number(r[4] || 0),
-        }));
-        setAccounts(accs);
-        if (accs.length >= 2) {
-          setDebitAccId(accs[0].id);
-          setCreditAccId(accs[1].id);
-        }
+      const accs = financeService.getAccounts();
+      setAccounts(accs);
+      if (accs.length >= 2) {
+        setDebitAccId((current) => current || accs[0].id);
+        setCreditAccId((current) => current || accs[1].id);
       }
 
-      // Load Journal Entries
-      const jeRes = db.exec(`SELECT id, entry_number, date, description, total_debit, total_credit FROM journal_entries ORDER BY date DESC, created_at DESC LIMIT 30`);
-      if (jeRes.length > 0 && jeRes[0].values.length > 0) {
-        const jes: JournalEntryRecord[] = jeRes[0].values.map((r: any[]) => ({
-          id: String(r[0]),
-          entryNumber: String(r[1]),
-          date: String(r[2]),
-          description: String(r[3]),
-          totalDebit: Number(r[4] || 0),
-          totalCredit: Number(r[5] || 0),
-        }));
-        setJournalEntries(jes);
-      } else {
-        // Seed default journal entry if empty
-        const jeId = uuidv4();
-        const today = new Date().toISOString().split('T')[0];
-        db.run(`
-          INSERT INTO journal_entries (id, entry_number, date, description, total_debit, total_credit, is_posted, created_by)
-          VALUES (?, 'JV-2026-001', ?, 'قيد افتتاحي لرأس المال والصندوق', 100000, 100000, 1, 'usr_admin')
-        `, [jeId, today]);
-
-        DatabaseManager.getInstance().saveToStorage();
-      }
+      const entries = financeService.getJournalEntries(30);
+      setJournalEntries(entries);
     } catch (e) {
       console.error(e);
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل بيانات المركز المالي.');
     } finally {
       setLoading(false);
     }
@@ -167,14 +149,8 @@ export const FinanceOverviewPage: React.FC = () => {
 
   const handleCreateAccount = (e: React.FormEvent) => {
     e.preventDefault();
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
     try {
-      db.run(`
-        INSERT INTO chart_of_accounts (id, code, name, type, balance, is_active)
-        VALUES (?, ?, ?, ?, 0, 1)
-      `, [uuidv4(), newAccCode, newAccName, newAccType]);
-      DatabaseManager.getInstance().saveToStorage();
+      financeService.createAccount({ code: newAccCode, name: newAccName, type: newAccType });
       setShowAddAccountModal(false);
       setNewAccCode('');
       setNewAccName('');
@@ -191,36 +167,18 @@ export const FinanceOverviewPage: React.FC = () => {
       return;
     }
 
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
-
     try {
-      const jId = uuidv4();
-      const jNum = `JV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-      const dateStr = new Date().toISOString().split('T')[0];
-
-      db.run(`
-        INSERT INTO journal_entries (id, entry_number, date, description, total_debit, total_credit, is_posted, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, 1, 'usr_admin')
-      `, [jId, jNum, dateStr, entryDesc, entryAmount, entryAmount]);
-
-      // Lines
-      db.run(`
-        INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit, description)
-        VALUES (?, ?, ?, ?, 0, ?)
-      `, [uuidv4(), jId, debitAccId, entryAmount, entryDesc]);
-
-      db.run(`
-        INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit, description)
-        VALUES (?, ?, ?, 0, ?, ?)
-      `, [uuidv4(), jId, creditAccId, entryAmount, entryDesc]);
-
-      // Update accounts balance
-      db.run(`UPDATE chart_of_accounts SET balance = balance + ? WHERE id = ?`, [entryAmount, debitAccId]);
-      db.run(`UPDATE chart_of_accounts SET balance = balance - ? WHERE id = ?`, [entryAmount, creditAccId]);
-
-      DatabaseManager.getInstance().saveToStorage();
-      alert(`✅ تم حفظ وترحيل القيد اليومي رقم ${jNum} بنجاح!`);
+      const jId = financeService.createJournalEntry({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        description: entryDesc,
+        createdBy: '',
+        lines: [
+          { accountId: debitAccId, debit: entryAmount, credit: 0 },
+          { accountId: creditAccId, debit: 0, credit: entryAmount },
+        ],
+      });
+      const createdEntry = financeService.getJournalEntries(1).find((entry) => entry.id === jId);
+      alert(`✅ تم حفظ وترحيل القيد اليومي رقم ${createdEntry?.entryNumber ?? ''} بنجاح!`);
       setShowAddEntryModal(false);
       setEntryDesc('');
       loadData();
@@ -298,6 +256,11 @@ export const FinanceOverviewPage: React.FC = () => {
 
       {activeTab === 'OVERVIEW' && (
         <>
+          {loadError && (
+            <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              تعذر تحميل بعض بيانات المركز المالي: {loadError}
+            </div>
+          )}
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             {cards.map(c => {

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
+import { authorizeRemoteSql } from '../src/database/remoteAuthorization.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -12,6 +13,37 @@ function q(sql: string, params: any[] = []): any[] {
 function makeUser(id: string, role: string): any {
   return { id, username: id, fullName: id, role, phone: null, isActive: true, createdAt: '', updatedAt: '' };
 }
+
+test('remote SQL authorization enforces read and write permissions and rejects unsafe syntax', () => {
+  const granted = new Set(['sales.view', 'sales.create', 'employees.view']);
+  const can = (codes: string[]) => codes.some((code) => granted.has(code));
+
+  assert.doesNotThrow(() => authorizeRemoteSql('SELECT id FROM sales_invoices', 'query', can));
+  assert.throws(() => authorizeRemoteSql('SELECT password_hash FROM users', 'query', can), /Remote access denied/);
+  assert.throws(() => authorizeRemoteSql('SELECT id, username FROM users', 'query', can), /Remote access denied/);
+  assert.doesNotThrow(() => authorizeRemoteSql(
+    'SELECT id, username, full_name FROM users WHERE id = ? AND is_active = 1',
+    'query', can, ['usr_remote'], 'usr_remote'
+  ));
+  assert.doesNotThrow(() => authorizeRemoteSql("INSERT INTO sales_invoices (id) VALUES ('x')", 'run', can));
+  assert.throws(() => authorizeRemoteSql('DELETE FROM sales_invoices', 'run', can), /Remote write denied/);
+  assert.throws(() => authorizeRemoteSql(
+    'INSERT INTO sales_invoices (id) SELECT id FROM users', 'run', can
+  ), /Remote (?:access|write) denied/);
+  assert.throws(() => authorizeRemoteSql('SELECT id FROM sales_invoices; DELETE FROM users', 'query', can), /not allowed/);
+  assert.throws(() => authorizeRemoteSql('PRAGMA table_info(users)', 'query', can), /not allowed/);
+  assert.throws(() => authorizeRemoteSql(
+    'WITH target AS (SELECT id FROM products) DELETE FROM sales_invoices', 'query', can
+  ), /CTE statements are not allowed/);
+  assert.throws(() => authorizeRemoteSql('SELECT base_salary FROM employees', 'query', can), /employee payroll data/);
+  assert.throws(() => authorizeRemoteSql('BEGIN TRANSACTION', 'run', () => false), /transaction permission/);
+  assert.throws(() => authorizeRemoteSql(
+    'INSERT INTO sequence_counters (name, value) VALUES (?, 0)', 'run', can, ['REC', 0]
+  ), /sequence permission/);
+  assert.doesNotThrow(() => authorizeRemoteSql(
+    'INSERT INTO sequence_counters (name, value) VALUES (?, 0)', 'run', can, ['INV', 0]
+  ));
+});
 
 test('permissions: admin has everything, limited role is denied, override grants and denies', async () => {
   const db = DatabaseManager.getInstance();

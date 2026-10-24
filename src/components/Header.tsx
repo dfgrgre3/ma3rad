@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ChevronDown, ChevronUp, Bell, Menu, X, Search,
+  ChevronDown, ChevronUp, Bell, Menu, X,
   Sun, Moon, SlidersHorizontal,
 } from 'lucide-react';
 import type { User } from '../types';
@@ -94,7 +94,6 @@ export const Header: React.FC<HeaderProps> = ({
       {/* ── Desktop Mega Menu ─────────────────────────────────────────────────── */}
       <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center" dir="rtl">
         {visibleGroups.map((group) => {
-          const GroupIcon = group.icon;
           const isOpen = openMenu === group.id;
           const isGroupActive = group.items.some(
             (item) => location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to + '/'))
@@ -104,13 +103,12 @@ export const Header: React.FC<HeaderProps> = ({
             <div key={group.id} className="relative" ref={isOpen ? menuRef : null}>
               <button
                 onClick={() => toggleMenu(group.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
                   isGroupActive || isOpen
                     ? 'bg-sky-50 text-sky-600 dark:bg-slate-800 dark:text-sky-400'
                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                 }`}
               >
-                <GroupIcon className="w-4 h-4" />
                 <span>{group.label}</span>
                 {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
@@ -119,7 +117,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="absolute top-full right-0 mt-1 w-96 p-4 rounded-xl shadow-2xl border z-50 bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-700">
                   <div className="grid grid-cols-1 gap-1">
                     {group.items.map((item) => {
-                      const ItemIcon = item.icon;
                       return (
                         <NavLink
                           key={item.to + item.label}
@@ -134,7 +131,6 @@ export const Header: React.FC<HeaderProps> = ({
                             }`
                           }
                         >
-                          <ItemIcon className="w-4 h-4 shrink-0" />
                           <span className="truncate">{item.label}</span>
                           {item.badge && item.badge > 0 && (
                             <span className="mr-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
@@ -205,24 +201,22 @@ export const Header: React.FC<HeaderProps> = ({
           <nav className="p-4 space-y-2" dir="rtl">
             <button
               onClick={() => { setMobileMenuOpen(false); navigate('/dashboard'); }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="w-full px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              <Search className="w-4 h-4" /> بحث سريع
+              بحث سريع
             </button>
             {visibleGroups.map((group) => {
-              const GroupIcon = group.icon;
               const isOpen = openMenu === group.id;
               return (
                 <div key={group.id}>
                   <button
                     onClick={() => toggleMenu(group.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+                    className={`w-full flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
                       isOpen
                         ? 'bg-sky-50 text-sky-600 dark:bg-slate-800 dark:text-sky-400'
                         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
                   >
-                    <GroupIcon className="w-4 h-4" />
                     <span className="flex-1 text-right">{group.label}</span>
                     {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
@@ -230,7 +224,6 @@ export const Header: React.FC<HeaderProps> = ({
                   {isOpen && (
                     <div className="mt-1 mr-4 space-y-1">
                       {group.items.map((item) => {
-                        const ItemIcon = item.icon;
                         return (
                           <NavLink
                             key={item.to + item.label}
@@ -243,7 +236,6 @@ export const Header: React.FC<HeaderProps> = ({
                               }`
                             }
                           >
-                            <ItemIcon className="w-4 h-4 shrink-0" />
                             <span className="truncate">{item.label}</span>
                           </NavLink>
                         );

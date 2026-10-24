@@ -450,23 +450,38 @@ export class DatabaseManager {
 
   public importDatabaseBinary(bytes: Uint8Array): void {
     if (!this.SQL) throw new Error('SQL engine not loaded');
-    let imported: Database;
+    let imported: Database | undefined;
     try {
-      imported = new this.SQL.Database(bytes);
+      const candidate = new this.SQL.Database(bytes);
+      imported = candidate;
       const requiredTables = ['users', 'products', 'system_settings', 'sales_invoices'];
-      const tables = imported.exec("SELECT name FROM sqlite_master WHERE type = 'table'");
+      const tables = candidate.exec("SELECT name FROM sqlite_master WHERE type = 'table'");
       const names = new Set((tables[0]?.values || []).map((row: unknown[]) => String(row[0])));
       if (!requiredTables.every((name) => names.has(name))) {
         throw new Error('الملف لا يحتوي على نسخة احتياطية صالحة للنظام.');
       }
+      const integrity = candidate.exec('PRAGMA integrity_check');
+      if (integrity[0]?.values[0]?.[0] !== 'ok') {
+        throw new Error('Backup database failed SQLite integrity_check.');
+      }
+      // Migrate and validate the candidate in isolation so failed restores
+      // cannot replace the database currently used by this session.
+      runMigrations(candidate);
+      const migratedIntegrity = candidate.exec('PRAGMA integrity_check');
+      if (migratedIntegrity[0]?.values[0]?.[0] !== 'ok') {
+        throw new Error('Restored database failed SQLite integrity_check after migrations.');
+      }
+      const foreignKeyErrors = candidate.exec('PRAGMA foreign_key_check');
+      if (foreignKeyErrors[0]?.values.length) {
+        throw new Error('Restored database contains foreign key violations.');
+      }
     } catch (error) {
+      imported?.close();
       throw new Error(`تعذر استعادة النسخة الاحتياطية: ${error instanceof Error ? error.message : 'ملف غير صالح'}`);
     }
 
+    if (typeof imported === 'undefined') throw new Error('Backup database was not initialized.');
     this.db = imported;
-    // A backup can be older than the running build, so bring it up to the
-    // current schema before anything queries it.
-    runMigrations(this.db);
     this.saveToStorage();
   }
 }

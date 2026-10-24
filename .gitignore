@@ -3,6 +3,7 @@ node_modules/
 # Build output
 dist/
 build/
+/release-whitefix/
 *.tsbuildinfo
 
 # Electron runtime data (created via app.setPath('userData', .../.electron-data))
@@ -74,4 +75,3 @@ $RECYCLE.BIN/
 
 # Windows runtime-generated spellcheck dictionaries
 Microsoft/
-

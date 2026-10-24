@@ -107,3 +107,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .no-print { display: none !important; }
   .print-only { display: block !important; }
 }
+
+@media print {
+  body:has(.supplier-statement-print-area) * { visibility: hidden !important; }
+  .supplier-statement-print-area,
+  .supplier-statement-print-area * { visibility: visible !important; }
+  .supplier-statement-print-area {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  .supplier-statement-print-area .max-h-80 {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}

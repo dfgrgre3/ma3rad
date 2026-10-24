@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, Lock, User as UserIcon, ShieldCheck, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Eye, EyeOff, Lock, User as UserIcon, ShieldCheck, Loader2, LogIn } from 'lucide-react';
 import { AuthService } from '../../services/AuthService';
 import type { User } from '../../types';
+
+interface RememberedCredentials {
+  username: string;
+  password: string;
+}
 
 interface LoginPageProps {
   onSuccess: (user: User) => void;
@@ -10,16 +15,58 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberedCredentials, setRememberedCredentials] = useState<RememberedCredentials | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const credentialStore = window.ceramisys?.credentials;
+    if (!credentialStore?.get) return;
+
+    let mounted = true;
+    void credentialStore.get().then((saved) => {
+      if (!mounted || !saved) return;
+      setRememberedCredentials(saved);
+      setUsername(saved.username);
+      setPassword(saved.password);
+    }).catch((loadError) => {
+      console.error('Could not load remembered login credentials:', loadError);
+    });
+
+    return () => { mounted = false; };
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const user = AuthService.login(username.trim(), password);
+      const normalizedUsername = username.trim();
+      const user = AuthService.login(normalizedUsername, password);
+      const credentialStore = window.ceramisys?.credentials;
+      if (credentialStore?.set) {
+        try {
+          await credentialStore.set(normalizedUsername, password);
+          setRememberedCredentials({ username: normalizedUsername, password });
+        } catch (saveError) {
+          console.error('Could not save remembered login credentials:', saveError);
+        }
+      }
+      onSuccess(user);
+    } catch (err: any) {
+      setError(err?.message || 'تعذر تسجيل الدخول.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickLogin = () => {
+    if (!rememberedCredentials || loading) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const user = AuthService.login(rememberedCredentials.username, rememberedCredentials.password);
       onSuccess(user);
     } catch (err: any) {
       setError(err?.message || 'تعذر تسجيل الدخول.');
@@ -30,6 +77,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
   return (
     <div className="min-h-screen w-screen flex bg-slate-100 text-slate-900" dir="rtl">
+      {rememberedCredentials && (
+        <button
+          type="button"
+          onClick={handleQuickLogin}
+          disabled={loading}
+          aria-label="تسجيل الدخول بالحساب المحفوظ"
+          title="تسجيل الدخول بالحساب المحفوظ"
+          className="group fixed right-0 top-1/2 z-20 flex -translate-y-1/2 items-center gap-2 rounded-l-xl border border-r-0 border-sky-200 bg-white/90 px-3 py-3 text-sky-700 opacity-70 shadow-lg transition-all hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
+          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold transition-all group-hover:max-w-32 group-focus:max-w-32">
+            دخول سريع
+          </span>
+        </button>
+      )}
+
       {/* Brand panel */}
       <div className="hidden lg:flex flex-col justify-between w-[44%] bg-gradient-to-br from-sky-600 via-sky-700 to-indigo-800 text-white p-10 relative overflow-hidden">
         <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-white/10" />

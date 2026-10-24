@@ -1,5 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
@@ -87,9 +89,22 @@ const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 export class FinanceExtrasService {
   private db = DatabaseManager.getInstance();
 
+  private requireView() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'finance.view');
+    return actor;
+  }
+
+  private requireManage() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'finance.approve');
+    return actor;
+  }
+
   // ─── Chart of accounts ──────────────────────────────────────────────────────
 
   getAccounts(): Account[] {
+    this.requireView();
     return this.db.query<Account>(
       `SELECT a.*, COALESCE(SUM(l.debit - l.credit), 0) AS computed_balance
        FROM chart_of_accounts a
@@ -100,6 +115,7 @@ export class FinanceExtrasService {
   }
 
   createAccount(input: { code: string; name: string; type: AccountType; parentCode?: string; notes?: string }): void {
+    this.requireManage();
     const code = input.code.trim();
     if (!code) throw new Error('كود الحساب مطلوب.');
     if (!input.name.trim()) throw new Error('اسم الحساب مطلوب.');
@@ -114,6 +130,7 @@ export class FinanceExtrasService {
   }
 
   updateAccount(id: string, input: { name?: string; isActive?: boolean; notes?: string }): void {
+    this.requireManage();
     this.db.run(
       `UPDATE chart_of_accounts SET name = COALESCE(?, name), is_active = COALESCE(?, is_active), notes = COALESCE(?, notes) WHERE id = ?`,
       [input.name?.trim() || null, input.isActive === undefined ? null : input.isActive ? 1 : 0, input.notes ?? null, id]
@@ -121,6 +138,7 @@ export class FinanceExtrasService {
   }
 
   deleteAccount(id: string): void {
+    this.requireManage();
     const children = this.db.query<{ c: number }>('SELECT COUNT(*) AS c FROM chart_of_accounts WHERE parent_code = (SELECT code FROM chart_of_accounts WHERE id = ?)', [id])[0]?.c || 0;
     if (children > 0) throw new Error('لا يمكن حذف حساب له حسابات فرعية.');
     const used = this.db.query<{ c: number }>('SELECT COUNT(*) AS c FROM journal_entry_lines WHERE account_id = ?', [id])[0]?.c || 0;
@@ -131,6 +149,7 @@ export class FinanceExtrasService {
   // ─── Journal entries ────────────────────────────────────────────────────────
 
   getJournalEntries(limit = 200): JournalEntry[] {
+    this.requireView();
     return this.db.query<JournalEntry>(
       `SELECT e.*, (SELECT COUNT(*) FROM journal_entry_lines l WHERE l.entry_id = e.id) AS line_count
        FROM journal_entries e
@@ -141,6 +160,7 @@ export class FinanceExtrasService {
   }
 
   getJournalLines(entryId: string): JournalLine[] {
+    this.requireView();
     return this.db.query<JournalLine>(
       `SELECT l.*, a.code AS account_code, a.name AS account_name
        FROM journal_entry_lines l
@@ -159,6 +179,7 @@ export class FinanceExtrasService {
     referenceType?: string;
     referenceId?: string;
   }): string {
+    const actor = this.requireManage();
     if (!input.description.trim()) throw new Error('بيان القيد مطلوب.');
     const lines = input.lines.filter((l) => Number(l.debit) > 0 || Number(l.credit) > 0);
     if (lines.length < 2) throw new Error('القيد يحتاج إلى سطرين على الأقل.');
@@ -173,7 +194,7 @@ export class FinanceExtrasService {
       db.run(
         `INSERT INTO journal_entries (id, entry_number, date, description, reference_type, reference_id, total_debit, total_credit, is_posted, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-        [id, number, input.date, input.description.trim(), input.referenceType || null, input.referenceId || null, totalDebit, totalCredit, input.createdBy]
+        [id, number, input.date, input.description.trim(), input.referenceType || null, input.referenceId || null, totalDebit, totalCredit, actor.id]
       );
       for (const line of lines) {
         db.run(
@@ -187,6 +208,7 @@ export class FinanceExtrasService {
   }
 
   deleteJournalEntry(id: string): void {
+    this.requireManage();
     const entry = this.db.query<JournalEntry>('SELECT * FROM journal_entries WHERE id = ?', [id])[0];
     if (!entry) throw new Error('القيد غير موجود.');
     const lines = this.getJournalLines(id);
@@ -200,6 +222,7 @@ export class FinanceExtrasService {
   }
 
   getTrialBalance(): Array<{ code: string; name: string; type: AccountType; debit: number; credit: number }> {
+    this.requireView();
     return this.db.query(
       `SELECT a.code, a.name, a.type,
               COALESCE(SUM(l.debit), 0) AS debit,
@@ -215,6 +238,7 @@ export class FinanceExtrasService {
   // ─── VAT / tax ──────────────────────────────────────────────────────────────
 
   getTaxSummary(dateFrom: string, dateTo: string) {
+    this.requireView();
     const sales = this.db.query<any>(
       `SELECT COALESCE(SUM(tax_amount), 0) AS tax, COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
        FROM sales_invoices WHERE invoice_status != 'VOID' AND date >= ? AND date <= ?`,
@@ -239,6 +263,7 @@ export class FinanceExtrasService {
   }
 
   getTaxByMonth(dateFrom: string, dateTo: string) {
+    this.requireView();
     return this.db.query<{ month: string; outputTax: number; inputTax: number }>(
       `SELECT month, SUM(output_tax) AS output_tax, SUM(input_tax) AS input_tax FROM (
          SELECT substr(date, 1, 7) AS month, tax_amount AS output_tax, 0 AS input_tax
@@ -254,10 +279,12 @@ export class FinanceExtrasService {
   // ─── Cheques ────────────────────────────────────────────────────────────────
 
   getCheques(): Cheque[] {
+    this.requireView();
     return this.db.query<Cheque>('SELECT * FROM cheques ORDER BY due_date ASC, created_at DESC');
   }
 
   saveCheque(input: Partial<Cheque> & { chequeNumber: string; partyName: string; amount: number; dueDate: string }): void {
+    const actor = this.requireManage();
     if (!input.chequeNumber.trim()) throw new Error('رقم الشيك مطلوب.');
     if (!input.partyName.trim()) throw new Error('اسم الطرف مطلوب.');
     if (!(Number(input.amount) > 0)) throw new Error('قيمة الشيك يجب أن تكون أكبر من صفر.');
@@ -284,26 +311,30 @@ export class FinanceExtrasService {
       this.db.run(
         `INSERT INTO cheques (id, cheque_number, type, party_type, party_id, party_name, bank_name, amount, due_date, status, notes, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [`chq_${uuidv4().substring(0, 8)}`, ...values, input.createdBy || null]
+        [`chq_${uuidv4().substring(0, 8)}`, ...values, actor.id]
       );
     }
   }
 
   setChequeStatus(id: string, status: ChequeStatus): void {
+    this.requireManage();
     this.db.run('UPDATE cheques SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [status, id]);
   }
 
   deleteCheque(id: string): void {
+    this.requireManage();
     this.db.run('DELETE FROM cheques WHERE id = ?', [id]);
   }
 
   // ─── Fixed assets ───────────────────────────────────────────────────────────
 
   getFixedAssets(): FixedAsset[] {
+    this.requireView();
     return this.db.query<FixedAsset>('SELECT * FROM fixed_assets ORDER BY code ASC');
   }
 
   saveFixedAsset(input: Partial<FixedAsset> & { name: string; purchaseDate: string; purchaseCost: number }): void {
+    this.requireManage();
     if (!input.name.trim()) throw new Error('اسم الأصل مطلوب.');
     if (!(Number(input.purchaseCost) > 0)) throw new Error('تكلفة الشراء يجب أن تكون أكبر من صفر.');
     if (!input.purchaseDate) throw new Error('تاريخ الشراء مطلوب.');
@@ -339,6 +370,7 @@ export class FinanceExtrasService {
   }
 
   postMonthlyDepreciation(id: string): void {
+    this.requireManage();
     const asset = this.db.query<FixedAsset>('SELECT * FROM fixed_assets WHERE id = ?', [id])[0];
     if (!asset) throw new Error('الأصل غير موجود.');
     if (asset.status !== 'ACTIVE') throw new Error('لا يمكن إهلاك أصل غير نشط.');
@@ -354,6 +386,7 @@ export class FinanceExtrasService {
   }
 
   deleteFixedAsset(id: string): void {
+    this.requireManage();
     this.db.run('DELETE FROM fixed_assets WHERE id = ?', [id]);
   }
 }

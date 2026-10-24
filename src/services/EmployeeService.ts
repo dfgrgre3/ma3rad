@@ -1,5 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 
 export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
 export type SalaryType = 'MONTHLY' | 'DAILY';
@@ -56,9 +58,25 @@ export interface EmployeeFinancials {
 export class EmployeeService {
   private static db = DatabaseManager.getInstance();
 
+  private static requireView() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.view');
+    return actor;
+  }
+
+  private static requireManage() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.manage');
+    return actor;
+  }
+
   // ─── Employees ────────────────────────────────────────────────────────────────
 
   static getAll(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Employee[] {
+    const actor = this.requireView();
+    const salaryColumns = PermissionService.can(actor, 'employees.manage')
+      ? 'base_salary AS baseSalary, salary_type AS salaryType'
+      : "0 AS baseSalary, 'MONTHLY' AS salaryType";
     const conditions: string[] = [];
     const params: any[] = [];
 
@@ -77,16 +95,27 @@ export class EmployeeService {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const sql = `SELECT * FROM employees ${where} ORDER BY COALESCE(name, full_name) ASC`;
+    const sql = `SELECT id, name, location, role, phone, email, ${salaryColumns}, status,
+                        joined_date, notes, created_at, updated_at
+                 FROM employees ${where} ORDER BY COALESCE(name, full_name) ASC`;
     return this.db.query<Employee>(sql, params);
   }
 
   static getById(id: string): Employee | null {
-    const rows = this.db.query<Employee>(`SELECT * FROM employees WHERE id = ?`, [id]);
+    const actor = this.requireView();
+    const salaryColumns = PermissionService.can(actor, 'employees.manage')
+      ? 'base_salary AS baseSalary, salary_type AS salaryType'
+      : "0 AS baseSalary, 'MONTHLY' AS salaryType";
+    const rows = this.db.query<Employee>(
+      `SELECT id, name, location, role, phone, email, ${salaryColumns}, status,
+              joined_date, notes, created_at, updated_at FROM employees WHERE id = ?`,
+      [id]
+    );
     return rows[0] ?? null;
   }
 
   static create(data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'notes'> & { notes?: string }): Employee {
+    this.requireManage();
     if (!data.name?.trim()) throw new Error('اسم الموظف مطلوب.');
     if (!data.phone?.trim()) throw new Error('رقم الهاتف مطلوب.');
     const id = `emp_${uuidv4().substring(0, 8)}`;
@@ -106,6 +135,7 @@ export class EmployeeService {
   }
 
   static update(id: string, data: Partial<Omit<Employee, 'id' | 'createdAt'>>): Employee {
+    this.requireManage();
     const existing = this.getById(id);
     if (!existing) throw new Error('الموظف غير موجود.');
     const nextStatus = data.status ?? existing.status;
@@ -136,6 +166,7 @@ export class EmployeeService {
   }
 
   static delete(id: string): void {
+    this.requireManage();
     // Cascade deletes payroll_transactions & attendance via FK
     this.db.run(`DELETE FROM employees WHERE id = ?`, [id]);
   }
@@ -143,6 +174,7 @@ export class EmployeeService {
   // ─── Payroll Transactions ─────────────────────────────────────────────────────
 
   static getTransactions(employeeId?: string): PayrollTransaction[] {
+    this.requireManage();
     if (employeeId) {
       return this.db.query<PayrollTransaction>(
         `SELECT pt.*, e.name AS employee_name
@@ -169,21 +201,24 @@ export class EmployeeService {
     notes: string;
     createdBy?: string;
   }): PayrollTransaction {
+    const actor = this.requireManage();
     if (!this.getById(data.employeeId)) throw new Error('الموظف غير موجود.');
     const id = `ptx_${uuidv4().substring(0, 8)}`;
     this.db.run(
       `INSERT INTO payroll_transactions (id, employee_id, type, amount, date, notes, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, data.employeeId, data.type, data.amount, data.date, data.notes, data.createdBy ?? 'usr_admin']
+      [id, data.employeeId, data.type, data.amount, data.date, data.notes, actor.id]
     );
     return this.getTransactions(data.employeeId).find(t => t.id === id)!;
   }
 
   static deleteTransaction(id: string): void {
+    this.requireManage();
     this.db.run(`DELETE FROM payroll_transactions WHERE id = ?`, [id]);
   }
 
   static getEmployeeFinancials(employeeId: string): EmployeeFinancials {
+    this.requireManage();
     const emp = this.getById(employeeId);
     if (!emp) return { baseSalary: 0, advances: 0, bonuses: 0, deductions: 0, payouts: 0, netDue: 0 };
 
@@ -208,10 +243,12 @@ export class EmployeeService {
   // ─── Attendance ────────────────────────────────────────────────────────────────
 
   static getAllAttendance(): Attendance[] {
+    this.requireView();
     return this.db.query<Attendance>(`SELECT * FROM attendance ORDER BY date DESC`);
   }
 
   static getAttendanceByDate(date: string): Attendance[] {
+    this.requireView();
     return this.db.query<Attendance>(
       `SELECT * FROM attendance WHERE date = ? ORDER BY created_at`,
       [date]
@@ -225,6 +262,7 @@ export class EmployeeService {
     notes?: string;
     recordedBy?: string;
   }): void {
+    const actor = this.requireManage();
     const id = `att_${uuidv4().substring(0, 8)}`;
     this.db.run(
       `INSERT INTO attendance (id, employee_id, date, status, notes, recorded_by)
@@ -233,19 +271,21 @@ export class EmployeeService {
          status = excluded.status,
          notes = excluded.notes,
          recorded_by = excluded.recorded_by`,
-      [id, data.employeeId, data.date, data.status, data.notes ?? null, data.recordedBy ?? 'usr_admin']
+      [id, data.employeeId, data.date, data.status, data.notes ?? null, actor.id]
     );
   }
 
   // ─── Analytics helpers ────────────────────────────────────────────────────────
 
   static getLocationCounts(): { location: string; count: number }[] {
+    this.requireView();
     return this.db.query<{ location: string; count: number }>(
       `SELECT location, COUNT(*) AS count FROM employees GROUP BY location ORDER BY count DESC`
     );
   }
 
   static getTotalWagesBill(): number {
+    this.requireManage();
     const rows = this.db.query<{ salaryType: string; baseSalary: number }>(
       `SELECT salary_type, base_salary FROM employees WHERE status = 'ACTIVE'`
     );

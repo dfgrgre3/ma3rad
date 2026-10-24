@@ -10,6 +10,10 @@ declare global {
         backup?: (label?: string) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
         info?: () => Promise<{ path: string; exists: boolean; bytes: number; backupDir: string; error?: string }>;
       };
+      credentials?: {
+        get?: () => Promise<{ username: string; password: string } | null>;
+        set?: (username: string, password: string) => Promise<{ ok: boolean }>;
+      };
       app?: {
         info?: () => Promise<{ version: string; packaged: boolean; dataDir: string; backupDir: string }>;
         openFolder?: (target?: 'data' | 'backups') => Promise<{ ok: boolean; path?: string; error?: string }>;

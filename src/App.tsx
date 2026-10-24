@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
@@ -12,6 +12,24 @@ import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { registerRemoteDbBridge } from './database/remoteBridge';
 import { isRemoteClient, remoteHasToken } from './database/remote';
+
+const RUNTIME_SESSION_KEY = 'ceramisys_runtime_initialized';
+
+function hasRuntimeSession(): boolean {
+  try {
+    return sessionStorage.getItem(RUNTIME_SESSION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markRuntimeSession(): void {
+  try {
+    sessionStorage.setItem(RUNTIME_SESSION_KEY, '1');
+  } catch {
+    // Session storage may be unavailable in restricted browser contexts.
+  }
+}
 
 // Start the LAN companion server automatically when the setting enables it.
 // Runs only inside the desktop app and only after the DB is ready.
@@ -29,6 +47,7 @@ function maybeStartLanServer(): void {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export const App: React.FC = () => {
+  const backupTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dbReady, setDbReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -54,6 +73,10 @@ export const App: React.FC = () => {
     DatabaseManager.getInstance()
       .initialize()
       .then(() => {
+        const restoreCurrentRuntimeSession = hasRuntimeSession();
+        if (!restoreCurrentRuntimeSession) AuthService.clearPersistedSession();
+        markRuntimeSession();
+
         // A fresh LAN client has no session token yet — go straight to the
         // login screen; the desktop host has already seeded permissions.
         if (isRemoteClient() && !remoteHasToken()) {
@@ -61,17 +84,24 @@ export const App: React.FC = () => {
           return;
         }
         PermissionService.seed();
-        setCurrentUser(AuthService.restoreSession());
+        setCurrentUser(restoreCurrentRuntimeSession ? AuthService.restoreSession() : null);
         setDbReady(true);
         maybeStartLanServer();
-        // Scheduled local backups (runs once per configured interval).
+        // Check the configured interval throughout the desktop session.
         void import('./services/BackupService').then(({ BackupService }) => {
-          try {
-            const interval = SettingsService.getSettings().autoBackupIntervalHours || 24;
-            void new BackupService().runAutoBackupIfDue(interval);
-          } catch (e) {
-            console.warn('Auto backup skipped:', e);
-          }
+          const runBackupCheck = () => {
+            try {
+              const interval = SettingsService.getSettings().autoBackupIntervalHours || 24;
+              void new BackupService().runAutoBackupIfDue(interval).then((result) => {
+                if (result.error) console.warn('Auto backup failed:', result.error);
+              });
+            } catch (e) {
+              console.warn('Auto backup skipped:', e);
+            }
+          };
+          if (backupTimer.current) clearInterval(backupTimer.current);
+          runBackupCheck();
+          backupTimer.current = setInterval(runBackupCheck, 15 * 60 * 1000);
         });
         // Scheduled business alerts (low stock, dues, pending approvals).
         void import('./services/NotificationService').then(({ NotificationService }) => {
@@ -90,6 +120,9 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     initDb();
+    return () => {
+      if (backupTimer.current) clearInterval(backupTimer.current);
+    };
   }, []);
 
   // Ensure the latest snapshot reaches disk before the window closes.

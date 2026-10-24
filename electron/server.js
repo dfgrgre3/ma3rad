@@ -27,6 +27,25 @@ let server = null;
 let currentPort = 0;
 const sessions = new Map(); // token -> { userId, createdAt }
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+let transactionOwner = null;
+let transactionIdleTimer = null;
+const TRANSACTION_IDLE_TIMEOUT_MS = 30 * 1000;
+
+function clearRemoteTransaction(rollback = false) {
+  if (transactionIdleTimer) clearTimeout(transactionIdleTimer);
+  transactionIdleTimer = null;
+  const hadOwner = transactionOwner !== null;
+  transactionOwner = null;
+  if (rollback && hadOwner) {
+    sendToRenderer({ mode: 'systemRollback' }).catch(() => {});
+  }
+}
+
+function refreshRemoteTransactionTimeout() {
+  if (transactionIdleTimer) clearTimeout(transactionIdleTimer);
+  transactionIdleTimer = setTimeout(() => clearRemoteTransaction(true), TRANSACTION_IDLE_TIMEOUT_MS);
+  transactionIdleTimer.unref?.();
+}
 
 function pruneSessions() {
   const now = Date.now();
@@ -133,17 +152,41 @@ function createHandler(distDir) {
         const token = authed(req);
         if (!token) return json(res, 401, { ok: false, error: 'الجلسة منتهية، أعد تسجيل الدخول' });
         const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
-        if (typeof body.sql !== 'string' || !Array.isArray(body.params || [])) {
+        const mode = body.mode;
+        if (!['query', 'exec', 'run', 'export', 'import'].includes(mode)) {
+          return json(res, 400, { ok: false, error: 'Invalid database operation.' });
+        }
+        if (['query', 'exec', 'run'].includes(mode) &&
+            (typeof body.sql !== 'string' || !Array.isArray(body.params || []))) {
           return json(res, 400, { ok: false, error: 'استعلام غير صالح' });
         }
+        if (mode === 'import' && typeof body.base64 !== 'string') {
+          return json(res, 400, { ok: false, error: 'Invalid backup payload.' });
+        }
+        const sql = typeof body.sql === 'string' ? body.sql.trim() : '';
+        const beginsTransaction = /^BEGIN(?:\s+TRANSACTION)?\s*;?$/i.test(sql);
+        const endsTransaction = /^(?:COMMIT|ROLLBACK)\s*;?$/i.test(sql);
+        const requestTransactionId = typeof body.transactionId === 'string' ? body.transactionId : '';
+        if (transactionOwner && (transactionOwner.token !== token || transactionOwner.transactionId !== requestTransactionId)) {
+          return json(res, 423, { ok: false, error: 'يوجد إجراء مالي جارٍ من جلسة أخرى، حاول بعد اكتماله' });
+        }
+        if (beginsTransaction && !requestTransactionId) {
+          return json(res, 400, { ok: false, error: 'معرّف المعاملة مطلوب' });
+        }
         try {
+          if (beginsTransaction) transactionOwner = { token, transactionId: requestTransactionId };
+          if (transactionOwner?.token === token && transactionOwner.transactionId === requestTransactionId && !endsTransaction) refreshRemoteTransactionTimeout();
           const result = await sendToRenderer({
-            mode: body.mode === 'run' ? 'run' : 'query',
+            mode,
+            actorId: sessions.get(token)?.userId,
             sql: body.sql,
             params: body.params || [],
+            base64: body.base64,
           });
-          return json(res, 200, { ok: true, rows: result.rows || [] });
+          if (endsTransaction && transactionOwner?.token === token && transactionOwner.transactionId === requestTransactionId) clearRemoteTransaction(false);
+          return json(res, 200, { ok: true, ...(result || {}) });
         } catch (e) {
+          if (beginsTransaction && transactionOwner?.token === token && transactionOwner.transactionId === requestTransactionId) clearRemoteTransaction(true);
           return json(res, 500, { ok: false, error: e.message });
         }
       }
@@ -209,6 +252,7 @@ function stop() {
     server = null;
     currentPort = 0;
     sessions.clear();
+    clearRemoteTransaction(true);
   });
 }
 

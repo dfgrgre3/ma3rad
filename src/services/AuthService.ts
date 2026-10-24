@@ -106,6 +106,36 @@ export class AuthService {
     }
   }
 
+  /** Clear any session left by a previous app run instead of restoring it. */
+  public static clearPersistedSession(): void {
+    if (AuthService.currentUser) PermissionService.invalidate(AuthService.currentUser);
+    AuthService.currentUser = null;
+
+    let sessionId: string | null = null;
+    try {
+      sessionId = localStorage.getItem(SESSION_ID_KEY);
+      localStorage.removeItem(SESSION_ID_KEY);
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Browser storage may be unavailable in the test harness.
+    }
+
+    if (isRemoteClient()) {
+      remoteLogout();
+    } else if (sessionId) {
+      try {
+        DatabaseManager.getInstance().run(
+          `UPDATE user_sessions SET is_active = 0, ended_at = ?, end_reason = 'LOGOUT'
+           WHERE id = ? AND is_active = 1`,
+          [new Date().toISOString(), sessionId]
+        );
+      } catch {
+        // Startup must continue even if an earlier session cannot be closed.
+      }
+    }
+    AuthService.currentSessionId = null;
+  }
+
   private static recordLogin(userId: string | null, username: string, succeeded: boolean, reason?: string): void {
     try {
       DatabaseManager.getInstance().run(
@@ -129,7 +159,8 @@ export class AuthService {
     if (!userId) return null;
 
     const rows = DatabaseManager.getInstance().query<any>(
-      `SELECT * FROM users WHERE id = ? AND is_active = 1`,
+      `SELECT id, username, full_name, role, phone, is_active, created_at, updated_at
+       FROM users WHERE id = ? AND is_active = 1`,
       [userId]
     );
     if (rows.length === 0) {

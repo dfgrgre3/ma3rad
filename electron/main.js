@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -13,6 +13,7 @@ app.setPath('userData', APP_DATA_DIR);
 const DATA_DIR = path.join(APP_DATA_DIR, 'data');
 const BACKUP_DIR = path.join(APP_DATA_DIR, 'backups');
 const DB_FILE = path.join(DATA_DIR, 'ceramisys.sqlite');
+const REMEMBERED_CREDENTIALS_FILE = path.join(APP_DATA_DIR, 'remembered-login.enc');
 
 app.disableHardwareAcceleration();
 
@@ -112,6 +113,34 @@ ipcMain.handle('db:info', async () => {
   } catch (error) {
     return { path: DB_FILE, exists: false, bytes: 0, backupDir: BACKUP_DIR, error: String(error) };
   }
+});
+
+ipcMain.handle('credentials:get', async () => {
+  if (!fsSync.existsSync(REMEMBERED_CREDENTIALS_FILE)) return null;
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
+  }
+  const encrypted = await fs.readFile(REMEMBERED_CREDENTIALS_FILE);
+  const credentials = JSON.parse(safeStorage.decryptString(encrypted));
+  if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
+    throw new Error('بيانات الدخول المحفوظة غير صالحة.');
+  }
+  return credentials;
+});
+
+ipcMain.handle('credentials:set', async (_event, { username, password }) => {
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    throw new Error('بيانات الدخول غير صالحة للحفظ.');
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
+  }
+  ensureDirs();
+  const encrypted = safeStorage.encryptString(JSON.stringify({ username, password }));
+  const temporaryFile = `${REMEMBERED_CREDENTIALS_FILE}.tmp`;
+  await fs.writeFile(temporaryFile, encrypted);
+  await fs.rename(temporaryFile, REMEMBERED_CREDENTIALS_FILE);
+  return { ok: true };
 });
 
 ipcMain.handle('app:info', async () => ({
@@ -290,6 +319,7 @@ public class RawPrinterHelper {
     `;
     await runPowerShell(ps);
     return { ok: true };
+    }
   } catch (error) {
     return { ok: false, error: String(error) };
   } finally {

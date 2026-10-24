@@ -83,6 +83,12 @@ export class BackupService {
         module: 'SYSTEM',
         newValues: JSON.stringify({ path: result.path, bytes: result.bytes }),
       });
+    } else {
+      this.db.run(
+        `INSERT INTO backup_history (id, file_name, file_path, file_size_bytes, backup_type, status)
+         VALUES (?, ?, ?, 0, ?, 'FAILED')`,
+        [`bak_${uuidv4().substring(0, 8)}`, label, 'N/A', label.toUpperCase()]
+      );
     }
     return result;
   }
@@ -108,7 +114,9 @@ export class BackupService {
   }
 
   public getLastBackup(): any | null {
-    const rows = this.db.query(`SELECT * FROM backup_history ORDER BY created_at DESC LIMIT 1`);
+    const rows = this.db.query(
+      `SELECT * FROM backup_history WHERE backup_type = 'AUTO' AND status = 'SUCCESS' ORDER BY created_at DESC LIMIT 1`
+    );
     return rows[0] || null;
   }
 

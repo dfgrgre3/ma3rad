@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package,
-  AlertTriangle, Users, ArrowUpRight, ArrowDownRight, Clock,
-  Building2, RefreshCw, Calendar
+  TrendingUp, DollarSign, ShoppingCart, Package,
+  AlertTriangle, ArrowUpRight, ArrowDownRight, Clock
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -38,6 +37,7 @@ const CHART_COLORS = ['#38bdf8', '#818cf8', '#34d399', '#fb923c', '#f472b6'];
 export const ExecutiveDashboard: React.FC = () => {
   const [range, setRange] = useState<DateRange>('month');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [kpis, setKpis] = useState<KPI[]>([]);
   const [dailySales, setDailySales] = useState<DailySale[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
@@ -66,20 +66,21 @@ export const ExecutiveDashboard: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const db = DatabaseManager.getInstance().getDatabase();
       if (!db) return;
 
       const { from, to } = getRangeDates();
-      const fromStr = from.toISOString();
-      const toStr = to.toISOString();
+      const fromStr = format(from, 'yyyy-MM-dd');
+      const toStr = format(to, 'yyyy-MM-dd');
       const today = format(new Date(), 'yyyy-MM-dd');
       const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
       // ── KPIs ──────────────────────────────────────────────────────────────────
       const salesRow = db.exec(
-        `SELECT COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(total_amount - discount_amount - (total_cost_amount)), 0) as profit
-         FROM sales_invoices WHERE created_at BETWEEN ? AND ? AND status != 'CANCELLED'`,
+        `SELECT COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(gross_profit), 0) as profit
+         FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
         [fromStr, toStr]
       );
       const total = salesRow[0]?.values[0]?.[0] as number ?? 0;
@@ -87,12 +88,12 @@ export const ExecutiveDashboard: React.FC = () => {
 
       const yesterdayRow = db.exec(
         `SELECT COALESCE(SUM(total_amount),0) as total FROM sales_invoices
-         WHERE DATE(created_at) = ? AND status != 'CANCELLED'`,
+         WHERE date = ? AND invoice_status != 'VOID'`,
         [yesterday]
       );
       const todayRow = db.exec(
         `SELECT COALESCE(SUM(total_amount),0) as total FROM sales_invoices
-         WHERE DATE(created_at) = ? AND status != 'CANCELLED'`,
+         WHERE date = ? AND invoice_status != 'VOID'`,
         [today]
       );
       const todaySales = todayRow[0]?.values[0]?.[0] as number ?? 0;
@@ -102,26 +103,26 @@ export const ExecutiveDashboard: React.FC = () => {
         : '0';
 
       const debtRow = db.exec(
-        `SELECT COALESCE(SUM(balance),0) FROM customers WHERE balance > 0`
+        `SELECT COALESCE(SUM(current_balance),0) FROM customers WHERE current_balance > 0`
       );
       const totalDebt = debtRow[0]?.values[0]?.[0] as number ?? 0;
 
       const purchaseRow = db.exec(
         `SELECT COALESCE(SUM(total_amount),0) FROM purchase_invoices
-         WHERE created_at BETWEEN ? AND ?`,
+         WHERE date BETWEEN ? AND ?`,
         [fromStr, toStr]
       );
       const totalPurchases = purchaseRow[0]?.values[0]?.[0] as number ?? 0;
 
       const receivedRow = db.exec(
-        `SELECT COALESCE(SUM(amount),0) FROM cash_transactions
-         WHERE type IN ('RECEIPT','PAYMENT_IN') AND created_at BETWEEN ? AND ?`,
+        `SELECT COALESCE(SUM(amount),0) FROM customer_payments
+         WHERE date BETWEEN ? AND ?`,
         [fromStr, toStr]
       );
       const totalReceived = receivedRow[0]?.values[0]?.[0] as number ?? 0;
 
       const invoiceCountRow = db.exec(
-        `SELECT COUNT(*) FROM sales_invoices WHERE created_at BETWEEN ? AND ? AND status != 'CANCELLED'`,
+        `SELECT COUNT(*) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
         [fromStr, toStr]
       );
       const invoiceCount = invoiceCountRow[0]?.values[0]?.[0] as number ?? 0;
@@ -180,12 +181,12 @@ export const ExecutiveDashboard: React.FC = () => {
       // ── Daily Sales Chart (last 30 days) ─────────────────────────────────────
       const days30From = format(subDays(new Date(), 29), 'yyyy-MM-dd');
       const salesByDayRow = db.exec(
-        `SELECT DATE(created_at) as day,
+        `SELECT date as day,
                 COALESCE(SUM(total_amount),0) as sales,
-                COALESCE(SUM(total_amount - discount_amount - total_cost_amount),0) as profit
+                COALESCE(SUM(gross_profit),0) as profit
          FROM sales_invoices
-         WHERE DATE(created_at) >= ? AND status != 'CANCELLED'
-         GROUP BY DATE(created_at)
+         WHERE date >= ? AND invoice_status != 'VOID'
+         GROUP BY date
          ORDER BY day ASC`,
         [days30From]
       );
@@ -213,12 +214,12 @@ export const ExecutiveDashboard: React.FC = () => {
       // ── Top Products ──────────────────────────────────────────────────────────
       const topProdRow = db.exec(
         `SELECT p.name,
-                COALESCE(SUM(sii.quantity_m2 + sii.quantity_pieces * 0.01), 0) as qty,
+                COALESCE(SUM(sii.quantity_m2), 0) as qty,
                 COALESCE(SUM(sii.total_price), 0) as revenue
          FROM sales_invoice_items sii
          JOIN products p ON p.id = sii.product_id
          JOIN sales_invoices si ON si.id = sii.invoice_id
-         WHERE si.created_at BETWEEN ? AND ? AND si.status != 'CANCELLED'
+         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
          GROUP BY p.id ORDER BY revenue DESC LIMIT 6`,
         [fromStr, toStr]
       );
@@ -238,7 +239,7 @@ export const ExecutiveDashboard: React.FC = () => {
                 si.total_amount, si.created_at, si.payment_status
          FROM sales_invoices si
          LEFT JOIN customers c ON c.id = si.customer_id
-         WHERE si.status != 'CANCELLED'
+         WHERE si.invoice_status != 'VOID'
          ORDER BY si.created_at DESC LIMIT 8`
       );
       const recentData: RecentInvoice[] = recentRow[0]?.values.map((row: any[]) => {
@@ -255,7 +256,7 @@ export const ExecutiveDashboard: React.FC = () => {
 
       // ── Top Debt Customers ────────────────────────────────────────────────────
       const debtCustRow = db.exec(
-        `SELECT name, balance FROM customers WHERE balance > 0 ORDER BY balance DESC LIMIT 5`
+        `SELECT name, current_balance FROM customers WHERE current_balance > 0 ORDER BY current_balance DESC LIMIT 5`
       );
       const debtData: DebtCustomer[] = debtCustRow[0]?.values.map((row: any[]) => {
         const [n, b] = row;
@@ -272,7 +273,7 @@ export const ExecutiveDashboard: React.FC = () => {
                 COALESCE(SUM(si.total_amount),0) as total
          FROM sales_invoices si
          LEFT JOIN warehouses w ON w.id = si.warehouse_id
-         WHERE si.created_at BETWEEN ? AND ? AND si.status != 'CANCELLED'
+         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
          GROUP BY w.id LIMIT 5`,
         [fromStr, toStr]
       );
@@ -311,6 +312,7 @@ export const ExecutiveDashboard: React.FC = () => {
       setLastRefresh(new Date());
     } catch (e) {
       console.error('Executive Dashboard error:', e);
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل بيانات لوحة المؤشرات.');
     } finally {
       setLoading(false);
     }
@@ -365,10 +367,10 @@ export const ExecutiveDashboard: React.FC = () => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2 rounded-lg bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition"
+            className="px-3 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition disabled:cursor-not-allowed disabled:opacity-50"
             title="تحديث"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            تحديث
           </button>
         </div>
       </div>
@@ -382,6 +384,11 @@ export const ExecutiveDashboard: React.FC = () => {
         </div>
       ) : (
         <>
+          {loadError && (
+            <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              تعذر تحميل بعض المؤشرات: {loadError}
+            </div>
+          )}
           {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {kpis.map((kpi) => {

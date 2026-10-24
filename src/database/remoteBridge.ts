@@ -1,5 +1,7 @@
 import { DatabaseManager } from './db';
 import { AuthService } from '../services/AuthService';
+import { PermissionService } from '../services/PermissionService';
+import { authorizeRemoteSql } from './remoteAuthorization';
 
 /**
  * Renderer-side bridge for LAN clients. When the Electron main process runs
@@ -14,12 +16,39 @@ export function registerRemoteDbBridge(): void {
   if (!api?.onRequest) return; // not running inside Electron
 
   api.onRequest(async (payload: any) => {
+    if (['query', 'run', 'export', 'import', 'exec'].includes(payload?.mode)) {
+      const db = DatabaseManager.getInstance();
+      const actor = db.query<any>(
+        `SELECT id, username, full_name AS fullName, role, is_active AS isActive,
+                created_at AS createdAt, updated_at AS updatedAt
+         FROM users WHERE id = ? AND is_active = 1`,
+        [String(payload.actorId || '')]
+      )[0];
+      if (!actor) throw new Error('Remote session user is inactive or invalid.');
+      PermissionService.invalidate(actor);
+      if (payload.mode === 'export' || payload.mode === 'import') {
+        PermissionService.require(actor, 'settings.backup');
+      } else {
+        authorizeRemoteSql(
+          String(payload.sql || ''),
+          payload.mode === 'exec' ? 'query' : payload.mode,
+          (codes) => codes.includes('*') || PermissionService.canAny(actor, codes),
+          payload.params || [],
+          actor.id,
+        );
+      }
+    }
+
     switch (payload?.mode) {
       case 'authLogin': {
         // Runs the full login flow locally (lockout, audit history, sessions)
         // and hands the resulting user back to the LAN client.
         const user = AuthService.login(String(payload.username), String(payload.password));
         return { user };
+      }
+      case 'systemRollback': {
+        DatabaseManager.getInstance().getDatabase().run('ROLLBACK;');
+        return {};
       }
       case 'exec': {
         const raw = DatabaseManager.getInstance().getDatabase().exec(String(payload.sql));

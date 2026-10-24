@@ -4,7 +4,10 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/',
+  // Electron loads the packaged renderer from file://, so root-absolute URLs
+  // like /assets/... resolve outside the app bundle and leave a blank window.
+  // Relative URLs also work when Vite serves the app from the LAN host root.
+  base: './',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

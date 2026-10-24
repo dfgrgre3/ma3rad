@@ -8,6 +8,10 @@ contextBridge.exposeInMainWorld('ceramisys', {
     backup: (label) => ipcRenderer.invoke('db:backup', label),
     info: () => ipcRenderer.invoke('db:info'),
   },
+  credentials: {
+    get: () => ipcRenderer.invoke('credentials:get'),
+    set: (username, password) => ipcRenderer.invoke('credentials:set', { username, password }),
+  },
   app: {
     info: () => ipcRenderer.invoke('app:info'),
     openFolder: (target) => ipcRenderer.invoke('app:openFolder', target),
