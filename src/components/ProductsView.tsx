@@ -20,12 +20,13 @@ import { exportToExcel } from '../utils/export';
 const UNITS: { value: UnitType; label: string }[] = [
   { value: 'M2', label: 'متر مربع (م²)' },
   { value: 'LINEAR_METER', label: 'متر طولي' },
-  { value: 'BOX', label: 'كرتونة' },
-  { value: 'PIECE', label: 'قطعة' },
   { value: 'KG', label: 'كيلوجرام' },
   { value: 'TON', label: 'طن' },
   { value: 'SET', label: 'طقم' },
+  { value: 'BOX', label: 'Box' },
+  { value: 'PIECE', label: 'Piece' },
 ];
+const unitLabelFor = (unit: UnitType, custom = '') => custom.trim() || UNITS.find((item) => item.value === unit)?.label || unit;
 
 const SURFACES = [
   { value: 'FLOOR', label: 'أرضيات' },
@@ -56,6 +57,7 @@ const calcMetersFromSize = (size: string, pieces: number): number | null => {
 };
 
 interface FormState {
+  productType: 'CERAMIC' | 'GENERAL';
   name: string;
   sku: string;
   barcode: string;
@@ -65,10 +67,12 @@ interface FormState {
   size: string;
   thickness: number;
   color: string;
+  tone: string;
   finish: string;
   surfaceLocation: 'FLOOR' | 'WALL' | 'OUTDOOR' | 'GENERAL';
   baseUnit: UnitType;
   sellUnit: UnitType;
+  customUnit: string;
   piecesPerBox: number;
   metersPerBox: number;
   weightPerBox: number;
@@ -104,6 +108,7 @@ interface VariantDraft {
 type TabId = 'basic' | 'units' | 'pricing' | 'stock' | 'extras';
 
 const emptyForm = (categoryId = '', brandId = ''): FormState => ({
+  productType: 'CERAMIC',
   name: '',
   sku: '',
   barcode: '',
@@ -113,10 +118,12 @@ const emptyForm = (categoryId = '', brandId = ''): FormState => ({
   size: '60x60',
   thickness: 8,
   color: '',
+  tone: '',
   finish: 'لامع',
   surfaceLocation: 'FLOOR',
   baseUnit: 'M2',
   sellUnit: 'M2',
+  customUnit: '',
   piecesPerBox: 4,
   metersPerBox: 1.44,
   weightPerBox: 0,
@@ -198,8 +205,9 @@ export const ProductsView: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState('');
   const [stockStatus, setStockStatus] = useState<'all' | 'in' | 'low' | 'out'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'newest' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc'>('name');
-  const [showInactive, setShowInactive] = useState(false);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  const [productStatus, setProductStatus] = useState<'active' | 'inactive' | 'all'>('active');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>(() => localStorage.getItem('products_view_mode') === 'cards' ? 'cards' : 'table');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -279,7 +287,8 @@ export const ProductsView: React.FC = () => {
           grade: selectedGrade || undefined,
           stockStatus: stockStatus === 'all' ? undefined : stockStatus,
           sortBy,
-          includeInactive: showInactive,
+          includeInactive: productStatus === 'all',
+          status: productStatus,
         },
       );
       setProducts(result.items);
@@ -301,9 +310,13 @@ export const ProductsView: React.FC = () => {
 
   useEffect(() => {
     loadProducts();
-  }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, showInactive, page, pageSize]);
+  }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, productStatus, page, pageSize]);
 
-  useEffect(() => { setPage(1); }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, showInactive]);
+  useEffect(() => { setSelectedProductIds([]); }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, productStatus, page, pageSize]);
+
+  useEffect(() => { setPage(1); }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, productStatus]);
+
+  useEffect(() => { localStorage.setItem('products_view_mode', viewMode); }, [viewMode]);
 
   useEffect(() => {
     const category = searchParams.get('category') || '';
@@ -312,6 +325,7 @@ export const ProductsView: React.FC = () => {
 
   const stockOf = (p: Product) => {
     const m2 = Number(p.totalStockM2 ?? 0);
+    if (p.productType === 'GENERAL') return { m2, boxes: 0, pieces: m2 };
     const metersPerBox = p.metersPerBox || 0;
     const boxes = metersPerBox > 0 ? m2 / metersPerBox : 0;
     const pieces = metersPerBox > 0 ? boxes * (p.piecesPerBox || 0) : 0;
@@ -358,19 +372,22 @@ export const ProductsView: React.FC = () => {
     setRemovedImageIds([]);
     setPendingImages([]);
     setFormData({
+      productType: product.productType || 'CERAMIC',
       name: product.name,
       sku: product.sku,
       barcode: product.barcode,
       categoryId: product.categoryId,
-      brandId: product.brandId,
+      brandId: product.brandId || '',
       grade: product.grade,
       size: product.size,
       thickness: product.thickness || 0,
       color: product.color || '',
+      tone: product.tone || '',
       finish: product.finish || '',
       surfaceLocation: (product.surfaceLocation || 'FLOOR') as FormState['surfaceLocation'],
       baseUnit: product.baseUnit || 'M2',
       sellUnit: product.sellUnit || 'M2',
+      customUnit: product.customUnit || '',
       piecesPerBox: product.piecesPerBox || 1,
       metersPerBox: product.metersPerBox || 0,
       weightPerBox: product.weightPerBox || 0,
@@ -580,26 +597,29 @@ export const ProductsView: React.FC = () => {
     e.preventDefault();
     if (!formData.name.trim()) { alert('أدخل اسم الصنف.'); return; }
     if (!formData.categoryId) { alert('اختر نوع المنتج أو أضف نوعًا جديدًا.'); return; }
-    if (!formData.brandId) { alert('اختر الماركة أو أضف ماركة جديدة.'); return; }
+    if (formData.productType === 'CERAMIC' && !formData.brandId) { alert('اختر الماركة أو أضف ماركة جديدة.'); return; }
     if (!formData.barcode.trim() || !formData.sku.trim()) { alert('الباركود وكود الصنف مطلوبان.'); return; }
     setIsSaving(true);
     try {
       const payload = {
+        productType: formData.productType,
         name: formData.name.trim(),
         sku: formData.sku.trim(),
         barcode: formData.barcode.trim(),
         categoryId: formData.categoryId,
         brandId: formData.brandId,
-        grade: formData.grade,
-        size: formData.size,
+        grade: formData.productType === 'CERAMIC' ? formData.grade : 'GRADE_1',
+        size: formData.productType === 'CERAMIC' ? formData.size : '',
         thickness: formData.thickness,
         color: formData.color,
+        tone: formData.tone,
         finish: formData.finish,
         surfaceLocation: formData.surfaceLocation,
         baseUnit: formData.baseUnit,
         sellUnit: formData.sellUnit,
-        piecesPerBox: formData.piecesPerBox,
-        metersPerBox: formData.metersPerBox,
+        customUnit: formData.customUnit,
+        piecesPerBox: formData.productType === 'CERAMIC' ? formData.piecesPerBox : 1,
+        metersPerBox: formData.productType === 'CERAMIC' ? formData.metersPerBox : 1,
         weightPerBox: formData.weightPerBox,
         costPrice: formData.costPrice,
         sellingPriceM2: formData.sellingPriceM2,
@@ -704,6 +724,33 @@ export const ProductsView: React.FC = () => {
     }
   };
 
+  const toggleProductSelection = (id: string) => {
+    setSelectedProductIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
+  const togglePageSelection = () => {
+    const pageIds = products.map((product) => product.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedProductIds.includes(id));
+    setSelectedProductIds((current) => allSelected
+      ? current.filter((id) => !pageIds.includes(id))
+      : [...new Set([...current, ...pageIds])]);
+  };
+
+  const handleBulkStatus = (active: boolean) => {
+    const label = active ? 'تفعيل' : 'إيقاف';
+    if (selectedProductIds.length === 0 || !confirm(`${label} ${selectedProductIds.length} صنف؟`)) return;
+    try {
+      selectedProductIds.forEach((id) => productService.setProductActive(id, active));
+      setSelectedProductIds([]);
+      loadProducts();
+      loadStats();
+    } catch (err: any) {
+      alert(`تعذر ${label} الأصناف المحددة: ${err?.message || err}`);
+      loadProducts();
+      loadStats();
+    }
+  };
+
   const openStockModal = (product: Product) => {
     setStockProduct(product);
     setStockReason('إضافة كمية للمخزون');
@@ -744,7 +791,15 @@ export const ProductsView: React.FC = () => {
 
   const handleExport = () => {
     try {
-      const all = productService.getAllProducts(search, selectedCategory || undefined, selectedBrand || undefined);
+      const all = selectedProductIds.length
+        ? selectedProductIds.map((id) => productService.getProductById(id)).filter((p): p is Product => Boolean(p))
+        : productService.getProductsPage(search, selectedCategory || undefined, selectedBrand || undefined, 1, 100000, {
+            grade: selectedGrade || undefined,
+            stockStatus: stockStatus === 'all' ? undefined : stockStatus,
+            sortBy,
+            status: productStatus,
+            includeInactive: productStatus === 'all',
+          }).items;
       const rows = all.map((p) => {
         const stock = productService.getProductStockSummary(p.id);
         return {
@@ -756,6 +811,7 @@ export const ProductsView: React.FC = () => {
           size: p.size,
           grade: p.grade,
           color: p.color || '',
+          tone: p.tone || '',
           finish: p.finish || '',
           piecesPerBox: p.piecesPerBox,
           metersPerBox: p.metersPerBox,
@@ -782,6 +838,7 @@ export const ProductsView: React.FC = () => {
           { key: 'size', label: 'المقاس' },
           { key: 'grade', label: 'الفرز' },
           { key: 'color', label: 'اللون' },
+          { key: 'tone', label: 'التون' },
           { key: 'finish', label: 'التشطيب' },
           { key: 'piecesPerBox', label: 'قطع/كرتونة' },
           { key: 'metersPerBox', label: 'م²/كرتونة' },
@@ -812,8 +869,8 @@ export const ProductsView: React.FC = () => {
         { key: 'brand', label: 'الماركة' },
         { key: 'barcode', label: 'الباركود' },
         { key: 'sku', label: 'الكود' },
-        { key: 'grade', label: 'الفرز' },
-        { key: 'size', label: 'المقاس' },
+          { key: 'grade', label: 'الفرز' },
+          { key: 'size', label: 'المقاس' },
         { key: 'color', label: 'اللون' },
         { key: 'finish', label: 'التشطيب' },
         { key: 'piecesPerBox', label: 'قطع بالكرتونة' },
@@ -951,7 +1008,7 @@ export const ProductsView: React.FC = () => {
   const profitPerMeter = formData.sellingPriceM2 - formData.costPrice;
   const profitMargin = formData.sellingPriceM2 > 0 ? (profitPerMeter / formData.sellingPriceM2) * 100 : 0;
   const stockValue = formData.costPrice * openingRows.reduce((sum, row) => sum + row.meters, 0);
-  const unitLabel = formData.baseUnit === 'LINEAR_METER' ? 'متر طولي' : 'م²';
+  const unitLabel = unitLabelFor(formData.baseUnit, formData.customUnit);
 
   const tabs = useMemo(() => ([
     { id: 'basic' as TabId, label: 'البيانات الأساسية', icon: <Package className="w-4 h-4" /> },
@@ -1008,7 +1065,7 @@ export const ProductsView: React.FC = () => {
           <button onClick={() => setShowFilters((v) => !v)} className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${showFilters ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
             <Filter className="w-4 h-4" /> فلاتر متقدمة
           </button>
-          <div className="flex items-center overflow-hidden rounded-xl border border-slate-200">
+        <div className="flex items-center overflow-hidden rounded-xl border border-slate-200">
             <button onClick={() => setViewMode('table')} className={`px-2.5 py-2 ${viewMode === 'table' ? 'bg-sky-600 text-white' : 'bg-white text-slate-500'}`} title="عرض جدول"><List className="w-4 h-4" /></button>
             <button onClick={() => setViewMode('cards')} className={`px-2.5 py-2 ${viewMode === 'cards' ? 'bg-sky-600 text-white' : 'bg-white text-slate-500'}`} title="عرض بطاقات"><LayoutGrid className="w-4 h-4" /></button>
           </div>
@@ -1043,13 +1100,27 @@ export const ProductsView: React.FC = () => {
               <option value="stock_asc">المخزون: الأقل</option>
               <option value="stock_desc">المخزون: الأكثر</option>
             </select>
-            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
-              <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-slate-300 text-sky-600" />
-              إظهار الموقوفة
-            </label>
+            <select aria-label="Product status" value={productStatus} onChange={(e) => setProductStatus(e.target.value as typeof productStatus)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+              <option value="active">Active products</option>
+              <option value="inactive">Inactive products</option>
+              <option value="all">All products</option>
+            </select>
+            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">Clear filters</button>
           </div>
         )}
       </div>
+
+      {selectedProductIds.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3">
+          <div className="text-xs font-bold text-sky-900">تم تحديد {selectedProductIds.length} صنف من الصفحة الحالية</div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleExport} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-100">Export selected</button>
+            <button onClick={() => handleBulkStatus(true)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">تفعيل المحدد</button>
+            <button onClick={() => handleBulkStatus(false)} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700">إيقاف المحدد</button>
+            <button onClick={() => setSelectedProductIds([])} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">مسح التحديد</button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         {isLoading ? (
@@ -1063,6 +1134,7 @@ export const ProductsView: React.FC = () => {
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                 <tr>
+                  <th className="p-3.5 text-center"><input aria-label="تحديد كل أصناف الصفحة" type="checkbox" checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))} onChange={togglePageSelection} className="rounded border-slate-300 text-sky-600" /></th>
                   <th className="p-3.5">الصنف</th>
                   <th className="p-3.5">الباركود / الكود</th>
                   <th className="p-3.5">النوع والماركة</th>
@@ -1080,6 +1152,7 @@ export const ProductsView: React.FC = () => {
                   const stock = stockOf(p);
                   return (
                     <tr key={p.id} className={`hover:bg-slate-50 transition ${p.isActive ? '' : 'opacity-60'}`}>
+                      <td className="p-3.5 text-center"><input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="rounded border-slate-300 text-sky-600" /></td>
                       <td className="p-3.5">
                         <div className="flex items-center gap-2">
                           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
@@ -1106,19 +1179,23 @@ export const ProductsView: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-3.5 font-semibold text-slate-700">
-                        <div>{p.metersPerBox} {p.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
-                        <div className="text-[10px] text-slate-500">{p.piecesPerBox} قطعة / كرتونة</div>
+                        {p.productType === 'GENERAL' ? <div>{p.metersPerBox} {unitLabelFor(p.baseUnit, p.customUnit)}</div> : <>
+                          <div>{p.metersPerBox} {p.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
+                          <div className="text-[10px] text-slate-500">{p.piecesPerBox} قطعة / كرتونة</div>
+                        </>}
                       </td>
                       <td className="p-3.5 font-mono text-slate-600">{CeramicMath.formatCurrency(p.costPrice)}</td>
                       <td className="p-3.5 font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</td>
                       <td className="p-3.5 font-bold text-slate-900">{CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
                       <td className="p-3.5 text-center">
                         <span className={`inline-block px-2 py-1 rounded-lg font-black text-[11px] ${stockTone(p)}`}>
-                          {CeramicMath.formatM2(stock.m2)}
-                          <span className="mx-1 text-slate-400">|</span>
-                          {round(stock.boxes)} كرتونة
-                          <span className="mx-1 text-slate-400">|</span>
-                          {Math.round(stock.pieces)} قطعة
+                          {p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${unitLabelFor(p.baseUnit, p.customUnit)}` : <>
+                            {CeramicMath.formatM2(stock.m2)}
+                            <span className="mx-1 text-slate-400">|</span>
+                            {round(stock.boxes)} كرتونة
+                            <span className="mx-1 text-slate-400">|</span>
+                            {Math.round(stock.pieces)} قطعة
+                          </>}
                         </span>
                       </td>
                       <td className="p-3.5 text-center">
@@ -1147,6 +1224,7 @@ export const ProductsView: React.FC = () => {
                   <div className="relative h-36 bg-slate-100">
                     {p.imagePath ? <img src={p.imagePath} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-10 w-10" /></div>}
                     <span className={`absolute right-2 top-2 rounded-lg px-2 py-1 text-[10px] font-black ${stockTone(p)}`}>{CeramicMath.formatM2(stock.m2)}</span>
+                    <input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="absolute left-2 top-2 h-4 w-4 rounded border-slate-300 text-sky-600" />
                     {!p.isActive && <span className="absolute left-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-black text-white">موقوف</span>}
                   </div>
                   <div className="flex-1 space-y-2 p-3.5">
@@ -1222,6 +1300,12 @@ export const ProductsView: React.FC = () => {
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <div className="md:col-span-3 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <Field label="نوع الصنف">
+                          <select value={formData.productType} onChange={(e) => setFormData({ ...formData, productType: e.target.value as FormState['productType'] })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                            <option value="CERAMIC">سيراميك / بورسلين</option>
+                            <option value="GENERAL">صنف عام (مواد تشطيب وغيرها)</option>
+                          </select>
+                        </Field>
                         <Field label="اسم الصنف" required>
                           <input required placeholder="مثال: سيراميك رويال 60×60 رمادي" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500" />
                         </Field>
@@ -1234,11 +1318,11 @@ export const ProductsView: React.FC = () => {
                             <button type="button" onClick={() => setFormData({ ...formData, sku: `TILE-${Date.now().toString().slice(-6)}` })} className="rounded-xl border border-slate-200 px-2.5 text-slate-600 hover:bg-slate-100" title="توليد كود"><Calculator className="w-4 h-4" /></button>
                           </div>
                         </Field>
-                        <Field label="الفرز والدرجة">
+                        {formData.productType === 'CERAMIC' && <Field label="الفرز والدرجة">
                           <select value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value as CeramicGrade })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                             {GRADES.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
                           </select>
-                        </Field>
+                        </Field>}
                         <Field label="نوع المنتج (التصنيف)" required>
                           {showNewCategory ? (
                             <div className="flex gap-2">
@@ -1256,7 +1340,7 @@ export const ProductsView: React.FC = () => {
                             </div>
                           )}
                         </Field>
-                        <Field label="الماركة / المصنع" required>
+                        <Field label="الماركة / المصنع" required={formData.productType === 'CERAMIC'}>
                           {showNewBrand ? (
                             <div className="flex gap-2">
                               <input autoFocus value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="اسم الماركة الجديدة" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
@@ -1273,11 +1357,11 @@ export const ProductsView: React.FC = () => {
                             </div>
                           )}
                         </Field>
-                        <Field label="الاستخدام / السطح">
+                        {formData.productType === 'CERAMIC' && <Field label="الاستخدام / السطح">
                           <select value={formData.surfaceLocation} onChange={(e) => setFormData({ ...formData, surfaceLocation: e.target.value as FormState['surfaceLocation'] })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                             {SURFACES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                           </select>
-                        </Field>
+                        </Field>}
                       </div>
                       <Field label="ملاحظات">
                         <input value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="ملاحظات إضافية عن الصنف" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
@@ -1318,6 +1402,26 @@ export const ProductsView: React.FC = () => {
 
               {activeTab === 'units' && (
                 <div className="space-y-4">
+                  {formData.productType === 'GENERAL' ? (
+                    <section className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
+                      <div className="flex items-center gap-1.5 text-sm font-extrabold text-sky-800"><Ruler className="w-4 h-4" /> وحدة الصنف العام</div>
+                      <p className="text-xs text-slate-600">اختر الوحدة التي ستُسجل بها الكميات في المخزون والفواتير.</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="وحدة المخزون والبيع">
+                          <select value={formData.baseUnit} onChange={(e) => setFormData({ ...formData, baseUnit: e.target.value as UnitType, sellUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
+                            {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                            <option value="CUSTOM">أخرى (اكتب الوحدة)</option>
+                          </select>
+                        </Field>
+                        {formData.baseUnit === ('CUSTOM' as UnitType) && <Field label="اسم الوحدة" required>
+                          <input required value={formData.customUnit} onChange={(e) => setFormData({ ...formData, customUnit: e.target.value })} placeholder="جردل، شيكارة، لفة..." className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
+                        </Field>}
+                        <Field label={`سعر البيع / ${unitLabel}`}>
+                          <input type="number" min="0" step="0.01" value={formData.sellingPriceM2} onChange={(e) => setFormData({ ...formData, sellingPriceM2: parseFloat(e.target.value) || 0, sellingPriceBox: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
+                        </Field>
+                      </div>
+                    </section>
+                  ) : <>
                   <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Ruler className="w-4 h-4 text-sky-600" /> المقاس والمواصفات</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1329,6 +1433,14 @@ export const ProductsView: React.FC = () => {
                       </Field>
                       <Field label="اللون">
                         <input value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder="رمادي رخامي" className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
+                      </Field>
+                      <Field label="التون">
+                        <select value={formData.tone} onChange={(e) => setFormData({ ...formData, tone: e.target.value })} className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold">
+                          <option value="">— اختر التون —</option>
+                          {Array.from({ length: 20 }, (_, index) => `T${index + 1}`).map((tone) => (
+                            <option key={tone} value={tone}>{tone}</option>
+                          ))}
+                        </select>
                       </Field>
                       <Field label="التشطيب">
                         <input value={formData.finish} onChange={(e) => setFormData({ ...formData, finish: e.target.value })} placeholder="لامع / مطفي" className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
@@ -1374,6 +1486,7 @@ export const ProductsView: React.FC = () => {
                       </div>
                     </div>
                   </section>
+                  </>}
                 </div>
               )}
 
@@ -1444,20 +1557,20 @@ export const ProductsView: React.FC = () => {
                   ) : (
                     <>
                       {openingRows.map((row, index) => (
-                        <div key={index} className="grid grid-cols-2 items-end gap-2 rounded-xl border border-amber-200 bg-white p-3 md:grid-cols-5">
+                        <div key={index} className={`grid grid-cols-2 items-end gap-2 rounded-xl border border-amber-200 bg-white p-3 ${formData.productType === 'CERAMIC' ? 'md:grid-cols-5' : 'md:grid-cols-3'}`}>
                           <Field label="المخزن">
                             <select value={row.warehouseId} onChange={(e) => setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, warehouseId: e.target.value } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold">
                               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                             </select>
                           </Field>
-                          <Field label="عدد الكراتين">
-                            <input type="number" step="0.01" value={row.boxes} onChange={(e) => setOpeningBy(index, 'boxes', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
-                          </Field>
-                          <Field label="عدد القطع">
-                            <input type="number" step="1" value={row.pieces} onChange={(e) => setOpeningBy(index, 'pieces', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
-                          </Field>
+                          {formData.productType === 'CERAMIC' && <Field label="عدد الكراتين">
+                            <input type="number" min="0" step="0.01" value={row.boxes} onChange={(e) => setOpeningBy(index, 'boxes', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
+                          </Field>}
+                          {formData.productType === 'CERAMIC' && <Field label="عدد القطع">
+                            <input type="number" min="0" step="1" value={row.pieces} onChange={(e) => setOpeningBy(index, 'pieces', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
+                          </Field>}
                           <Field label={`الكمية (${unitLabel})`}>
-                            <input type="number" step="0.001" value={row.meters} onChange={(e) => setOpeningBy(index, 'meters', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
+                            <input type="number" min="0" step="0.001" value={row.meters} onChange={(e) => formData.productType === 'CERAMIC' ? setOpeningBy(index, 'meters', parseFloat(e.target.value) || 0) : setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, meters: Math.max(0, parseFloat(e.target.value) || 0) } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
                           </Field>
                           <button type="button" onClick={() => removeOpeningRow(index)} className="rounded-xl border border-rose-200 px-2 py-2 text-rose-500 hover:bg-rose-50" title="حذف السطر"><Trash2 className="w-4 h-4" /></button>
                         </div>

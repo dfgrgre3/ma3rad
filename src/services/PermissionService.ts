@@ -51,6 +51,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'sales.create', name: 'إنشاء فاتورة بيع', module: 'SALES' },
   { code: 'sales.update', name: 'تعديل فاتورة بيع', module: 'SALES' },
   { code: 'sales.discount', name: 'منح خصم استثنائي', module: 'SALES' },
+  { code: 'sales.credit', name: 'البيع الآجل', module: 'SALES' },
   { code: 'sales.refund', name: 'مرتجعات البيع', module: 'SALES' },
   { code: 'sales.approve', name: 'اعتماد أسعار/خصومات', module: 'SALES' },
   { code: 'sales.void', name: 'إلغاء فاتورة', module: 'SALES' },
@@ -171,7 +172,6 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'settings.view', name: 'عرض الإعدادات', module: 'SETTINGS' },
   { code: 'settings.update', name: 'تعديل الإعدادات', module: 'SETTINGS' },
   { code: 'settings.backup', name: 'النسخ الاحتياطي والاستعادة', module: 'SETTINGS' },
-  { code: 'settings.cloud', name: 'إدارة المزامنة السحابية', module: 'SETTINGS' },
   { code: 'audit.view', name: 'عرض سجل التدقيق', module: 'AUDIT' },
   { code: 'audit.export', name: 'تصدير سجل التدقيق', module: 'AUDIT' },
   { code: 'admin.view', name: 'الدخول إلى مركز التحكم', module: 'ADMIN' },
@@ -208,7 +208,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
   SALES: [
     'dashboard.view',
     'products.view', 'categories.view', 'brands.view', 'inventory.view',
-    'sales.view', 'sales.create', 'sales.update', 'sales.refund', 'sales.approve',
+    'sales.view', 'sales.create', 'sales.update', 'sales.refund', 'sales.approve', 'sales.credit',
     'quotations.view', 'quotations.create', 'quotations.update',
     'orders.view', 'orders.create', 'orders.update',
     'returns.view', 'returns.create',
@@ -221,7 +221,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
   ],
   CASHIER: [
     'dashboard.view', 'products.view', 'categories.view', 'brands.view',
-    'sales.view', 'sales.create', 'sales.refund',
+    'sales.view', 'sales.create', 'sales.refund', 'sales.credit',
     'quotations.view', 'orders.view', 'returns.view', 'returns.create',
     'customers.view', 'customers.create', 'customers.payment',
     'cashier.view', 'cashier.expense', 'cashier.shift',
@@ -251,7 +251,7 @@ function nowIso(): string {
 }
 
 export class PermissionService {
-  private static cache: Map<string, Set<string>> | null = null;
+  private static cache: Map<string, { grants: Set<string>; denies: Set<string> }> | null = null;
 
   /** Idempotently populate the permissions catalog and seed built-in roles. */
   public static seed(): void {
@@ -435,17 +435,19 @@ export class PermissionService {
 
   // ─── Effective permission resolution ────────────────────────────────────────
 
-  private static loadEffective(user: User): Set<string> {
+  private static loadSets(user: User | null): { grants: Set<string>; denies: Set<string> } {
+    if (!user) return { grants: new Set(), denies: new Set() };
+
     if (PermissionService.cache && PermissionService.cache.has(user.id)) {
       return PermissionService.cache.get(user.id)!;
     }
 
     // ADMIN always has everything and cannot be locked out.
     if (user.role === 'ADMIN') {
-      const all = new Set<string>(ALL);
+      const sets = { grants: new Set<string>(ALL), denies: new Set<string>() };
       PermissionService.cache = PermissionService.cache || new Map();
-      PermissionService.cache.set(user.id, all);
-      return all;
+      PermissionService.cache.set(user.id, sets);
+      return sets;
     }
 
     const db = DatabaseManager.getInstance();
@@ -466,7 +468,8 @@ export class PermissionService {
       roleCodes = [...(ROLE_DEFAULTS[user.role] || [])];
     }
 
-    const effective = new Set<string>(roleCodes);
+    const grants = new Set<string>(roleCodes);
+    const denies = new Set<string>();
     try {
       const rows = db.query<{ code: string; effect: string }>(
         `SELECT permission_code AS code, COALESCE(effect, 'GRANT') AS effect
@@ -474,30 +477,34 @@ export class PermissionService {
         [user.id]
       );
       for (const r of rows) {
-        if (String(r.effect).toUpperCase() === 'DENY') effective.delete(r.code);
-        else effective.add(r.code);
+        if (String(r.effect).toUpperCase() === 'DENY') denies.add(r.code);
+        else grants.add(r.code);
       }
     } catch {
       // ignore — role defaults still apply
     }
 
+    const sets = { grants, denies };
     PermissionService.cache = PermissionService.cache || new Map();
-    PermissionService.cache.set(user.id, effective);
-    return effective;
+    PermissionService.cache.set(user.id, sets);
+    return sets;
   }
 
   public static getEffectiveCodes(user: User | null): string[] {
     if (!user) return [];
-    return Array.from(PermissionService.loadEffective(user)).sort();
+    return Array.from(PermissionService.loadSets(user).grants).sort();
   }
 
   public static can(user: User | null, required: string): boolean {
     if (!user) return false;
-    const effective = PermissionService.loadEffective(user);
-    if (effective.has(required)) return true;
-    // wildcard support: 'sales.*' grants all sales.* permissions
+    const { grants, denies } = PermissionService.loadSets(user);
     const [mod] = required.split('.');
-    return effective.has(`${mod}.*`) || effective.has('*');
+    // A user-level DENY always wins — including over role wildcards
+    // ('sales.*' or '*'), which are the broadest grants a role can carry.
+    if (denies.has(required) || denies.has(`${mod}.*`) || denies.has('*')) return false;
+    if (grants.has(required)) return true;
+    // wildcard support: 'sales.*' grants all sales.* permissions
+    return grants.has(`${mod}.*`) || grants.has('*');
   }
 
   public static canAny(user: User | null, required: string[]): boolean {

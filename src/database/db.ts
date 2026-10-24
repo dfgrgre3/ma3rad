@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import { runMigrations, DEFAULT_BRANCH_ID } from './migrations';
 import bcrypt from 'bcryptjs';
+import { isRemoteClient, RemoteDatabaseManager } from './remote';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 
@@ -60,6 +61,11 @@ export class DatabaseManager {
   private constructor() {}
 
   public static getInstance(): DatabaseManager {
+    // Browser/phone LAN clients talk to the desktop host over HTTP instead of
+    // running sql.js locally — same synchronous API, single source of truth.
+    if (isRemoteClient()) {
+      return RemoteDatabaseManager.getInstance() as unknown as DatabaseManager;
+    }
     if (!DatabaseManager.instance) {
       DatabaseManager.instance = new DatabaseManager();
     }

@@ -10,6 +10,22 @@ import { SetupWizard } from './components/SetupWizard';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { registerRemoteDbBridge } from './database/remoteBridge';
+import { isRemoteClient, remoteHasToken } from './database/remote';
+
+// Start the LAN companion server automatically when the setting enables it.
+// Runs only inside the desktop app and only after the DB is ready.
+function maybeStartLanServer(): void {
+  try {
+    const serverApi = (window as any).ceramisys?.server;
+    if (!serverApi?.start) return;
+    const settings = SettingsService.getSettings();
+    if (!settings.lanServerEnabled) return;
+    void serverApi.start(settings.lanServerPort || 8585).then((res: any) => {
+      if (res && !res.ok) console.warn('LAN server failed to start:', res.error);
+    });
+  } catch { /* desktop-only feature */ }
+}
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 export const App: React.FC = () => {
@@ -34,12 +50,20 @@ export const App: React.FC = () => {
   // ── DB Init ─────────────────────────────────────────────────────────────────
   const initDb = () => {
     setInitError(null);
+    registerRemoteDbBridge();
     DatabaseManager.getInstance()
       .initialize()
       .then(() => {
+        // A fresh LAN client has no session token yet — go straight to the
+        // login screen; the desktop host has already seeded permissions.
+        if (isRemoteClient() && !remoteHasToken()) {
+          setDbReady(true);
+          return;
+        }
         PermissionService.seed();
         setCurrentUser(AuthService.restoreSession());
         setDbReady(true);
+        maybeStartLanServer();
         // Scheduled local backups (runs once per configured interval).
         void import('./services/BackupService').then(({ BackupService }) => {
           try {
@@ -179,7 +203,7 @@ export const App: React.FC = () => {
           {showSetup ? (
             <SetupWizard onComplete={() => setShowSetup(false)} />
           ) : (
-            <HashRouter>
+            <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <AppRouterWithProps
                 currentUser={currentUser}
                 onLogout={handleLogout}
@@ -210,6 +234,8 @@ const PageLoader: React.FC = () => (
 
 // Lazy pages
 const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
+const DataImportPage = lazy(() => import('./pages/settings/DataImportPage').then(m => ({ default: m.DataImportPage })));
+const DynamicDataPage = lazy(() => import('./pages/settings/DynamicDataPage').then(m => ({ default: m.DynamicDataPage })));
 const ExecutiveDashboard     = lazy(() => import('./pages/dashboard/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
 const PosView                = lazy(() => import('./components/PosView').then(m => ({ default: m.PosView })));
 const SalesView              = lazy(() => import('./components/SalesView').then(m => ({ default: m.SalesView })));
@@ -220,6 +246,7 @@ const TodayDebtsPage         = lazy(() => import('./pages/daily/DailyPage').then
 const QuotationsPage         = lazy(() => import('./pages/sales/QuotationsPage').then(m => ({ default: m.QuotationsPage })));
 const OrdersPage             = lazy(() => import('./pages/sales/OrdersPage').then(m => ({ default: m.OrdersPage })));
 const ReturnsPage            = lazy(() => import('./pages/sales/ReturnsPage').then(m => ({ default: m.ReturnsPage })));
+const SalesAnalyticsPage     = lazy(() => import('./pages/sales/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
 const ProductsView           = lazy(() => import('./components/ProductsView').then(m => ({ default: m.ProductsView })));
 const ProductDetailPage      = lazy(() => import('./pages/products/ProductDetailPage').then(m => ({ default: m.ProductDetailPage })));
 const ProductAttributesPage  = lazy(() => import('./pages/products/ProductAttributesPage').then(m => ({ default: m.ProductAttributesPage })));
@@ -229,6 +256,7 @@ const BrandsView             = lazy(() => import('./components/BrandsView').then
 const PricingPage            = lazy(() => import('./pages/pricing/PricingPage').then(m => ({ default: m.PricingPage })));
 const PromotionsPage         = lazy(() => import('./pages/pricing/PromotionsPage').then(m => ({ default: m.PromotionsPage })));
 const InventoryView          = lazy(() => import('./components/InventoryView').then(m => ({ default: m.InventoryView })));
+const LocationStockPage      = lazy(() => import('./pages/inventory/LocationStockPage').then(m => ({ default: m.LocationStockPage })));
 const StockLedgerPage        = lazy(() => import('./pages/inventory/StockLedgerPage').then(m => ({ default: m.StockLedgerPage })));
 const StockTransfersView     = lazy(() => import('./components/StockTransfersView').then(m => ({ default: m.StockTransfersView })));
 const InventoryCountPage     = lazy(() => import('./pages/inventory/InventoryCountPage').then(m => ({ default: m.InventoryCountPage })));
@@ -246,10 +274,14 @@ const SuppliersView          = lazy(() => import('./components/SuppliersView').t
 const PurchasesView          = lazy(() => import('./components/PurchasesView').then(m => ({ default: m.PurchasesView })));
 const PurchaseRequestsPage   = lazy(() => import('./pages/purchasing/PurchaseRequestsPage').then(m => ({ default: m.PurchaseRequestsPage })));
 const PurchaseOrdersPage     = lazy(() => import('./pages/purchasing/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+const IncomingProductsPage   = lazy(() => import('./pages/purchasing/IncomingProductsPage').then(m => ({ default: m.IncomingProductsPage })));
+const CustomerImportedProductsPage = lazy(() => import('./pages/customers/CustomerImportedProductsPage').then(m => ({ default: m.CustomerImportedProductsPage })));
+const ReadyDeliveriesPage    = lazy(() => import('./pages/customers/ReadyDeliveriesPage').then(m => ({ default: m.ReadyDeliveriesPage })));
 const PurchaseReturnsPage    = lazy(() => import('./pages/purchasing/PurchaseReturnsPage').then(m => ({ default: m.PurchaseReturnsPage })));
 const CashierView            = lazy(() => import('./components/CashierView').then(m => ({ default: m.CashierView })));
 const FinanceOverviewPage    = lazy(() => import('./pages/finance/FinanceOverviewPage').then(m => ({ default: m.FinanceOverviewPage })));
 const DebtsDashboardPage     = lazy(() => import('./pages/finance/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
+const OtherReceivablesPage    = lazy(() => import('./pages/finance/OtherReceivablesPage').then(m => ({ default: m.OtherReceivablesPage })));
 const InstallmentsPage       = lazy(() => import('./pages/finance/InstallmentsPage').then(m => ({ default: m.InstallmentsPage })));
 const ExpensesPage           = lazy(() => import('./pages/finance/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const ChartOfAccountsPage    = lazy(() => import('./pages/finance/ChartOfAccountsPage').then(m => ({ default: m.ChartOfAccountsPage })));
@@ -277,7 +309,6 @@ const SettingsView           = lazy(() => import('./components/SettingsView').th
 const UsersView              = lazy(() => import('./components/UsersView').then(m => ({ default: m.UsersView })));
 const BackupPage             = lazy(() => import('./pages/settings/BackupPage').then(m => ({ default: m.BackupPage })));
 const SystemHealthPage       = lazy(() => import('./pages/settings/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
-const CloudSyncPage          = lazy(() => import('./pages/settings/CloudSyncPage').then(m => ({ default: m.CloudSyncPage })));
 const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 const SecurityCenterPage     = lazy(() => import('./pages/admin/SecurityCenterPage').then(m => ({ default: m.SecurityCenterPage })));
 
@@ -306,6 +337,7 @@ const AppRouterWithProps: React.FC<{
       <Route path="dashboard/executive" element={<S><ExecutiveDashboard /></S>} />
 
       {/* Sales / POS */}
+      <Route path="sales/analytics" element={<S><SalesAnalyticsPage /></S>} />
       <Route path="pos" element={<S><PosView /></S>} />
             <Route path="sales" element={<S><SalesView /></S>} />
             <Route path="daily/sales" element={<S><TodaySalesPage /></S>} />
@@ -330,6 +362,8 @@ const AppRouterWithProps: React.FC<{
 
       {/* Inventory */}
       <Route path="inventory" element={<S><InventoryView /></S>} />
+      <Route path="inventory/warehouse-stock" element={<S><LocationStockPage mode="warehouse" /></S>} />
+      <Route path="inventory/showroom-stock" element={<S><LocationStockPage mode="showroom" /></S>} />
       <Route path="inventory/ledger" element={<S><StockLedgerPage /></S>} />
       <Route path="inventory/transfers" element={<S><StockTransfersView /></S>} />
       <Route path="inventory/counts" element={<S><InventoryCountPage /></S>} />
@@ -343,6 +377,9 @@ const AppRouterWithProps: React.FC<{
 
       {/* CRM */}
       <Route path="customers" element={<S><CustomersView /></S>} />
+      <Route path="customers/imported-products" element={<S><CustomerImportedProductsPage /></S>} />
+      <Route path="customers/ready-deliveries" element={<S><ReadyDeliveriesPage /></S>} />
+      <Route path="customers/:id/imported-products" element={<S><CustomerImportedProductsPage /></S>} />
       <Route path="customers/:id" element={<S><CustomerDetailPage /></S>} />
       <Route path="crm/leads" element={<S><LeadsPage /></S>} />
       <Route path="crm/pipeline" element={<S><PipelinePage /></S>} />
@@ -354,12 +391,14 @@ const AppRouterWithProps: React.FC<{
       <Route path="purchases" element={<S><PurchasesView /></S>} />
       <Route path="purchases/requests" element={<S><PurchaseRequestsPage /></S>} />
       <Route path="purchases/orders" element={<S><PurchaseOrdersPage /></S>} />
+      <Route path="purchases/incoming" element={<S><IncomingProductsPage /></S>} />
       <Route path="purchases/returns" element={<S><PurchaseReturnsPage /></S>} />
 
       {/* Finance */}
       <Route path="cashboxes" element={<S><CashierView /></S>} />
       <Route path="finance" element={<S><FinanceOverviewPage /></S>} />
       <Route path="finance/debts" element={<S><DebtsDashboardPage /></S>} />
+      <Route path="finance/other-receivables" element={<S><OtherReceivablesPage /></S>} />
       <Route path="finance/installments" element={<S><InstallmentsPage /></S>} />
       <Route path="finance/expenses" element={<S><ExpensesPage /></S>} />
       <Route path="finance/accounts" element={<S><ChartOfAccountsPage /></S>} />
@@ -398,11 +437,12 @@ const AppRouterWithProps: React.FC<{
       <Route path="admin" element={<S><AdminPage /></S>} />
 
       {/* Settings */}
+      <Route path="data-import/types" element={<S><DynamicDataPage /></S>} />
+      <Route path="data-import" element={<S><DataImportPage /></S>} />
       <Route path="settings" element={<S><SettingsView /></S>} />
       <Route path="users" element={<S><UsersView /></S>} />
       <Route path="backup" element={<S><BackupPage /></S>} />
       <Route path="system-health" element={<S><SystemHealthPage /></S>} />
-      <Route path="cloud-sync" element={<S><CloudSyncPage /></S>} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

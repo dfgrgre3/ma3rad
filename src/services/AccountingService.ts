@@ -144,7 +144,7 @@ export class AccountingService {
       salesGrowthRate,
       profitMargin,
       averageOrderValue,
-      topCustomer: topCustomer ? { name: topCustomer.name, totalPurchases: Number(topCustomer.total_purchases.toFixed(2)) } : null,
+      topCustomer: topCustomer ? { name: topCustomer.name, totalPurchases: Number((topCustomer.total_purchases || 0).toFixed(2)) } : null,
       urgentDebtsCount: urgentDebts
     };
   }

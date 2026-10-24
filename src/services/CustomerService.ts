@@ -52,12 +52,12 @@ export class CustomerService {
       sqliteDb.run(`
         INSERT INTO customers (
           id, code, name, phone, phone2, national_id, address, city,
-          customer_type, credit_limit, current_balance, total_purchases, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+          customer_type, credit_limit, payment_terms_days, current_balance, total_purchases, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
       `, [
         id, code, customer.name, customer.phone, customer.phone2 || null,
         customer.nationalId || null, customer.address || null, customer.city || null,
-        customer.customerType || 'RETAIL', customer.creditLimit || 0, customer.initialBalance || 0,
+        customer.customerType || 'RETAIL', customer.creditLimit || 0, customer.paymentTermsDays || 0, customer.initialBalance || 0,
         customer.notes || null
       ]);
 
@@ -84,6 +84,7 @@ export class CustomerService {
         city = COALESCE(?, city),
         customer_type = COALESCE(?, customer_type),
         credit_limit = COALESCE(?, credit_limit),
+        payment_terms_days = COALESCE(?, payment_terms_days),
         notes = COALESCE(?, notes),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -92,7 +93,7 @@ export class CustomerService {
     return this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(sql, [
         updates.name ?? null, updates.phone ?? null, updates.phone2 ?? null, updates.nationalId ?? null,
-        updates.address ?? null, updates.city ?? null, updates.customerType ?? null, updates.creditLimit ?? null,
+        updates.address ?? null, updates.city ?? null, updates.customerType ?? null, updates.creditLimit ?? null, updates.paymentTermsDays ?? null,
         updates.notes ?? null, id
       ]);
 
@@ -112,7 +113,9 @@ export class CustomerService {
     registerId?: string,
     shiftId?: string,
     notes = '',
-    performedBy = 'usr_admin'
+    performedBy = 'usr_admin',
+    paymentDate?: string,
+    idempotencyKey?: string
   ): CustomerPayment {
     if (amount <= 0) throw new Error('يجب أن يكون مبلغ السند أكبر من الصفر.');
     const actor = AuthService.requireAuth();
@@ -122,16 +125,18 @@ export class CustomerService {
     if (!cust) throw new Error('العميل غير موجود.');
 
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = paymentDate || new Date().toISOString().slice(0, 10);
 
     return this.db.executeTransaction((sqliteDb) => {
+      const prior = idempotencyKey ? sqliteDb.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`,[idempotencyKey])[0] : null;
+      if (prior) return { id:prior.id, receiptNumber:prior.receiptNumber, customerId:prior.customerId, amount:prior.amount, paymentType:prior.paymentType, date:prior.date, registerId:prior.registerId, shiftId:prior.shiftId, notes:prior.notes, performedBy:prior.performedBy, createdAt:prior.createdAt };
       const receiptNumber = sqliteDb.nextNumber('REC');
       // 1. Record customer payment receipt
       sqliteDb.run(`
         INSERT INTO customer_payments (
-          id, receipt_number, customer_id, amount, payment_type, date, register_id, shift_id, notes, performed_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [paymentId, receiptNumber, customerId, amount, paymentType, today, registerId || 'cr_main', shiftId || null, notes, actor.id]);
+          id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, notes, performed_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, registerId || 'cr_main', shiftId || null, notes, actor.id]);
       // 2. Reduce customer debt balance
       sqliteDb.run(`
         UPDATE customers SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
@@ -176,7 +181,7 @@ export class CustomerService {
       [paymentId]
     )[0];
     if (!payment) throw new Error('سند القبض غير موجود.');
-    if (payment.invoice_id) throw new Error('سند مرتبط بفاتورة بيع. احذفه من تفاصيل الفاتورة.');
+    if (payment.invoiceId) throw new Error('سند مرتبط بفاتورة بيع. اعكسه من تفاصيل الفاتورة.');
 
     const installment = this.db.query<{ count: number }>(
       'SELECT COUNT(*) AS count FROM installments WHERE payment_id = ?',
@@ -190,20 +195,20 @@ export class CustomerService {
     this.db.executeTransaction((db) => {
       db.run(
         `UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [amount, payment.customer_id]
+        [amount, payment.customerId]
       );
-      if (payment.payment_type === 'CASH') {
-        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.register_id || 'cr_main']);
+      if (payment.paymentType === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
       }
-      if (payment.shift_id) {
-        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shift_id]);
+      if (payment.shiftId) {
+        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
       }
       db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)
          VALUES (?, ?, ?, 'حذف سند تحصيل', 'CUSTOMERS', ?, ?)`,
-        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, payment.customer_id, JSON.stringify({
-          receiptNumber: payment.receipt_number, amount,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, payment.customerId, JSON.stringify({
+          receiptNumber: payment.receiptNumber, amount,
         })]
       );
     });

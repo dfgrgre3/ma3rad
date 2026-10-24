@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon,
+  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Smartphone, Play, Square,
 } from 'lucide-react';
 import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
@@ -12,7 +12,7 @@ const inputCls =
   'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
 const labelCls = 'mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300';
 
-type Tab = 'general' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security';
+type Tab = 'general' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security' | 'devices';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'عام والمعرض', icon: Store },
@@ -21,6 +21,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inventory', label: 'المخزون والتكلفة', icon: Boxes },
   { id: 'operations', label: 'التشغيل والموافقات', icon: Truck },
   { id: 'security', label: 'الأمان والنسخ', icon: ShieldCheck },
+  { id: 'devices', label: 'الأجهزة والشبكة', icon: Smartphone },
 ];
 
 export const AdminSettingsTab: React.FC = () => {
@@ -46,6 +47,15 @@ export const AdminSettingsTab: React.FC = () => {
       setSettings(next);
       setDirty(false);
       toast.success('تم حفظ الإعدادات بنجاح.');
+      // Apply the LAN server toggle immediately (not just on next launch).
+      void (async () => {
+        const serverApi = window.ceramisys?.server;
+        if (!serverApi?.status) return;
+        const st = await serverApi.status?.();
+        if (!st?.ok) return;
+        if (next.lanServerEnabled && !st.running) await serverApi.start?.(next.lanServerPort || 8585);
+        if (!next.lanServerEnabled && st.running) await serverApi.stop?.();
+      })();
     } catch (error: any) {
       toast.error('تعذر حفظ الإعدادات', error?.message || String(error));
     }
@@ -205,7 +215,61 @@ export const AdminSettingsTab: React.FC = () => {
             <Field label="ترويسة الفاتورة"><textarea rows={3} value={settings.receiptHeader || ''} onChange={(e) => set('receiptHeader', e.target.value)} className={inputCls} /></Field>
             <Field label="تذييل الفاتورة وشروط الاسترجاع"><textarea rows={3} value={settings.receiptFooter || ''} onChange={(e) => set('receiptFooter', e.target.value)} className={inputCls} /></Field>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="اسم طابعة الإيصالات الحرارية"><input value={settings.thermalPrinterName || ''} onChange={(e) => set('thermalPrinterName', e.target.value)} className={inputCls} /></Field>
+              <Field label="اسم طابعة الإيصالات الحرارية">
+                <div className="flex gap-2">
+                  <input value={settings.thermalPrinterName || ''} onChange={(e) => set('thermalPrinterName', e.target.value)} className={inputCls} />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const res = await window.ceramisys?.printing?.listPrinters?.();
+                        if (res?.ok && res.printers.length) {
+                          const current = settings.thermalPrinterName || '';
+                          const list = res.printers.map((p) => (p === current ? `${p} ✓` : p)).join('\n');
+                          const picked = window.prompt('الطابعات المتاحة (اكتب الاسم بدقة):\n\n' + list, current);
+                          if (picked) set('thermalPrinterName', picked.trim());
+                        } else {
+                          alert('لم يتم العثور على طابعات مثبتة في النظام.');
+                        }
+                      } catch {
+                        alert('جلب قائمة الطابعات متاح داخل تطبيق سطح المكتب فقط.');
+                      }
+                    }}
+                    className="shrink-0 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
+                  >
+                    استعراض
+                  </button>
+                </div>
+              </Field>
+              <Field label="كود صفحة الأحرف (Codepage)">
+                <select value={settings.thermalCodepage ?? 54} onChange={(e) => set('thermalCodepage', Number(e.target.value))} className={inputCls}>
+                  <option value={54}>54 — عربي Windows-1256 (الأغلب)</option>
+                  <option value={32}>32 — عربي (بعض الأجهزة)</option>
+                  <option value={16}>16 — WPC1256 (أخرى)</option>
+                </select>
+              </Field>
+              <Field label="عرض ورق الإيصال">
+                <select value={settings.thermalPaperWidth || '80'} onChange={(e) => set('thermalPaperWidth', e.target.value as '58' | '80')} className={inputCls}>
+                  <option value="80">80 مم (48 حرفاً)</option>
+                  <option value="58">58 مم (32 حرفاً)</option>
+                </select>
+              </Field>
+              <Field label="طريقة التوصيل">
+                <select value={settings.thermalTransport || 'system'} onChange={(e) => set('thermalTransport', e.target.value as 'system' | 'network')} className={inputCls}>
+                  <option value="system">طابعة مثبتة في النظام (USB)</option>
+                  <option value="network">طابعة شبكية مباشرة (TCP 9100)</option>
+                </select>
+              </Field>
+              {settings.thermalTransport === 'network' && (
+                <>
+                  <Field label="عنوان IP للطابعة">
+                    <input value={settings.thermalHost || ''} onChange={(e) => set('thermalHost', e.target.value)} placeholder="مثال: 192.168.1.100" className={inputCls} />
+                  </Field>
+                  <Field label="المنفذ (عادة 9100)">
+                    <input type="number" value={settings.thermalPort ?? 9100} onChange={(e) => set('thermalPort', Number(e.target.value))} className={inputCls} />
+                  </Field>
+                </>
+              )}
               <Field label="اسم طابعة A4"><input value={settings.a4PrinterName || ''} onChange={(e) => set('a4PrinterName', e.target.value)} className={inputCls} /></Field>
             </div>
           </div>
@@ -261,6 +325,8 @@ export const AdminSettingsTab: React.FC = () => {
             </Field>
           </div>
         )}
+
+        {tab === 'devices' && <DevicesSettings settings={settings} set={set} />}
       </fieldset>
 
       {readOnly && (
@@ -278,6 +344,98 @@ const Field: React.FC<{ label: string; full?: boolean; children: React.ReactNode
     {children}
   </div>
 );
+
+type SystemSettingsSetter = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => void;
+
+/** LAN companion server controls + remote-device guidance. */
+const DevicesSettings: React.FC<{ settings: SystemSettings; set: SystemSettingsSetter }> = ({ settings, set }) => {
+  const [status, setStatus] = useState<{ running: boolean; port: number; addresses: string[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const isDesktop = !!window.ceramisys?.server;
+
+  const refresh = async () => {
+    try {
+      const res = await window.ceramisys?.server?.status?.();
+      if (res?.ok) setStatus({ running: res.running, port: res.port, addresses: res.addresses || [] });
+    } catch { /* desktop only */ }
+  };
+
+  useEffect(() => { void refresh(); }, []);
+
+  const toggleServer = async () => {
+    setBusy(true);
+    try {
+      if (status?.running) {
+        await window.ceramisys?.server?.stop?.();
+      } else {
+        const res = await window.ceramisys?.server?.start?.(settings.lanServerPort || 8585);
+        if (res && !res.ok) alert(res.error || 'تعذر تشغيل الخادم');
+      }
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!isDesktop) {
+    return (
+      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
+        أنت متصل كجهاز بعيد. إعدادات الخادم متاحة على جهاز الكاشير (تطبيق سطح المكتب).
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-4">
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="text-xs font-black text-slate-800 dark:text-slate-100">خادم الشبكة المحلية (وصول الجوال والمتصفح)</div>
+            <div className="text-[11px] text-slate-500 mt-1">
+              يتيح فتح النظام من أي جهاز على نفس شبكة الواي فاي عبر المتصفح — نفس البيانات والصلاحيات لحظياً.
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[11px] font-black px-2 py-1 rounded-lg ${status?.running ? 'bg-emerald-500/15 text-emerald-600' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>
+              {status?.running ? `يعمل على المنفذ ${status.port}` : 'متوقف'}
+            </span>
+            <button
+              type="button"
+              onClick={toggleServer}
+              disabled={busy}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition disabled:opacity-50 ${status?.running ? 'bg-rose-600 hover:bg-rose-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}
+            >
+              {status?.running ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+              {status?.running ? 'إيقاف' : 'تشغيل الآن'}
+            </button>
+          </div>
+        </div>
+
+        {status?.running && (
+          <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3 space-y-1">
+            <div className="text-[11px] font-bold text-slate-500 mb-1">افتح أحد هذه العناوين من المتصفح على أي جهاز بنفس الشبكة:</div>
+            {status.addresses.length === 0 && <div className="text-[11px] text-slate-500">لم يتم العثور على عناوين شبكة.</div>}
+            {status.addresses.map((a) => (
+              <div key={a} className="font-mono text-xs text-sky-600 dark:text-sky-400" dir="ltr">{a}</div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label="التشغيل تلقائياً مع بدء البرنامج">
+            <Toggle checked={!!settings.lanServerEnabled} onChange={(v) => set('lanServerEnabled', v)} label={settings.lanServerEnabled ? 'يعمل تلقائياً' : 'يدوي'} />
+          </Field>
+          <Field label="المنفذ (افتراضي 8585)">
+            <input type="number" min={1024} max={65535} value={settings.lanServerPort ?? 8585} onChange={(e) => set('lanServerPort', Number(e.target.value))} className={inputCls} />
+          </Field>
+        </div>
+        <p className="text-[11px] leading-relaxed text-slate-400">
+          ملاحظة: يجب أن يبقى برنامج الكاشير مفتوحاً لعمل الخادم. الدخول من الأجهزة الأخرى بنفس المستخدمين وكلمات المرور المعرفة في النظام.
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string }> = ({ checked, onChange, label }) => (
   <button

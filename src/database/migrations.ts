@@ -118,6 +118,13 @@ export interface Migration {
 
 export const MIGRATIONS: Migration[] = [
   {
+    id: '016_general_product_types',
+    description: 'Allow general non-ceramic products in the product catalog',
+    up: (db) => {
+      addColumn(db, 'products', 'product_type', "TEXT NOT NULL DEFAULT 'CERAMIC'");
+    },
+  },
+  {
     id: '001_seed_default_branch',
     description: 'Create the main branch row so branch_id has something to point at',
     up: (db) => {
@@ -584,6 +591,51 @@ export const MIGRATIONS: Migration[] = [
         WHERE api_key LIKE 'sk_live_demo%'
            OR server_url LIKE '%cloud.ceramisys-erp.com%'
       `);
+    },
+  },
+  {
+    id: '017_custom_product_units',
+    description: 'Store custom labels for product units',
+    up: (db) => {
+      addColumn(db, 'products', 'custom_unit', "TEXT NOT NULL DEFAULT ''");
+    },
+  },
+  {
+    id: '018_product_tone',
+    description: 'Store the ceramic tone code on products',
+    up: (db) => {
+      addColumn(db, 'products', 'tone', "TEXT NOT NULL DEFAULT ''");
+    },
+  },
+  {
+    id: '019_customer_payment_groups',
+    description: 'Group multiple invoice allocations recorded as one customer payment',
+    up: (db) => {
+      addColumn(db, 'customer_payments', 'payment_group_id', 'TEXT');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_customer_payments_group ON customer_payments(payment_group_id)');
+    },
+  },
+  {
+    id: '020_customer_invoice_due_dates',
+    description: 'Add configurable customer payment terms and sales invoice due dates',
+    up: (db) => {
+      addColumn(db, 'customers', 'payment_terms_days', 'INTEGER NOT NULL DEFAULT 0');
+      addColumn(db, 'sales_invoices', 'due_date', 'TEXT');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_sales_inv_due_remaining ON sales_invoices(due_date, remaining_amount)');
+    },
+  },
+  {
+    id: '021_receivable_custom_fields',
+    description: 'Allow extra structured fields on other receivables',
+    up: (db) => {
+      addColumn(db, 'receivables', 'custom_fields_json', "TEXT NOT NULL DEFAULT '{}'");
+    },
+  },
+  {
+    id: '022_supplier_active_status',
+    description: 'Support archiving and reactivating suppliers',
+    up: (db) => {
+      addColumn(db, 'suppliers', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
     },
   },
 ];

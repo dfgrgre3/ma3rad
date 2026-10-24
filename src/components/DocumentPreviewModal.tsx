@@ -19,14 +19,18 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 }) => {
   const [savingPdf, setSavingPdf] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleDownloadPdf = async () => {
     setSavingPdf(true);
     setSaved(false);
+    setSaveError(null);
     try {
       await downloadPdf(html, fileName);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'تعذر حفظ ملف PDF.');
     } finally {
       setSavingPdf(false);
     }
@@ -93,8 +97,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           />
         </div>
 
-        <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[10px] text-slate-500 flex items-center justify-between gap-2">
-          <span>يمكنك اختيار الطباعة أو تنزيل PDF أو Excel من الأعلى.</span>
+        <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 text-[10px] text-slate-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+          {saveError ? (
+            <span role="alert" className="text-rose-700 font-bold">{saveError}</span>
+          ) : (
+            <span>يمكنك اختيار الطباعة أو تنزيل PDF أو Excel من الأعلى.</span>
+          )}
           <span className="font-mono">{fileName}</span>
         </div>
       </div>

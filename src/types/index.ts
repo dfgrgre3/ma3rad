@@ -35,9 +35,11 @@ export interface Permission {
 }
 
 export type CeramicGrade = 'GRADE_1' | 'GRADE_2' | 'GRADE_3' | 'COMMERCIAL';
-export type UnitType = 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET';
+export type UnitType = 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM';
 
 export interface Product {
+  productType?: 'CERAMIC' | 'GENERAL';
+  customUnit?: string;
   id: string;
   sku: string;
   barcode: string;
@@ -50,6 +52,7 @@ export interface Product {
   size: string; // مثال: 60x60, 120x60, 20x120
   thickness?: number; // بالملليمتر
   color?: string;
+  tone?: string;
   finish?: string; // لامع، مطفي، باركيه، رخامي
   surfaceLocation?: 'FLOOR' | 'WALL' | 'OUTDOOR' | 'GENERAL'; // أرضيات، حوائط
   
@@ -168,6 +171,7 @@ export interface Customer {
   city?: string;
   customerType: 'RETAIL' | 'CONTRACTOR' | 'WHOLESALE' | 'ENGINEER';
   creditLimit: number;
+  paymentTermsDays?: number;
   currentBalance: number; // مدين (+) أو دائن (-)
   totalPurchases: number;
   notes?: string;
@@ -185,6 +189,7 @@ export interface Supplier {
   taxNumber?: string;
   commercialRecord?: string;
   address?: string;
+  isActive?: number;
   currentBalance: number; // مستحق له (+) أو لنا (-)
   totalPurchases: number;
   paymentTermsDays?: number;
@@ -202,6 +207,7 @@ export interface SalesInvoice {
   id: string;
   invoiceNumber: string;
   date: string;
+  dueDate?: string | null;
   customerId: string;
   customerName?: string;
   customerPhone?: string;
@@ -456,6 +462,20 @@ export interface SystemSettings {
   enableNegativeStock: boolean;
   costingMethod: 'AVERAGE_COST' | 'FIFO';
   thermalPrinterName?: string;
+  /** Printer firmware codepage selected via ESC t n — 54 = Windows-1256 (Arabic) on most ESC/POS devices. */
+  thermalCodepage?: number;
+  /** Receipt paper width — determines the ESC/POS line width (58mm=32 chars, 80mm=48 chars). */
+  thermalPaperWidth?: '58' | '80';
+  /** How raw bytes reach the printer: OS spooler (winspool/CUPS) or direct TCP 9100. */
+  thermalTransport?: 'system' | 'network';
+  /** Network printer host (IP) when thermalTransport is 'network'. */
+  thermalHost?: string;
+  /** Network printer TCP port; ESC/POS default is 9100. */
+  thermalPort?: number;
+  /** Serve the app to browsers/phones on the local network (LAN companion server). */
+  lanServerEnabled?: boolean;
+  /** TCP port for the LAN companion server. */
+  lanServerPort?: number;
   a4PrinterName?: string;
   receiptHeader?: string;
   receiptFooter?: string;
@@ -538,4 +558,3 @@ export interface EmployeeFinancials {
   payouts: number;
   netDue: number;
 }
-

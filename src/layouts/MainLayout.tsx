@@ -14,6 +14,7 @@ interface MainLayoutProps {
 
 // Route prefix -> permission required. Longest prefix wins.
 const ROUTE_PERMISSIONS: Array<[string, string]> = [
+  ['/data-import', 'settings.view'],
   ['/dashboard/executive', 'dashboard.view'],
   ['/dashboard', 'dashboard.view'],
   ['/daily/sales', 'sales.view'],
@@ -65,7 +66,6 @@ const ROUTE_PERMISSIONS: Array<[string, string]> = [
   ['/users', 'users.view'],
   ['/backup', 'settings.backup'],
   ['/system-health', 'settings.view'],
-  ['/cloud-sync', 'settings.cloud'],
   ['/admin', 'admin.view'],
   ['/settings', 'settings.view'],
 ];
@@ -79,6 +79,7 @@ function requiredPermission(pathname: string): string | null {
 
 // ─── Page title map (Arabic) ──────────────────────────────────────────────────
 const PAGE_TITLES: Record<string, string> = {
+  '/data-import': 'مركز استيراد البيانات',
   '/dashboard': 'لوحة المعلومات',
   '/dashboard/executive': 'Executive Dashboard — نظرة تنفيذية شاملة',
   '/pos': 'نقطة البيع السريع (POS)',
@@ -98,6 +99,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/pricing': 'قوائم الأسعار',
   '/promotions': 'العروض والخصومات',
   '/inventory': 'المخازن وحركات المخزون',
+  '/inventory/warehouse-stock': 'الأصناف الموجودة في المخزن',
+  '/inventory/showroom-stock': 'مقارنة مخزون المعرض والمخزن',
   '/inventory/ledger': 'سجل المخزون (Stock Ledger)',
   '/inventory/transfers': 'التحويلات المخزنية',
   '/inventory/counts': 'جرد المخزون',
@@ -144,7 +147,6 @@ const PAGE_TITLES: Record<string, string> = {
   '/users': 'المستخدمون والصلاحيات',
   '/backup': 'النسخ الاحتياطي',
   '/system-health': 'صحة النظام',
-  '/cloud-sync': 'مركز المزامنة السحابية وربط الفروع',
   '/settings': 'إعدادات النظام',
 };
 

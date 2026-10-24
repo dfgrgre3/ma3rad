@@ -174,6 +174,10 @@ export class SalesService {
         const prod = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
         if (!prod) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
 
+        if (item.unitPrice !== Number(prod.sellingPriceM2) && !PermissionService.can(actor, 'sales.approve')) {
+          throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${prod.name}».`);
+        }
+
         // Margin / price protection (brief §132): selling below the minimum allowed price needs approval.
         if (item.unitPrice < (prod.minSellingPriceM2 || 0)) {
           PermissionService.require(actor, 'sales.approve');
@@ -247,6 +251,10 @@ export class SalesService {
         paidAmount: dto.paidAmount,
       });
 
+      if (totals.remainingAmount > 0 && !PermissionService.can(actor, 'sales.credit')) {
+        throw new Error('لا تملك صلاحية البيع الآجل أو تسجيل مبلغ متبقٍ على العميل.');
+      }
+
       // Credit-limit guard: extensions beyond the customer's limit need approval.
       if (totals.remainingAmount > 0) {
         const customer = sqliteDb.query<any>(
@@ -266,16 +274,19 @@ export class SalesService {
       const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
       const invoiceNumber = sqliteDb.nextNumber('INV');
       const today = new Date().toISOString().slice(0, 10);
+      const termsDays = Number(sqliteDb.query<{ paymentTermsDays: number }>('SELECT payment_terms_days AS paymentTermsDays FROM customers WHERE id=?',[dto.customerId])[0]?.paymentTermsDays || 0);
+      let dueDate: string | null = null;
+      if (totals.remainingAmount > 0 && termsDays > 0) { const due = new Date(`${today}T12:00:00`); due.setDate(due.getDate()+termsDays); dueDate=due.toISOString().slice(0,10); }
 
       sqliteDb.run(`
         INSERT INTO sales_invoices (
-          id, invoice_number, date, customer_id, warehouse_id, shift_id, order_id, project_id,
+          id, invoice_number, date, due_date, customer_id, warehouse_id, shift_id, order_id, project_id,
           subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
           shipping_cost, total_amount, paid_amount, remaining_amount, payment_type,
           payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
       `, [
-        invoiceId, invoiceNumber, today, dto.customerId, dto.warehouseId, dto.shiftId || null,
+        invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, dto.shiftId || null,
         dto.orderId || null, dto.projectId || null,
         totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
         totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, dto.paymentType,
@@ -436,6 +447,55 @@ export class SalesService {
     });
   }
 
+  /** Record one receipt allocated across several open invoices in one transaction. */
+  public recordCustomerPaymentAllocations(
+    customerId: string,
+    allocations: Array<{ invoiceId: string; amount: number }>,
+    paymentType: PaymentType = 'CASH',
+    registerId = 'cr_main',
+    date = new Date().toISOString().slice(0, 10),
+    reference = '',
+    notes = '',
+    shiftId?: string,
+    idempotencyKey?: string,
+  ): { groupId: string; total: number; receipts: string[] } {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'customers.payment');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('تاريخ الدفعة غير صحيح.');
+    const entries = allocations.filter((a) => Number(a.amount) > 0);
+    if (!entries.length || new Set(entries.map((a) => a.invoiceId)).size !== entries.length) throw new Error('حدد فواتير ومبالغ صحيحة دون تكرار.');
+    const groupId = idempotencyKey || `cpgrp_${uuidv4().slice(0, 10)}`;
+    return this.db.executeTransaction((db) => {
+      const prior = db.query<{ receiptNumber: string; amount: number }>(`SELECT receipt_number AS receiptNumber,amount FROM customer_payments WHERE payment_group_id=? ORDER BY created_at`,[groupId]);
+      if (prior.length) return { groupId, total: round2(prior.reduce((sum,row)=>sum+Number(row.amount),0)), receipts: prior.map(row=>row.receiptNumber) };
+      const customer = db.query<{ id: string }>('SELECT id FROM customers WHERE id=?', [customerId])[0];
+      if (!customer) throw new Error('العميل غير موجود.');
+      const receipts: string[] = [];
+      let total = 0;
+      for (const allocation of entries) {
+        const invoice = db.query<any>(`SELECT id,invoice_number AS invoiceNumber,customer_id AS customerId,paid_amount AS paidAmount,remaining_amount AS remainingAmount,invoice_status AS invoiceStatus FROM sales_invoices WHERE id=?`, [allocation.invoiceId])[0];
+        const amount = round2(Number(allocation.amount));
+        if (!invoice || invoice.customerId !== customerId || invoice.invoiceStatus === 'VOID') throw new Error('إحدى الفواتير المحددة غير صالحة لهذا العميل.');
+        if (amount <= 0 || amount > Number(invoice.remainingAmount) + 0.009) throw new Error(`المبلغ يتجاوز المتبقي في الفاتورة ${invoice.invoiceNumber}.`);
+        const receiptNumber = db.nextNumber('REC');
+        const newPaid = round2(Number(invoice.paidAmount) + amount);
+        const remaining = round2(Math.max(0, Number(invoice.remainingAmount) - amount));
+        const paymentNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
+        db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,notes,performed_by)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [`cpay_${uuidv4().slice(0, 8)}`, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, paymentNotes, actor.id]);
+        db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+          [newPaid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', allocation.invoiceId]);
+        receipts.push(receiptNumber); total = round2(total + amount);
+      }
+      db.run(`UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [total, customerId]);
+      if (paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?`, [total, registerId]);
+      if (shiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments+? WHERE id=?`, [total, shiftId]);
+      db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
+        [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'تحصيل دفعة موزعة على فواتير', 'SALES', groupId, JSON.stringify({ customerId, allocations: entries, total, date, reference, receipts })]);
+      return { groupId, total, receipts };
+    });
+  }
+
   public getInvoicePayments(invoiceId: string): CustomerPayment[] {
     return this.db.query<CustomerPayment>(
       `SELECT * FROM customer_payments WHERE invoice_id = ? ORDER BY created_at ASC`,
@@ -447,13 +507,31 @@ export class SalesService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.payment');
     const payment = this.db.query<any>(
-      `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id
+      `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id
        FROM customer_payments WHERE id = ?`,
       [paymentId]
     )[0];
     if (!payment) throw new Error('سند القبض غير موجود.');
-    if (!payment.invoice_id) throw new Error('هذا السند غير مرتبط بفاتورة بيع. احذفه من كشف حساب العميل.');
-    const invoice = this.getInvoiceById(payment.invoice_id);
+    if (payment.paymentGroupId) {
+      const group = this.db.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [payment.paymentGroupId]);
+      this.db.executeTransaction((db) => {
+        for (const row of group) {
+          const invoice = db.query<any>(`SELECT id,customer_id,paid_amount,total_amount,remaining_amount,invoice_status FROM sales_invoices WHERE id=?`, [row.invoiceId])[0];
+          if (!invoice || invoice.invoiceStatus === 'VOID') throw new Error('تعذر عكس الدفعة المرتبطة بفاتورة غير متاحة.');
+          const value = round2(row.amount); const paid = round2(Math.max(0, invoice.paidAmount - value)); const remaining = round2(Math.min(invoice.totalAmount, invoice.remainingAmount + value));
+          db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [paid, remaining, remaining <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]);
+          db.run(`UPDATE customers SET current_balance=current_balance+?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [value, invoice.customerId]);
+          if (row.paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?`, [value, row.registerId || 'cr_main']);
+          if (row.shiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?`, [value, row.shiftId]);
+        }
+        db.run(`DELETE FROM customer_payments WHERE payment_group_id=?`, [payment.paymentGroupId]);
+        db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,old_values) VALUES (?,?,?,?,?,?,?)`,
+          [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'عكس دفعة موزعة على فواتير', 'SALES', payment.paymentGroupId, JSON.stringify(group.map(row => ({ receiptNumber: row.receiptNumber, invoiceId: row.invoiceId, amount: row.amount })))]);
+      });
+      return;
+    }
+    if (!payment.invoiceId) throw new Error('هذا السند غير مرتبط بفاتورة بيع. احذفه من كشف حساب العميل.');
+    const invoice = this.getInvoiceById(payment.invoiceId);
     if (!invoice) throw new Error('فاتورة البيع غير موجودة.');
     if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن حذف دفعة من فاتورة ملغاة.');
 
@@ -472,11 +550,11 @@ export class SalesService {
         `UPDATE customers SET current_balance = current_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [amount, invoice.customerId]
       );
-      if (payment.payment_type === 'CASH') {
-        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.register_id || 'cr_main']);
+      if (payment.paymentType === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [amount, payment.registerId || 'cr_main']);
       }
-      if (payment.shift_id) {
-        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shift_id]);
+      if (payment.shiftId) {
+        db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?`, [amount, payment.shiftId]);
       }
       db.run('DELETE FROM customer_payments WHERE id = ?', [paymentId]);
       db.run(
@@ -484,7 +562,7 @@ export class SalesService {
          VALUES (?, ?, ?, 'حذف سند تحصيل', 'SALES', ?, ?, ?)`,
         [
           `aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoice.id,
-          JSON.stringify({ receiptNumber: payment.receipt_number, amount }),
+          JSON.stringify({ receiptNumber: payment.receiptNumber, amount }),
           JSON.stringify({ invoiceNumber: invoice.invoiceNumber }),
         ]
       );

@@ -1,9 +1,10 @@
 import { DatabaseManager } from '../database/db';
-import type { PurchaseInvoice, PurchaseInvoiceItem, PaymentType } from '../types';
+import type { PurchaseInvoice, PurchaseInvoiceItem, PaymentType, PaymentStatus } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { computeWeightedAverageCost, round2 } from './financials';
+import { CustomerSupplyService } from './CustomerSupplyService';
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -86,7 +87,7 @@ export class PurchaseService {
     const today = new Date().toISOString().slice(0, 10);
     const performedBy = actor.id;
 
-    return this.db.executeTransaction((sqliteDb) => {
+    const invoice = this.db.executeTransaction((sqliteDb) => {
       const invoiceNumber = sqliteDb.nextNumber('PUR');
       let subtotal = 0;
       const preparedItems: any[] = [];
@@ -118,7 +119,7 @@ export class PurchaseService {
       const shippingCost = round2(dto.shippingCost || 0);
       const totalAmount = round2(subtotal - discountAmount + taxAmount + shippingCost);
       const remainingAmount = round2(Math.max(0, totalAmount - dto.paidAmount));
-      const paymentStatus = remainingAmount <= 0 ? 'PAID' : (dto.paidAmount > 0 ? 'PARTIAL' : 'UNPAID');
+      const paymentStatus: PaymentStatus = remainingAmount <= 0 ? 'PAID' : (dto.paidAmount > 0 ? 'PARTIAL' : 'UNPAID');
 
       // 1. Insert Purchase Invoice
       sqliteDb.run(`
@@ -246,6 +247,11 @@ export class PurchaseService {
         items: preparedItems,
       };
     });
+
+    for (const item of dto.items) {
+      new CustomerSupplyService().allocateReceivedQuantity(dto.warehouseId, item.productId, item.quantityM2);
+    }
+    return invoice;
   }
 
   public recordPayment(

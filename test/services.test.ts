@@ -11,12 +11,21 @@ import { FinancialStatementsService } from '../src/services/FinancialStatementsS
 import { CommissionService } from '../src/services/CommissionService.ts';
 import { ReservationService } from '../src/services/ReservationService.ts';
 import { ApprovalService } from '../src/services/ApprovalService.ts';
-import { CloudSyncService } from '../src/services/CloudSyncService.ts';
 import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
+import { AccountingService } from '../src/services/AccountingService.ts';
+import { SupplierService } from '../src/services/SupplierService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
 }
+
+test('dashboard metrics handle an empty database without a top customer', async () => {
+  await DatabaseManager.getInstance().initialize();
+  const metrics = new AccountingService().getDashboardMetrics();
+  assert.equal(metrics.topCustomer, null);
+  assert.equal(metrics.todaySales, 0);
+  assert.equal(metrics.totalReceivables, 0);
+});
 
 test('pricing and financial statements: overrides, aging and balance sheet', async () => {
   const db = DatabaseManager.getInstance();
@@ -148,13 +157,44 @@ test('approved credit-limit request updates the customer automatically', async (
   assert.equal(decisions[0].status, 'APPROVED');
 });
 
+test('supplier lifecycle supports edit, archive, reactivation, payments and statement ranges', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
 
-test('cloud sync is disabled until a real endpoint is configured', async () => {
-  const config = new CloudSyncService().getConfig();
-  assert.equal(config.isEnabled, false);
-  assert.equal(config.serverUrl, '');
-  const result = await new CloudSyncService().triggerSync();
-  assert.equal(result.success, false);
+  const service = new SupplierService();
+  const supplier = service.createSupplier({
+    code: 'SUP-LIFECYCLE',
+    name: 'مورد دورة الحياة',
+    phone: '01000000077',
+    initialBalance: 100,
+    paymentTermsDays: 20,
+  });
+
+  assert.equal(supplier.currentBalance, 100);
+  assert.ok(service.getAllSuppliers().some((row) => row.id === supplier.id));
+
+  const edited = service.updateSupplier(supplier.id, { email: 'supplier@example.test', paymentTermsDays: 45 });
+  assert.equal(edited.email, 'supplier@example.test');
+  assert.equal(edited.paymentTermsDays, 45);
+
+  service.updateSupplier(supplier.id, { isActive: 0 });
+  assert.ok(!service.getAllSuppliers().some((row) => row.id === supplier.id));
+  assert.ok(service.getAllSuppliers(undefined, true).some((row) => row.id === supplier.id));
+
+  service.updateSupplier(supplier.id, { isActive: 1 });
+  service.recordPayment(supplier.id, 30, 'BANK_TRANSFER', undefined, 'دفعة اختبار');
+  const statement = service.getSupplierStatement(supplier.id);
+  assert.equal(statement.openingBalance, 100);
+  assert.equal(statement.closingBalance, 70);
+  assert.equal(statement.transactions.length, 1);
+  const futureStatement = service.getSupplierStatement(supplier.id, '9999-01-01', '9999-12-31');
+  assert.equal(futureStatement.openingBalance, 70);
+  assert.equal(futureStatement.transactions.length, 0);
+
+  assert.throws(() => service.recordPayment(supplier.id, Number.NaN), /مبلغ السداد/);
+  assert.equal(db.query<any>('SELECT is_active FROM suppliers WHERE id = ?', [supplier.id])[0].isActive, 1);
 });
 
 
@@ -189,4 +229,3 @@ test("daily operations expose today's sales, purchases, expenses and debts", asy
   assert.equal(debts.rows.length, 1);
   assert.equal(debts.summary.netChange, 2600);
 });
-

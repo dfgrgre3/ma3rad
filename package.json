@@ -12,7 +12,9 @@
     "check": "npm run typecheck && npm test && npm run build",
     "electron:pack": "npm run build && electron-builder --dir",
     "electron:dist": "npm run build && electron-builder --win nsis",
-    "test": "node --import ./test/register-hook.mjs --import ./test/integration.setup.ts --test test/financials.test.ts test/integration.test.ts test/services.test.ts"
+    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/dynamic-data.test.ts",
+    "electron:dist:mac": "npm run build && electron-builder --mac",
+    "electron:dist:linux": "npm run build && electron-builder --linux"
   },
   "build": {
     "appId": "com.ceramisys.erp",
@@ -42,6 +44,35 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "CeramiSys ERP"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    },
+    "dmg": {
+      "title": "CeramiSys ERP"
     }
   },
   "keywords": [

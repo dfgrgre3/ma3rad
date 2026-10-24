@@ -3,9 +3,9 @@ import {
   RotateCcw as RotateCcl, Layers, BookOpen, ArrowLeftRight, ScanLine, Scale,
   Wrench, Package, FolderTree, Tags, Ruler, Percent, Star, Barcode, Users,
   UserRound, Workflow, Activity, Boxes, Handshake, ClipboardList, ClipboardCheck, ShoppingBag,
-  Undo2, Wallet, TrendingDown, Banknote, CalendarDays, Building2, Warehouse,
+  Undo2, Wallet, TrendingDown, Banknote, CalendarDays, Building2, Warehouse, PackageCheck,
   HardHat, Truck, Car, BarChart3, CheckSquare, Bell, ShieldCheck, Settings,
-  Download, Cpu, Cloud, SlidersHorizontal, BadgeDollarSign, BookmarkPlus,
+  Download, Cpu, SlidersHorizontal, BadgeDollarSign, BookmarkPlus, FileSpreadsheet, MessageCircle,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -64,6 +64,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     items: [
       { label: 'نقطة البيع (POS)', to: '/pos', icon: ShoppingCart, highlight: true, perm: 'sales.create' },
       { label: 'فواتير المبيعات', to: '/sales', icon: Receipt, perm: 'sales.view' },
+      { label: 'تحليلات المبيعات', to: '/sales/analytics', icon: Activity, perm: 'sales.view' },
       { label: 'عروض الأسعار', to: '/quotations', icon: FileText, perm: 'quotations.view' },
       { label: 'الطلبات', to: '/orders', icon: Package2, perm: 'orders.view' },
       { label: 'المرتجعات', to: '/returns', icon: RotateCcl, perm: 'returns.view' },
@@ -77,6 +78,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
     perm: 'inventory.view',
     items: [
       { label: 'نظرة عامة', to: '/inventory', icon: Layers, perm: 'inventory.view' },
+      { label: 'الأصناف في المخزن', to: '/inventory/warehouse-stock', icon: Warehouse, perm: 'inventory.view' },
+      { label: 'مقارنة المعرض والمخزن', to: '/inventory/showroom-stock', icon: Building2, perm: 'inventory.view' },
       { label: 'سجل المخزون', to: '/inventory/ledger', icon: BookOpen, perm: 'inventory.view' },
       { label: 'التحويلات', to: '/inventory/transfers', icon: ArrowLeftRight, perm: 'inventory.transfer' },
       { label: 'الجرد', to: '/inventory/counts', icon: ScanLine, perm: 'inventory.count' },
@@ -109,6 +112,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
     perm: 'customers.view',
     items: [
       { label: 'العملاء', to: '/customers', icon: Users, perm: 'customers.view' },
+      { label: 'منتجات العملاء الخارجية', to: '/customers/imported-products', icon: MessageCircle, perm: 'customers.view' },
+      { label: 'طلبات جاهزة للتسليم', to: '/customers/ready-deliveries', icon: PackageCheck, perm: 'customers.view' },
       { label: 'العملاء المحتملون', to: '/crm/leads', icon: UserRound, perm: 'crm.view' },
       { label: 'Pipeline المبيعات', to: '/crm/pipeline', icon: Workflow, perm: 'crm.view' },
       { label: 'الأنشطة والمتابعة', to: '/crm/activities', icon: Activity, perm: 'crm.view' },
@@ -126,6 +131,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { label: 'الموردون', to: '/suppliers', icon: Handshake, perm: 'suppliers.view' },
       { label: 'طلبات الشراء', to: '/purchases/requests', icon: ClipboardList, perm: 'purchases.view' },
       { label: 'أوامر الشراء', to: '/purchases/orders', icon: ClipboardCheck, perm: 'purchases.view' },
+      { label: 'المنتجات المنتظرة للوصول', to: '/purchases/incoming', icon: PackageCheck, perm: 'purchases.view' },
       { label: 'فواتير الشراء', to: '/purchases', icon: ShoppingBag, perm: 'purchases.view' },
       { label: 'مرتجعات الشراء', to: '/purchases/returns', icon: Undo2, perm: 'purchases.return' },
     ],
@@ -145,6 +151,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { label: 'الشيكات', to: '/finance/cheques', icon: Banknote, perm: 'finance.view' },
       { label: 'الأصول الثابتة', to: '/finance/assets', icon: Building2, perm: 'finance.view' },
       { label: 'الديون والذمم', to: '/finance/debts', icon: Banknote, perm: 'finance.debts.view' },
+      { label: 'المستحقات الأخرى', to: '/finance/other-receivables', icon: ClipboardList, perm: 'finance.debts.view' },
       { label: 'الأقساط', to: '/finance/installments', icon: CalendarDays, perm: 'finance.installments.view' },
     ],
   },
@@ -197,11 +204,11 @@ export const NAV_GROUPS: NavGroupDef[] = [
     perm: 'settings.view',
     items: [
       { label: 'مركز التحكم', to: '/admin', icon: SlidersHorizontal, highlight: true, perm: 'admin.view' },
+      { label: 'مركز استيراد البيانات', to: '/data-import', icon: FileSpreadsheet, perm: 'settings.view' },
       { label: 'الإشعارات', to: '/notifications', icon: Bell, perm: 'notifications.view' },
       { label: 'سجل التدقيق', to: '/audit', icon: ShieldCheck, perm: 'audit.view' },
       { label: 'مركز الأمان', to: '/security', icon: ShieldCheck, perm: 'users.view' },
       { label: 'المستخدمون', to: '/users', icon: UserRound, perm: 'users.view' },
-      { label: 'الربط السحابي والفروع', to: '/cloud-sync', icon: Cloud, perm: 'settings.cloud' },
       { label: 'النسخ الاحتياطي', to: '/backup', icon: Download, perm: 'settings.backup' },
       { label: 'صحة النظام', to: '/system-health', icon: Cpu, perm: 'settings.view' },
       { label: 'الإعدادات', to: '/settings', icon: Settings, perm: 'settings.view' },

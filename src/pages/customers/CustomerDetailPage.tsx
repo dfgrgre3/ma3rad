@@ -36,7 +36,7 @@ const DataTable: React.FC<{ headers: string[]; rows: React.ReactNode[][]; empty:
   <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
     <table className="w-full text-sm text-right min-w-[520px]">
       <thead className="bg-slate-50 border-b border-slate-200">
-        <tr>{headers.map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr>
+        <tr>{[...headers, ...(rows[0]?.length > headers.length ? ['إجراء'] : [])].map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr>
       </thead>
       <tbody className="divide-y divide-slate-100">
         {rows.length === 0 ? (
@@ -81,7 +81,7 @@ export const CustomerDetailPage: React.FC = () => {
       const db = DatabaseManager.getInstance();
       setCustomer(new CustomerService().getCustomerById(id));
       setLists({
-        sales: db.query(`SELECT invoice_number AS n1, date, total_amount AS amount, paid_amount AS paid,
+        sales: db.query(`SELECT id, invoice_number AS n1, date, total_amount AS amount, paid_amount AS paid,
           remaining_amount AS remaining, payment_status AS status FROM sales_invoices
           WHERE customer_id = ? AND invoice_status != 'VOID' ORDER BY date DESC LIMIT 100`, [id]),
         quotations: db.query(`SELECT quotation_number AS n1, date, total_amount AS amount, status,
@@ -252,6 +252,7 @@ export const CustomerDetailPage: React.FC = () => {
               <b>{fmt(r.amount)}</b>, <span className="text-emerald-600">{fmt(r.paid)}</span>,
               <span className="text-rose-600">{r.remaining > 0 ? fmt(r.remaining) : '—'}</span>,
               <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${PAY_STATUS[r.status] || 'bg-slate-100 text-slate-600'}`}>{PAY_LABEL[r.status] || r.status}</span>,
+              <button onClick={() => navigate(`/customers/${id}/imported-products?invoiceId=${encodeURIComponent(r.id)}`)} className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[11px] font-bold whitespace-nowrap">متابعة المنتجات الخارجية</button>,
             ])} />
         )}
 

@@ -1,6 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import type { SalesInvoice, SystemSettings } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { EscPosService } from './EscPosService';
 import { SettingsService } from './SettingsService';
 
 export class PrintService {
@@ -21,8 +22,8 @@ export class PrintService {
       <tr style="border-bottom: 1px solid #e2e8f0; text-align: center;">
         <td style="padding: 8px;">${idx + 1}</td>
         <td style="padding: 8px; text-align: right; font-weight: 600;">
-          ${item.productName}
-          <div style="font-size: 11px; color: #64748b;">كود: ${item.productSku} | مقاس: ${item.size} | فرز: ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري/ثاني'}</div>
+          ${this.esc(item.productName)}
+          <div style="font-size: 11px; color: #64748b;">كود: ${this.esc(item.productSku)} | مقاس: ${this.esc(item.size)} | فرز: ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري/ثاني'}</div>
         </td>
         <td style="padding: 8px;">${item.soldBy === 'BOX' ? 'كرتونة' : 'متر مربع'}</td>
         <td style="padding: 8px; font-weight: 700;">${item.quantityM2} م² <span style="font-size: 11px; color: #64748b;">(${item.boxesCount} كرتونة)</span></td>
@@ -37,7 +38,7 @@ export class PrintService {
       <html lang="ar" dir="rtl">
         <head>
           <meta charset="utf-8">
-          <title>فاتورة مبيعات ${invoice.invoiceNumber}</title>
+          <title>فاتورة مبيعات ${this.esc(invoice.invoiceNumber)}</title>
           <style>
             body { font-family: 'Cairo', system-ui, sans-serif; margin: 0; padding: 20px; color: #0f172a; font-size: 13px; line-height: 1.5; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 15px; }
@@ -57,21 +58,21 @@ export class PrintService {
         <body>
           <div class="header">
             <div>
-              <div class="showroom-title">${settings.showroomName}</div>
-              <div>${settings.tagline}</div>
-              <div>العنوان: ${settings.address} | هاتف: ${settings.phone}</div>
-              ${settings.taxNumber ? `<div>س.ت: ${settings.commercialRecord} | ب.ض: ${settings.taxNumber}</div>` : ''}
+              <div class="showroom-title">${this.esc(settings.showroomName)}</div>
+              <div>${this.esc(settings.tagline)}</div>
+              <div>العنوان: ${this.esc(settings.address)} | هاتف: ${this.esc(settings.phone)}</div>
+              ${settings.taxNumber ? `<div>س.ت: ${this.esc(settings.commercialRecord)} | ب.ض: ${this.esc(settings.taxNumber)}</div>` : ''}
             </div>
             <div style="text-align: left;">
               <div class="badge">فاتورة مبيعات ضريبية</div>
-              <div style="font-size: 14px; font-weight: 700; margin-top: 6px;">رقم: ${invoice.invoiceNumber}</div>
-              <div>التاريخ: ${invoice.date}</div>
+              <div style="font-size: 14px; font-weight: 700; margin-top: 6px;">رقم: ${this.esc(invoice.invoiceNumber)}</div>
+              <div>التاريخ: ${this.esc(invoice.date)}</div>
             </div>
           </div>
 
           <div style="display: flex; justify-content: space-between; background: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
-            <div><strong>العميل:</strong> ${invoice.customerName || 'عميل نقدي'} | <strong>الهاتف:</strong> ${invoice.customerPhone || '-'}</div>
-            <div><strong>المخزن المنصرف منه:</strong> ${invoice.warehouseName || 'المعرض الرئيسي'}</div>
+            <div><strong>العميل:</strong> ${this.esc(invoice.customerName || 'عميل نقدي')} | <strong>الهاتف:</strong> ${this.esc(invoice.customerPhone || '-')}</div>
+            <div><strong>المخزن المنصرف منه:</strong> ${this.esc(invoice.warehouseName || 'المعرض الرئيسي')}</div>
           </div>
 
           <table>
@@ -94,11 +95,12 @@ export class PrintService {
           <div style="display: flex; justify-content: space-between; align-items: flex-start;">
             <div style="margin-top: 20px; font-size: 12px;">
               <strong>طريقة الدفع:</strong> ${invoice.paymentType === 'CASH' ? 'نقدي كاش' : (invoice.paymentType === 'CARD' ? 'بطاقة بنكية / فيزا' : 'آجل / تقسيط')}<br>
-              <strong>ملاحظات:</strong> ${invoice.notes || 'لا يوجد'}
+              <strong>ملاحظات:</strong> ${this.esc(invoice.notes || 'لا يوجد')}
             </div>
             <div class="totals-box">
               <div class="total-row"><span>المجموع الفرعي:</span> <span>${CeramicMath.formatCurrency(invoice.subtotal)}</span></div>
               ${invoice.discountAmount > 0 ? `<div class="total-row" style="color: #dc2626;"><span>خصم الفاتورة:</span> <span>-${CeramicMath.formatCurrency(invoice.discountAmount)}</span></div>` : ''}
+              ${invoice.taxAmount > 0 ? `<div class="total-row"><span>الضريبة (${this.esc(invoice.taxPercentage)}%):</span> <span>+${CeramicMath.formatCurrency(invoice.taxAmount)}</span></div>` : ''}
               ${invoice.shippingCost > 0 ? `<div class="total-row"><span>مشال ونقل:</span> <span>+${CeramicMath.formatCurrency(invoice.shippingCost)}</span></div>` : ''}
               <div class="total-row grand-total"><span>صافي الفاتورة:</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
               <div class="total-row" style="color: #16a34a; font-weight: 700; margin-top: 4px;"><span>المبلغ المسدد:</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
@@ -107,7 +109,7 @@ export class PrintService {
           </div>
 
           <div class="footer">
-            ${settings.receiptFooter}
+            ${this.esc(settings.receiptFooter)}
           </div>
 
           ${autoPrint ? `<script>
@@ -135,8 +137,26 @@ export class PrintService {
    * 80mm thermal receipt for point-of-sale checkout. Kept intentionally compact
    * (no table borders, monospace-ish) so it renders correctly on narrow roll paper.
    */
-  public printThermalReceipt(invoice: SalesInvoice & { items: any[] }): void {
+  public async printThermalReceipt(invoice: SalesInvoice & { items: any[] }): Promise<void> {
     const settings = this.getSettings();
+
+    // Direct ESC/POS route: raw bytes to the OS spooler (winspool/CUPS) or
+    // straight over TCP 9100 for network printers — silent, no dialog.
+    if (settings.thermalPrinterName && window.ceramisys?.printing?.raw) {
+      try {
+        const width = EscPosService.lineWidthFor(settings);
+        const bytes = EscPosService.buildReceiptBytes(invoice, settings, width);
+        const isNetwork = settings.thermalTransport === 'network';
+        const res = await window.ceramisys.printing.raw(bytes, settings.thermalPrinterName, isNetwork
+          ? { transport: 'network', host: settings.thermalHost, port: settings.thermalPort }
+          : { transport: 'system' });
+        if (res?.ok) return;
+        console.warn('Direct ESC/POS printing failed, falling back to dialog:', res?.error);
+      } catch (error) {
+        console.warn('Direct ESC/POS printing failed, falling back to dialog:', error);
+      }
+    }
+
     const printWindow = window.open('', '_blank', 'width=380,height=640');
     if (!printWindow) {
       alert('يرجى السماح بالنوافذ المنبثقة لطباعة الإيصال');
@@ -145,8 +165,8 @@ export class PrintService {
 
     const itemsHtml = invoice.items.map((item) => `
       <div class="item">
-        <div class="item-name">${item.productName}</div>
-        <div class="item-meta">${item.productSku} | مقاس ${item.size} | ${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز ثاني/تجاري'}</div>
+        <div class="item-name">${this.esc(item.productName)}</div>
+        <div class="item-meta">${this.esc(item.productSku)} | مقاس ${this.esc(item.size)} | ${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز ثاني/تجاري'}</div>
         <div class="item-row">
           <span>${item.quantityM2} م² (${item.boxesCount} كرتونة) × ${item.unitPrice}</span>
           <span>${CeramicMath.formatCurrency(item.totalPrice)}</span>
@@ -160,7 +180,7 @@ export class PrintService {
       <html lang="ar" dir="rtl">
         <head>
           <meta charset="utf-8">
-          <title>إيصال ${invoice.invoiceNumber}</title>
+          <title>إيصال ${this.esc(invoice.invoiceNumber)}</title>
           <style>
             @page { size: 80mm auto; margin: 2mm; }
             * { box-sizing: border-box; }
@@ -181,14 +201,14 @@ export class PrintService {
           </style>
         </head>
         <body>
-          <div class="center shop-name">${settings.showroomName}</div>
-          <div class="center muted">${settings.tagline || ''}</div>
-          <div class="center muted">${settings.address || ''}${settings.phone ? ' | ت: ' + settings.phone : ''}</div>
+          <div class="center shop-name">${this.esc(settings.showroomName)}</div>
+          <div class="center muted">${this.esc(settings.tagline || '')}</div>
+          <div class="center muted">${this.esc(settings.address || '')}${settings.phone ? ' | ت: ' + this.esc(settings.phone) : ''}</div>
           <div class="divider"></div>
-          <div class="meta-row"><span>إيصال بيع</span><span>${invoice.invoiceNumber}</span></div>
-          <div class="meta-row"><span>التاريخ</span><span>${invoice.date}</span></div>
-          <div class="meta-row"><span>العميل</span><span>${invoice.customerName || 'عميل نقدي'}</span></div>
-          <div class="meta-row"><span>المخزن</span><span>${invoice.warehouseName || '-'}</span></div>
+          <div class="meta-row"><span>إيصال بيع</span><span>${this.esc(invoice.invoiceNumber)}</span></div>
+          <div class="meta-row"><span>التاريخ</span><span>${this.esc(invoice.date)}</span></div>
+          <div class="meta-row"><span>العميل</span><span>${this.esc(invoice.customerName || 'عميل نقدي')}</span></div>
+          <div class="meta-row"><span>المخزن</span><span>${this.esc(invoice.warehouseName || '-')}</span></div>
           <div class="divider"></div>
           ${itemsHtml}
           <div class="divider"></div>
@@ -200,7 +220,7 @@ export class PrintService {
           <div class="totals-row"><span>المدفوع</span><span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
           <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : invoice.paymentType === 'CARD' ? 'بطاقة' : 'آجل'}</span></div>
           ${invoice.remainingAmount > 0 ? `<div class="totals-row"><span>المتبقي (آجل)</span><span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
-          <div class="footer">${settings.receiptFooter || ''}</div>
+          <div class="footer">${this.esc(settings.receiptFooter || '')}</div>
           <script>
             window.onload = function() {
               window.print();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Barcode, ShoppingCart, Trash2, Plus, Minus,
@@ -49,6 +49,8 @@ interface HeldOrder {
   discountAmount: number;
   shippingCost: number;
   notes: string;
+  paidAmount?: number;
+  paymentType?: PaymentType;
 }
 
 interface Toast {
@@ -74,6 +76,10 @@ export const PosView: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedBrand, setSelectedBrand] = useState<string>('ALL');
+  const [selectedGrade, setSelectedGrade] = useState<string>('ALL');
+  const [selectedSize, setSelectedSize] = useState<string>('ALL');
+  const [selectedColor, setSelectedColor] = useState<string>('ALL');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -86,6 +92,7 @@ export const PosView: React.FC = () => {
   const [taxPercentage, setTaxPercentage] = useState<number>(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const [notes, setNotes] = useState('');
 
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
@@ -106,12 +113,16 @@ export const PosView: React.FC = () => {
   const [isHeldModalOpen, setIsHeldModalOpen] = useState(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
+  const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
+  const [closingCash, setClosingCash] = useState(0);
+  const [closingNotes, setClosingNotes] = useState('');
 
   // New-customer form
   const [newCustName, setNewCustName] = useState('');
   const [newCustPhone, setNewCustPhone] = useState('');
   const [newCustType, setNewCustType] = useState<Customer['customerType']>('RETAIL');
   const [newCustCredit, setNewCustCredit] = useState(0);
+  const [customerError, setCustomerError] = useState('');
 
   // Open-shift form
   const [shiftRegisterId, setShiftRegisterId] = useState('cr_main');
@@ -206,6 +217,13 @@ export const PosView: React.FC = () => {
   }, [loadInitialData]);
 
   useEffect(() => {
+    const update = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
+  }, []);
+
+  useEffect(() => {
     if (selectedWarehouseId) loadStock(selectedWarehouseId);
   }, [selectedWarehouseId, loadStock]);
 
@@ -217,10 +235,16 @@ export const PosView: React.FC = () => {
         p.name.toLowerCase().includes(q) ||
         (p.barcode || '').includes(q) ||
         (p.sku || '').toLowerCase().includes(q) ||
-        (p.size || '').includes(q);
+        (p.size || '').includes(q) ||
+        (p.brandName || '').toLowerCase().includes(q) ||
+        (p.color || '').toLowerCase().includes(q);
       const matchesCategory = selectedCategory === 'ALL' || p.categoryId === selectedCategory;
+      const matchesBrand = selectedBrand === 'ALL' || p.brandId === selectedBrand;
+      const matchesGrade = selectedGrade === 'ALL' || p.grade === selectedGrade;
+      const matchesSize = selectedSize === 'ALL' || p.size === selectedSize;
+      const matchesColor = selectedColor === 'ALL' || (p.color || '') === selectedColor;
       const matchesStock = !inStockOnly || stockOf(p.id) > 0;
-      return matchesSearch && matchesCategory && matchesStock;
+      return matchesSearch && matchesCategory && matchesBrand && matchesGrade && matchesSize && matchesColor && matchesStock;
     });
 
     list = [...list].sort((a, b) => {
@@ -232,12 +256,15 @@ export const PosView: React.FC = () => {
       }
     });
     return list;
-  }, [products, searchQuery, selectedCategory, inStockOnly, sortMode, stockOf]);
+  }, [products, searchQuery, selectedCategory, selectedBrand, selectedGrade, selectedSize, selectedColor, inStockOnly, sortMode, stockOf]);
 
   const visibleCategories = useMemo(
     () => categories.filter((c) => c.productCount > 0),
     [categories]
   );
+  const visibleBrands = useMemo(() => [...new Map(products.filter((p) => p.brandId).map((p) => [p.brandId, p.brandName || ''])).entries()], [products]);
+  const visibleSizes = useMemo(() => [...new Set(products.map((p) => p.size).filter(Boolean))].sort(), [products]);
+  const visibleColors = useMemo(() => [...new Set(products.map((p) => p.color).filter(Boolean) as string[])].sort(), [products]);
 
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.trim().toLowerCase();
@@ -303,7 +330,8 @@ export const PosView: React.FC = () => {
   };
 
   const updateCartQuantity = (index: number, value: number) => {
-    if (value <= 0) {
+    if (!Number.isFinite(value) || value < 0) return;
+    if (value === 0) {
       removeFromCart(index);
       return;
     }
@@ -338,12 +366,24 @@ export const PosView: React.FC = () => {
   const updateCartUnit = (index: number, unit: PosUnit) => {
     setCart((prev) => {
       const updated = [...prev];
-      updated[index].soldBy = unit;
+      const item = { ...updated[index] };
+      if (item.soldBy !== unit) {
+        const metersPerBox = item.product.metersPerBox || 1.44;
+        item.soldBy = unit;
+        item.unitPrice = unit === 'BOX'
+          ? round2(item.unitPrice * metersPerBox)
+          : round2(item.unitPrice / metersPerBox);
+        updated[index] = item;
+      }
       return updated;
     });
   };
 
   const updateCartPrice = (index: number, value: number) => {
+    if (!can('sales.approve')) {
+      notify('لا تملك صلاحية تعديل سعر الصنف', 'error');
+      return;
+    }
     setCart((prev) => {
       const updated = [...prev];
       const item = updated[index];
@@ -358,7 +398,9 @@ export const PosView: React.FC = () => {
   const updateCartLineDiscount = (index: number, value: number) => {
     setCart((prev) => {
       const updated = [...prev];
-      updated[index].discountAmount = Math.max(0, round2(value));
+      const item = { ...updated[index] };
+      item.discountAmount = Math.min(item.quantityM2 * item.unitPrice, Math.max(0, round2(Number.isFinite(value) ? value : 0)));
+      updated[index] = item;
       return updated;
     });
   };
@@ -386,6 +428,7 @@ export const PosView: React.FC = () => {
   const totalAmount = round2(Math.max(0, taxableBase + taxAmount + (shippingCost || 0)));
   const remainingAmount = round2(Math.max(0, totalAmount - (paidAmount || 0)));
   const changeDue = round2(Math.max(0, (paidAmount || 0) - totalAmount));
+  const expectedClosingCash = round2((activeShift?.openingBalance || 0) + (activeShift?.totalSalesCash || 0) + (activeShift?.totalCustomerPayments || 0) - (activeShift?.totalSupplierPayments || 0) - (activeShift?.totalExpenses || 0) - (activeShift?.totalRefunds || 0));
   const totalItems = round2(cart.reduce((sum, item) => sum + item.quantityM2, 0));
   const totalBoxes = round2(cart.reduce((sum, item) => sum + item.boxesCount, 0));
 
@@ -423,11 +466,20 @@ export const PosView: React.FC = () => {
 
   // ── Customers ───────────────────────────────────────────────────────────────
   const handleCreateCustomer = () => {
+    if (!can('customers.create')) {
+      notify('لا تملك صلاحية إضافة عميل', 'error');
+      return;
+    }
     if (!newCustName.trim() || !newCustPhone.trim()) {
       notify('يرجى إدخال اسم العميل ورقم الهاتف', 'error');
       return;
     }
     try {
+      const normalizedPhone = newCustPhone.trim().replace(/\s+/g, '');
+      if (customers.some((customer) => (customer.phone || '').replace(/\s+/g, '') === normalizedPhone)) {
+        setCustomerError('رقم الهاتف مرتبط بعميل موجود. ابحث عنه واختره بدلاً من إنشاء سجل مكرر.');
+        return;
+      }
       const created = customerService.createCustomer({
         code: '',
         name: newCustName.trim(),
@@ -442,6 +494,7 @@ export const PosView: React.FC = () => {
       setSelectedCustomer(created);
       applyCustomerPricing(created);
       setIsCustomerModalOpen(false);
+      setCustomerError('');
       setNewCustName('');
       setNewCustPhone('');
       setNewCustCredit(0);
@@ -477,7 +530,9 @@ export const PosView: React.FC = () => {
       items: cart,
       discountAmount,
       shippingCost,
-      notes
+      notes,
+      paidAmount,
+      paymentType
     };
     persistHeld([hold, ...heldOrders]);
     setCart([]);
@@ -495,6 +550,8 @@ export const PosView: React.FC = () => {
     setDiscountAmount(order.discountAmount || 0);
     setShippingCost(order.shippingCost || 0);
     setNotes(order.notes || '');
+    setPaidAmount(order.paidAmount || 0);
+    setPaymentType(order.paymentType || 'CASH');
     persistHeld(heldOrders.filter((h) => h.id !== order.id));
     setIsHeldModalOpen(false);
     notify(`تم استرجاع الطلب: ${order.customerName}`, 'success');
@@ -525,8 +582,27 @@ export const PosView: React.FC = () => {
     }
   };
 
+  const handleCloseShift = () => {
+    if (!activeShift) return;
+    if (!can('cashier.shift')) {
+      notify('غير مصرح لك بإغلاق وردية الكاشير', 'error');
+      return;
+    }
+    try {
+      cashierService.closeShift(activeShift.id, Math.max(0, closingCash), closingNotes, currentUser?.id || 'usr_admin');
+      setActiveShift(null);
+      setIsCloseShiftModalOpen(false);
+      setClosingCash(0);
+      setClosingNotes('');
+      notify('تم إغلاق الوردية وحفظ فرق الصندوق', 'success');
+    } catch (e: any) {
+      notify(e.message || 'تعذر إغلاق الوردية', 'error');
+    }
+  };
+
   // ── Checkout ────────────────────────────────────────────────────────────────
   const handleCheckout = useCallback(() => {
+    if (isProcessing) return;
     if (cart.length === 0) {
       notify('السلة فارغة، أضف أصنافاً أولاً', 'error');
       return;
@@ -537,6 +613,14 @@ export const PosView: React.FC = () => {
     }
     if (!selectedWarehouseId) {
       notify('يرجى اختيار المخزن', 'error');
+      return;
+    }
+    if (!can('sales.create')) {
+      notify('لا تملك صلاحية إنشاء فاتورة بيع', 'error');
+      return;
+    }
+    if (remainingAmount > 0 && !can('sales.credit')) {
+      notify('لا تملك صلاحية البيع الآجل أو ترك مبلغ متبقٍ', 'error');
       return;
     }
 
@@ -653,7 +737,7 @@ export const PosView: React.FC = () => {
       setIsProcessing(false);
     }
   }, [
-    cart, selectedCustomer, selectedWarehouseId, settings, stockOf, can,
+    cart, selectedCustomer, selectedWarehouseId, settings, stockOf, can, isProcessing,
     discountAmount, lineDiscountTotal, remainingAmount, activeShift, taxPercentage,
     taxAmount, shippingCost, paidAmount, paymentType, notes, currentUser,
     salesService, productService, cashierService, loadStock, notify
@@ -712,6 +796,9 @@ export const PosView: React.FC = () => {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const s = latest.current;
+      const target = e.target as HTMLElement | null;
+      const isTyping = !!target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+      if (isTyping && !['F1', 'F8', 'Escape'].includes(e.key)) return;
       if (e.key === 'F2') {
         e.preventDefault();
         barcodeInputRef.current?.focus();
@@ -743,8 +830,7 @@ export const PosView: React.FC = () => {
   const gradeLabel = (grade: Product['grade']) =>
     grade === 'GRADE_1' ? 'فرز أول' : grade === 'GRADE_2' ? 'فرز ثاني' : grade === 'GRADE_3' ? 'فرز ثالث' : 'تجاري';
 
-  const paymentLabel = (type: PaymentType) =>
-    type === 'CASH' ? 'نقدي كاش' : type === 'CARD' ? 'فيزا / بطاقة' : type === 'CREDIT' ? 'آجل بالكامل' : type;
+  const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
 
   const toastColor: Record<Toast['type'], string> = {
     success: 'bg-emerald-600 border-emerald-400',
@@ -754,7 +840,7 @@ export const PosView: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
+    <div className="flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col" dir="rtl">
       {/* ═══ Left: Catalog ═══ */}
       <div className="flex-1 flex flex-col overflow-hidden border-l border-slate-200 min-w-0">
         {/* Header / shift bar */}
@@ -766,6 +852,7 @@ export const PosView: React.FC = () => {
             <div>
               <h1 className="text-sm font-black text-slate-900 leading-tight">نقطة البيع السريعة</h1>
               <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                <span className={isOnline ? "flex items-center gap-1 font-bold text-emerald-600" : "flex items-center gap-1 font-bold text-amber-600"} title={isOnline ? "قاعدة البيانات المحلية متاحة" : "العمل محلي؛ قد لا تتوفر المزامنة الخارجية"}><span className={isOnline ? "w-2 h-2 rounded-full bg-emerald-500" : "w-2 h-2 rounded-full bg-amber-500"} />{isOnline ? "متصل" : "دون اتصال"}</span>
                 {activeShift ? (
                   <>
                     <span className="flex items-center gap-1 text-emerald-600 font-bold">
@@ -786,12 +873,15 @@ export const PosView: React.FC = () => {
 
           <div className="flex items-center gap-2 flex-wrap">
             {activeShift && (
-              <div className="hidden xl:flex items-center gap-3 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px]">
-                <span className="text-slate-500">كاش اليوم:</span>
-                <span className="font-black text-emerald-600">{CeramicMath.formatCurrency(activeShift.totalSalesCash)}</span>
-                <span className="text-slate-500">بطاقة:</span>
-                <span className="font-black text-sky-600">{CeramicMath.formatCurrency(activeShift.totalSalesCard)}</span>
-              </div>
+              <>
+                <div className="hidden xl:flex items-center gap-3 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px]">
+                  <span className="text-slate-500">كاش الوردية:</span>
+                  <span className="font-black text-emerald-600">{CeramicMath.formatCurrency(activeShift.totalSalesCash)}</span>
+                  <span className="text-slate-500">بطاقة:</span>
+                  <span className="font-black text-sky-600">{CeramicMath.formatCurrency(activeShift.totalSalesCard)}</span>
+                </div>
+                {can('cashier.shift') && <button onClick={() => { setClosingCash(expectedClosingCash); setIsCloseShiftModalOpen(true); }} className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition"><Lock className="w-4 h-4" /> إغلاق الوردية</button>}
+              </>
             )}
             {!activeShift && (
               <button
@@ -853,9 +943,9 @@ export const PosView: React.FC = () => {
               )}
             </form>
 
-            <select
+              <select
               value={selectedWarehouseId}
-              onChange={(e) => setSelectedWarehouseId(e.target.value)}
+              onChange={(e) => { setSelectedWarehouseId(e.target.value); loadStock(e.target.value); }}
               className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-sky-500"
             >
               {warehouses.map((w) => (
@@ -886,6 +976,19 @@ export const PosView: React.FC = () => {
               <Package className="w-4 h-4" /> المتوفر فقط
             </button>
 
+            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+              <option value="ALL">كل الماركات</option>{visibleBrands.map(([id, name]) => <option key={id} value={id}>{name || 'بدون ماركة'}</option>)}
+            </select>
+            <select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+              <option value="ALL">كل الأنواع والفرز</option><option value="GRADE_1">فرز أول</option><option value="GRADE_2">فرز ثاني</option><option value="GRADE_3">فرز ثالث</option><option value="COMMERCIAL">تجاري</option>
+            </select>
+            <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+              <option value="ALL">كل المقاسات</option>{visibleSizes.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+            {visibleColors.length > 0 && <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+              <option value="ALL">كل الألوان</option>{visibleColors.map((color) => <option key={color} value={color}>{color}</option>)}
+            </select>}
+
             <button
               type="button"
               onClick={() => setIsCalculatorOpen(true)}
@@ -900,8 +1003,8 @@ export const PosView: React.FC = () => {
             <button
               onClick={() => setSelectedCategory('ALL')}
               className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition ${
- selectedCategory === 'ALL'
- ? 'bg-sky-600 text-slate-900 border-sky-500'
+                selectedCategory === 'ALL'
+ ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
  : 'bg-slate-50 border-slate-200 hover:border-slate-300'
  }`}
             >
@@ -913,8 +1016,8 @@ export const PosView: React.FC = () => {
                 key={c.id}
                 onClick={() => setSelectedCategory(c.id)}
                 className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition ${
- selectedCategory === c.id
- ? 'bg-sky-600 text-slate-900 border-sky-500'
+                selectedCategory === c.id
+ ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
  : 'bg-slate-50 border-slate-200 hover:border-slate-300'
  }`}
               >
@@ -939,10 +1042,12 @@ export const PosView: React.FC = () => {
                 const isLow = p.minStockLevel > 0 && available <= p.minStockLevel;
                 const inCart = cart.find((c) => c.product.id === p.id);
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={p.id}
                     onClick={() => addToCart(p)}
-                    className="relative bg-white p-3 rounded-2xl border border-slate-200 hover:border-sky-500/70 cursor-pointer transition shadow-sm flex flex-col justify-between group overflow-hidden"
+                    aria-label={`إضافة ${p.name} إلى السلة`}
+                    className="relative text-right bg-white p-3 rounded-2xl border border-slate-200 hover:border-sky-500 hover:shadow-md focus-visible:ring-2 focus-visible:ring-sky-500 cursor-pointer transition flex flex-col justify-between group overflow-hidden min-h-[154px]"
                   >
                     {inCart && (
                       <span className="absolute top-0 left-0 bg-sky-600 text-white text-[10px] font-black px-2 py-0.5 rounded-br-xl">
@@ -950,6 +1055,7 @@ export const PosView: React.FC = () => {
                       </span>
                     )}
                     <div>
+                      {p.imagePath && <img src={p.imagePath} alt={p.name} loading="lazy" className="w-full h-24 object-cover rounded-xl mb-2 bg-slate-100" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
                       <div className="flex items-center justify-between gap-1 mb-1.5">
                         <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600">
                           {gradeLabel(p.grade)}
@@ -962,8 +1068,8 @@ export const PosView: React.FC = () => {
                       <div className="text-[10px] text-slate-500 mt-1">
                         الكرتونة: {p.metersPerBox} م² ({p.piecesPerBox} قطع)
                       </div>
-                      {p.brandName && (
-                        <div className="text-[10px] text-slate-500 truncate">{p.brandName}</div>
+                      {(p.brandName || p.color) && (
+                        <div className="text-[10px] text-slate-500 truncate">{[p.brandName, p.color].filter(Boolean).join(' • ')}</div>
                       )}
                     </div>
 
@@ -977,15 +1083,11 @@ export const PosView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="mt-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); addToCart(p); }}
-                        className="flex-1 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[10px] font-bold flex items-center justify-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" /> إضافة
-                      </button>
+                    <div className="mt-2 flex items-center justify-between gap-1 text-[10px] font-bold text-sky-700">
+                      <span className="flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة للسلة</span>
+                      {inCart && <span className="text-slate-500">{inCart.boxesCount} كرتونة</span>}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -994,17 +1096,15 @@ export const PosView: React.FC = () => {
       </div>
 
       {/* ═══ Right: Cart & Checkout ═══ */}
-      <div className="w-[26rem] max-w-[90vw] bg-white flex flex-col h-full border-r border-slate-200 shadow-2xl">
+      <div className="w-[26rem] max-w-[90vw] bg-white flex flex-col h-full border-r border-slate-200 shadow-2xl shrink-0 max-[900px]:w-full max-[900px]:max-w-none max-[900px]:h-[48%] max-[900px]:border-t max-[900px]:border-r-0">
         {/* Customer selector */}
-        <div className="p-3 border-b border-slate-200 space-y-2">
+        <div className="p-3 border-b border-slate-200 space-y-2 bg-slate-50/70">
           <div className="flex items-center justify-between text-xs font-bold text-slate-500">
             <span className="flex items-center gap-1"><UserPlus className="w-3.5 h-3.5" /> العميل</span>
-            <button
-              onClick={() => setIsCustomerModalOpen(true)}
-              className="text-[11px] text-sky-600 hover:text-sky-700"
-            >
-              + عميل جديد
-            </button>
+          {can('customers.create') && <button
+            onClick={() => { setCustomerError(''); setIsCustomerModalOpen(true); }}
+            className="text-[11px] text-sky-600 hover:text-sky-700"
+          >+ عميل جديد</button>}
           </div>
           <div className="relative">
             <input
@@ -1043,7 +1143,11 @@ export const PosView: React.FC = () => {
         </div>
 
         {/* Cart lines */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+        <div className="px-3 pt-3 pb-2 flex items-center justify-between text-[11px]">
+          <span className="font-black text-slate-700">سلة البيع <span className="text-slate-400 font-semibold">({cart.length} أصناف)</span></span>
+          {cart.length > 0 && <span className="text-slate-500">{totalItems} م² · {totalBoxes} كرتونة</span>}
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 space-y-2.5">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-slate-600">
               <ShoppingCart className="w-12 h-12 mb-2 opacity-40" />
@@ -1086,10 +1190,12 @@ export const PosView: React.FC = () => {
                   {/* Unit toggle */}
                   <div className="flex items-center gap-1">
                     <button
+                      type="button"
                       onClick={() => updateCartUnit(idx, 'M2')}
                       className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'M2' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
                     >م²</button>
                     <button
+                      type="button"
                       onClick={() => updateCartUnit(idx, 'BOX')}
                       className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'BOX' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
                     >كرتونة</button>
@@ -1111,7 +1217,7 @@ export const PosView: React.FC = () => {
                         type="number"
                         step={item.soldBy === 'BOX' ? 1 : 0.01}
                         value={displayQty}
-                        onChange={(e) => updateCartQuantity(idx, parseFloat(e.target.value) || 0)}
+                        onChange={(e) => { if (e.target.value !== '') updateCartQuantity(idx, parseFloat(e.target.value)); }}
                         className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-slate-900"
                       />
                       <button
@@ -1126,7 +1232,7 @@ export const PosView: React.FC = () => {
                       <input
                         type="number"
                         value={displayPrice}
-                        onChange={(e) => updateCartPrice(idx, parseFloat(e.target.value) || 0)}
+                        onChange={(e) => { if (e.target.value !== '') updateCartPrice(idx, parseFloat(e.target.value)); }}
                         className="w-16 text-center font-bold bg-white border border-slate-200 rounded-lg p-1 text-xs text-slate-900"
                       />
                       <span className="text-[10px] text-slate-500">ج.م</span>
@@ -1142,7 +1248,7 @@ export const PosView: React.FC = () => {
                       type="number"
                       value={item.discountAmount || ''}
                       placeholder="0"
-                      onChange={(e) => updateCartLineDiscount(idx, parseFloat(e.target.value) || 0)}
+                      onChange={(e) => updateCartLineDiscount(idx, e.target.value === '' ? 0 : parseFloat(e.target.value))}
                       className="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900"
                     />
                   </div>
@@ -1153,7 +1259,7 @@ export const PosView: React.FC = () => {
         </div>
 
         {/* Totals & payment */}
-        <div className="p-3 border-t border-slate-200 bg-white space-y-3 max-h-[62%] overflow-y-auto">
+        <div className="p-3 border-t border-slate-200 bg-white space-y-3 max-h-[58%] overflow-y-auto shadow-[0_-8px_24px_rgba(15,23,42,0.04)] max-[900px]:max-h-[65%]">
           {/* Order extras */}
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div>
@@ -1162,7 +1268,7 @@ export const PosView: React.FC = () => {
                 type="number"
                 value={discountAmount || ''}
                 placeholder="0"
-                onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setDiscountAmount(e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value) || 0))}
                 className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5"
               />
             </div>
@@ -1172,7 +1278,7 @@ export const PosView: React.FC = () => {
                 type="number"
                 value={taxPercentage || ''}
                 placeholder="0"
-                onChange={(e) => setTaxPercentage(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setTaxPercentage(e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value) || 0))}
                 className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5"
               />
             </div>
@@ -1182,7 +1288,7 @@ export const PosView: React.FC = () => {
                 type="number"
                 value={shippingCost || ''}
                 placeholder="0"
-                onChange={(e) => setShippingCost(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setShippingCost(e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value) || 0))}
                 className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5"
               />
             </div>
@@ -1192,8 +1298,8 @@ export const PosView: React.FC = () => {
           <div>
             <label className="text-[10px] font-bold text-slate-500 block mb-1">طريقة السداد</label>
             <div className="grid grid-cols-3 gap-1">
-              {(['CASH', 'CARD', 'CREDIT'] as PaymentType[]).map((type) => {
-                const Icon = type === 'CREDIT' ? CreditCard : type === 'CARD' ? CreditCard : Banknote;
+              {(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT', 'MIXED'] as PaymentType[]).map((type) => {
+                const Icon = type === 'CASH' ? Banknote : CreditCard;
                 return (
                   <button
                     key={type}
@@ -1220,7 +1326,7 @@ export const PosView: React.FC = () => {
               ref={paidInputRef}
               type="number"
               value={paidAmount}
-              onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setPaidAmount(e.target.value === '' ? 0 : parseFloat(e.target.value))}
               className="w-32 text-left font-black px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-500"
             />
           </div>
@@ -1255,9 +1361,9 @@ export const PosView: React.FC = () => {
                 <span>+{CeramicMath.formatCurrency(shippingCost)}</span>
               </div>
             )}
-            <div className="flex justify-between items-center pt-1.5 border-t border-sky-500/20">
+            <div className="flex justify-between items-center pt-2 border-t border-sky-500/20">
               <span className="font-bold text-slate-700">صافي الفاتورة</span>
-              <span className="text-sky-600 font-black text-lg">{CeramicMath.formatCurrency(totalAmount)}</span>
+              <span className="text-sky-700 font-black text-xl">{CeramicMath.formatCurrency(totalAmount)} <span className="text-[10px] font-bold">ج.م</span></span>
             </div>
             {remainingAmount > 0 && (
               <div className="flex justify-between font-bold text-amber-600">
@@ -1424,6 +1530,7 @@ export const PosView: React.FC = () => {
             <Field label="رقم الهاتف *">
               <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="01xxxxxxxxx" className={inputCls} />
             </Field>
+            {customerError && <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">{customerError}</div>}
             <div className="grid grid-cols-2 gap-3">
               <Field label="نوع العميل">
                 <select value={newCustType} onChange={(e) => setNewCustType(e.target.value as Customer['customerType'])} className={inputCls}>
@@ -1471,6 +1578,31 @@ export const PosView: React.FC = () => {
             >
               <Unlock className="w-4 h-4" /> فتح الوردية
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {isCloseShiftModalOpen && activeShift && (
+        <Modal title="إقفال الوردية ومطابقة الصندوق" icon={<Lock className="w-5 h-5" />} onClose={() => setIsCloseShiftModalOpen(false)}>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">رقم الوردية</span><strong>{activeShift.shiftNumber}</strong></div>
+              <div className="flex justify-between"><span className="text-slate-500">الرصيد الافتتاحي</span><strong>{CeramicMath.formatCurrency(activeShift.openingBalance)}</strong></div>
+              <div className="flex justify-between"><span className="text-slate-500">مبيعات نقدية</span><strong>{CeramicMath.formatCurrency(activeShift.totalSalesCash)}</strong></div>
+              <div className="flex justify-between"><span className="text-slate-500">تحصيلات العملاء</span><strong>{CeramicMath.formatCurrency(activeShift.totalCustomerPayments)}</strong></div>
+              <div className="flex justify-between"><span className="text-slate-500">مصروفات / مرتجعات</span><strong>{CeramicMath.formatCurrency((activeShift.totalExpenses || 0) + (activeShift.totalRefunds || 0))}</strong></div>
+              <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold">النقد المتوقع بالصندوق</span><strong className="text-emerald-700">{CeramicMath.formatCurrency(expectedClosingCash)}</strong></div>
+            </div>
+            <Field label="النقد الفعلي بعد العد">
+              <input type="number" min="0" step="0.01" value={closingCash} onChange={(e) => setClosingCash(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))} className={inputCls} />
+            </Field>
+            <div className={`rounded-xl px-3 py-2 text-sm font-bold ${round2(closingCash - expectedClosingCash) === 0 ? 'bg-emerald-50 text-emerald-700' : closingCash > expectedClosingCash ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
+              فرق الصندوق: {CeramicMath.formatCurrency(closingCash - expectedClosingCash)}
+            </div>
+            <Field label="ملاحظات الإقفال">
+              <textarea rows={2} value={closingNotes} onChange={(e) => setClosingNotes(e.target.value)} placeholder="سبب العجز أو الزيادة، إن وجد..." className={inputCls} />
+            </Field>
+            <button onClick={handleCloseShift} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد عدّ النقد وإغلاق الوردية</button>
           </div>
         </Modal>
       )}

@@ -37,6 +37,7 @@ export const CustomersView: React.FC = () => {
     city: 'القاهرة',
     customerType: 'RETAIL' as any,
     creditLimit: 50000,
+    paymentTermsDays: 0,
     initialBalance: 0,
     notes: ''
   });
@@ -86,6 +87,7 @@ export const CustomersView: React.FC = () => {
         city: formData.city,
         customerType: formData.customerType,
         creditLimit: formData.creditLimit,
+        paymentTermsDays: formData.paymentTermsDays,
         initialBalance: formData.initialBalance,
         notes: formData.notes
       });
@@ -137,6 +139,7 @@ export const CustomersView: React.FC = () => {
               city: 'القاهرة',
               customerType: 'RETAIL',
               creditLimit: 50000,
+              paymentTermsDays: 0,
               initialBalance: 0,
               notes: ''
             });
@@ -352,6 +355,10 @@ export const CustomersView: React.FC = () => {
                     onChange={(e) => setFormData({ ...formData, creditLimit: parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                   />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">أجل السداد (أيام)</label>
+                  <input type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: parseInt(e.target.value,10) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">رصيد افتتاحي (إن وجد)</label>

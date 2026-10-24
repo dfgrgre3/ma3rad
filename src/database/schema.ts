@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS brands (
 -- 3. PRODUCTS (SPECIALIZED CERAMICS)
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
+  product_type TEXT NOT NULL DEFAULT 'CERAMIC',
+  custom_unit TEXT NOT NULL DEFAULT '',
   sku TEXT UNIQUE NOT NULL,
   barcode TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
@@ -62,6 +64,7 @@ CREATE TABLE IF NOT EXISTS products (
   size TEXT NOT NULL,
   thickness REAL DEFAULT 0,
   color TEXT,
+  tone TEXT NOT NULL DEFAULT '',
   finish TEXT,
   surface_location TEXT DEFAULT 'FLOOR',
   
@@ -161,6 +164,7 @@ CREATE TABLE IF NOT EXISTS customers (
   city TEXT,
   customer_type TEXT DEFAULT 'RETAIL',
   credit_limit REAL DEFAULT 0,
+  payment_terms_days INTEGER DEFAULT 0,
   current_balance REAL DEFAULT 0,
   total_purchases REAL DEFAULT 0,
   notes TEXT,
@@ -182,6 +186,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
   tax_number TEXT,
   commercial_record TEXT,
   address TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
   current_balance REAL DEFAULT 0,
   total_purchases REAL DEFAULT 0,
   payment_terms_days INTEGER DEFAULT 30,
@@ -254,6 +259,7 @@ CREATE TABLE IF NOT EXISTS sales_invoices (
   id TEXT PRIMARY KEY,
   invoice_number TEXT UNIQUE NOT NULL,
   date TEXT NOT NULL,
+  due_date TEXT,
   customer_id TEXT NOT NULL,
   warehouse_id TEXT NOT NULL,
   project_id TEXT,
@@ -409,6 +415,7 @@ CREATE TABLE IF NOT EXISTS customer_payments (
   receipt_number TEXT UNIQUE NOT NULL,
   customer_id TEXT NOT NULL,
   amount REAL NOT NULL,
+  payment_group_id TEXT,
   payment_type TEXT NOT NULL DEFAULT 'CASH',
   date TEXT NOT NULL,
   register_id TEXT,
@@ -787,6 +794,88 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
   FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id)
 );
+
+CREATE TABLE IF NOT EXISTS purchase_order_receipts (
+  id TEXT PRIMARY KEY,
+  purchase_order_id TEXT NOT NULL,
+  purchase_invoice_id TEXT NOT NULL,
+  received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notes TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id),
+  FOREIGN KEY (purchase_invoice_id) REFERENCES purchase_invoices(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS purchase_order_receipt_items (
+  id TEXT PRIMARY KEY,
+  receipt_id TEXT NOT NULL,
+  order_item_id TEXT NOT NULL,
+  quantity_m2 REAL NOT NULL,
+  FOREIGN KEY (receipt_id) REFERENCES purchase_order_receipts(id) ON DELETE CASCADE,
+  FOREIGN KEY (order_item_id) REFERENCES purchase_order_items(id)
+);
+
+CREATE TABLE IF NOT EXISTS receivables (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'OTHER',
+  responsible_name TEXT,
+  phone TEXT,
+  address TEXT,
+  description TEXT,
+  custom_fields_json TEXT NOT NULL DEFAULT '{}',
+  quantity REAL,
+  unit TEXT,
+  amount REAL,
+  due_date TEXT,
+  status TEXT NOT NULL DEFAULT 'OPEN',
+  progress REAL NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_receivables_status_due ON receivables(status, due_date);
+CREATE TABLE IF NOT EXISTS receivable_updates (
+  id TEXT PRIMARY KEY,
+  receivable_id TEXT NOT NULL,
+  update_type TEXT NOT NULL DEFAULT 'NOTE',
+  details TEXT NOT NULL,
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (receivable_id) REFERENCES receivables(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_receivable_updates_record ON receivable_updates(receivable_id, created_at);
+CREATE TABLE IF NOT EXISTS receivable_attachments (
+  id TEXT PRIMARY KEY,
+  receivable_id TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  data_url TEXT NOT NULL,
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (receivable_id) REFERENCES receivables(id) ON DELETE CASCADE,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS customer_payment_promises (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  invoice_id TEXT,
+  promised_amount REAL,
+  promise_date TEXT,
+  followup_date TEXT,
+  status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','KEPT','BROKEN','CANCELLED')),
+  notes TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+  FOREIGN KEY (invoice_id) REFERENCES sales_invoices(id) ON DELETE SET NULL,
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_customer_promises_due ON customer_payment_promises(status,promise_date,followup_date);
 
 CREATE TABLE IF NOT EXISTS purchase_returns (
   id TEXT PRIMARY KEY,
@@ -1619,4 +1708,43 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
   description TEXT,
   applied_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 38. Dynamic user-defined data catalog (independent of the ERP's fixed tables)
+CREATE TABLE IF NOT EXISTS dynamic_entity_types (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  name_key TEXT NOT NULL UNIQUE,
+  description TEXT DEFAULT '',
+  fields_json TEXT NOT NULL DEFAULT '[]',
+  relations_json TEXT NOT NULL DEFAULT '[]',
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS dynamic_records (
+  id TEXT PRIMARY KEY,
+  entity_type_id TEXT NOT NULL,
+  values_json TEXT NOT NULL DEFAULT '{}',
+  search_text TEXT NOT NULL DEFAULT '',
+  source_batch_id TEXT,
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (entity_type_id) REFERENCES dynamic_entity_types(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_dynamic_records_entity ON dynamic_records(entity_type_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_dynamic_records_search ON dynamic_records(entity_type_id, search_text);
+CREATE TABLE IF NOT EXISTS dynamic_import_batches (
+  id TEXT PRIMARY KEY,
+  entity_type_id TEXT,
+  source_name TEXT NOT NULL DEFAULT '',
+  source_hash TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'COMPLETED',
+  imported_count INTEGER NOT NULL DEFAULT 0,
+  raw_rows_json TEXT NOT NULL DEFAULT '[]',
+  created_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (entity_type_id) REFERENCES dynamic_entity_types(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_dynamic_batches_created ON dynamic_import_batches(created_at);
 `;

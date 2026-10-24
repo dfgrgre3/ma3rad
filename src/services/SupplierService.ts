@@ -7,16 +7,20 @@ import { PermissionService } from './PermissionService';
 export class SupplierService {
   private db = DatabaseManager.getInstance();
 
-  public getAllSuppliers(search?: string): Supplier[] {
+  public getAllSuppliers(search?: string, includeInactive = false): Supplier[] {
     let sql = `SELECT * FROM suppliers`;
     const params: any[] = [];
+    const conditions: string[] = [];
+
+    if (!includeInactive) conditions.push('is_active = 1');
 
     if (search && search.trim()) {
-      sql += ` WHERE name LIKE ? OR company_name LIKE ? OR phone LIKE ? OR code LIKE ?`;
+      conditions.push('(name LIKE ? OR company_name LIKE ? OR phone LIKE ? OR code LIKE ?)');
       const term = `%${search.trim()}%`;
       params.push(term, term, term, term);
     }
 
+    if (conditions.length) sql += ` WHERE ${conditions.join(' AND ')}`;
     sql += ` ORDER BY name ASC`;
     return this.db.query<Supplier>(sql, params);
   }
@@ -69,6 +73,7 @@ export class SupplierService {
         address = COALESCE(?, address),
         payment_terms_days = COALESCE(?, payment_terms_days),
         notes = COALESCE(?, notes),
+        is_active = COALESCE(?, is_active),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `;
@@ -77,7 +82,7 @@ export class SupplierService {
       sqliteDb.run(sql, [
         updates.name ?? null, updates.companyName ?? null, updates.phone ?? null, updates.email ?? null,
         updates.taxNumber ?? null, updates.commercialRecord ?? null, updates.address ?? null,
-        updates.paymentTermsDays ?? null, updates.notes ?? null, id
+        updates.paymentTermsDays ?? null, updates.notes ?? null, updates.isActive ?? null, id
       ]);
 
       sqliteDb.run(`
@@ -98,7 +103,7 @@ export class SupplierService {
     performedBy = 'usr_admin'
   ): SupplierPayment {
     PermissionService.require(AuthService.requireAuth(), 'suppliers.payment');
-    if (amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
 
     const sup = this.getSupplierById(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
@@ -142,21 +147,34 @@ export class SupplierService {
     });
   }
 
-  public getSupplierStatement(supplierId: string) {
+  public getSupplierStatement(supplierId: string, fromDate?: string, toDate?: string) {
     const sup = this.getSupplierById(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
 
     const purchases = this.db.query<any>(`
       SELECT id, date, invoice_number as docNumber, total_amount as credit, paid_amount, created_at
       FROM purchase_invoices
-      WHERE supplier_id = ?
-    `, [supplierId]);
+      WHERE supplier_id = ? AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
 
     const payments = this.db.query<any>(`
       SELECT id, date, receipt_number as docNumber, amount as debit, created_at, notes
       FROM supplier_payments
-      WHERE supplier_id = ?
-    `, [supplierId]);
+      WHERE supplier_id = ? AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
+
+    const totals = this.db.query<{ purchases: number; payments: number }>(`
+      SELECT
+        COALESCE((SELECT SUM(total_amount) FROM purchase_invoices WHERE supplier_id = ?), 0) AS purchases,
+        COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ?), 0) AS payments
+    `, [supplierId, supplierId])[0];
+    const beforeRange = fromDate
+      ? this.db.query<{ purchases: number; payments: number }>(`
+        SELECT
+          COALESCE((SELECT SUM(total_amount) FROM purchase_invoices WHERE supplier_id = ? AND date < ?), 0) AS purchases,
+          COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ? AND date < ?), 0) AS payments
+      `, [supplierId, fromDate, supplierId, fromDate])[0]
+      : { purchases: 0, payments: 0 };
 
     const allRecords: any[] = [
       ...purchases.map(p => ({
@@ -183,9 +201,12 @@ export class SupplierService {
 
     allRecords.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-    let runningBalance = 0;
+    const historicalOpening = Number(sup.currentBalance || 0) -
+      (Number(totals?.purchases || 0) - Number(totals?.payments || 0));
+    let runningBalance = historicalOpening +
+      Number(beforeRange.purchases || 0) - Number(beforeRange.payments || 0);
     const finalStatement = allRecords.map(item => {
-      runningBalance += (item.credit - item.debit); // له - سددنا له
+      runningBalance += (item.credit - item.debit);
       return {
         ...item,
         balanceAfter: Number(runningBalance.toFixed(2))
@@ -194,6 +215,8 @@ export class SupplierService {
 
     return {
       supplier: sup,
+      openingBalance: Number((historicalOpening + Number(beforeRange.purchases || 0) - Number(beforeRange.payments || 0)).toFixed(2)),
+      closingBalance: Number(runningBalance.toFixed(2)),
       transactions: finalStatement
     };
   }

@@ -10,6 +10,7 @@ export interface ProductQueryOptions {
   stockStatus?: 'all' | 'in' | 'low' | 'out';
   sortBy?: 'name' | 'newest' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc';
   includeInactive?: boolean;
+  status?: 'all' | 'active' | 'inactive';
 }
 
 export interface ProductStats {
@@ -68,7 +69,9 @@ export class ProductService {
   ) {
     const filters: string[] = [];
     const params: any[] = [];
-    if (!options.includeInactive) filters.push('p.is_active = 1');
+    if (options.status === 'active') filters.push('p.is_active = 1');
+    else if (options.status === 'inactive') filters.push('p.is_active = 0');
+    else if (!options.includeInactive) filters.push('p.is_active = 1');
     if (search.trim()) {
       filters.push('(p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.size LIKE ? OR c.name LIKE ? OR b.name LIKE ?)');
       const term = `%${search.trim()}%`;
@@ -171,17 +174,17 @@ export class ProductService {
     return this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(`
         INSERT INTO products (
-          id, sku, barcode, name, category_id, brand_id, grade, size,
-          thickness, color, finish, surface_location, base_unit, sell_unit,
+          id, product_type, custom_unit, sku, barcode, name, category_id, brand_id, grade, size,
+            thickness, color, tone, finish, surface_location, base_unit, sell_unit,
           pieces_per_box, meters_per_box, weight_per_box, cost_price,
           selling_price_m2, selling_price_box, wholesale_price_m2, min_selling_price_m2,
           min_stock_level, max_stock_level, image_path, notes, is_active
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        id, product.sku, product.barcode, product.name, product.categoryId, product.brandId,
-        product.grade, product.size, product.thickness || 0, product.color || '', product.finish || '',
+        id, product.productType || 'CERAMIC', product.customUnit || '', product.sku, product.barcode, product.name, product.categoryId, product.brandId,
+          product.grade || 'GRADE_1', product.size || '', product.thickness || 0, product.color || '', product.tone || '', product.finish || '',
         product.surfaceLocation || 'FLOOR', product.baseUnit || 'M2', product.sellUnit || 'M2',
-        product.piecesPerBox || 4, product.metersPerBox || 1.44, product.weightPerBox || 0,
+        product.piecesPerBox || 1, product.metersPerBox || 1, product.weightPerBox || 0,
         product.costPrice || 0, product.sellingPriceM2 || 0, product.sellingPriceBox || 0,
         product.wholesalePriceM2 || 0, product.minSellingPriceM2 || 0, product.minStockLevel || 10,
         product.maxStockLevel || 1000, product.imagePath || '', product.notes || '', 1
@@ -235,10 +238,13 @@ export class ProductService {
         barcode = COALESCE(?, barcode),
         category_id = COALESCE(?, category_id),
         brand_id = COALESCE(?, brand_id),
+        product_type = COALESCE(?, product_type),
+        custom_unit = COALESCE(?, custom_unit),
         grade = COALESCE(?, grade),
         size = COALESCE(?, size),
         thickness = COALESCE(?, thickness),
         color = COALESCE(?, color),
+        tone = COALESCE(?, tone),
         finish = COALESCE(?, finish),
         surface_location = COALESCE(?, surface_location),
         base_unit = COALESCE(?, base_unit),
@@ -262,7 +268,7 @@ export class ProductService {
     return this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(sql, [
         updates.name ?? null, updates.sku ?? null, updates.barcode ?? null, updates.categoryId ?? null, updates.brandId ?? null,
-        updates.grade ?? null, updates.size ?? null, updates.thickness ?? null, updates.color ?? null, updates.finish ?? null,
+        updates.productType ?? null, updates.customUnit ?? null, updates.grade ?? null, updates.size ?? null, updates.thickness ?? null, updates.color ?? null, updates.tone ?? null, updates.finish ?? null,
         updates.surfaceLocation ?? null, updates.baseUnit ?? null, updates.sellUnit ?? null,
         updates.piecesPerBox ?? null, updates.metersPerBox ?? null, updates.weightPerBox ?? null,
         updates.costPrice ?? null, updates.sellingPriceM2 ?? null, updates.sellingPriceBox ?? null,
