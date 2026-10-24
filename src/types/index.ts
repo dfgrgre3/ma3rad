@@ -472,10 +472,6 @@ export interface SystemSettings {
   thermalHost?: string;
   /** Network printer TCP port; ESC/POS default is 9100. */
   thermalPort?: number;
-  /** Serve the app to browsers/phones on the local network (LAN companion server). */
-  lanServerEnabled?: boolean;
-  /** TCP port for the LAN companion server. */
-  lanServerPort?: number;
   a4PrinterName?: string;
   receiptHeader?: string;
   receiptFooter?: string;

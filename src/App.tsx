@@ -10,8 +10,6 @@ import { SetupWizard } from './components/SetupWizard';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { registerRemoteDbBridge } from './database/remoteBridge';
-import { isRemoteClient, remoteHasToken } from './database/remote';
 
 const RUNTIME_SESSION_KEY = 'ceramisys_runtime_initialized';
 
@@ -29,20 +27,6 @@ function markRuntimeSession(): void {
   } catch {
     // Session storage may be unavailable in restricted browser contexts.
   }
-}
-
-// Start the LAN companion server automatically when the setting enables it.
-// Runs only inside the desktop app and only after the DB is ready.
-function maybeStartLanServer(): void {
-  try {
-    const serverApi = (window as any).ceramisys?.server;
-    if (!serverApi?.start) return;
-    const settings = SettingsService.getSettings();
-    if (!settings.lanServerEnabled) return;
-    void serverApi.start(settings.lanServerPort || 8585).then((res: any) => {
-      if (res && !res.ok) console.warn('LAN server failed to start:', res.error);
-    });
-  } catch { /* desktop-only feature */ }
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -69,7 +53,6 @@ export const App: React.FC = () => {
   // ── DB Init ─────────────────────────────────────────────────────────────────
   const initDb = () => {
     setInitError(null);
-    registerRemoteDbBridge();
     DatabaseManager.getInstance()
       .initialize()
       .then(() => {
@@ -77,16 +60,9 @@ export const App: React.FC = () => {
         if (!restoreCurrentRuntimeSession) AuthService.clearPersistedSession();
         markRuntimeSession();
 
-        // A fresh LAN client has no session token yet — go straight to the
-        // login screen; the desktop host has already seeded permissions.
-        if (isRemoteClient() && !remoteHasToken()) {
-          setDbReady(true);
-          return;
-        }
         PermissionService.seed();
         setCurrentUser(restoreCurrentRuntimeSession ? AuthService.restoreSession() : null);
         setDbReady(true);
-        maybeStartLanServer();
         // Check the configured interval throughout the desktop session.
         void import('./services/BackupService').then(({ BackupService }) => {
           const runBackupCheck = () => {

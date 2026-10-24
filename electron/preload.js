@@ -27,23 +27,4 @@ contextBridge.exposeInMainWorld('ceramisys', {
     }),
     rawCups: (bytes, printerName) => ipcRenderer.invoke('print:rawCups', { bytes: Array.from(bytes || []), printerName }),
   },
-  server: {
-    start: (port) => ipcRenderer.invoke('server:start', { port }),
-    stop: () => ipcRenderer.invoke('server:stop'),
-    status: () => ipcRenderer.invoke('server:status'),
-  },
-  remoteDb: {
-    onRequest: (cb) => {
-      const listener = (_event, envelope) => {
-        Promise.resolve()
-          .then(() => cb(envelope.payload))
-          .then(
-            (result) => ipcRenderer.send('remote-db:response', { id: envelope.id, result }),
-            (error) => ipcRenderer.send('remote-db:response', { id: envelope.id, result: { error: String(error?.message || error) } })
-          );
-      };
-      ipcRenderer.on('remote-db:request', listener);
-      return () => ipcRenderer.removeListener('remote-db:request', listener);
-    },
-  },
 });

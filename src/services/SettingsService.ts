@@ -63,8 +63,6 @@ export class SettingsService {
       thermalTransport: map.thermalTransport === 'network' ? 'network' : 'system',
       thermalHost: map.thermalHost || '',
       thermalPort: map.thermalPort ? Number(map.thermalPort) : 9100,
-      lanServerEnabled: bool(map.lanServerEnabled),
-      lanServerPort: map.lanServerPort ? Number(map.lanServerPort) : 8585,
       a4PrinterName: map.a4PrinterName || '',
       receiptHeader: map.receiptHeader || '',
       receiptFooter: map.receiptFooter || '',

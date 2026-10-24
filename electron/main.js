@@ -4,7 +4,6 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const { execFile } = require('child_process');
 const net = require('net');
-const lanServer = require('./server');
 
 // Keep application data in the OS-standard roaming profile. This is always
 // writable, even when the app itself is installed under Program Files.
@@ -351,16 +350,11 @@ ipcMain.handle('print:rawCups', async (_event, { bytes, printerName }) => {
 
 app.whenReady().then(() => {
   ensureDirs();
-  lanServer.registerIpc(() => BrowserWindow.getAllWindows()[0]);
   createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
-
-app.on('before-quit', () => {
-  lanServer.stop();
 });
 
 app.on('window-all-closed', () => {

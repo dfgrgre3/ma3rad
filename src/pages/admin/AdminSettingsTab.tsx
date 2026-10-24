@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Smartphone, Play, Square,
+  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon,
 } from 'lucide-react';
 import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
@@ -12,7 +12,7 @@ const inputCls =
   'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
 const labelCls = 'mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300';
 
-type Tab = 'general' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security' | 'devices';
+type Tab = 'general' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'عام والمعرض', icon: Store },
@@ -21,7 +21,6 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'inventory', label: 'المخزون والتكلفة', icon: Boxes },
   { id: 'operations', label: 'التشغيل والموافقات', icon: Truck },
   { id: 'security', label: 'الأمان والنسخ', icon: ShieldCheck },
-  { id: 'devices', label: 'الأجهزة والشبكة', icon: Smartphone },
 ];
 
 export const AdminSettingsTab: React.FC = () => {
@@ -47,15 +46,6 @@ export const AdminSettingsTab: React.FC = () => {
       setSettings(next);
       setDirty(false);
       toast.success('تم حفظ الإعدادات بنجاح.');
-      // Apply the LAN server toggle immediately (not just on next launch).
-      void (async () => {
-        const serverApi = window.ceramisys?.server;
-        if (!serverApi?.status) return;
-        const st = await serverApi.status?.();
-        if (!st?.ok) return;
-        if (next.lanServerEnabled && !st.running) await serverApi.start?.(next.lanServerPort || 8585);
-        if (!next.lanServerEnabled && st.running) await serverApi.stop?.();
-      })();
     } catch (error: any) {
       toast.error('تعذر حفظ الإعدادات', error?.message || String(error));
     }
@@ -326,7 +316,6 @@ export const AdminSettingsTab: React.FC = () => {
           </div>
         )}
 
-        {tab === 'devices' && <DevicesSettings settings={settings} set={set} />}
       </fieldset>
 
       {readOnly && (
@@ -346,96 +335,6 @@ const Field: React.FC<{ label: string; full?: boolean; children: React.ReactNode
 );
 
 type SystemSettingsSetter = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => void;
-
-/** LAN companion server controls + remote-device guidance. */
-const DevicesSettings: React.FC<{ settings: SystemSettings; set: SystemSettingsSetter }> = ({ settings, set }) => {
-  const [status, setStatus] = useState<{ running: boolean; port: number; addresses: string[] } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const isDesktop = !!window.ceramisys?.server;
-
-  const refresh = async () => {
-    try {
-      const res = await window.ceramisys?.server?.status?.();
-      if (res?.ok) setStatus({ running: res.running, port: res.port, addresses: res.addresses || [] });
-    } catch { /* desktop only */ }
-  };
-
-  useEffect(() => { void refresh(); }, []);
-
-  const toggleServer = async () => {
-    setBusy(true);
-    try {
-      if (status?.running) {
-        await window.ceramisys?.server?.stop?.();
-      } else {
-        const res = await window.ceramisys?.server?.start?.(settings.lanServerPort || 8585);
-        if (res && !res.ok) alert(res.error || 'تعذر تشغيل الخادم');
-      }
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (!isDesktop) {
-    return (
-      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-bold text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
-        أنت متصل كجهاز بعيد. إعدادات الخادم متاحة على جهاز الكاشير (تطبيق سطح المكتب).
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-4">
-      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <div className="text-xs font-black text-slate-800 dark:text-slate-100">خادم الشبكة المحلية (وصول الجوال والمتصفح)</div>
-            <div className="text-[11px] text-slate-500 mt-1">
-              يتيح فتح النظام من أي جهاز على نفس شبكة الواي فاي عبر المتصفح — نفس البيانات والصلاحيات لحظياً.
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-[11px] font-black px-2 py-1 rounded-lg ${status?.running ? 'bg-emerald-500/15 text-emerald-600' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>
-              {status?.running ? `يعمل على المنفذ ${status.port}` : 'متوقف'}
-            </span>
-            <button
-              type="button"
-              onClick={toggleServer}
-              disabled={busy}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white transition disabled:opacity-50 ${status?.running ? 'bg-rose-600 hover:bg-rose-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}
-            >
-              {status?.running ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-              {status?.running ? 'إيقاف' : 'تشغيل الآن'}
-            </button>
-          </div>
-        </div>
-
-        {status?.running && (
-          <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3 space-y-1">
-            <div className="text-[11px] font-bold text-slate-500 mb-1">افتح أحد هذه العناوين من المتصفح على أي جهاز بنفس الشبكة:</div>
-            {status.addresses.length === 0 && <div className="text-[11px] text-slate-500">لم يتم العثور على عناوين شبكة.</div>}
-            {status.addresses.map((a) => (
-              <div key={a} className="font-mono text-xs text-sky-600 dark:text-sky-400" dir="ltr">{a}</div>
-            ))}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Field label="التشغيل تلقائياً مع بدء البرنامج">
-            <Toggle checked={!!settings.lanServerEnabled} onChange={(v) => set('lanServerEnabled', v)} label={settings.lanServerEnabled ? 'يعمل تلقائياً' : 'يدوي'} />
-          </Field>
-          <Field label="المنفذ (افتراضي 8585)">
-            <input type="number" min={1024} max={65535} value={settings.lanServerPort ?? 8585} onChange={(e) => set('lanServerPort', Number(e.target.value))} className={inputCls} />
-          </Field>
-        </div>
-        <p className="text-[11px] leading-relaxed text-slate-400">
-          ملاحظة: يجب أن يبقى برنامج الكاشير مفتوحاً لعمل الخادم. الدخول من الأجهزة الأخرى بنفس المستخدمين وكلمات المرور المعرفة في النظام.
-        </p>
-      </div>
-    </div>
-  );
-};
 
 const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string }> = ({ checked, onChange, label }) => (
   <button

@@ -3,7 +3,6 @@ import type { User, UserRole } from '../types';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PermissionService } from './PermissionService';
-import { isRemoteClient, remoteLogin, remoteLogout } from '../database/remote';
 
 const SESSION_KEY = 'ceramisys_session_user_id';
 const SESSION_ID_KEY = 'ceramisys_session_id';
@@ -98,7 +97,6 @@ export class AuthService {
     if (AuthService.currentUser) PermissionService.invalidate(AuthService.currentUser);
     AuthService.endSession('LOGOUT');
     AuthService.currentUser = null;
-    if (isRemoteClient()) remoteLogout();
     try {
       localStorage.removeItem(SESSION_KEY);
     } catch {
@@ -120,9 +118,7 @@ export class AuthService {
       // Browser storage may be unavailable in the test harness.
     }
 
-    if (isRemoteClient()) {
-      remoteLogout();
-    } else if (sessionId) {
+    if (sessionId) {
       try {
         DatabaseManager.getInstance().run(
           `UPDATE user_sessions SET is_active = 0, ended_at = ?, end_reason = 'LOGOUT'
@@ -200,11 +196,6 @@ export class AuthService {
   }
 
   public static login(username: string, passwordAttempt: string): User {
-    // Browser/phone LAN clients authenticate through the desktop host so the
-    // full flow (lockout, audit history, session tracking) runs once, locally.
-    if (isRemoteClient()) {
-      return remoteLogin(username, passwordAttempt);
-    }
     const db = DatabaseManager.getInstance();
     const rows = db.query<any>(`SELECT * FROM users WHERE username = ? AND is_active = 1`, [username]);
     if (rows.length === 0) {
