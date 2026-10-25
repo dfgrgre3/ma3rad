@@ -6,6 +6,7 @@ import {
   Undo2, Wallet, TrendingDown, Banknote, CalendarDays, Building2, Warehouse, PackageCheck,
   HardHat, Truck, Car, BarChart3, CheckSquare, Bell, ShieldCheck, Settings,
   Download, Cpu, SlidersHorizontal, BadgeDollarSign, BookmarkPlus, FileSpreadsheet, MessageCircle,
+  Trash2,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -209,6 +210,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { label: 'سجل التدقيق', to: '/audit', icon: ShieldCheck, perm: 'audit.view' },
       { label: 'مركز الأمان', to: '/security', icon: ShieldCheck, perm: 'users.view' },
       { label: 'المستخدمون', to: '/users', icon: UserRound, perm: 'users.view' },
+      { label: 'حذف البيانات', to: '/admin/data-deletion', icon: Trash2, perm: 'admin.data' },
       { label: 'النسخ الاحتياطي', to: '/backup', icon: Download, perm: 'settings.backup' },
       { label: 'صحة النظام', to: '/system-health', icon: Cpu, perm: 'settings.view' },
       { label: 'الإعدادات', to: '/settings', icon: Settings, perm: 'settings.view' },

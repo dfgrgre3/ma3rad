@@ -177,6 +177,30 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'admin.view', name: 'الدخول إلى مركز التحكم', module: 'ADMIN' },
   { code: 'admin.navigation', name: 'تخصيص قوائم التنقل', module: 'ADMIN' },
   { code: 'admin.data', name: 'أدوات البيانات والصيانة', module: 'ADMIN' },
+
+  // Electronic invoicing
+  { code: 'electronic_invoices.view', name: 'عرض الفواتير الإلكترونية', module: 'E_INVOICING' },
+  { code: 'electronic_invoices.create', name: 'إنشاء فاتورة إلكترونية', module: 'E_INVOICING' },
+  { code: 'electronic_invoices.submit', name: 'إرسال الفاتورة الإلكترونية للهيئة الضريبية', module: 'E_INVOICING' },
+  { code: 'electronic_invoices.accept', name: 'قبول الفاتورة الإلكترونية', module: 'E_INVOICING' },
+  { code: 'electronic_invoices.reject', name: 'رفض الفاتورة الإلكترونية', module: 'E_INVOICING' },
+  { code: 'electronic_invoices.cancel', name: 'إلغاء الفاتورة الإلكترونية', module: 'E_INVOICING' },
+
+  // Loyalty program
+  { code: 'loyalty.view', name: 'عرض برنامج الولاء', module: 'LOYALTY' },
+  { code: 'loyalty.earn', name: 'إضافة نقاط ولاء', module: 'LOYALTY' },
+  { code: 'loyalty.redeem', name: 'استبدال نقاط ولاء', module: 'LOYALTY' },
+  { code: 'loyalty.manage', name: 'إدارة مستويات الولاء', module: 'LOYALTY' },
+
+  // Multi-branch (branches.view is declared in the operations block above)
+  { code: 'branches.create', name: 'إضافة فرع', module: 'BRANCHES' },
+  { code: 'branches.update', name: 'تعديل فرع', module: 'BRANCHES' },
+  { code: 'branches.delete', name: 'حذف فرع', module: 'BRANCHES' },
+  { code: 'branches.manage_users', name: 'إدارة مستخدمي الفرع', module: 'BRANCHES' },
+
+  // Analytics
+  { code: 'analytics.view', name: 'عرض التحليلات المتقدمة', module: 'ANALYTICS' },
+  { code: 'analytics.write', name: 'تسجيل مقاييس التحليلات', module: 'ANALYTICS' },
 ];
 
 // Default permissions per built-in role. These are only used to seed a role

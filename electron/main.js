@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, session } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -15,6 +15,28 @@ const DB_FILE = path.join(DATA_DIR, 'ceramisys.sqlite');
 const REMEMBERED_CREDENTIALS_FILE = path.join(APP_DATA_DIR, 'remembered-login.enc');
 
 app.disableHardwareAcceleration();
+
+// Security: Allowed origins for IPC communication
+const ALLOWED_ORIGINS = new Set([
+  'file://', // Local file protocol (production)
+  'http://localhost:5173', // Vite dev server
+  'http://127.0.0.1:5173', // Alternative localhost
+]);
+
+// Security: Validate IPC sender
+function validateIpcSender(event) {
+  const senderUrl = event.sender.getURL();
+  const origin = new URL(senderUrl).origin;
+  if (!ALLOWED_ORIGINS.has(origin) && !origin.startsWith('file://')) {
+    console.error(`Security: Blocked IPC call from unauthorized origin: ${origin}`);
+    throw new Error('Unauthorized IPC caller');
+  }
+  return true;
+}
+
+// Security: Validate data size limits
+const MAX_DB_SIZE = 500 * 1024 * 1024; // 500MB
+const MAX_PRINT_DATA = 10 * 1024 * 1024; // 10MB for print data
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -71,10 +93,14 @@ function createWindow() {
 }
 
 // ─── Database persistence (real file on disk instead of localStorage) ────────
-ipcMain.handle('db:load', async () => {
+ipcMain.handle('db:load', async (event) => {
+  validateIpcSender(event);
   ensureDirs();
   if (!(await databaseFileExists())) return null;
   const buffer = await fs.readFile(DB_FILE);
+  if (buffer.length > MAX_DB_SIZE) {
+    throw new Error('Database file exceeds maximum allowed size');
+  }
   return new Uint8Array(buffer);
 });
 
@@ -119,10 +145,14 @@ ipcMain.handle('db:create-fresh-after-recovery', async () => {
   return { ok: true, path: target };
 });
 
-ipcMain.handle('db:save', async (_event, bytes) => {
+ipcMain.handle('db:save', async (event, bytes) => {
+  validateIpcSender(event);
   try {
     ensureDirs();
     const data = Buffer.from(bytes);
+    if (data.length > MAX_DB_SIZE) {
+      throw new Error('Database data exceeds maximum allowed size');
+    }
     const tmp = `${DB_FILE}.tmp`;
     try {
       await fs.writeFile(tmp, data);
@@ -214,6 +244,14 @@ ipcMain.handle('app:info', async () => ({
   dataDir: APP_DATA_DIR,
   backupDir: BACKUP_DIR,
 }));
+
+// Full application restart. The renderer flushes the SQLite snapshot to disk
+// before calling this, so a relaunch never loses the newest writes.
+ipcMain.handle('app:relaunch', async () => {
+  app.relaunch();
+  app.exit(0);
+  return { ok: true };
+});
 
 ipcMain.handle('app:openFolder', async (_event, target) => {
   try {
@@ -425,4 +463,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Handle graceful shutdown - allow renderer to request controlled close
+ipcMain.handle('app:requestShutdown', async () => {
+  // In a real implementation, this would coordinate with the renderer
+  // to ensure all data is flushed before closing
+  return { ok: true };
 });

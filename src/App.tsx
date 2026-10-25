@@ -123,8 +123,24 @@ export const App: React.FC = () => {
 
   // Ensure the latest snapshot reaches disk before the window closes.
   useEffect(() => {
-    const onBeforeUnload = () => {
-      try { void DatabaseManager.getInstance().flush(); } catch { /* ignore */ }
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Note: beforeunload cannot be fully async in browsers, but we attempt a synchronous-like approach
+      // In Electron, we can request a controlled shutdown through IPC if available
+      try {
+        const db = DatabaseManager.getInstance();
+        // Attempt to flush synchronously - this won't fully work in all browsers
+        // but provides best-effort attempt. For reliable shutdown, use app's exit handler.
+        void db.flush().then(() => {
+          // Flush completed successfully
+        }).catch((err) => {
+          console.error('Failed to flush database on close:', err);
+          // In production, this should show a user-facing error
+        });
+      } catch (err) {
+        console.error('Error during database flush attempt:', err);
+      }
+      // Return undefined to allow default browser behavior
+      // Do not return a string to avoid showing the generic browser confirmation dialog
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
@@ -349,6 +365,7 @@ const BackupPage             = lazy(() => import('./pages/settings/BackupPage').
 const SystemHealthPage       = lazy(() => import('./pages/settings/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
 const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 const SecurityCenterPage     = lazy(() => import('./pages/admin/SecurityCenterPage').then(m => ({ default: m.SecurityCenterPage })));
+const DataDeletionPage       = lazy(() => import('./pages/admin/DataDeletionPage').then(m => ({ default: m.DataDeletionPage })));
 
 function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
@@ -473,6 +490,7 @@ const AppRouterWithProps: React.FC<{
 
       {/* Admin Control Center */}
       <Route path="admin" element={<S><AdminPage /></S>} />
+      <Route path="admin/data-deletion" element={<S><DataDeletionPage /></S>} />
 
       {/* Settings */}
       <Route path="data-import/types" element={<S><DynamicDataPage /></S>} />

@@ -207,13 +207,6 @@ export interface Migration {
 
 export const MIGRATIONS: Migration[] = [
   {
-    id: '016_general_product_types',
-    description: 'Allow general non-ceramic products in the product catalog',
-    up: (db) => {
-      addColumn(db, 'products', 'product_type', "TEXT NOT NULL DEFAULT 'CERAMIC'");
-    },
-  },
-  {
     id: '001_seed_default_branch',
     description: 'Create the main branch row so branch_id has something to point at',
     up: (db) => {
@@ -312,9 +305,20 @@ export const MIGRATIONS: Migration[] = [
   },
 
   {
+    id: '005b_add_price_lists_is_default',
+    description: 'Add is_default column to price_lists table for legacy databases',
+    up: (db) => {
+      addColumn(db, 'price_lists', 'is_default', 'INTEGER DEFAULT 0');
+    },
+  },
+
+  {
     id: '006_seed_default_price_list',
     description: 'Seed the default retail price list so products always resolve a price',
     up: (db) => {
+      // Ensure is_default column exists before inserting (for legacy databases)
+      addColumn(db, 'price_lists', 'is_default', 'INTEGER DEFAULT 0');
+
       db.run(
         `INSERT OR IGNORE INTO price_lists (id, code, name, customer_type, currency, is_default, is_active)
          VALUES (?, ?, ?, ?, ?, 1, 1)`,
@@ -608,6 +612,14 @@ export const MIGRATIONS: Migration[] = [
       } finally {
         db.exec('PRAGMA foreign_keys = ON');
       }
+    },
+  },
+
+  {
+    id: '016_general_product_types',
+    description: 'Allow general non-ceramic products in the product catalog',
+    up: (db) => {
+      addColumn(db, 'products', 'product_type', "TEXT NOT NULL DEFAULT 'CERAMIC'");
     },
   },
 

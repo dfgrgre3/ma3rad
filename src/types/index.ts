@@ -553,3 +553,165 @@ export interface EmployeeFinancials {
   payouts: number;
   netDue: number;
 }
+
+// ─── ELECTRONIC INVOICING ─────────────────────────────────────────────────────
+
+export type ElectronicInvoiceStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+
+export interface ElectronicInvoice {
+  id: string;
+  invoiceNumber: string;
+  salesInvoiceId: string;
+  customerId: string;
+  status: ElectronicInvoiceStatus;
+  xmlFilePath?: string | null;
+  pdfFilePath?: string | null;
+  submissionDate?: string | null;
+  acceptedDate?: string | null;
+  rejectionReason?: string | null;
+  taxAuthorityReference?: string | null;
+  totalTax: number;
+  totalAmount: number;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateElectronicInvoiceDTO {
+  salesInvoiceId: string;
+  customerId: string;
+}
+
+// ─── LOYALTY PROGRAM ──────────────────────────────────────────────────────────
+
+export type LoyaltyTransactionType = 'EARN' | 'REDEEM' | 'EXPIRE' | 'ADJUST';
+
+export interface LoyaltyTier {
+  id: string;
+  name: string;
+  minPoints: number;
+  discountPercentage: number;
+  benefits?: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CustomerLoyalty {
+  id: string;
+  customerId: string;
+  currentPoints: number;
+  totalPointsEarned: number;
+  totalPointsRedeemed: number;
+  tierId?: string | null;
+  joinedAt: string;
+  lastActivityAt: string;
+  tierName?: string | null;
+}
+
+export interface LoyaltyTransaction {
+  id: string;
+  customerId: string;
+  type: LoyaltyTransactionType;
+  points: number;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  description?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+}
+
+export interface EarnLoyaltyPointsDTO {
+  customerId: string;
+  points: number;
+  referenceType?: string;
+  referenceId?: string;
+  description?: string;
+}
+
+export interface RedeemLoyaltyPointsDTO {
+  customerId: string;
+  points: number;
+  referenceType?: string;
+  referenceId?: string;
+  description?: string;
+}
+
+// ─── MULTI-BRANCH ─────────────────────────────────────────────────────────────
+
+export interface Branch {
+  id: string;
+  name: string;
+  code: string;
+  address?: string | null;
+  phone?: string | null;
+  managerId?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  managerName?: string | null;
+}
+
+export interface BranchWarehouse {
+  id: string;
+  branchId: string;
+  warehouseId: string;
+  isPrimary: boolean;
+  warehouseName?: string | null;
+}
+
+export interface UserBranch {
+  userId: string;
+  branchId: string;
+}
+
+export interface CreateBranchDTO {
+  name: string;
+  code: string;
+  address?: string;
+  phone?: string;
+  managerId?: string;
+  isDefault?: boolean;
+}
+
+// ─── ADVANCED ANALYTICS ───────────────────────────────────────────────────────
+
+export interface AnalyticsSnapshot {
+  id: string;
+  metricName: string;
+  metricValue: number;
+  dimension?: string | null;
+  periodStart: string;
+  periodEnd: string;
+  createdAt: string;
+}
+
+export interface SalesAnalytics {
+  period: string;
+  totalSales: number;
+  totalOrders: number;
+  averageOrderValue: number;
+  totalProfit: number;
+  topProducts: Array<{ productId: string; productName: string; quantity: number; revenue: number }>;
+  topCustomers: Array<{ customerId: string; customerName: string; totalSpent: number; orderCount: number }>;
+  salesByDay: Array<{ date: string; amount: number; count: number }>;
+}
+
+// ─── NOTIFICATION PREFERENCES ─────────────────────────────────────────────────
+
+export interface NotificationPreference {
+  id: string;
+  userId: string;
+  emailEnabled: boolean;
+  pushEnabled: boolean;
+  lowStockAlerts: boolean;
+  paymentDueAlerts: boolean;
+  systemAlerts: boolean;
+}
+
+export interface UpdateNotificationPreferencesDTO {
+  emailEnabled?: boolean;
+  pushEnabled?: boolean;
+  lowStockAlerts?: boolean;
+  paymentDueAlerts?: boolean;
+  systemAlerts?: boolean;
+}

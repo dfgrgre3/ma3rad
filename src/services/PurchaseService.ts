@@ -168,8 +168,11 @@ export class PurchaseService {
         }
 
         // Costing strategy (brief §33): weighted average, or latest-cost for FIFO (lot-tracking not yet implemented).
-      const prevQty = stockRow ? stockRow.quantityM2 : 0;
-      const prevCost = (stockRow ? this.db.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0] : null)?.costPrice || 0;
+        // NOTE: Current implementation uses organization-wide average cost (products.cost_price).
+        // For multi-warehouse scenarios, consider implementing warehouse-specific cost tracking
+        // by adding cost_price to warehouse_stock table or a separate warehouse_product_costs table.
+        const prevQty = stockRow ? stockRow.quantityM2 : 0;
+        const prevCost = (stockRow ? this.db.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0] : null)?.costPrice || 0;
         const newCost = method === 'FIFO'
           ? round2(item.unitCost)
           : computeWeightedAverageCost(prevQty, prevCost, item.quantityM2, item.unitCost);
@@ -379,11 +382,28 @@ export class PurchaseService {
     if (returnsCount > 0) throw new Error('لا يمكن حذف فاتورة لها مرتجعات مسجلة. احذف المرتجعات أولًا.');
 
     this.db.executeTransaction((db) => {
-      if (InventoryCostingService.costingMethod(db) === 'FIFO'
-        && !db.query<any>(`SELECT id FROM inventory_cost_layers WHERE source_type='PURCHASE' AND source_id=? LIMIT 1`, [purchaseId]).length) {
-        throw new Error('This legacy purchase has no traceable FIFO lot. Do not delete it while FIFO is active; reconcile the stock through a documented inventory adjustment.');
+      const costingMethod = InventoryCostingService.costingMethod(db);
+
+      // For FIFO: check if any quantity has been consumed
+      if (costingMethod === 'FIFO') {
+        if (!db.query<any>(`SELECT id FROM inventory_cost_layers WHERE source_type='PURCHASE' AND source_id=? LIMIT 1`, [purchaseId]).length) {
+          throw new Error('This legacy purchase has no traceable FIFO lot. Do not delete it while FIFO is active; reconcile the stock through a documented inventory adjustment.');
+        }
+        InventoryCostingService.removeUnusedSource(db, 'PURCHASE', purchaseId);
+      } else {
+        // For AVERAGE_COST: verify current stock is sufficient before deletion
+        for (const item of invoice.items) {
+          const stockRow = db.query<{ quantityM2: number }>(
+            `SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+            [item.productId, invoice.warehouseId]
+          )[0];
+          const currentQuantity = stockRow ? Number(stockRow.quantityM2) : 0;
+          if (currentQuantity < item.quantityM2) {
+            throw new Error(`لا يمكن حذف فاتورة التوريد. الرصيد الحالي للصنف (${currentQuantity} م²) أقل من كمية الفاتورة (${item.quantityM2} م²). تم استخدام جزء من الكمية في مبيعات. استخدم مرتجع بدلاً من الحذف.`);
+          }
+        }
       }
-      InventoryCostingService.removeUnusedSource(db, 'PURCHASE', purchaseId);
+
       for (const item of invoice.items) {
         db.run(
           `UPDATE warehouse_stock

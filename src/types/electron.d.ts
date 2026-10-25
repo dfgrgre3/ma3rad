@@ -21,6 +21,7 @@ declare global {
       app?: {
         info?: () => Promise<{ version: string; packaged: boolean; dataDir: string; backupDir: string }>;
         openFolder?: (target?: 'data' | 'backups') => Promise<{ ok: boolean; path?: string; error?: string }>;
+        relaunch?: () => Promise<{ ok: boolean }>;
       };
       printing?: {
         listPrinters?: () => Promise<{ ok: boolean; printers: string[]; error?: string }>;

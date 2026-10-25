@@ -179,14 +179,14 @@ export class InventoryCostingService {
   }
 
   static transferLayers(db: DatabaseManager, fromWarehouseId: string, toWarehouseId: string,
-    productId: string, quantity: number, transferId: string, reservedByLayer: Map<string, number> = new Map()): FifoCostPlan {
-    const plan = this.planFifo(db, productId, fromWarehouseId, quantity, reservedByLayer);
-    for (const row of plan.allocations) {
+    productId: string, quantity: number, transferId: string, plan: FifoCostPlan | null = null, reservedByLayer: Map<string, number> = new Map()): FifoCostPlan {
+    const costPlan = plan || this.planFifo(db, productId, fromWarehouseId, quantity, reservedByLayer);
+    for (const row of costPlan.allocations) {
       db.run('UPDATE inventory_cost_layers SET quantity_remaining=MAX(0,quantity_remaining-?) WHERE id=?', [row.quantity,row.layerId]);
       this.addLayer(db, { productId, warehouseId: toWarehouseId, sourceType: 'TRANSFER', sourceId: transferId,
         date: localDateString(), quantity: row.quantity, unitCost: row.unitCost });
     }
-    return plan;
+    return costPlan;
   }
 
   static removeUnusedSource(db: DatabaseManager, sourceType: string, sourceId: string): void {

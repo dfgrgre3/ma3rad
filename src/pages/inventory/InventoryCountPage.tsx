@@ -245,7 +245,21 @@ export const InventoryCountPage: React.FC = () => {
         for (const item of sessionItems) {
           if (item.countedQuantityM2 === null) continue;
 
-          // 1. Update items in DB
+          // 1. Validate that counted quantity is not less than reserved quantity
+          const stockRow = txDb.query(
+            `SELECT reserved_m2, meters_per_box FROM warehouse_stock ws
+             JOIN products p ON p.id = ws.product_id
+             WHERE ws.product_id = ? AND ws.warehouse_id = ?`,
+            [item.productId, activeSession.warehouseId]
+          )[0] as any;
+          const reservedM2 = stockRow ? Number(stockRow.reservedM2 || 0) : 0;
+          const metersPerBox = stockRow ? Number(stockRow.metersPerBox || 1.44) : 1.44;
+
+          if (item.countedQuantityM2 < reservedM2) {
+            throw new Error(`الكمية المعدودة للصنف "${item.productName}" (${item.countedQuantityM2} م²) أقل من الكمية المحجوزة (${reservedM2} م²). يجب فك الحجز أو تصحيح الكمية قبل الترحيل.`);
+          }
+
+          // 2. Update items in DB
           txDb.run(`
             UPDATE stock_count_items
             SET counted_quantity_m2 = ?, variance_m2 = ?, variance_value = ?
@@ -257,23 +271,25 @@ export const InventoryCountPage: React.FC = () => {
             varianceCount++;
             totalVarianceVal += Math.abs(item.varianceValue);
 
-            // 2. Adjust warehouse stock quantity to the counted quantity
-            txDb.run(`
-              UPDATE warehouse_stock
-              SET quantity_m2 = ?, last_updated = CURRENT_TIMESTAMP
-              WHERE warehouse_id = ? AND product_id = ?
-            `, [item.countedQuantityM2, activeSession.warehouseId, item.productId]);
-
-            // 3. Write record into inventory_transactions
-            const txId = `tx_${uuidv4().substring(0, 8)}`;
-            const txType = diffM2 > 0 ? 'ADJUSTMENT_ADD' : 'ADJUSTMENT_SUB';
-            const boxesCount = Number((diffM2 / 1.44).toFixed(2)); // Default approximation
+            // 3. Calculate FIFO plan BEFORE updating stock quantity
             const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
             const fifoPlan = fifoEnabled && diffM2 < 0
               ? InventoryCostingService.planFifo(txDb, item.productId, activeSession.warehouseId, Math.abs(diffM2))
               : null;
             const unitCost = fifoPlan?.unitCost ?? Number(item.unitCost);
             const value = Math.round(Math.abs(diffM2 * unitCost) * 100) / 100;
+
+            // 4. Adjust warehouse stock quantity to the counted quantity
+            txDb.run(`
+              UPDATE warehouse_stock
+              SET quantity_m2 = ?, last_updated = CURRENT_TIMESTAMP
+              WHERE warehouse_id = ? AND product_id = ?
+            `, [item.countedQuantityM2, activeSession.warehouseId, item.productId]);
+
+            // 5. Write record into inventory_transactions
+            const txId = `tx_${uuidv4().substring(0, 8)}`;
+            const txType = diffM2 > 0 ? 'ADJUSTMENT_ADD' : 'ADJUSTMENT_SUB';
+            const boxesCount = Number((diffM2 / metersPerBox).toFixed(2));
 
             txDb.run(`
               INSERT INTO inventory_transactions (
@@ -307,7 +323,7 @@ export const InventoryCountPage: React.FC = () => {
           }
         }
 
-        // 4. Close session status
+        // 6. Close session status
         txDb.run(`
           UPDATE stock_counts
           SET status = 'POSTED', posted_at = CURRENT_TIMESTAMP, posted_by = ?,

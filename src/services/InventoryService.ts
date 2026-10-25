@@ -97,10 +97,21 @@ export class InventoryService {
     if (diffM2 === 0) return;
 
     this.db.executeTransaction((sqliteDb) => {
-      // 1. Ensure stock record exists
+      // 1. Fetch product cost and calculate FIFO plan BEFORE changing stock quantity
+      const prod = sqliteDb.query(`SELECT cost_price, meters_per_box FROM products WHERE id = ?`, [productId])[0];
+      const fifoEnabled = InventoryCostingService.costingMethod(sqliteDb) === 'FIFO';
+      const costPlan = fifoEnabled && diffM2 < 0
+        ? InventoryCostingService.planFifo(sqliteDb, productId, warehouseId, Math.abs(diffM2))
+        : null;
+      const unitCost = costPlan ? costPlan.unitCost : (prod ? (prod as any).costPrice : 0);
+      const metersPerBox = prod ? (prod as any).metersPerBox : 1.44;
+      const totalCost = Math.round(Math.abs(diffM2 * Number(unitCost || 0)) * 100) / 100;
+      if (totalCost <= 0) throw new Error('Set a positive product cost before posting an inventory adjustment.');
+
+      // 2. Ensure stock record exists and update quantity
       if (currentStock) {
         sqliteDb.run(`
-          UPDATE warehouse_stock 
+          UPDATE warehouse_stock
           SET quantity_m2 = ?, last_updated = CURRENT_TIMESTAMP
           WHERE product_id = ? AND warehouse_id = ?
         `, [actualQuantityM2, productId, warehouseId]);
@@ -111,17 +122,6 @@ export class InventoryService {
           VALUES (?, ?, ?, ?, 0)
         `, [stockId, warehouseId, productId, actualQuantityM2]);
       }
-
-      // 2. Fetch product cost
-      const prod = sqliteDb.query(`SELECT cost_price, meters_per_box FROM products WHERE id = ?`, [productId])[0];
-      const fifoEnabled = InventoryCostingService.costingMethod(sqliteDb) === 'FIFO';
-      const costPlan = fifoEnabled && diffM2 < 0
-        ? InventoryCostingService.planFifo(sqliteDb, productId, warehouseId, Math.abs(diffM2))
-        : null;
-      const unitCost = costPlan ? costPlan.unitCost : (prod ? (prod as any).costPrice : 0);
-      const metersPerBox = prod ? (prod as any).metersPerBox : 1.44;
-      const totalCost = Math.round(Math.abs(diffM2 * Number(unitCost || 0)) * 100) / 100;
-      if (totalCost <= 0) throw new Error('Set a positive product cost before posting an inventory adjustment.');
 
       // 3. Record Inventory Transaction
       const txType: InventoryTransactionType = diffM2 > 0 ? 'ADJUSTMENT_ADD' : 'ADJUSTMENT_SUB';
@@ -194,14 +194,25 @@ export class InventoryService {
     }
 
     this.db.executeTransaction((sqliteDb) => {
-      // 1. Decrease source warehouse
+      // 1. Calculate FIFO plan BEFORE changing any stock quantities
+      const prod = sqliteDb.query(`SELECT cost_price, meters_per_box FROM products WHERE id = ?`, [productId])[0];
+      const costPlan = InventoryCostingService.costingMethod(sqliteDb) === 'FIFO'
+        ? InventoryCostingService.planFifo(sqliteDb, productId, fromWarehouseId, quantityM2)
+        : null;
+      const unitCost = costPlan ? costPlan.unitCost : (prod ? (prod as any).costPrice : 0);
+      const metersPerBox = prod ? (prod as any).metersPerBox : 1.44;
+      const boxes = Number((quantityM2 / metersPerBox).toFixed(2));
+      const refOut = sqliteDb.nextNumber('TX-TRF-OUT');
+      const refIn = sqliteDb.nextNumber('TX-TRF-IN');
+
+      // 2. Decrease source warehouse
       sqliteDb.run(`
         UPDATE warehouse_stock 
         SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
         WHERE product_id = ? AND warehouse_id = ?
       `, [quantityM2, productId, fromWarehouseId]);
 
-      // 2. Increase destination warehouse
+      // 3. Increase destination warehouse
       const toStock = this.getProductStock(productId, toWarehouseId);
       if (toStock) {
         sqliteDb.run(`
@@ -217,17 +228,7 @@ export class InventoryService {
         `, [stockId, toWarehouseId, productId, quantityM2]);
       }
 
-      // 3. Log 2 Inventory Transactions (Transfer OUT & Transfer IN)
-      const prod = sqliteDb.query(`SELECT cost_price, meters_per_box FROM products WHERE id = ?`, [productId])[0];
-      const costPlan = InventoryCostingService.costingMethod(sqliteDb) === 'FIFO'
-        ? InventoryCostingService.planFifo(sqliteDb, productId, fromWarehouseId, quantityM2)
-        : null;
-      const unitCost = costPlan ? costPlan.unitCost : (prod ? (prod as any).costPrice : 0);
-      const metersPerBox = prod ? (prod as any).metersPerBox : 1.44;
-      const boxes = Number((quantityM2 / metersPerBox).toFixed(2));
-      const refOut = sqliteDb.nextNumber('TX-TRF-OUT');
-      const refIn = sqliteDb.nextNumber('TX-TRF-IN');
-
+      // 4. Log 2 Inventory Transactions (Transfer OUT & Transfer IN)
       sqliteDb.run(`
         INSERT INTO inventory_transactions (
           id, transaction_number, type, product_id, warehouse_id,
@@ -251,7 +252,15 @@ export class InventoryService {
         quantityM2, boxes, unitCost, quantityM2 * unitCost,
         `تحويل مخزني وارد من ${fromWarehouseId}. ${notes}`, performedBy2
       ]);
-      if (costPlan) InventoryCostingService.transferLayers(sqliteDb, fromWarehouseId, toWarehouseId, productId, quantityM2, refIn);
+
+      // 5. Transfer cost layers using the pre-calculated plan
+      if (costPlan) {
+        for (const allocation of costPlan.allocations) {
+          sqliteDb.run('UPDATE inventory_cost_layers SET quantity_remaining=MAX(0,quantity_remaining-?) WHERE id=?', [allocation.quantity, allocation.layerId]);
+          InventoryCostingService.addLayer(sqliteDb, { productId, warehouseId: toWarehouseId, sourceTransactionId: refIn, sourceType: 'TRANSFER', sourceId: refIn,
+            date: localDateString(), quantity: allocation.quantity, unitCost: allocation.unitCost });
+        }
+      }
     });
   }
 

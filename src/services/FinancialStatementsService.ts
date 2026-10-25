@@ -152,8 +152,23 @@ export class FinancialStatementsService {
              COALESCE(SUM(CASE WHEN is_estimated = 1 AND quantity_remaining > 0.009 THEN 1 ELSE 0 END), 0) AS estimatedLayers
       FROM inventory_cost_layers WHERE quantity_remaining > 0.009
     `)[0];
-    add('inventory', 'قيمة المخزون حسب طبقات التكلفة', accountBalance('1104', 'DEBIT'), Number(inventory?.value || 0),
-      `${Number(inventory?.estimatedLayers || 0)} طبقة تكلفة متبقية تقديرية؛ قد تفسر جزءًا من الفرق`);
+    const costingMethod = this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='costingMethod'`)[0]?.value || 'AVERAGE_COST';
+    const inventoryValue = Number(inventory?.value || 0);
+    const ledgerValue = accountBalance('1104', 'DEBIT');
+
+    if (costingMethod === 'FIFO') {
+      add('inventory', 'قيمة المخزون حسب طبقات التكلفة (FIFO)', ledgerValue, inventoryValue,
+        `${Number(inventory?.estimatedLayers || 0)} طبقة تكلفة متبقية تقديرية؛ قد تفسر جزءًا من الفرق`);
+    } else {
+      // For AVERAGE_COST, compare ledger with calculated value from stock * cost_price
+      const stockValue = this.db.query<{ value: number }>(`
+        SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
+        FROM warehouse_stock ws
+        JOIN products p ON p.id = ws.product_id
+      `)[0]?.value || 0;
+      add('inventory', 'قيمة المخزون حسب التكلفة المتوسطة (Stock × Cost Price)', ledgerValue, Number(stockValue),
+        'الفرق بسبب طريقة التكلفة المتوسطة المرجحة');
+    }
 
     return checks;
   }
@@ -251,8 +266,12 @@ export class FinancialStatementsService {
     };
   }
 
-  // ── Cash flow (simplified direct method) ─────────────────────────────────
-  public getCashFlow(dateFrom?: string, dateTo?: string): { months: CashFlowMonth[]; totals: CashFlowMonth } {
+  // ── Cash flow (simplified direct method with activity classification) ─────────────────────────────────
+  public getCashFlow(dateFrom?: string, dateTo?: string): {
+    months: CashFlowMonth[];
+    totals: CashFlowMonth;
+    byActivity: { operating: CashFlowMonth; investing: CashFlowMonth; financing: CashFlowMonth };
+  } {
     this.requireView('finance.view');
     const from = dateFrom || localDateString(new Date(new Date().getFullYear(), 0, 1));
     const to = dateTo || localDateString();
@@ -260,10 +279,16 @@ export class FinancialStatementsService {
       throw new Error('Invalid cash flow date range.');
     }
 
-    const rows = this.db.query<any>(`
+    // Operating activities: cash from sales, payments to suppliers, operating expenses
+    const operatingRows = this.db.query<any>(`
       WITH cash_by_entry AS (
         SELECT e.id, substr(e.date, 1, 7) AS month,
-               SUM(CASE WHEN a.code IN ('1101', '1102', '1106') THEN l.debit - l.credit ELSE 0 END) AS net_cash
+               SUM(CASE
+                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('SALES_INVOICE', 'CUSTOMER_PAYMENT') THEN l.debit - l.credit
+                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('SUPPLIER_PAYMENT', 'PURCHASE_INVOICE') THEN l.debit - l.credit
+                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type LIKE '%EXPENSE%' THEN l.debit - l.credit
+                 ELSE 0
+               END) AS net_cash
         FROM journal_entries e
         JOIN journal_entry_lines l ON l.entry_id = e.id
         JOIN chart_of_accounts a ON a.id = l.account_id
@@ -276,12 +301,70 @@ export class FinancialStatementsService {
       ORDER BY month ASC
     `, [from, to]);
 
-    const months: CashFlowMonth[] = rows.map((r) => ({
-      month: r.month,
-      inflows: round2(r.inflow || 0),
-      outflows: round2(r.outflow || 0),
-      net: round2((r.inflow || 0) - (r.outflow || 0)),
-    }));
+    // Investing activities: fixed assets, investments
+    const investingRows = this.db.query<any>(`
+      WITH cash_by_entry AS (
+        SELECT e.id, substr(e.date, 1, 7) AS month,
+               SUM(CASE
+                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('FIXED_ASSET_PURCHASE', 'FIXED_ASSET_SALE') THEN l.debit - l.credit
+                 ELSE 0
+               END) AS net_cash
+        FROM journal_entries e
+        JOIN journal_entry_lines l ON l.entry_id = e.id
+        JOIN chart_of_accounts a ON a.id = l.account_id
+        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+        GROUP BY e.id, substr(e.date, 1, 7)
+      )
+      SELECT month, SUM(MAX(net_cash, 0)) AS inflow, SUM(MAX(-net_cash, 0)) AS outflow
+      FROM cash_by_entry
+      GROUP BY month
+      ORDER BY month ASC
+    `, [from, to]);
+
+    // Financing activities: loans, capital, dividends
+    const financingRows = this.db.query<any>(`
+      WITH cash_by_entry AS (
+        SELECT e.id, substr(e.date, 1, 7) AS month,
+               SUM(CASE
+                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('LOAN_RECEIVED', 'LOAN_REPAYMENT', 'CAPITAL_INJECTION', 'DIVIDEND_PAYMENT') THEN l.debit - l.credit
+                 ELSE 0
+               END) AS net_cash
+        FROM journal_entries e
+        JOIN journal_entry_lines l ON l.entry_id = e.id
+        JOIN chart_of_accounts a ON a.id = l.account_id
+        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+        GROUP BY e.id, substr(e.date, 1, 7)
+      )
+      SELECT month, SUM(MAX(net_cash, 0)) AS inflow, SUM(MAX(-net_cash, 0)) AS outflow
+      FROM cash_by_entry
+      GROUP BY month
+      ORDER BY month ASC
+    `, [from, to]);
+
+    // Combine all cash flows
+    const combinedMap = new Map<string, { inflow: number; outflow: number }>();
+
+    const addRows = (rows: any[]) => {
+      for (const r of rows) {
+        const existing = combinedMap.get(r.month) || { inflow: 0, outflow: 0 };
+        existing.inflow += Number(r.inflow || 0);
+        existing.outflow += Number(r.outflow || 0);
+        combinedMap.set(r.month, existing);
+      }
+    };
+
+    addRows(operatingRows);
+    addRows(investingRows);
+    addRows(financingRows);
+
+    const months: CashFlowMonth[] = Array.from(combinedMap.entries())
+      .map(([month, values]) => ({
+        month,
+        inflows: round2(values.inflow),
+        outflows: round2(values.outflow),
+        net: round2(values.inflow - values.outflow),
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month));
 
     const totals = months.reduce<CashFlowMonth>(
       (acc, m) => ({
@@ -293,7 +376,44 @@ export class FinancialStatementsService {
       { month: 'الإجمالي', inflows: 0, outflows: 0, net: 0 }
     );
 
-    return { months, totals };
+    // Calculate totals by activity type
+    const operatingTotal = operatingRows.reduce((sum, r) => ({
+      inflow: sum.inflow + Number(r.inflow || 0),
+      outflow: sum.outflow + Number(r.outflow || 0),
+    }), { inflow: 0, outflow: 0 });
+
+    const investingTotal = investingRows.reduce((sum, r) => ({
+      inflow: sum.inflow + Number(r.inflow || 0),
+      outflow: sum.outflow + Number(r.outflow || 0),
+    }), { inflow: 0, outflow: 0 });
+
+    const financingTotal = financingRows.reduce((sum, r) => ({
+      inflow: sum.inflow + Number(r.inflow || 0),
+      outflow: sum.outflow + Number(r.outflow || 0),
+    }), { inflow: 0, outflow: 0 });
+
+    const byActivity = {
+      operating: {
+        month: 'الأنشطة التشغيلية',
+        inflows: round2(operatingTotal.inflow),
+        outflows: round2(operatingTotal.outflow),
+        net: round2(operatingTotal.inflow - operatingTotal.outflow),
+      },
+      investing: {
+        month: 'الأنشطة الاستثمارية',
+        inflows: round2(investingTotal.inflow),
+        outflows: round2(investingTotal.outflow),
+        net: round2(investingTotal.inflow - investingTotal.outflow),
+      },
+      financing: {
+        month: 'الأنشطة التمويلية',
+        inflows: round2(financingTotal.inflow),
+        outflows: round2(financingTotal.outflow),
+        net: round2(financingTotal.inflow - financingTotal.outflow),
+      },
+    };
+
+    return { months, totals, byActivity };
   }
 
   // ── AR / AP aging ────────────────────────────────────────────────────────

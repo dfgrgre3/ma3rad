@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('ceramisys', {
   app: {
     info: () => ipcRenderer.invoke('app:info'),
     openFolder: (target) => ipcRenderer.invoke('app:openFolder', target),
+    relaunch: () => ipcRenderer.invoke('app:relaunch'),
+    requestShutdown: () => ipcRenderer.invoke('app:requestShutdown'),
   },
   printing: {
     listPrinters: () => ipcRenderer.invoke('print:listPrinters'),
