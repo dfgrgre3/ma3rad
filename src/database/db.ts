@@ -54,8 +54,10 @@ export class DatabaseManager {
   private readonly pageCacheTtlMs = 15000;
   private persistQueue: Promise<void> = Promise.resolve();
   private lastPersistError: string | null = null;
+  private initializedSuccessfully = false;
   private storageBackend: 'file' | 'localStorage' | 'none' = 'none';
   private migratedLegacyStorage = false;
+  private forceFreshAfterRecovery = false;
 
   private constructor() {}
 
@@ -67,7 +69,11 @@ export class DatabaseManager {
   }
 
   public async initialize(): Promise<Database> {
-    if (this.db) return this.db;
+    if (this.db && this.initializedSuccessfully) return this.db;
+    if (this.db) {
+      this.db?.close();
+      this.db = null;
+    }
 
     // Resolve the sql.js engine + wasm URL in a runtime-agnostic way:
     //  - Browser / Vite bundler: load the browser distribution. sql.js is a
@@ -147,15 +153,20 @@ export class DatabaseManager {
     let isFreshDatabase = true;
 
     if (fileApi?.load) {
+      let loaded: Uint8Array | null;
       try {
-        savedBytes = toUint8Array(await fileApi.load());
-        if (savedBytes && savedBytes.length > 0) this.storageBackend = 'file';
-      } catch (e) {
-        console.error('Failed to load SQLite file, falling back to local storage', e);
+        loaded = await fileApi.load();
+      } catch (error) {
+        throw await this.databaseRecoveryError(error);
+      }
+      if (loaded !== null) {
+        savedBytes = toUint8Array(loaded);
+        if (!savedBytes) throw new Error('تعذر قراءة ملف قاعدة البيانات بسبب صيغة بيانات غير صالحة.');
+        this.storageBackend = 'file';
       }
     }
 
-    if (!savedBytes && typeof localStorage !== 'undefined') {
+    if (!this.forceFreshAfterRecovery && savedBytes === null && typeof localStorage !== 'undefined') {
       const legacy = localStorage.getItem(DB_STORAGE_KEY);
       if (legacy) {
         try {
@@ -168,14 +179,16 @@ export class DatabaseManager {
       }
     }
 
-    if (savedBytes && savedBytes.length > 0) {
+    if (savedBytes !== null) {
+      if (savedBytes.length === 0) {
+        throw await this.databaseRecoveryError(new Error('ملف قاعدة البيانات فارغ.'));
+      }
       try {
         this.db = new this.SQL.Database(savedBytes);
         isFreshDatabase = false;
         console.log(`✅ Loaded existing SQLite database (${this.storageBackend === 'file' ? 'file' : 'legacy storage'}).`);
       } catch (e) {
-        console.error('Failed to load saved database, initializing fresh schema', e);
-        this.db = new this.SQL.Database();
+        throw await this.databaseRecoveryError(e);
       }
     } else {
       console.log('Creating fresh SQLite database and running migrations...');
@@ -189,10 +202,42 @@ export class DatabaseManager {
     // Bring the database up to the current schema. This runs on BOTH paths:
     // a saved database is loaded as an opaque blob, so tables and columns added
     // since it was created only ever arrive through here.
+    if (!isFreshDatabase && !this.isMigrationApplied('045_reconcile_invoice_gross_profit')) {
+      try {
+        if (!savedBytes) throw new Error('تعذر الوصول إلى نسخة قاعدة البيانات الأصلية.');
+        const backupApi = typeof window !== 'undefined' ? window.ceramisys?.db?.backupSnapshot : undefined;
+        if (backupApi) {
+          const backup = await backupApi(savedBytes, 'before-gross-profit-policy');
+          if (!backup?.ok || !backup.path) throw new Error(backup?.error || 'لم يتم إنشاء نسخة احتياطية.');
+        } else if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(
+            `${DB_STORAGE_KEY}_before_gross_profit_${Date.now()}`,
+            bytesToBase64(savedBytes)
+          );
+        } else {
+          throw new Error('لا يتوفر وسيط لإنشاء نسخة احتياطية قبل الترحيل.');
+        }
+      } catch (error) {
+        this.db?.close();
+        this.db = null;
+        throw new Error(`توقف الترحيل المالي قبل تعديل البيانات لعدم إنشاء نسخة احتياطية: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     const report = runMigrations(this.getDatabase());
     if (report.failed.length > 0) {
       console.error('⚠️ Some migrations did not apply; they will be retried on next launch.', report.failed);
-      throw new Error(`Database migration failed (${report.failed[0].id}): ${report.failed[0].error}`);
+      let backupMessage = '';
+      if (!isFreshDatabase && fileApi?.preserveCorrupt) {
+        try {
+          const backup = await fileApi.preserveCorrupt();
+          backupMessage = ` نسخة الاستعادة الخام: ${backup.path}.`;
+        } catch (backupError) {
+          backupMessage = ` تعذر إنشاء نسخة خام: ${backupError instanceof Error ? backupError.message : String(backupError)}.`;
+        }
+      }
+      this.db?.close();
+      this.db = null;
+      throw new Error(`Database migration failed (${report.failed[0].id}): ${report.failed[0].error}.${backupMessage}`);
     }
 
     // Seed reference data only for a genuinely new database — migrations already
@@ -202,7 +247,61 @@ export class DatabaseManager {
     }
 
     this.saveToStorage();
+    await this.flush();
+    if (this.lastPersistError) {
+      this.db?.close();
+      this.db = null;
+      throw new Error(`تعذر حفظ قاعدة البيانات على وسيط التخزين. لم يبدأ النظام لتجنب العمل على بيانات غير محفوظة. ${this.lastPersistError}`);
+    }
+    this.forceFreshAfterRecovery = false;
+    this.initializedSuccessfully = true;
     return this.getDatabase();
+  }
+
+  private async databaseRecoveryError(cause: unknown): Promise<Error & { code: string }> {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    if (fileApi?.preserveCorrupt) {
+      try {
+        const backup = await fileApi.preserveCorrupt();
+        return Object.assign(
+          new Error(`تعذر فتح قاعدة البيانات الموجودة. تم حفظ نسخة خام للاستعادة في: ${backup.path}. لن تُكتب قاعدة جديدة فوق الملف الأصلي.`),
+          { code: 'DATABASE_RECOVERY_REQUIRED' }
+        );
+      } catch (backupError) {
+        const backupMessage = backupError instanceof Error ? backupError.message : String(backupError);
+        return Object.assign(
+          new Error(`تعذر فتح قاعدة البيانات الموجودة (${message})، كما تعذر حفظ نسخة استعادة خام (${backupMessage}). لم يتم تعديل الملف الأصلي.`),
+          { code: 'DATABASE_RECOVERY_REQUIRED' }
+        );
+      }
+    }
+    return Object.assign(
+      new Error(`تعذر فتح قاعدة البيانات الموجودة (${message}). لم يتم إنشاء قاعدة جديدة أو الكتابة فوق الملف.`),
+      { code: 'DATABASE_RECOVERY_REQUIRED' }
+    );
+  }
+
+  private isMigrationApplied(id: string): boolean {
+    const migrationTable = this.db?.exec(
+      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'`
+    )[0]?.values.length;
+    if (!migrationTable) return false;
+    return Boolean(this.db?.exec(
+      'SELECT 1 FROM schema_migrations WHERE id = ?',
+      [id]
+    )[0]?.values.length);
+  }
+
+  public async createFreshAfterRecovery(): Promise<void> {
+    const recoveryApi = typeof window !== 'undefined' ? window.ceramisys?.db?.createFreshAfterRecovery : undefined;
+    if (!recoveryApi) throw new Error('إنشاء قاعدة جديدة بعد التعذر متاح فقط من تطبيق سطح المكتب.');
+    const result = await recoveryApi();
+    if (!result?.ok) throw new Error('تعذر أرشفة قاعدة البيانات السابقة قبل إنشاء قاعدة جديدة.');
+    this.db = null;
+    this.forceFreshAfterRecovery = true;
+    this.storageBackend = 'none';
+    this.lastPersistError = null;
   }
 
   private seedInitialData(): void {
@@ -216,7 +315,7 @@ export class DatabaseManager {
     this.db.run(`
       INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, ['usr_admin', 'admin', adminHash, 'مدير النظام', 'ADMIN', '01000000000', '1234', 1, DEFAULT_BRANCH_ID]);
+    `, ['usr_admin', 'admin', adminHash, 'مدير النظام', 'ADMIN', null, null, 1, DEFAULT_BRANCH_ID]);
 
     // 2. System settings, default branch, roles and price lists are all seeded by
     //    migrations (see DEFAULT_SETTINGS and MIGRATIONS in ./migrations) so that

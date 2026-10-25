@@ -1,12 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, EyeOff, Lock, User as UserIcon, ShieldCheck, Loader2, LogIn } from 'lucide-react';
+import { Eye, EyeOff, Lock, User as UserIcon, ShieldCheck, Loader2 } from 'lucide-react';
 import { AuthService } from '../../services/AuthService';
 import type { User } from '../../types';
-
-interface RememberedCredentials {
-  username: string;
-  password: string;
-}
 
 interface LoginPageProps {
   onSuccess: (user: User) => void;
@@ -15,7 +10,7 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberedCredentials, setRememberedCredentials] = useState<RememberedCredentials | null>(null);
+  const [rememberOnDevice, setRememberOnDevice] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,12 +21,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
     let mounted = true;
     void credentialStore.get().then((saved) => {
-      if (!mounted || !saved) return;
-      setRememberedCredentials(saved);
+      if (!mounted || !saved?.consented) return;
       setUsername(saved.username);
       setPassword(saved.password);
+      setRememberOnDevice(true);
     }).catch((loadError) => {
-      console.error('Could not load remembered login credentials:', loadError);
+      console.error('Could not load consented login credentials:', loadError);
     });
 
     return () => { mounted = false; };
@@ -45,12 +40,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       const normalizedUsername = username.trim();
       const user = AuthService.login(normalizedUsername, password);
       const credentialStore = window.ceramisys?.credentials;
-      if (credentialStore?.set) {
+      if (rememberOnDevice && credentialStore?.set) {
         try {
           await credentialStore.set(normalizedUsername, password);
-          setRememberedCredentials({ username: normalizedUsername, password });
         } catch (saveError) {
           console.error('Could not save remembered login credentials:', saveError);
+          window.alert('تم تسجيل الدخول، لكن تعذر حفظ بيانات الدخول على هذا الجهاز.');
+        }
+      } else if (!rememberOnDevice && credentialStore?.clear) {
+        try {
+          await credentialStore.clear();
+        } catch (clearError) {
+          console.error('Could not clear remembered login credentials:', clearError);
+          window.alert('تم تسجيل الدخول، لكن تعذر حذف بيانات الدخول المحفوظة سابقًا.');
         }
       }
       onSuccess(user);
@@ -61,38 +63,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleQuickLogin = () => {
-    if (!rememberedCredentials || loading) return;
-    setError(null);
-    setLoading(true);
-    try {
-      const user = AuthService.login(rememberedCredentials.username, rememberedCredentials.password);
-      onSuccess(user);
-    } catch (err: any) {
-      setError(err?.message || 'تعذر تسجيل الدخول.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen w-screen flex bg-slate-100 text-slate-900" dir="rtl">
-      {rememberedCredentials && (
-        <button
-          type="button"
-          onClick={handleQuickLogin}
-          disabled={loading}
-          aria-label="تسجيل الدخول بالحساب المحفوظ"
-          title="تسجيل الدخول بالحساب المحفوظ"
-          className="group fixed right-0 top-1/2 z-20 flex -translate-y-1/2 items-center gap-2 rounded-l-xl border border-r-0 border-sky-200 bg-white/90 px-3 py-3 text-sky-700 opacity-70 shadow-lg transition-all hover:opacity-100 focus:opacity-100 disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
-          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold transition-all group-hover:max-w-32 group-focus:max-w-32">
-            دخول سريع
-          </span>
-        </button>
-      )}
-
       {/* Brand panel */}
       <div className="hidden lg:flex flex-col justify-between w-[44%] bg-gradient-to-br from-sky-600 via-sky-700 to-indigo-800 text-white p-10 relative overflow-hidden">
         <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-white/10" />
@@ -188,6 +160,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   </button>
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={rememberOnDevice}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setRememberOnDevice(checked);
+                    if (!checked) {
+                      void window.ceramisys?.credentials?.clear?.().catch((clearError) => {
+                        console.error('Could not clear remembered login credentials:', clearError);
+                        setError('تعذر حذف بيانات الدخول المحفوظة من هذا الجهاز.');
+                      });
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                />
+                تذكرني على هذا الجهاز
+              </label>
 
               <button
                 type="submit"

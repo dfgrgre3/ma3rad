@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   round2,
+  toMinorUnits,
+  fromMinorUnits,
   computeSaleLine,
   computeSaleTotals,
   computeWeightedAverageCost,
@@ -12,6 +14,13 @@ test('round2 eliminates IEEE-754 drift (brief §224)', () => {
   assert.equal(round2(0.1 + 0.2), 0.3);
   assert.equal(round2(1.005), 1.01);
   assert.equal(round2(NaN), 0);
+});
+
+test('money conversion uses integer minor units for currency arithmetic', () => {
+  assert.equal(toMinorUnits(0.1 + 0.2), 30);
+  assert.equal(toMinorUnits(19.99), 1999);
+  assert.equal(fromMinorUnits(1999), 19.99);
+  assert.equal(round2(-1.005), -1.01);
 });
 
 test('computeSaleLine: subtotal, discount, cost and profit', () => {
@@ -34,7 +43,20 @@ test('computeSaleTotals: discount/tax/shipping, remaining and payment status', (
   assert.equal(t.remainingAmount, 950);
   assert.equal(t.paymentStatus, 'PARTIAL');
   assert.equal(t.totalCost, 1380);
-  assert.equal(t.grossProfit, 1950 - 1380);
+  assert.equal(t.grossProfit, 1890 - 90 - 1380);
+});
+
+test('computeSaleTotals excludes tax and shipping charges from merchandise gross profit', () => {
+  const result = computeSaleTotals({
+    lines: [{ lineTotal: 120, lineCost: 80 }],
+    discountAmount: 20,
+    taxAmount: 15,
+    shippingCost: 10,
+    paidAmount: 125,
+  });
+
+  assert.equal(result.totalAmount, 125);
+  assert.equal(result.grossProfit, 20);
 });
 
 test('computeSaleTotals: fully paid -> PAID, zero remaining', () => {

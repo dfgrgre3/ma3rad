@@ -34,6 +34,16 @@ function ensureDirs() {
   fsSync.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
+async function databaseFileExists() {
+  try {
+    await fs.stat(DB_FILE);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1366,
@@ -62,15 +72,51 @@ function createWindow() {
 
 // ─── Database persistence (real file on disk instead of localStorage) ────────
 ipcMain.handle('db:load', async () => {
-  try {
-    ensureDirs();
-    if (!fsSync.existsSync(DB_FILE)) return null;
-    const buffer = await fs.readFile(DB_FILE);
-    return new Uint8Array(buffer);
-  } catch (error) {
-    console.error('Failed to load database file:', error);
-    return null;
+  ensureDirs();
+  if (!(await databaseFileExists())) return null;
+  const buffer = await fs.readFile(DB_FILE);
+  return new Uint8Array(buffer);
+});
+
+ipcMain.handle('db:preserve-corrupt', async () => {
+  ensureDirs();
+  if (!(await databaseFileExists())) {
+    throw new Error('قاعدة البيانات الأصلية غير موجودة لإنشاء نسخة استعادة.');
   }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = path.join(BACKUP_DIR, `ceramisys_corrupt_${stamp}.sqlite`);
+  await fs.copyFile(DB_FILE, target, fsSync.constants.COPYFILE_EXCL);
+  return { path: target, bytes: (await fs.stat(target)).size };
+});
+
+ipcMain.handle('db:backup-snapshot', async (_event, { bytes, label }) => {
+  ensureDirs();
+  const data = Buffer.from(bytes);
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const safeLabel = String(label || 'snapshot').replace(/[^a-zA-Z0-9_-]/g, '-');
+  const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite`);
+  const temporaryFile = `${target}.tmp`;
+  try {
+    await fs.writeFile(temporaryFile, data, { flag: 'wx' });
+    await fs.rename(temporaryFile, target);
+    return { ok: true, path: target, bytes: data.length };
+  } catch (error) {
+    try { await fs.unlink(temporaryFile); } catch (cleanupError) {
+      if (cleanupError.code !== 'ENOENT') throw cleanupError;
+    }
+    throw error;
+  }
+});
+
+ipcMain.handle('db:create-fresh-after-recovery', async () => {
+  ensureDirs();
+  if (!(await databaseFileExists())) return { ok: true };
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const target = path.join(BACKUP_DIR, `ceramisys_replaced_${stamp}.sqlite`);
+  await fs.copyFile(DB_FILE, target, fsSync.constants.COPYFILE_EXCL);
+  await fs.rename(DB_FILE, `${DB_FILE}.replaced-${stamp}`);
+  return { ok: true, path: target };
 });
 
 ipcMain.handle('db:save', async (_event, bytes) => {
@@ -78,8 +124,15 @@ ipcMain.handle('db:save', async (_event, bytes) => {
     ensureDirs();
     const data = Buffer.from(bytes);
     const tmp = `${DB_FILE}.tmp`;
-    await fs.writeFile(tmp, data);
-    await fs.rename(tmp, DB_FILE);
+    try {
+      await fs.writeFile(tmp, data);
+      await fs.rename(tmp, DB_FILE);
+    } catch (error) {
+      try { await fs.unlink(tmp); } catch (cleanupError) {
+        if (cleanupError.code !== 'ENOENT') throw cleanupError;
+      }
+      throw error;
+    }
     return { ok: true, path: DB_FILE, bytes: data.length };
   } catch (error) {
     console.error('Failed to save database file:', error);
@@ -124,6 +177,10 @@ ipcMain.handle('credentials:get', async () => {
   if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
     throw new Error('بيانات الدخول المحفوظة غير صالحة.');
   }
+  if (credentials.consented !== true) {
+    await fs.unlink(REMEMBERED_CREDENTIALS_FILE);
+    return null;
+  }
   return credentials;
 });
 
@@ -135,10 +192,19 @@ ipcMain.handle('credentials:set', async (_event, { username, password }) => {
     throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
   }
   ensureDirs();
-  const encrypted = safeStorage.encryptString(JSON.stringify({ username, password }));
+  const encrypted = safeStorage.encryptString(JSON.stringify({ username, password, consented: true }));
   const temporaryFile = `${REMEMBERED_CREDENTIALS_FILE}.tmp`;
   await fs.writeFile(temporaryFile, encrypted);
   await fs.rename(temporaryFile, REMEMBERED_CREDENTIALS_FILE);
+  return { ok: true };
+});
+
+ipcMain.handle('credentials:clear', async () => {
+  try {
+    await fs.unlink(REMEMBERED_CREDENTIALS_FILE);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
   return { ok: true };
 });
 

@@ -61,10 +61,12 @@ export class PrintService {
               <div class="showroom-title">${this.esc(settings.showroomName)}</div>
               <div>${this.esc(settings.tagline)}</div>
               <div>العنوان: ${this.esc(settings.address)} | هاتف: ${this.esc(settings.phone)}</div>
-              ${settings.taxNumber ? `<div>س.ت: ${this.esc(settings.commercialRecord)} | ب.ض: ${this.esc(settings.taxNumber)}</div>` : ''}
+              ${settings.commercialRecord ? `<div>السجل التجاري: ${this.esc(settings.commercialRecord)}</div>` : ''}
+              ${settings.taxNumber ? `<div>الرقم الضريبي: ${this.esc(settings.taxNumber)}</div>` : ''}
             </div>
             <div style="text-align: left;">
-              <div class="badge">فاتورة مبيعات ضريبية</div>
+              <div class="badge">فاتورة مبيعات عادية</div>
+              <div style="font-size: 10px; color: #64748b; margin-top: 4px;">مستند غير معتمد إلكترونياً</div>
               <div style="font-size: 14px; font-weight: 700; margin-top: 6px;">رقم: ${this.esc(invoice.invoiceNumber)}</div>
               <div>التاريخ: ${this.esc(invoice.date)}</div>
             </div>

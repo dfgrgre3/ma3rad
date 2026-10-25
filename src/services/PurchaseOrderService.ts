@@ -239,12 +239,12 @@ export class PurchaseOrderService {
       db.run(`UPDATE purchase_orders SET status = ? WHERE id = ?`, [left <= 0.001 ? 'RECEIVED' : 'PARTIAL', id]);
       db.run(`INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values) VALUES (?, ?, ?, 'استلام أمر شراء', 'PURCHASES', ?, ?)`,
         [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify({ orderNumber: order.orderNumber, invoiceId: created.id, lines })]);
+      for (const { item, quantity } of lines) {
+        new CustomerSupplyService().allocateReceivedQuantity(order.warehouseId, item.productId, quantity, db);
+      }
       return created;
     });
 
-    for (const { item, quantity } of lines) {
-      new CustomerSupplyService().allocateReceivedQuantity(order.warehouseId, item.productId, quantity);
-    }
     return invoice;
   }
 

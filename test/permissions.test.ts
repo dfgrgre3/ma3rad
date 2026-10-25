@@ -1,6 +1,7 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
@@ -57,6 +58,7 @@ test('permissions: user-level DENY beats role wildcards (sales.* and *)', async 
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
+  assert.equal(q('SELECT pin_code FROM users WHERE id = ?', ['usr_admin'])[0]?.pinCode ?? null, null);
   const admin = AuthService.login('admin', 'admin123');
 
   const role = PermissionService.createRole({ code: 'test_wildcard', name: 'اختبار wildcard' }, admin);
@@ -110,4 +112,44 @@ test('auth: wrong password fails, and repeated failures lock the account for 15 
   }
   const user = AuthService.login('admin', 'admin123');
   assert.equal(user.username, 'admin');
+});
+
+test('auth: PIN hashes stay private, actor arguments are ignored, and own-password changes are account-bound', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const auth = new AuthService();
+  const created = auth.createUser({
+    username: 'pin_hash_test',
+    password: 'test-password',
+    fullName: 'PIN hash test',
+    role: 'CASHIER',
+    pinCode: '2468',
+  });
+
+  const stored = q('SELECT pin_code AS pinCode FROM users WHERE id = ?', [created.id])[0];
+  assert.match(stored.pinCode, /^\$2[aby]\$/);
+  assert.equal(bcrypt.compareSync('2468', stored.pinCode), true);
+  assert.equal(Object.prototype.hasOwnProperty.call(auth.getAllUsers().find((user) => user.id === created.id) || {}, 'pinCode'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(auth.getUserById(created.id) || {}, 'pinCode'), false);
+  assert.throws(
+    () => auth.changeOwnPassword(created.id, 'test-password', 'new-password'),
+    /حسابك الحالي فقط/
+  );
+
+  AuthService.logout();
+  const forgedAdmin = { ...admin, id: 'forged-admin', role: 'ADMIN' };
+  assert.throws(
+    () => auth.createUser({
+      username: 'forged_actor_test',
+      password: 'test-password',
+      fullName: 'forged actor',
+      role: 'CASHIER',
+    }, 'usr_admin', forgedAdmin),
+    /يجب تسجيل الدخول/
+  );
+
+  db.run('DELETE FROM users WHERE id = ?', [created.id]);
+  AuthService.login('admin', 'admin123');
 });

@@ -263,14 +263,13 @@ export class AuthService {
 
   public getAllUsers(): User[] {
     PermissionService.require(AuthService.requireAuth(), 'users.view');
-    const rows = this.db.query<any>(`SELECT id, username, full_name, role, phone, pin_code, is_active, created_at, updated_at FROM users ORDER BY full_name ASC`);
+    const rows = this.db.query<any>(`SELECT id, username, full_name, role, phone, is_active, created_at, updated_at FROM users ORDER BY full_name ASC`);
     return rows.map(r => ({
       id: r.id,
       username: r.username,
       fullName: r.fullName,
       role: r.role,
       phone: r.phone,
-      pinCode: r.pinCode,
       isActive: Boolean(r.isActive),
       createdAt: r.createdAt,
       updatedAt: r.updatedAt
@@ -288,6 +287,7 @@ export class AuthService {
     if (roleExists.length === 0) {
       throw new Error('الدور المحدد غير موجود.');
     }
+    const pinHash = user.pinCode ? this.hashPin(user.pinCode) : null;
     const existing = this.db.query(`SELECT id FROM users WHERE username = ?`, [user.username]);
     if (existing.length > 0) {
       throw new Error('اسم المستخدم مسجل مسبقاً.');
@@ -300,7 +300,7 @@ export class AuthService {
     this.db.run(`
       INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-    `, [id, user.username, hash, user.fullName, user.role, user.phone || null, user.pinCode || null]);
+    `, [id, user.username, hash, user.fullName, user.role, user.phone || null, pinHash]);
 
     this.db.run(`
       INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
@@ -327,29 +327,40 @@ export class AuthService {
   // ─── Admin user management ──────────────────────────────────────────────────
 
   public getUserById(id: string): User | null {
+    PermissionService.require(AuthService.requireAuth(), 'users.view');
+    return this.getUserRecordById(id)?.user ?? null;
+  }
+
+  private getUserRecordById(id: string): { user: User; pinHash: string | null } | null {
     const row = this.db.query<any>(
       `SELECT id, username, full_name, role, phone, pin_code, is_active, created_at, updated_at
        FROM users WHERE id = ?`,
       [id]
     )[0];
-    return row ? this.mapUser(row) : null;
+    return row ? { user: this.mapUser(row), pinHash: row.pinCode || null } : null;
   }
 
   public updateUser(
     id: string,
-    patch: Partial<Pick<User, 'fullName' | 'role' | 'phone' | 'pinCode' | 'isActive'>>,
+    patch: Partial<Pick<User, 'fullName' | 'role' | 'phone' | 'isActive'>> & { pinCode?: string },
     actor?: User | null
   ): User {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'users.update');
-    const existing = this.getUserById(id);
-    if (!existing) throw new Error('المستخدم غير موجود.');
+    const record = this.getUserRecordById(id);
+    if (!record) throw new Error('المستخدم غير موجود.');
+    const existing = record.user;
     if (existing.id === subject.id && patch.isActive === false) {
       throw new Error('لا يمكنك تعطيل حسابك الحالي.');
     }
     if (existing.id === subject.id && patch.role && patch.role !== 'ADMIN' && existing.role === 'ADMIN') {
       throw new Error('لا يمكنك إزالة صلاحية مدير النظام عن حسابك الحالي.');
     }
+    const pinHash = patch.pinCode === undefined
+      ? record.pinHash
+      : patch.pinCode === ''
+        ? null
+        : this.hashPin(patch.pinCode);
 
     this.db.run(
       `UPDATE users SET full_name = ?, role = ?, phone = ?, pin_code = ?, is_active = ?, updated_at = ?
@@ -358,7 +369,7 @@ export class AuthService {
         patch.fullName ?? existing.fullName,
         patch.role ?? existing.role,
         patch.phone ?? existing.phone ?? null,
-        patch.pinCode ?? existing.pinCode ?? null,
+        pinHash,
         (patch.isActive ?? existing.isActive) ? 1 : 0,
         new Date().toISOString(),
         id,
@@ -366,14 +377,14 @@ export class AuthService {
     );
     this.audit(subject, 'تعديل بيانات مستخدم', 'USERS', id, existing, patch);
     PermissionService.invalidate(existing);
-    return this.getUserById(id)!;
+    return this.getUserRecordById(id)!.user;
   }
 
   public resetPassword(id: string, newPassword: string, actor?: User | null): void {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'users.reset_password');
     if (newPassword.length < 6) throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
-    const existing = this.getUserById(id);
+    const existing = this.getUserRecordById(id)?.user;
     if (!existing) throw new Error('المستخدم غير موجود.');
     const hash = bcrypt.hashSync(newPassword, bcrypt.genSaltSync(10));
     this.db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
@@ -385,7 +396,11 @@ export class AuthService {
   }
 
   public changeOwnPassword(userId: string, currentPassword: string, newPassword: string): void {
-    const row = this.db.query<any>('SELECT password_hash FROM users WHERE id = ?', [userId])[0];
+    const currentUser = AuthService.requireAuth();
+    if (currentUser.id !== userId) {
+      throw new Error('يمكنك تغيير كلمة مرور حسابك الحالي فقط.');
+    }
+    const row = this.db.query<any>('SELECT password_hash FROM users WHERE id = ?', [currentUser.id])[0];
     if (!row) throw new Error('المستخدم غير موجود.');
     if (!bcrypt.compareSync(currentPassword, row.passwordHash)) {
       throw new Error('كلمة المرور الحالية غير صحيحة.');
@@ -394,7 +409,7 @@ export class AuthService {
     this.db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
       bcrypt.hashSync(newPassword, bcrypt.genSaltSync(10)),
       new Date().toISOString(),
-      userId,
+      currentUser.id,
     ]);
   }
 
@@ -402,7 +417,7 @@ export class AuthService {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'users.delete');
     if (id === subject.id) throw new Error('لا يمكنك حذف حسابك الحالي.');
-    const existing = this.getUserById(id);
+    const existing = this.getUserRecordById(id)?.user;
     if (!existing) throw new Error('المستخدم غير موجود.');
     if (existing.username === 'admin') throw new Error('لا يمكن حذف حساب المدير الأساسي.');
     this.db.executeTransaction(() => {
@@ -414,6 +429,7 @@ export class AuthService {
   }
 
   public getLoginHistory(userId?: string, limit = 100): any[] {
+    PermissionService.require(AuthService.requireAuth(), 'users.view');
     const params: any[] = [];
     let where = '';
     if (userId) {
@@ -429,9 +445,15 @@ export class AuthService {
     );
   }
 
-  private requireActor(actor?: User | null): User {
-    const subject = actor ?? AuthService.currentUser ?? AuthService.requireAuth();
-    return subject;
+  private requireActor(_actor?: User | null): User {
+    return AuthService.requireAuth();
+  }
+
+  private hashPin(pin: string): string {
+    if (!/^\d{4,8}$/.test(pin)) {
+      throw new Error('رمز PIN يجب أن يتكون من 4 إلى 8 أرقام.');
+    }
+    return bcrypt.hashSync(pin, bcrypt.genSaltSync(10));
   }
 
   private mapUser(row: any): User {
@@ -441,7 +463,6 @@ export class AuthService {
       fullName: row.fullName,
       role: row.role,
       phone: row.phone,
-      pinCode: row.pinCode,
       isActive: Boolean(row.isActive),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

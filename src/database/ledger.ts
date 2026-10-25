@@ -32,7 +32,13 @@ export function queryLedgerRows<T extends Record<string, unknown>>(
 }
 
 function round2(value: number): number {
-  return Math.round((Number(value) || 0) * 100) / 100;
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round((amount + Number.EPSILON * Math.sign(amount)) * 100) / 100;
+}
+
+function cents(value: number): number {
+  return Math.round(value * 100);
 }
 
 export function paymentAccountCode(paymentType: string): string {
@@ -54,7 +60,8 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   )[0];
   if (prior) return prior.id;
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(posting.date) || Number.isNaN(Date.parse(`${posting.date}T00:00:00`))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(posting.date) || Number.isNaN(Date.parse(`${posting.date}T00:00:00Z`)) ||
+      new Date(`${posting.date}T00:00:00Z`).toISOString().slice(0, 10) !== posting.date) {
     throw new Error(`Invalid ledger posting date: ${posting.date}`);
   }
   if (!posting.description.trim() || !posting.referenceType || !posting.referenceId || !posting.createdBy) {
@@ -84,9 +91,11 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   }).filter((line) => line.debit > 0 || line.credit > 0);
 
   if (lines.length < 2) throw new Error('A ledger entry requires at least two non-zero lines.');
-  const totalDebit = round2(lines.reduce((sum, line) => sum + line.debit, 0));
-  const totalCredit = round2(lines.reduce((sum, line) => sum + line.credit, 0));
-  if (Math.abs(totalDebit - totalCredit) > 0.009) {
+  const totalDebitCents = lines.reduce((sum, line) => sum + cents(line.debit), 0);
+  const totalCreditCents = lines.reduce((sum, line) => sum + cents(line.credit), 0);
+  const totalDebit = totalDebitCents / 100;
+  const totalCredit = totalCreditCents / 100;
+  if (totalDebitCents !== totalCreditCents) {
     throw new Error(`Unbalanced ledger entry (${totalDebit} debit, ${totalCredit} credit).`);
   }
 
@@ -113,7 +122,7 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
       [`jvl_${uuidv4().slice(0, 8)}`, entryId, line.accountId, line.debit, line.credit, line.description?.trim() || null]
     );
     db.run('UPDATE chart_of_accounts SET balance = balance + ? WHERE id = ?', [
-      line.debit - line.credit,
+      round2(line.debit - line.credit),
       line.accountId,
     ]);
   }

@@ -1,7 +1,7 @@
 import React from 'react';
-import { FileSpreadsheet, Wallet, TrendingUp, BookOpen, RefreshCw, Calendar, Scale } from 'lucide-react';
+import { FileSpreadsheet, Wallet, TrendingUp, BookOpen, RefreshCw, Calendar, Scale, GitCompare } from 'lucide-react';
 
-export type FinancialStatementsTab = 'balance' | 'cash' | 'aging' | 'ledger';
+export type FinancialStatementsTab = 'balance' | 'cash' | 'aging' | 'ledger' | 'reconciliation';
 export type AgingType = 'customer' | 'supplier';
 
 const tabs = [
@@ -9,6 +9,7 @@ const tabs = [
   ['cash', 'التدفقات النقدية', TrendingUp],
   ['aging', 'أعمار الديون', Calendar],
   ['ledger', 'دفتر الأستاذ', BookOpen],
+  ['reconciliation', 'المصالحة', GitCompare],
 ] as const;
 
 export function FinancialStatementsHeader({

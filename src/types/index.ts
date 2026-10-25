@@ -21,7 +21,6 @@ export interface User {
   role: UserRole;
   phone?: string;
   isActive: boolean;
-  pinCode?: string;
   createdAt: string;
   updatedAt: string;
 }

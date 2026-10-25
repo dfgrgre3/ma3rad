@@ -6,6 +6,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { CustomerService } from '../src/services/CustomerService.ts';
+import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
 import { PurchaseService } from '../src/services/PurchaseService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { InventoryService } from '../src/services/InventoryService.ts';
@@ -164,6 +165,16 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   db.run(`INSERT INTO suppliers (id, code, name, phone, current_balance, total_purchases)
           VALUES (?,?,?,?,0,0)`, ['sup_test', 'SUP-T', 'مورد اختبار', '0100000001']);
   const created = new CustomerService().createCustomer({ name: 'عميل اختبار', phone: '0100000002', customerType: 'RETAIL', creditLimit: 0 });
+  const demand = new CustomerSupplyService().recordInvoiceDemand({
+    customerId: created.id,
+    invoiceId: 'invoice_customer_supply_test',
+    invoiceNumber: 'SUPPLY-TEST',
+    warehouseId: 'wh_main',
+    productId: pid,
+    productName: 'بلاطة اختبار',
+    quantityRequested: 20,
+    unitPrice: 300,
+  });
 
   const product = q('SELECT meters_per_box, pieces_per_box FROM products WHERE id=?', [pid])[0];
   const mPerBox = product.metersPerBox;
@@ -179,6 +190,11 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
     paidAmount: 0,
     paymentType: 'CREDIT',
   });
+  const allocatedDemand = q(
+    'SELECT quantity_received AS quantityReceived FROM customer_supply_request_items WHERE id = ?',
+    [demand.id]
+  )[0];
+  assert.equal(allocatedDemand.quantityReceived, 20, 'purchase receipt allocates customer demand as part of posting');
   const avgCost = q('SELECT cost_price FROM products WHERE id=?', [pid])[0].costPrice;
   assert.equal(avgCost, 133.33, 'weighted average cost should be 133.33');
 

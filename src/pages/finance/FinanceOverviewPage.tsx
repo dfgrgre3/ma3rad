@@ -74,7 +74,7 @@ export const FinanceOverviewPage: React.FC = () => {
       };
 
       const revRow = db.exec(
-        `SELECT COALESCE(SUM(total_amount),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
+        `SELECT COALESCE(SUM(subtotal - discount_amount + shipping_cost),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
         [thisMonth.from, thisMonth.to]
       );
       const expRow = db.exec(
@@ -97,11 +97,16 @@ export const FinanceOverviewPage: React.FC = () => {
         [thisMonth.from, thisMonth.to]
       );
       const grossProfit = Number(grossProfitRow[0]?.values[0]?.[0] || 0);
+      const shippingRevenueRow = db.exec(
+        `SELECT COALESCE(SUM(shipping_cost),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
+        [thisMonth.from, thisMonth.to]
+      );
+      const shippingRevenue = Number(shippingRevenueRow[0]?.values[0]?.[0] || 0);
 
       setMetrics({
         totalRevenue: rev,
         totalExpenses: exp,
-        netProfit: grossProfit - exp,
+        netProfit: grossProfit + shippingRevenue - exp,
         totalReceivables: Number(receivRow[0]?.values[0]?.[0] || 0),
         totalPayables: Number(payRow[0]?.values[0]?.[0] || 0),
         cashBalance: Number(cashRow[0]?.values[0]?.[0] || 0),

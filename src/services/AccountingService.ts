@@ -1,5 +1,13 @@
 import { DatabaseManager } from '../database/db';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
+
+function isValidDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
+    new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
+}
 
 export interface DashboardMetrics {
   todaySales: number;
@@ -27,7 +35,12 @@ export interface DashboardMetrics {
 export class AccountingService {
   private db = DatabaseManager.getInstance();
 
+  private requireView(permission: string): void {
+    PermissionService.require(AuthService.requireAuth(), permission);
+  }
+
   public getDashboardMetrics(): DashboardMetrics {
+    this.requireView('dashboard.view');
     const today = localDateString();
     const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
 
@@ -151,6 +164,7 @@ export class AccountingService {
   }
 
   public getSalesTrendLast7Days(): { date: string; sales: number; profit: number }[] {
+    this.requireView('dashboard.view');
     const results: { date: string; sales: number; profit: number }[] = [];
     const now = new Date();
 
@@ -176,6 +190,7 @@ export class AccountingService {
   }
 
   public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number }[] {
+    this.requireView('reports.view');
     return this.db.query<any>(`
       SELECT 
         p.name,
@@ -197,6 +212,7 @@ export class AccountingService {
     totalRemaining: number;
     invoices: any[];
   } {
+    this.requireView('finance.view');
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
 
@@ -240,6 +256,7 @@ export class AccountingService {
     byCategory: { category: string; total: number }[];
     expenses: any[];
   } {
+    this.requireView('finance.view');
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
 
@@ -283,56 +300,47 @@ export class AccountingService {
 
   public getProfitAndLossReport(dateFrom?: string, dateTo?: string): {
     revenue: number;
+    merchandiseRevenue: number;
+    shippingRevenue: number;
+    otherRevenue: number;
     costOfGoodsSold: number;
     grossProfit: number;
     expenses: number;
     netProfit: number;
     margin: number;
   } {
-    let salesWhere = 'WHERE invoice_status != \'VOID\'';
-    let expenseWhere = 'WHERE 1=1';
-    const salesParams: any[] = [];
-    const expenseParams: any[] = [];
-
-    if (dateFrom) {
-      salesWhere += ' AND date >= ?';
-      expenseWhere += ' AND date >= ?';
-      salesParams.push(dateFrom);
-      expenseParams.push(dateFrom);
+    this.requireView('finance.view');
+    if ((dateFrom && !isValidDate(dateFrom)) || (dateTo && !isValidDate(dateTo)) || (dateFrom && dateTo && dateFrom > dateTo)) {
+      throw new Error('Invalid profit and loss date range.');
     }
-    if (dateTo) {
-      salesWhere += ' AND date <= ?';
-      expenseWhere += ' AND date <= ?';
-      salesParams.push(dateTo);
-      expenseParams.push(dateTo);
-    }
-
-    const salesResult = this.db.query<any>(`
-      SELECT 
-        SUM(total_amount) as revenue,
-        SUM(total_cost) as cogs,
-        SUM(gross_profit) as grossProfit
-      FROM sales_invoices
-      ${salesWhere}
-    `, salesParams)[0] || {};
-
-    const expenseResult = this.db.query<any>(`
-      SELECT SUM(amount) as totalExpenses
-      FROM expenses
-      ${expenseWhere}
-    `, expenseParams)[0] || {};
-
-    const revenue = Number((salesResult.revenue || 0).toFixed(2));
-    const costOfGoodsSold = Number((salesResult.cogs || 0).toFixed(2));
-    const grossProfit = Number((salesResult.grossProfit || 0).toFixed(2));
-    const expenses = Number((expenseResult.totalExpenses || 0).toFixed(2));
-    const netProfit = Number((grossProfit - expenses).toFixed(2));
+    const conditions = ['e.is_posted = 1', "a.type IN ('REVENUE', 'EXPENSE')"];
+    const params: string[] = [];
+    if (dateFrom) { conditions.push('e.date >= ?'); params.push(dateFrom); }
+    if (dateTo) { conditions.push('e.date <= ?'); params.push(dateTo); }
+    const balances = this.db.query<{ code: string; type: string; amount: number }>(`
+      SELECT a.code, a.type,
+             ROUND(SUM(CASE WHEN a.type = 'REVENUE' THEN l.credit - l.debit ELSE l.debit - l.credit END), 2) AS amount
+      FROM journal_entries e
+      JOIN journal_entry_lines l ON l.entry_id = e.id
+      JOIN chart_of_accounts a ON a.id = l.account_id
+      WHERE ${conditions.join(' AND ')}
+      GROUP BY a.code, a.type
+    `, params);
+    const merchandiseRevenue = Number(balances.filter((row) => row.code === '4101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const shippingRevenue = Number(balances.filter((row) => row.code === '4102').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const otherRevenue = Number(balances.filter((row) => row.type === 'REVENUE' && !['4101', '4102'].includes(row.code)).reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const revenue = Number((merchandiseRevenue + shippingRevenue + otherRevenue).toFixed(2));
+    const costOfGoodsSold = Number(balances.filter((row) => row.type === 'EXPENSE' && row.code === '5101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const grossProfit = Number((merchandiseRevenue - costOfGoodsSold).toFixed(2));
+    const expenses = Number(balances.filter((row) => row.type === 'EXPENSE' && row.code !== '5101').reduce((sum, row) => sum + Number(row.amount || 0), 0).toFixed(2));
+    const netProfit = Number((grossProfit + shippingRevenue + otherRevenue - expenses).toFixed(2));
     const margin = revenue > 0 ? Number(((netProfit / revenue) * 100).toFixed(1)) : 0;
 
-    return { revenue, costOfGoodsSold, grossProfit, expenses, netProfit, margin };
+    return { revenue, merchandiseRevenue, shippingRevenue, otherRevenue, costOfGoodsSold, grossProfit, expenses, netProfit, margin };
   }
 
   public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number }[] {
+    this.requireView('reports.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
 
@@ -362,6 +370,7 @@ export class AccountingService {
   }
 
   public getBrandSalesReport(dateFrom?: string, dateTo?: string): { brandName: string; quantityM2: number; totalRevenue: number; profit: number }[] {
+    this.requireView('reports.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
 
@@ -395,6 +404,7 @@ export class AccountingService {
     totalSaleValue: number;
     byWarehouse: { warehouseName: string; costValue: number; saleValue: number; items: number }[];
   } {
+    this.requireView('finance.view');
     const byWarehouse = this.db.query<any>(`
       SELECT 
         w.name as warehouseName,
@@ -430,6 +440,7 @@ export class AccountingService {
     currentMonth: { sales: number; profit: number; invoices: number };
     previousMonth: { sales: number; profit: number; invoices: number };
   } {
+    this.requireView('dashboard.view');
     const now = new Date();
     const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
@@ -471,6 +482,7 @@ export class AccountingService {
   }
 
   public getTopCustomers(limit = 5): { name: string; totalPurchases: number; purchaseCount: number }[] {
+    this.requireView('customers.view');
     return this.db.query<any>(`
       SELECT 
         c.name,
@@ -486,6 +498,7 @@ export class AccountingService {
   }
 
   public getPaymentMethodDistribution(): { method: string; count: number; totalAmount: number }[] {
+    this.requireView('finance.view');
     return this.db.query<any>(`
       SELECT 
         payment_type as method,
@@ -499,6 +512,7 @@ export class AccountingService {
   }
 
   public getSalesByGrade(): { grade: string; quantityM2: number; totalRevenue: number }[] {
+    this.requireView('reports.view');
     return this.db.query<any>(`
       SELECT 
         p.grade,
@@ -519,6 +533,7 @@ export class AccountingService {
     amount?: number;
     date: string;
   }[] {
+    this.requireView('dashboard.view');
     const activities: any[] = [];
 
     // Recent sales

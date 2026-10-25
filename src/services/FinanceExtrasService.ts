@@ -108,9 +108,12 @@ export class FinanceExtrasService {
   getAccounts(): Account[] {
     this.requireView();
     return this.db.query<Account>(
-      `SELECT a.*, COALESCE(SUM(CASE WHEN a.type IN ('LIABILITY', 'EQUITY', 'REVENUE') THEN l.credit - l.debit ELSE l.debit - l.credit END), 0) AS computed_balance
+      `SELECT a.*, COALESCE(SUM(CASE WHEN e.is_posted = 1 THEN
+                CASE WHEN a.type IN ('LIABILITY', 'EQUITY', 'REVENUE') THEN l.credit - l.debit ELSE l.debit - l.credit END
+              ELSE 0 END), 0) AS computed_balance
        FROM chart_of_accounts a
        LEFT JOIN journal_entry_lines l ON l.account_id = a.id
+       LEFT JOIN journal_entries e ON e.id = l.entry_id
        GROUP BY a.id
        ORDER BY a.code ASC`
     );
@@ -211,7 +214,8 @@ export class FinanceExtrasService {
   }): string {
     const actor = this.requireManage();
     if (!input.description.trim()) throw new Error('بيان القيد مطلوب.');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(Date.parse(`${input.date}T00:00:00`))) throw new Error('تاريخ القيد غير صحيح.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(Date.parse(`${input.date}T00:00:00Z`)) ||
+        new Date(`${input.date}T00:00:00Z`).toISOString().slice(0, 10) !== input.date) throw new Error('تاريخ القيد غير صحيح.');
     if (!Array.isArray(input.lines)) throw new Error('سطور القيد غير صحيحة.');
     const lines = input.lines.map((line) => {
       const debit = Number(line.debit);
@@ -225,9 +229,11 @@ export class FinanceExtrasService {
       return { ...line, debit: roundedDebit, credit: roundedCredit };
     }).filter((line) => line.debit > 0 || line.credit > 0);
     if (lines.length < 2) throw new Error('القيد يحتاج إلى سطرين على الأقل.');
-    const totalDebit = round2(lines.reduce((sum, line) => sum + line.debit, 0));
-    const totalCredit = round2(lines.reduce((sum, line) => sum + line.credit, 0));
-    if (Math.abs(totalDebit - totalCredit) > 0.009) throw new Error('القيد غير متوازن: إجمالي المدين لا يساوي إجمالي الدائن.');
+    const debitCents = lines.reduce((sum, line) => sum + Math.round(line.debit * 100), 0);
+    const creditCents = lines.reduce((sum, line) => sum + Math.round(line.credit * 100), 0);
+    const totalDebit = debitCents / 100;
+    const totalCredit = creditCents / 100;
+    if (debitCents !== creditCents) throw new Error('القيد غير متوازن: إجمالي المدين لا يساوي إجمالي الدائن.');
 
     const id = `jv_${uuidv4().substring(0, 8)}`;
     this.db.executeTransaction((db) => {
@@ -242,7 +248,7 @@ export class FinanceExtrasService {
           `INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit, description) VALUES (?, ?, ?, ?, ?, ?)`,
           [`jvl_${uuidv4().substring(0, 8)}`, id, line.accountId, line.debit, line.credit, line.description?.trim() || null]
         );
-        db.run('UPDATE chart_of_accounts SET balance = balance + ? WHERE id = ?', [line.debit - line.credit, line.accountId]);
+        db.run('UPDATE chart_of_accounts SET balance = ROUND(balance + ?, 2) WHERE id = ?', [line.debit - line.credit, line.accountId]);
       }
     });
     return id;
@@ -255,7 +261,7 @@ export class FinanceExtrasService {
     const lines = this.getJournalLines(id);
     this.db.executeTransaction((db) => {
       for (const line of lines) {
-        db.run('UPDATE chart_of_accounts SET balance = balance - ? WHERE id = ?', [line.debit - line.credit, line.accountId]);
+        db.run('UPDATE chart_of_accounts SET balance = ROUND(balance - ?, 2) WHERE id = ?', [line.debit - line.credit, line.accountId]);
       }
       db.run('DELETE FROM journal_entry_lines WHERE entry_id = ?', [id]);
       db.run('DELETE FROM journal_entries WHERE id = ?', [id]);
@@ -479,7 +485,7 @@ export class FinanceExtrasService {
       for (const line of [{ accountId: expense.id, debit: amount, credit: 0 }, { accountId: accumulated.id, debit: 0, credit: amount }]) {
         db.run('INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit, description) VALUES (?, ?, ?, ?, ?, ?)',
           [`jvl_${uuidv4().substring(0, 8)}`, entryId, line.accountId, line.debit, line.credit, asset.name]);
-        db.run('UPDATE chart_of_accounts SET balance = balance + ? WHERE id = ?', [line.debit - line.credit, line.accountId]);
+        db.run('UPDATE chart_of_accounts SET balance = ROUND(balance + ?, 2) WHERE id = ?', [line.debit - line.credit, line.accountId]);
       }
       db.run(
         'UPDATE fixed_assets SET accumulated_depreciation = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',

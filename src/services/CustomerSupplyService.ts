@@ -1,6 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 
 export type CustomerSupplyStatus = 'OPEN' | 'PARTIAL' | 'READY' | 'CANCELLED';
 
@@ -82,6 +83,7 @@ export class CustomerSupplyService {
   }
 
   public getOpenRequests(filters: { customerId?: string; warehouseId?: string; search?: string } = {}): CustomerSupplyRequest[] {
+    PermissionService.require(AuthService.requireAuth(), 'customers.view');
     this.ensureTables();
     const params: any[] = [];
     let sql = `
@@ -105,7 +107,8 @@ export class CustomerSupplyService {
     }
     if (filters.search && filters.search.trim()) {
       const term = `%${filters.search.trim()}%`;
-      sql += ` AND (c.name LIKE ? OR c.phone LIKE ? OR r.invoice_number LIKE ? OR p.product_name LIKE ?)`;
+      sql += ` AND (c.name LIKE ? OR c.phone LIKE ? OR r.invoice_number LIKE ?
+        OR EXISTS (SELECT 1 FROM customer_supply_request_items i WHERE i.request_id = r.id AND i.product_name LIKE ?))`;
       params.push(term, term, term, term);
     }
     sql += ` ORDER BY r.created_at DESC`;
@@ -138,6 +141,7 @@ export class CustomerSupplyService {
     expectedDate?: string | null;
     notes?: string | null;
   }): CustomerSupplyRequestItem {
+    PermissionService.require(AuthService.requireAuth(), 'sales.create');
     this.ensureTables();
     const quantity = Number(input.quantityRequested || 0);
     if (!(quantity > 0)) throw new Error('يجب إدخال كمية أكبر من صفر للمنتج المطلوب.');
@@ -153,17 +157,21 @@ export class CustomerSupplyService {
 
     const existing = this.db.query<any>(`SELECT * FROM customer_supply_request_items WHERE request_id = ? AND product_id = ?`, [requestId, input.productId])[0];
     const unitPrice = Number(input.unitPrice || 0);
-    const totalPrice = unitPrice * quantity;
+    const totalPrice = Math.round(unitPrice * quantity * 100) / 100;
 
     if (existing) {
       const nextRequested = Number(existing.quantity_requested) + quantity;
       const nextRemaining = Math.max(0, nextRequested - Number(existing.quantity_received));
       const nextStatus = nextRemaining <= 0 ? 'READY' : (Number(existing.quantity_received) > 0 ? 'PARTIAL' : 'OPEN');
+      // Preserve the value of earlier demand if the newly requested quantity
+      // has a different price; unit_price remains the blended request price.
+      const nextTotalPrice = Math.round((Number(existing.total_price || 0) + totalPrice) * 100) / 100;
+      const nextUnitPrice = nextRequested > 0 ? nextTotalPrice / nextRequested : unitPrice;
       this.db.run(`
         UPDATE customer_supply_request_items
         SET quantity_requested = ?, quantity_remaining = ?, total_price = ?, unit_price = ?, status = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `, [nextRequested, nextRemaining, totalPrice, unitPrice, nextStatus, existing.id]);
+      `, [nextRequested, nextRemaining, nextTotalPrice, nextUnitPrice, nextStatus, existing.id]);
       this.refreshRequestStatus(requestId);
       return this.getItemById(existing.id)!;
     }
@@ -196,12 +204,13 @@ export class CustomerSupplyService {
     return this.getItemById(itemId)!;
   }
 
-  public allocateReceivedQuantity(warehouseId: string, productId: string, receivedQuantity: number): number {
+  public allocateReceivedQuantity(warehouseId: string, productId: string, receivedQuantity: number, db = this.db): number {
+    PermissionService.require(AuthService.requireAuth(), 'purchases.create');
     this.ensureTables();
     const qty = Number(receivedQuantity || 0);
     if (!(qty > 0)) return 0;
 
-    const rows = this.db.query<any>(`
+    const rows = db.query<any>(`
       SELECT i.id, i.request_id, i.quantity_requested, i.quantity_received, i.quantity_remaining, i.status,
              r.customer_id, r.invoice_id, r.invoice_number
       FROM customer_supply_request_items i
@@ -221,21 +230,21 @@ export class CustomerSupplyService {
       const nextReceived = Number(row.quantity_received) + alloc;
       const nextRemaining = Math.max(0, Number(row.quantity_requested) - nextReceived);
       const nextStatus = nextRemaining <= 0 ? 'READY' : 'PARTIAL';
-      this.db.run(`UPDATE customer_supply_request_items SET quantity_received = ?, quantity_remaining = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextReceived, nextRemaining, nextStatus, row.id]);
+      db.run(`UPDATE customer_supply_request_items SET quantity_received = ?, quantity_remaining = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextReceived, nextRemaining, nextStatus, row.id]);
       remainingToAllocate -= alloc;
     }
 
     for (const row of rows) {
-      const refreshed = this.db.query<any>(`SELECT quantity_requested, quantity_received, quantity_remaining, status FROM customer_supply_request_items WHERE id = ?`, [row.id])[0];
+      const refreshed = db.query<any>(`SELECT quantity_requested, quantity_received, quantity_remaining, status FROM customer_supply_request_items WHERE id = ?`, [row.id])[0];
       if (refreshed && refreshed.quantity_remaining <= 0) {
-        this.db.run(`UPDATE customer_supply_request_items SET status = 'READY', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [row.id]);
+        db.run(`UPDATE customer_supply_request_items SET status = 'READY', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [row.id]);
       }
     }
 
     // Refresh parent request statuses after inventory allocation.
     const requestIds = Array.from(new Set(rows.map((row) => row.request_id)));
     for (const requestId of requestIds) {
-      this.refreshRequestStatus(requestId);
+      this.refreshRequestStatus(requestId, db);
     }
 
     return qty - remainingToAllocate;
@@ -290,16 +299,16 @@ export class CustomerSupplyService {
     return requestId;
   }
 
-  private refreshRequestStatus(requestId: string): void {
-    const items = this.db.query<any>(`SELECT status, quantity_requested, quantity_received FROM customer_supply_request_items WHERE request_id = ?`, [requestId]);
+  private refreshRequestStatus(requestId: string, db = this.db): void {
+    const items = db.query<any>(`SELECT status, quantity_requested, quantity_received FROM customer_supply_request_items WHERE request_id = ?`, [requestId]);
     if (!items.length) {
-      this.db.run(`UPDATE customer_supply_requests SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [requestId]);
+      db.run(`UPDATE customer_supply_requests SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [requestId]);
       return;
     }
 
     const allReady = items.every((item) => Number(item.quantity_received) >= Number(item.quantity_requested) || item.status === 'READY');
     const hasProgress = items.some((item) => Number(item.quantity_received) > 0 || item.status === 'PARTIAL');
     const nextStatus = allReady ? 'READY' : (hasProgress ? 'PARTIAL' : 'OPEN');
-    this.db.run(`UPDATE customer_supply_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextStatus, requestId]);
+    db.run(`UPDATE customer_supply_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextStatus, requestId]);
   }
 }

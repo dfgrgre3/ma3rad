@@ -34,6 +34,8 @@ export const App: React.FC = () => {
   const backupTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dbReady, setDbReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [recoveryRequired, setRecoveryRequired] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showSetup, setShowSetup] = useState(false);
 
@@ -53,6 +55,7 @@ export const App: React.FC = () => {
   // ── DB Init ─────────────────────────────────────────────────────────────────
   const initDb = () => {
     setInitError(null);
+    setRecoveryRequired(false);
     DatabaseManager.getInstance()
       .initialize()
       .then(() => {
@@ -91,7 +94,24 @@ export const App: React.FC = () => {
       .catch((err) => {
         console.error('Failed to initialize SQLite Database:', err);
         setInitError(err?.message || 'حدث خطأ أثناء تحميل قاعدة البيانات');
+        setRecoveryRequired(err?.code === 'DATABASE_RECOVERY_REQUIRED');
       });
+  };
+
+  const createFreshDatabase = async () => {
+    const confirmed = window.confirm(
+      'سيتم أرشفة ملف قاعدة البيانات الحالي وبدء قاعدة جديدة فارغة. لن تُحذف النسخة السابقة. هل تريد المتابعة؟'
+    );
+    if (!confirmed) return;
+    setRecoveryBusy(true);
+    try {
+      await DatabaseManager.getInstance().createFreshAfterRecovery();
+      initDb();
+    } catch (error) {
+      setInitError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRecoveryBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -181,6 +201,15 @@ export const App: React.FC = () => {
             >
               إعادة المحاولة
             </button>
+            {recoveryRequired && window.ceramisys?.db?.createFreshAfterRecovery && (
+              <button
+                onClick={() => void createFreshDatabase()}
+                disabled={recoveryBusy}
+                className="px-6 py-2.5 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-sm font-bold shadow-lg transition-all disabled:opacity-50"
+              >
+                {recoveryBusy ? 'جارٍ أرشفة القاعدة...' : 'أرشفة القاعدة وبدء قاعدة جديدة'}
+              </button>
+            )}
           </div>
         ) : (
           <p className="text-xs text-sky-600 font-medium animate-pulse">

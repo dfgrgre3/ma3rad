@@ -1,4 +1,6 @@
 import { DatabaseManager } from '../database/db';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 
 export interface DebtRow {
@@ -21,7 +23,12 @@ export interface DebtRow {
 export class DebtService {
   private db = DatabaseManager.getInstance();
 
+  private requireView(): void {
+    PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
+  }
+
   public getDebts(search = ''): DebtRow[] {
+    this.requireView();
     const term = `%${search.trim()}%`;
     const customers = this.db.query<DebtRow>(
       `SELECT c.id,c.name,c.phone,CASE WHEN COALESCE(inv.invoiceRemaining,0)>0.009 THEN inv.invoiceRemaining ELSE c.current_balance END AS amount,c.credit_limit AS creditLimit,c.updated_at AS updatedAt,
@@ -54,6 +61,7 @@ export class DebtService {
   }
 
   public getTotals(): { receivable: number; payable: number; net: number } {
+    this.requireView();
     const receivable = Number(this.db.query<{ v: number }>(
       `SELECT COALESCE(SUM(CASE WHEN COALESCE(inv.invoiceRemaining,0)>0.009 THEN inv.invoiceRemaining ELSE c.current_balance END),0) AS v
        FROM customers c LEFT JOIN (SELECT customer_id,SUM(remaining_amount) AS invoiceRemaining FROM sales_invoices WHERE invoice_status <> 'VOID' GROUP BY customer_id) inv ON inv.customer_id=c.id

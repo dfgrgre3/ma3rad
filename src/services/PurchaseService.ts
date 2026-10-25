@@ -269,6 +269,10 @@ export class PurchaseService {
         VALUES (?, ?, ?, 'إدخال فاتورة مشتريات وتوريد', 'PURCHASES', ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, actor.fullName, purchaseId, JSON.stringify({ invoiceNumber, totalAmount })]);
 
+      for (const item of dto.items) {
+        new CustomerSupplyService().allocateReceivedQuantity(dto.warehouseId, item.productId, item.quantityM2, sqliteDb);
+      }
+
       return {
         id: purchaseId,
         invoiceNumber,
@@ -292,9 +296,6 @@ export class PurchaseService {
       };
     });
 
-    for (const item of dto.items) {
-      new CustomerSupplyService().allocateReceivedQuantity(dto.warehouseId, item.productId, item.quantityM2);
-    }
     return invoice;
   }
 

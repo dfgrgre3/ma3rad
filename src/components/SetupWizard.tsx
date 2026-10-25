@@ -42,6 +42,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       showroomName: current?.showroomName || '',
       phone: current?.phone || '',
       address: current?.address || '',
+      taxNumber: current?.taxNumber || '',
+      commercialRecord: current?.commercialRecord || '',
       currency: current?.currency || 'EGP',
       currencySymbol: current?.currencySymbol || 'ج.م',
       taxPercentage: String(current?.defaultTaxPercentage ?? 0),
@@ -83,6 +85,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         showroomName: form.showroomName.trim(),
         phone: form.phone.trim(),
         address: form.address.trim(),
+        taxNumber: form.taxNumber.trim(),
+        commercialRecord: form.commercialRecord.trim(),
         currency: form.currency,
         currencySymbol: currencySymbol,
         defaultTaxPercentage: Number(form.taxPercentage) || 0,
@@ -162,6 +166,17 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               <div>
                 <label className={labelClass}>العنوان</label>
                 <input value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} placeholder="المدينة - الشارع" />
+              </div>
+              <p className="text-xs font-semibold text-slate-600">بيانات التسجيل الاختيارية</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>الرقم الضريبي</label>
+                  <input value={form.taxNumber} onChange={(e) => set('taxNumber', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>السجل التجاري</label>
+                  <input value={form.commercialRecord} onChange={(e) => set('commercialRecord', e.target.value)} className={inputClass} />
+                </div>
               </div>
             </div>
           )}

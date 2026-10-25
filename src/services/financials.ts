@@ -1,12 +1,20 @@
 // Pure, dependency-free financial & ceramic domain calculations.
 // Centralized here so the exact same logic is executed by services AND tested by node --test.
-// NOTE on currency precision (brief §224): the SQLite schema currently stores money as REAL.
-// These helpers round to 2 decimal places consistently to minimize IEEE-754 drift, but a
-// future hardening step should migrate monetary columns to integer minor-units (cents).
+// Money values cross service boundaries in major currency units. Convert to integer
+// minor units for each calculation; persistence migration remains a separate concern.
 
-export function round2(n: number): number {
-  if (!Number.isFinite(n)) return 0;
-  return Math.round((n + Number.EPSILON) * 100) / 100;
+export function toMinorUnits(amount: number): number {
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round((amount + Math.sign(amount) * Number.EPSILON) * 100);
+}
+
+export function fromMinorUnits(amount: number): number {
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round(amount) / 100;
+}
+
+export function round2(amount: number): number {
+  return fromMinorUnits(toMinorUnits(amount));
 }
 
 export interface SaleLineInput {
@@ -26,11 +34,11 @@ export interface SaleLineResult {
 
 export function computeSaleLine(input: SaleLineInput): SaleLineResult {
   const qty = Math.max(0, input.quantity || 0);
-  const subtotal = round2(qty * (input.unitPrice || 0));
-  const discount = round2(Math.max(0, input.discountAmount || 0));
-  const total = round2(Math.max(0, subtotal - discount));
-  const cost = round2(qty * (input.unitCost || 0));
-  const profit = round2(total - cost);
+  const subtotal = fromMinorUnits(toMinorUnits(qty * (input.unitPrice || 0)));
+  const discount = fromMinorUnits(toMinorUnits(Math.max(0, input.discountAmount || 0)));
+  const total = fromMinorUnits(Math.max(0, toMinorUnits(subtotal) - toMinorUnits(discount)));
+  const cost = fromMinorUnits(toMinorUnits(qty * (input.unitCost || 0)));
+  const profit = fromMinorUnits(toMinorUnits(total) - toMinorUnits(cost));
   return {
     lineSubtotal: subtotal,
     lineDiscount: discount,
@@ -64,17 +72,24 @@ export interface SaleTotalsResult {
 }
 
 export function computeSaleTotals(input: SaleTotalsInput): SaleTotalsResult {
-  const subtotal = round2(input.lines.reduce((s, l) => s + l.lineTotal, 0));
-  const discountAmount = round2(Math.max(0, input.discountAmount || 0));
-  const taxAmount = round2(Math.max(0, input.taxAmount || 0));
-  const shippingCost = round2(Math.max(0, input.shippingCost || 0));
-  const totalAmount = round2(subtotal - discountAmount + taxAmount + shippingCost);
-  const paidAmount = round2(Math.max(0, input.paidAmount || 0));
-  const remainingAmount = round2(Math.max(0, totalAmount - paidAmount));
+  const subtotalMinor = input.lines.reduce((sum, line) => sum + toMinorUnits(line.lineTotal), 0);
+  const subtotal = fromMinorUnits(subtotalMinor);
+  const discountMinor = toMinorUnits(Math.max(0, input.discountAmount || 0));
+  const discountAmount = fromMinorUnits(discountMinor);
+  const taxMinor = toMinorUnits(Math.max(0, input.taxAmount || 0));
+  const taxAmount = fromMinorUnits(taxMinor);
+  const shippingMinor = toMinorUnits(Math.max(0, input.shippingCost || 0));
+  const shippingCost = fromMinorUnits(shippingMinor);
+  const totalMinor = subtotalMinor - discountMinor + taxMinor + shippingMinor;
+  const totalAmount = fromMinorUnits(totalMinor);
+  const paidMinor = toMinorUnits(Math.max(0, input.paidAmount || 0));
+  const paidAmount = fromMinorUnits(paidMinor);
+  const remainingAmount = fromMinorUnits(Math.max(0, totalMinor - paidMinor));
   const paymentStatus: PaymentStatus =
     remainingAmount <= 0 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID';
-  const totalCost = round2(input.lines.reduce((s, l) => s + l.lineCost, 0));
-  const grossProfit = round2(totalAmount - totalCost);
+  const totalCostMinor = input.lines.reduce((sum, line) => sum + toMinorUnits(line.lineCost), 0);
+  const totalCost = fromMinorUnits(totalCostMinor);
+  const grossProfit = fromMinorUnits(subtotalMinor - discountMinor - totalCostMinor);
   return {
     subtotal,
     discountAmount,
@@ -137,7 +152,8 @@ export function computeReturnImpact(input: ReturnImpactInput): ReturnImpactResul
   const invoicePaid = round2(input.invoicePaid || 0);
   const returnTotal = round2(Math.max(0, input.returnTotal || 0));
   const paidRatio = invoiceTotal > 0 ? Math.min(1, invoicePaid / invoiceTotal) : 0;
-  const cashRefund = input.refundCash ? round2(returnTotal * paidRatio) : 0;
-  const balanceDelta = round2(returnTotal - cashRefund);
+  const returnMinor = toMinorUnits(returnTotal);
+  const cashRefund = input.refundCash ? fromMinorUnits(toMinorUnits(returnTotal * paidRatio)) : 0;
+  const balanceDelta = fromMinorUnits(returnMinor - toMinorUnits(cashRefund));
   return { paidRatio, cashRefund, balanceDelta };
 }

@@ -1,4 +1,6 @@
 import { DatabaseManager } from '../database/db';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 
@@ -120,11 +122,16 @@ const num = (value: unknown) => Number(value) || 0;
 export class DailyOperationsService {
   private db = DatabaseManager.getInstance();
 
+  private requireView(permission: string): void {
+    PermissionService.require(AuthService.requireAuth(), permission);
+  }
+
   public today(): string {
     return localDateString();
   }
 
   public getSales(date = this.today()): DailySalesResult {
+    this.requireView('sales.view');
     const day = dateOnly(date);
     const rows = this.db.query<DailySalesRow>(
       `SELECT si.id, si.invoice_number AS invoiceNumber, si.date, si.created_at AS createdAt,
@@ -158,6 +165,7 @@ export class DailyOperationsService {
   }
 
   public getPurchases(date = this.today()): DailyPurchaseResult {
+    this.requireView('purchases.view');
     const day = dateOnly(date);
     const rows = this.db.query<DailyPurchaseRow>(
       `SELECT pi.id, pi.invoice_number AS invoiceNumber, pi.date, pi.created_at AS createdAt,
@@ -190,6 +198,7 @@ export class DailyOperationsService {
   }
 
   public getExpenses(date = this.today()): DailyExpenseResult {
+    this.requireView('cashier.view');
     const day = dateOnly(date);
     const rows = this.db.query<DailyExpenseRow>(
       `SELECT e.id, e.category, e.description, e.amount, e.date, e.created_at AS createdAt,
@@ -223,6 +232,7 @@ export class DailyOperationsService {
   }
 
   public getDebts(date = this.today()): DailyDebtResult {
+    this.requireView('finance.debts.view');
     const day = dateOnly(date);
     const rows = this.db.query<DailyDebtRow>(
       `SELECT si.id, si.invoice_number AS invoiceNumber, si.date,

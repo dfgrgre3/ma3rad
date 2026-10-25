@@ -101,14 +101,9 @@ export class SettingsService {
   }
 
   /** Read + write without UI concerns. Writes are validated and audited. */
-  public static update(patch: SettingsPatch, actor?: User | null): SystemSettings {
-    const current = AuthService.getCurrentUser();
-    const user = actor ?? current;
-    if (user) {
-      PermissionService.require(user, 'settings.update');
-    } else {
-      PermissionService.require(AuthService.requireAuth(), 'settings.update');
-    }
+  public static update(patch: SettingsPatch, _actor?: User | null): SystemSettings {
+    const user = AuthService.requireAuth();
+    PermissionService.require(user, 'settings.update');
 
     const normalized = SettingsService.validate(patch);
     const db = SettingsService.db();
@@ -128,8 +123,12 @@ export class SettingsService {
 
     db.executeTransaction((tx) => {
       if (after.costingMethod === 'FIFO' && before.costingMethod !== 'FIFO') {
-        tx.run('DELETE FROM inventory_cost_allocations');
-        tx.run('DELETE FROM inventory_cost_layers');
+        const historicalCosts = tx.query<{ count: number }>(`SELECT
+          (SELECT COUNT(*) FROM inventory_cost_allocations) +
+          (SELECT COUNT(*) FROM inventory_cost_layers) AS count`)[0]?.count || 0;
+        if (historicalCosts > 0) {
+          throw new Error('لا يمكن تفعيل FIFO تلقائيًا مع وجود سجل تكلفة سابق. احتفظ بالسجلات الحالية ونفّذ تحويلًا مرحليًا قابلًا للتدقيق.');
+        }
         const openingRows = tx.query<any>(`SELECT ws.product_id AS productId,ws.warehouse_id AS warehouseId,
           ws.quantity_m2 AS quantity,p.cost_price AS unitCost FROM warehouse_stock ws
           JOIN products p ON p.id=ws.product_id WHERE ws.quantity_m2>0`);

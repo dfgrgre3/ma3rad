@@ -27,7 +27,7 @@ const emptyForm: UserForm = {
   fullName: '',
   role: 'CASHIER',
   phone: '',
-  pinCode: '1234',
+  pinCode: '',
 };
 
 export const AdminUsersTab: React.FC = () => {
@@ -82,7 +82,7 @@ export const AdminUsersTab: React.FC = () => {
       fullName: user.fullName,
       role: user.role,
       phone: user.phone || '',
-      pinCode: user.pinCode || '',
+      pinCode: '',
     });
     setModal('edit');
   };
@@ -134,7 +134,7 @@ export const AdminUsersTab: React.FC = () => {
           fullName: form.fullName.trim(),
           role: form.role,
           phone: form.phone,
-          pinCode: form.pinCode,
+          pinCode: form.pinCode || undefined,
           isActive: active.isActive,
         }),
       'تم تحديث بيانات المستخدم.'
@@ -280,7 +280,7 @@ export const AdminUsersTab: React.FC = () => {
                 </select>
               </Field>
               <Field label="رمز PIN">
-                <input value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value })} className={`${inputCls} font-mono`} />
+                <input inputMode="numeric" autoComplete="off" maxLength={8} value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value })} className={`${inputCls} font-mono`} />
               </Field>
             </div>
             <Field label="الهاتف">
@@ -304,7 +304,7 @@ export const AdminUsersTab: React.FC = () => {
                 </select>
               </Field>
               <Field label="رمز PIN">
-                <input value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value })} className={`${inputCls} font-mono`} />
+                <input inputMode="numeric" autoComplete="off" maxLength={8} value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value })} className={`${inputCls} font-mono`} placeholder="اتركه فارغاً للإبقاء على الحالي" />
               </Field>
             </div>
             <Field label="الهاتف">

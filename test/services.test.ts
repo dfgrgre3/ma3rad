@@ -19,6 +19,8 @@ import { postLedgerEntry } from '../src/database/ledger.ts';
 import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { InventoryCostingService } from '../src/services/InventoryCostingService.ts';
 import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
+import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
+import { SettingsService } from '../src/services/SettingsService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -26,6 +28,77 @@ function q(sql: string, params: any[] = []): any[] {
 
 test('business date uses the local calendar day', () => {
   assert.equal(localDateString(new Date(2026, 9, 24, 0, 0, 0)), '2026-10-24');
+});
+
+test('customer supply demand accumulates quantity and total value across added quantities', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const customer = new CustomerService().createCustomer({
+    name: 'Customer supply total test',
+    phone: '0199000042',
+    customerType: 'RETAIL',
+    creditLimit: 0,
+  });
+  const service = new CustomerSupplyService();
+  const base = {
+    customerId: customer.id,
+    invoiceId: 'invoice_supply_total_test',
+    invoiceNumber: 'SUPPLY-TOTAL-TEST',
+    warehouseId: 'wh_main',
+    productId: 'prod_supply_total_test',
+    productName: 'Supply total test',
+  };
+
+  service.recordInvoiceDemand({ ...base, quantityRequested: 10, unitPrice: 100 });
+  const updated = service.recordInvoiceDemand({ ...base, quantityRequested: 5, unitPrice: 120 });
+  assert.equal(updated.quantityRequested, 15);
+  assert.equal(updated.totalPrice, 1600);
+  assert.equal(updated.unitPrice, 106.67);
+
+  AuthService.logout();
+  assert.throws(() => service.getOpenRequests(), /يجب تسجيل الدخول/);
+  db.run('DELETE FROM customer_supply_requests WHERE invoice_id = ?', [base.invoiceId]);
+  db.run('DELETE FROM customers WHERE id = ?', [customer.id]);
+  AuthService.login('admin', 'admin123');
+});
+
+test('profit and loss reconciles merchandise gross profit with invoices and separates shipping revenue', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const db = manager.getDatabase();
+  const today = localDateString();
+  let report: ReturnType<AccountingService['getProfitAndLossReport']>;
+
+  db.run('BEGIN TRANSACTION');
+  try {
+    postLedgerEntry(db, {
+      date: today,
+      description: 'Profit policy reconciliation test',
+      referenceType: 'TEST_PROFIT_POLICY',
+      referenceId: 'profit_policy_reconciliation',
+      createdBy: 'usr_admin',
+      lines: [
+        { accountCode: '1101', debit: 115, credit: 0 },
+        { accountCode: '5101', debit: 60, credit: 0 },
+        { accountCode: '5201', debit: 10, credit: 0 },
+        { accountCode: '4101', debit: 0, credit: 100 },
+        { accountCode: '4102', debit: 0, credit: 25 },
+        { accountCode: '1104', debit: 0, credit: 60 },
+      ],
+    });
+    report = new AccountingService().getProfitAndLossReport(today, today);
+    assert.equal(report.merchandiseRevenue, 100);
+    assert.equal(report.shippingRevenue, 25);
+    assert.equal(report.revenue, 125);
+    assert.equal(report.grossProfit, 40);
+    assert.equal(report.netProfit, 55);
+  } finally {
+    db.run('ROLLBACK');
+  }
 });
 
 test('FIFO cost layers consume oldest lots first and can restore a returned issue', async () => {
@@ -50,6 +123,23 @@ test('FIFO cost layers consume oldest lots first and can restore a returned issu
   assert.equal(InventoryCostingService.previewRestoreCost(db,issueId,2),10);
   InventoryCostingService.restoreIssue(db,issueId,2);
   assert.equal(db.query<any>('SELECT quantity_remaining AS q FROM inventory_cost_layers WHERE id=?',[firstLayer])[0].q,2);
+});
+
+test('enabling FIFO refuses destructive conversion when cost history exists', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  AuthService.login('admin', 'admin123');
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'AVERAGE_COST')`);
+  const layersBefore = q('SELECT COUNT(*) AS count FROM inventory_cost_layers')[0].count;
+  const allocationsBefore = q('SELECT COUNT(*) AS count FROM inventory_cost_allocations')[0].count;
+
+  assert.throws(
+    () => SettingsService.update({ costingMethod: 'FIFO' }),
+    /سجل تكلفة سابق/
+  );
+  assert.equal(q('SELECT COUNT(*) AS count FROM inventory_cost_layers')[0].count, layersBefore);
+  assert.equal(q('SELECT COUNT(*) AS count FROM inventory_cost_allocations')[0].count, allocationsBefore);
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'FIFO')`);
 });
 
 test('dashboard metrics handle an empty database without a top customer', async () => {

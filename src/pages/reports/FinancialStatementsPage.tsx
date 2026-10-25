@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { FinancialStatementsService } from '../../services/FinancialStatementsService';
-import type { BalanceSheet, CashFlowMonth, AgingRow, AgingBucket, LedgerLine } from '../../services/FinancialStatementsService';
+import type { BalanceSheet, CashFlowMonth, AgingRow, AgingBucket, LedgerLine, ReconciliationCheck } from '../../services/FinancialStatementsService';
 import { exportToExcel } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
 import { localDateString } from '../../utils/date';
@@ -9,6 +9,7 @@ import { BalanceSheetPanel } from '../../components/reports/financial-statements
 import { CashFlowPanel } from '../../components/reports/financial-statements/CashFlowPanel';
 import { AgingPanel } from '../../components/reports/financial-statements/AgingPanel';
 import { GeneralLedgerPanel } from '../../components/reports/financial-statements/GeneralLedgerPanel';
+import { ReconciliationPanel } from '../../components/reports/financial-statements/ReconciliationPanel';
 import { FinancialStatementsHeader } from '../../components/reports/financial-statements/FinancialStatementsHeader';
 import type { AgingType, FinancialStatementsTab } from '../../components/reports/financial-statements/FinancialStatementsHeader';
 
@@ -34,6 +35,7 @@ export const FinancialStatementsPage: React.FC = () => {
   const [accounts, setAccounts] = useState<Array<{ id: string; code: string; name: string; type: string }>>([]);
   const [accountId, setAccountId] = useState('');
   const [ledger, setLedger] = useState<{ opening: number; lines: LedgerLine[]; closing: number } | null>(null);
+  const [reconciliation, setReconciliation] = useState<ReconciliationCheck[] | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -41,6 +43,7 @@ export const FinancialStatementsPage: React.FC = () => {
       if (tab === 'balance') setBalance(service.getBalanceSheet(asOf));
       if (tab === 'cash') setCash(service.getCashFlow(from, to));
       if (tab === 'aging') setAging(agingType === 'customer' ? service.getCustomerAging(asOf) : service.getSupplierAging(asOf));
+      if (tab === 'reconciliation') setReconciliation(service.getReconciliation());
       if (tab === 'ledger') {
         const list = accounts.length ? accounts : service.getAccountsForLedger();
         if (!accounts.length) setAccounts(list);
@@ -57,7 +60,7 @@ export const FinancialStatementsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab, agingType]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab, agingType, asOf, from, to, accountId]);
 
   const exportBalance = () => {
     if (!balance) return;
@@ -124,6 +127,8 @@ export const FinancialStatementsPage: React.FC = () => {
               setLedger(nextAccountId ? service.getGeneralLedger(nextAccountId, from, to) : null);
             }}
           />
+        ) : tab === 'reconciliation' && reconciliation ? (
+          <ReconciliationPanel checks={reconciliation} />
         ) : null}
       </div>
     </div>

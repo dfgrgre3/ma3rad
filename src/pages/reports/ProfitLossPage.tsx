@@ -7,13 +7,26 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
 const today = () => localDateString();
 
-type PnL = { revenue: number; costOfGoodsSold: number; grossProfit: number; expenses: number; netProfit: number; margin: number };
+type PnL = {
+  revenue: number;
+  merchandiseRevenue: number;
+  shippingRevenue: number;
+  otherRevenue: number;
+  costOfGoodsSold: number;
+  grossProfit: number;
+  expenses: number;
+  netProfit: number;
+  margin: number;
+};
 
 export const ProfitLossPage: React.FC = () => {
   const service = useMemo(() => new AccountingService(), []);
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
-  const [pnl, setPnl] = useState<PnL>({ revenue: 0, costOfGoodsSold: 0, grossProfit: 0, expenses: 0, netProfit: 0, margin: 0 });
+  const [pnl, setPnl] = useState<PnL>({
+    revenue: 0, merchandiseRevenue: 0, shippingRevenue: 0, otherRevenue: 0,
+    costOfGoodsSold: 0, grossProfit: 0, expenses: 0, netProfit: 0, margin: 0,
+  });
   const [expenses, setExpenses] = useState<Array<{ category: string; total: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,15 +105,23 @@ export const ProfitLossPage: React.FC = () => {
               </div>
               <div className="divide-y divide-slate-100">
                 <div className="flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm font-bold text-slate-700">إيرادات المبيعات</span>
-                  <span className="font-mono font-black text-slate-900">{fmt(pnl.revenue)}</span>
+                  <span className="text-sm font-bold text-slate-700">إيرادات البضاعة</span>
+                  <span className="font-mono font-black text-slate-900">{fmt(pnl.merchandiseRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3.5">
+                  <span className="text-sm text-slate-600">إيرادات الشحن (منفصلة)</span>
+                  <span className="font-mono font-bold text-slate-800">{fmt(pnl.shippingRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-3.5">
+                  <span className="text-sm text-slate-600">إيرادات أخرى</span>
+                  <span className="font-mono font-bold text-slate-800">{fmt(pnl.otherRevenue)}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-3.5">
                   <span className="text-sm text-slate-600">(−) تكلفة البضاعة المباعة</span>
                   <span className="font-mono font-bold text-rose-600">{fmt(pnl.costOfGoodsSold)}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-4 bg-emerald-50/50">
-                  <span className="text-sm font-black text-emerald-800">إجمالي الربح</span>
+                  <span className="text-sm font-black text-emerald-800">إجمالي ربح البضاعة</span>
                   <span className="font-mono font-black text-emerald-800 text-lg">{fmt(pnl.grossProfit)}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-3.5">
