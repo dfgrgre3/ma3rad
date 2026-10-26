@@ -21,6 +21,7 @@ export const FinancialStatementsPage: React.FC = () => {
   const toast = useToast();
   const [tab, setTab] = useState<FinancialStatementsTab>('balance');
   const [loading, setLoading] = useState(true);
+  const [scopeWarning, setScopeWarning] = useState<string | null>(null);
 
   const [asOf, setAsOf] = useState(today());
   const [balance, setBalance] = useState<BalanceSheet | null>(null);
@@ -40,6 +41,7 @@ export const FinancialStatementsPage: React.FC = () => {
   const load = () => {
     setLoading(true);
     try {
+      setScopeWarning(service.getBranchScopeWarning());
       if (tab === 'balance') setBalance(service.getBalanceSheet(asOf));
       if (tab === 'cash') setCash(service.getCashFlow(from, to));
       if (tab === 'aging') setAging(agingType === 'customer' ? service.getCustomerAging(asOf) : service.getSupplierAging(asOf));
@@ -109,6 +111,7 @@ export const FinancialStatementsPage: React.FC = () => {
       />
 
       <div className="flex-1 overflow-auto p-6">
+        {scopeWarning && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">{scopeWarning}</div>}
         {loading ? (
           <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-teal-500" /></div>
         ) : tab === 'balance' && balance ? (

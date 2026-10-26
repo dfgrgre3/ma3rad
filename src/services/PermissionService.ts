@@ -81,6 +81,8 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'purchases.create', name: 'إدخال مشتريات وتوريد', module: 'PURCHASES' },
   { code: 'purchases.update', name: 'تعديل مشتريات', module: 'PURCHASES' },
   { code: 'purchases.delete', name: 'حذف مشتريات', module: 'PURCHASES' },
+  { code: 'purchases.reject', name: 'رفض طلب شراء', module: 'PURCHASES' },
+  { code: 'purchases.cancel_request', name: 'إلغاء طلب شراء', module: 'PURCHASES' },
   { code: 'purchases.return', name: 'مرتجعات الشراء', module: 'PURCHASES' },
   { code: 'purchases.approve', name: 'اعتماد طلبات الشراء', module: 'PURCHASES' },
 
@@ -90,6 +92,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'customers.update', name: 'تعديل عميل', module: 'CUSTOMERS' },
   { code: 'customers.delete', name: 'حذف عميل', module: 'CUSTOMERS' },
   { code: 'customers.payment', name: 'تحصيل من عميل', module: 'CUSTOMERS' },
+  { code: 'customers.payment.reverse', name: 'عكس/حذف سند تحصيل', module: 'CUSTOMERS' },
   { code: 'customers.export', name: 'تصدير العملاء', module: 'CUSTOMERS' },
 
   // Suppliers
@@ -102,12 +105,18 @@ export const PERMISSIONS: PermissionDef[] = [
   // Cashier / treasury
   { code: 'cashier.view', name: 'عرض الخزينة', module: 'CASHIER' },
   { code: 'cashier.expense', name: 'إثبات مصروف', module: 'CASHIER' },
+  { code: 'cashier.expense.update', name: 'تعديل مصروف مسجل', module: 'CASHIER' },
+  { code: 'cashier.expense.delete', name: 'حذف مصروف مسجل', module: 'CASHIER' },
   { code: 'cashier.shift', name: 'فتح/إغلاق وردية', module: 'CASHIER' },
+  { code: 'cashier.shift.open', name: 'فتح وردية', module: 'CASHIER' },
+  { code: 'cashier.shift.close', name: 'إغلاق وردية', module: 'CASHIER' },
   { code: 'cashier.manage', name: 'إدارة الخزائن', module: 'CASHIER' },
 
   // Finance
   { code: 'finance.view', name: 'عرض التقارير المالية', module: 'FINANCE' },
   { code: 'finance.approve', name: 'اعتماد مالي', module: 'FINANCE' },
+  { code: 'finance.close', name: 'إقفال المصالحات المالية', module: 'FINANCE' },
+  { code: 'finance.reopen', name: 'إعادة فتح فترة مالية مقفلة', module: 'FINANCE' },
   { code: 'finance.debts.view', name: 'عرض الديون والذمم', module: 'FINANCE' },
   { code: 'finance.installments.view', name: 'عرض الأقساط', module: 'FINANCE' },
   { code: 'finance.installments.manage', name: 'إدارة الأقساط', module: 'FINANCE' },
@@ -152,7 +161,10 @@ export const PERMISSIONS: PermissionDef[] = [
 
   // Approvals
   { code: 'approvals.view', name: 'عرض صندوق الموافقات', module: 'APPROVALS' },
-  { code: 'approvals.approve', name: 'اعتماد أو رفض الطلبات', module: 'APPROVALS' },
+  { code: 'approvals.create', name: 'إنشاء طلب اعتماد', module: 'APPROVALS' },
+  { code: 'approvals.approve', name: 'اعتماد الطلبات', module: 'APPROVALS' },
+  { code: 'approvals.reject', name: 'رفض الطلبات', module: 'APPROVALS' },
+  { code: 'approvals.cancel', name: 'إلغاء طلب اعتماد', module: 'APPROVALS' },
 
   // Notifications
   { code: 'notifications.view', name: 'عرض الإشعارات', module: 'NOTIFICATIONS' },
@@ -199,6 +211,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'branches.update', name: 'تعديل فرع', module: 'BRANCHES' },
   { code: 'branches.delete', name: 'حذف فرع', module: 'BRANCHES' },
   { code: 'branches.manage_users', name: 'إدارة مستخدمي الفرع', module: 'BRANCHES' },
+  { code: 'branches.access_all', name: 'الوصول المركزي إلى جميع الفروع', module: 'BRANCHES' },
 
   // Analytics
   { code: 'analytics.view', name: 'عرض التحليلات المتقدمة', module: 'ANALYTICS' },
@@ -224,23 +237,23 @@ const MANAGER_RESTRICTED = new Set([
 
 export const ROLE_DEFAULTS: Record<string, string[]> = {
   ADMIN: [...ALL],
-  MANAGER: [...ALL.filter((code) => !MANAGER_RESTRICTED.has(code)), 'admin.data', 'admin.data.export'],
+  MANAGER: [...new Set([...ALL.filter((code) => !MANAGER_RESTRICTED.has(code)), 'admin.data', 'admin.data.export'])],
   ACCOUNTANT: [
     'dashboard.view', 'dashboard.export',
     'products.view', 'categories.view', 'brands.view',
     'inventory.view', 'sales.view', 'sales.export',
     'quotations.view', 'orders.view', 'returns.view',
-    'purchases.view', 'purchases.approve',
+    'purchases.view', 'purchases.approve', 'purchases.reject', 'purchases.cancel_request',
     'customers.view', 'customers.payment', 'customers.export',
     'suppliers.view', 'suppliers.payment',
-    'cashier.view', 'cashier.expense', 'cashier.shift',
-    'finance.view', 'finance.approve', 'finance.debts.view',
+    'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
+    'finance.view', 'finance.approve', 'finance.close', 'finance.debts.view',
     'finance.installments.view', 'finance.installments.manage',
     'reports.view', 'reports.export',
     'crm.view', 'projects.view', 'pricing.view', 'promotions.view',
     'operations.view', 'branches.view', 'warehouses.view',
     'employees.view', 'deliveries.view', 'drivers.view', 'vehicles.view',
-    'approvals.view', 'approvals.approve',
+    'approvals.view', 'approvals.create', 'approvals.approve', 'approvals.reject', 'approvals.cancel',
     'notifications.view', 'audit.view', 'audit.export',
   ],
   SALES: [
@@ -254,7 +267,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'reports.view', 'crm.view', 'crm.create', 'crm.update',
     'projects.view', 'projects.create',
     'pricing.view', 'promotions.view',
-    'approvals.view', 'notifications.view',
+    'approvals.view', 'approvals.create', 'notifications.view',
     'employees.view', 'deliveries.view', 'branches.view', 'warehouses.view',
   ],
   CASHIER: [
@@ -262,8 +275,8 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'sales.view', 'sales.create', 'sales.refund', 'sales.credit',
     'quotations.view', 'orders.view', 'returns.view', 'returns.create',
     'customers.view', 'customers.create', 'customers.payment',
-    'cashier.view', 'cashier.expense', 'cashier.shift',
-    'crm.view', 'notifications.view',
+    'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
+    'approvals.create', 'crm.view', 'notifications.view',
   ],
   WAREHOUSE: [
     'dashboard.view', 'products.view', 'categories.view', 'brands.view',
@@ -271,7 +284,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'purchases.view', 'purchases.create', 'returns.view',
     'operations.view', 'branches.view', 'warehouses.view', 'warehouses.manage',
     'deliveries.view', 'deliveries.manage', 'drivers.view', 'vehicles.view',
-    'employees.view', 'approvals.view', 'notifications.view',
+    'employees.view', 'approvals.view', 'approvals.create', 'notifications.view',
   ],
 };
 

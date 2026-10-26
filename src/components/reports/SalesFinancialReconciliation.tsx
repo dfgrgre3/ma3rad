@@ -19,13 +19,15 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
   const service = useMemo(() => new SalesFinancialReconciliationService(), []);
   const user = AuthService.getCurrentUser();
   const canView = PermissionService.can(user, 'finance.view');
-  const canClose = PermissionService.can(user, 'finance.approve');
+  const [centralClosureAccess, setCentralClosureAccess] = useState(false);
+  const canClose = PermissionService.can(user, 'finance.close') && centralClosureAccess;
   const [checks, setChecks] = useState<SalesFinancialCheck[]>([]);
   const [closure, setClosure] = useState<SalesFinancialClosure | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scopeWarning, setScopeWarning] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!canView) {
@@ -35,6 +37,8 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
     setLoading(true);
     setError(null);
     try {
+      setCentralClosureAccess(service.canUseCentralClosure());
+      setScopeWarning(service.getBranchScopeWarning());
       setChecks(service.getReconciliation(dateFrom, dateTo));
       setClosure(service.getLatestClosure(dateFrom, dateTo));
       setReasons({});
@@ -92,6 +96,11 @@ export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: s
       {error && (
         <div role="alert" className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
           <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+        </div>
+      )}
+      {scopeWarning && (
+        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {scopeWarning}
         </div>
       )}
 

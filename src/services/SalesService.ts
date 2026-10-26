@@ -3,6 +3,7 @@ import type { SalesInvoice, SalesInvoiceItem, SalesReturn, SalesReturnItem, Paym
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
@@ -91,6 +92,7 @@ export interface ReturnStats {
 
 export class SalesService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   // ─── Invoices ───────────────────────────────────────────────────────────────
 
@@ -102,6 +104,7 @@ export class SalesService {
     filters: InvoiceFilters = {},
     includeVoid = true
   ): (SalesInvoice & { returnedAmount?: number; itemsCount?: number })[] {
+    AuthService.requireAuth();
     const { where, params } = this.buildInvoiceWhere(filters, includeVoid);
     return this.db.query<SalesInvoice & { returnedAmount?: number; itemsCount?: number }>(
       `SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
@@ -118,6 +121,7 @@ export class SalesService {
   }
 
   public getStats(filters: InvoiceFilters = {}, includeVoid = true): InvoiceStats {
+    AuthService.requireAuth();
     const { where, params } = this.buildInvoiceWhere(filters, includeVoid);
     const row = this.db.query<any>(
       `SELECT
@@ -146,6 +150,8 @@ export class SalesService {
   }
 
   public getInvoiceById(id: string): (SalesInvoice & { items: SalesInvoiceItem[] }) | null {
+    AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
     const invoices = this.db.query<SalesInvoice>(`
       SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
              c.current_balance as customerBalance, c.credit_limit as customerCreditLimit,
@@ -154,8 +160,8 @@ export class SalesService {
       JOIN customers c ON si.customer_id = c.id
       JOIN warehouses w ON si.warehouse_id = w.id
       LEFT JOIN users u ON si.created_by = u.id
-      WHERE si.id = ?
-    `, [id]);
+      WHERE si.id = ? AND ${scope.clause}
+    `, [id, ...scope.params]);
 
     if (invoices.length === 0) return null;
     const inv = invoices[0];
@@ -174,6 +180,15 @@ export class SalesService {
     }
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.create');
+    const branchId = this.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
+    const branchRegisterId = this.branchAccess.getDefaultRegisterId(branchId, actor);
+    let cashRegisterId = branchRegisterId;
+    if (dto.shiftId) {
+      const shift = this.branchAccess.requireShiftAccess(dto.shiftId, actor);
+      if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
+      if (shift.branchId !== branchId) throw new Error('يجب أن تتبع الوردية فرع فاتورة البيع.');
+      cashRegisterId = shift.registerId;
+    }
 
     return this.db.executeTransaction((sqliteDb) => {
       let totalLineDiscount = 0;
@@ -313,13 +328,13 @@ export class SalesService {
 
       sqliteDb.run(`
         INSERT INTO sales_invoices (
-          id, invoice_number, date, due_date, customer_id, warehouse_id, shift_id, order_id, project_id,
+          id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, shift_id, order_id, project_id,
           subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
           shipping_cost, total_amount, paid_amount, remaining_amount, payment_type,
           payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
       `, [
-        invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, dto.shiftId || null,
+        invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, dto.shiftId || null,
         dto.orderId || null, dto.projectId || null,
         totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
         totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, dto.paymentType,
@@ -390,7 +405,7 @@ export class SalesService {
 
       if (totals.paidAmount > 0) {
         if (dto.paymentType === 'CASH') {
-          sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE is_default = 1`, [totals.paidAmount]);
+          sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [totals.paidAmount, cashRegisterId]);
         }
         if (dto.shiftId) {
           const col = dto.paymentType === 'CASH' ? 'total_sales_cash'
@@ -463,27 +478,32 @@ export class SalesService {
     if (!invoice) throw new Error('الفاتورة غير موجودة.');
     if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن التحصيل على فاتورة ملغاة.');
     if (invoice.remainingAmount <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
+    const invoiceBranchId = invoice.branchId || this.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
 
     const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
     if (value <= 0) throw new Error('يجب أن يكون مبلغ التحصيل أكبر من الصفر.');
 
     const today = localDateString();
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
+    const register = registerId || 'cr_main';
+    const branchId = this.branchAccess.requireRegisterAccess(register, actor, invoiceBranchId);
+    if (shiftId) {
+      const shift = this.branchAccess.requireShiftAccess(shiftId, actor, register);
+      if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
+    }
 
     return this.db.executeTransaction((db) => {
       const receiptNumber = db.nextNumber('REC');
       const newPaid = round2(invoice.paidAmount + value);
       const newRemaining = round2(Math.max(0, invoice.remainingAmount - value));
       const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
-      const register = registerId || 'cr_main';
-
       db.run(
         `INSERT INTO customer_payments (
-           id, receipt_number, customer_id, invoice_id, amount, payment_type, date,
+           id, receipt_number, customer_id, invoice_id, amount, payment_type, date, branch_id,
            register_id, shift_id, notes, performed_by
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          paymentId, receiptNumber, invoice.customerId, invoiceId, value, paymentType, today,
+          paymentId, receiptNumber, invoice.customerId, invoiceId, value, paymentType, today, branchId,
           register, shiftId || null,
           notes || `تحصيل دفعة على الفاتورة ${invoice.invoiceNumber}`,
           actor.id,
@@ -533,6 +553,7 @@ export class SalesService {
         id: paymentId,
         receiptNumber,
         customerId: invoice.customerId,
+        branchId,
         amount: value,
         paymentType,
         date: today,
@@ -562,9 +583,30 @@ export class SalesService {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('تاريخ الدفعة غير صحيح.');
     const entries = allocations.filter((a) => Number(a.amount) > 0);
     if (!entries.length || new Set(entries.map((a) => a.invoiceId)).size !== entries.length) throw new Error('حدد فواتير ومبالغ صحيحة دون تكرار.');
+    let branchId: string | undefined;
+    for (const entry of entries) {
+      const invoice = this.getInvoiceById(entry.invoiceId);
+      if (!invoice) throw new Error('تتضمن الدفعة فاتورة غير موجودة أو خارج نطاق الفروع المصرح به.');
+      const invoiceBranchId = invoice.branchId || this.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
+      if (branchId && invoiceBranchId !== branchId) throw new Error('لا يمكن توزيع سند واحد على فواتير من فروع مختلفة.');
+      branchId = invoiceBranchId;
+    }
+    if (!branchId) throw new Error('تعذر تحديد فرع الدفعة.');
+    this.branchAccess.requireRegisterAccess(registerId, actor, branchId);
+    if (shiftId) {
+      const shift = this.branchAccess.requireShiftAccess(shiftId, actor, registerId);
+      if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
+    }
     const groupId = idempotencyKey || `cpgrp_${uuidv4().slice(0, 10)}`;
     return this.db.executeTransaction((db) => {
-      const prior = db.query<{ receiptNumber: string; amount: number }>(`SELECT receipt_number AS receiptNumber,amount FROM customer_payments WHERE payment_group_id=? ORDER BY created_at`,[groupId]);
+      const prior = db.query<{ receiptNumber: string; amount: number; branchId: string }>(
+        `SELECT receipt_number AS receiptNumber, amount, branch_id AS branchId
+         FROM customer_payments WHERE payment_group_id = ? ORDER BY created_at`,
+        [groupId]
+      );
+      if (prior.some((row) => row.branchId !== branchId)) {
+        throw new Error('The customer payment idempotency key was already used in another branch.');
+      }
       if (prior.length) return { groupId, total: round2(prior.reduce((sum,row)=>sum+Number(row.amount),0)), receipts: prior.map(row=>row.receiptNumber) };
       const customer = db.query<{ id: string }>('SELECT id FROM customers WHERE id=?', [customerId])[0];
       if (!customer) throw new Error('العميل غير موجود.');
@@ -580,8 +622,8 @@ export class SalesService {
         const remaining = round2(Math.max(0, Number(invoice.remainingAmount) - amount));
         const paymentNotes = [reference ? `مرجع: ${reference}` : '', notes, `دفعة مجمعة ${groupId}`].filter(Boolean).join(' | ');
         const paymentId = `cpay_${uuidv4().slice(0, 8)}`;
-        db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,notes,performed_by)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, paymentNotes, actor.id]);
+        db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_group_id,payment_type,date,register_id,shift_id,branch_id,notes,performed_by)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, [paymentId, receiptNumber, customerId, allocation.invoiceId, amount, groupId, paymentType, date, registerId, shiftId || null, branchId, paymentNotes, actor.id]);
         db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
           [`cpa_${uuidv4().substring(0, 8)}`, paymentId, allocation.invoiceId, amount]);
         db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
@@ -609,6 +651,8 @@ export class SalesService {
   }
 
   public getInvoicePayments(invoiceId: string): CustomerPayment[] {
+    const invoice = this.getInvoiceById(invoiceId);
+    if (!invoice) return [];
     return this.db.query<CustomerPayment>(
       `SELECT * FROM customer_payments WHERE invoice_id = ? ORDER BY created_at ASC`,
       [invoiceId]
@@ -617,16 +661,25 @@ export class SalesService {
 
   public deleteInvoicePayment(paymentId: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'customers.payment');
+    PermissionService.require(actor, 'customers.payment.reverse');
     const payment = this.db.query<any>(
-      `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id
+      `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id, branch_id
        FROM customer_payments WHERE id = ?`,
       [paymentId]
     )[0];
     if (!payment) throw new Error('سند القبض غير موجود.');
+    this.branchAccess.requireBranchAccess(payment.branchId, actor);
+    if (payment.registerId) this.branchAccess.requireRegisterAccess(payment.registerId, actor, payment.branchId);
+    if (payment.invoiceId) {
+      const invoice = this.getInvoiceById(payment.invoiceId);
+      if (!invoice) throw new Error('الفاتورة غير موجودة أو خارج نطاق الفروع المصرح به.');
+    }
     if (payment.paymentGroupId) {
-      const group = this.db.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [payment.paymentGroupId]);
+      const group = this.db.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=? AND branch_id=?`, [payment.paymentGroupId, payment.branchId]);
       for (const row of group) {
+        if (row.invoiceId && !this.getInvoiceById(row.invoiceId)) {
+          throw new Error('تتضمن الدفعة فاتورة خارج نطاق الفروع المصرح به.');
+        }
         const protectedPayment = this.db.query<any>('SELECT COUNT(*) AS count FROM installments WHERE payment_id=?', [row.id])[0]?.count || 0;
         const linkedPlan = this.db.query<any>(`SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`, [row.invoiceId])[0]?.count || 0;
         if (protectedPayment || linkedPlan) throw new Error('This receipt belongs to an installment plan. Reverse the plan payment from the installments screen.');
@@ -724,31 +777,46 @@ export class SalesService {
     if (inv.invoiceStatus === 'VOID') throw new Error('لا يمكن مرتجعة فاتورة ملغاة.');
     if (!returnItems || returnItems.length === 0) throw new Error('حدد بنداً واحداً على الأقل للإرجاع.');
 
-    // Validate returned quantity per product never exceeds what was originally sold (brief §68).
+    // Prices and costs come from the invoice; never trust values supplied by the UI.
+    // Multiple invoice rows for one product are supported using quantity weighted prices.
+    const requestedByProduct = new Map<string, number>();
     for (const rit of returnItems) {
-      if (rit.quantityM2 <= 0) throw new Error('كمية الإرجاع يجب أن تكون أكبر من صفر.');
-      const sold = inv.items
-        .filter((i) => i.productId === rit.productId)
-        .reduce((s, i) => s + i.quantityM2, 0);
-      const alreadyReturned = this.db.query<{ q: number }>(
-        `SELECT COALESCE(SUM(quantity_m2),0) as q FROM sales_return_items sri
-         JOIN sales_returns sr ON sr.id = sri.return_id
-         WHERE sr.original_invoice_id = ? AND sri.product_id = ?`,
-        [invoiceId, rit.productId]
-      )[0]?.q || 0;
-      if (rit.quantityM2 + alreadyReturned > sold + 1e-6) {
-        const line = inv.items.find((item) => item.productId === rit.productId);
-        const unitLabel = line ? getProductUnitLabel(line) : 'وحدة';
-        throw new Error(`لا يمكن إرجاع كمية أكبر من المباعة للصنف (المباع: ${sold} ${unitLabel}، المُرجع سابقاً: ${alreadyReturned} ${unitLabel}).`);
-      }
+      const quantity = Number(rit.quantityM2);
+      if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('كمية الإرجاع يجب أن تكون أكبر من صفر.');
+      requestedByProduct.set(rit.productId, (requestedByProduct.get(rit.productId) || 0) + quantity);
+      if (!inv.items.some((item) => item.productId === rit.productId)) throw new Error('الصنف غير موجود في الفاتورة الأصلية.');
     }
 
     const returnId = `ret_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
+      // Recheck inside the transaction so repeated or simultaneous submissions cannot
+      // return more than the invoice quantity.
+      for (const [productId, requested] of requestedByProduct) {
+        const sold = inv.items.filter((item) => item.productId === productId)
+          .reduce((sum, item) => sum + Number(item.quantityM2 || 0), 0);
+        const alreadyReturned = Number(sqliteDb.query<{ q: number }>(
+          `SELECT COALESCE(SUM(sri.quantity_m2),0) AS q FROM sales_return_items sri
+           JOIN sales_returns sr ON sr.id = sri.return_id
+           WHERE sr.original_invoice_id = ? AND sri.product_id = ?`, [invoiceId, productId]
+        )[0]?.q || 0);
+        if (requested + alreadyReturned > sold + 1e-6) {
+          const line = inv.items.find((item) => item.productId === productId);
+          const unitLabel = line ? getProductUnitLabel(line) : 'وحدة';
+          throw new Error(`لا يمكن إرجاع كمية أكبر من المباعة للصنف (المباع: ${sold} ${unitLabel}، المُرجع سابقاً: ${alreadyReturned} ${unitLabel}).`);
+        }
+      }
+      const authoritativeItems = returnItems.map((item) => {
+        const soldLines = inv.items.filter((line) => line.productId === item.productId);
+        const soldQuantity = soldLines.reduce((sum, line) => sum + Number(line.quantityM2 || 0), 0);
+        const weighted = (key: 'unitPrice' | 'unitCost') => soldQuantity > 0
+          ? soldLines.reduce((sum, line) => sum + Number(line[key] || 0) * Number(line.quantityM2 || 0), 0) / soldQuantity
+          : 0;
+        return { ...item, unitPrice: round2(weighted('unitPrice')), unitCost: round2(weighted('unitCost')) };
+      });
       const returnNumber = sqliteDb.nextNumber('RET');
-      const totalReturnAmount = round2(returnItems.reduce(
+      const totalReturnAmount = round2(authoritativeItems.reduce(
         (sum, item) => sum + round2(item.quantityM2 * item.unitPrice),
         0
       ));
@@ -770,14 +838,14 @@ export class SalesService {
       `, [
         returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
         inv.warehouseId, today, totalReturnAmount, impact.cashRefund, impact.balanceDelta,
-        returnItems[0]?.reason || 'مرتجع سيراميك',
+        authoritativeItems[0]?.reason || 'مرتجع سيراميك',
         options.registerId || (impact.cashRefund > 0 && refundMethod === 'CASH' ? 'cr_main' : null),
         options.shiftId || null, refundMethod, actor.id,
       ]);
 
       let fifoReturnedCost = 0;
       const fifoEnabled = SettingsService.getSettings().costingMethod === 'FIFO';
-      for (const item of returnItems) {
+      for (const item of authoritativeItems) {
         const lineTotal = round2(item.quantityM2 * item.unitPrice);
 
         const product = sqliteDb.query<any>(
@@ -788,7 +856,7 @@ export class SalesService {
         const metersPerBox = Number(product.meters_per_box) || 1.44;
         const boxesCount = product.product_type === 'GENERAL'
           ? product.base_unit === 'BOX' ? round2(item.quantityM2) : 0
-          : item.boxesCount > 0 ? round2(item.boxesCount) : round2(item.quantityM2 / metersPerBox);
+          : round2(item.quantityM2 / metersPerBox);
         let unitCost = item.unitCost > 0 ? item.unitCost : 0;
         if (fifoEnabled) {
           const actualCost = InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2);
@@ -806,6 +874,11 @@ export class SalesService {
           item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
         ]);
 
+        const stockRow = sqliteDb.query<{ productId: string }>(
+          `SELECT product_id AS productId FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+          [item.productId, inv.warehouseId]
+        )[0];
+        if (!stockRow) throw new Error(`لا يوجد سجل مخزون للصنف ${product.name} في مخزن الفاتورة.`);
         sqliteDb.run(`
           UPDATE warehouse_stock
           SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
@@ -858,7 +931,7 @@ export class SalesService {
           );
         }
       }
-      const returnedCost = fifoEnabled ? fifoReturnedCost : round2(returnItems.reduce(
+      const returnedCost = fifoEnabled ? fifoReturnedCost : round2(authoritativeItems.reduce(
         (sum, item) => sum + Number(item.quantityM2) * Number(item.unitCost || 0),
         0
       ));
@@ -914,7 +987,7 @@ export class SalesService {
         totalAmount: totalReturnAmount,
         refundedAmount: impact.cashRefund,
         remainingToBalance: impact.balanceDelta,
-        reason: returnItems[0]?.reason || 'مرتجع',
+        reason: authoritativeItems[0]?.reason || 'مرتجع',
         refundMethod,
         createdBy: actor.id,
         createdAt: new Date().toISOString()
@@ -1038,12 +1111,16 @@ export class SalesService {
   }
 
   public getReturns(search = '', dateFrom?: string, dateTo?: string): (SalesReturn & { customerName: string; invoiceNumber: string })[] {
+    AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
     let sql = `
       SELECT sr.*, c.name as customerName, sr.original_invoice_number as invoiceNumber
       FROM sales_returns sr
       JOIN customers c ON c.id = sr.customer_id
-      WHERE 1 = 1`;
-    const params: any[] = [];
+      JOIN sales_invoices si ON si.id = sr.original_invoice_id
+      JOIN warehouses w ON w.id = si.warehouse_id
+      WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
     if (search.trim()) {
       sql += ` AND (sr.return_number LIKE ? OR c.name LIKE ? OR sr.original_invoice_number LIKE ?)`;
       const term = `%${search.trim()}%`;
@@ -1062,19 +1139,25 @@ export class SalesService {
   }
 
   public getReturnById(id: string): (SalesReturn & { items: SalesReturnItem[]; customerName?: string; invoiceNumber?: string }) | null {
+    AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
     const rows = this.db.query<SalesReturn & { customerName: string; invoiceNumber: string }>(
       `SELECT sr.*, c.name as customerName, sr.original_invoice_number as invoiceNumber
        FROM sales_returns sr
        JOIN customers c ON c.id = sr.customer_id
-       WHERE sr.id = ?`,
-      [id]
+       JOIN sales_invoices si ON si.id = sr.original_invoice_id
+       JOIN warehouses w ON w.id = si.warehouse_id
+       WHERE sr.id = ? AND ${scope.clause}`,
+      [id, ...scope.params]
     );
     if (rows.length === 0) return null;
     return { ...rows[0], items: this.getReturnItems(id) };
   }
 
   public getReturnsStats(): ReturnStats {
+    AuthService.requireAuth();
     const today = localDateString();
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
     const row = this.db.query<any>(
       `SELECT COUNT(*) AS count,
               COALESCE(SUM(total_amount), 0) AS totalAmount,
@@ -1082,8 +1165,11 @@ export class SalesService {
               COALESCE(SUM(remaining_to_balance), 0) AS creditedToBalance,
               COALESCE(SUM(CASE WHEN date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
               COALESCE(SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END), 0) AS todayAmount
-       FROM sales_returns`,
-      [today, today]
+       FROM sales_returns sr
+       JOIN sales_invoices si ON si.id = sr.original_invoice_id
+       JOIN warehouses w ON w.id = si.warehouse_id
+       WHERE ${scope.clause}`,
+      [today, today, ...scope.params]
     )[0] || {};
     return {
       count: Number(row.count || 0),
@@ -1096,13 +1182,18 @@ export class SalesService {
   }
 
   public getTopReturnReasons(limit = 5): { reason: string; count: number; amount: number }[] {
+    AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
     return this.db.query<any>(
-      `SELECT reason, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS amount
-       FROM sales_returns
-       GROUP BY reason
+      `SELECT sr.reason, COUNT(*) AS count, COALESCE(SUM(sr.total_amount), 0) AS amount
+       FROM sales_returns sr
+       JOIN sales_invoices si ON si.id = sr.original_invoice_id
+       JOIN warehouses w ON w.id = si.warehouse_id
+       WHERE ${scope.clause}
+       GROUP BY sr.reason
        ORDER BY count DESC, amount DESC
        LIMIT ?`,
-      [Math.max(1, Math.min(20, limit))]
+      [...scope.params, Math.max(1, Math.min(20, limit))]
     ).map((row) => ({
       reason: row.reason || 'غير محدد',
       count: Number(row.count || 0),
@@ -1111,18 +1202,30 @@ export class SalesService {
   }
 
   public getReturnItems(returnId: string): SalesReturnItem[] {
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
+    if (!this.db.query(
+      `SELECT sr.id FROM sales_returns sr
+       JOIN sales_invoices si ON si.id = sr.original_invoice_id
+       JOIN warehouses w ON w.id = si.warehouse_id
+       WHERE sr.id = ? AND ${scope.clause}`,
+      [returnId, ...scope.params]
+    ).length) return [];
     return this.db.query<SalesReturnItem>(
       `SELECT sri.*, COALESCE(p.product_type, 'CERAMIC') AS productType,
               p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM sales_return_items sri
+       JOIN sales_returns sr ON sr.id = sri.return_id
+       JOIN sales_invoices si ON si.id = sr.original_invoice_id
+       JOIN warehouses w ON w.id = si.warehouse_id
        LEFT JOIN products p ON p.id = sri.product_id
-       WHERE sri.return_id = ?`,
-      [returnId]
+       WHERE sri.return_id = ? AND ${scope.clause}`,
+      [returnId, ...scope.params]
     );
   }
 
   /** Remaining returnable quantity per product for an invoice, after prior returns. */
   public getReturnableItems(invoiceId: string): ReturnableItem[] {
+    if (!this.getInvoiceById(invoiceId)) return [];
     const rows = this.db.query<any>(
       `SELECT sii.product_id, sii.product_name, sii.product_grade, sii.size, sii.quantity_m2,
               sii.unit_price, sii.unit_cost, sii.boxes_count, sii.meters_per_box,
@@ -1147,15 +1250,22 @@ export class SalesService {
     for (const r of rows) {
       const existing = map.get(r.productId);
       if (existing) {
-        existing.soldM2 = round2(existing.soldM2 + Number(r.quantity_m2 || 0));
-        existing.boxesCount = round2(existing.boxesCount + Number(r.boxes_count || 0));
+        const priorQuantity = existing.soldM2;
+        const lineQuantity = Number(r.quantityM2 || 0);
+        const combinedQuantity = priorQuantity + lineQuantity;
+        if (combinedQuantity > 0) {
+          existing.unitPrice = round2((existing.unitPrice * priorQuantity + Number(r.unitPrice || 0) * lineQuantity) / combinedQuantity);
+          existing.unitCost = round2((existing.unitCost * priorQuantity + Number(r.unitCost || 0) * lineQuantity) / combinedQuantity);
+        }
+        existing.soldM2 = round2(combinedQuantity);
+        existing.boxesCount = round2(existing.boxesCount + Number(r.boxesCount || 0));
       } else {
         map.set(r.productId, {
           productId: r.productId,
           productName: r.productName,
           grade: r.productGrade,
           size: r.size,
-          soldM2: round2(Number(r.quantity_m2 || 0)),
+          soldM2: round2(Number(r.quantityM2 || 0)),
           returnedM2: 0,
           returnableM2: 0,
           unitPrice: Number(r.unitPrice || 0),
@@ -1179,8 +1289,9 @@ export class SalesService {
   }
 
   private buildInvoiceWhere(filters: InvoiceFilters, includeVoid: boolean): { where: string; params: any[] } {
-    let where = 'WHERE 1 = 1';
-    const params: any[] = [];
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
+    let where = `WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
 
     if (filters.invoiceStatus && filters.invoiceStatus !== 'ALL') {
       where += ` AND si.invoice_status = ?`;

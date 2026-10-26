@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 
 export type ApprovalType =
   | 'DISCOUNT' | 'PRICE_CHANGE' | 'SALES_RETURN' | 'PURCHASE_RETURN'
@@ -30,15 +31,53 @@ export interface ApprovalRequest {
 
 export class ApprovalService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
+
+  private resolveReferenceBranch(referenceType?: string, referenceId?: string): string | null {
+    if (!referenceType || !referenceId) return null;
+    switch (referenceType.toUpperCase()) {
+      case 'SALES_INVOICE':
+      case 'INVOICE':
+        return this.db.query<{ branchId: string | null }>(
+          `SELECT COALESCE(si.branch_id, w.branch_id) AS branchId
+           FROM sales_invoices si LEFT JOIN warehouses w ON w.id = si.warehouse_id WHERE si.id = ?`,
+          [referenceId]
+        )[0]?.branchId ?? null;
+      case 'PURCHASE_INVOICE':
+      case 'PURCHASE':
+        return this.db.query<{ branchId: string | null }>(
+          `SELECT COALESCE(pi.branch_id, w.branch_id) AS branchId
+           FROM purchase_invoices pi LEFT JOIN warehouses w ON w.id = pi.warehouse_id WHERE pi.id = ?`,
+          [referenceId]
+        )[0]?.branchId ?? null;
+      case 'INVENTORY_TRANSACTION':
+      case 'STOCK_ADJUSTMENT':
+        return this.db.query<{ branchId: string | null }>(
+          `SELECT w.branch_id AS branchId FROM inventory_transactions it
+           JOIN warehouses w ON w.id = it.warehouse_id WHERE it.id = ?`,
+          [referenceId]
+        )[0]?.branchId ?? null;
+      case 'PURCHASE_REQUEST':
+        return this.db.query<{ branchId: string | null }>(
+          'SELECT branch_id AS branchId FROM purchase_requests WHERE id = ?',
+          [referenceId]
+        )[0]?.branchId ?? null;
+      default:
+        return null;
+    }
+  }
 
   public getRequests(status = 'ALL', search = '', type = 'ALL'): ApprovalRequest[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'approvals.view');
+    const scope = this.branchAccess.sqlScope('a.branch_id', undefined, actor);
     let sql = `
       SELECT a.*, ru.full_name AS requested_by_name, du.full_name AS decided_by_name
       FROM approval_requests a
       LEFT JOIN users ru ON ru.id = a.requested_by
       LEFT JOIN users du ON du.id = a.decided_by
-      WHERE 1 = 1`;
-    const params: any[] = [];
+      WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
     if (status !== 'ALL') { sql += ` AND a.status = ?`; params.push(status); }
     if (type !== 'ALL') { sql += ` AND a.request_type = ?`; params.push(type); }
     if (search.trim()) {
@@ -51,8 +90,13 @@ export class ApprovalService {
   }
 
   public getStats(): { pending: number; approved: number; rejected: number } {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'approvals.view');
+    const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const rows = this.db.query<{ status: string; count: number }>(
-      `SELECT status, COUNT(*) AS count FROM approval_requests WHERE status IN ('PENDING','APPROVED','REJECTED') GROUP BY status`
+      `SELECT status, COUNT(*) AS count FROM approval_requests
+       WHERE ${scope.clause} AND status IN ('PENDING','APPROVED','REJECTED') GROUP BY status`,
+      scope.params
     );
     const map = new Map(rows.map((r) => [r.status, Number(r.count)]));
     return {
@@ -65,23 +109,37 @@ export class ApprovalService {
   public createRequest(input: {
     requestType: ApprovalType; title: string; description?: string;
     requestedValue?: number; currentValue?: number;
-    priority?: ApprovalRequest['priority']; referenceType?: string; referenceId?: string;
+    priority?: ApprovalRequest['priority']; referenceType?: string; referenceId?: string; branchId?: string;
   }): ApprovalRequest {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'approvals.view');
+    PermissionService.require(actor, 'approvals.create');
     if (!input.title.trim()) throw new Error('عنوان الطلب مطلوب.');
+    const referenceBranchId = this.resolveReferenceBranch(input.referenceType, input.referenceId);
+    const referenceType = input.referenceType?.toUpperCase();
+    const requiresBranchSource = Boolean(input.referenceId && referenceType && [
+      'SALES_INVOICE', 'INVOICE', 'PURCHASE_INVOICE', 'PURCHASE',
+      'INVENTORY_TRANSACTION', 'STOCK_ADJUSTMENT', 'PURCHASE_REQUEST',
+    ].includes(referenceType));
+    if (requiresBranchSource && !referenceBranchId) {
+      throw new Error('تعذر تحديد فرع المعاملة المرتبطة بطلب الاعتماد.');
+    }
+    if (input.branchId && referenceBranchId && input.branchId !== referenceBranchId) {
+      throw new Error('فرع الطلب لا يطابق فرع المعاملة المرتبطة.');
+    }
+    const branchId = input.branchId || referenceBranchId || this.branchAccess.getDefaultAccessibleBranchId(actor);
+    this.branchAccess.requireBranchAccess(branchId, actor);
 
     const id = `apr_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const requestNumber = db.nextNumber('APR');
       db.run(
         `INSERT INTO approval_requests (
-          id, request_number, request_type, reference_type, reference_id, title, description,
+          id, request_number, request_type, reference_type, reference_id, branch_id, title, description,
           requested_value, current_value, priority, requested_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, requestNumber, input.requestType, input.referenceType || null, input.referenceId || null,
-          input.title.trim(), input.description || null, input.requestedValue ?? null,
+          branchId, input.title.trim(), input.description || null, input.requestedValue ?? null,
           input.currentValue ?? null, input.priority || 'NORMAL', actor.id,
         ]
       );
@@ -91,8 +149,12 @@ export class ApprovalService {
 
   public decide(id: string, approved: boolean, notes?: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'approvals.approve');
-    const row = this.db.query<ApprovalRequest>(`SELECT * FROM approval_requests WHERE id = ?`, [id])[0];
+    PermissionService.require(actor, approved ? 'approvals.approve' : 'approvals.reject');
+    const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
+    const row = this.db.query<ApprovalRequest>(
+      `SELECT * FROM approval_requests WHERE id = ? AND ${scope.clause}`,
+      [id, ...scope.params]
+    )[0];
     if (!row) throw new Error('الطلب غير موجود.');
     if (row.status !== 'PENDING') throw new Error('تم اتخاذ قرار في هذا الطلب بالفعل.');
 
@@ -145,10 +207,25 @@ export class ApprovalService {
 
   public cancel(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'approvals.view');
-    this.db.run(
-      `UPDATE approval_requests SET status = 'CANCELLED', decided_by = ?, decided_at = ? WHERE id = ? AND status = 'PENDING'`,
-      [actor.id, new Date().toISOString(), id]
-    );
+    PermissionService.require(actor, 'approvals.cancel');
+    const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
+    const row = this.db.query<ApprovalRequest>(
+      `SELECT * FROM approval_requests WHERE id = ? AND ${scope.clause}`,
+      [id, ...scope.params]
+    )[0];
+    if (!row) throw new Error('الطلب غير موجود أو خارج نطاق الفروع المصرح به.');
+    if (row.status !== 'PENDING') throw new Error('لا يمكن إلغاء طلب غير معلق.');
+    this.db.executeTransaction((db) => {
+      db.run(
+        `UPDATE approval_requests SET status = 'CANCELLED', decided_by = ?, decided_at = ?
+         WHERE id = ? AND status = 'PENDING'`,
+        [actor.id, new Date().toISOString(), id]
+      );
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, 'إلغاء طلب اعتماد', 'APPROVALS', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify({ status: 'CANCELLED' })]
+      );
+    });
   }
 }

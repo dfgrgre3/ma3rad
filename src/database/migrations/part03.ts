@@ -50,7 +50,7 @@ export const MIGRATION_PART_03: Migration[] = [
       db.run(
         `INSERT OR IGNORE INTO customers (
            id, code, name, phone, customer_type, credit_limit, current_balance, total_purchases, notes
-         ) VALUES ('cust_cash', 'CASH-001', 'عميل نقدي (بيع مباشر)', '01000000000', 'RETAIL', 0, 0, 0, 'حساب افتراضي لفواتير البيع النقدي السريع من شاشة نقطة البيع')`
+         ) VALUES ('cust_cash', 'CASH-001', 'عميل نقدي (بيع مباشر)', '', 'RETAIL', 0, 0, 0, 'حساب افتراضي لفواتير البيع النقدي السريع من شاشة نقطة البيع')`
       );
     },
   },

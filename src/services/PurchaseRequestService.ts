@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 import { round2 } from './financials';
+import { BranchAccessService } from './BranchAccessService';
 
 export type PurchaseRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ORDERED' | 'CANCELLED';
 export type RequestPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
@@ -39,8 +40,12 @@ export interface PurchaseRequestItemInput {
 
 export class PurchaseRequestService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   public getRequests(search = '', status = 'ALL'): PurchaseRequest[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.view');
+    const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
     let sql = `
       SELECT pr.*, u.full_name AS requester_name, du.full_name AS decided_by_name,
         b.name AS branch_name, w.name AS warehouse_name,
@@ -52,8 +57,8 @@ export class PurchaseRequestService {
       LEFT JOIN users du ON du.id = pr.decided_by
       LEFT JOIN branches b ON b.id = pr.branch_id
       LEFT JOIN warehouses w ON w.id = pr.warehouse_id
-      WHERE 1 = 1`;
-    const params: any[] = [];
+      WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
     if (status !== 'ALL') { sql += ` AND pr.status = ?`; params.push(status); }
     if (search.trim()) {
       sql += ` AND (pr.request_number LIKE ? OR u.full_name LIKE ? OR pr.notes LIKE ?)`;
@@ -65,6 +70,15 @@ export class PurchaseRequestService {
   }
 
   public getItems(requestId: string): any[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.view');
+    const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
+    if (!this.db.query(
+      `SELECT pr.id FROM purchase_requests pr WHERE pr.id = ? AND ${scope.clause}`,
+      [requestId, ...scope.params]
+    ).length) {
+      throw new Error('طلب الشراء غير موجود أو خارج نطاق الفروع المصرح به.');
+    }
     return this.db.query(
       `SELECT pri.*, p.sku, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM purchase_request_items pri LEFT JOIN products p ON p.id = pri.product_id WHERE pri.request_id = ?`,
@@ -85,6 +99,17 @@ export class PurchaseRequestService {
     const items = input.items.filter((i) => i.quantityM2 > 0);
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
 
+    let branchId = input.branchId;
+    if (input.warehouseId) {
+      const warehouseBranchId = this.branchAccess.requireWarehouseAccess(input.warehouseId, actor);
+      if (branchId && branchId !== warehouseBranchId) {
+        throw new Error('فرع الطلب لا يطابق فرع المخزن المحدد.');
+      }
+      branchId = warehouseBranchId;
+    }
+    branchId = branchId || this.branchAccess.getDefaultAccessibleBranchId(actor);
+    this.branchAccess.requireBranchAccess(branchId, actor);
+
     const id = `prq_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const requestNumber = db.nextNumber('PRQ');
@@ -93,7 +118,7 @@ export class PurchaseRequestService {
           needed_by, priority, status, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
         [
-          id, requestNumber, localDateString(), input.branchId || null,
+          id, requestNumber, localDateString(), branchId,
           input.warehouseId || null, actor.id, input.neededBy || null,
           input.priority || 'NORMAL', input.notes || null,
         ]
@@ -117,10 +142,21 @@ export class PurchaseRequestService {
 
   public decide(id: string, status: 'APPROVED' | 'REJECTED' | 'ORDERED' | 'CANCELLED'): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'finance.approve');
-    const req = this.db.query<{ status: string }>(`SELECT status FROM purchase_requests WHERE id = ?`, [id])[0];
+    const requiredPermission = status === 'APPROVED' || status === 'ORDERED'
+      ? 'purchases.approve'
+      : status === 'REJECTED'
+        ? 'purchases.reject'
+        : 'purchases.cancel_request';
+    PermissionService.require(actor, requiredPermission);
+    const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
+    const req = this.db.query<{ status: string }>(
+      `SELECT status FROM purchase_requests WHERE id = ? AND ${scope.clause}`,
+      [id, ...scope.params]
+    )[0];
     if (!req) throw new Error('الطلب غير موجود.');
-    if (req.status === 'REJECTED' || req.status === 'CANCELLED') throw new Error('لا يمكن تعديل طلب مغلق.');
+    if (req.status !== 'PENDING' && !(req.status === 'APPROVED' && status === 'ORDERED')) {
+      throw new Error('لا يمكن تعديل طلب مغلق أو تنفيذ هذا الانتقال من حالته الحالية.');
+    }
     this.db.run(
       `UPDATE purchase_requests SET status = ?, decided_by = ?, decided_at = CURRENT_TIMESTAMP WHERE id = ?`,
       [status, actor.id, id]

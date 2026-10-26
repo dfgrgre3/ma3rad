@@ -10,7 +10,7 @@ const {
 const { registerAppHandlers } = require('../electron/appHandlers');
 const { registerPrintingHandlers } = require('../electron/printing');
 
-async function createHandlers() {
+async function createHandlers(fsImpl = fs) {
   const appDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-electron-'));
   const dataDir = path.join(appDataDir, 'data');
   const backupDir = path.join(appDataDir, 'backups');
@@ -41,7 +41,7 @@ async function createHandlers() {
   };
 
   registerDatabaseHandlers({
-    ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
+    ipcMain, validateIpcSender, app, path, fs: fsImpl, fsSync, safeStorage,
     APP_DATA_DIR: appDataDir, DATA_DIR: dataDir, BACKUP_DIR: backupDir,
     DB_FILE: dbFile, REMEMBERED_CREDENTIALS_FILE: path.join(appDataDir, 'credentials.enc'),
     ensureDirs, databaseFileExists, MAX_DB_SIZE: 4,
@@ -105,6 +105,54 @@ test('registered database handlers initialize directories and load/save within t
   }
 });
 
+test('a failed database write does not replace the last complete database file', async () => {
+  let interruptDatabaseWrite = false;
+  const interruptedFs = new Proxy(fs, {
+    get(target, property) {
+      if (property === 'writeFile') {
+        return async (filePath, ...args) => {
+          if (interruptDatabaseWrite && String(filePath).endsWith('ceramisys.sqlite.tmp')) {
+            await fs.writeFile(filePath, Buffer.from('partial database write'));
+            throw new Error('simulated interrupted database write');
+          }
+          return fs.writeFile(filePath, ...args);
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const context = await createHandlers(interruptedFs);
+  try {
+    const { handlers, event, dbFile } = context;
+    const original = await handlers.get('db:save')(event, new Uint8Array([1, 2, 3]));
+    assert.equal(original.ok, true);
+    const originalBytes = await fs.readFile(dbFile);
+
+    interruptDatabaseWrite = true;
+    const originalConsoleError = console.error;
+    let loggedError;
+    let failed;
+    console.error = (...args) => { loggedError = args; };
+    try {
+      failed = await handlers.get('db:save')(event, new Uint8Array([4, 5, 6]));
+    } finally {
+      console.error = originalConsoleError;
+    }
+    assert.equal(failed.ok, false);
+    assert.match(String(loggedError && loggedError[0]), /Failed to save encrypted database file/);
+    assert.deepEqual(await fs.readFile(dbFile), originalBytes);
+    assert.deepEqual(
+      Array.from(await handlers.get('db:load')(event)),
+      [1, 2, 3],
+      'the last successfully committed database remains readable',
+    );
+    assert.equal(fsSync.existsSync(`${dbFile}.tmp`), false, 'the incomplete temporary file is removed');
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
 test('registered app and printing handlers receive their directory and size dependencies', async () => {
   const context = await createHandlers();
   try {
@@ -154,6 +202,40 @@ test('database backup removal is limited to automatic backup files', async () =>
       handlers.get('db:remove-backup')(event, '..\\outside.sqlite'),
       /Invalid automatic backup file name/,
     );
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('an interrupted backup publish leaves no visible partial backup', async () => {
+  let interruptBackup = false;
+  const interruptedFs = new Proxy(fs, {
+    get(target, property) {
+      if (property === 'writeFile') {
+        return async (filePath, ...args) => {
+          if (interruptBackup && String(filePath).includes('ceramisys_manual_') && String(filePath).endsWith('.tmp')) {
+            await fs.writeFile(filePath, Buffer.from('partial backup'));
+            throw new Error('simulated interrupted backup write');
+          }
+          return fs.writeFile(filePath, ...args);
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  const context = await createHandlers(interruptedFs);
+  try {
+    await fs.mkdir(path.dirname(context.dbFile), { recursive: true });
+    const original = Buffer.from('complete database');
+    await fs.writeFile(context.dbFile, original);
+    interruptBackup = true;
+
+    const result = await context.handlers.get('db:backup')(context.event, 'manual');
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(await fs.readFile(context.dbFile), original, 'backup failure never changes the active database');
+    assert.deepEqual(await fs.readdir(context.backupDir), [], 'no incomplete backup is exposed');
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }

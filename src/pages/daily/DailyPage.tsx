@@ -216,7 +216,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const canSupplierPay = can('suppliers.payment');
   const canVoidSale = can('sales.void');
   const canDeletePurchase = can('purchases.delete');
-  const canDeleteExpense = can('cashier.manage');
+  const canDeleteExpense = can('cashier.expense.delete');
   const canCreateSale = can('sales.create');
   const canCreatePurchase = can('purchases.create');
   const canExpense = can('cashier.expense');
@@ -309,7 +309,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const saleActions = (row: any) => (
     <div className="flex items-center gap-1">
       {canCustomerPay && row.remaining > 0 && (
-        <button type="button" aria-label={`تسجيل دفعة للفاتورة ${row.invoiceNumber}`} title="تسجيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-950">
+        <button type="button" aria-label={`تسجيل دفعة للفاتورة ${row.invoiceNumber}`} title="تسجيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-950">
           <HandCoins className="h-4 w-4" />
         </button>
       )}
@@ -663,7 +663,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 payBadge(row.paymentStatus),
                 <div className="flex items-center gap-1">
                   {canSupplierPay && row.remaining > 0 && (
-                    <button title="سداد للمورد" onClick={() => setPaymentTarget({ kind: 'purchase', id: row.id, name: `${row.invoiceNumber} — ${row.supplierName || ''}`, remaining: row.remaining })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
+                    <button title="سداد للمورد" onClick={() => setPaymentTarget({ kind: 'purchase', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.supplierName || ''}`, remaining: row.remaining })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
                   )}
                   <button title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'purchase', id: row.id })} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                   {canDeletePurchase && (
@@ -693,7 +693,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 <b className="text-rose-600">{fmt(row.amount)}</b>,
                 <span className="text-slate-500">{time(row.createdAt)}</span>,
                 <div className="flex items-center gap-1">
-                  {canExpense && (
+                  {can('cashier.expense.update') && (
                     <button title="تعديل" onClick={() => setExpenseModal({ initial: row })} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg"><Pencil className="w-3.5 h-3.5" /></button>
                   )}
                   {canDeleteExpense && (
@@ -725,7 +725,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 payBadge(row.paymentStatus),
                 <div className="flex items-center gap-1">
                   {canCustomerPay && row.remaining > 0 && (
-                    <button title="تحصيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
+                    <button title="تحصيل دفعة" onClick={() => setPaymentTarget({ kind: 'sale', id: row.id, branchId: row.branchId, name: `${row.invoiceNumber} — ${row.customerName || ''}`, remaining: row.remaining })} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"><HandCoins className="w-3.5 h-3.5" /></button>
                   )}
                   <button title="التفاصيل" onClick={() => setDetailsTarget({ kind: 'sale', id: row.id })} className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg"><Eye className="w-3.5 h-3.5" /></button>
                   {canVoidSale && (

@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertOctagon, RefreshCw } from 'lucide-react';
+import { toAppError } from '../../errors/appError';
 
 interface State {
   error: Error | null;
@@ -9,7 +10,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
-    return { error };
+    return { error: toAppError(error, 'UI_RENDER_FAILED') };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {

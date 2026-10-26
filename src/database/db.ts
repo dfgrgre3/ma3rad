@@ -1,6 +1,7 @@
 import type { Database } from 'sql.js';
 import { runMigrations, DEFAULT_BRANCH_ID } from './migrations';
 import bcrypt from 'bcryptjs';
+import { AppError, toAppError } from '../errors/appError';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 
@@ -56,6 +57,7 @@ export class DatabaseManager {
   private pendingSnapshot: Uint8Array | null = null;
   private isPersisting = false;
   private lastPersistError: string | null = null;
+  private lastPersistErrorCode: string | null = null;
   private initializedSuccessfully = false;
   private storageBackend: 'file' | 'localStorage' | 'none' = 'none';
   private migratedLegacyStorage = false;
@@ -330,6 +332,7 @@ export class DatabaseManager {
     this.forceFreshAfterRecovery = true;
     this.storageBackend = 'none';
     this.lastPersistError = null;
+    this.lastPersistErrorCode = null;
   }
 
   private seedInitialData(): void {
@@ -344,8 +347,8 @@ export class DatabaseManager {
 
     // 1. Initial Admin User
     this.db.run(`
-      INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id, branch_scope)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ALL')
     `, ['usr_admin', 'admin', adminHash, 'مدير النظام', 'ADMIN', null, null, 1, DEFAULT_BRANCH_ID]);
 
     // 2. System settings, default branch, roles and price lists are all seeded by
@@ -438,7 +441,9 @@ export class DatabaseManager {
     try {
       snapshot = this.exportSnapshot();
     } catch (e) {
-      this.lastPersistError = e instanceof Error ? e.message : String(e);
+      const failure = toAppError(e, 'DATABASE_SNAPSHOT_FAILED', 'تعذر إنشاء لقطة لقاعدة البيانات.');
+      this.lastPersistError = failure.message;
+      this.lastPersistErrorCode = failure.code;
       console.error('Failed to export SQLite database snapshot', e);
       return;
     }
@@ -462,9 +467,13 @@ export class DatabaseManager {
             const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
             if (fileApi?.save) {
               const result = await fileApi.save(nextSnapshot);
-              if (!result?.ok) throw new Error(result?.error || 'فشل حفظ قاعدة البيانات على القرص');
+              if (!result?.ok) {
+                throw new AppError(result?.error || 'تعذر حفظ قاعدة البيانات على القرص.',
+                  result?.code || 'DATABASE_SAVE_FAILED', result?.retryable !== false);
+              }
               this.storageBackend = 'file';
               this.lastPersistError = null;
+              this.lastPersistErrorCode = null;
               if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
                 try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
                 this.migratedLegacyStorage = false;
@@ -473,11 +482,14 @@ export class DatabaseManager {
               localStorage.setItem(DB_STORAGE_KEY, bytesToBase64(nextSnapshot));
               this.storageBackend = 'localStorage';
               this.lastPersistError = null;
+              this.lastPersistErrorCode = null;
             } else {
               this.storageBackend = 'none';
             }
           } catch (error) {
-            this.lastPersistError = error instanceof Error ? error.message : String(error);
+            const failure = toAppError(error, 'DATABASE_PERSIST_FAILED', 'تعذر حفظ قاعدة البيانات.');
+            this.lastPersistError = failure.message;
+            this.lastPersistErrorCode = failure.code;
             console.error('Failed to persist SQLite database', error);
           }
         }
@@ -499,7 +511,9 @@ export class DatabaseManager {
       await this.persistQueue;
     } while (this.isPersisting || this.pendingSnapshot);
     if (this.lastPersistError) {
-      throw new Error(`Database changes are not saved: ${this.lastPersistError}`);
+      throw new AppError(`تعذر حفظ تغييرات قاعدة البيانات: ${this.lastPersistError}`, 'DATABASE_PERSIST_FAILED', true, {
+        cause: new AppError(this.lastPersistError, this.lastPersistErrorCode || 'DATABASE_SAVE_FAILED', true),
+      });
     }
   }
 
@@ -511,8 +525,8 @@ export class DatabaseManager {
     return this.lastPersistError;
   }
 
-  public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable'; error?: string } {
-    if (this.lastPersistError) return { status: 'error', error: this.lastPersistError };
+  public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable'; error?: string; code?: string } {
+    if (this.lastPersistError) return { status: 'error', error: this.lastPersistError, code: this.lastPersistErrorCode || 'DATABASE_PERSIST_FAILED' };
     if (this.storageBackend === 'none') return { status: 'unavailable' };
     if (this.debounceSaveTimer || this.isPersisting || this.pendingSnapshot) return { status: 'saving' };
     if (this.storageBackend === 'localStorage') return { status: 'unencrypted' };
@@ -576,7 +590,7 @@ export class DatabaseManager {
         } catch { /* savepoint may already have been released */ }
       }
       console.error('Transaction rolled back due to error:', error);
-      throw error;
+      throw toAppError(error, 'DATABASE_TRANSACTION_FAILED');
     }
   }
 

@@ -156,6 +156,7 @@ test('FIFO sales post layer cost and a sales return restores the original lot', 
 test('end-to-end: weighted-average costing, sale, and return accounting', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
+  db.run(`UPDATE cash_registers SET current_balance = 0 WHERE id = 'cr_main'`);
   db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','AVERAGE_COST')`);
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');

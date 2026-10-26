@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { parseSpreadsheetBuffer } from './SpreadsheetImportService';
+import type { ParsedSpreadsheetSheet } from './SpreadsheetImportService';
 
 export type DynamicFieldType = 'text' | 'number' | 'boolean' | 'date' | 'json';
 export interface DynamicField { key: string; label: string; type: DynamicFieldType; required: boolean; originalHeader?: string; relationCandidate?: string }
@@ -71,16 +73,16 @@ export class DynamicDataService {
   }
 
   importWorkbook(buffer: ArrayBuffer, fileName: string, requestedType?: string): DynamicImportResult {
-    const actor=this.requireAccess(); const workbook=XLSX.read(buffer,{type:'array',cellDates:true});
-    const allRows: Array<{ sheet: string; headers: string[]; rows: Record<string, unknown>[] }> = [];
-    for (const sheetName of workbook.SheetNames) {
-      const sheet=workbook.Sheets[sheetName]; if(!sheet) continue;
-      const rows=XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet,{defval:'',raw:true});
-      if(rows.length) allRows.push({sheet:sheetName,headers:Object.keys(rows[0]),rows});
-    }
+    const parsed = parseSpreadsheetBuffer(buffer, fileName);
+    return this.importSheets(buffer, fileName, parsed.sheets, requestedType);
+  }
+
+  importSheets(buffer: ArrayBuffer, fileName: string, sheets: ParsedSpreadsheetSheet[], requestedType?: string): DynamicImportResult {
+    const actor=this.requireAccess();
+    const allRows = sheets.map(sheet => ({ sheet: sheet.name, headers: sheet.headers, rows: sheet.rows }));
     if(!allRows.length) throw new Error('الملف لا يحتوي على صفوف بيانات.');
     if(allRows.length>1){
-      const outcomes=allRows.map(tab=>{const one=XLSX.utils.book_new();XLSX.utils.book_append_sheet(one,XLSX.utils.json_to_sheet(tab.rows, {header:tab.headers}),tab.sheet.slice(0,31));const bytes=XLSX.write(one,{type:'array',bookType:'xlsx'}) as ArrayBuffer;return this.importWorkbook(bytes,fileName,undefined);});
+      const outcomes=allRows.map(tab=>this.importSheets(buffer,fileName,[{name:tab.sheet,headers:tab.headers,rows:tab.rows}],undefined));
       return {...outcomes[0],entities:outcomes.map(x=>x.entity),imported:outcomes.reduce((n,x)=>n+x.imported,0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:outcomes.flatMap(x=>x.errors)};
     }
     const parsed=allRows[0]; const typeName=(requestedType||parsed.sheet||fileName.replace(/\.[^.]+$/,'')).trim();

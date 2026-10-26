@@ -7,6 +7,7 @@ import { PermissionService } from '../src/services/PermissionService.ts';
 import { FinanceEnterpriseService } from '../src/services/FinanceEnterpriseService.ts';
 import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
 import { postLedgerEntry } from '../src/database/ledger.ts';
+import { MIGRATIONS } from '../src/database/migrations.ts';
 
 function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
   return DatabaseManager.getInstance().query<T>(sql, params)[0];
@@ -295,4 +296,48 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   assert.equal(settleJvLines.find((l: any) => l.code === '1102')?.debit, 9799, 'Dr Bank 9,799');
   assert.equal(settleJvLines.find((l: any) => l.code === '5207')?.debit, 201, 'Dr Gateway fees 201');
   assert.equal(settleJvLines.find((l: any) => l.code === '1106')?.credit, 10000, 'Cr Gateway clearing 10,000');
+});
+
+test('removes only unchanged, unused example records', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const cleanup = MIGRATIONS.find((migration) => migration.id === '055_remove_unmodified_sample_records');
+  assert.ok(cleanup, 'Sample cleanup migration must exist');
+
+  db.run(`INSERT INTO bank_accounts
+    (id, account_name, bank_name, account_number, iban, swift_code, gl_account_id, current_balance, is_active)
+    VALUES ('bank_default', 'البنك الأهلي المصري - الحساب الرئيسي', 'البنك الأهلي المصري',
+      '10002938481', 'EG12000200010002938481001', 'NBEGEGCX', 'acc_1102', 0, 1)`);
+  db.run(`INSERT INTO bank_accounts
+    (id, account_name, bank_name, account_number, gl_account_id, current_balance, is_active)
+    VALUES ('bank_for_sample_settlement', 'حساب مستخدم', 'بنك مصر', 'USER-001', 'acc_1102', 0, 1)`);
+  db.run(`INSERT INTO payment_gateways
+    (id, name, provider_code, gl_account_id, commission_rate, fixed_fee, settlement_period_days, is_active)
+    VALUES
+      ('gw_pos_main', 'ماكينة نقاط البيع POS (فيزا / ماستركارد)', 'POS_TERMINAL', 'acc_1106', 1.5, 2, 1, 1),
+      ('gw_fawry', 'فوري للدفع الإلكتروني', 'FAWRY', 'acc_1106', 2, 1, 2, 1)`);
+  db.run(`INSERT INTO payment_gateway_settlements
+    (id, settlement_number, gateway_id, settlement_date, gross_amount, commission_amount,
+      net_amount, bank_account_id, created_by)
+    VALUES ('settlement_for_sample_gateway', 'STL-TEST-01', 'gw_fawry', '2026-01-01',
+      100, 2, 98, 'bank_for_sample_settlement', 'usr_admin')`);
+  db.run(`INSERT INTO cost_centers (id, code, name, description, is_active) VALUES
+    ('cc_hq', 'CC-HQ', 'اسم عُدّل يدويًا', 'المقر الرئيسي والإدارة', 1),
+    ('cc_sh1', 'CC-SH1', 'صالة العرض الرئيسية', 'معرض المبيعات الرئيسي', 1)`);
+  db.run(`INSERT INTO warehouse_locations
+    (id, warehouse_id, zone, aisle, shelf, bin, barcode, max_capacity_m2, notes) VALUES
+    ('loc_01', 'wh_main', 'A', '01', '01', '01', 'MAIN-01-A-01-01-01', 500, 'ملاحظة معدّلة يدويًا'),
+    ('loc_02', 'wh_main', 'A', '01', '02', '01', 'MAIN-01-A-01-02-01', 500, 'منطقة أرضيات فرز أول')`);
+  db.run(`UPDATE customers SET phone = '01000000000' WHERE id = 'cust_cash'`);
+
+  cleanup.up(db.getDatabase());
+
+  assert.equal(queryOne(`SELECT id FROM bank_accounts WHERE id = 'bank_default'`), undefined);
+  assert.equal(queryOne(`SELECT id FROM payment_gateways WHERE id = 'gw_pos_main'`), undefined);
+  assert.ok(queryOne(`SELECT id FROM payment_gateways WHERE id = 'gw_fawry'`), 'Gateway with a settlement must be preserved');
+  assert.equal(queryOne(`SELECT id FROM cost_centers WHERE id = 'cc_sh1'`), undefined);
+  assert.equal(queryOne(`SELECT name FROM cost_centers WHERE id = 'cc_hq'`)?.name, 'اسم عُدّل يدويًا');
+  assert.equal(queryOne(`SELECT id FROM warehouse_locations WHERE id = 'loc_02'`), undefined);
+  assert.ok(queryOne(`SELECT id FROM warehouse_locations WHERE id = 'loc_01'`), 'Edited location must be preserved');
+  assert.equal(queryOne<{ phone: string }>(`SELECT phone FROM customers WHERE id = 'cust_cash'`)?.phone, '');
 });

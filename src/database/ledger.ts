@@ -15,6 +15,7 @@ export interface LedgerPosting {
   referenceType: string;
   referenceId: string;
   createdBy: string;
+  branchId?: string | null;
   lines: LedgerPostingLine[];
 }
 
@@ -40,6 +41,84 @@ function round2(value: number): number {
 
 function cents(value: number): number {
   return Math.round(value * 100);
+}
+
+function resolvePostingBranchId(db: Database, posting: LedgerPosting): string | null {
+  if (posting.branchId) return posting.branchId;
+
+  const referenceId = posting.referenceId.split(':', 1)[0];
+  const sourceByType: Record<string, string> = {
+    SALES_INVOICE: 'sales_invoices',
+    SALES_VOID: 'sales_invoices',
+    PURCHASE_INVOICE: 'purchase_invoices',
+    PURCHASE_VOID: 'purchase_invoices',
+    EXPENSE: 'expenses',
+    EXPENSE_EDIT: 'expenses',
+    CUSTOMER_PAYMENT: 'customer_payments',
+    CUSTOMER_PAYMENT_VOID: 'customer_payments',
+    SUPPLIER_PAYMENT: 'supplier_payments',
+    SUPPLIER_PAYMENT_VOID: 'supplier_payments',
+    SALES_RETURN: 'sales_returns',
+    PURCHASE_RETURN: 'purchase_returns',
+    PAYROLL_TRANSACTION: 'payroll_transactions',
+    PAYROLL_REVERSAL: 'payroll_transactions',
+    COMMISSION_APPROVAL: 'commissions',
+    COMMISSION_PAYMENT: 'commissions',
+    COMMISSION_CANCELLATION: 'commissions',
+  };
+  const sourceTable = sourceByType[posting.referenceType];
+  if (posting.referenceType === 'PAYROLL_SALARY_ACCRUAL' || posting.referenceType === 'PAYROLL_ADVANCE_APPLICATION') {
+    return queryLedgerRows<{ branch_id: string | null }>(
+      db,
+      'SELECT branch_id FROM employees WHERE id = ?',
+      [referenceId]
+    )[0]?.branch_id ?? null;
+  }
+  if (sourceTable === 'sales_returns') {
+    return queryLedgerRows<{ branch_id: string | null }>(db, `
+      SELECT si.branch_id
+      FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
+      WHERE sr.id = ?
+    `, [referenceId])[0]?.branch_id ?? null;
+  }
+  if (sourceTable === 'purchase_returns') {
+    return queryLedgerRows<{ branch_id: string | null }>(db, `
+      SELECT pi.branch_id
+      FROM purchase_returns pr JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
+      WHERE pr.id = ?
+    `, [referenceId])[0]?.branch_id ?? null;
+  }
+  if (sourceTable) {
+    return queryLedgerRows<{ branch_id: string | null }>(
+      db,
+      `SELECT branch_id FROM ${sourceTable} WHERE id = ?`,
+      [referenceId]
+    )[0]?.branch_id ?? null;
+  }
+  if (posting.referenceType === 'CUSTOMER_PAYMENT_GROUP' || posting.referenceType === 'CUSTOMER_PAYMENT_GROUP_VOID') {
+    return queryLedgerRows<{ branch_id: string | null }>(db, `
+      SELECT branch_id FROM customer_payments
+      WHERE payment_group_id = ? ORDER BY date, id LIMIT 1
+    `, [referenceId])[0]?.branch_id ?? null;
+  }
+  if (posting.referenceType.startsWith('INVENTORY_') || posting.referenceType === 'TRANSFER_LOSS') {
+    return queryLedgerRows<{ branch_id: string | null }>(db, `
+      SELECT COALESCE(w.branch_id, (
+        SELECT bw.branch_id FROM branch_warehouses bw
+        WHERE bw.warehouse_id = t.warehouse_id
+        ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1
+      )) AS branch_id
+      FROM inventory_transactions t
+      LEFT JOIN warehouses w ON w.id = t.warehouse_id
+      WHERE t.id = ?
+    `, [referenceId])[0]?.branch_id ?? null;
+  }
+  const priorBranch = queryLedgerRows<{ branch_id: string | null }>(db, `
+    SELECT branch_id FROM journal_entries
+    WHERE reference_id = ? AND branch_id IS NOT NULL
+    ORDER BY created_at DESC LIMIT 1
+  `, [referenceId])[0]?.branch_id;
+  return priorBranch ?? null;
 }
 
 export function paymentAccountCode(paymentType: string): string {
@@ -129,14 +208,15 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   db.run('UPDATE sequence_counters SET value = ? WHERE name = ?', [next, 'JV']);
   const entryNumber = `JV-${new Date().getFullYear()}-${String(next).padStart(6, '0')}`;
   const entryId = `jv_${uuidv4().slice(0, 8)}`;
+  const branchId = resolvePostingBranchId(db, posting);
 
   db.run(
     `INSERT INTO journal_entries (
        id, entry_number, date, description, reference_type, reference_id,
-       total_debit, total_credit, is_posted, created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+       total_debit, total_credit, is_posted, created_by, branch_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [entryId, entryNumber, posting.date, posting.description.trim(), posting.referenceType,
-      posting.referenceId, totalDebit, totalCredit, posting.createdBy]
+      posting.referenceId, totalDebit, totalCredit, posting.createdBy, branchId]
   );
 
   for (const line of lines) {

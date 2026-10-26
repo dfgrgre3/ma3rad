@@ -14,6 +14,7 @@ export interface SalesInvoice {
   customerName?: string;
   customerPhone?: string;
   warehouseId: string;
+  branchId?: string;
   warehouseName?: string;
   shiftId?: string;
   

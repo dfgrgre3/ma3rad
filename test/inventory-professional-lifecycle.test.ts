@@ -29,9 +29,9 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   const whSource = 'wh_inv_source';
   const whDest = 'wh_inv_dest';
 
-  db.run(`INSERT OR IGNORE INTO warehouses (id, code, name, is_active) VALUES (?, ?, ?, 1)`,
+  db.run(`INSERT OR IGNORE INTO warehouses (id, code, name, branch_id, is_active) VALUES (?, ?, ?, 'br_main', 1)`,
     [whSource, 'WH-SRC-01', 'مستودع الوجه القبلي المركزي']);
-  db.run(`INSERT OR IGNORE INTO warehouses (id, code, name, is_active) VALUES (?, ?, ?, 1)`,
+  db.run(`INSERT OR IGNORE INTO warehouses (id, code, name, branch_id, is_active) VALUES (?, ?, ?, 'br_main', 1)`,
     [whDest, 'WH-DST-01', 'مستودع فرع المعادي']);
 
   db.run(`INSERT OR IGNORE INTO categories (id, name) VALUES ('cat_tiles_inv', 'سيراميك وبورسلين - اختبار')`);

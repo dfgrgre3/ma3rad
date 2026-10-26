@@ -107,6 +107,13 @@ public transferStock(
   }
 
 public getTransactions(limit = 100): InventoryTransaction[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'inventory.view');
+    const scope = this.branchAccess.sqlScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)',
+      actor
+    );
     return this.db.query<InventoryTransaction>(`
       SELECT it.*, p.name as productName, p.sku as productSku,
              p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
@@ -115,8 +122,9 @@ public getTransactions(limit = 100): InventoryTransaction[] {
       JOIN products p ON it.product_id = p.id
       JOIN warehouses w ON it.warehouse_id = w.id
       LEFT JOIN users u ON it.performed_by = u.id
+      WHERE ${scope.clause}
       ORDER BY it.created_at DESC
       LIMIT ?
-    `, [limit]);
+    `, [...scope.params, limit]);
   }
 }

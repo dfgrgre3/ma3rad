@@ -6,6 +6,30 @@ import { DataImportService, ENTITY_META, ImportEntity, ParsedImport, ImportIssue
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { DynamicDataService, DynamicImportResult } from '../../services/DynamicDataService';
+import {
+  MAX_SPREADSHEET_COLUMNS,
+  MAX_SPREADSHEET_FILE_SIZE,
+  MAX_SPREADSHEET_ROWS,
+  ParsedSpreadsheetSheet,
+  validateSpreadsheetFileHeader,
+  validateSpreadsheetFileMetadata,
+} from '../../services/SpreadsheetImportService';
+
+const parseSpreadsheetInWorker = (buffer: ArrayBuffer, fileName: string): Promise<{ buffer: ArrayBuffer; sheets: ParsedSpreadsheetSheet[] }> =>
+  new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('../../workers/spreadsheetImport.worker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (event: MessageEvent<{ buffer?: ArrayBuffer; sheets?: ParsedSpreadsheetSheet[]; error?: string }>) => {
+      worker.terminate();
+      if (event.data.error) reject(new Error(event.data.error));
+      else if (event.data.buffer && event.data.sheets) resolve({ buffer: event.data.buffer, sheets: event.data.sheets });
+      else reject(new Error('تعذر استلام نتيجة تحليل الملف.'));
+    };
+    worker.onerror = () => {
+      worker.terminate();
+      reject(new Error('تعذر تحليل الملف في الخلفية. تحقق من الملف وحاول مجددًا.'));
+    };
+    worker.postMessage({ buffer, fileName }, [buffer]);
+  });
 
 export const DataImportPage: React.FC = () => {
   const service = useMemo(() => new DataImportService(), []);
@@ -21,6 +45,7 @@ export const DataImportPage: React.FC = () => {
   const [manualEntity, setManualEntity] = useState<ImportEntity | ''>('');
   const [manualOverride, setManualOverride] = useState(false);
   const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
+  const [spreadsheetSheets, setSpreadsheetSheets] = useState<ParsedSpreadsheetSheet[]>([]);
   const [dynamicName, setDynamicName] = useState('');
   const [dynamicPreview, setDynamicPreview] = useState<{ headers: string[]; rows: Record<string, unknown>[] } | null>(null);
   const [dynamicResult, setDynamicResult] = useState<DynamicImportResult | null>(null);
@@ -29,20 +54,22 @@ export const DataImportPage: React.FC = () => {
 
   const handleFile = async (file?: File) => {
     if (!file) return;
-    setBusy(true); setMessage(''); setResult(null); setIssues([]); setFileName(file.name);
+    setBusy(true); setMessage(''); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]);
+    setDynamicPreview(null); setDynamicResult(null); setFileName(file.name);
     try {
-      const buffer = await file.arrayBuffer(); setFileBuffer(buffer);
-      const parsedBase = service.parse(buffer, manualOverride && manualEntity ? manualEntity : undefined);
-      const workbookInfo = XLSX.read(buffer, { type: 'array' });
-      const nonEmptySheets = workbookInfo.SheetNames.filter(name => { const sheet=workbookInfo.Sheets[name]; return Boolean(sheet && XLSX.utils.sheet_to_json(sheet,{defval:''}).length); });
-      const parsed = !manualOverride && nonEmptySheets.length > 1 ? { ...parsedBase, entity: 'dynamic' as const } : parsedBase;
+      const extension = validateSpreadsheetFileMetadata(file.name, file.size);
+      const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+      validateSpreadsheetFileHeader(extension, header);
+      const parsedFile = await parseSpreadsheetInWorker(await file.arrayBuffer(), file.name);
+      setFileBuffer(parsedFile.buffer); setSpreadsheetSheets(parsedFile.sheets);
+      const firstSheet = parsedFile.sheets[0];
+      const parsedBase = service.parseRows(firstSheet.headers, firstSheet.rows, manualOverride && manualEntity ? manualEntity : undefined);
+      const parsed = !manualOverride && parsedFile.sheets.length > 1 ? { ...parsedBase, entity: 'dynamic' as const } : parsedBase;
       setData(parsed);
       if (parsed.entity === 'dynamic') {
         if (!PermissionService.can(currentUser, 'admin.data')) throw new Error('الملف لا يطابق كيانًا معروفًا. صلاحية إنشاء أنواع البيانات المرنة غير متاحة لحسابك.');
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-        const sheetName = workbook.SheetNames[0]; const sheet = workbook.Sheets[sheetName];
-        const rows = sheet ? XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true }) : [];
-        setDynamicPreview({ headers: Object.keys(rows[0] || {}), rows });
+        const { name: sheetName, headers, rows } = firstSheet;
+        setDynamicPreview({ headers, rows });
         setDynamicName(sheetName || file.name.replace(/\.[^.]+$/, ''));
         setIssues([]);
       } else { setDynamicPreview(null); setIssues(service.validate(parsed)); }
@@ -56,13 +83,12 @@ export const DataImportPage: React.FC = () => {
     setManualEntity(entity);
     setManualOverride(Boolean(entity));
     if (!data) return;
-    if (!fileBuffer) return;
-    const next = service.parse(fileBuffer, entity || undefined);
+    if (!spreadsheetSheets.length) return;
+    const firstSheet = spreadsheetSheets[0];
+    const next = service.parseRows(firstSheet.headers, firstSheet.rows, entity || undefined);
     setData(next); setIssues(next.entity === 'dynamic' ? [] : service.validate(next)); setResult(null); setDynamicResult(null);
     if (next.entity === 'dynamic') {
-      const workbook = XLSX.read(fileBuffer, { type: 'array', cellDates: true }); const sheetName = workbook.SheetNames[0]; const sheet = workbook.Sheets[sheetName];
-      const rows = sheet ? XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true }) : [];
-      setDynamicPreview({ headers: Object.keys(rows[0] || {}), rows }); setDynamicName(sheetName || fileName.replace(/\.[^.]+$/, ''));
+      setDynamicPreview({ headers: firstSheet.headers, rows: firstSheet.rows }); setDynamicName(firstSheet.name || fileName.replace(/\.[^.]+$/, ''));
     } else setDynamicPreview(null);
   };
 
@@ -85,7 +111,8 @@ export const DataImportPage: React.FC = () => {
     setBusy(true); setMessage('');
     try {
       if (data.entity === 'dynamic') {
-        const outcome = dynamicService.importWorkbook(fileBuffer!, fileName, dynamicName);
+        if (!fileBuffer) throw new Error('أعد اختيار الملف قبل الاستيراد.');
+        const outcome = dynamicService.importSheets(fileBuffer, fileName, spreadsheetSheets, dynamicName);
         setDynamicResult(outcome);
         setMessage(`تم استيراد ${outcome.imported} سجل إلى ${outcome.entities?.length||1} نوع بيانات. البيانات الأصلية محفوظة كاملة.`);
         setBusy(false);
@@ -132,6 +159,7 @@ export const DataImportPage: React.FC = () => {
           <label className="block"><span className="mb-2 block text-xs font-black text-slate-600">تحديد نوع البيانات</span><select value={manualEntity} onChange={e=>changeEntity(e.target.value as ImportEntity)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold"><option value="">اكتشاف تلقائي من الملف</option>{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><option key={key} value={key}>{meta.label}</option>)}{PermissionService.can(currentUser,'admin.data')&&<option value="dynamic">إنشاء نوع بيانات مرن</option>}</select></label>
           <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملف Excel أو CSV'}<input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
         </div>
+        <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV. الحد الأقصى {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت، و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود لكل مصنف.</p>
         {message && <div className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${result?.created ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{message}</span></div>}
         {data?.entity === 'dynamic' && dynamicPreview && <div className="space-y-4 rounded-xl border border-violet-200 bg-violet-50/60 p-4"><div className="flex items-start gap-3"><WandSparkles className="mt-1 h-5 w-5 text-violet-700"/><div><h2 className="font-black text-violet-950">نوع غير معروف — سيُنشأ له تعريف قابل لإعادة الاستخدام</h2><p className="mt-1 text-xs leading-5 text-violet-900">سيتم استنتاج أنواع الحقول مبدئيًا، وحفظ كل قيمة أصلية كما وردت في الملف. يمكن تعديل التعريف والبحث والتصدير من إدارة الأنواع.</p></div></div><label className="block text-xs font-black text-slate-700">اسم نوع البيانات<input value={dynamicName} onChange={e=>setDynamicName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="اسم الورقة أو اسم واضح لهذا النوع"/></label><div className="overflow-auto rounded-lg border border-slate-200 bg-white"><table className="min-w-full text-right text-xs"><thead className="bg-slate-100"><tr>{dynamicPreview.headers.map(h=><th key={h} className="p-2.5">{h}</th>)}</tr></thead><tbody>{dynamicPreview.rows.slice(0,8).map((row,i)=><tr key={i} className="border-t border-slate-100">{dynamicPreview.headers.map(h=><td key={h} className="max-w-48 truncate p-2.5">{String(row[h]??'')}</td>)}</tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{dynamicPreview.rows.length} سجل · {dynamicPreview.headers.length} حقل · ستُحفظ القيم الأصلية كاملة</span><button onClick={runImport} disabled={!dynamicName.trim()||busy||!PermissionService.can(currentUser,'admin.data')} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">إنشاء النوع واستيراد البيانات</button></div>{dynamicResult&&<Link className="inline-block text-sm font-black text-violet-800 underline" to="/data-import/types">فتح إدارة الأنواع والسجلات</Link>}</div>}
         {data && data.entity !== 'dynamic' && <>

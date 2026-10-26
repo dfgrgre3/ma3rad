@@ -15,10 +15,16 @@ import {
 import { FinanceEnterpriseService } from '../../services/FinanceEnterpriseService';
 import type { FiscalYear, FiscalPeriod } from '../../types/finance';
 import { useToast } from '../../components/ui/Toast';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 
 export const FiscalClosingPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const toast = useToast();
+  const actor = AuthService.getCurrentUser();
+  const canManage = PermissionService.can(actor, 'finance.approve');
+  const canClose = PermissionService.can(actor, 'finance.close');
+  const canReopen = PermissionService.can(actor, 'finance.reopen');
 
   const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
   const [selectedYearId, setSelectedYearId] = useState<string>('');
@@ -161,7 +167,7 @@ export const FiscalClosingPage: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
+          {canManage && <button
             onClick={() => {
               const nextYear = new Date().getFullYear() + 1;
               setYearForm({
@@ -176,7 +182,7 @@ export const FiscalClosingPage: React.FC = () => {
           >
             <Plus className="w-4 h-4" />
             <span>سنة مالية جديدة</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -205,12 +211,12 @@ export const FiscalClosingPage: React.FC = () => {
             </span>
           </div>
           {currentYearObj?.status === 'OPEN' ? (
-            <button
+            canClose ? <button
               onClick={() => setCloseYearTarget(currentYearObj)}
               className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-semibold transition"
             >
               إقفال السنة السنوي
-            </button>
+            </button> : <span className="text-xs text-slate-400">الإقفال يتطلب صلاحية مستقلة</span>
           ) : (
             <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-medium">
               قيد الإقفال مُرحّل
@@ -294,19 +300,21 @@ export const FiscalClosingPage: React.FC = () => {
                       <td className="p-3.5 text-slate-500 max-w-xs truncate">{p.closingNotes || '-'}</td>
                       <td className="p-3.5 text-center">
                         {isClosed ? (
+                          canReopen ? (
                           <button
                             onClick={() => setReopenPeriodTarget(p)}
                             className="px-3 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-semibold transition"
                           >
                             إعادة فتح لضرورة
                           </button>
+                          ) : <span className="text-slate-400">إعادة الفتح غير مصرح</span>
                         ) : (
-                          <button
+                          canClose ? <button
                             onClick={() => setClosePeriodTarget(p)}
                             className="px-3 py-1 bg-slate-800 text-white hover:bg-slate-900 rounded-lg text-xs font-semibold transition"
                           >
                             إقفال الفترة
-                          </button>
+                          </button> : <span className="text-slate-400">الإقفال غير مصرح</span>
                         )}
                       </td>
                     </tr>

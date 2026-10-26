@@ -27,7 +27,8 @@ import { FinanceEnterprisePart01 } from './FinanceEnterprisePart01';
 
 export abstract class FinanceEnterprisePart02 extends FinanceEnterprisePart01 {
 public reopenPeriod(periodId: string, reason: string): void {
-    const actor = this.requireManage();
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'finance.reopen');
     if (!reason.trim()) throw new Error('سبب إعادة فتح الفترة إلزامي للرقابة والتدقيق.');
     const period = this.db.query<any>('SELECT * FROM fiscal_periods WHERE id = ?', [periodId])[0];
     if (!period) throw new Error('الفترة المالية غير موجودة.');
@@ -55,7 +56,7 @@ public reopenPeriod(periodId: string, reason: string): void {
   }
 
 public closeFiscalYear(fiscalYearId: string, retainedEarningsCode = '3102'): string {
-    const actor = this.requireManage();
+    const actor = this.requireClose();
     const fy = this.db.query<any>('SELECT * FROM fiscal_years WHERE id = ?', [fiscalYearId])[0];
     if (!fy) throw new Error('السنة المالية غير موجودة.');
     if (fy.status !== 'OPEN') throw new Error('السنة المالية مقفلة بالفعل.');

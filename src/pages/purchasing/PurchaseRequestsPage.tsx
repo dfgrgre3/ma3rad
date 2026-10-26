@@ -40,7 +40,9 @@ export const PurchaseRequestsPage: React.FC = () => {
 
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'purchases.create');
-  const canDecide = PermissionService.can(currentUser, 'finance.approve');
+  const canApprove = PermissionService.can(currentUser, 'purchases.approve');
+  const canReject = PermissionService.can(currentUser, 'purchases.reject');
+  const canCancelRequest = PermissionService.can(currentUser, 'purchases.cancel_request');
 
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -309,22 +311,29 @@ export const PurchaseRequestsPage: React.FC = () => {
                               <FileText className="w-3.5 h-3.5" /> البنود
                             </button>
 
-                            {canDecide && req.status === 'PENDING' && (
+                            {req.status === 'PENDING' && (canApprove || canReject || canCancelRequest) && (
                               <div className="flex gap-1">
-                                <button
+                                {canApprove && <button
                                   onClick={() => decide(req, 'APPROVED')}
                                   className="p-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100"
                                   title="اعتماد الطلب"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
+                                </button>}
+                                {canReject && <button
                                   onClick={() => decide(req, 'REJECTED')}
                                   className="p-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100"
                                   title="رفض"
                                 >
                                   <XCircle className="w-3.5 h-3.5" />
-                                </button>
+                                </button>}
+                                {canCancelRequest && <button
+                                  onClick={() => decide(req, 'CANCELLED')}
+                                  className="p-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
+                                  title="إلغاء الطلب"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>}
                               </div>
                             )}
 
@@ -337,7 +346,7 @@ export const PurchaseRequestsPage: React.FC = () => {
                                 >
                                   <FileSpreadsheet className="w-3 h-3" /> RFQ
                                 </button>
-                                {canDecide && (
+                                {canApprove && (
                                   <button
                                     onClick={() => decide(req, 'ORDERED')}
                                     className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-bold hover:bg-emerald-100"

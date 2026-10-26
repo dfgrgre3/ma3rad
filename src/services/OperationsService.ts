@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
+import { BranchAccessService } from './BranchAccessService';
 
 export interface Branch {
   id: string;
@@ -93,6 +94,7 @@ export interface Delivery {
 
 export class OperationsService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   private requireManage(permission: string): void {
     const actor = AuthService.requireAuth();
@@ -101,11 +103,14 @@ export class OperationsService {
 
   // ── Branches ───────────────────────────────────────────────────────────────
   public getBranches(search = ''): Branch[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'branches.view');
+    const scope = this.branchAccess.sqlScope('b.id', undefined, actor);
     let sql = `
       SELECT b.*, u.full_name AS manager_name,
         (SELECT COUNT(*) FROM warehouses w WHERE w.branch_id = b.id AND w.is_active = 1) AS warehouses_count
-      FROM branches b LEFT JOIN users u ON u.id = b.manager_id WHERE 1 = 1`;
-    const params: any[] = [];
+      FROM branches b LEFT JOIN users u ON u.id = b.manager_id WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
     if (search.trim()) {
       sql += ` AND (b.name LIKE ? OR b.code LIKE ? OR b.address LIKE ? OR b.city LIKE ?)`;
       const term = `%${search.trim()}%`;
@@ -121,6 +126,7 @@ export class OperationsService {
 
   public createBranch(input: { name: string; phone?: string; address?: string; city?: string }): Branch {
     this.requireManage('branches.manage');
+    PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
     if (!input.name.trim()) throw new Error('اسم الفرع مطلوب.');
     const id = `br_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
@@ -136,17 +142,21 @@ export class OperationsService {
 
   public toggleBranch(id: string, active: boolean): void {
     this.requireManage('branches.manage');
+    PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
     this.db.run(`UPDATE branches SET is_active = ? WHERE id = ?`, [active ? 1 : 0, id]);
   }
 
   // ── Warehouses ─────────────────────────────────────────────────────────────
   public getWarehouses(search = ''): WarehouseRow[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'warehouses.view');
+    const scope = this.branchAccess.sqlScope('w.branch_id', undefined, actor);
     let sql = `
       SELECT w.*, b.name AS branch_name,
         (SELECT COUNT(DISTINCT ws.product_id) FROM warehouse_stock ws WHERE ws.warehouse_id = w.id AND ws.quantity_m2 > 0) AS products_count,
         (SELECT COALESCE(SUM(ws.quantity_m2), 0) FROM warehouse_stock ws WHERE ws.warehouse_id = w.id) AS stock_m2
-      FROM warehouses w LEFT JOIN branches b ON b.id = w.branch_id WHERE 1 = 1`;
-    const params: any[] = [];
+      FROM warehouses w LEFT JOIN branches b ON b.id = w.branch_id WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
     if (search.trim()) {
       sql += ` AND (w.name LIKE ? OR w.code LIKE ? OR w.location LIKE ?)`;
       const term = `%${search.trim()}%`;
@@ -163,13 +173,17 @@ export class OperationsService {
   public createWarehouse(input: { name: string; location?: string; branchId?: string }): WarehouseRow {
     this.requireManage('warehouses.manage');
     if (!input.name.trim()) throw new Error('اسم المخزن مطلوب.');
+    const actor = AuthService.requireAuth();
+    const branchId = input.branchId
+      ? (this.branchAccess.requireBranchAccess(input.branchId, actor), input.branchId)
+      : this.branchAccess.getDefaultAccessibleBranchId(actor);
     const id = `wh_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('WH');
       db.run(
         `INSERT INTO warehouses (id, name, code, location, branch_id, is_default, is_active)
          VALUES (?, ?, ?, ?, ?, 0, 1)`,
-        [id, input.name.trim(), code, input.location || null, input.branchId || null]
+        [id, input.name.trim(), code, input.location || null, branchId]
       );
       return this.getWarehouses().find((w) => w.id === id)!;
     });

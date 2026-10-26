@@ -3,30 +3,47 @@ import type { CashRegister, CashShift, Expense, ExpenseCategory, PaymentType } f
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
   private static readonly AUTO_CLOSE_ENABLED_KEY = 'cashShiftAutoCloseEnabled';
   private static readonly AUTO_CLOSE_TIME_KEY = 'cashShiftAutoCloseTime';
 
   public getAllRegisters(): CashRegister[] {
-    return this.db.query<CashRegister>(`SELECT * FROM cash_registers WHERE is_active = 1`);
+    const actor = AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('cr.branch_id', undefined, actor);
+    return this.db.query<CashRegister>(`
+      SELECT cr.*, cr.branch_id AS branchId, b.name AS branchName
+      FROM cash_registers cr
+      JOIN branches b ON b.id = cr.branch_id
+      WHERE cr.is_active = 1 AND ${scope.clause}
+      ORDER BY cr.is_default DESC, b.name ASC, cr.name ASC
+    `, scope.params);
   }
 
-  public getActiveShift(userId?: string): CashShift | null {
+  public getActiveShift(userId?: string, branchId?: string): CashShift | null {
+    const actor = AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('cr.branch_id', undefined, actor);
+    if (branchId) this.branchAccess.requireBranchAccess(branchId, actor);
     let sql = `
-      SELECT cs.*, cr.name as registerName, u.full_name as userName
+      SELECT cs.*, cs.branch_id AS branchId, cr.name as registerName, u.full_name as userName
       FROM cash_shifts cs
       JOIN cash_registers cr ON cs.register_id = cr.id
       JOIN users u ON cs.user_id = u.id
-      WHERE cs.status = 'OPEN'
+      WHERE cs.status = 'OPEN' AND ${scope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...scope.params];
     if (userId) {
       sql += ` AND cs.user_id = ?`;
       params.push(userId);
+    }
+    if (branchId) {
+      sql += ` AND cr.branch_id = ?`;
+      params.push(branchId);
     }
     sql += ` ORDER BY cs.opened_at DESC LIMIT 1`;
 
@@ -35,8 +52,10 @@ export class CashierService {
   }
 
   public getLastClosedShift(registerId: string): CashShift | null {
+    const actor = AuthService.requireAuth();
+    this.branchAccess.requireRegisterAccess(registerId, actor);
     const rows = this.db.query<CashShift>(`
-      SELECT cs.*, cr.name as registerName, u.full_name as userName
+      SELECT cs.*, cs.branch_id AS branchId, cr.name as registerName, u.full_name as userName
       FROM cash_shifts cs
       JOIN cash_registers cr ON cs.register_id = cr.id
       JOIN users u ON cs.user_id = u.id
@@ -47,6 +66,7 @@ export class CashierService {
   }
 
   public getSuggestedOpeningBalance(registerId: string): number {
+    this.branchAccess.requireRegisterAccess(registerId);
     const lastShift = this.getLastClosedShift(registerId);
     if (lastShift) {
       return Number(lastShift.actualEndingCash ?? lastShift.expectedEndingCash ?? 0);
@@ -75,7 +95,7 @@ export class CashierService {
 
   public saveShiftAutoCloseSchedule(enabled: boolean, closeTime: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'cashier.shift');
+    PermissionService.require(actor, 'cashier.manage');
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(closeTime)) {
       throw new Error('أدخل وقت إغلاق صحيحًا بصيغة الساعة والدقيقة.');
     }
@@ -127,7 +147,26 @@ export class CashierService {
   }
 
   public openShift(registerId: string, userId: string, openingBalance: number): CashShift {
-    PermissionService.require(AuthService.requireAuth(), 'cashier.shift');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'cashier.shift.open');
+    const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
+    if (actor.id !== userId && actor.role !== 'ADMIN') {
+      PermissionService.require(actor, 'cashier.manage');
+    }
+    const target = this.db.query<{ branchScope: string }>(
+      'SELECT branch_scope AS branchScope FROM users WHERE id = ? AND is_active = 1',
+      [userId]
+    )[0];
+    if (!target) {
+      throw new Error('المستخدم المحدد غير موجود أو غير نشط.');
+    }
+    const targetCanWorkBranch = target.branchScope === 'ALL' || Boolean(this.db.query(
+      'SELECT 1 FROM users_branches WHERE user_id = ? AND branch_id = ?',
+      [userId, branchId]
+    ).length);
+    if (!targetCanWorkBranch) {
+      throw new Error('المستخدم المحدد غير مخول للعمل على فرع الخزينة.');
+    }
     if (!Number.isFinite(openingBalance) || openingBalance < 0) {
       throw new Error('الرصيد الافتتاحي يجب أن يكون رقمًا صحيحًا غير سالب.');
     }
@@ -142,9 +181,9 @@ export class CashierService {
     return this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(`
         INSERT INTO cash_shifts (
-          id, shift_number, register_id, user_id, opening_balance, expected_ending_cash, status
-        ) VALUES (?, ?, ?, ?, ?, ?, 'OPEN')
-      `, [shiftId, shiftNumber, registerId, userId, openingBalance, openingBalance]);
+          id, shift_number, register_id, user_id, branch_id, opening_balance, expected_ending_cash, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN')
+      `, [shiftId, shiftNumber, registerId, userId, branchId, openingBalance, openingBalance]);
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
@@ -156,11 +195,21 @@ export class CashierService {
   }
 
   public closeShift(shiftId: string, actualEndingCash: number, closingNotes = '', performedBy = 'usr_admin'): CashShift {
-    PermissionService.require(AuthService.requireAuth(), 'cashier.shift');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'cashier.shift.close');
     if (!Number.isFinite(actualEndingCash) || actualEndingCash < 0) {
       throw new Error('المبلغ الفعلي يجب أن يكون رقمًا صحيحًا غير سالب.');
     }
-    return this.closeShiftInternal(shiftId, actualEndingCash, closingNotes, performedBy, false);
+    const shift = this.db.query<{ userId: string; registerId: string }>(
+      'SELECT user_id AS userId, register_id AS registerId FROM cash_shifts WHERE id = ? AND status = ?',
+      [shiftId, 'OPEN']
+    )[0];
+    if (!shift) throw new Error('الوردية غير موجودة أو مغلقة مسبقاً.');
+    this.branchAccess.requireShiftAccess(shiftId, actor, shift.registerId);
+    if (actor.id !== shift.userId && actor.role !== 'ADMIN') {
+      PermissionService.require(actor, 'cashier.manage');
+    }
+    return this.closeShiftInternal(shiftId, actualEndingCash, closingNotes, actor.id, false);
   }
 
   private calculateExpectedEndingCash(shift: CashShift): number {
@@ -225,19 +274,24 @@ export class CashierService {
   }
 
   public getAllExpenses(dateFrom?: string, dateTo?: string): Expense[] {
+    const actor = AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('e.branch_id', 'cr.branch_id', actor);
     let sql = `
-      SELECT e.*, u.full_name as performedByName
+      SELECT e.*, e.branch_id AS branchId, u.full_name as performedByName
       FROM expenses e
       LEFT JOIN users u ON e.performed_by = u.id
+      LEFT JOIN cash_registers cr ON cr.id = e.register_id
     `;
     const params: any[] = [];
+    sql += ` WHERE ${scope.clause}`;
+    params.push(...scope.params);
 
     if (dateFrom) {
-      sql += ` WHERE e.date >= ?`;
+      sql += ` AND e.date >= ?`;
       params.push(dateFrom);
     }
     if (dateTo) {
-      sql += (dateFrom ? ' AND' : ' WHERE') + ` e.date <= ?`;
+      sql += ` AND e.date <= ?`;
       params.push(dateTo);
     }
 
@@ -258,6 +312,16 @@ export class CashierService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'cashier.expense');
     if (amount <= 0) throw new Error('مبلغ المصروف يجب أن يكون أكبر من الصفر.');
+    const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
+    if (shiftId) {
+      const shift = this.db.query<{ registerId: string; status: string }>(
+        'SELECT register_id AS registerId, status FROM cash_shifts WHERE id = ? AND branch_id = ?',
+        [shiftId, branchId]
+      )[0];
+      if (!shift || shift.status !== 'OPEN' || shift.registerId !== registerId) {
+        throw new Error('الوردية المحددة غير مفتوحة أو لا تتبع خزينة هذا الفرع.');
+      }
+    }
 
     const expId = `exp_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
@@ -266,9 +330,9 @@ export class CashierService {
       // 1. Insert Expense
       sqliteDb.run(`
         INSERT INTO expenses (
-          id, category, amount, register_id, shift_id, payment_type, date, recipient, description, performed_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [expId, category, amount, registerId, shiftId || null, paymentType, today, recipient || null, description, performedBy]);
+          id, category, amount, register_id, shift_id, branch_id, payment_type, date, recipient, description, performed_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [expId, category, amount, registerId, shiftId || null, branchId, paymentType, today, recipient || null, description, actor.id]);
 
       // 2. Deduct from Cash register if cash
       if (paymentType === 'CASH') {
@@ -301,6 +365,7 @@ export class CashierService {
         category,
         amount,
         registerId,
+        branchId,
         shiftId,
         paymentType,
         date: today,
@@ -317,13 +382,19 @@ export class CashierService {
     patch: { category: string; amount: number; description: string; recipient?: string; paymentType: PaymentType; registerId?: string }
   ): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'cashier.expense');
-    const current = this.db.query<any>('SELECT * FROM expenses WHERE id = ?', [id])[0];
+    PermissionService.require(actor, 'cashier.expense.update');
+    const scope = this.branchAccess.sqlScope('e.branch_id', 'cr.branch_id', actor);
+    const current = this.db.query<any>(`
+      SELECT e.*, e.branch_id AS branchId
+      FROM expenses e LEFT JOIN cash_registers cr ON cr.id = e.register_id
+      WHERE e.id = ? AND ${scope.clause}
+    `, [id, ...scope.params])[0];
     if (!current) throw new Error('المصروف غير موجود.');
     if (!patch.description.trim()) throw new Error('بيان المصروف مطلوب.');
     if (!patch.amount || patch.amount <= 0) throw new Error('أدخل مبلغًا صحيحًا أكبر من صفر.');
 
     const registerId = patch.registerId || current.register_id || 'cr_main';
+    const branchId = this.branchAccess.requireRegisterAccess(registerId, actor, current.branchId);
     this.db.executeTransaction((db) => {
       const ledgerDb = db.getDatabase();
       const currentPosting = ledgerDb.exec(`
@@ -356,9 +427,9 @@ export class CashierService {
         }
       }
       db.run(
-        `UPDATE expenses SET category = ?, amount = ?, description = ?, recipient = ?, payment_type = ?, register_id = ?
+        `UPDATE expenses SET category = ?, amount = ?, description = ?, recipient = ?, payment_type = ?, register_id = ?, branch_id = ?
          WHERE id = ?`,
-        [patch.category, patch.amount, patch.description.trim(), patch.recipient || null, patch.paymentType, registerId, id]
+        [patch.category, patch.amount, patch.description.trim(), patch.recipient || null, patch.paymentType, registerId, branchId, id]
       );
       postLedgerEntry(ledgerDb, {
         date: localDateString(), description: patch.description.trim(),
@@ -382,9 +453,15 @@ export class CashierService {
 
   public deleteExpense(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'cashier.manage');
-    const expense = this.db.query<any>('SELECT * FROM expenses WHERE id = ?', [id])[0];
+    PermissionService.require(actor, 'cashier.expense.delete');
+    const scope = this.branchAccess.sqlScope('e.branch_id', 'cr.branch_id', actor);
+    const expense = this.db.query<any>(`
+      SELECT e.*, e.branch_id AS branchId
+      FROM expenses e LEFT JOIN cash_registers cr ON cr.id = e.register_id
+      WHERE e.id = ? AND ${scope.clause}
+    `, [id, ...scope.params])[0];
     if (!expense) throw new Error('المصروف غير موجود.');
+    this.branchAccess.requireRegisterAccess(expense.register_id, actor, expense.branchId);
 
     this.db.executeTransaction((db) => {
       const ledgerDb = db.getDatabase();

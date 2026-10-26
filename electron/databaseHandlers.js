@@ -71,6 +71,21 @@ async function atomicWrite(fs, filePath, bytes) {
   }
 }
 
+async function atomicCreate(fs, filePath, bytes) {
+  const temporaryPath = `${filePath}.${randomBytes(8).toString('hex')}.tmp`;
+  try {
+    await fs.writeFile(temporaryPath, bytes, { mode: 0o600, flag: 'wx' });
+    // link() publishes the completed file atomically and fails if the target exists.
+    await fs.link(temporaryPath, filePath);
+    await fs.unlink(temporaryPath);
+  } catch (error) {
+    try { await fs.unlink(temporaryPath); } catch (cleanupError) {
+      if (cleanupError.code !== 'ENOENT') throw cleanupError;
+    }
+    throw error;
+  }
+}
+
 function registerDatabaseHandlers({
   ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
   APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
@@ -105,7 +120,7 @@ function registerDatabaseHandlers({
       : encryptDatabaseBytes(raw, await getKey());
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const target = path.join(BACKUP_DIR, `ceramisys_corrupt_${stamp}.sqlite.enc`);
-    await fs.writeFile(target, protectedBytes, { mode: 0o600, flag: 'wx' });
+    await atomicCreate(fs, target, protectedBytes);
     return { path: target, bytes: protectedBytes.length };
   });
 
@@ -135,7 +150,12 @@ function registerDatabaseHandlers({
       return { ok: true, path: DB_FILE, bytes: encrypted.length };
     } catch (error) {
       console.error('Failed to save encrypted database file:', error);
-      return { ok: false, error: error.message || String(error) };
+      return {
+        ok: false,
+        code: error.code || 'DATABASE_SAVE_FAILED',
+        retryable: true,
+        error: error.message || String(error),
+      };
     }
   });
 
@@ -163,7 +183,7 @@ function registerDatabaseHandlers({
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const safeLabel = String(label || 'manual').replace(/[^a-zA-Z0-9_-]/g, '-');
       const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite.enc`);
-      await fs.writeFile(target, protectedBytes, { mode: 0o600, flag: 'wx' });
+      await atomicCreate(fs, target, protectedBytes);
       return { ok: true, path: target, bytes: protectedBytes.length };
     } catch (error) {
       console.error('Failed to create encrypted database backup:', error);

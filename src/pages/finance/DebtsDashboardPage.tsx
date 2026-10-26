@@ -42,7 +42,7 @@ export const DebtsDashboardPage: React.FC = () => {
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null);
   const [customerDetails, setCustomerDetails] = useState<Record<string, { address: string; invoices: Array<{ id: string; invoiceNumber: string; date: string; total: number; paid: number; remaining: number; items: Array<{ name: string; sku:string; grade:string; size:string; quantity: number; unit: string; unitPrice:number; discount:number; total:number; returned:number }> }>; payments: Array<{ id:string; invoiceId:string|null; paymentGroupId:string|null; receiptNumber: string; date: string; amount: number; paymentType: string; notes: string | null }>; promises:PromiseRow[] }>>({});
   const [summary, setSummary] = useState({ openCustomers: 0, openInvoices: 0, overdueInvoices: 0, overdueInvoiceCount: 0, pendingGoodsValue: 0, overdueOrders: 0, otherReceivables: 0 });
-  const canReversePayments = PermissionService.can(AuthService.getCurrentUser(),'customers.payment');
+  const canReversePayments = PermissionService.can(AuthService.getCurrentUser(),'customers.payment.reverse');
   const canManagePromises = PermissionService.can(AuthService.getCurrentUser(),'customers.update');
 
   const toggleCustomer = (id: string) => {

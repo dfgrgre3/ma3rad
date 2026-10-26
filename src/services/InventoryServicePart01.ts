@@ -3,6 +3,7 @@ import type { Warehouse, WarehouseStock, InventoryTransaction, InventoryTransact
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 import { postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
@@ -10,6 +11,7 @@ import { getProductUnitLabel } from '../utils/productUnits';
 
 export class InventoryServicePart01 {
 protected db = DatabaseManager.getInstance();
+protected branchAccess = new BranchAccessService();
 
 protected getUnitLabel(productId: string): string {
     const product = this.db.query<{ productType: 'CERAMIC' | 'GENERAL'; baseUnit: UnitType; customUnit: string }>(
@@ -20,10 +22,24 @@ protected getUnitLabel(productId: string): string {
   }
 
 public getAllWarehouses(): Warehouse[] {
-    return this.db.query<Warehouse>(`SELECT * FROM warehouses WHERE is_active = 1 ORDER BY is_default DESC, name ASC`);
+      AuthService.requireAuth();
+      const scope = this.branchAccess.sqlScope(
+        'w.branch_id',
+        '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)'
+      );
+      return this.db.query<Warehouse>(
+        `SELECT w.* FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} ORDER BY w.is_default DESC, w.name ASC`,
+        scope.params
+      );
   }
 
 public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock & { productName: string; sku: string; barcode: string; grade: string; size: string; metersPerBox: number; costPrice: number; sellingPriceM2: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: UnitType; customUnit: string })[] {
+    AuthService.requireAuth();
+    if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId);
+    const scope = this.branchAccess.sqlScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)'
+    );
     let sql = `
       SELECT 
         ws.id, ws.warehouse_id as warehouseId, ws.product_id as productId,
@@ -47,9 +63,9 @@ public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock
         GROUP BY product_id, warehouse_id
       ) movement_totals ON movement_totals.product_id = ws.product_id
                        AND movement_totals.warehouse_id = ws.warehouse_id
-      WHERE p.is_active = 1
+      WHERE p.is_active = 1 AND ${scope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...scope.params];
 
     if (warehouseId) {
       sql += ` AND ws.warehouse_id = ?`;
@@ -85,6 +101,8 @@ public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock
   }
 
 public getProductStock(productId: string, warehouseId: string): WarehouseStock | null {
+    AuthService.requireAuth();
+    this.branchAccess.requireWarehouseAccess(warehouseId);
     const rows = this.db.query<WarehouseStock>(`
       SELECT ws.*, p.meters_per_box as metersPerBox, p.product_type as productType, p.base_unit as baseUnit
       FROM warehouse_stock ws

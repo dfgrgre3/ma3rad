@@ -1,6 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService, type BranchSqlScope } from './BranchAccessService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 
@@ -80,27 +81,45 @@ export interface ReconciliationCheck {
 
 export class FinancialStatementsService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   private requireView(permission: string): void {
     PermissionService.require(AuthService.requireAuth(), permission);
   }
 
+  private ledgerScope(alias = 'e'): BranchSqlScope {
+    return this.branchAccess.sqlScope(`${alias}.branch_id`);
+  }
+
+  public getBranchScopeWarning(): string | null {
+    if (this.branchAccess.getAccessibleBranchIds() === null) return null;
+    const count = Number(this.db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM journal_entries WHERE branch_id IS NULL'
+    )[0]?.count || 0);
+    return count
+      ? `تم استبعاد ${count} قيد محاسبي غير منسوب إلى فرع؛ راجعها بصلاحية مركزية قبل الاعتماد على الإجماليات.`
+      : null;
+  }
+
   public getReconciliation(): ReconciliationCheck[] {
     this.requireView('finance.view');
+    const scope = this.ledgerScope();
     const accountBalance = (code: string, normal: 'DEBIT' | 'CREDIT') => {
       const row = this.db.query<{ balance: number }>(`
         SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
         FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
         JOIN chart_of_accounts a ON a.id = l.account_id
-        WHERE e.is_posted = 1 AND a.code = ?
-      `, [code])[0];
+        WHERE e.is_posted = 1 AND a.code = ? AND ${scope.clause}
+      `, [code, ...scope.params])[0];
       const signed = Number(row?.balance || 0);
       return round2(normal === 'DEBIT' ? signed : -signed);
     };
     const checks: ReconciliationCheck[] = [];
     const add = (key: string, label: string, ledger: number, source: number, detail: string) => {
-      const difference = round2(ledger - source);
-      checks.push({ key, label, ledger: round2(ledger), source: round2(source), difference,
+      const roundedLedger = round2(ledger);
+      const roundedSource = round2(source);
+      const difference = round2(roundedLedger - roundedSource);
+      checks.push({ key, label, ledger: roundedLedger, source: roundedSource, difference,
         status: Math.abs(difference) < 0.01 ? 'MATCH' : 'DIFFERENCE', detail });
     };
 
@@ -110,7 +129,7 @@ export class FinancialStatementsService {
                COALESCE(SUM(l.debit), 0) AS line_debit,
                COALESCE(SUM(l.credit), 0) AS line_credit
         FROM journal_entries e LEFT JOIN journal_entry_lines l ON l.entry_id = e.id
-        WHERE e.is_posted = 1 GROUP BY e.id
+        WHERE e.is_posted = 1 AND ${scope.clause} GROUP BY e.id
       )
       SELECT COUNT(*) AS entries,
              COALESCE(SUM(CASE WHEN ABS(ROUND(line_debit - line_credit, 2)) > 0 OR
@@ -118,7 +137,7 @@ export class FinancialStatementsService {
                THEN 1 ELSE 0 END), 0) AS unbalanced,
              COALESCE(SUM(line_debit), 0) AS debit, COALESCE(SUM(line_credit), 0) AS credit
       FROM entry_totals
-    `)[0];
+    `, scope.params)[0];
     const journalDifference = round2(Number(integrity?.debit || 0) - Number(integrity?.credit || 0));
     const unbalancedEntries = Number(integrity?.unbalanced || 0);
     checks.push({ key: 'journal', label: 'توازن القيود المرحلة', ledger: round2(integrity?.debit || 0),
@@ -126,7 +145,8 @@ export class FinancialStatementsService {
       status: unbalancedEntries === 0 ? 'MATCH' : 'DIFFERENCE',
       detail: `${unbalancedEntries} قيد غير متوازن من ${Number(integrity?.entries || 0)} قيد مرحل` });
 
-    const cached = this.db.query<{ mismatches: number; maxDifference: number }>(`
+    const allowedBranches = this.branchAccess.getAccessibleBranchIds();
+    const cached = allowedBranches === null ? this.db.query<{ mismatches: number; maxDifference: number }>(`
       SELECT COALESCE(SUM(CASE WHEN ABS(ROUND(a.balance - COALESCE(x.balance, 0), 2)) > 0 THEN 1 ELSE 0 END), 0) AS mismatches,
              COALESCE(MAX(ABS(ROUND(a.balance - COALESCE(x.balance, 0), 2))), 0) AS maxDifference
       FROM chart_of_accounts a
@@ -135,31 +155,35 @@ export class FinancialStatementsService {
         FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
         WHERE e.is_posted = 1 GROUP BY l.account_id
       ) x ON x.account_id = a.id
-    `)[0];
-    add('cached', 'أرصدة دليل الحسابات المخزنة', 0, Number(cached?.maxDifference || 0),
-      `${Number(cached?.mismatches || 0)} حساب يحتاج إلى تحديث رصيده المخزن`);
+    `)[0] : undefined;
+    if (cached) {
+      add('cached', 'أرصدة دليل الحسابات المخزنة', 0, Number(cached.maxDifference || 0),
+        `${Number(cached.mismatches || 0)} حساب يحتاج إلى تحديث رصيده المخزن`);
+    }
 
-    const customers = this.db.query<{ balance: number }>('SELECT COALESCE(SUM(current_balance), 0) AS balance FROM customers')[0]?.balance || 0;
-    add('customers', 'ذمم العملاء مقابل الأستاذ العام', accountBalance('1103', 'DEBIT'), Number(customers),
-      'مقارنة حساب العملاء 1103 بإجمالي الأرصدة الحالية في سجل العملاء');
+    if (allowedBranches === null) {
+      const customers = this.db.query<{ balance: number }>('SELECT COALESCE(SUM(current_balance), 0) AS balance FROM customers')[0]?.balance || 0;
+      add('customers', 'ذمم العملاء مقابل الأستاذ العام', accountBalance('1103', 'DEBIT'), Number(customers),
+        'مقارنة حساب العملاء 1103 بإجمالي الأرصدة الحالية في سجل العملاء');
 
-    const suppliers = this.db.query<{ balance: number }>('SELECT COALESCE(SUM(current_balance), 0) AS balance FROM suppliers')[0]?.balance || 0;
-    add('suppliers', 'ذمم الموردين مقابل الأستاذ العام', accountBalance('2101', 'CREDIT'), Number(suppliers),
-      'مقارنة حساب الموردين 2101 بإجمالي الأرصدة الحالية في سجل الموردين');
+      const suppliers = this.db.query<{ balance: number }>('SELECT COALESCE(SUM(current_balance), 0) AS balance FROM suppliers')[0]?.balance || 0;
+      add('suppliers', 'ذمم الموردين مقابل الأستاذ العام', accountBalance('2101', 'CREDIT'), Number(suppliers),
+        'مقارنة حساب الموردين 2101 بإجمالي الأرصدة الحالية في سجل الموردين');
+    }
 
-    const inventory = this.db.query<{ value: number; estimatedLayers: number }>(`
+    const inventory = allowedBranches === null ? this.db.query<{ value: number; estimatedLayers: number }>(`
       SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS value,
              COALESCE(SUM(CASE WHEN is_estimated = 1 AND quantity_remaining > 0.009 THEN 1 ELSE 0 END), 0) AS estimatedLayers
       FROM inventory_cost_layers WHERE quantity_remaining > 0.009
-    `)[0];
+    `)[0] : undefined;
     const costingMethod = this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='costingMethod'`)[0]?.value || 'AVERAGE_COST';
-    const inventoryValue = Number(inventory?.value || 0);
     const ledgerValue = accountBalance('1104', 'DEBIT');
 
-    if (costingMethod === 'FIFO') {
+    if (inventory && costingMethod === 'FIFO') {
+      const inventoryValue = Number(inventory.value || 0);
       add('inventory', 'قيمة المخزون حسب طبقات التكلفة (FIFO)', ledgerValue, inventoryValue,
-        `${Number(inventory?.estimatedLayers || 0)} طبقة تكلفة متبقية تقديرية؛ قد تفسر جزءًا من الفرق`);
-    } else {
+        `${Number(inventory.estimatedLayers || 0)} طبقة تكلفة متبقية تقديرية؛ قد تفسر جزءًا من الفرق`);
+    } else if (inventory) {
       // For AVERAGE_COST, compare ledger with calculated value from stock * cost_price
       const stockValue = this.db.query<{ value: number }>(`
         SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
@@ -178,6 +202,7 @@ export class FinancialStatementsService {
     this.requireView('finance.view');
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid balance sheet date.');
+    const scope = this.ledgerScope();
     const accounts = this.db.query<{
       code: string;
       name: string;
@@ -190,9 +215,9 @@ export class FinancialStatementsService {
              COALESCE(SUM(CASE WHEN e.id IS NOT NULL THEN l.credit ELSE 0 END), 0) AS credit
       FROM chart_of_accounts a
       LEFT JOIN journal_entry_lines l ON l.account_id = a.id
-      LEFT JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1 AND e.date <= ?
+      LEFT JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1 AND e.date <= ? AND ${scope.clause}
       GROUP BY a.id
-    `, [date]);
+    `, [date, ...scope.params]);
     const accountBalance = (code: string, type: string) => {
       const account = accounts.find((row) => row.code === code);
       if (!account) return 0;
@@ -278,6 +303,7 @@ export class FinancialStatementsService {
     if (!isValidDate(from) || !isValidDate(to) || from > to) {
       throw new Error('Invalid cash flow date range.');
     }
+    const scope = this.ledgerScope();
 
     // Operating activities: all operating cash movements (sales, purchases, expenses, manual adjustments)
     const operatingRows = this.db.query<any>(`
@@ -292,14 +318,14 @@ export class FinancialStatementsService {
         FROM journal_entries e
         JOIN journal_entry_lines l ON l.entry_id = e.id
         JOIN chart_of_accounts a ON a.id = l.account_id
-        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${scope.clause}
         GROUP BY e.id, substr(e.date, 1, 7)
       )
       SELECT month, SUM(MAX(net_cash, 0)) AS inflow, SUM(MAX(-net_cash, 0)) AS outflow
       FROM cash_by_entry
       GROUP BY month
       ORDER BY month ASC
-    `, [from, to]);
+    `, [from, to, ...scope.params]);
 
     // Investing activities: fixed assets, investments
     const investingRows = this.db.query<any>(`
@@ -312,14 +338,14 @@ export class FinancialStatementsService {
         FROM journal_entries e
         JOIN journal_entry_lines l ON l.entry_id = e.id
         JOIN chart_of_accounts a ON a.id = l.account_id
-        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${scope.clause}
         GROUP BY e.id, substr(e.date, 1, 7)
       )
       SELECT month, SUM(MAX(net_cash, 0)) AS inflow, SUM(MAX(-net_cash, 0)) AS outflow
       FROM cash_by_entry
       GROUP BY month
       ORDER BY month ASC
-    `, [from, to]);
+    `, [from, to, ...scope.params]);
 
     // Financing activities: loans, capital, dividends
     const financingRows = this.db.query<any>(`
@@ -332,14 +358,14 @@ export class FinancialStatementsService {
         FROM journal_entries e
         JOIN journal_entry_lines l ON l.entry_id = e.id
         JOIN chart_of_accounts a ON a.id = l.account_id
-        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+        WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${scope.clause}
         GROUP BY e.id, substr(e.date, 1, 7)
       )
       SELECT month, SUM(MAX(net_cash, 0)) AS inflow, SUM(MAX(-net_cash, 0)) AS outflow
       FROM cash_by_entry
       GROUP BY month
       ORDER BY month ASC
-    `, [from, to]);
+    `, [from, to, ...scope.params]);
 
     // Combine all cash flows
     const combinedMap = new Map<string, { inflow: number; outflow: number }>();
@@ -421,6 +447,7 @@ export class FinancialStatementsService {
     this.requireView('finance.debts.view');
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid aging date.');
+    const scope = this.branchAccess.sqlScope('si.branch_id');
     return this.buildAging(`
       SELECT c.id, c.name, c.phone, COALESCE(si.due_date, si.date) AS docDate,
         MAX(0, si.total_amount
@@ -433,7 +460,7 @@ export class FinancialStatementsService {
               WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0)
         ) AS remaining
       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
-      WHERE si.invoice_status != 'VOID' AND si.date <= ?
+      WHERE si.invoice_status != 'VOID' AND si.date <= ? AND ${scope.clause}
         AND si.total_amount
           - MAX(0, si.paid_amount - COALESCE((SELECT SUM(cpa0.amount) FROM customer_payment_allocations cpa0
               WHERE cpa0.sales_invoice_id = si.id), 0))
@@ -442,13 +469,14 @@ export class FinancialStatementsService {
               WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?), 0)
           - COALESCE((SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
               WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0) > 0.009
-    `, [date, date, date, date, date], date);
+    `, [date, date, date, date, date, ...scope.params], date);
   }
 
   public getSupplierAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
     this.requireView('finance.debts.view');
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid aging date.');
+    const scope = this.branchAccess.sqlScope('pi.branch_id');
     return this.buildAging(`
       SELECT s.id, s.name, s.phone, pi.date AS docDate,
         MAX(0, pi.total_amount
@@ -461,7 +489,7 @@ export class FinancialStatementsService {
               WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0)
         ) AS remaining
       FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id
-      WHERE pi.date <= ?
+      WHERE pi.date <= ? AND ${scope.clause}
         AND pi.total_amount
           - MAX(0, pi.paid_amount - COALESCE((SELECT SUM(spa0.amount) FROM supplier_payment_allocations spa0
               WHERE spa0.purchase_invoice_id = pi.id), 0))
@@ -470,7 +498,7 @@ export class FinancialStatementsService {
               WHERE spa.purchase_invoice_id = pi.id AND sp.date <= ?), 0)
           - COALESCE((SELECT SUM(pr.remaining_to_balance) FROM purchase_returns pr
               WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0) > 0.009
-    `, [date, date, date, date, date], date);
+    `, [date, date, date, date, date, ...scope.params], date);
   }
 
   private buildAging(sql: string, params: any[], asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
@@ -534,19 +562,20 @@ export class FinancialStatementsService {
     if ((dateFrom && !isValidDate(dateFrom)) || (dateTo && !isValidDate(dateTo)) || from > to) {
       throw new Error('Invalid general ledger date range.');
     }
+    const scope = this.ledgerScope();
     const opening = this.scalar(`
       SELECT COALESCE(SUM(l.debit - l.credit), 0)
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
-      WHERE l.account_id = ? AND e.is_posted = 1 AND e.date < ?
-    `, [accountId, from]);
+      WHERE l.account_id = ? AND e.is_posted = 1 AND e.date < ? AND ${scope.clause}
+    `, [accountId, from, ...scope.params]);
 
     const rows = this.db.query<any>(`
       SELECT e.date, e.entry_number AS entryNumber, e.description,
              l.debit, l.credit, l.description AS lineDescription
       FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
-      WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+      WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${scope.clause}
       ORDER BY e.date ASC, e.created_at ASC
-    `, [accountId, from, to]);
+    `, [accountId, from, to, ...scope.params]);
 
     let running = opening;
     const lines = rows.map((row) => {

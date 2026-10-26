@@ -51,12 +51,9 @@ const number = (value: unknown) => { const n = Number(String(value ?? '').replac
 const truthy = (v: unknown) => ['1','true','yes','نعم','ذكر'].includes(text(v).toLowerCase());
 
 export class DataImportService {
-  parse(buffer: ArrayBuffer, preferred?: ImportEntity): ParsedImport {
-    const wb = XLSX.read(buffer, { type: 'array' }); const sheet = wb.Sheets[wb.SheetNames[0]];
-    if (!sheet) throw new Error('الملف لا يحتوي على ورقة بيانات.');
-    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: true });
+  parseRows(headers: string[], rows: Record<string, unknown>[], preferred?: ImportEntity): ParsedImport {
     if (!rows.length) throw new Error('الملف لا يحتوي على صفوف بيانات.');
-    const headers = Object.keys(rows[0]); const scores = (Object.keys(ENTITY_META) as ExistingImportEntity[]).map(entity => ({ entity, score: ENTITY_META[entity].fields.reduce((n,f)=>n+(headers.some(h=>f.aliases.some(a=>cleanHeader(a)===cleanHeader(h)))?1:0),0) }));
+    const scores = (Object.keys(ENTITY_META) as ExistingImportEntity[]).map(entity => ({ entity, score: ENTITY_META[entity].fields.reduce((n,f)=>n+(headers.some(h=>f.aliases.some(a=>cleanHeader(a)===cleanHeader(h)))?1:0),0) }));
     scores.sort((a,b)=>b.score-a.score);
     const best = scores[0];
     const requiredCount = ENTITY_META[best.entity].fields.filter(f=>f.required).length;

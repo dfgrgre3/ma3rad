@@ -13,6 +13,7 @@ import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { computeReturnImpact, round2 } from '../../services/financials';
 
 const PAGE_SIZE = 15;
 
@@ -139,16 +140,16 @@ export const ReturnsPage: React.FC = () => {
   const setLine = (idx: number, patch: Partial<ReturnLine>) =>
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
 
-  const total = lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice, 0);
+  const total = round2(lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice, 0));
   const refundPreview = useMemo(() => {
     if (!invoiceInfo) return { cash: 0, balance: 0 };
-    const invoiceTotal = Number(invoiceInfo.totalAmount || 0);
-    const invoicePaid = Number(invoiceInfo.paidAmount || 0);
-    const creditPortion = Math.max(0, invoiceTotal - invoicePaid);
-    const paysCash = refundCash && refundMethod !== 'BALANCE';
-    const toBalance = paysCash ? Math.max(0, Math.min(total, creditPortion)) : total;
-    const cash = paysCash ? Math.max(0, total - toBalance) : 0;
-    return { cash, balance: paysCash ? toBalance : total };
+    const impact = computeReturnImpact({
+      invoiceTotal: Number(invoiceInfo.totalAmount || 0),
+      invoicePaid: Number(invoiceInfo.paidAmount || 0),
+      returnTotal: total,
+      refundCash: refundCash && refundMethod !== 'BALANCE',
+    });
+    return { cash: impact.cashRefund, balance: impact.balanceDelta };
   }, [invoiceInfo, total, refundCash, refundMethod]);
 
   const submit = (e: React.FormEvent) => {

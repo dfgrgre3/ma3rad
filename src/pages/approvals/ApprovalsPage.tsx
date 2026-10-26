@@ -28,6 +28,9 @@ export const ApprovalsPage: React.FC = () => {
   const service = new ApprovalService();
   const user = AuthService.getCurrentUser();
   const canApprove = PermissionService.can(user, 'approvals.approve');
+  const canReject = PermissionService.can(user, 'approvals.reject');
+  const canCancel = PermissionService.can(user, 'approvals.cancel');
+  const canCreate = PermissionService.can(user, 'approvals.create');
 
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
@@ -61,6 +64,15 @@ export const ApprovalsPage: React.FC = () => {
       load();
     } catch (e: any) {
       alert(e?.message || 'تعذر تنفيذ القرار.');
+    }
+  };
+
+  const cancel = (req: ApprovalRequest) => {
+    try {
+      service.cancel(req.id);
+      load();
+    } catch (e: any) {
+      alert(e?.message || 'تعذر إلغاء الطلب.');
     }
   };
 
@@ -98,9 +110,11 @@ export const ApprovalsPage: React.FC = () => {
             <p className="text-xs text-slate-500">مراجعة واعتماد طلبات الخصم، تسويات الجرد، وتجاوز الحدود الائتمانية</p>
           </div>
         </div>
-        <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
-          <Plus className="w-4 h-4" /> طلب اعتماد جديد
-        </button>
+        {canCreate && (
+          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-sm font-semibold transition self-start sm:self-auto">
+            <Plus className="w-4 h-4" /> طلب اعتماد جديد
+          </button>
+        )}
       </div>
 
       <div className="p-4 grid grid-cols-3 gap-3">
@@ -166,14 +180,17 @@ export const ApprovalsPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {req.status === 'PENDING' && canApprove ? (
+                    {req.status === 'PENDING' && (canApprove || canReject || canCancel) ? (
                       <>
-                        <button onClick={() => decide(req, true)} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        {canApprove && <button onClick={() => decide(req, true)} className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1">
                           <Check className="w-3.5 h-3.5" /> موافقة
-                        </button>
-                        <button onClick={() => decide(req, false)} className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                        </button>}
+                        {canReject && <button onClick={() => decide(req, false)} className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg text-xs font-bold transition flex items-center gap-1">
                           <X className="w-3.5 h-3.5" /> رفض
-                        </button>
+                        </button>}
+                        {canCancel && <button onClick={() => cancel(req)} className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold" title="إلغاء الطلب">
+                          إلغاء
+                        </button>}
                       </>
                     ) : (
                       <span className={`text-xs font-extrabold px-3 py-1.5 rounded-lg border ${

@@ -9,6 +9,7 @@ export interface PurchaseInvoice {
   supplierId: string;
   supplierName?: string;
   warehouseId: string;
+  branchId?: string;
   warehouseName?: string;
   
   subtotal: number;

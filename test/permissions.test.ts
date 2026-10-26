@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
+import { CashierService } from '../src/services/CashierService.ts';
+import { CustomerService } from '../src/services/CustomerService.ts';
 import { PermissionService, ROLE_DEFAULTS } from '../src/services/PermissionService.ts';
+import { SalesService } from '../src/services/SalesService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -95,6 +98,9 @@ test('permissions: manager defaults exclude full-access privileges, including le
   const defaultPermissions = PermissionService.getRolePermissions('MANAGER');
   assert.ok(defaultPermissions.includes('sales.create'));
   assert.ok(defaultPermissions.includes('approvals.approve'));
+  assert.ok(defaultPermissions.includes('customers.payment.reverse'));
+  assert.ok(defaultPermissions.includes('cashier.expense.update'));
+  assert.ok(!defaultPermissions.includes('cashier.expense.delete'));
   for (const permission of [
     'roles.manage', 'users.create', 'users.update', 'users.delete',
     'users.reset_password', 'users.permissions', 'settings.update',
@@ -110,6 +116,40 @@ test('permissions: manager defaults exclude full-access privileges, including le
   }
   PermissionService.seed();
   assert.deepEqual(PermissionService.getRolePermissions('MANAGER').sort(), defaultPermissions.sort());
+});
+
+test('permissions: reverse, expense mutation, and shift closing require their dedicated grants', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_action_limits', name: 'اختبار حدود العمليات' }, admin);
+  PermissionService.setRolePermissions(role.code, [
+    'customers.payment',
+    'cashier.expense',
+    'cashier.shift.open',
+  ], admin);
+  const limited = makeUser(db, 'usr_action_limits_test', role.code);
+  db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync('test-password', 4), limited.id]);
+
+  try {
+    AuthService.login(limited.username, 'test-password');
+    assert.throws(() => new CustomerService().deletePayment('missing'), /customers\.payment\.reverse/);
+    assert.throws(() => new SalesService().deleteInvoicePayment('missing'), /customers\.payment\.reverse/);
+    assert.throws(() => new CashierService().updateExpense('missing', {
+      category: 'OTHER',
+      amount: 1,
+      description: 'Expense',
+      paymentType: 'CASH',
+    }), /cashier\.expense\.update/);
+    assert.throws(() => new CashierService().deleteExpense('missing'), /cashier\.expense\.delete/);
+    assert.throws(() => new CashierService().closeShift('missing', 0), /cashier\.shift\.close/);
+  } finally {
+    AuthService.logout();
+    AuthService.login('admin', 'admin123');
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
 });
 
 test('permissions: destructive data deletion is limited to ADMIN across built-in role defaults', () => {

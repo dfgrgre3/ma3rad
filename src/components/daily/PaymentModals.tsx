@@ -4,14 +4,16 @@ import { CustomerService } from '../../services/CustomerService';
 import { SalesService } from '../../services/SalesService';
 import { PurchaseService } from '../../services/PurchaseService';
 import { useToast } from '../ui/Toast';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 import { formatProductQuantity } from '../../utils/productUnits';
 import type { PaymentType } from '../../types';
 import { fmt, input, label, LoadErrorNotice, ModalShell, useRegisters } from './DailyModalShared';
 
 export type PaymentTarget =
-  | { kind: 'sale'; id: string; name: string; remaining: number }
-  | { kind: 'purchase'; id: string; name: string; remaining: number }
-  | { kind: 'customer'; id: string; name: string; remaining: number };
+  | { kind: 'sale'; id: string; branchId?: string; name: string; remaining: number }
+  | { kind: 'purchase'; id: string; branchId?: string; name: string; remaining: number }
+  | { kind: 'customer'; id: string; branchId?: string; name: string; remaining: number };
 
 export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void; onSaved: () => void }> = ({ target, onClose, onSaved }) => {
   const toast = useToast();
@@ -21,17 +23,22 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
   const [registerId, setRegisterId] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const availableRegisters = target.branchId
+    ? registers.filter((register) => register.branchId === target.branchId)
+    : registers;
 
   useEffect(() => {
-    if (!registerId && registers.length) setRegisterId(registers[0].id);
-  }, [registerId, registers]);
+    if (availableRegisters.some((register) => register.id === registerId)) return;
+    const defaultRegister = availableRegisters.find((register) => register.isDefault) || availableRegisters[0];
+    setRegisterId(defaultRegister?.id || '');
+  }, [availableRegisters, registerId]);
 
   const save = () => {
     const value = Number(amount);
     if (saving) return;
     if (!Number.isFinite(value) || value <= 0) { toast.error('أدخل مبلغًا صحيحًا'); return; }
     if (value > target.remaining) { toast.error('المبلغ يتجاوز الرصيد المتبقي'); return; }
-    if (!registerId) { toast.error('اختر الخزينة'); return; }
+    if (!availableRegisters.some((register) => register.id === registerId)) { toast.error('اختر خزينة تابعة لفرع المعاملة'); return; }
     setSaving(true);
     try {
       if (target.kind === 'sale') {
@@ -55,7 +62,7 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
     <ModalShell title="تسجيل دفعة" subtitle={target.name} onClose={onClose} busy={saving}>
       <div className="space-y-3">
         {registersError && <LoadErrorNotice message={registersError} />}
-        {!registersError && registers.length === 0 && <LoadErrorNotice message="لا توجد خزائن نشطة للاختيار." />}
+        {!registersError && availableRegisters.length === 0 && <LoadErrorNotice message="لا توجد خزائن نشطة مرتبطة بفرع هذه المعاملة." />}
         <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 flex items-center justify-between">
           <span className="text-xs text-slate-500">المتبقي</span>
           <span className="text-base font-black text-rose-600">{fmt(target.remaining)}</span>
@@ -76,9 +83,9 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
         </div>
         <div>
           <label className={label}>الخزينة</label>
-          <select value={registerId} onChange={(e) => setRegisterId(e.target.value)} className={input} disabled={Boolean(registersError) || registers.length === 0}>
+          <select value={registerId} onChange={(e) => setRegisterId(e.target.value)} className={input} disabled={Boolean(registersError) || availableRegisters.length === 0}>
             <option value="">اختر الخزينة</option>
-            {registers.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            {availableRegisters.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branchName ? ` — ${r.branchName}` : ''}</option>)}
           </select>
         </div>
         <div>
@@ -87,7 +94,7 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50">إلغاء</button>
-          <button type="button" onClick={save} disabled={saving || Boolean(registersError) || registers.length === 0 || target.remaining <= 0} className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
+          <button type="button" onClick={save} disabled={saving || Boolean(registersError) || availableRegisters.length === 0 || target.remaining <= 0} className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} تسجيل الدفعة
           </button>
         </div>
@@ -98,6 +105,7 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
 
 export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onClose: () => void; onChanged: () => void }> = ({ kind, id, onClose, onChanged }) => {
   const toast = useToast();
+  const canReversePayment = PermissionService.can(AuthService.getCurrentUser(), 'customers.payment.reverse');
   const [invoice, setInvoice] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,7 +204,7 @@ export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onC
                       <span className="font-mono text-emerald-600">{payment.receiptNumber}</span>
                       <span>{fmt(payment.amount)}</span>
                       <span className="text-slate-500">{payment.paymentType}</span>
-                      <button onClick={() => removePayment(payment.id)} className="p-1 text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {canReversePayment && <button onClick={() => removePayment(payment.id)} className="p-1 text-rose-500 hover:bg-rose-50 rounded"><Trash2 className="w-3.5 h-3.5" /></button>}
                     </div>
                   ))}
                 </div>

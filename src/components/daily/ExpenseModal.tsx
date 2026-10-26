@@ -98,7 +98,7 @@ export const ExpenseModal: React.FC<{ initial?: any; onClose: () => void; onSave
             <label className={label}>الخزينة</label>
             <select value={form.registerId} onChange={(e) => setForm({ ...form, registerId: e.target.value })} className={input} disabled={Boolean(registersError) || registers.length === 0}>
               <option value="">اختر الخزينة</option>
-              {registers.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              {registers.map((r: any) => <option key={r.id} value={r.id}>{r.name}{r.branchName ? ` — ${r.branchName}` : ''}</option>)}
             </select>
           </div>
         </div>

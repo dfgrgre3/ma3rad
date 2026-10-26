@@ -355,9 +355,10 @@ export class BatchService {
         a.returned_m2 AS returnedM2
       FROM sales_invoice_batch_allocations a
       JOIN sales_invoice_items sii ON sii.id = a.invoice_item_id
+      JOIN product_batches b ON b.id = a.batch_id
       WHERE sii.invoice_id = ? AND sii.product_id = ?
         AND a.quantity_m2 - a.returned_m2 > 0.001
-      ORDER BY a.created_at ASC, a.id ASC
+      ORDER BY b.created_at ASC, b.id ASC, a.created_at ASC, a.id ASC
     `, [input.invoiceId, input.productId]);
 
     for (const allocation of allocations) {
@@ -425,9 +426,10 @@ export class BatchService {
         a.returned_m2 AS returnedM2
       FROM sales_invoice_batch_allocations a
       JOIN sales_invoice_items sii ON sii.id = a.invoice_item_id
+      JOIN product_batches b ON b.id = a.batch_id
       WHERE sii.invoice_id = ? AND sii.product_id = ?
         AND a.quantity_m2 - a.returned_m2 > 0.001
-      ORDER BY a.created_at ASC, a.id ASC
+      ORDER BY b.created_at ASC, b.id ASC, a.created_at ASC, a.id ASC
     `, [input.invoiceId, input.productId]);
 
     for (const allocation of allocations) {

@@ -33,7 +33,6 @@ export const CashierView: React.FC = () => {
 
   // Form States
   const [openingBalance, setOpeningBalance] = useState(0);
-  const [actualEndingCash, setActualEndingCash] = useState(0);
   const [closingNotes, setClosingNotes] = useState('');
 
   const [expenseData, setExpenseData] = useState({
@@ -91,13 +90,6 @@ export const CashierView: React.FC = () => {
         setExpenseData(prev => ({ ...prev, category: cats[0].name }));
       }
 
-      if (shift) {
-        // Sync actual ending cash input with expected when opening modal
-        setActualEndingCash(Number((
-          shift.openingBalance + shift.totalSalesCash + shift.totalCustomerPayments -
-          shift.totalSupplierPayments - shift.totalExpenses - shift.totalRefunds
-        ).toFixed(2)));
-      }
     } catch (e: any) {
       console.error(e);
       showNotification('error', `فشل تحميل البيانات: ${e.message}`);
@@ -145,11 +137,11 @@ export const CashierView: React.FC = () => {
     e.preventDefault();
     if (!activeShift) return;
     try {
-      cashierService.closeShift(activeShift.id, actualEndingCash, closingNotes, currentUser?.id || activeShift.userId);
+      cashierService.closeShift(activeShift.id, expectedEndingCash, closingNotes, currentUser?.id || activeShift.userId);
       setIsCloseShiftModal(false);
       setClosingNotes('');
       await loadData();
-      showNotification('success', `تم إغلاق الوردية. الرصيد المُرحّل لليوم التالي: ${CeramicMath.formatCurrency(actualEndingCash)}.`);
+      showNotification('success', `تم إغلاق الوردية. الرصيد المُرحّل لليوم التالي: ${CeramicMath.formatCurrency(expectedEndingCash)}.`);
     } catch (err: any) {
       showNotification('error', `خطأ: ${err.message || err}`);
     }
@@ -183,7 +175,9 @@ export const CashierView: React.FC = () => {
   };
 
   const defaultReg = registers.find((register) => register.isDefault) || registers[0];
-  const canManageShifts = PermissionService.can(currentUser, 'cashier.shift');
+  const canOpenShift = PermissionService.can(currentUser, 'cashier.shift.open');
+  const canCloseShift = PermissionService.can(currentUser, 'cashier.shift.close');
+  const canManageShifts = PermissionService.can(currentUser, 'cashier.manage');
 
   const openShiftModal = () => {
     const register = defaultReg;
@@ -236,7 +230,7 @@ export const CashierView: React.FC = () => {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {activeShift ? (
+          {activeShift && canCloseShift ? (
             <button
               onClick={() => setIsCloseShiftModal(true)}
               className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-amber-600/20 transition-all active:scale-95 text-xs"
@@ -244,7 +238,7 @@ export const CashierView: React.FC = () => {
               <Clock className="w-4 h-4" />
               <span>إغلاق الوردية ({activeShift.shiftNumber})</span>
             </button>
-          ) : (
+          ) : !activeShift && canOpenShift ? (
             <button
               onClick={openShiftModal}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 text-xs"
@@ -252,7 +246,7 @@ export const CashierView: React.FC = () => {
               <Clock className="w-4 h-4" />
               <span>فتح وردية جديدة</span>
             </button>
-          )}
+          ) : null}
 
           <button
             onClick={() => setIsExpenseModalOpen(true)}
@@ -446,7 +440,7 @@ export const CashierView: React.FC = () => {
                     }}
                     className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                   >
-                    {registers.map((register) => <option key={register.id} value={register.id}>{register.name}</option>)}
+                    {registers.map((register) => <option key={register.id} value={register.id}>{register.name}{register.branchName ? ` — ${register.branchName}` : ''}</option>)}
                   </select>
                 </div>
               )}
@@ -512,25 +506,10 @@ export const CashierView: React.FC = () => {
 
             <form onSubmit={handleCloseShift} className="space-y-4">
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">المبلغ الفعلي بعد العد *</label>
-                <input
-                  type="number"
-                  required
-                  autoFocus
-                  value={actualEndingCash}
-                  onChange={(e) => setActualEndingCash(parseFloat(e.target.value) || 0)}
-                  className={`w-full px-4 py-3 bg-slate-50 rounded-xl border font-black text-lg outline-none transition-all ${
- Math.abs(actualEndingCash - expectedEndingCash) > 0.01 
- ? 'border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-amber-600' 
- : 'border-slate-200 focus:ring-2 focus:border-emerald-500'
- }`}
-                />
-                {Math.abs(actualEndingCash - expectedEndingCash) > 0.01 && (
-                  <p className="text-[10px] text-amber-600 mt-1 font-bold flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    يوجد فرق مقداره: {CeramicMath.formatCurrency(actualEndingCash - expectedEndingCash)}
-                  </p>
-                )}
+                <label className="font-bold text-xs text-slate-700 block mb-1.5">الرصيد الختامي المحسوب تلقائيًا</label>
+                <div className="w-full px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-200 font-black text-lg text-emerald-700">
+                  {CeramicMath.formatCurrency(expectedEndingCash)}
+                </div>
               </div>
 
               <div>

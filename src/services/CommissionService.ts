@@ -5,15 +5,19 @@ import { PermissionService } from './PermissionService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 import { postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
+import { BranchAccessService } from './BranchAccessService';
 
 export * from './commissionTypes';
 import type { CommissionRow, CommissionStats } from './commissionTypes';
 
 export class CommissionService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   public getCommissions(filters: { month?: string; status?: string; employeeId?: string } = {}): CommissionRow[] {
-    PermissionService.require(AuthService.requireAuth(), 'employees.view');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.view');
+    const scope = this.branchAccess.sqlScope('c.branch_id', 'e.branch_id', actor);
     let sql = `
       SELECT c.id, c.employee_id AS employeeId, e.full_name AS employeeName,
              c.source_type AS sourceType, c.source_id AS sourceId, c.period_month AS periodMonth,
@@ -23,8 +27,8 @@ export class CommissionService {
       FROM commissions c
       JOIN employees e ON e.id = c.employee_id
       LEFT JOIN sales_invoices si ON si.id = c.source_id
-      WHERE 1 = 1`;
-    const params: any[] = [];
+      WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
     if (filters.month) { sql += ` AND c.period_month = ?`; params.push(filters.month); }
     if (filters.status && filters.status !== 'ALL') { sql += ` AND c.status = ?`; params.push(filters.status); }
     if (filters.employeeId) { sql += ` AND c.employee_id = ?`; params.push(filters.employeeId); }
@@ -34,12 +38,15 @@ export class CommissionService {
 
   public getStats(month?: string): CommissionStats {
     PermissionService.require(AuthService.requireAuth(), 'employees.view');
+    const scope = this.branchAccess.sqlScope('c.branch_id', 'e.branch_id');
     const params: any[] = [];
-    let where = '';
-    if (month) { where = 'WHERE period_month = ?'; params.push(month); }
+    const conditions = [scope.clause];
+    params.push(...scope.params);
+    if (month) { conditions.push('c.period_month = ?'); params.push(month); }
     const rows = this.db.query<any>(
-      `SELECT status, COUNT(*) AS count, COALESCE(SUM(commission_amount), 0) AS total
-       FROM commissions ${where} GROUP BY status`,
+      `SELECT c.status, COUNT(*) AS count, COALESCE(SUM(c.commission_amount), 0) AS total
+       FROM commissions c JOIN employees e ON e.id = c.employee_id
+       WHERE ${conditions.join(' AND ')} GROUP BY c.status`,
       params
     );
     const stats: CommissionStats = { pending: 0, approved: 0, paid: 0, totalPending: 0, totalPaid: 0 };
@@ -54,9 +61,12 @@ export class CommissionService {
   }
 
   public getSalesReps(): Array<{ id: string; name: string; percentage: number; monthlyTarget: number }> {
+    PermissionService.require(AuthService.requireAuth(), 'employees.view');
+    const scope = this.branchAccess.sqlScope('e.branch_id');
     return this.db.query(
-      `SELECT id, full_name AS name, commission_percentage AS percentage, monthly_target AS monthlyTarget
-       FROM employees WHERE is_active = 1 ORDER BY full_name`
+      `SELECT e.id, e.full_name AS name, e.commission_percentage AS percentage, e.monthly_target AS monthlyTarget
+       FROM employees e WHERE e.is_active = 1 AND ${scope.clause} ORDER BY e.full_name`,
+      scope.params
     );
   }
 
@@ -65,15 +75,16 @@ export class CommissionService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'employees.manage');
     if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
+    const scope = this.branchAccess.sqlScope('si.branch_id');
 
     const invoices = this.db.query<any>(`
       SELECT si.id, si.invoice_number AS invoiceNumber, si.total_amount AS totalAmount,
              si.tax_amount AS taxAmount, si.sales_rep_id AS salesRepId,
-             c.assigned_rep_id AS assignedRepId
+             c.assigned_rep_id AS assignedRepId, si.branch_id AS branchId
       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
-      WHERE substr(si.date, 1, 7) = ? AND si.invoice_status != 'VOID'
+      WHERE substr(si.date, 1, 7) = ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       ORDER BY si.date ASC
-    `, [month]);
+    `, [month, ...scope.params]);
 
     let created = 0;
     let skipped = 0;
@@ -101,11 +112,11 @@ export class CommissionService {
         if (commission <= 0) { skipped++; continue; }
 
         db.run(
-          `INSERT INTO commissions (id, employee_id, source_type, source_id, period_month,
+          `INSERT INTO commissions (id, employee_id, source_type, source_id, period_month, branch_id,
              base_amount, percentage, commission_amount, status, notes, created_by)
-           VALUES (?, ?, 'SALES_INVOICE', ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
+           VALUES (?, ?, 'SALES_INVOICE', ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
           [
-            `com_${uuidv4().substring(0, 8)}`, employeeId, invoice.id, month,
+            `com_${uuidv4().substring(0, 8)}`, employeeId, invoice.id, month, invoice.branchId,
             base, percentage, commission, `عمولة فاتورة ${invoice.invoiceNumber}`, actor.id,
           ]
         );
@@ -120,8 +131,13 @@ export class CommissionService {
   public setStatus(id: string, status: 'APPROVED' | 'PAID' | 'CANCELLED'): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'employees.manage');
-    const row = this.db.query<any>(`SELECT status, commission_amount AS amount, employee_id AS employee_id FROM commissions WHERE id = ?`, [id])[0];
+    const row = this.db.query<any>(`
+      SELECT c.status, c.commission_amount AS amount, c.employee_id, COALESCE(c.branch_id, e.branch_id) AS branchId
+      FROM commissions c JOIN employees e ON e.id = c.employee_id WHERE c.id = ?
+    `, [id])[0];
     if (!row) throw new Error('العمولة غير موجودة.');
+    if (!row.branchId) throw new Error('العمولة غير مرتبطة بفرع.');
+    this.branchAccess.requireBranchAccess(row.branchId, actor);
     if (row.status === 'PAID') throw new Error('العمولة مدفوعة بالفعل.');
     if (status === 'APPROVED' && row.status !== 'PENDING') throw new Error('لا يمكن اعتماد عمولة بهذه الحالة.');
     if (status === 'PAID' && row.status !== 'APPROVED') throw new Error('يجب اعتماد العمولة قبل صرفها.');
@@ -132,13 +148,14 @@ export class CommissionService {
     this.db.executeTransaction((db) => {
       if (status === 'APPROVED') {
         postLedgerEntry(db.getDatabase(), {
-          date: today, description: `Accrue commission for employee ${row.employeeId}`,
+          date: today, description: `Accrue commission for employee ${row.employee_id}`,
           referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id,
           lines: [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2103', debit: 0, credit: amount }],
         });
       } else if (status === 'PAID') {
-        const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', ['cr_main'])[0];
-        if (!register) throw new Error('The main cash register is unavailable.');
+        const registerId = this.branchAccess.getDefaultRegisterId(row.branchId, actor);
+        const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0];
+        if (!register) throw new Error('خزينة فرع العمولة غير متاحة.');
         const accrued = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];
         if (!accrued) postLedgerEntry(db.getDatabase(), {
           date: today, description: `Accrue commission before payment ${id}`,
@@ -179,8 +196,13 @@ export class CommissionService {
   public deleteCommission(id: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'employees.manage');
-    const row = this.db.query<any>(`SELECT status FROM commissions WHERE id = ?`, [id])[0];
+    const row = this.db.query<any>(`
+      SELECT c.status, COALESCE(c.branch_id, e.branch_id) AS branchId
+      FROM commissions c JOIN employees e ON e.id = c.employee_id WHERE c.id = ?
+    `, [id])[0];
     if (!row) throw new Error('العمولة غير موجودة.');
+    if (!row.branchId) throw new Error('العمولة غير مرتبطة بفرع.');
+    this.branchAccess.requireBranchAccess(row.branchId, actor);
     if (row.status === 'PAID') throw new Error('لا يمكن حذف عمولة مدفوعة.');
     this.db.executeTransaction((db) => {
       const accrual = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];

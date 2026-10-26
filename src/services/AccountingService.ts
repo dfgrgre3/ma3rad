@@ -1,6 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 
 function isValidDate(value: string): boolean {
@@ -34,15 +35,37 @@ export interface DashboardMetrics {
 
 export class AccountingService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   private requireView(permission: string): void {
     PermissionService.require(AuthService.requireAuth(), permission);
+  }
+
+  private branchScope(expression: string, fallbackExpression?: string) {
+    return this.branchAccess.sqlScope(expression, fallbackExpression);
+  }
+
+  public getBranchScopeWarning(): string | null {
+    if (this.branchAccess.getAccessibleBranchIds() === null) return null;
+    const count = Number(this.db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM journal_entries WHERE branch_id IS NULL'
+    )[0]?.count || 0);
+    return count
+      ? `تم استبعاد ${count} قيد محاسبي غير منسوب إلى فرع؛ راجعها بصلاحية مركزية قبل الاعتماد على الإجماليات.`
+      : null;
   }
 
   public getDashboardMetrics(): DashboardMetrics {
     this.requireView('dashboard.view');
     const today = localDateString();
     const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
+    const salesScope = this.branchScope('si.branch_id');
+    const purchaseScope = this.branchScope('pi.branch_id');
+    const expenseScope = this.branchScope('e.branch_id');
+    const warehouseScope = this.branchScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
+    );
 
     // Compare the elapsed days in this month with the same dates last month.
     const now = new Date();
@@ -54,13 +77,13 @@ export class AccountingService {
     // 1. Sales metrics (bounded up to today to exclude future-dated entries from MTD)
     const salesStats = this.db.query<any>(`
       SELECT 
-        SUM(CASE WHEN date = ? THEN subtotal - discount_amount ELSE 0 END) as todaySales,
-        SUM(CASE WHEN date >= ? AND date <= ? THEN subtotal - discount_amount ELSE 0 END) as monthSales,
-        SUM(CASE WHEN date >= ? AND date <= ? THEN gross_profit ELSE 0 END) as monthGrossProfit,
-        COUNT(CASE WHEN date = ? THEN 1 END) as todaySalesCount
-      FROM sales_invoices
-      WHERE invoice_status != 'VOID'
-    `, [today, monthStart, today, monthStart, today, today])[0] || {};
+        SUM(CASE WHEN si.date = ? THEN si.subtotal - si.discount_amount ELSE 0 END) as todaySales,
+        SUM(CASE WHEN si.date >= ? AND si.date <= ? THEN si.subtotal - si.discount_amount ELSE 0 END) as monthSales,
+        SUM(CASE WHEN si.date >= ? AND si.date <= ? THEN si.gross_profit ELSE 0 END) as monthGrossProfit,
+        COUNT(CASE WHEN si.date = ? THEN 1 END) as todaySalesCount
+      FROM sales_invoices si
+      WHERE si.invoice_status != 'VOID' AND ${salesScope.clause}
+    `, [today, monthStart, today, monthStart, today, today, ...salesScope.params])[0] || {};
 
     const returnStats = this.db.query<any>(`
       SELECT
@@ -74,37 +97,40 @@ export class AccountingService {
           ELSE 0 END) AS monthReturnedCost
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
-      WHERE si.invoice_status != 'VOID'
-    `, [today, monthStart, today, monthStart, today])[0] || {};
+      WHERE si.invoice_status != 'VOID' AND ${salesScope.clause}
+    `, [today, monthStart, today, monthStart, today, ...salesScope.params])[0] || {};
 
     const prevMonthSales = Number(this.db.query<any>(`
       SELECT
-        COALESCE((SELECT SUM(subtotal - discount_amount) FROM sales_invoices
-          WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'), 0)
+        COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
+          WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}), 0)
         - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
             THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2) ELSE 0 END) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
-          WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'), 0) AS sales
-    `, [prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd])[0]?.sales || 0);
+          WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}), 0) AS sales
+    `, [prevMonthStart, prevMonthEnd, ...salesScope.params, prevMonthStart, prevMonthEnd, ...salesScope.params])[0]?.sales || 0);
 
     // 2. Purchases metrics
     const purchaseStats = this.db.query<any>(`
-      SELECT SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END) as todayPurchases
-      FROM purchase_invoices
-    `, [today])[0] || {};
+      SELECT SUM(CASE WHEN pi.date = ? THEN pi.total_amount ELSE 0 END) as todayPurchases
+      FROM purchase_invoices pi
+      WHERE ${purchaseScope.clause}
+    `, [today, ...purchaseScope.params])[0] || {};
 
     // 3. Expenses metrics (bounded up to today)
     const expenseStats = this.db.query<any>(`
       SELECT 
-        SUM(CASE WHEN date = ? THEN amount ELSE 0 END) as todayExpenses,
-        SUM(CASE WHEN date >= ? AND date <= ? THEN amount ELSE 0 END) as monthExpenses
-      FROM expenses
-    `, [today, monthStart, today])[0] || {};
+        SUM(CASE WHEN e.date = ? THEN e.amount ELSE 0 END) as todayExpenses,
+        SUM(CASE WHEN e.date >= ? AND e.date <= ? THEN e.amount ELSE 0 END) as monthExpenses
+      FROM expenses e
+      WHERE ${expenseScope.clause}
+    `, [today, monthStart, today, ...expenseScope.params])[0] || {};
 
     // 4. Receivables (Customer debts)
     const customerDebts = this.db.query<any>(`
-      SELECT SUM(current_balance) as totalReceivables FROM customers WHERE current_balance > 0
-    `)[0]?.totalReceivables || 0;
+      SELECT SUM(si.remaining_amount) as totalReceivables FROM sales_invoices si
+      WHERE si.remaining_amount > 0 AND si.invoice_status != 'VOID' AND ${salesScope.clause}
+    `, salesScope.params)[0]?.totalReceivables || 0;
 
     // Urgent debts: customers with debts overdue by > 30 days based on invoice due dates
     const cutoff30DaysAgo = new Date();
@@ -114,16 +140,17 @@ export class AccountingService {
       SELECT COUNT(DISTINCT si.customer_id) as count
       FROM sales_invoices si
       JOIN customers c ON c.id = si.customer_id
-      WHERE c.current_balance > 0
+      WHERE si.remaining_amount > 0
         AND si.invoice_status != 'VOID'
         AND COALESCE(si.due_date, si.date) < ?
-        AND (si.total_amount - si.paid_amount) > 0.01
-    `, [cutoff30Str])[0]?.count || 0;
+        AND ${salesScope.clause}
+    `, [cutoff30Str, ...salesScope.params])[0]?.count || 0;
 
     // 5. Payables (Supplier dues)
     const supplierPayables = this.db.query<any>(`
-      SELECT SUM(current_balance) as totalPayables FROM suppliers WHERE current_balance > 0
-    `)[0]?.totalPayables || 0;
+      SELECT SUM(pi.remaining_amount) as totalPayables FROM purchase_invoices pi
+      WHERE pi.remaining_amount > 0 AND ${purchaseScope.clause}
+    `, purchaseScope.params)[0]?.totalPayables || 0;
 
     // 6. Inventory Valuation
     const costingMethod = this.db.query<{ value: string }>(
@@ -132,13 +159,14 @@ export class AccountingService {
     if (costingMethod === 'FIFO') {
       const inconsistentStock = this.db.query<{ productId: string; warehouseId: string }>(`
         SELECT ws.product_id AS productId, ws.warehouse_id AS warehouseId
-        FROM warehouse_stock ws
+        FROM warehouse_stock ws JOIN warehouses w ON w.id = ws.warehouse_id
         WHERE COALESCE((SELECT SUM(icl.quantity_remaining)
           FROM inventory_cost_layers icl
           WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)
           > ws.quantity_m2 + 0.009
+          AND ${warehouseScope.clause}
         LIMIT 1
-      `)[0];
+      `, warehouseScope.params)[0];
       if (inconsistentStock) {
         throw new Error(
           `FIFO cost layers exceed physical stock for product ${inconsistentStock.productId} in warehouse ${inconsistentStock.warehouseId}. Reconcile inventory before viewing valuation.`
@@ -159,18 +187,21 @@ export class AccountingService {
         COUNT(CASE WHEN ws.quantity_m2 <= p.min_stock_level AND ws.quantity_m2 > 0 THEN 1 END) as lowStock,
         COUNT(CASE WHEN ws.quantity_m2 <= 0 THEN 1 END) as outOfStock
       FROM warehouse_stock ws
+      JOIN warehouses w ON w.id = ws.warehouse_id
       JOIN products p ON ws.product_id = p.id
-      WHERE p.is_active = 1
-    `, [costingMethod])[0] || {};
+      WHERE p.is_active = 1 AND ${warehouseScope.clause}
+    `, [costingMethod, ...warehouseScope.params])[0] || {};
 
     // 7. Top customer
     const topCustomer = this.db.query<any>(`
-      SELECT name, total_purchases
-      FROM customers
-      WHERE total_purchases > 0
+      SELECT c.name, SUM(si.total_amount) AS total_purchases
+      FROM customers c JOIN sales_invoices si ON si.customer_id = c.id
+      WHERE si.invoice_status != 'VOID' AND ${salesScope.clause}
+      GROUP BY c.id
+      HAVING total_purchases > 0
       ORDER BY total_purchases DESC
       LIMIT 1
-    `)[0] || null;
+    `, salesScope.params)[0] || null;
 
     const monthGross = Number(salesStats.monthGrossProfit || 0)
       - Number(returnStats.monthReturns || 0)
@@ -220,6 +251,7 @@ export class AccountingService {
 
   public getSalesTrendLast7Days(): { date: string; sales: number; profit: number }[] {
     this.requireView('dashboard.view');
+    const scope = this.branchScope('si.branch_id');
     const results: { date: string; sales: number; profit: number }[] = [];
     const now = new Date();
 
@@ -230,24 +262,25 @@ export class AccountingService {
 
       const row = this.db.query<any>(`
         SELECT
-          COALESCE((SELECT SUM(subtotal - discount_amount) FROM sales_invoices
-            WHERE date = ? AND invoice_status != 'VOID'), 0)
+          COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
+            WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
           - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
               THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END) FROM sales_returns sr
             JOIN sales_invoices si ON si.id = sr.original_invoice_id
-            WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0) AS sales,
-          COALESCE((SELECT SUM(gross_profit) FROM sales_invoices
-            WHERE date = ? AND invoice_status != 'VOID'), 0)
+            WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS sales,
+          COALESCE((SELECT SUM(si.gross_profit) FROM sales_invoices si
+            WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
           - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
               THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END) FROM sales_returns sr
             JOIN sales_invoices si ON si.id = sr.original_invoice_id
-            WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0)
+            WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
           + COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
             FROM sales_returns sr
             JOIN sales_invoices si ON si.id = sr.original_invoice_id
             JOIN sales_return_items sri ON sri.return_id = sr.id
-            WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0) AS profit
-      `, [dateStr, dateStr, dateStr, dateStr, dateStr])[0];
+            WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS profit
+      `, [dateStr, ...scope.params, dateStr, ...scope.params, dateStr, ...scope.params,
+        dateStr, ...scope.params, dateStr, ...scope.params])[0];
 
       results.push({
         date: dateStr,
@@ -261,6 +294,7 @@ export class AccountingService {
 
   public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[] {
     this.requireView('reports.view');
+    const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
         p.name,
@@ -272,11 +306,11 @@ export class AccountingService {
       FROM sales_invoice_items sii
       JOIN products p ON sii.product_id = p.id
       JOIN sales_invoices si ON sii.invoice_id = si.id
-      WHERE si.invoice_status != 'VOID'
+      WHERE si.invoice_status != 'VOID' AND ${scope.clause}
       GROUP BY p.id
       ORDER BY totalRevenue DESC
       LIMIT ?
-    `, [limit]);
+    `, [...scope.params, limit]);
   }
 
   public getPurchaseReport(dateFrom?: string, dateTo?: string): {
@@ -288,6 +322,9 @@ export class AccountingService {
     this.requireView('finance.view');
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
+    const scope = this.branchScope('pi.branch_id');
+    whereClause += ` AND ${scope.clause}`;
+    params.push(...scope.params);
 
     if (dateFrom) {
       whereClause += ' AND pi.date >= ?';
@@ -332,6 +369,9 @@ export class AccountingService {
     this.requireView('finance.view');
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
+    const scope = this.branchScope('e.branch_id');
+    whereClause += ` AND ${scope.clause}`;
+    params.push(...scope.params);
 
     if (dateFrom) {
       whereClause += ' AND e.date >= ?';
@@ -388,6 +428,9 @@ export class AccountingService {
     }
     const conditions = ['e.is_posted = 1', "a.type IN ('REVENUE', 'EXPENSE')"];
     const params: string[] = [];
+    const scope = this.branchScope('e.branch_id');
+    conditions.push(scope.clause);
+    params.push(...scope.params);
     if (dateFrom) { conditions.push('e.date >= ?'); params.push(dateFrom); }
     if (dateTo) { conditions.push('e.date <= ?'); params.push(dateTo); }
     const balances = this.db.query<{ code: string; type: string; amount: number }>(`
@@ -416,6 +459,9 @@ export class AccountingService {
     this.requireView('reports.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
+    const scope = this.branchScope('si.branch_id');
+    whereClause += ` AND ${scope.clause}`;
+    params.push(...scope.params);
 
     if (dateFrom) {
       whereClause += ' AND si.date >= ?';
@@ -460,6 +506,9 @@ export class AccountingService {
     this.requireView('reports.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
+    const scope = this.branchScope('si.branch_id');
+    whereClause += ` AND ${scope.clause}`;
+    params.push(...scope.params);
 
     if (dateFrom) {
       whereClause += ' AND si.date >= ?';
@@ -506,6 +555,10 @@ export class AccountingService {
     byWarehouse: { warehouseName: string; costValue: number; saleValue: number; items: number }[];
   } {
     this.requireView('finance.view');
+    const scope = this.branchScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
+    );
     const byWarehouse = this.db.query<any>(`
       SELECT 
         w.name as warehouseName,
@@ -515,19 +568,20 @@ export class AccountingService {
       FROM warehouse_stock ws
       JOIN warehouses w ON ws.warehouse_id = w.id
       JOIN products p ON ws.product_id = p.id
-      WHERE p.is_active = 1 AND ws.quantity_m2 > 0
+      WHERE p.is_active = 1 AND ws.quantity_m2 > 0 AND ${scope.clause}
       GROUP BY w.id, w.name
       ORDER BY costValue DESC
-    `);
+    `, scope.params);
 
     const totals = this.db.query<any>(`
       SELECT 
         SUM(ws.quantity_m2 * p.cost_price) as totalCost,
         SUM(ws.quantity_m2 * p.selling_price_m2) as totalSale
       FROM warehouse_stock ws
+      JOIN warehouses w ON ws.warehouse_id = w.id
       JOIN products p ON ws.product_id = p.id
-      WHERE p.is_active = 1 AND ws.quantity_m2 > 0
-    `)[0] || {};
+      WHERE p.is_active = 1 AND ws.quantity_m2 > 0 AND ${scope.clause}
+    `, scope.params)[0] || {};
 
     return {
       totalCostValue: Number((totals.totalCost || 0).toFixed(2)),
@@ -550,26 +604,27 @@ export class AccountingService {
     prevMonth.setMonth(prevMonth.getMonth() - 1);
     const prevMonthStart = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
     const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()}`;
+    const scope = this.branchScope('si.branch_id');
 
     const loadSalesSummary = (from: string, to: string) => {
       const sales = this.db.query<any>(`
         SELECT COALESCE(SUM(subtotal - discount_amount),0) AS revenue,
           COALESCE(SUM(gross_profit),0) AS profit, COUNT(*) AS invoices
-        FROM sales_invoices
-        WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'
-      `, [from, to])[0] || {};
+        FROM sales_invoices si
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0] || {};
       const returnedRevenue = Number(this.db.query<any>(`
         SELECT COALESCE(SUM(sr.total_amount - CASE WHEN si.total_amount > 0
             THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END),0) AS revenue
         FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
-      `, [from, to])[0]?.revenue || 0);
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.revenue || 0);
       const returnedCost = Number(this.db.query<any>(`
         SELECT COALESCE(SUM(sri.quantity_m2*sri.unit_cost),0) AS cost
         FROM sales_return_items sri JOIN sales_returns sr ON sr.id=sri.return_id
         JOIN sales_invoices si ON si.id=sr.original_invoice_id
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
-      `, [from, to])[0]?.cost || 0);
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.cost || 0);
       return {
         sales: Number(sales.revenue || 0) - returnedRevenue,
         profit: Number(sales.profit || 0) - returnedRevenue + returnedCost,
@@ -596,36 +651,39 @@ export class AccountingService {
 
   public getTopCustomers(limit = 5): { name: string; totalPurchases: number; purchaseCount: number }[] {
     this.requireView('customers.view');
+    const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
         c.name,
         SUM(si.total_amount) as totalPurchases,
         COUNT(DISTINCT si.id) as purchaseCount
       FROM customers c
-      LEFT JOIN sales_invoices si ON c.id = si.customer_id AND si.invoice_status != 'VOID'
+      LEFT JOIN sales_invoices si ON c.id = si.customer_id AND si.invoice_status != 'VOID' AND ${scope.clause}
       GROUP BY c.id
       HAVING totalPurchases > 0
       ORDER BY totalPurchases DESC
       LIMIT ?
-    `, [limit]);
+    `, [...scope.params, limit]);
   }
 
   public getPaymentMethodDistribution(): { method: string; count: number; totalAmount: number }[] {
     this.requireView('finance.view');
+    const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
         payment_type as method,
         COUNT(*) as count,
         SUM(total_amount) as totalAmount
-      FROM sales_invoices
-      WHERE invoice_status != 'VOID' AND date >= date('now', '-30 days')
+      FROM sales_invoices si
+      WHERE invoice_status != 'VOID' AND date >= date('now', '-30 days') AND ${scope.clause}
       GROUP BY payment_type
       ORDER BY totalAmount DESC
-    `);
+    `, scope.params);
   }
 
   public getSalesByGrade(): { grade: string; quantityM2: number; totalRevenue: number }[] {
     this.requireView('reports.view');
+    const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
         p.grade,
@@ -634,10 +692,10 @@ export class AccountingService {
       FROM sales_invoice_items sii
       JOIN products p ON sii.product_id = p.id
       JOIN sales_invoices si ON sii.invoice_id = si.id
-      WHERE si.invoice_status != 'VOID' AND si.date >= date('now', '-30 days')
+      WHERE si.invoice_status != 'VOID' AND si.date >= date('now', '-30 days') AND ${scope.clause}
       GROUP BY p.grade
       ORDER BY totalRevenue DESC
-    `);
+    `, scope.params);
   }
 
   public getRecentActivities(limit = 10): {
@@ -647,41 +705,50 @@ export class AccountingService {
     date: string;
   }[] {
     this.requireView('dashboard.view');
+    const salesScope = this.branchScope('si.branch_id');
+    const purchaseScope = this.branchScope('pi.branch_id');
+    const stockScope = this.branchScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
+    );
     const activities: any[] = [];
 
     // Recent sales
     const sales = this.db.query<any>(`
       SELECT 'SALE' as type, 
-        'فاتورة مبيعات #' || invoice_number as description,
-        total_amount as amount,
-        date
-      FROM sales_invoices
-      WHERE invoice_status != 'VOID'
-      ORDER BY date DESC
+        'فاتورة مبيعات #' || si.invoice_number as description,
+        si.total_amount as amount,
+        si.date
+      FROM sales_invoices si
+      WHERE si.invoice_status != 'VOID' AND ${salesScope.clause}
+      ORDER BY si.date DESC
       LIMIT 3
-    `);
+    `, salesScope.params);
 
     // Recent purchases
     const purchases = this.db.query<any>(`
       SELECT 'PURCHASE' as type,
-        'فاتورة توريد #' || invoice_number as description,
-        total_amount as amount,
-        date
-      FROM purchase_invoices
-      ORDER BY date DESC
+        'فاتورة توريد #' || pi.invoice_number as description,
+        pi.total_amount as amount,
+        pi.date
+      FROM purchase_invoices pi
+      WHERE ${purchaseScope.clause}
+      ORDER BY pi.date DESC
       LIMIT 3
-    `);
+    `, purchaseScope.params);
 
     // Recent stock movements
     const stocks = this.db.query<any>(`
       SELECT 'STOCK' as type,
-        'حركة مخزون #' || transaction_number as description,
+        'حركة مخزون #' || t.transaction_number as description,
         NULL as amount,
-        created_at as date
-      FROM inventory_transactions
-      ORDER BY created_at DESC
+        t.created_at as date
+      FROM inventory_transactions t
+      JOIN warehouses w ON w.id = t.warehouse_id
+      WHERE ${stockScope.clause}
+      ORDER BY t.created_at DESC
       LIMIT 2
-    `);
+    `, stockScope.params);
 
     activities.push(...sales, ...purchases, ...stocks);
     activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

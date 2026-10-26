@@ -12,6 +12,7 @@ import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal'
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { toAppError } from './errors/appError';
 
 const RUNTIME_SESSION_KEY = 'ceramisys_runtime_initialized';
 
@@ -102,9 +103,10 @@ export const App: React.FC = () => {
         });
       })
       .catch((err) => {
-        console.error('Failed to initialize SQLite Database:', err);
-        setInitError(err?.message || 'حدث خطأ أثناء تحميل قاعدة البيانات');
-        setRecoveryRequired(err?.code === 'DATABASE_RECOVERY_REQUIRED');
+        const failure = toAppError(err, 'DATABASE_INITIALIZATION_FAILED', 'حدث خطأ أثناء تحميل قاعدة البيانات.');
+        console.error('Failed to initialize SQLite Database:', failure);
+        setInitError(failure.message);
+        setRecoveryRequired(failure.code === 'DATABASE_RECOVERY_REQUIRED');
       });
   };
 
@@ -135,13 +137,16 @@ export const App: React.FC = () => {
   useEffect(() => {
     // 1. Electron-controlled graceful shutdown: ensures pending disk writes finish before destroying the window
     if (typeof window !== 'undefined' && window.ceramisys?.app?.onBeforeClose) {
-      const unsubscribe = window.ceramisys.app.onBeforeClose(async () => {
+      const unsubscribe = window.ceramisys.app.onBeforeClose(async (requestId) => {
         try {
           await DatabaseManager.getInstance().flush();
-          window.ceramisys?.app?.notifyCloseReady?.();
+          window.ceramisys?.app?.notifyCloseReady?.(requestId, { ok: true });
         } catch (err) {
           console.error('Failed to flush database on app close:', err);
-          window.alert(`تعذر حفظ آخر التغييرات؛ أغلق التطبيق بعد معالجة مشكلة التخزين. ${err instanceof Error ? err.message : String(err)}`);
+          window.ceramisys?.app?.notifyCloseReady?.(requestId, {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       });
       return unsubscribe;

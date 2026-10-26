@@ -6,7 +6,7 @@ declare global {
       savePdf?: (html: string, fileName: string, landscape?: boolean) => Promise<string | null>;
       db?: {
         load?: () => Promise<Uint8Array | null>;
-        save?: (bytes: Uint8Array) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
+        save?: (bytes: Uint8Array) => Promise<{ ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string }>;
         decryptLocalBackup?: (bytes: Uint8Array) => Promise<Uint8Array>;
         backup?: (label?: string) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
         removeBackup?: (fileName: string) => Promise<{ ok: boolean; deleted: boolean; error?: string }>;
@@ -23,8 +23,8 @@ declare global {
         info?: () => Promise<{ version: string; packaged: boolean; dataDir: string; backupDir: string }>;
         openFolder?: (target?: 'data' | 'backups') => Promise<{ ok: boolean; path?: string; error?: string }>;
         relaunch?: () => Promise<{ ok: boolean }>;
-        onBeforeClose?: (callback: () => void | Promise<void>) => () => void;
-        notifyCloseReady?: () => void;
+        onBeforeClose?: (callback: (requestId: number) => void | Promise<void>) => () => void;
+        notifyCloseReady?: (requestId: number, result: { ok: boolean; error?: string }) => void;
       };
       printing?: {
         listPrinters?: () => Promise<{ ok: boolean; printers: string[]; error?: string }>;

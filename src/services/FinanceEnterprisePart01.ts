@@ -38,6 +38,12 @@ protected requireManage() {
     return actor;
   }
 
+protected requireClose() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'finance.close');
+    return actor;
+  }
+
 public getFiscalYears(): FiscalYear[] {
     this.requireView();
     return this.db.query<any>(`
@@ -124,7 +130,7 @@ public createFiscalYear(input: { yearCode: string; name: string; startDate: stri
   }
 
 public closePeriod(periodId: string, notes?: string): void {
-    const actor = this.requireManage();
+    const actor = this.requireClose();
     const period = this.db.query<any>('SELECT * FROM fiscal_periods WHERE id = ?', [periodId])[0];
     if (!period) throw new Error('الفترة المالية غير موجودة.');
     if (period.status === 'CLOSED' || period.status === 'LOCKED') throw new Error('الفترة مقفلة بالفعل.');

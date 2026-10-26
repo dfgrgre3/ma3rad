@@ -23,11 +23,11 @@ contextBridge.exposeInMainWorld('ceramisys', {
     relaunch: () => ipcRenderer.invoke('app:relaunch'),
     requestShutdown: () => ipcRenderer.invoke('app:requestShutdown'),
     onBeforeClose: (callback) => {
-      const handler = () => callback();
+      const handler = (_event, request) => callback(request?.requestId);
       ipcRenderer.on('app:before-close', handler);
       return () => ipcRenderer.removeListener('app:before-close', handler);
     },
-    notifyCloseReady: () => ipcRenderer.send('app:close-ready'),
+    notifyCloseReady: (requestId, result) => ipcRenderer.send('app:close-ready', { ...result, requestId }),
   },
   printing: {
     listPrinters: () => ipcRenderer.invoke('print:listPrinters'),

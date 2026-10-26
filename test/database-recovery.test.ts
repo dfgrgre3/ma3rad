@@ -44,9 +44,18 @@ test('database recovery preserves unreadable data and requires an explicit fresh
 
   await manager.createFreshAfterRecovery();
   assert.equal(archiveCalls, 1, 'fresh creation uses the explicit recovery action');
-  await assert.rejects(manager.initialize(), /تعذر حفظ قاعدة البيانات/);
+  await assert.rejects(manager.initialize(), (error: any) =>
+    error.code === 'DATABASE_PERSIST_FAILED' && error.retryable === true && /ENOSPC/.test(error.message));
   assert.equal(saveCalls, 1, 'disk-full failures are surfaced instead of starting an unsaved database');
   diskFull = false;
   await manager.initialize();
   assert.equal(saveCalls, 2, 'a retry can persist the explicitly created database');
+
+  manager.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('restore_failure_sentinel', 'keep-current')`);
+  await manager.flush();
+  const currentDb = manager.getDatabase();
+  assert.throws(() => manager.importDatabaseBinary(new Uint8Array([1, 2, 3])));
+  assert.equal(manager.getDatabase(), currentDb, 'a rejected restore never swaps the live database handle');
+  assert.equal(manager.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='restore_failure_sentinel'`)[0]?.value,
+    'keep-current', 'the active database contents remain available after restore validation fails');
 });

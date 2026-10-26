@@ -3,11 +3,13 @@ import type { Supplier, SupplierPayment, PaymentType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 
 export class SupplierService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   public getAllSuppliers(search?: string, includeInactive = false): Supplier[] {
     let sql = `SELECT * FROM suppliers`;
@@ -103,11 +105,13 @@ export class SupplierService {
     amount: number,
     paymentType: PaymentType = 'CASH',
     registerId = 'cr_main',
-    notes = ''
+    notes = '',
+    idempotencyKey?: string
   ): SupplierPayment {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.payment');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
+    const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
 
     const sup = this.getSupplierById(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
@@ -117,15 +121,25 @@ export class SupplierService {
     const today = localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
+      if (idempotencyKey) {
+        const prior = sqliteDb.query<any>(`SELECT * FROM supplier_payments WHERE idempotency_key = ?`, [idempotencyKey])[0];
+        if (prior) {
+          if (prior.supplierId !== supplierId || Number(prior.amount) !== amount ||
+            prior.paymentType !== paymentType || (prior.registerId || 'cr_main') !== registerId || (prior.notes || '') !== notes) {
+            throw new Error('The supplier payment idempotency key was already used for a different request.');
+          }
+          return prior as SupplierPayment;
+        }
+      }
       // 1. Insert Payment Receipt
       sqliteDb.run(`
         INSERT INTO supplier_payments (
-          id, receipt_number, supplier_id, amount, payment_type, date, register_id, notes, performed_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [paymentId, receiptNumber, supplierId, amount, paymentType, today, registerId, notes, actor.id]);
+          id, receipt_number, supplier_id, amount, idempotency_key, payment_type, date, register_id, branch_id, notes, performed_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [paymentId, receiptNumber, supplierId, amount, idempotencyKey || null, paymentType, today, registerId, branchId, notes, actor.id]);
 
       let unapplied = amount;
-      const invoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount FROM purchase_invoices WHERE supplier_id=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [supplierId]);
+      const invoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount FROM purchase_invoices WHERE supplier_id=? AND branch_id=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [supplierId, branchId]);
       for (const invoice of invoices) {
         if (unapplied <= 0.009) break;
         const allocated = Math.round(Math.min(unapplied, Number(invoice.remainingAmount)) * 100) / 100;
@@ -177,6 +191,7 @@ export class SupplierService {
         id: paymentId,
         receiptNumber,
         supplierId,
+        branchId,
         amount,
         paymentType,
         date: today,

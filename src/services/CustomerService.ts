@@ -3,12 +3,14 @@ import type { Customer, CustomerPayment, PaymentType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 
 export class CustomerService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   public getAllCustomers(search?: string): Customer[] {
     let sql = `SELECT * FROM customers`;
@@ -125,23 +127,38 @@ export class CustomerService {
 
     const cust = this.getCustomerById(customerId);
     if (!cust) throw new Error('العميل غير موجود.');
+    const register = registerId || 'cr_main';
+    const branchId = this.branchAccess.requireRegisterAccess(register, actor);
+    if (shiftId) {
+      const shift = this.branchAccess.requireShiftAccess(shiftId, actor, register);
+      if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
+    }
 
     const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
     const today = paymentDate || localDateString();
-    const register = registerId || 'cr_main';
 
     return this.db.executeTransaction((sqliteDb) => {
-      const prior = idempotencyKey ? sqliteDb.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`,[idempotencyKey])[0] : null;
-      if (prior) return { id:prior.id, receiptNumber:prior.receiptNumber, customerId:prior.customerId, amount:prior.amount, paymentType:prior.paymentType, date:prior.date, registerId:prior.registerId, shiftId:prior.shiftId, notes:prior.notes, performedBy:prior.performedBy, createdAt:prior.createdAt };
+      const prior = idempotencyKey ? sqliteDb.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [idempotencyKey]) : [];
+      if (prior.some((row: any) => row.branchId !== branchId)) {
+        throw new Error('The customer payment idempotency key was already used in another branch.');
+      }
+      if (prior.length) {
+        const existingPayment = prior[0];
+        if (existingPayment.customerId !== customerId || Number(existingPayment.amount) !== amount || existingPayment.paymentType !== paymentType ||
+          (existingPayment.registerId || 'cr_main') !== register || (existingPayment.shiftId || null) !== (shiftId || null) || (existingPayment.notes || '') !== notes) {
+          throw new Error('The customer payment idempotency key was already used for a different request.');
+        }
+        return { id:existingPayment.id, receiptNumber:existingPayment.receiptNumber, customerId:existingPayment.customerId, branchId:existingPayment.branchId, amount:existingPayment.amount, paymentType:existingPayment.paymentType, date:existingPayment.date, registerId:existingPayment.registerId, shiftId:existingPayment.shiftId, notes:existingPayment.notes, performedBy:existingPayment.performedBy, createdAt:existingPayment.createdAt };
+      }
       const receiptNumber = sqliteDb.nextNumber('REC');
       // 1. Record customer payment receipt
       sqliteDb.run(`
         INSERT INTO customer_payments (
-          id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, notes, performed_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, register, shiftId || null, notes, actor.id]);
+          id, receipt_number, customer_id, amount, payment_group_id, payment_type, date, register_id, shift_id, branch_id, notes, performed_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [paymentId, receiptNumber, customerId, amount, idempotencyKey || null, paymentType, today, register, shiftId || null, branchId, notes, actor.id]);
       let unapplied = round2(amount);
-      const openInvoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount,total_amount FROM sales_invoices WHERE customer_id=? AND invoice_status!='VOID' AND date<=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [customerId, today]);
+      const openInvoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount,total_amount FROM sales_invoices WHERE customer_id=? AND branch_id=? AND invoice_status!='VOID' AND date<=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [customerId, branchId, today]);
       for (const invoice of openInvoices) {
         if (unapplied <= 0.009) break;
         const allocated = round2(Math.min(unapplied, Number(invoice.remainingAmount)));
@@ -188,6 +205,7 @@ export class CustomerService {
         id: paymentId,
         receiptNumber,
         customerId,
+        branchId,
         amount,
         paymentType,
         date: today,
@@ -202,13 +220,15 @@ export class CustomerService {
 
   public deletePayment(paymentId: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'customers.payment');
+    PermissionService.require(actor, 'customers.payment.reverse');
     const payment = this.db.query<any>(
-      `SELECT id, receipt_number, customer_id, invoice_id, amount, payment_type, register_id, shift_id
+      `SELECT id, receipt_number, customer_id, invoice_id, amount, payment_type, register_id, shift_id, branch_id
        FROM customer_payments WHERE id = ?`,
       [paymentId]
     )[0];
     if (!payment) throw new Error('سند القبض غير موجود.');
+    this.branchAccess.requireBranchAccess(payment.branchId, actor);
+    if (payment.registerId) this.branchAccess.requireRegisterAccess(payment.registerId, actor, payment.branchId);
     if (payment.invoiceId) throw new Error('سند مرتبط بفاتورة بيع. اعكسه من تفاصيل الفاتورة.');
 
     const installment = this.db.query<{ count: number }>(

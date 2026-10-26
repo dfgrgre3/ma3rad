@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { round2 } from './financials';
 
 export interface SalesFinancialCheck {
@@ -33,6 +34,21 @@ function isValidDate(value: string): boolean {
 
 export class SalesFinancialReconciliationService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
+
+  public canUseCentralClosure(): boolean {
+    return this.branchAccess.getAccessibleBranchIds() === null;
+  }
+
+  public getBranchScopeWarning(): string | null {
+    if (this.canUseCentralClosure()) return null;
+    const count = Number(this.db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM journal_entries WHERE branch_id IS NULL'
+    )[0]?.count || 0);
+    return count
+      ? `تم استبعاد ${count} قيد محاسبي غير منسوب إلى فرع من فحوصات الأستاذ العام.`
+      : null;
+  }
 
   private validatePeriod(dateFrom: string, dateTo: string): void {
     if (!isValidDate(dateFrom) || !isValidDate(dateTo) || dateFrom > dateTo) {
@@ -64,6 +80,12 @@ export class SalesFinancialReconciliationService {
   public getReconciliation(dateFrom: string, dateTo: string): SalesFinancialCheck[] {
     this.validatePeriod(dateFrom, dateTo);
     PermissionService.require(AuthService.requireAuth(), 'finance.view');
+    const invoiceScope = this.branchAccess.sqlScope('si.branch_id');
+    const ledgerScope = this.branchAccess.sqlScope('e.branch_id');
+    const warehouseScope = this.branchAccess.sqlScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
+    );
 
     const netSales = Number(this.db.query<{ amount: number }>(`
       SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost), 0)
@@ -74,16 +96,21 @@ export class SalesFinancialReconciliationService {
           FROM sales_returns sr
           JOIN sales_invoices original ON original.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
+            AND ${this.branchAccess.sqlScope('original.branch_id').clause}
         ), 0) AS amount
       FROM sales_invoices si
-      WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
-    `, [dateFrom, dateTo, dateFrom, dateTo])[0]?.amount || 0);
+      WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
+    `, [
+      dateFrom, dateTo, ...this.branchAccess.sqlScope('original.branch_id').params,
+      dateFrom, dateTo, ...invoiceScope.params,
+    ])[0]?.amount || 0);
     const ledgerSales = Number(this.db.query<{ amount: number }>(`
       SELECT COALESCE(SUM(l.credit - l.debit), 0) AS amount
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+        AND ${ledgerScope.clause}
         AND a.code IN ('4101', '4102')
         AND (
           (e.reference_type = 'SALES_INVOICE' AND EXISTS (
@@ -96,7 +123,7 @@ export class SalesFinancialReconciliationService {
             WHERE sr.id = e.reference_id AND si.invoice_status != 'VOID'
           ))
         )
-    `, [dateFrom, dateTo])[0]?.amount || 0);
+    `, [dateFrom, dateTo, ...ledgerScope.params])[0]?.amount || 0);
 
     const costOfSales = Number(this.db.query<{ amount: number }>(`
       SELECT COALESCE(SUM(si.total_cost), 0)
@@ -106,16 +133,20 @@ export class SalesFinancialReconciliationService {
           JOIN sales_returns sr ON sr.id = sri.return_id
           JOIN sales_invoices original ON original.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
+            AND ${this.branchAccess.sqlScope('original.branch_id').clause}
         ), 0) AS amount
       FROM sales_invoices si
-      WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
-    `, [dateFrom, dateTo, dateFrom, dateTo])[0]?.amount || 0);
+      WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
+    `, [
+      dateFrom, dateTo, ...this.branchAccess.sqlScope('original.branch_id').params,
+      dateFrom, dateTo, ...invoiceScope.params,
+    ])[0]?.amount || 0);
     const ledgerCostOfSales = Number(this.db.query<{ amount: number }>(`
       SELECT COALESCE(SUM(l.debit - l.credit), 0) AS amount
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
-      WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND a.code = '5101'
+      WHERE e.is_posted = 1 AND e.date >= ? AND e.date <= ? AND ${ledgerScope.clause} AND a.code = '5101'
         AND (
           (e.reference_type = 'SALES_INVOICE' AND EXISTS (
             SELECT 1 FROM sales_invoices si
@@ -127,23 +158,31 @@ export class SalesFinancialReconciliationService {
             WHERE sr.id = e.reference_id AND si.invoice_status != 'VOID'
           ))
         )
-    `, [dateFrom, dateTo])[0]?.amount || 0);
+    `, [dateFrom, dateTo, ...ledgerScope.params])[0]?.amount || 0);
 
     const accountBalance = (code: string) => Number(this.db.query<{ balance: number }>(`
       SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       JOIN chart_of_accounts a ON a.id = l.account_id
-      WHERE e.is_posted = 1 AND a.code = ?
-    `, [code])[0]?.balance || 0);
-    const customerBalance = Number(this.db.query<{ balance: number }>(
-      'SELECT COALESCE(SUM(current_balance), 0) AS balance FROM customers'
-    )[0]?.balance || 0);
+      WHERE e.is_posted = 1 AND a.code = ? AND ${ledgerScope.clause}
+    `, [code, ...ledgerScope.params])[0]?.balance || 0);
+    const allowedBranches = this.branchAccess.getAccessibleBranchIds();
+    const customerBalance = allowedBranches === null
+      ? Number(this.db.query<{ balance: number }>(
+        'SELECT COALESCE(SUM(current_balance), 0) AS balance FROM customers'
+      )[0]?.balance || 0)
+      : Number(this.db.query<{ balance: number }>(`
+          SELECT COALESCE(SUM(si.remaining_amount), 0) AS balance
+          FROM sales_invoices si
+          WHERE si.invoice_status != 'VOID' AND ${invoiceScope.clause}
+        `, invoiceScope.params)[0]?.balance || 0);
     const inventoryValue = Number(this.db.query<{ value: number }>(`
-      SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS value
-      FROM inventory_cost_layers
-      WHERE quantity_remaining > 0.009
-    `)[0]?.value || 0);
+      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
+      FROM inventory_cost_layers icl
+      JOIN warehouses w ON w.id = icl.warehouse_id
+      WHERE icl.quantity_remaining > 0.009 AND ${warehouseScope.clause}
+    `, warehouseScope.params)[0]?.value || 0);
     const costingMethod = this.db.query<{ value: string }>(
       "SELECT value FROM system_settings WHERE key = 'costingMethod'"
     )[0]?.value || 'AVERAGE_COST';
@@ -152,16 +191,17 @@ export class SalesFinancialReconciliationService {
       : Number(this.db.query<{ value: number }>(`
           SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
           FROM warehouse_stock ws
+          JOIN warehouses w ON w.id = ws.warehouse_id
           JOIN products p ON p.id = ws.product_id
-        `)[0]?.value || 0);
+          WHERE ${warehouseScope.clause}
+        `, warehouseScope.params)[0]?.value || 0);
+    const registerScope = this.branchAccess.sqlScope('branch_id');
     const cashRegisters = Number(this.db.query<{ balance: number }>(
-      'SELECT COALESCE(SUM(current_balance), 0) AS balance FROM cash_registers'
-    )[0]?.balance || 0);
-    const bankAccounts = Number(this.db.query<{ balance: number }>(
-      'SELECT COALESCE(SUM(current_balance), 0) AS balance FROM bank_accounts'
+      `SELECT COALESCE(SUM(current_balance), 0) AS balance FROM cash_registers WHERE ${registerScope.clause}`,
+      registerScope.params
     )[0]?.balance || 0);
 
-    return [
+    const checks = [
       this.addCheck('sales', 'صافي المبيعات والمرتجعات مقابل دفتر الإيرادات', ledgerSales, netSales,
         `حركات الفترة ${dateFrom} إلى ${dateTo}، دون ضريبة القيمة المضافة.`),
       this.addCheck('cost', 'تكلفة المبيعات والمرتجعات مقابل دفتر التكلفة', ledgerCostOfSales, costOfSales,
@@ -174,14 +214,21 @@ export class SalesFinancialReconciliationService {
           : 'القيمة التقديرية للمخزون وفق الكمية × تكلفة الصنف الحالية.'),
       this.addCheck('cash', 'أرصدة الخزائن مقابل الأستاذ العام', accountBalance('1101'), cashRegisters,
         'مقارنة حساب الصندوق 1101 بإجمالي أرصدة الخزائن المسجلة.'),
-      this.addCheck('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102'), bankAccounts,
-        'مقارنة حساب البنوك 1102 بإجمالي أرصدة الحسابات البنكية المسجلة.'),
     ];
+    if (allowedBranches === null) {
+      const bankAccounts = Number(this.db.query<{ balance: number }>(
+        'SELECT COALESCE(SUM(current_balance), 0) AS balance FROM bank_accounts'
+      )[0]?.balance || 0);
+      checks.push(this.addCheck('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102'), bankAccounts,
+        'مقارنة حساب البنوك 1102 بإجمالي أرصدة الحسابات البنكية المسجلة.'));
+    }
+    return checks;
   }
 
   public getLatestClosure(dateFrom: string, dateTo: string): SalesFinancialClosure | null {
     this.validatePeriod(dateFrom, dateTo);
     PermissionService.require(AuthService.requireAuth(), 'finance.view');
+    if (!this.canUseCentralClosure()) return null;
     const row = this.db.query<{
       id: string;
       dateFrom: string;
@@ -218,7 +265,10 @@ export class SalesFinancialReconciliationService {
   ): SalesFinancialClosure {
     this.validatePeriod(dateFrom, dateTo);
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'finance.approve');
+    PermissionService.require(actor, 'finance.close');
+    if (this.branchAccess.getAccessibleBranchIds(actor) !== null) {
+      throw new Error('إقفال المصالحة متاح للصلاحيات المركزية فقط لأن سجل الإقفال مشترك بين الفروع.');
+    }
     const checks = this.getReconciliation(dateFrom, dateTo).map((check) => ({
       ...check,
       reason: check.status === 'DIFFERENCE' ? (reasons[check.key] || '').trim() : undefined,

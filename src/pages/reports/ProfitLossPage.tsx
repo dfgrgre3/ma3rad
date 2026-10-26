@@ -30,10 +30,12 @@ export const ProfitLossPage: React.FC = () => {
   const [expenses, setExpenses] = useState<Array<{ category: string; total: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scopeWarning, setScopeWarning] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
     try {
+      setScopeWarning(service.getBranchScopeWarning());
       setPnl(service.getProfitAndLossReport(from, to));
       setExpenses(service.getExpenseReport(from, to).byCategory as Array<{ category: string; total: number }>);
       setError(null);
@@ -96,6 +98,7 @@ export const ProfitLossPage: React.FC = () => {
 
       <div className="flex-1 overflow-auto p-6">
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {scopeWarning && <div className="mb-3 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">{scopeWarning}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div> : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="xl:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden">

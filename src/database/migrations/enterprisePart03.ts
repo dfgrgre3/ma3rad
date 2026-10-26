@@ -26,13 +26,6 @@ export function runEnterprisePart9(db: Database): void {
     ('AED', 'درهم إماراتي', 'د.إ', 0.122, 0, 1)
   `);
   
-  // Seed default bank account linked to acc_1102
-  const bankCount = Number(db.exec("SELECT COUNT(*) FROM bank_accounts")[0]?.values[0]?.[0] || 0);
-  if (bankCount === 0) {
-    db.run(`INSERT INTO bank_accounts (id, account_name, bank_name, account_number, iban, swift_code, gl_account_id, current_balance, is_active)
-      VALUES ('bank_default', 'البنك الأهلي المصري - الحساب الرئيسي', 'البنك الأهلي المصري', '10002938481', 'EG12000200010002938481001', 'NBEGEGCX', 'acc_1102', 0, 1)`);
-  }
-  
   // Seed current fiscal year and 12 periods if none exist
   const currentYear = new Date().getFullYear();
   const fyCount = Number(db.exec("SELECT COUNT(*) FROM fiscal_years")[0]?.values[0]?.[0] || 0);
@@ -51,23 +44,4 @@ export function runEnterprisePart9(db: Database): void {
     }
   }
   
-  // Seed sample Cost Centers
-  const ccCount = Number(db.exec("SELECT COUNT(*) FROM cost_centers")[0]?.values[0]?.[0] || 0);
-  if (ccCount === 0) {
-    db.run(`INSERT INTO cost_centers (id, code, name, description, is_active) VALUES
-      ('cc_hq', 'CC-HQ', 'الإدارة العامة والمصروفات المشتركة', 'المقر الرئيسي والإدارة', 1),
-      ('cc_sh1', 'CC-SH1', 'صالة العرض الرئيسية', 'معرض المبيعات الرئيسي', 1),
-      ('cc_wh1', 'CC-WH1', 'المستودع المركزي واللوجستيات', 'المخازن المركزية وعمليات الشحن', 1),
-      ('cc_proj', 'CC-PROJ', 'إدارة المشاريع والمقاولات', 'المشاريع الكبرى والتوريدات الحكومية والخاصة', 1)
-    `);
-  }
-  
-  // Seed sample E-Payment Gateway
-  const gwCount = Number(db.exec("SELECT COUNT(*) FROM payment_gateways")[0]?.values[0]?.[0] || 0);
-  if (gwCount === 0) {
-    db.run(`INSERT INTO payment_gateways (id, name, provider_code, gl_account_id, commission_rate, fixed_fee, settlement_period_days, is_active) VALUES
-      ('gw_pos_main', 'ماكينة نقاط البيع POS (فيزا / ماستركارد)', 'POS_TERMINAL', 'acc_1106', 1.5, 2.0, 1, 1),
-      ('gw_fawry', 'فوري للدفع الإلكتروني', 'FAWRY', 'acc_1106', 2.0, 1.0, 2, 1)
-    `);
-  }
 }

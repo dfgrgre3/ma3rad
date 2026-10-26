@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
+import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 
 export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
@@ -12,6 +13,7 @@ export type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE';
 
 export interface Employee {
   id: string;
+  branchId?: string;
   name: string;
   location: string;
   role: string;
@@ -29,6 +31,7 @@ export interface Employee {
 export interface PayrollTransaction {
   id: string;
   employeeId: string;
+  branchId?: string;
   employeeName?: string;
   type: PayrollTxType;
   amount: number;
@@ -65,6 +68,7 @@ export interface EmployeePayrollPayable {
 
 export class EmployeeService {
   private static db = DatabaseManager.getInstance();
+  private static branchAccess = new BranchAccessService();
 
   private static requireView() {
     const actor = AuthService.requireAuth();
@@ -78,6 +82,16 @@ export class EmployeeService {
     return actor;
   }
 
+  private static requireEmployeeBranch(employeeId: string, actor = AuthService.requireAuth()): string {
+    const branchId = this.db.query<{ branchId: string | null }>(
+      'SELECT branch_id AS branchId FROM employees WHERE id = ?',
+      [employeeId]
+    )[0]?.branchId;
+    if (!branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
+    this.branchAccess.requireBranchAccess(branchId, actor);
+    return branchId;
+  }
+
   // ─── Employees ────────────────────────────────────────────────────────────────
 
   static getAll(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Employee[] {
@@ -87,6 +101,7 @@ export class EmployeeService {
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
     const conditions: string[] = [];
     const params: any[] = [];
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
 
     if (opts.search && opts.search.trim()) {
       conditions.push(`(name LIKE ? OR role LIKE ? OR phone LIKE ?)`);
@@ -101,41 +116,46 @@ export class EmployeeService {
       conditions.push(`status = ?`);
       params.push(opts.status);
     }
+    conditions.push(scope.clause);
+    params.push(...scope.params);
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const sql = `SELECT id, name, location, role, phone, email, ${salaryColumns}, status,
-                        joined_date, notes, created_at, updated_at
-                 FROM employees ${where} ORDER BY COALESCE(name, full_name) ASC`;
+    const sql = `SELECT e.id, e.branch_id AS branchId, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
+                        e.joined_date, e.notes, e.created_at, e.updated_at
+                 FROM employees e ${where} ORDER BY COALESCE(e.name, e.full_name) ASC`;
     return this.db.query<Employee>(sql, params);
   }
 
   static getById(id: string): Employee | null {
     const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const salaryColumns = PermissionService.can(actor, 'employees.manage')
       ? 'base_salary AS baseSalary, salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
     const rows = this.db.query<Employee>(
-      `SELECT id, name, location, role, phone, email, ${salaryColumns}, status,
-              joined_date, notes, created_at, updated_at FROM employees WHERE id = ?`,
-      [id]
+      `SELECT e.id, e.branch_id AS branchId, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
+              e.joined_date, e.notes, e.created_at, e.updated_at FROM employees e WHERE e.id = ? AND ${scope.clause}`,
+      [id, ...scope.params]
     );
     return rows[0] ?? null;
   }
 
   static create(data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'notes'> & { notes?: string }): Employee {
-    this.requireManage();
+    const actor = this.requireManage();
     if (!data.name?.trim()) throw new Error('اسم الموظف مطلوب.');
     if (!data.phone?.trim()) throw new Error('رقم الهاتف مطلوب.');
+    const branchId = data.branchId || this.branchAccess.getDefaultAccessibleBranchId(actor);
+    this.branchAccess.requireBranchAccess(branchId, actor);
     const id = `emp_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('EMP');
       db.run(
         `INSERT INTO employees (
-           id, code, full_name, name, phone, email, job_title, role, location,
+           id, code, full_name, name, phone, email, job_title, role, location, branch_id,
            employment_type, hired_at, joined_date, base_salary, salary_type, status, is_active, notes
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'FULL_TIME', ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'FULL_TIME', ?, ?, ?, ?, ?, ?, ?)`,
         [id, code, data.name, data.name, data.phone, data.email || null, data.role, data.role,
-         data.location || '', data.joinedDate, data.joinedDate, data.baseSalary,
+         data.location || '', branchId, data.joinedDate, data.joinedDate, data.baseSalary,
          data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes || null]
       );
       return this.getById(id)!;
@@ -143,15 +163,17 @@ export class EmployeeService {
   }
 
   static update(id: string, data: Partial<Omit<Employee, 'id' | 'createdAt'>>): Employee {
-    this.requireManage();
+    const actor = this.requireManage();
     const existing = this.getById(id);
     if (!existing) throw new Error('الموظف غير موجود.');
+    if (data.branchId) this.branchAccess.requireBranchAccess(data.branchId, actor);
     const nextStatus = data.status ?? existing.status;
     this.db.run(
       `UPDATE employees SET
          name = COALESCE(?, name),
          full_name = COALESCE(?, full_name),
          location = COALESCE(?, location),
+         branch_id = COALESCE(?, branch_id),
          role = COALESCE(?, role),
          job_title = COALESCE(?, job_title),
          phone = COALESCE(?, phone),
@@ -165,7 +187,7 @@ export class EmployeeService {
          notes = COALESCE(?, notes),
          updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [data.name ?? null, data.name ?? null, data.location ?? null, data.role ?? null, data.role ?? null,
+      [data.name ?? null, data.name ?? null, data.location ?? null, data.branchId ?? null, data.role ?? null, data.role ?? null,
        data.phone ?? null, data.email ?? null, data.baseSalary ?? null, data.salaryType ?? null,
        nextStatus, nextStatus === 'ACTIVE' ? 1 : 0, data.joinedDate ?? null, data.joinedDate ?? null,
        data.notes ?? null, id]
@@ -174,30 +196,34 @@ export class EmployeeService {
   }
 
   static delete(id: string): void {
-    this.requireManage();
-    // Cascade deletes payroll_transactions & attendance via FK
+    const actor = this.requireManage();
+    this.requireEmployeeBranch(id, actor);
     this.db.run(`DELETE FROM employees WHERE id = ?`, [id]);
   }
 
   // ─── Payroll Transactions ─────────────────────────────────────────────────────
 
   static getTransactions(employeeId?: string): PayrollTransaction[] {
-    this.requireManage();
+    const actor = this.requireManage();
+    const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
     if (employeeId) {
+      this.requireEmployeeBranch(employeeId, actor);
       return this.db.query<PayrollTransaction>(
         `SELECT pt.*, e.name AS employee_name
          FROM payroll_transactions pt
          LEFT JOIN employees e ON e.id = pt.employee_id
-         WHERE pt.employee_id = ?
+         WHERE pt.employee_id = ? AND ${scope.clause}
          ORDER BY pt.date DESC, pt.created_at DESC`,
-        [employeeId]
+        [employeeId, ...scope.params]
       );
     }
     return this.db.query<PayrollTransaction>(
       `SELECT pt.*, e.name AS employee_name
        FROM payroll_transactions pt
        LEFT JOIN employees e ON e.id = pt.employee_id
-       ORDER BY pt.date DESC, pt.created_at DESC`
+       WHERE ${scope.clause}
+       ORDER BY pt.date DESC, pt.created_at DESC`,
+      scope.params
     );
   }
 
@@ -211,18 +237,22 @@ export class EmployeeService {
     registerId?: string;
   }): PayrollTransaction {
     const actor = this.requireManage();
-    if (!this.getById(data.employeeId)) throw new Error('الموظف غير موجود.');
+    const branchId = this.requireEmployeeBranch(data.employeeId, actor);
     const id = `ptx_${uuidv4().substring(0, 8)}`;
     const amount = Math.round(Number(data.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payroll amount must be greater than zero.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date) || Number.isNaN(Date.parse(`${data.date}T00:00:00`))) throw new Error('Payroll date is invalid.');
-    const registerId = data.registerId || 'cr_main';
+    const hasCashMovement = data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT';
+    const registerId = data.registerId
+      ? data.registerId
+      : hasCashMovement
+        ? this.branchAccess.getDefaultRegisterId(branchId, actor)
+        : null;
     this.db.executeTransaction((db) => {
-      if (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') {
-        if (!db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0]) throw new Error('The selected cash register is unavailable.');
-      }
-      db.run(`INSERT INTO payroll_transactions (id,employee_id,type,amount,date,notes,created_by,register_id) VALUES (?,?,?,?,?,?,?,?)`,
-        [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, registerId]);
+      if (registerId) this.branchAccess.requireRegisterAccess(registerId, actor, branchId);
+      if (hasCashMovement && !registerId) throw new Error('يجب تحديد خزينة فرع الموظف لهذه الحركة النقدية.');
+      db.run(`INSERT INTO payroll_transactions (id,employee_id,type,amount,date,notes,created_by,register_id,branch_id) VALUES (?,?,?,?,?,?,?,?,?)`,
+        [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, registerId, branchId]);
       if (data.type === 'DEDUCTION' || data.type === 'SALARY_PAYOUT') {
         const period = data.date.slice(0, 7);
         const accrualRef = `${data.employeeId}:${period}`;
@@ -289,6 +319,7 @@ export class EmployeeService {
 
   static accrueMonthlyPayroll(period: string): { created: number; skipped: number } {
     const actor = this.requireManage();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('Payroll period must be YYYY-MM.');
     if (period > localDateString().slice(0, 7)) throw new Error('Future payroll periods cannot be accrued.');
     const year = Number(period.slice(0, 4));
@@ -296,8 +327,8 @@ export class EmployeeService {
     const periodEnd = localDateString(new Date(year, month, 0));
     const employees = this.db.query<{ id: string; name: string; baseSalary: number; salaryType: SalaryType }>(
       `SELECT id, name, base_salary AS baseSalary, salary_type AS salaryType
-       FROM employees WHERE joined_date <= ? AND status != 'SUSPENDED' ORDER BY id`,
-      [periodEnd]
+       FROM employees e WHERE joined_date <= ? AND status != 'SUSPENDED' AND ${scope.clause} ORDER BY id`,
+      [periodEnd, ...scope.params]
     );
     let created = 0;
     let skipped = 0;
@@ -334,7 +365,8 @@ export class EmployeeService {
   }
 
   static getPayrollPayables(): EmployeePayrollPayable[] {
-    this.requireManage();
+    const actor = this.requireManage();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     return this.db.query<EmployeePayrollPayable>(`
       WITH payroll_lines AS (
         SELECT
@@ -354,6 +386,7 @@ export class EmployeeService {
         LEFT JOIN payroll_transactions reversed_tx
           ON e.reference_type = 'PAYROLL_REVERSAL'
           AND substr(e.reference_id, 1, length(reversed_tx.id) + 1) = reversed_tx.id || ':'
+        WHERE ${scope.clause}
       )
       SELECT p.employee_id AS employeeId,
              COALESCE(emp.name, 'قيود رواتب غير موزعة') AS employeeName,
@@ -363,13 +396,18 @@ export class EmployeeService {
       GROUP BY p.employee_id, emp.name
       HAVING ABS(SUM(p.balance)) > 0.009
       ORDER BY employeeName
-    `);
+    `, scope.params);
   }
 
   static deleteTransaction(id: string): void {
     const actor = this.requireManage();
-    const row = this.db.query<any>('SELECT * FROM payroll_transactions WHERE id=?', [id])[0];
-    if (!row) return;
+    const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
+    const row = this.db.query<any>(`
+      SELECT pt.* FROM payroll_transactions pt
+      LEFT JOIN employees e ON e.id = pt.employee_id
+      WHERE pt.id = ? AND ${scope.clause}
+    `, [id, ...scope.params])[0];
+    if (!row) throw new Error('عملية الرواتب غير موجودة ضمن نطاق فروعك.');
     this.db.executeTransaction((db) => {
       const entry = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_TRANSACTION' AND reference_id=?`, [id])[0];
       if (entry) reverseLedgerEntry(db.getDatabase(), entry.id, {
@@ -386,11 +424,14 @@ export class EmployeeService {
   static getEmployeeFinancials(employeeId: string): EmployeeFinancials {
     this.requireManage();
     const emp = this.getById(employeeId);
-    if (!emp) return { baseSalary: 0, advances: 0, bonuses: 0, deductions: 0, payouts: 0, netDue: 0 };
+    if (!emp) throw new Error('الموظف غير موجود ضمن نطاق فروعك.');
 
+    const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id');
     const rows = this.db.query<{ type: PayrollTxType; total: number }>(
-      `SELECT type, SUM(amount) AS total FROM payroll_transactions WHERE employee_id = ? GROUP BY type`,
-      [employeeId]
+      `SELECT pt.type, SUM(pt.amount) AS total
+       FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
+       WHERE pt.employee_id = ? AND ${scope.clause} GROUP BY pt.type`,
+      [employeeId, ...scope.params]
     );
 
     const map: Record<string, number> = {};
@@ -409,15 +450,21 @@ export class EmployeeService {
   // ─── Attendance ────────────────────────────────────────────────────────────────
 
   static getAllAttendance(): Attendance[] {
-    this.requireView();
-    return this.db.query<Attendance>(`SELECT * FROM attendance ORDER BY date DESC`);
+    const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    return this.db.query<Attendance>(`
+      SELECT a.* FROM attendance a JOIN employees e ON e.id = a.employee_id
+      WHERE ${scope.clause} ORDER BY a.date DESC
+    `, scope.params);
   }
 
   static getAttendanceByDate(date: string): Attendance[] {
-    this.requireView();
+    const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     return this.db.query<Attendance>(
-      `SELECT * FROM attendance WHERE date = ? ORDER BY created_at`,
-      [date]
+      `SELECT a.* FROM attendance a JOIN employees e ON e.id = a.employee_id
+       WHERE a.date = ? AND ${scope.clause} ORDER BY a.created_at`,
+      [date, ...scope.params]
     );
   }
 
@@ -429,6 +476,7 @@ export class EmployeeService {
     recordedBy?: string;
   }): void {
     const actor = this.requireManage();
+    this.requireEmployeeBranch(data.employeeId, actor);
     const id = `att_${uuidv4().substring(0, 8)}`;
     this.db.run(
       `INSERT INTO attendance (id, employee_id, date, status, notes, recorded_by)
@@ -444,16 +492,22 @@ export class EmployeeService {
   // ─── Analytics helpers ────────────────────────────────────────────────────────
 
   static getLocationCounts(): { location: string; count: number }[] {
-    this.requireView();
+    const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     return this.db.query<{ location: string; count: number }>(
-      `SELECT location, COUNT(*) AS count FROM employees GROUP BY location ORDER BY count DESC`
+      `SELECT e.location, COUNT(*) AS count FROM employees e
+       WHERE ${scope.clause} GROUP BY e.location ORDER BY count DESC`,
+      scope.params
     );
   }
 
   static getTotalWagesBill(): number {
-    this.requireManage();
+    const actor = this.requireManage();
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const rows = this.db.query<{ salaryType: string; baseSalary: number }>(
-      `SELECT salary_type, base_salary FROM employees WHERE status = 'ACTIVE'`
+      `SELECT e.salary_type AS salaryType, e.base_salary AS baseSalary FROM employees e
+       WHERE e.status = 'ACTIVE' AND ${scope.clause}`,
+      scope.params
     );
     return rows.reduce((sum, e) => {
       return sum + (e.salaryType === 'DAILY' ? e.baseSalary * 26 : e.baseSalary);

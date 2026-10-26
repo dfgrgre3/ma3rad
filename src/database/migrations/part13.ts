@@ -141,23 +141,6 @@ export const MIGRATION_PART_13: Migration[] = [
         END;
       `);
 
-      // 7. Seed sample location for default warehouse if none exist
-      const defaultWh = db.exec("SELECT id, code FROM warehouses WHERE is_default = 1 OR is_active = 1 LIMIT 1");
-      if (defaultWh[0]?.values?.length) {
-        const whId = String(defaultWh[0].values[0][0]);
-        const whCode = String(defaultWh[0].values[0][1] || 'WH1');
-        const locCount = Number(db.exec("SELECT COUNT(*) FROM warehouse_locations WHERE warehouse_id = '" + whId + "'")[0]?.values[0]?.[0] || 0);
-        if (locCount === 0) {
-          db.run(`
-            INSERT INTO warehouse_locations (id, warehouse_id, zone, aisle, shelf, bin, barcode, max_capacity_m2, notes)
-            VALUES
-              ('loc_01', ?, 'A', '01', '01', '01', ? || '-A-01-01-01', 500, 'منطقة البورسلين الرئيسية'),
-              ('loc_02', ?, 'A', '01', '02', '01', ? || '-A-01-02-01', 500, 'منطقة أرضيات فرز أول'),
-              ('loc_03', ?, 'B', '02', '01', '01', ? || '-B-02-01-01', 350, 'حائط حمامات ومطابخ'),
-              ('loc_04', ?, 'Q', '00', '00', '00', ? || '-Q-QUARANTINE', 200, 'منطقة الحجر والتفتيش')
-          `, [whId, whCode, whId, whCode, whId, whCode, whId, whCode]);
-        }
-      }
     },
   }
 ];

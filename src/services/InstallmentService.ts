@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { postLedgerEntry, paymentAccountCode, reverseLedgerEntry } from '../database/ledger';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { v4 as uuidv4 } from 'uuid';
 import { localDateString } from '../utils/date';
 
@@ -16,12 +17,22 @@ function addLocalMonths(dateString: string, months: number): string {
 
 export class InstallmentService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   createPlan(input: { customerId: string; invoiceId: string; totalAmount: number; downPayment: number; installmentsCount: number; startDate: string }) {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'finance.installments.manage');
     const { customerId, invoiceId, totalAmount, downPayment, installmentsCount, startDate } = input;
     if (!this.db.query('SELECT id FROM customers WHERE id = ?', [customerId])[0]) throw new Error('Customer not found.');
+    const invoiceScope = this.db.query<{ branchId: string }>(
+      'SELECT branch_id AS branchId FROM sales_invoices WHERE id = ? AND customer_id = ?',
+      [invoiceId, customerId]
+    )[0];
+    if (!invoiceScope) throw new Error('Select a valid invoice for this customer.');
+    this.branchAccess.requireBranchAccess(invoiceScope.branchId, actor);
+    const downPaymentRegisterId = downPayment > 0
+      ? this.branchAccess.getDefaultRegisterId(invoiceScope.branchId, actor)
+      : null;
     if (!Number.isFinite(totalAmount) || totalAmount <= 0 || !Number.isFinite(downPayment) || downPayment < 0 || downPayment > totalAmount) throw new Error('Check total and down payment amounts.');
     if (!Number.isInteger(installmentsCount) || installmentsCount < 1 || installmentsCount > 120) throw new Error('Installment count is invalid.');
     const financed = totalAmount - downPayment;
@@ -39,14 +50,14 @@ export class InstallmentService {
       let downPaymentId: string | null = null;
       let downPaymentReceipt: string | null = null;
       if (downPayment > 0) {
-        const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', ['cr_main'])[0];
+        const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [downPaymentRegisterId])[0];
         if (!register) throw new Error('The main cash register is unavailable for the down payment.');
-        const shift = db.query<any>(`SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND status='OPEN' ORDER BY opened_at DESC LIMIT 1`, [actor.id, register.id])[0];
+        const shift = db.query<any>(`SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND branch_id=? AND status='OPEN' ORDER BY opened_at DESC LIMIT 1`, [actor.id, register.id, invoiceScope.branchId])[0];
         downPaymentId = uuidv4();
         downPaymentReceipt = db.nextNumber('RCP-INST-DP');
         const today = localDateString();
-        db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,register_id,shift_id,notes,performed_by)
-          VALUES (?,?,?,?,?,'CASH',?,?,?,?,?)`, [downPaymentId, downPaymentReceipt, customerId, invoiceId, downPayment, today, register.id, shift?.id || null, `Down payment for installment plan on ${invoice.invoiceNumber}`, actor.id]);
+        db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,register_id,shift_id,branch_id,notes,performed_by)
+          VALUES (?,?,?,?,?,'CASH',?,?,?,?,?,?)`, [downPaymentId, downPaymentReceipt, customerId, invoiceId, downPayment, today, register.id, shift?.id || null, invoiceScope.branchId, `Down payment for installment plan on ${invoice.invoiceNumber}`, actor.id]);
         db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
           [`cpa_${uuidv4().substring(0, 8)}`, downPaymentId, invoiceId, downPayment]);
         db.run(`UPDATE sales_invoices SET paid_amount=paid_amount+?,remaining_amount=MAX(0,remaining_amount-?),payment_status=CASE WHEN remaining_amount-?<=0 THEN 'PAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [downPayment, downPayment, downPayment, invoiceId]);
@@ -57,8 +68,8 @@ export class InstallmentService {
           lines: [{ accountCode: paymentAccountCode('CASH'), debit: downPayment, credit: 0 }, { accountCode: '1103', debit: 0, credit: downPayment }] });
       }
       const planNumber = db.nextNumber('PLN');
-      db.run(`INSERT INTO installment_plans (id,plan_number,customer_id,invoice_id,total_amount,down_payment,financed_amount,installments_count,installment_amount,start_date,down_payment_payment_id,paid_amount,remaining_amount,status,created_by)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,0,?,'ACTIVE',?)`, [planId, planNumber, customerId, invoiceId, totalAmount, downPayment, financed, installmentsCount, monthlyAmount, startDate, downPaymentId, financed, actor.id]);
+      db.run(`INSERT INTO installment_plans (id,plan_number,customer_id,invoice_id,branch_id,total_amount,down_payment,financed_amount,installments_count,installment_amount,start_date,down_payment_payment_id,paid_amount,remaining_amount,status,created_by)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,'ACTIVE',?)`, [planId, planNumber, customerId, invoiceId, invoiceScope.branchId, totalAmount, downPayment, financed, installmentsCount, monthlyAmount, startDate, downPaymentId, financed, actor.id]);
       let allocated = 0;
       for (let i = 1; i <= installmentsCount; i++) {
         const amount = i === installmentsCount ? Math.round((financed - allocated) * 100) / 100 : monthlyAmount;
@@ -75,6 +86,14 @@ export class InstallmentService {
   payInstallment(installmentId: string) {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'finance.installments.manage');
+    const installment = this.db.query<{ branchId: string }>(
+      `SELECT p.branch_id AS branchId FROM installments i
+       JOIN installment_plans p ON p.id = i.plan_id WHERE i.id = ?`,
+      [installmentId]
+    )[0];
+    if (!installment) throw new Error('Installment not found.');
+    this.branchAccess.requireBranchAccess(installment.branchId, actor);
+    const registerId = this.branchAccess.getDefaultRegisterId(installment.branchId, actor);
     return this.db.executeTransaction((db) => {
       const inst = db.query<any>(`SELECT i.*,p.plan_number,p.installments_count,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0];
       if (!inst) throw new Error('Installment not found.');
@@ -82,14 +101,14 @@ export class InstallmentService {
       const amount = Number(inst.remainingAmount);
       if (!(amount > 0)) throw new Error('No amount is due for this installment.');
       const customer = db.query<any>('SELECT name FROM customers WHERE id=?', [inst.customerId])[0];
-      const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', ['cr_main'])[0];
+      const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0];
       if (!register) throw new Error('The main cash register is unavailable.');
-      const shift = db.query<any>(`SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND status='OPEN' ORDER BY opened_at DESC LIMIT 1`, [actor.id, register.id])[0];
+      const shift = db.query<any>(`SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND branch_id=? AND status='OPEN' ORDER BY opened_at DESC LIMIT 1`, [actor.id, register.id, installment.branchId])[0];
       const paymentId = uuidv4();
       const receiptNumber = db.nextNumber('RCP-INST');
       const today = localDateString();
-      db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,notes,performed_by,register_id,shift_id) VALUES (?,?,?,?,?,'CASH',?,?,?,?,?)`,
-        [paymentId, receiptNumber, inst.customerId, inst.invoiceId || null, amount, today, `Installment payment ${inst.sequenceNumber}/${inst.installmentsCount} for plan ${inst.planNumber}`, actor.id, register.id, shift?.id || null]);
+      db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,notes,performed_by,register_id,shift_id,branch_id) VALUES (?,?,?,?,?,'CASH',?,?,?,?,?,?)`,
+        [paymentId, receiptNumber, inst.customerId, inst.invoiceId || null, amount, today, `Installment payment ${inst.sequenceNumber}/${inst.installmentsCount} for plan ${inst.planNumber}`, actor.id, register.id, shift?.id || null, installment.branchId]);
       if (inst.invoiceId) db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, inst.invoiceId, amount]);
       if (inst.invoiceId) {
@@ -111,11 +130,19 @@ export class InstallmentService {
   reverseInstallmentPayment(installmentId: string) {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'finance.installments.manage');
+    const installment = this.db.query<{ branchId: string }>(
+      `SELECT p.branch_id AS branchId FROM installments i
+       JOIN installment_plans p ON p.id = i.plan_id WHERE i.id = ?`,
+      [installmentId]
+    )[0];
+    if (!installment) throw new Error('This installment has no payment to reverse.');
+    this.branchAccess.requireBranchAccess(installment.branchId, actor);
     return this.db.executeTransaction((db) => {
       const inst = db.query<any>(`SELECT i.*,p.plan_number,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0];
       if (!inst || inst.status !== 'PAID' || !inst.paymentId) throw new Error('This installment has no payment to reverse.');
       const payment = db.query<any>('SELECT * FROM customer_payments WHERE id=?', [inst.paymentId])[0];
       if (!payment) throw new Error('The installment receipt is missing.');
+      this.branchAccess.requireRegisterAccess(payment.registerId, actor, installment.branchId);
       const amount = Number(payment.amount);
       const today = localDateString();
       const entry = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`, [payment.id])[0];
@@ -142,6 +169,12 @@ export class InstallmentService {
   cancelPlan(planId: string) {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'finance.installments.manage');
+    const planScope = this.db.query<{ branchId: string }>(
+      'SELECT branch_id AS branchId FROM installment_plans WHERE id = ?',
+      [planId]
+    )[0];
+    if (!planScope) throw new Error('This installment plan cannot be cancelled.');
+    this.branchAccess.requireBranchAccess(planScope.branchId, actor);
     return this.db.executeTransaction((db) => {
       const plan = db.query<any>(`SELECT * FROM installment_plans WHERE id=?`, [planId])[0];
       if (!plan || !['ACTIVE', 'DEFAULTED'].includes(plan.status)) throw new Error('This installment plan cannot be cancelled.');

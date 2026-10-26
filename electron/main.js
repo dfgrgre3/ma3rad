@@ -6,6 +6,7 @@ const { registerPrintingHandlers } = require('./printing');
 const { registerDatabaseHandlers } = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
 const { isAllowedAppUrl, isAllowedIpcSender } = require('./security');
+const { installGracefulClose } = require('./gracefulShutdown');
 
 // Keep application data in the OS-standard roaming profile. This is always
 // writable, even when the app itself is installed under Program Files.
@@ -113,40 +114,11 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  // Graceful shutdown: coordinate with renderer to wait for flush() before closing
-  let isClosing = false;
-  win.on('close', async (event) => {
-    if (isClosing) return;
-    event.preventDefault();
-    isClosing = true;
-
-    try {
-      if (!win.isDestroyed() && win.webContents) {
-        win.webContents.send('app:before-close');
-        const saved = await new Promise((resolve) => {
-          const onCloseReady = () => {
-            clearTimeout(timeout);
-            ipcMain.removeListener('app:close-ready', onCloseReady);
-            resolve(true);
-          };
-          const timeout = setTimeout(() => {
-            ipcMain.removeListener('app:close-ready', onCloseReady);
-            resolve(false);
-          }, 3500);
-          ipcMain.once('app:close-ready', onCloseReady);
-        });
-        if (!saved) {
-          isClosing = false;
-          return;
-        }
-      }
-    } catch (err) {
-      console.error('Graceful shutdown error:', err);
-    } finally {
-      if (!win.isDestroyed()) {
-        win.destroy();
-      }
-    }
+  installGracefulClose({
+    win,
+    ipcMain,
+    dialog,
+    validateIpcSender,
   });
 
   if (!app.isPackaged) {

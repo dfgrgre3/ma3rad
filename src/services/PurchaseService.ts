@@ -3,6 +3,7 @@ import type { PurchaseInvoice, PurchaseInvoiceItem, PaymentType, PaymentStatus }
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { computeWeightedAverageCost, round2 } from './financials';
 import { CustomerSupplyService } from './CustomerSupplyService';
 import { localDateString } from '../utils/date';
@@ -43,23 +44,27 @@ export interface CreatePurchaseDTO {
 
 export class PurchaseService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   private costingMethod(): string {
     return SettingsService.getSettings().costingMethod;
   }
 
   public getAllPurchases(search?: string): PurchaseInvoice[] {
+    AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
     let sql = `
       SELECT pi.*, s.name as supplierName, w.name as warehouseName, u.full_name as createdByName
       FROM purchase_invoices pi
       JOIN suppliers s ON pi.supplier_id = s.id
       JOIN warehouses w ON pi.warehouse_id = w.id
       LEFT JOIN users u ON pi.created_by = u.id
+      WHERE ${scope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...scope.params];
 
     if (search && search.trim()) {
-      sql += ` WHERE pi.invoice_number LIKE ? OR s.name LIKE ? OR pi.supplier_invoice_number LIKE ?`;
+      sql += ` AND (pi.invoice_number LIKE ? OR s.name LIKE ? OR pi.supplier_invoice_number LIKE ?)`;
       const term = `%${search.trim()}%`;
       params.push(term, term, term);
     }
@@ -69,14 +74,16 @@ export class PurchaseService {
   }
 
   public getPurchaseById(id: string): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
+    AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
     const rows = this.db.query<PurchaseInvoice>(`
       SELECT pi.*, s.name as supplierName, s.phone as supplierPhone, w.name as warehouseName, u.full_name as createdByName
       FROM purchase_invoices pi
       JOIN suppliers s ON pi.supplier_id = s.id
       JOIN warehouses w ON pi.warehouse_id = w.id
       LEFT JOIN users u ON pi.created_by = u.id
-      WHERE pi.id = ?
-    `, [id]);
+      WHERE pi.id = ? AND ${scope.clause}
+    `, [id, ...scope.params]);
 
     if (rows.length === 0) return null;
     const inv = rows[0];
@@ -103,6 +110,8 @@ export class PurchaseService {
     }
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'purchases.create');
+    const branchId = this.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
+    const branchRegisterId = this.branchAccess.getDefaultRegisterId(branchId, actor);
 
     // Duplicate supplier invoice check (unless explicit override for suppliers without numbers)
     if (!dto.isNoNumberSupplier && dto.supplierInvoiceNumber && dto.supplierInvoiceNumber.trim()) {
@@ -217,15 +226,15 @@ export class PurchaseService {
       // 1. Insert Purchase Invoice
       sqliteDb.run(`
         INSERT INTO purchase_invoices (
-          id, invoice_number, supplier_invoice_number, date, due_date, supplier_id, warehouse_id,
+          id, invoice_number, supplier_invoice_number, date, due_date, supplier_id, warehouse_id, branch_id,
           subtotal, discount_amount, tax_amount, shipping_cost, total_amount,
           paid_amount, remaining_amount, payment_type, payment_status, notes, created_by,
           grn_id, purchase_order_id, landed_freight, landed_loading, landed_customs_taxes,
           landed_insurance, landed_other, landed_allocation_method, is_no_number_supplier,
           matching_status, price_variance_amount, qty_variance_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dueDateString, dto.supplierId, dto.warehouseId,
+        purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dueDateString, dto.supplierId, dto.warehouseId, branchId,
         subtotal, discountAmount, taxAmount, shippingCost, totalAmount,
         dto.paidAmount, remainingAmount, dto.paymentType, paymentStatus, dto.notes || null, performedBy,
         dto.grnId || null, dto.purchaseOrderId || null, landedFreight, landedLoading, landedCustoms,
@@ -317,16 +326,16 @@ export class PurchaseService {
       // 4. If Cash Paid, Deduct from Cash Register
       if (dto.paidAmount > 0 && dto.paymentType === 'CASH') {
         sqliteDb.run(`
-          UPDATE cash_registers SET current_balance = current_balance - ? WHERE is_default = 1
-        `, [dto.paidAmount]);
+          UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?
+        `, [dto.paidAmount, branchRegisterId]);
       }
 
       if (dto.paidAmount > 0 && dto.paymentType !== 'CREDIT') {
         const paymentId = `spay_${uuidv4().substring(0, 8)}`;
         const receiptNumber = `PAY-${Date.now().toString().slice(-8)}`;
         sqliteDb.run(`
-          INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, notes, performed_by)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, branch_id, notes, performed_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           paymentId,
           receiptNumber,
@@ -334,7 +343,8 @@ export class PurchaseService {
           dto.paidAmount,
           dto.paymentType,
           today,
-          'cr_main',
+          branchRegisterId,
+          branchId,
           `دفعة مع فاتورة توريد ${invoiceNumber}`,
           performedBy,
         ]);
@@ -421,6 +431,8 @@ export class PurchaseService {
     const invoice = this.getPurchaseById(purchaseId);
     if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
     if (invoice.remainingAmount <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
+    const invoiceBranchId = invoice.branchId || this.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
+    const branchId = this.branchAccess.requireRegisterAccess(registerId, actor, invoiceBranchId);
 
     const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
     if (value <= 0) throw new Error('أدخل مبلغًا صحيحًا أكبر من صفر.');
@@ -435,9 +447,9 @@ export class PurchaseService {
       const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
 
       db.run(
-        `INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, notes, performed_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [paymentId, receiptNumber, invoice.supplierId, value, paymentType, today, registerId, notes || `سداد دفعة على فاتورة توريد ${invoice.invoiceNumber}`, actor.id]
+        `INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, branch_id, notes, performed_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [paymentId, receiptNumber, invoice.supplierId, value, paymentType, today, registerId, branchId, notes || `سداد دفعة على فاتورة توريد ${invoice.invoiceNumber}`, actor.id]
       );
       db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
         [`spa_${uuidv4().substring(0, 8)}`, paymentId, purchaseId, value]);
@@ -480,6 +492,7 @@ export class PurchaseService {
     PermissionService.require(actor, 'purchases.delete');
     const invoice = this.getPurchaseById(purchaseId);
     if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
+    const invoiceBranchId = invoice.branchId || this.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
     if (!reason || !reason.trim()) throw new Error('سبب الحذف مطلوب.');
 
     const returnsCount = this.db.query<{ count: number }>(
@@ -548,8 +561,8 @@ export class PurchaseService {
 
       const relatedPayments = db.query<any>(
         `SELECT id, amount, payment_type, register_id FROM supplier_payments
-         WHERE supplier_id = ? AND notes LIKE ?`,
-        [invoice.supplierId, `%${invoice.invoiceNumber}%`]
+         WHERE supplier_id = ? AND branch_id = ? AND notes LIKE ?`,
+        [invoice.supplierId, invoiceBranchId, `%${invoice.invoiceNumber}%`]
       );
       for (const payment of relatedPayments) {
         postLedgerEntry(db.getDatabase(), {
@@ -569,7 +582,8 @@ export class PurchaseService {
         db.run('DELETE FROM supplier_payments WHERE id = ?', [payment.id]);
       }
       if (relatedPayments.length === 0 && invoice.paidAmount > 0 && invoice.paymentType === 'CASH') {
-        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE is_default = 1`, [invoice.paidAmount]);
+        const registerId = this.branchAccess.getDefaultRegisterId(invoiceBranchId, actor);
+        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [invoice.paidAmount, registerId]);
       }
 
       const inventoryCost = round2(invoice.items.reduce((sum, item) => sum + Number(item.totalCost), 0));

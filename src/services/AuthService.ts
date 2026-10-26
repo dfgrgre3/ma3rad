@@ -3,6 +3,7 @@ import type { User, UserRole } from '../types';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 
 // Use sessionStorage instead of localStorage for session data (cleared on tab close)
 const SESSION_KEY = 'ceramisys_session_user_id';
@@ -318,16 +319,22 @@ export class AuthService {
     const id = `usr_${uuidv4().substring(0, 8)}`;
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(user.password, salt);
+    const branchId = new BranchAccessService().getDefaultAccessibleBranchId(subject);
 
-    this.db.run(`
-      INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-    `, [id, user.username, hash, user.fullName, user.role, user.phone || null, pinHash]);
-
-    this.db.run(`
-      INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
-      VALUES (?, ?, ?, 'إنشاء مستخدم جديد', 'USERS', ?)
-    `, [`aud_${uuidv4().substring(0, 8)}`, subject.id || performedBy, subject.fullName, id]);
+    this.db.executeTransaction((db) => {
+      db.run(`
+        INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id, branch_scope)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, 'ASSIGNED')
+      `, [id, user.username, hash, user.fullName, user.role, user.phone || null, pinHash, branchId]);
+      db.run(
+        'INSERT INTO users_branches (user_id, branch_id) VALUES (?, ?)',
+        [id, branchId]
+      );
+      db.run(`
+        INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
+        VALUES (?, ?, ?, 'إنشاء مستخدم جديد', 'USERS', ?)
+      `, [`aud_${uuidv4().substring(0, 8)}`, subject.id || performedBy, subject.fullName, id]);
+    });
 
     return {
       id,

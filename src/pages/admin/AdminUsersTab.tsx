@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search, UserPlus, Pencil, KeyRound, Trash2, ShieldCheck, RefreshCw,
-  ChevronDown, ChevronLeft, UserCog, Power,
+  ChevronDown, ChevronLeft, UserCog, Power, Building2,
 } from 'lucide-react';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { BranchService } from '../../services/BranchService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
 import type { Role, User, UserRole } from '../../types';
@@ -32,15 +33,19 @@ const emptyForm: UserForm = {
 
 export const AdminUsersTab: React.FC = () => {
   const auth = useMemo(() => new AuthService(), []);
+  const branchService = useMemo(() => new BranchService(), []);
   const toast = useToast();
   const can = usePermission();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<'create' | 'edit' | 'password' | 'permissions' | null>(null);
+  const [modal, setModal] = useState<'create' | 'edit' | 'password' | 'permissions' | 'branch-scope' | null>(null);
   const [active, setActive] = useState<User | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
   const [newPassword, setNewPassword] = useState('');
+  const [branchOptions, setBranchOptions] = useState<ReturnType<BranchService['getAllBranches']>>([]);
+  const [branchScope, setBranchScope] = useState<'ASSIGNED' | 'ALL'>('ASSIGNED');
+  const [assignedBranchIds, setAssignedBranchIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = () => {
@@ -91,6 +96,26 @@ export const AdminUsersTab: React.FC = () => {
     setActive(user);
     setNewPassword('');
     setModal('password');
+  };
+
+  const openBranchScope = (user: User) => {
+    try {
+      setActive(user);
+      setBranchScope(branchService.getUserBranchScope(user.id));
+      setAssignedBranchIds(branchService.getUserAssignedBranchIds(user.id));
+      setBranchOptions(branchService.getAllBranches());
+      setModal('branch-scope');
+    } catch (error: any) {
+      toast.error('تعذر تحميل نطاق الفروع', error?.message || String(error));
+    }
+  };
+
+  const submitBranchScope = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!active) return;
+    run(() => {
+      branchService.updateUserBranchAccess(active.id, branchScope, assignedBranchIds);
+    }, 'تم تحديث نطاق الفروع.');
   };
 
   const run = async (fn: () => void, success: string) => {
@@ -191,6 +216,7 @@ export const AdminUsersTab: React.FC = () => {
                 <th className="p-3.5">المستخدم</th>
                 <th className="p-3.5">الاسم الكامل</th>
                 <th className="p-3.5">الدور</th>
+                <th className="p-3.5">نطاق الفروع</th>
                 <th className="p-3.5">الهاتف</th>
                 <th className="p-3.5">الحالة</th>
                 <th className="p-3.5">إجراءات</th>
@@ -205,6 +231,15 @@ export const AdminUsersTab: React.FC = () => {
                     <span className="rounded bg-sky-500/10 px-2 py-0.5 text-[10px] font-black text-sky-600 dark:text-sky-400">
                       {roles.find((r) => r.code === user.role)?.name || user.role}
                     </span>
+                  </td>
+                  <td className="p-3.5">
+                    {user.role === 'ADMIN'
+                      ? <span className="text-[10px] font-bold text-slate-500">وصول مركزي (مدير)</span>
+                      : can('branches.manage_users') && can('branches.view')
+                      ? <button onClick={() => openBranchScope(user)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-slate-800">
+                          <Building2 className="h-3.5 w-3.5" /> إدارة النطاق
+                        </button>
+                      : '—'}
                   </td>
                   <td className="p-3.5 font-mono text-slate-500 dark:text-slate-400">{user.phone || '-'}</td>
                   <td className="p-3.5">
@@ -251,7 +286,7 @@ export const AdminUsersTab: React.FC = () => {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400">لا توجد نتائج مطابقة.</td>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">لا توجد نتائج مطابقة.</td>
                 </tr>
               )}
             </tbody>
@@ -325,6 +360,36 @@ export const AdminUsersTab: React.FC = () => {
               <input required type="password" minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} />
             </Field>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="تعيين كلمة المرور" />
+          </form>
+        </Modal>
+      )}
+
+      {modal === 'branch-scope' && active && (
+        <Modal title={`نطاق الفروع: ${active.fullName}`} onClose={() => setModal(null)}>
+          <form onSubmit={submitBranchScope} className="space-y-4">
+            <Field label="نطاق البيانات">
+              <select value={branchScope} onChange={(event) => setBranchScope(event.target.value as 'ASSIGNED' | 'ALL')} className={inputCls}>
+                <option value="ASSIGNED">الفروع المسندة فقط</option>
+                {can('branches.access_all') && <option value="ALL">وصول مركزي إلى كل الفروع</option>}
+              </select>
+            </Field>
+            <div className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">الفروع المسندة</p>
+              {branchOptions.map((branch) => (
+                <label key={branch.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={assignedBranchIds.includes(branch.id)}
+                    onChange={(event) => setAssignedBranchIds((current) =>
+                      event.target.checked ? [...new Set([...current, branch.id])] : current.filter((id) => id !== branch.id)
+                    )}
+                  />
+                  {branch.name}
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] leading-5 text-slate-500">النطاق يفرضه النظام داخل الخدمات والاستعلامات. الحساب المركزي يحتاج صلاحية «الوصول المركزي إلى جميع الفروع» بالإضافة إلى تعيين هذا النطاق.</p>
+            <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق الفروع" />
           </form>
         </Modal>
       )}

@@ -3,6 +3,8 @@ import type { PaymentType, PaymentStatus } from './sales';
 export interface CashRegister {
   id: string;
   name: string;
+  branchId?: string;
+  branchName?: string;
   currentBalance: number;
   isDefault: boolean;
   isActive: boolean;
@@ -12,6 +14,7 @@ export interface CashRegister {
 export interface CashShift {
   id: string;
   shiftNumber: string;
+  branchId?: string;
   registerId: string;
   registerName?: string;
   userId: string;
@@ -49,6 +52,7 @@ export interface Expense {
   categoryId?: string;
   amount: number;
   registerId: string;
+  branchId?: string;
   shiftId?: string;
   paymentType: PaymentType;
   date: string;
@@ -64,6 +68,7 @@ export interface CustomerPayment {
   receiptNumber: string;
   customerId: string;
   invoiceId?: string | null;
+  branchId?: string;
   customerName?: string;
   amount: number;
   paymentType: PaymentType;
@@ -79,6 +84,7 @@ export interface SupplierPayment {
   id: string;
   receiptNumber: string;
   supplierId: string;
+  branchId?: string;
   supplierName?: string;
   amount: number;
   paymentType: PaymentType;

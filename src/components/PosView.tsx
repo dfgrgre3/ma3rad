@@ -115,7 +115,6 @@ export const PosView: React.FC = () => {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
-  const [closingCash, setClosingCash] = useState(0);
   const [closingNotes, setClosingNotes] = useState('');
   // Tone/Shade mixing warning before checkout
   const [toneConflicts, setToneConflicts] = useState<ToneMixingConflict[]>([]);
@@ -130,7 +129,7 @@ export const PosView: React.FC = () => {
   const [customerError, setCustomerError] = useState('');
 
   // Open-shift form
-  const [shiftRegisterId, setShiftRegisterId] = useState('cr_main');
+  const [shiftRegisterId, setShiftRegisterId] = useState('');
   const [openingBalance, setOpeningBalance] = useState(0);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +145,17 @@ export const PosView: React.FC = () => {
   const cashierService = useMemo(() => new CashierService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const pricingService = useMemo(() => new PricingService(), []);
+
+  useEffect(() => {
+    if (!registers.length) {
+      if (shiftRegisterId) setShiftRegisterId('');
+      return;
+    }
+    if (registers.some((register) => register.id === shiftRegisterId)) return;
+    const selected = registers.find((register) => register.isDefault) || registers[0];
+    setShiftRegisterId(selected.id);
+    setOpeningBalance(cashierService.getSuggestedOpeningBalance(selected.id));
+  }, [cashierService, registers, shiftRegisterId]);
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const notify = useCallback((message: string, type: Toast['type'] = 'info') => {
@@ -185,8 +195,9 @@ export const PosView: React.FC = () => {
       const allWhs = inventoryService.getAllWarehouses();
       const allCats = categoryService.getAllCategories();
       const allRegs = cashierService.getAllRegisters();
-      const shift = cashierService.getActiveShift();
       const sysSettings = printService.getSettings();
+      const defaultWarehouse = allWhs[0];
+      const shift = cashierService.getActiveShift(currentUser?.id, defaultWarehouse?.branchId);
 
       setProducts(allProds);
       setCustomers(allCusts);
@@ -197,20 +208,22 @@ export const PosView: React.FC = () => {
       setSettings(sysSettings);
       setTaxPercentage(sysSettings.defaultTaxPercentage || 0);
 
-      const defaultWarehouse = allWhs[0]?.id || '';
-      setSelectedWarehouseId(defaultWarehouse);
-      if (defaultWarehouse) loadStock(defaultWarehouse);
+      setSelectedWarehouseId(defaultWarehouse?.id || '');
+      if (defaultWarehouse) loadStock(defaultWarehouse.id);
 
       const walkIn = allCusts.find((c) => c.id === 'cust_cash') || allCusts[0] || null;
       setSelectedCustomer(walkIn);
 
-      const defaultReg = allRegs.find((r) => r.isDefault) || allRegs[0];
+      const defaultReg = allRegs.find((r) => r.branchId === defaultWarehouse?.branchId && r.isDefault)
+        || allRegs.find((r) => r.branchId === defaultWarehouse?.branchId)
+        || allRegs.find((r) => r.isDefault)
+        || allRegs[0];
       if (defaultReg) setShiftRegisterId(defaultReg.id);
     } catch (e) {
       console.error(e);
       notify('تعذر تحميل بيانات نقطة البيع', 'error');
     }
-  }, [productService, customerService, inventoryService, categoryService, cashierService, printService, loadStock, notify]);
+  }, [productService, customerService, inventoryService, categoryService, cashierService, printService, loadStock, notify, currentUser?.id]);
 
   useEffect(() => {
     loadInitialData();
@@ -598,7 +611,7 @@ export const PosView: React.FC = () => {
 
   // ── Shifts ──────────────────────────────────────────────────────────────────
   const handleOpenShift = () => {
-    if (!can('cashier.shift')) {
+    if (!can('cashier.shift.open')) {
       notify('غير مصرح لك بفتح وردية كاشير', 'error');
       return;
     }
@@ -619,15 +632,14 @@ export const PosView: React.FC = () => {
 
   const handleCloseShift = () => {
     if (!activeShift) return;
-    if (!can('cashier.shift')) {
+    if (!can('cashier.shift.close')) {
       notify('غير مصرح لك بإغلاق وردية الكاشير', 'error');
       return;
     }
     try {
-      cashierService.closeShift(activeShift.id, Math.max(0, closingCash), closingNotes, currentUser?.id || 'usr_admin');
+      cashierService.closeShift(activeShift.id, expectedClosingCash, closingNotes, currentUser?.id || 'usr_admin');
       setActiveShift(null);
       setIsCloseShiftModalOpen(false);
-      setClosingCash(0);
       setClosingNotes('');
       notify('تم إغلاق الوردية وحفظ فرق الصندوق', 'success');
     } catch (e: any) {
@@ -790,7 +802,10 @@ export const PosView: React.FC = () => {
       setPendingCheckout(false);
       setProducts(productService.getAllProducts());
       if (selectedWarehouseId) loadStock(selectedWarehouseId);
-      setActiveShift(cashierService.getActiveShift());
+      setActiveShift(cashierService.getActiveShift(
+        currentUser?.id,
+        warehouses.find((warehouse) => warehouse.id === selectedWarehouseId)?.branchId
+      ));
       notify(`تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح`, 'success');
     } catch (e: any) {
       notify(e.message || 'خطأ أثناء حفظ الفاتورة', 'error');
@@ -941,10 +956,10 @@ export const PosView: React.FC = () => {
                   <span className="text-slate-500">بطاقة:</span>
                   <span className="font-black text-sky-600">{CeramicMath.formatCurrency(activeShift.totalSalesCard)}</span>
                 </div>
-                {can('cashier.shift') && <button onClick={() => { setClosingCash(expectedClosingCash); setIsCloseShiftModalOpen(true); }} className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition"><Lock className="w-4 h-4" /> إغلاق الوردية</button>}
+                {can('cashier.shift.close') && <button onClick={() => setIsCloseShiftModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition"><Lock className="w-4 h-4" /> إغلاق الوردية</button>}
               </>
             )}
-            {!activeShift && (
+            {!activeShift && can('cashier.shift.open') && (
               <button
                 onClick={() => {
                   setOpeningBalance(cashierService.getSuggestedOpeningBalance(shiftRegisterId));
@@ -1009,7 +1024,16 @@ export const PosView: React.FC = () => {
 
               <select
               value={selectedWarehouseId}
-              onChange={(e) => { setSelectedWarehouseId(e.target.value); loadStock(e.target.value); }}
+              onChange={(e) => {
+                const warehouseId = e.target.value;
+                const warehouse = warehouses.find((item) => item.id === warehouseId);
+                setSelectedWarehouseId(warehouseId);
+                loadStock(warehouseId);
+                setActiveShift(cashierService.getActiveShift(currentUser?.id, warehouse?.branchId));
+                const branchRegister = registers.find((register) => register.branchId === warehouse?.branchId && register.isDefault)
+                  || registers.find((register) => register.branchId === warehouse?.branchId);
+                if (branchRegister) setShiftRegisterId(branchRegister.id);
+              }}
               className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-sky-500"
             >
               {warehouses.map((w) => (
@@ -1636,10 +1660,11 @@ export const PosView: React.FC = () => {
                 className={inputCls}
               >
                 {registers.length === 0 ? (
-                  <option value="cr_main">الخزينة الرئيسية</option>
+                  <option value="">لا توجد خزائن متاحة لهذا المستخدم</option>
                 ) : (
                   registers.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
+                    <option key={r.id} value={r.id}>{r.name}{r.branchName ? ` — ${r.branchName}` : ''}
+                    </option>
                   ))
                 )}
               </select>
@@ -1649,6 +1674,7 @@ export const PosView: React.FC = () => {
             </Field>
             <button
               onClick={handleOpenShift}
+              disabled={!shiftRegisterId || registers.length === 0}
               className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"
             >
               <Unlock className="w-4 h-4" /> فتح الوردية
@@ -1669,15 +1695,13 @@ export const PosView: React.FC = () => {
               <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold">النقد المتوقع بالصندوق</span><strong className="text-emerald-700">{CeramicMath.formatCurrency(expectedClosingCash)}</strong></div>
             </div>
             <Field label="النقد الفعلي بعد العد">
-              <input type="number" min="0" step="0.01" value={closingCash} onChange={(e) => setClosingCash(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))} className={inputCls} />
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-800">سيُسجّل الرصيد المتوقع تلقائيًا: {CeramicMath.formatCurrency(expectedClosingCash)}</div>
             </Field>
-            <div className={`rounded-xl px-3 py-2 text-sm font-bold ${round2(closingCash - expectedClosingCash) === 0 ? 'bg-emerald-50 text-emerald-700' : closingCash > expectedClosingCash ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'}`}>
-              فرق الصندوق: {CeramicMath.formatCurrency(closingCash - expectedClosingCash)}
-            </div>
+            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">فرق الصندوق المحسوب: {CeramicMath.formatCurrency(0)}</div>
             <Field label="ملاحظات الإقفال">
               <textarea rows={2} value={closingNotes} onChange={(e) => setClosingNotes(e.target.value)} placeholder="سبب العجز أو الزيادة، إن وجد..." className={inputCls} />
             </Field>
-            <button onClick={handleCloseShift} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد عدّ النقد وإغلاق الوردية</button>
+            <button onClick={handleCloseShift} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد الرصيد المحسوب وإغلاق الوردية</button>
           </div>
         </Modal>
       )}

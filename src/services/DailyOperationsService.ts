@@ -1,11 +1,13 @@
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 
 export interface DailySalesRow {
   id: string;
+  branchId: string;
   invoiceNumber: string;
   date: string;
   createdAt: string;
@@ -32,6 +34,7 @@ export interface DailySalesResult {
 
 export interface DailyPurchaseRow {
   id: string;
+  branchId: string;
   invoiceNumber: string;
   supplierInvoiceNumber?: string | null;
   date: string;
@@ -188,9 +191,12 @@ const num = (value: unknown) => Number(value) || 0;
 
 export class DailyOperationsService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
-  private requireView(permission: string): void {
-    PermissionService.require(AuthService.requireAuth(), permission);
+  private requireView(permission: string) {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, permission);
+    return actor;
   }
 
   public today(): string {
@@ -198,10 +204,11 @@ export class DailyOperationsService {
   }
 
   public getSales(date = this.today()): DailySalesResult {
-    this.requireView('sales.view');
+    const actor = this.requireView('sales.view');
+    const scope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id', actor);
     const day = dateOnly(date);
     const rows = this.db.query<DailySalesRow>(
-      `SELECT si.id, si.invoice_number AS invoiceNumber, si.date, si.created_at AS createdAt,
+      `SELECT si.id, si.branch_id AS branchId, si.invoice_number AS invoiceNumber, si.date, si.created_at AS createdAt,
               c.name AS customerName, c.phone AS customerPhone,
               (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount,
               si.total_amount AS total, si.paid_amount AS paid, si.remaining_amount AS remaining,
@@ -210,10 +217,11 @@ export class DailyOperationsService {
               si.invoice_status AS invoiceStatus, u.full_name AS createdByName
        FROM sales_invoices si
        LEFT JOIN customers c ON c.id = si.customer_id
+       LEFT JOIN warehouses w ON w.id = si.warehouse_id
        LEFT JOIN users u ON u.id = si.created_by
-       WHERE si.date = ? AND si.invoice_status != 'VOID'
+       WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}
        ORDER BY si.created_at DESC`,
-      [day]
+      [day, ...scope.params]
     );
 
     return {
@@ -232,10 +240,11 @@ export class DailyOperationsService {
   }
 
   public getPurchases(date = this.today()): DailyPurchaseResult {
-    this.requireView('purchases.view');
+    const actor = this.requireView('purchases.view');
     const day = dateOnly(date);
+    const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id', actor);
     const rows = this.db.query<DailyPurchaseRow>(
-      `SELECT pi.id, pi.invoice_number AS invoiceNumber, pi.supplier_invoice_number AS supplierInvoiceNumber,
+      `SELECT pi.id, pi.branch_id AS branchId, pi.invoice_number AS invoiceNumber, pi.supplier_invoice_number AS supplierInvoiceNumber,
               pi.date, pi.created_at AS createdAt,
               pi.supplier_id AS supplierId, s.name AS supplierName, s.phone AS supplierPhone,
               w.name AS warehouseName,
@@ -248,9 +257,9 @@ export class DailyOperationsService {
        LEFT JOIN suppliers s ON s.id = pi.supplier_id
        LEFT JOIN warehouses w ON w.id = pi.warehouse_id
        LEFT JOIN users u ON u.id = pi.created_by
-       WHERE pi.date = ?
+       WHERE pi.date = ? AND ${scope.clause}
        ORDER BY pi.created_at DESC`,
-      [day]
+      [day, ...scope.params]
     );
 
     const items = this.db.query<DailyPurchaseItemRow>(
@@ -262,13 +271,15 @@ export class DailyOperationsService {
               pii.unit_cost AS unitCost, pii.total_cost AS totalCost
        FROM purchase_invoice_items pii
        JOIN purchase_invoices pi ON pi.id = pii.purchase_id
+       LEFT JOIN warehouses w ON w.id = pi.warehouse_id
        LEFT JOIN suppliers s ON s.id = pi.supplier_id
        LEFT JOIN products p ON p.id = pii.product_id
-       WHERE pi.date = ?
+       WHERE pi.date = ? AND ${scope.clause}
        ORDER BY pii.total_cost DESC`,
-      [day]
+      [day, ...scope.params]
     );
 
+    const paymentScope = this.branchAccess.sqlScope('sp.branch_id', 'cr.branch_id', actor);
     const payments = this.db.query<DailySupplierPaymentRow>(
       `SELECT sp.id, sp.receipt_number AS receiptNumber, sp.supplier_id AS supplierId,
               s.name AS supplierName, sp.amount, sp.payment_type AS paymentType,
@@ -276,13 +287,14 @@ export class DailyOperationsService {
               (SELECT GROUP_CONCAT(pi.invoice_number, '، ')
                  FROM supplier_payment_allocations spa
                  JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id
-                WHERE spa.payment_id = sp.id) AS invoiceNumbers
+                 WHERE spa.payment_id = sp.id AND pi.branch_id = sp.branch_id) AS invoiceNumbers
        FROM supplier_payments sp
+       LEFT JOIN cash_registers cr ON cr.id = sp.register_id
        LEFT JOIN suppliers s ON s.id = sp.supplier_id
        LEFT JOIN users u ON u.id = sp.performed_by
-       WHERE sp.date = ?
+       WHERE sp.date = ? AND ${paymentScope.clause}
        ORDER BY sp.created_at DESC`,
-      [day]
+      [day, ...paymentScope.params]
     );
 
     const start = new Date(`${day}T12:00:00`);
@@ -290,10 +302,11 @@ export class DailyOperationsService {
     const startDay = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
     const trendRows = this.db.query<{ date: string; count: number; total: number }>(
       `SELECT date, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS total
-       FROM purchase_invoices
-       WHERE date BETWEEN ? AND ?
+       FROM purchase_invoices pi
+       LEFT JOIN warehouses w ON w.id = pi.warehouse_id
+       WHERE pi.date BETWEEN ? AND ? AND ${scope.clause}
        GROUP BY date`,
-      [startDay, day]
+      [startDay, day, ...scope.params]
     );
     const trendMap = new Map(trendRows.map((row) => [row.date, row]));
     const trend: DailyPurchaseTrendPoint[] = Array.from({ length: 7 }, (_, index) => {
@@ -305,7 +318,11 @@ export class DailyOperationsService {
     });
 
     const supplierOutstanding = this.db.query<{ total: number }>(
-      `SELECT COALESCE(SUM(current_balance), 0) AS total FROM suppliers WHERE current_balance > 0`
+      `SELECT COALESCE(SUM(pi.remaining_amount), 0) AS total
+       FROM purchase_invoices pi
+       LEFT JOIN warehouses w ON w.id = pi.warehouse_id
+       WHERE pi.remaining_amount > 0 AND ${scope.clause}`,
+      scope.params
     )[0]?.total || 0;
 
     const sumByPaymentType = (type: string) => round2(rows
@@ -346,8 +363,9 @@ export class DailyOperationsService {
   }
 
   public getExpenses(date = this.today()): DailyExpenseResult {
-    this.requireView('cashier.view');
+    const actor = this.requireView('cashier.view');
     const day = dateOnly(date);
+    const scope = this.branchAccess.sqlScope('e.branch_id', 'r.branch_id', actor);
     const rows = this.db.query<DailyExpenseRow>(
       `SELECT e.id, e.category, e.description, e.amount, e.date, e.created_at AS createdAt,
               e.payment_type AS paymentType, e.recipient,
@@ -355,9 +373,9 @@ export class DailyOperationsService {
        FROM expenses e
        LEFT JOIN cash_registers r ON r.id = e.register_id
        LEFT JOIN users u ON u.id = e.performed_by
-       WHERE e.date = ?
+       WHERE e.date = ? AND ${scope.clause}
        ORDER BY e.created_at DESC`,
-      [day]
+      [day, ...scope.params]
     );
 
     const byCategory = new Map<string, number>();
@@ -380,8 +398,9 @@ export class DailyOperationsService {
   }
 
   public getDebts(date = this.today()): DailyDebtResult {
-    this.requireView('finance.debts.view');
+    const actor = this.requireView('finance.debts.view');
     const day = dateOnly(date);
+    const salesScope = this.branchAccess.sqlScope('si.branch_id', 'w.branch_id', actor);
     const rows = this.db.query<DailyDebtRow>(
       `SELECT si.id, si.invoice_number AS invoiceNumber, si.date,
               c.name AS customerName, c.phone AS customerPhone,
@@ -389,36 +408,45 @@ export class DailyOperationsService {
               si.payment_status AS paymentStatus
        FROM sales_invoices si
        LEFT JOIN customers c ON c.id = si.customer_id
-       WHERE si.date = ? AND si.invoice_status != 'VOID' AND si.remaining_amount > 0.009
+       LEFT JOIN warehouses w ON w.id = si.warehouse_id
+       WHERE si.date = ? AND si.invoice_status != 'VOID' AND si.remaining_amount > 0.009 AND ${salesScope.clause}
        ORDER BY si.created_at DESC`,
-      [day]
+      [day, ...salesScope.params]
     );
 
+    const paymentScope = this.branchAccess.sqlScope('cp.branch_id', 'cr.branch_id', actor);
     const payments = this.db.query<DailyDebtPaymentRow>(
       `SELECT cp.id, cp.receipt_number AS receiptNumber, c.name AS customerName,
               cp.amount, cp.payment_type AS paymentType, cp.notes, cp.invoice_id AS invoiceId, u.full_name AS performedByName
        FROM customer_payments cp
+       LEFT JOIN cash_registers cr ON cr.id = cp.register_id
        LEFT JOIN customers c ON c.id = cp.customer_id
        LEFT JOIN users u ON u.id = cp.performed_by
-       WHERE cp.date = ?
+       WHERE cp.date = ? AND ${paymentScope.clause}
        ORDER BY cp.created_at DESC`,
-      [day]
+      [day, ...paymentScope.params]
     );
 
+    const installmentScope = this.branchAccess.sqlScope('p.branch_id', 'si.branch_id', actor);
     const dueInstallments = this.db.query<DailyDueInstallmentRow>(
       `SELECT i.id, p.plan_number AS planNumber, c.name AS customerName, c.phone AS customerPhone,
               i.sequence_number AS sequenceNumber, i.due_date AS dueDate,
               i.amount, i.paid_amount AS paidAmount, i.remaining_amount AS remaining, i.status
        FROM installments i
        JOIN installment_plans p ON p.id = i.plan_id
+       LEFT JOIN sales_invoices si ON si.id = p.invoice_id
        LEFT JOIN customers c ON c.id = p.customer_id
-       WHERE i.due_date <= ? AND i.status NOT IN ('PAID', 'WAIVED')
+       WHERE i.due_date <= ? AND i.status NOT IN ('PAID', 'WAIVED') AND ${installmentScope.clause}
        ORDER BY i.due_date, p.plan_number`,
-      [day]
+      [day, ...installmentScope.params]
     );
 
     const outstanding = this.db.query<{ total: number }>(
-      `SELECT COALESCE(SUM(current_balance), 0) AS total FROM customers WHERE current_balance > 0`
+      `SELECT COALESCE(SUM(si.remaining_amount), 0) AS total
+       FROM sales_invoices si
+       LEFT JOIN warehouses w ON w.id = si.warehouse_id
+       WHERE si.invoice_status != 'VOID' AND si.remaining_amount > 0 AND ${salesScope.clause}`,
+      salesScope.params
     )[0]?.total || 0;
 
     const newDebt = round2(rows.reduce((sum, row) => sum + num(row.remaining), 0));
