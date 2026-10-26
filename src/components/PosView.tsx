@@ -946,7 +946,10 @@ export const PosView: React.FC = () => {
             )}
             {!activeShift && (
               <button
-                onClick={() => setIsShiftModalOpen(true)}
+                onClick={() => {
+                  setOpeningBalance(cashierService.getSuggestedOpeningBalance(shiftRegisterId));
+                  setIsShiftModalOpen(true);
+                }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-600 border border-emerald-500/30 rounded-xl text-xs font-bold transition"
               >
                 <Unlock className="w-4 h-4" /> فتح وردية
@@ -1624,7 +1627,14 @@ export const PosView: React.FC = () => {
         <Modal title="فتح وردية كاشير" icon={<Unlock className="w-5 h-5" />} onClose={() => setIsShiftModalOpen(false)}>
           <div className="space-y-3">
             <Field label="الخزينة / نقطة الكاشير">
-              <select value={shiftRegisterId} onChange={(e) => setShiftRegisterId(e.target.value)} className={inputCls}>
+              <select
+                value={shiftRegisterId}
+                onChange={(e) => {
+                  setShiftRegisterId(e.target.value);
+                  setOpeningBalance(cashierService.getSuggestedOpeningBalance(e.target.value));
+                }}
+                className={inputCls}
+              >
                 {registers.length === 0 ? (
                   <option value="cr_main">الخزينة الرئيسية</option>
                 ) : (

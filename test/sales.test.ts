@@ -7,6 +7,8 @@ import { PermissionService } from '../src/services/PermissionService.ts';
 import { CustomerService } from '../src/services/CustomerService.ts';
 import { PrintService } from '../src/services/PrintService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
+import { runMigrations } from '../src/database/migrations.ts';
+import { SCHEMA_SQL } from '../src/database/schema.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -27,6 +29,26 @@ function seedProduct(db: any, id: string, opts: { cost?: number; minPrice?: numb
     [`stk_${id}`, 'wh_main', id, 100]
   );
 }
+
+test('legacy sales invoices gain status columns before queries run', async () => {
+  const initSqlJs = (await import('sql.js')).default;
+  const SQL = await initSqlJs();
+  const db = new SQL.Database();
+
+  const legacySchema = SCHEMA_SQL.replace(
+    /\s*payment_status TEXT NOT NULL DEFAULT 'PAID',\s*invoice_status TEXT NOT NULL DEFAULT 'COMPLETED',/g,
+    ''
+  );
+  db.exec(legacySchema);
+
+  const report = runMigrations(db);
+  assert.equal(report.failed.length, 0, 'legacy sales invoice migration should not fail');
+
+  const tableInfo = db.exec('PRAGMA table_info(sales_invoices)')[0]?.values ?? [];
+  const columns = tableInfo.map((row) => String(row[1]));
+  assert.ok(columns.includes('payment_status'));
+  assert.ok(columns.includes('invoice_status'));
+});
 
 test('sales: create, insufficient stock, partial payment, return and void', async () => {
   const db = DatabaseManager.getInstance();

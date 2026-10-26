@@ -15,6 +15,7 @@ import { MIGRATION_PART_11 } from './migrations/part11';
 import { MIGRATION_PART_12 } from './migrations/part12';
 import { MIGRATION_PART_13 } from './migrations/part13';
 import { MIGRATION_ENTERPRISE } from './migrations/enterprise';
+import { addColumn } from './migrationSupport';
 
 export { DEFAULT_SETTINGS, DEFAULT_BRANCH_ID } from './migrationSupport';
 export type { Migration } from './migrationSupport';
@@ -33,7 +34,14 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_11,
   MIGRATION_PART_12,
   MIGRATION_PART_13,
-  MIGRATION_ENTERPRISE
+  MIGRATION_ENTERPRISE,
+  {
+    id: '050_cash_shift_auto_close',
+    description: 'Track automatically closed cashier shifts',
+    up: (db) => {
+      addColumn(db, 'cash_shifts', 'auto_closed', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  }
 ].flat();
 
 export interface MigrationReport {

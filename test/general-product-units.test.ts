@@ -58,3 +58,54 @@ test('general product sales decrement stock using the selected unit', async () =
   assert.equal(savedInvoice?.items[0].productType, 'GENERAL');
   assert.equal(savedInvoice?.items[0].baseUnit, 'BOX');
 });
+
+test('general product sales preserve non-box base units on invoice rows', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const db = manager.getDatabase();
+
+  const productId = 'prod_unit_kg_test';
+  db.run(
+    `INSERT INTO products (
+       id, product_type, custom_unit, sku, barcode, name, category_id, brand_id, size,
+       base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price,
+       selling_price_m2, is_active
+     ) VALUES (?, 'GENERAL', '', ?, ?, ?, ?, ?, '', 'KG', 'KG', 1, 1, 5, 10, 1)`,
+    [productId, 'SKU-UNIT-KG', 'BAR-UNIT-KG', 'اختبار بالكيلو', 'cat_floor', 'br_cleo'],
+  );
+  db.run(
+    `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+     VALUES (?, 'wh_main', ?, 5, 0)`,
+    ['stk_unit_kg_test', productId],
+  );
+  const customer = new CustomerService().createCustomer({
+    code: 'CUST-UNIT-KG',
+    name: 'عميل اختبار وحدة الكيلو',
+    phone: '01000000992',
+    customerType: 'RETAIL',
+    creditLimit: 0,
+  });
+
+  const invoice = new SalesService().createSale({
+    customerId: customer.id,
+    warehouseId: 'wh_main',
+    items: [{
+      productId,
+      soldBy: 'KG',
+      quantityM2: 2,
+      boxesCount: 0,
+      piecesCount: 0,
+      unitPrice: 10,
+    }],
+    paidAmount: 20,
+    paymentType: 'CASH',
+  });
+
+  const savedInvoice = new SalesService().getInvoiceById(invoice.id);
+  const stock = new InventoryService().getWarehouseStock('wh_main').find((row) => row.productId === productId);
+  assert.equal(stock?.quantityM2, 3);
+  assert.equal(savedInvoice?.items?.[0].soldBy, 'KG');
+  assert.equal(savedInvoice?.items?.[0].baseUnit, 'KG');
+});

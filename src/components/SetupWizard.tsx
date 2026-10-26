@@ -15,6 +15,13 @@ import { SettingsService } from '../services/SettingsService';
 import { AuthService } from '../services/AuthService';
 import { useToast } from './ui/Toast';
 import { NAV_STORAGE_KEYS } from '../config/navigation';
+import {
+  BUSINESS_MODULES,
+  BUSINESS_TYPES,
+  getProfileModuleIds,
+  getProfileHiddenPaths,
+  parseEnabledModules,
+} from '../config/businessProfiles';
 
 interface SetupWizardProps {
   onComplete: () => void;
@@ -26,47 +33,6 @@ const CURRENCIES = [
   { code: 'AED', symbol: 'د.إ', label: 'درهم إماراتي' },
   { code: 'USD', symbol: '$', label: 'دولار أمريكي' },
 ];
-
-const BUSINESS_TYPES = [
-  { id: 'ceramics', label: 'سيراميك وبورسلين', description: 'مساحات ومقاسات ومخزون بالمتر والكرتونة' },
-  { id: 'building_materials', label: 'مواد بناء وتشطيب', description: 'أصناف متنوعة ومخازن ومشتريات' },
-  { id: 'sanitary', label: 'أدوات صحية', description: 'منتجات وماركات ومبيعات المعرض' },
-  { id: 'lighting', label: 'إضاءة وكهرباء', description: 'كتالوج أصناف وباركود ومخزون' },
-  { id: 'furniture', label: 'أثاث وديكور', description: 'طلبات ومشروعات وتسليمات' },
-  { id: 'electronics', label: 'أجهزة وإلكترونيات', description: 'أجهزة برقم تسلسلي وضمان ومتابعة مخزون' },
-  { id: 'clothing', label: 'ملابس وأحذية', description: 'مقاسات وألوان وموديلات وبيع بالتجزئة' },
-  { id: 'automotive', label: 'قطع غيار وسيارات', description: 'أصناف وموردون ومخزون وطلبات شراء' },
-  { id: 'home_appliances', label: 'أجهزة منزلية', description: 'منتجات وضمانات وتوصيل ومتابعة العملاء' },
-  { id: 'cosmetics', label: 'عطور ومستحضرات تجميل', description: 'كتالوج منتجات ومخزون ومبيعات' },
-  { id: 'food', label: 'مواد غذائية وسوبر ماركت', description: 'أصناف سريعة الحركة ومشتريات ومخزون' },
-  { id: 'general', label: 'معرض متعدد الأنشطة', description: 'تخصيص مرن لأي نشاط تجاري' },
-];
-
-const MODULES = [
-  { id: 'sales', label: 'المبيعات ونقطة البيع', paths: ['/daily/sales', '/pos', '/sales', '/sales/analytics', '/quotations', '/orders', '/returns'] },
-  { id: 'inventory', label: 'المخزون والمنتجات', paths: ['/inventory', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/reservations', '/products', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'] },
-  { id: 'customers', label: 'العملاء والمشروعات', paths: ['/customers', '/customers/imported-products', '/customers/ready-deliveries', '/crm/leads', '/crm/pipeline', '/crm/activities', '/crm/campaigns', '/projects'] },
-  { id: 'purchasing', label: 'المشتريات والموردون', paths: ['/daily/purchases', '/suppliers', '/purchases/requests', '/purchases/orders', '/purchases/incoming', '/purchases', '/purchases/returns'] },
-  { id: 'finance', label: 'الحسابات والمالية', paths: ['/daily/expenses', '/daily/debts', '/finance', '/cashboxes', '/finance/expenses', '/finance/accounts', '/finance/journal', '/finance/cheques', '/finance/assets', '/finance/debts', '/finance/other-receivables', '/finance/installments'] },
-  { id: 'operations', label: 'الفروع والموظفون والتوصيل', paths: ['/branches', '/warehouses', '/employees', '/employees/attendance', '/employees/payroll', '/employees/commissions', '/deliveries', '/drivers', '/vehicles'] },
-  { id: 'reports', label: 'التقارير', paths: ['/reports', '/reports/statements', '/reports/profit-loss', '/reports/tax'] },
-  { id: 'approvals', label: 'الموافقات', paths: ['/approvals'] },
-];
-
-const PROFILE_MODULES: Record<string, string[]> = {
-  ceramics: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  building_materials: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  sanitary: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  lighting: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  furniture: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
-  electronics: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  clothing: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  automotive: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  home_appliances: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
-  cosmetics: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  food: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
-  general: MODULES.map((module) => module.id),
-};
 
 export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const toast = useToast();
@@ -89,13 +55,12 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const [form, setForm] = useState(() => {
     let current: ReturnType<typeof SettingsService.getSettings> | null = null;
     try { current = SettingsService.getSettings(); } catch { current = null; }
+    const businessType = SettingsService.getValue('businessType') || 'ceramics';
     return {
       showroomName: current?.showroomName || '',
-      businessType: SettingsService.getValue('businessType') || 'ceramics',
-      enabledModules: (() => {
-        try { return JSON.parse(SettingsService.getValue('enabledModules') || ''); }
-        catch { return PROFILE_MODULES.ceramics; }
-      })() as string[],
+      businessType,
+      businessTypeLabel: SettingsService.getValue('businessTypeLabel') || '',
+      enabledModules: parseEnabledModules(SettingsService.getValue('enabledModules'), businessType),
       phone: current?.phone || '',
       address: current?.address || '',
       taxNumber: current?.taxNumber || '',
@@ -122,7 +87,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const selectBusinessType = (businessType: string) => setForm((prev) => ({
     ...prev,
     businessType,
-    enabledModules: PROFILE_MODULES[businessType] || PROFILE_MODULES.general,
+    enabledModules: getProfileModuleIds(businessType),
   }));
 
   const toggleModule = (id: string) => setForm((prev) => ({
@@ -141,6 +106,11 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     if (form.showroomName.trim().length < 2) {
       setStep(0);
       toast.error('اسم المعرض مطلوب (حرفان على الأقل)');
+      return;
+    }
+    if (form.businessType === 'custom' && form.businessTypeLabel.trim().length < 2) {
+      setStep(1);
+      toast.error('اكتب اسم النشاط التجاري (حرفان على الأقل)');
       return;
     }
     const taxPercentage = Number(form.taxPercentage);
@@ -167,8 +137,11 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       SettingsService.update({
         showroomName: form.showroomName.trim(),
         businessType: form.businessType,
+        businessTypeLabel: form.businessType === 'custom'
+          ? form.businessTypeLabel.trim()
+          : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || '',
         enabledModules: JSON.stringify(form.enabledModules),
-        [NAV_STORAGE_KEYS.hidden]: JSON.stringify(MODULES.filter((module) => !form.enabledModules.includes(module.id)).flatMap((module) => module.paths)),
+        [NAV_STORAGE_KEYS.hidden]: JSON.stringify(getProfileHiddenPaths(form.enabledModules)),
         phone: form.phone.trim(),
         address: form.address.trim(),
         taxNumber: form.taxNumber.trim(),
@@ -281,8 +254,19 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   <span className="block text-xs font-bold text-slate-900">{type.label}</span><span className="mt-1 block text-[10px] text-slate-500">{type.description}</span>
                 </button>)}
               </div>
+              {form.businessType === 'custom' && (
+                <div>
+                  <label className={labelClass}>اسم النشاط التجاري *</label>
+                  <input
+                    value={form.businessTypeLabel}
+                    onChange={(e) => set('businessTypeLabel', e.target.value)}
+                    className={inputClass}
+                    placeholder="مثال: معرض أدوات رياضية"
+                  />
+                </div>
+              )}
               <div><h3 className="mb-2 text-xs font-bold text-slate-700">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {MODULES.map((module) => <label key={module.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><input type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} className="accent-sky-600" />{module.label}</label>)}
+                {BUSINESS_MODULES.map((module) => <label key={module.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><input type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} className="accent-sky-600" />{module.label}</label>)}
               </div></div>
             </div>
           )}
@@ -395,7 +379,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                 {[
                   ['المعرض', form.showroomName || '—'],
-                  ['نوع النشاط', BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || 'معرض متعدد الأنشطة'],
+                  ['نوع النشاط', form.businessType === 'custom' ? form.businessTypeLabel || 'نشاط مخصص' : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || 'معرض متعدد الأنشطة'],
                   ['الوحدات المفعلة', `${form.enabledModules.length} وحدات`],
                   ['الهاتف', form.phone || '—'],
                   ['العملة', `${form.currency} (${currencySymbol})`],

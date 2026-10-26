@@ -145,6 +145,11 @@ export const MIGRATION_PART_01: Migration[] = [
     id: '007_performance_indexes',
     description: 'Add composite indexes for frequent ledger, invoice, payment and notification lookups',
     up: (db) => {
+      addColumn(db, 'sales_invoices', 'payment_status', "TEXT NOT NULL DEFAULT 'PAID'");
+      addColumn(db, 'sales_invoices', 'invoice_status', "TEXT NOT NULL DEFAULT 'COMPLETED'");
+      db.run(`UPDATE sales_invoices SET payment_status = 'PAID' WHERE payment_status IS NULL`);
+      db.run(`UPDATE sales_invoices SET invoice_status = 'COMPLETED' WHERE invoice_status IS NULL`);
+
       const indexes = [
         'CREATE INDEX IF NOT EXISTS idx_inv_tx_prod_wh_date ON inventory_transactions(product_id, warehouse_id, created_at)',
         'CREATE INDEX IF NOT EXISTS idx_sales_inv_customer_date ON sales_invoices(customer_id, date)',

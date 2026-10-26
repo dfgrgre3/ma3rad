@@ -113,6 +113,18 @@ export const MIGRATION_PART_03: Migration[] = [
   },
 
 {
+    id: '015_sales_invoice_status_columns',
+    description: 'Add legacy sales invoice status columns required by the analytics and payment screens',
+    up: (db) => {
+      addColumn(db, 'sales_invoices', 'payment_status', "TEXT NOT NULL DEFAULT 'PAID'");
+      addColumn(db, 'sales_invoices', 'invoice_status', "TEXT NOT NULL DEFAULT 'COMPLETED'");
+
+      db.run(`UPDATE sales_invoices SET payment_status = 'PAID' WHERE payment_status IS NULL`);
+      db.run(`UPDATE sales_invoices SET invoice_status = 'COMPLETED' WHERE invoice_status IS NULL`);
+    },
+  },
+
+{
     id: '014_users_custom_roles',
     description: 'Drop the built-in-role CHECK constraint so custom roles can be assigned to users',
     disableForeignKeys: true,

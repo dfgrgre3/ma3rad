@@ -21,6 +21,7 @@ import { InventoryCostingService } from '../src/services/InventoryCostingService
 import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
 import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
 import { SettingsService } from '../src/services/SettingsService.ts';
+import { CashierService } from '../src/services/CashierService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -28,6 +29,41 @@ function q(sql: string, params: any[] = []): any[] {
 
 test('business date uses the local calendar day', () => {
   assert.equal(localDateString(new Date(2026, 9, 24, 0, 0, 0)), '2026-10-24');
+});
+
+test('scheduled shift closure records the expected till balance for the next opening', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const service = new CashierService();
+  const previousSchedule = service.getShiftAutoCloseSchedule();
+  let shiftId: string | null = null;
+
+  try {
+    service.saveShiftAutoCloseSchedule(true, '23:59');
+    const opened = service.openShift('cr_main', 'usr_admin', 125);
+    shiftId = opened.id;
+    manager.run(
+      'UPDATE cash_shifts SET total_sales_cash = 40, total_expenses = 15 WHERE id = ?',
+      [opened.id]
+    );
+
+    const closed = service.closeScheduledShifts(new Date(2100, 0, 1, 23, 59));
+    assert.equal(closed.length, 1);
+    assert.equal(closed[0].id, opened.id);
+    assert.equal(closed[0].status, 'CLOSED');
+    assert.equal(Number(closed[0].autoClosed), 1);
+    assert.equal(closed[0].expectedEndingCash, 150);
+    assert.equal(closed[0].actualEndingCash, null);
+    assert.equal(service.getSuggestedOpeningBalance('cr_main'), 150);
+  } finally {
+    if (shiftId) {
+      manager.run('DELETE FROM audit_logs WHERE record_id = ?', [shiftId]);
+      manager.run('DELETE FROM cash_shifts WHERE id = ?', [shiftId]);
+    }
+    service.saveShiftAutoCloseSchedule(previousSchedule.enabled, previousSchedule.closeTime);
+  }
 });
 
 test('customer supply demand accumulates quantity and total value across added quantities', async () => {

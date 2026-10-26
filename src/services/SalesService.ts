@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../database/db';
-import type { SalesInvoice, SalesInvoiceItem, SalesReturn, SalesReturnItem, PaymentType, CustomerPayment } from '../types';
+import type { SalesInvoice, SalesInvoiceItem, SalesReturn, SalesReturnItem, PaymentType, CustomerPayment, UnitType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
@@ -24,7 +24,7 @@ export interface CreateSaleDTO {
   projectId?: string;
   items: {
     productId: string;
-    soldBy: 'M2' | 'BOX' | 'PIECE';
+    soldBy: UnitType;
     quantityM2: number;
     boxesCount: number;
     piecesCount: number;

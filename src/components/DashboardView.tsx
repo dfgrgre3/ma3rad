@@ -581,8 +581,7 @@ const OverviewSection: React.FC = () => {
             </div>
           </div>
         </div>
-          </div>
-        </details>
+      </details>
       )}
 
       {/* ── Main Charts Row (Sales Trend & Top Selling Products) ── */}

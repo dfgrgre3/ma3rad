@@ -55,7 +55,7 @@ export interface SalesInvoiceItem {
   productGrade: CeramicGrade;
   size: string;
   
-  soldBy: 'M2' | 'BOX' | 'PIECE';
+  soldBy: UnitType;
   productType?: 'CERAMIC' | 'GENERAL';
   baseUnit?: UnitType;
   customUnit?: string;

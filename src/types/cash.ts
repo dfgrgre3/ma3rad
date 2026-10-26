@@ -34,6 +34,7 @@ export interface CashShift {
   
   status: 'OPEN' | 'CLOSED';
   closingNotes?: string;
+  autoClosed?: boolean | number;
 }
 
 export interface ExpenseCategory {

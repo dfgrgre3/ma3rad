@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { 
   Wallet, DollarSign, ArrowUpRight, ArrowDownRight, 
   Plus, CheckCircle, Clock, AlertCircle, RefreshCw, X, Loader2
@@ -6,14 +6,21 @@ import {
 import { CashierService } from '../services/CashierService';
 import { CashRegister, CashShift, Expense, ExpenseCategory, PaymentType } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { LayoutContext } from '../layouts/MainLayout';
+import { PermissionService } from '../services/PermissionService';
 
 // Singleton instance to prevent re-creation on every render
 const cashierService = new CashierService();
 
 export const CashierView: React.FC = () => {
+  const { currentUser } = useContext(LayoutContext);
   // --- State Management ---
   const [registers, setRegisters] = useState<CashRegister[]>([]);
   const [activeShift, setActiveShift] = useState<CashShift | null>(null);
+  const [lastClosedShift, setLastClosedShift] = useState<CashShift | null>(null);
+  const [shiftRegisterId, setShiftRegisterId] = useState('');
+  const [autoCloseEnabled, setAutoCloseEnabled] = useState(true);
+  const [autoCloseTime, setAutoCloseTime] = useState('23:59');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,12 +69,20 @@ export const CashierView: React.FC = () => {
     try {
       setIsLoading(true);
       const regs = cashierService.getAllRegisters();
-      const shift = cashierService.getActiveShift();
+      const shift = cashierService.getActiveShift(currentUser?.id);
       const exps = cashierService.getAllExpenses();
       const cats = cashierService.getExpenseCategories();
+      const defaultRegister = regs.find((register) => register.isDefault) || regs[0];
+      const schedule = cashierService.getShiftAutoCloseSchedule();
 
       setRegisters(regs);
       setActiveShift(shift);
+      if (defaultRegister) {
+        setShiftRegisterId((selected) => regs.some((register) => register.id === selected) ? selected : defaultRegister.id);
+        setLastClosedShift(cashierService.getLastClosedShift(shift?.registerId || defaultRegister.id));
+      }
+      setAutoCloseEnabled(schedule.enabled);
+      setAutoCloseTime(schedule.closeTime);
       setExpenses(exps);
       setCategories(cats);
 
@@ -89,17 +104,35 @@ export const CashierView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [showNotification, expenseData.category]); // Added dependency carefully
+  }, [showNotification, expenseData.category, currentUser?.id]);
 
   useEffect(() => {
     loadData();
-  }, []); // Run once on mount
+  }, [loadData]);
+
+  useEffect(() => {
+    const onAutoClosed = (event: Event) => {
+      const detail = (event as CustomEvent<CashShift[]>).detail || [];
+      void loadData().then(() => {
+        if (detail.length) {
+          const total = detail.reduce(
+            (sum, shift) => sum + Number(shift.actualEndingCash ?? shift.expectedEndingCash ?? 0),
+            0
+          );
+          showNotification('success', `أُغلقت ${detail.length} وردية تلقائيًا. إجمالي الرصيد المُرحّل: ${CeramicMath.formatCurrency(total)}`);
+        }
+      });
+    };
+    window.addEventListener('cash-shift-auto-closed', onAutoClosed);
+    return () => window.removeEventListener('cash-shift-auto-closed', onAutoClosed);
+  }, [loadData, showNotification]);
 
   // --- Handlers ---
   const handleOpenShift = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      cashierService.openShift('cr_main', 'usr_admin', openingBalance);
+      if (!currentUser) throw new Error('يجب تسجيل الدخول قبل فتح الوردية.');
+      cashierService.openShift(shiftRegisterId, currentUser.id, openingBalance);
       setIsOpenShiftModal(false);
       await loadData();
       showNotification('success', 'تم فتح الوردية بنجاح.');
@@ -112,11 +145,11 @@ export const CashierView: React.FC = () => {
     e.preventDefault();
     if (!activeShift) return;
     try {
-      cashierService.closeShift(activeShift.id, actualEndingCash, closingNotes);
+      cashierService.closeShift(activeShift.id, actualEndingCash, closingNotes, currentUser?.id || activeShift.userId);
       setIsCloseShiftModal(false);
       setClosingNotes('');
       await loadData();
-      showNotification('success', 'تم إغلاق الوردية وتسوية العجز/الزيادة.');
+      showNotification('success', `تم إغلاق الوردية. الرصيد المُرحّل لليوم التالي: ${CeramicMath.formatCurrency(actualEndingCash)}.`);
     } catch (err: any) {
       showNotification('error', `خطأ: ${err.message || err}`);
     }
@@ -133,10 +166,11 @@ export const CashierView: React.FC = () => {
         expenseData.category,
         expenseData.amount,
         expenseData.description,
-        'cr_main',
+        activeShift.registerId,
         activeShift.id,
         expenseData.paymentType,
-        expenseData.recipient
+        expenseData.recipient,
+        currentUser?.id || activeShift.userId
       );
       setIsExpenseModalOpen(false);
       // Reset form partially
@@ -148,7 +182,26 @@ export const CashierView: React.FC = () => {
     }
   };
 
-  const defaultReg = registers[0];
+  const defaultReg = registers.find((register) => register.isDefault) || registers[0];
+  const canManageShifts = PermissionService.can(currentUser, 'cashier.shift');
+
+  const openShiftModal = () => {
+    const register = defaultReg;
+    if (register) {
+      setShiftRegisterId(register.id);
+      setOpeningBalance(cashierService.getSuggestedOpeningBalance(register.id));
+    }
+    setIsOpenShiftModal(true);
+  };
+
+  const saveAutoCloseSchedule = () => {
+    try {
+      cashierService.saveShiftAutoCloseSchedule(autoCloseEnabled, autoCloseTime);
+      showNotification('success', `تم حفظ جدول إغلاق الورديات عند ${autoCloseTime}.`);
+    } catch (error) {
+      showNotification('error', `تعذر حفظ الجدول: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
 
   if (isLoading && registers.length === 0) {
     return (
@@ -193,7 +246,7 @@ export const CashierView: React.FC = () => {
             </button>
           ) : (
             <button
-              onClick={() => setIsOpenShiftModal(true)}
+              onClick={openShiftModal}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 text-xs"
             >
               <Clock className="w-4 h-4" />
@@ -217,6 +270,43 @@ export const CashierView: React.FC = () => {
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
+        </div>
+      </div>
+
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h3 className="font-extrabold text-sm text-slate-900">جدول إغلاق الوردية وترحيل الرصيد</h3>
+          <p className="text-xs text-slate-500 mt-1">
+            {lastClosedShift
+              ? `آخر رصيد مُرحّل: ${CeramicMath.formatCurrency(lastClosedShift.actualEndingCash ?? lastClosedShift.expectedEndingCash)} — عند فتح الوردية التالية سيُقترح تلقائيًا.`
+              : 'سيُقترح رصيد الخزينة تلقائيًا عند فتح أول وردية.'}
+          </p>
+          <p className="text-[11px] text-slate-400 mt-1">الإقفال التلقائي يسجل الرصيد المتوقع، ويُنفّذ عند وقت الجدول إذا كان التطبيق يعمل أو عند تشغيله/تسجيل الدخول بعد الموعد.</p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={autoCloseEnabled}
+              disabled={!canManageShifts}
+              onChange={(event) => setAutoCloseEnabled(event.target.checked)}
+              className="w-4 h-4 accent-emerald-600"
+            />
+            تفعيل الإغلاق التلقائي
+          </label>
+          <input
+            type="time"
+            value={autoCloseTime}
+            disabled={!canManageShifts || !autoCloseEnabled}
+            onChange={(event) => setAutoCloseTime(event.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold disabled:bg-slate-100"
+            aria-label="وقت إغلاق الوردية تلقائيًا"
+          />
+          {canManageShifts && (
+            <button onClick={saveAutoCloseSchedule} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-bold">
+              حفظ الجدول
+            </button>
+          )}
         </div>
       </div>
 
@@ -345,8 +435,23 @@ export const CashierView: React.FC = () => {
             </div>
 
             <form onSubmit={handleOpenShift} className="space-y-4">
+              {registers.length > 1 && (
+                <div>
+                  <label className="font-bold text-xs text-slate-700 block mb-1.5">الخزينة</label>
+                  <select
+                    value={shiftRegisterId}
+                    onChange={(event) => {
+                      setShiftRegisterId(event.target.value);
+                      setOpeningBalance(cashierService.getSuggestedOpeningBalance(event.target.value));
+                    }}
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 font-bold"
+                  >
+                    {registers.map((register) => <option key={register.id} value={register.id}>{register.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">الرصيد الافتتاحي (ج.م) *</label>
+                <label className="font-bold text-xs text-slate-700 block mb-1.5">الرصيد الافتتاحي (ج.م) — رصيد آخر إغلاق مُرحّل تلقائيًا *</label>
                 <input
                   type="number"
                   required

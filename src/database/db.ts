@@ -228,6 +228,7 @@ export class DatabaseManager {
       }
     }
     const report = runMigrations(this.getDatabase());
+    this.ensureLegacySalesInvoiceStatusColumns();
     if (report.failed.length > 0) {
       console.error('⚠️ Some migrations did not apply; they will be retried on next launch.', report.failed);
       let backupMessage = '';
@@ -295,6 +296,26 @@ export class DatabaseManager {
       'SELECT 1 FROM schema_migrations WHERE id = ?',
       [id]
     )[0]?.values.length);
+  }
+
+  private ensureLegacySalesInvoiceStatusColumns(): void {
+    if (!this.db) return;
+    const salesInvoices = this.db.exec('SELECT name FROM sqlite_master WHERE type = "table" AND name = "sales_invoices"');
+    if ((salesInvoices[0]?.values?.length ?? 0) === 0) return;
+
+    const columns = new Set(
+      (this.db.exec('PRAGMA table_info(sales_invoices)')[0]?.values ?? []).map((row) => String(row[1]))
+    );
+
+    if (!columns.has('payment_status')) {
+      this.db.run("ALTER TABLE sales_invoices ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'PAID'");
+    }
+    if (!columns.has('invoice_status')) {
+      this.db.run("ALTER TABLE sales_invoices ADD COLUMN invoice_status TEXT NOT NULL DEFAULT 'COMPLETED'");
+    }
+
+    this.db.run(`UPDATE sales_invoices SET payment_status = 'PAID' WHERE payment_status IS NULL`);
+    this.db.run(`UPDATE sales_invoices SET invoice_status = 'COMPLETED' WHERE invoice_status IS NULL`);
   }
 
   public async createFreshAfterRecovery(): Promise<void> {

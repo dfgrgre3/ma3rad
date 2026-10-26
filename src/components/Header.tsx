@@ -3,13 +3,14 @@ import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronUp, Bell, Menu, X,
-  Sun, Moon, SlidersHorizontal,
+  Sun, Moon, SlidersHorizontal, Search,
 } from 'lucide-react';
 import type { User } from '../types';
 import { PermissionService } from '../services/PermissionService';
 import { NavigationService } from '../services/NavigationService';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProfileMenu } from './ui/ProfileMenu';
+import { GlobalSearch } from './GlobalSearch';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   const navigate = useNavigate();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { settings, resolvedMode, toggleMode } = useTheme();
@@ -57,6 +59,17 @@ export const Header: React.FC<HeaderProps> = ({
     setMobileMenuOpen(false);
     setOpenMenu(null);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleSearchShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleSearchShortcut);
+    return () => window.removeEventListener('keydown', handleSearchShortcut);
+  }, []);
 
   const toggleMenu = (groupId: string) => {
     setOpenMenu(openMenu === groupId ? null : groupId);
@@ -157,6 +170,18 @@ export const Header: React.FC<HeaderProps> = ({
       {/* ── Right Actions ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 shrink-0">
         <button
+          onClick={() => setSearchOpen(true)}
+          className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-sky-400"
+          title="بحث شامل (Ctrl+K)"
+          aria-label="بحث شامل"
+          aria-haspopup="dialog"
+        >
+          <Search className="h-4 w-4" />
+          <span className="hidden sm:inline">بحث شامل</span>
+          <kbd className="hidden xl:inline rounded border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-400 dark:border-slate-600">Ctrl K</kbd>
+        </button>
+
+        <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition"
           aria-label="القائمة"
@@ -212,10 +237,10 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <nav className="p-4 space-y-2" dir="rtl" aria-label="التنقل الرئيسي">
             <button
-              onClick={() => { setMobileMenuOpen(false); navigate('/dashboard'); }}
+              onClick={() => { setMobileMenuOpen(false); setSearchOpen(true); }}
               className="w-full px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              بحث سريع
+              بحث شامل
             </button>
             {visibleGroups.map((group) => {
               const isOpen = openMenu === group.id;
@@ -263,6 +288,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>,
         document.body,
       )}
+      <GlobalSearch
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        currentUser={currentUser}
+      />
     </header>
   );
 };

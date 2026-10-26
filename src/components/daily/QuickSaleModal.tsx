@@ -78,7 +78,7 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
             : product?.metersPerBox ? Math.ceil(qty / product.metersPerBox) : 0;
           return {
             productId: line.productId,
-            soldBy: isGeneral && (product?.baseUnit === 'BOX' || product?.baseUnit === 'PIECE') ? product.baseUnit : 'M2' as const,
+            soldBy: isGeneral ? product?.baseUnit || 'CUSTOM' : 'M2',
             quantityM2: qty,
             boxesCount: boxes,
             piecesCount: isGeneral ? product?.baseUnit === 'PIECE' ? qty : 0 : boxes * (product?.piecesPerBox || 0),

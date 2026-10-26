@@ -178,6 +178,27 @@ export const App: React.FC = () => {
     };
   }, [currentUser?.id]);
 
+  useEffect(() => {
+    if (!dbReady || !currentUser) return;
+    let isChecking = false;
+    const checkScheduledShiftClosures = () => {
+      if (isChecking) return;
+      isChecking = true;
+      void import('./services/CashierService')
+        .then(({ CashierService }) => {
+          const closedShifts = new CashierService().closeScheduledShifts();
+          if (closedShifts.length > 0) {
+            window.dispatchEvent(new CustomEvent('cash-shift-auto-closed', { detail: closedShifts }));
+          }
+        })
+        .catch((error) => console.error('Scheduled cashier shift closure failed:', error))
+        .finally(() => { isChecking = false; });
+    };
+    checkScheduledShiftClosures();
+    const timer = window.setInterval(checkScheduledShiftClosures, 30_000);
+    return () => window.clearInterval(timer);
+  }, [dbReady, currentUser?.id]);
+
   // ── Session heartbeat + periodic business alerts ─────────────────────────
   useEffect(() => {
     if (!currentUser) return;

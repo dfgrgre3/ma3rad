@@ -8,6 +8,8 @@ import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../data
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
+  private static readonly AUTO_CLOSE_ENABLED_KEY = 'cashShiftAutoCloseEnabled';
+  private static readonly AUTO_CLOSE_TIME_KEY = 'cashShiftAutoCloseTime';
 
   public getAllRegisters(): CashRegister[] {
     return this.db.query<CashRegister>(`SELECT * FROM cash_registers WHERE is_active = 1`);
@@ -32,8 +34,103 @@ export class CashierService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  public getLastClosedShift(registerId: string): CashShift | null {
+    const rows = this.db.query<CashShift>(`
+      SELECT cs.*, cr.name as registerName, u.full_name as userName
+      FROM cash_shifts cs
+      JOIN cash_registers cr ON cs.register_id = cr.id
+      JOIN users u ON cs.user_id = u.id
+      WHERE cs.register_id = ? AND cs.status = 'CLOSED'
+      ORDER BY cs.closed_at DESC LIMIT 1
+    `, [registerId]);
+    return rows[0] || null;
+  }
+
+  public getSuggestedOpeningBalance(registerId: string): number {
+    const lastShift = this.getLastClosedShift(registerId);
+    if (lastShift) {
+      return Number(lastShift.actualEndingCash ?? lastShift.expectedEndingCash ?? 0);
+    }
+    const register = this.db.query<{ currentBalance: number }>(
+      'SELECT current_balance AS currentBalance FROM cash_registers WHERE id = ?',
+      [registerId]
+    )[0];
+    return Number(register?.currentBalance || 0);
+  }
+
+  public getShiftAutoCloseSchedule(): { enabled: boolean; closeTime: string } {
+    const rows = this.db.query<{ key: string; value: string }>(
+      `SELECT key, value FROM system_settings WHERE key IN (?, ?)`,
+      [CashierService.AUTO_CLOSE_ENABLED_KEY, CashierService.AUTO_CLOSE_TIME_KEY]
+    );
+    const enabledValue = rows.find((row) => row.key === CashierService.AUTO_CLOSE_ENABLED_KEY)?.value;
+    const timeValue = rows.find((row) => row.key === CashierService.AUTO_CLOSE_TIME_KEY)?.value;
+    return {
+      enabled: enabledValue !== '0',
+      closeTime: /^\d{2}:\d{2}$/.test(timeValue || '')
+        ? timeValue!
+        : '23:59',
+    };
+  }
+
+  public saveShiftAutoCloseSchedule(enabled: boolean, closeTime: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'cashier.shift');
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(closeTime)) {
+      throw new Error('أدخل وقت إغلاق صحيحًا بصيغة الساعة والدقيقة.');
+    }
+    const schedule = this.getShiftAutoCloseSchedule();
+    this.db.executeTransaction((sqliteDb) => {
+      sqliteDb.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
+        CashierService.AUTO_CLOSE_ENABLED_KEY, enabled ? '1' : '0',
+      ]);
+      sqliteDb.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
+        CashierService.AUTO_CLOSE_TIME_KEY, closeTime,
+      ]);
+      sqliteDb.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, new_values)
+         VALUES (?, ?, ?, 'تعديل جدول إغلاق الورديات', 'CASHIER', ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName,
+          JSON.stringify({ before: schedule, after: { enabled, closeTime } })]
+      );
+    });
+  }
+
+  public closeScheduledShifts(now = new Date()): CashShift[] {
+    const schedule = this.getShiftAutoCloseSchedule();
+    if (!schedule.enabled) return [];
+    const [hours, minutes] = schedule.closeTime.split(':').map(Number);
+    const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+    if (now < cutoff) cutoff.setDate(cutoff.getDate() - 1);
+
+    const shifts = this.db.query<CashShift>(`
+      SELECT * FROM cash_shifts
+      WHERE status = 'OPEN'
+      ORDER BY opened_at ASC
+    `);
+    const cutoffTimestamp = cutoff.getTime();
+    return shifts
+      .filter((shift) => {
+        const openedAtValue = String(shift.openedAt).replace(' ', 'T');
+        const openedAt = new Date(
+          /(?:Z|[+-]\d{2}:\d{2})$/i.test(openedAtValue) ? openedAtValue : `${openedAtValue}Z`
+        );
+        return !Number.isNaN(openedAt.getTime()) && openedAt.getTime() <= cutoffTimestamp;
+      })
+      .map((shift) => this.closeShiftInternal(
+        shift.id,
+        null,
+        `إغلاق تلقائي حسب الجدول (${schedule.closeTime})`,
+        shift.userId,
+        true
+      ));
+  }
+
   public openShift(registerId: string, userId: string, openingBalance: number): CashShift {
     PermissionService.require(AuthService.requireAuth(), 'cashier.shift');
+    if (!Number.isFinite(openingBalance) || openingBalance < 0) {
+      throw new Error('الرصيد الافتتاحي يجب أن يكون رقمًا صحيحًا غير سالب.');
+    }
     const existing = this.getActiveShift(userId);
     if (existing) {
       throw new Error(`توجد وردية مفتوحة بالفعل للكاشير (${existing.shiftNumber}). يجب إغلاقها أولاً.`);
@@ -60,11 +157,14 @@ export class CashierService {
 
   public closeShift(shiftId: string, actualEndingCash: number, closingNotes = '', performedBy = 'usr_admin'): CashShift {
     PermissionService.require(AuthService.requireAuth(), 'cashier.shift');
-    const rows = this.db.query<CashShift>(`SELECT * FROM cash_shifts WHERE id = ? AND status = 'OPEN'`, [shiftId]);
-    if (rows.length === 0) throw new Error('الوردية غير موجودة أو مغلقة مسبقاً.');
+    if (!Number.isFinite(actualEndingCash) || actualEndingCash < 0) {
+      throw new Error('المبلغ الفعلي يجب أن يكون رقمًا صحيحًا غير سالب.');
+    }
+    return this.closeShiftInternal(shiftId, actualEndingCash, closingNotes, performedBy, false);
+  }
 
-    const shift = rows[0];
-    const expected = Number((
+  private calculateExpectedEndingCash(shift: CashShift): number {
+    return Number((
       shift.openingBalance +
       shift.totalSalesCash +
       shift.totalCustomerPayments -
@@ -72,10 +172,26 @@ export class CashierService {
       shift.totalExpenses -
       shift.totalRefunds
     ).toFixed(2));
+  }
 
-    const diff = Number((actualEndingCash - expected).toFixed(2));
-
+  private closeShiftInternal(
+    shiftId: string,
+    actualEndingCash: number | null,
+    closingNotes: string,
+    performedBy: string,
+    autoClosed: boolean
+  ): CashShift {
     return this.db.executeTransaction((sqliteDb) => {
+      const shift = this.db.query<CashShift>(
+        `SELECT * FROM cash_shifts WHERE id = ? AND status = 'OPEN'`,
+        [shiftId]
+      )[0];
+      if (!shift) throw new Error('الوردية غير موجودة أو مغلقة مسبقاً.');
+      const expected = this.calculateExpectedEndingCash(shift);
+      const diff = actualEndingCash === null
+        ? null
+        : Number((actualEndingCash - expected).toFixed(2));
+
       sqliteDb.run(`
         UPDATE cash_shifts SET
           closed_at = CURRENT_TIMESTAMP,
@@ -83,14 +199,22 @@ export class CashierService {
           actual_ending_cash = ?,
           cash_difference = ?,
           status = 'CLOSED',
-          closing_notes = ?
+          closing_notes = ?,
+          auto_closed = ?
         WHERE id = ?
-      `, [expected, actualEndingCash, diff, closingNotes, shiftId]);
+      `, [expected, actualEndingCash, diff, closingNotes, autoClosed ? 1 : 0, shiftId]);
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-        VALUES (?, ?, 'الكاشير', 'إغلاق وردية الكاشير', 'CASHIER', ?, ?)
-      `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, shiftId, JSON.stringify({ expected, actualEndingCash, diff })]);
+        VALUES (?, ?, ?, ?, 'CASHIER', ?, ?)
+      `, [
+        `aud_${uuidv4().substring(0, 8)}`,
+        performedBy,
+        autoClosed ? 'النظام - إغلاق تلقائي' : 'الكاشير',
+        autoClosed ? 'إغلاق وردية تلقائي' : 'إغلاق وردية الكاشير',
+        shiftId,
+        JSON.stringify({ expected, actualEndingCash, diff, autoClosed }),
+      ]);
 
       return this.db.query<CashShift>(`SELECT * FROM cash_shifts WHERE id = ?`, [shiftId])[0];
     });

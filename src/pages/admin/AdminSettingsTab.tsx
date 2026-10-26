@@ -7,15 +7,19 @@ import { AuthService } from '../../services/AuthService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
 import type { SystemSettings } from '../../types';
+import { BUSINESS_MODULES, BUSINESS_TYPES, getManagedBusinessPaths, getProfileHiddenPaths, parseEnabledModules } from '../../config/businessProfiles';
+import { NAV_STORAGE_KEYS } from '../../config/navigation';
+import { NavigationService } from '../../services/NavigationService';
 
 const inputCls =
   'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
 const labelCls = 'mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300';
 
-type Tab = 'general' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security';
+type Tab = 'general' | 'business' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'عام والمعرض', icon: Store },
+  { id: 'business', label: 'النشاط والوحدات', icon: Boxes },
   { id: 'branding', label: 'الهوية والمظهر', icon: Palette },
   { id: 'invoice', label: 'الفواتير والطباعة', icon: ReceiptText },
   { id: 'inventory', label: 'المخزون والتكلفة', icon: Boxes },
@@ -29,10 +33,12 @@ export const AdminSettingsTab: React.FC = () => {
   const readOnly = !can('settings.update');
   const [tab, setTab] = useState<Tab>('general');
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
+  const [businessProfile, setBusinessProfile] = useState(readBusinessProfile);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     setSettings(SettingsService.getSettings());
+    setBusinessProfile(readBusinessProfile());
   }, []);
 
   const set = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => {
@@ -42,10 +48,30 @@ export const AdminSettingsTab: React.FC = () => {
 
   const save = () => {
     try {
-      const next = SettingsService.update(settings as any, AuthService.getCurrentUser());
+      const managedPaths = getManagedBusinessPaths();
+      const existingHidden = NavigationService.getOverrides().hidden.filter((path) => !managedPaths.has(path));
+      const customName = businessProfile.customName.trim();
+      if (businessProfile.type === 'custom' && customName.length < 2) {
+        toast.error('اكتب اسم النشاط التجاري (حرفان على الأقل).');
+        setTab('business');
+        return;
+      }
+      const businessTypeLabel = businessProfile.type === 'custom'
+        ? customName
+        : BUSINESS_TYPES.find((type) => type.id === businessProfile.type)?.label || '';
+      const next = SettingsService.update({
+        ...settings,
+        businessType: businessProfile.type,
+        businessTypeLabel,
+        enabledModules: JSON.stringify(businessProfile.enabledModules),
+        [NAV_STORAGE_KEYS.hidden]: JSON.stringify([
+          ...existingHidden,
+          ...getProfileHiddenPaths(businessProfile.enabledModules),
+        ]),
+      }, AuthService.getCurrentUser());
       setSettings(next);
       setDirty(false);
-      toast.success('تم حفظ الإعدادات بنجاح.');
+      toast.success('تم حفظ إعدادات النشاط وبقية الإعدادات بنجاح.');
     } catch (error: any) {
       toast.error('تعذر حفظ الإعدادات', error?.message || String(error));
     }
@@ -54,7 +80,27 @@ export const AdminSettingsTab: React.FC = () => {
   const resetDefaults = () => {
     if (!window.confirm('إرجاع الحقول المعروضة إلى القيم الافتراضية؟')) return;
     setSettings(SettingsService.getSettings());
+    setBusinessProfile(readBusinessProfile());
     setDirty(false);
+  };
+
+  const selectBusinessType = (type: string) => {
+    setBusinessProfile((current) => ({
+      ...current,
+      type,
+      enabledModules: parseEnabledModules(undefined, type),
+    }));
+    setDirty(true);
+  };
+
+  const toggleBusinessModule = (moduleId: string) => {
+    setBusinessProfile((current) => ({
+      ...current,
+      enabledModules: current.enabledModules.includes(moduleId)
+        ? current.enabledModules.filter((id) => id !== moduleId)
+        : [...current.enabledModules, moduleId],
+    }));
+    setDirty(true);
   };
 
   const onLogo = (file: File | undefined) => {
@@ -127,6 +173,63 @@ export const AdminSettingsTab: React.FC = () => {
             <Field label="الأسعار شاملة الضريبة">
               <Toggle checked={settings.isTaxInclusive} onChange={(v) => set('isTaxInclusive', v)} label={settings.isTaxInclusive ? 'نعم، شاملة' : 'لا، الضريبة تُضاف'} />
             </Field>
+          </div>
+        )}
+
+        {tab === 'business' && (
+          <div className="space-y-5">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">خصص النظام لنشاطك</h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                غيّر نوع النشاط والوحدات الظاهرة في القائمة في أي وقت. إخفاء الوحدة لا يحذف بياناتها.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {BUSINESS_TYPES.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => selectBusinessType(type.id)}
+                  className={`rounded-xl border p-3 text-right transition ${
+                    businessProfile.type === type.id
+                      ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-500/10'
+                      : 'border-slate-200 hover:border-sky-300 dark:border-slate-700'
+                  }`}
+                >
+                  <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">{type.label}</span>
+                  <span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{type.description}</span>
+                </button>
+              ))}
+            </div>
+            {businessProfile.type === 'custom' && (
+              <Field label="اسم النشاط التجاري *">
+                <input
+                  value={businessProfile.customName}
+                  onChange={(event) => {
+                    setBusinessProfile((current) => ({ ...current, customName: event.target.value }));
+                    setDirty(true);
+                  }}
+                  placeholder="مثال: معرض أدوات رياضية"
+                  className={inputCls}
+                />
+              </Field>
+            )}
+            <div>
+              <h4 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">وحدات النظام</h4>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {BUSINESS_MODULES.map((module) => (
+                  <label key={module.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={businessProfile.enabledModules.includes(module.id)}
+                      onChange={() => toggleBusinessModule(module.id)}
+                      className="accent-sky-600"
+                    />
+                    {module.label}
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -327,6 +430,22 @@ export const AdminSettingsTab: React.FC = () => {
     </div>
   );
 };
+
+interface BusinessProfileForm {
+  type: string;
+  customName: string;
+  enabledModules: string[];
+}
+
+function readBusinessProfile(): BusinessProfileForm {
+  const storedType = SettingsService.getValue('businessType') || 'ceramics';
+  const type = BUSINESS_TYPES.some((item) => item.id === storedType) ? storedType : 'custom';
+  return {
+    type,
+    customName: SettingsService.getValue('businessTypeLabel') || (type === 'custom' ? storedType : ''),
+    enabledModules: parseEnabledModules(SettingsService.getValue('enabledModules'), type),
+  };
+}
 
 const Field: React.FC<{ label: string; full?: boolean; children: React.ReactNode }> = ({ label, full, children }) => (
   <div className={full ? 'md:col-span-2' : ''}>
