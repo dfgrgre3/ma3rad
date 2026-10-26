@@ -11,6 +11,7 @@ export const AdminDataTab: React.FC = () => {
   const toast = useToast();
   const can = usePermission();
   const allowed = can('admin.data');
+  const canExport = can('admin.data.export');
   const service = useMemo(() => new DataAdminService(), []);
   const [stats, setStats] = useState<StorageStats | null>(null);
   const [tables, setTables] = useState<TableInfo[]>([]);
@@ -124,9 +125,9 @@ export const AdminDataTab: React.FC = () => {
         <button onClick={load} className="rounded-xl border border-slate-200 dark:border-slate-700 p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="تحديث">
           <RefreshCw className="h-4 w-4" />
         </button>
-        <button onClick={exportAll} className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700">
+        {canExport && <button onClick={exportAll} className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700">
           <Download className="h-4 w-4" /> تصدير كل البيانات JSON
-        </button>
+        </button>}
         <button onClick={runIntegrity} className="flex items-center gap-1.5 rounded-xl border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:hover:bg-emerald-500/10">
           <ShieldCheck className="h-4 w-4" /> فحص السلامة
         </button>
@@ -156,9 +157,9 @@ export const AdminDataTab: React.FC = () => {
               <button onClick={() => view(table)} className="rounded p-1 text-slate-400 hover:text-sky-600" title="عرض">
                 <Eye className="h-3.5 w-3.5" />
               </button>
-              <button onClick={() => exportTable(table)} className="rounded p-1 text-slate-400 hover:text-emerald-600" title="تصدير">
+              {canExport && <button onClick={() => exportTable(table)} className="rounded p-1 text-slate-400 hover:text-emerald-600" title="تصدير">
                 <Download className="h-3.5 w-3.5" />
-              </button>
+              </button>}
             </div>
           ))}
           {filteredTables.length === 0 && <div className="p-6 text-center text-xs text-slate-400">لا توجد جداول مطابقة.</div>}

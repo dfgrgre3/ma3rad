@@ -6,10 +6,20 @@ import { AuditService } from './AuditService';
 import type { TableInfo, ColumnInfo, StorageStats, TableCount, DeleteResult } from './dataAdminTypes';
 import { IDENTIFIER, CORE_PROTECTED_TABLES } from './dataAdminConstants';
 import { DataAdminServicePart01 } from './DataAdminServicePart01';
+import { BackupService } from './BackupService';
 
 export class DataAdminServicePart02 extends DataAdminServicePart01 {
-public deleteTableData(tables: string[]): DeleteResult {
-    const user = this.require('admin.data');
+private async prepareDeletion(reason: string): Promise<{ id: string; fullName: string; reason: string }> {
+    const user = this.require('admin.data.delete');
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 5) throw new Error('سبب الحذف مطلوب (5 أحرف على الأقل).');
+    const snapshot = await new BackupService().createLocalSnapshot('pre_delete', user);
+    if (!snapshot.ok) throw new Error(`أُلغيت العملية لأن النسخة الاحتياطية السابقة للحذف فشلت: ${snapshot.error || 'unknown error'}`);
+    return { ...user, reason: normalizedReason };
+  }
+
+public async deleteTableData(tables: string[], reason: string): Promise<DeleteResult> {
+    const user = await this.prepareDeletion(reason);
     const targets = [...new Set(tables)];
     if (targets.length === 0) throw new Error('لم يتم تحديد أي جدول للحذف.');
     targets.forEach((table) => this.assertDeletableTable(table));
@@ -31,13 +41,14 @@ public deleteTableData(tables: string[]): DeleteResult {
     this.logDeletion(
       user,
       `حذف بيانات ${result.tables.length} جدول`,
-      JSON.stringify(result.tables)
+      JSON.stringify({ tables: result.tables, reason: user.reason })
     );
+    await this.db.flush();
     return result;
   }
 
-public deleteRows(table: string, keys: Array<Record<string, unknown>>): DeleteResult {
-    const user = this.require('admin.data');
+public async deleteRows(table: string, keys: Array<Record<string, unknown>>, reason: string): Promise<DeleteResult> {
+    const user = await this.prepareDeletion(reason);
     this.assertDeletableTable(table);
     if (keys.length === 0) throw new Error('لم يتم تحديد أي سجل للحذف.');
 
@@ -60,7 +71,8 @@ public deleteRows(table: string, keys: Array<Record<string, unknown>>): DeleteRe
       return total;
     });
 
-    this.logDeletion(user, `حذف ${deleted} سجل من ${table}`, JSON.stringify(keys.slice(0, 50)));
+    this.logDeletion(user, `حذف ${deleted} سجل من ${table}`, JSON.stringify({ keys: keys.slice(0, 50), reason: user.reason }));
+    await this.db.flush();
     return { deleted, tables: [{ table, rows: deleted }] };
   }
 
@@ -76,13 +88,17 @@ public countByDateRange(table: string, column: string, from: string, to: string)
     return Number(row?.c ?? 0);
   }
 
-public deleteByDateRange(table: string, column: string, from: string, to: string): DeleteResult {
-    const user = this.require('admin.data');
+public async deleteByDateRange(table: string, column: string, from: string, to: string, reason: string): Promise<DeleteResult> {
+    const user = await this.prepareDeletion(reason);
     this.assertDeletableTable(table);
     if (!from || !to) throw new Error('يجب تحديد تاريخ البداية والنهاية.');
     if (from > to) throw new Error('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.');
 
     const deleted = this.db.executeTransaction((manager) => {
+      if (!IDENTIFIER.test(table)) throw new Error('اسم الجدول غير صالح.');
+      if (!this.getColumns(table).some((c) => c.name === column)) {
+        throw new Error(`العمود غير موجود في الجدول: ${column}`);
+      }
       manager.run('PRAGMA defer_foreign_keys = ON');
       const before = Number(
         manager.query<{ c: number }>(
@@ -97,7 +113,8 @@ public deleteByDateRange(table: string, column: string, from: string, to: string
       return before;
     });
 
-    this.logDeletion(user, `حذف ${deleted} سجل من ${table} بين ${from} و ${to}`, JSON.stringify({ table, column, from, to }));
+    this.logDeletion(user, `حذف ${deleted} سجل من ${table} بين ${from} و ${to}`, JSON.stringify({ table, column, from, to, reason: user.reason }));
+    await this.db.flush();
     return { deleted, tables: [{ table, rows: deleted }] };
   }
 }

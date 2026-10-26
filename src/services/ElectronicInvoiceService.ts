@@ -79,37 +79,16 @@ export class ElectronicInvoiceService {
   public submitElectronicInvoice(id: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'electronic_invoices.submit');
-
-    const invoice = this.getElectronicInvoiceById(id);
-    if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة.');
-    if (invoice.status !== 'DRAFT') throw new Error('لا يمكن إرسال فاتورة غير في حالة مسودة.');
-
-    const now = new Date().toISOString();
-    this.db.run(`
-      UPDATE electronic_invoices
-      SET status = 'SENT', submission_date = ?, updated_at = ?
-      WHERE id = ?
-    `, [now, now, id]);
-
-    return this.getElectronicInvoiceById(id)!;
+    void id;
+    throw new Error('لم يتم إعداد موفر فوترة إلكترونية معتمد؛ لا يمكن تسجيل الفاتورة كمرسلة ضريبيًا.');
   }
 
   public acceptElectronicInvoice(id: string, taxAuthorityReference: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'electronic_invoices.accept');
-
-    const invoice = this.getElectronicInvoiceById(id);
-    if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة.');
-    if (invoice.status !== 'SENT') throw new Error('لا يمكن قبول فاتورة لم تُرسل بعد.');
-
-    const now = new Date().toISOString();
-    this.db.run(`
-      UPDATE electronic_invoices
-      SET status = 'ACCEPTED', accepted_date = ?, tax_authority_reference = ?, updated_at = ?
-      WHERE id = ?
-    `, [now, taxAuthorityReference, now, id]);
-
-    return this.getElectronicInvoiceById(id)!;
+    void id;
+    void taxAuthorityReference;
+    throw new Error('لا يمكن تسجيل قبول ضريبي دون رد موثق من موفر التكامل المعتمد.');
   }
 
   public rejectElectronicInvoice(id: string, reason: string): ElectronicInvoice {

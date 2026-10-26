@@ -369,10 +369,14 @@ export class SalesService {
         if (costingMethod === 'FIFO') InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan);
 
         // ── Batch FIFO deduction (runs only if batches are tracked for this product) ──
-        try {
-          if (item.productType !== 'GENERAL') new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2);
-        } catch {
-          // Batch tracking is optional — if table is missing or empty, silently skip.
+        if (item.productType !== 'GENERAL') {
+          const batchResult = new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2);
+          for (const allocation of batchResult.allocations) {
+            sqliteDb.run(`
+              INSERT INTO sales_invoice_batch_allocations (id, invoice_item_id, batch_id, quantity_m2)
+              VALUES (?, ?, ?, ?)
+            `, [`sba_${uuidv4().substring(0, 8)}`, item.id, allocation.batchId, allocation.quantityM2]);
+          }
         }
       }
 
@@ -792,12 +796,13 @@ export class SalesService {
           fifoReturnedCost = round2(fifoReturnedCost + actualCost);
         }
 
+        const returnItemId = `ritem_${uuidv4().substring(0, 8)}`;
         sqliteDb.run(`
           INSERT INTO sales_return_items (
             id, return_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-          `ritem_${uuidv4().substring(0, 8)}`, returnId, item.productId, product.name, product.grade,
+          returnItemId, returnId, item.productId, product.name, product.grade,
           item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
         ]);
 
@@ -820,6 +825,19 @@ export class SalesService {
           round2(item.quantityM2 * unitCost), returnId,
           `مرتجع مبيعات للفاتورة ${inv.invoiceNumber}`, actor.id
         ]);
+
+        if (product.product_type !== 'GENERAL') {
+          new BatchService().restoreForSaleReturn({
+            returnItemId,
+            invoiceId,
+            productId: item.productId,
+            warehouseId: inv.warehouseId,
+            quantityM2: item.quantityM2,
+            costPrice: unitCost,
+            performedBy: actor.id,
+            reason: item.reason,
+          });
+        }
       }
 
       // Reduce customer debt by the credit memo minus the cash portion that settles it,
@@ -945,11 +963,16 @@ export class SalesService {
           WHERE product_id = ? AND warehouse_id = ?
         `, [item.quantityM2, item.productId, inv.warehouseId]);
 
-        // ── Restore batch quantities (LIFO — add back to most recent batch) ────
-        try {
-          new BatchService().restoreToBatches(item.productId, inv.warehouseId, item.quantityM2);
-        } catch {
-          // Batch tracking is optional — skip silently.
+        if (item.productType !== 'GENERAL') {
+          new BatchService().restoreForInvoiceVoid({
+            invoiceId,
+            productId: item.productId,
+            warehouseId: inv.warehouseId,
+            quantityM2: item.quantityM2,
+            costPrice: item.unitCost,
+            performedBy: actor.id,
+            reason,
+          });
         }
 
         sqliteDb.run(`

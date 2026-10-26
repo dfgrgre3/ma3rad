@@ -63,7 +63,7 @@ test('route guards use the same permissions as navigation entries', () => {
   assert.equal(NavigationService.getRequiredPermission('/sales/cycle'), 'sales.view');
   assert.equal(NavigationService.getRequiredPermission('/purchases/returns'), 'purchases.return');
   assert.equal(NavigationService.getRequiredPermission('/finance/installments'), 'finance.installments.view');
-  assert.equal(NavigationService.getRequiredPermission('/admin/data-deletion'), 'admin.data');
+  assert.equal(NavigationService.getRequiredPermission('/admin/data-deletion'), 'admin.data.delete');
   assert.equal(NavigationService.getRequiredPermission('/products/prod-1'), 'products.view');
   assert.equal(NavigationService.getRequiredPermission('/unmapped-route'), null);
 });

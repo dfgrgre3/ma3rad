@@ -123,13 +123,22 @@ function createWindow() {
     try {
       if (!win.isDestroyed() && win.webContents) {
         win.webContents.send('app:before-close');
-        await new Promise((resolve) => {
-          const timeout = setTimeout(resolve, 3500);
-          ipcMain.once('app:close-ready', () => {
+        const saved = await new Promise((resolve) => {
+          const onCloseReady = () => {
             clearTimeout(timeout);
-            resolve();
-          });
+            ipcMain.removeListener('app:close-ready', onCloseReady);
+            resolve(true);
+          };
+          const timeout = setTimeout(() => {
+            ipcMain.removeListener('app:close-ready', onCloseReady);
+            resolve(false);
+          }, 3500);
+          ipcMain.once('app:close-ready', onCloseReady);
         });
+        if (!saved) {
+          isClosing = false;
+          return;
+        }
       }
     } catch (err) {
       console.error('Graceful shutdown error:', err);

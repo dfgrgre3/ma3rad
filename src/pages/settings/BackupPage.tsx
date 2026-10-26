@@ -26,9 +26,9 @@ export const BackupPage: React.FC = () => {
     loadHistory();
   }, []);
 
-  const handleDownloadBackup = () => {
+  const handleDownloadBackup = async () => {
     try {
-      backupService.exportBackupFile();
+      await backupService.exportBackupFile();
       setMessage({ text: 'تم تصدير وتحميل النسخة الاحتياطية لقاعدة البيانات بنجاح!' });
       loadHistory();
     } catch (err: any) {
@@ -76,7 +76,7 @@ export const BackupPage: React.FC = () => {
           <div>
             <h1 className="text-base font-black text-slate-900">النسخ الاحتياطي واستعادة البيانات (Backup & Recovery)</h1>
             <p className="text-xs text-slate-500 font-medium">
-              تصدير ملفات SQLite المشفرة وحفظها خارجياً واسترجاعها بأمان
+              ملفات SQLite المصدرة غير مشفرة على مستوى التطبيق؛ احفظها في موقع آمن
             </p>
           </div>
         </div>

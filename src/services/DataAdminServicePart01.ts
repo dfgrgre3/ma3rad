@@ -88,7 +88,7 @@ public vacuum(): void {
   }
 
 public exportTableJson(table: string): { fileName: string; content: string } {
-    this.require('admin.data');
+    this.require('admin.data.export');
     if (!IDENTIFIER.test(table)) throw new Error('اسم الجدول غير صالح.');
     const rows = this.db.query(`SELECT * FROM "${table}"`);
     return {
@@ -98,7 +98,7 @@ public exportTableJson(table: string): { fileName: string; content: string } {
   }
 
 public exportAllJson(): { fileName: string; content: string } {
-    this.require('admin.data');
+    this.require('admin.data.export');
     const payload: Record<string, unknown[]> = {};
     for (const table of this.listTables()) {
       if (!IDENTIFIER.test(table.name)) continue;

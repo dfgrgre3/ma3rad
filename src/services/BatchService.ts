@@ -301,54 +301,164 @@ export class BatchService {
     productId: string,
     warehouseId: string,
     quantityM2: number
-  ): void {
+  ): { tracked: boolean; deductedM2: number; allocations: Array<{ batchId: string; quantityM2: number }> } {
     const batches = this.db.query<{ id: string; quantityRemainingM2: number }>(
       `SELECT id, quantity_remaining_m2 AS quantityRemainingM2
        FROM product_batches
-       WHERE product_id = ? AND warehouse_id = ? AND quantity_remaining_m2 > 0.001
+       WHERE product_id = ? AND warehouse_id = ?
        ORDER BY created_at ASC, id ASC`,
       [productId, warehouseId]
     );
 
     let remaining = quantityM2;
+    const initialQuantity = quantityM2;
+    if (batches.length === 0) return { tracked: false, deductedM2: 0, allocations: [] };
+    const allocations: Array<{ batchId: string; quantityM2: number }> = [];
     for (const batch of batches) {
       if (remaining <= 0.001) break;
       const deduct = Math.min(remaining, batch.quantityRemainingM2);
+      if (deduct <= 0) continue;
       this.db.run(
         `UPDATE product_batches
          SET quantity_remaining_m2 = MAX(0, quantity_remaining_m2 - ?)
          WHERE id = ?`,
         [deduct, batch.id]
       );
+      allocations.push({ batchId: batch.id, quantityM2: deduct });
       remaining -= deduct;
+    }
+    if (remaining > 0.001) {
+      throw new Error(`Insufficient tracked batch quantity for product ${productId}: short ${remaining.toFixed(3)} m².`);
+    }
+    return { tracked: true, deductedM2: initialQuantity - remaining, allocations };
+  }
+
+  /** Return stock to the exact lots consumed by the original invoice line. */
+  public restoreForSaleReturn(input: {
+    returnItemId: string;
+    invoiceId: string;
+    productId: string;
+    warehouseId: string;
+    quantityM2: number;
+    costPrice: number;
+    performedBy: string;
+    reason: string;
+  }): void {
+    let remaining = input.quantityM2;
+    const allocations = this.db.query<{
+      id: string;
+      batchId: string;
+      quantityM2: number;
+      returnedM2: number;
+    }>(`
+      SELECT a.id, a.batch_id AS batchId, a.quantity_m2 AS quantityM2,
+        a.returned_m2 AS returnedM2
+      FROM sales_invoice_batch_allocations a
+      JOIN sales_invoice_items sii ON sii.id = a.invoice_item_id
+      WHERE sii.invoice_id = ? AND sii.product_id = ?
+        AND a.quantity_m2 - a.returned_m2 > 0.001
+      ORDER BY a.created_at ASC, a.id ASC
+    `, [input.invoiceId, input.productId]);
+
+    for (const allocation of allocations) {
+      if (remaining <= 0.001) break;
+      const available = Math.max(0, allocation.quantityM2 - allocation.returnedM2);
+      const restore = Math.min(remaining, available);
+      if (restore <= 0) continue;
+      this.db.run(
+        `UPDATE product_batches
+         SET quantity_remaining_m2 = MIN(quantity_m2, quantity_remaining_m2 + ?)
+         WHERE id = ?`,
+        [restore, allocation.batchId]
+      );
+      this.db.run(
+        `UPDATE sales_invoice_batch_allocations SET returned_m2 = returned_m2 + ? WHERE id = ?`,
+        [restore, allocation.id]
+      );
+      this.db.run(`
+        INSERT INTO sales_return_batch_allocations
+          (id, return_item_id, sale_allocation_id, batch_id, quantity_m2, is_pending)
+        VALUES (?, ?, ?, ?, ?, 0)
+      `, [`rba_${uuidv4().substring(0, 8)}`, input.returnItemId, allocation.id, allocation.batchId, restore]);
+      remaining -= restore;
+    }
+
+    if (remaining > 0.001) {
+      const pendingBatchId = `batch_ret_${uuidv4().substring(0, 10)}`;
+      this.db.run(`
+        INSERT INTO product_batches (
+          id, product_id, warehouse_id, batch_number, tone_shade, caliber,
+          cost_price, quantity_m2, quantity_remaining_m2, notes, created_by
+        ) VALUES (?, ?, ?, ?, 'RETURN-PENDING', 'غير محدد', ?, ?, ?, ?, ?)
+      `, [
+        pendingBatchId, input.productId, input.warehouseId,
+        `RET-${input.returnItemId.slice(-8)}`, input.costPrice, remaining, remaining,
+        `مرتجع لم يمكن ربطه بدفعة البيع الأصلية. السبب: ${input.reason}`,
+        input.performedBy,
+      ]);
+      this.db.run(`
+        INSERT INTO sales_return_batch_allocations
+          (id, return_item_id, sale_allocation_id, batch_id, quantity_m2, is_pending)
+        VALUES (?, ?, NULL, ?, ?, 1)
+      `, [`rba_${uuidv4().substring(0, 8)}`, input.returnItemId, pendingBatchId, remaining]);
     }
   }
 
-  /**
-   * يُعيد الكمية للدفعات عند إلغاء أو إرجاع فاتورة.
-   * يُضاف للدفعة الأحدث (LIFO للاسترداد — أقرب دفعة للواقع).
-   * تُحتسب بحد أقصى = quantity_m2 الأصلية لمنع تجاوز الكمية.
-   */
-  public restoreToBatches(
-    productId: string,
-    warehouseId: string,
-    quantityM2: number
-  ): void {
-    const batch = this.db.query<{ id: string; quantityM2: number }>(
-      `SELECT id, quantity_m2 AS quantityM2
-       FROM product_batches
-       WHERE product_id = ? AND warehouse_id = ?
-       ORDER BY created_at DESC, id DESC LIMIT 1`,
-      [productId, warehouseId]
-    )[0];
+  /** Reverse a sale using its original batch allocations; legacy sales get a distinct pending lot. */
+  public restoreForInvoiceVoid(input: {
+    invoiceId: string;
+    productId: string;
+    warehouseId: string;
+    quantityM2: number;
+    costPrice: number;
+    performedBy: string;
+    reason: string;
+  }): void {
+    let remaining = input.quantityM2;
+    const allocations = this.db.query<{
+      id: string;
+      batchId: string;
+      quantityM2: number;
+      returnedM2: number;
+    }>(`
+      SELECT a.id, a.batch_id AS batchId, a.quantity_m2 AS quantityM2,
+        a.returned_m2 AS returnedM2
+      FROM sales_invoice_batch_allocations a
+      JOIN sales_invoice_items sii ON sii.id = a.invoice_item_id
+      WHERE sii.invoice_id = ? AND sii.product_id = ?
+        AND a.quantity_m2 - a.returned_m2 > 0.001
+      ORDER BY a.created_at ASC, a.id ASC
+    `, [input.invoiceId, input.productId]);
 
-    if (!batch) return;
+    for (const allocation of allocations) {
+      if (remaining <= 0.001) break;
+      const restore = Math.min(remaining, allocation.quantityM2 - allocation.returnedM2);
+      if (restore <= 0) continue;
+      this.db.run(
+        'UPDATE product_batches SET quantity_remaining_m2 = MIN(quantity_m2, quantity_remaining_m2 + ?) WHERE id = ?',
+        [restore, allocation.batchId]
+      );
+      this.db.run(
+        'UPDATE sales_invoice_batch_allocations SET returned_m2 = returned_m2 + ? WHERE id = ?',
+        [restore, allocation.id]
+      );
+      remaining -= restore;
+    }
 
-    this.db.run(
-      `UPDATE product_batches
-       SET quantity_remaining_m2 = MIN(quantity_m2, quantity_remaining_m2 + ?)
-       WHERE id = ?`,
-      [quantityM2, batch.id]
-    );
+    if (remaining > 0.001) {
+      const pendingBatchId = `batch_void_${uuidv4().substring(0, 10)}`;
+      this.db.run(`
+        INSERT INTO product_batches (
+          id, product_id, warehouse_id, batch_number, tone_shade, caliber,
+          cost_price, quantity_m2, quantity_remaining_m2, notes, created_by
+        ) VALUES (?, ?, ?, ?, 'RETURN-PENDING', 'غير محدد', ?, ?, ?, ?, ?)
+      `, [
+        pendingBatchId, input.productId, input.warehouseId,
+        `VOID-${input.invoiceId.slice(-8)}`, input.costPrice, remaining, remaining,
+        `مرتجع إلغاء فاتورة بلا تخصيص دفعات أصلي. السبب: ${input.reason}`,
+        input.performedBy,
+      ]);
+    }
   }
+
 }

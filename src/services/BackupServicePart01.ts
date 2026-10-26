@@ -14,9 +14,12 @@ private require(): { id: string; fullName: string } {
     return user;
   }
 
-public exportBackupFile(): void {
+public async exportBackupFile(): Promise<void> {
     const user = this.require();
+    await this.db.flush();
     const binary = this.db.exportDatabaseBinary();
+    const inspection = this.verifyBackupFile(binary);
+    if (!inspection.valid) throw new Error(`تعذر التحقق من النسخة الحالية: ${inspection.error || inspection.integrity}`);
     const blob = new Blob([binary as any], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -61,8 +64,33 @@ public async restoreBackupFromFile(file: File): Promise<{
       throw new Error(`الملف تالف أو غير صالح للاستعادة: ${inspection.error || inspection.integrity}`);
     }
 
+    // Preserve the current, fully flushed database before replacing it.
+    await this.db.flush();
+    const currentSnapshot = this.db.exportDatabaseBinary();
+    const preRestore = await this.createLocalSnapshot('pre_restore', user);
+    if (!preRestore.ok) {
+      throw new Error(`لم يتم الاستعادة لأن إنشاء نسخة ما قبل الاستعادة فشل: ${preRestore.error || 'unknown error'}`);
+    }
+
     // Import and replace active database
-    this.db.importDatabaseBinary(bytes);
+    try {
+      this.db.importDatabaseBinary(bytes);
+      await this.db.flush();
+    } catch (restoreError) {
+      try {
+        this.db.importDatabaseBinary(currentSnapshot);
+        await this.db.flush();
+      } catch (rollbackError) {
+        throw new Error(`Restore failed (${restoreError instanceof Error ? restoreError.message : String(restoreError)}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}). The pre-restore snapshot remains at ${preRestore.path || 'the configured backup location'}.`);
+      }
+      throw restoreError;
+    }
+    const restored = this.verifyBackupFile(this.db.exportDatabaseBinary());
+    if (!restored.valid) {
+      this.db.importDatabaseBinary(currentSnapshot);
+      await this.db.flush();
+      throw new Error(`فشل التحقق بعد الاستعادة، وتمت إعادة قاعدة البيانات السابقة: ${restored.error || restored.integrity}`);
+    }
 
     new AuditService().log({
       userId: user.id,

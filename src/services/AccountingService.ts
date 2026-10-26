@@ -54,8 +54,8 @@ export class AccountingService {
     // 1. Sales metrics (bounded up to today to exclude future-dated entries from MTD)
     const salesStats = this.db.query<any>(`
       SELECT 
-        SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END) as todaySales,
-        SUM(CASE WHEN date >= ? AND date <= ? THEN total_amount ELSE 0 END) as monthSales,
+        SUM(CASE WHEN date = ? THEN subtotal - discount_amount ELSE 0 END) as todaySales,
+        SUM(CASE WHEN date >= ? AND date <= ? THEN subtotal - discount_amount ELSE 0 END) as monthSales,
         SUM(CASE WHEN date >= ? AND date <= ? THEN gross_profit ELSE 0 END) as monthGrossProfit,
         COUNT(CASE WHEN date = ? THEN 1 END) as todaySalesCount
       FROM sales_invoices
@@ -64,8 +64,10 @@ export class AccountingService {
 
     const returnStats = this.db.query<any>(`
       SELECT
-        SUM(CASE WHEN sr.date = ? THEN sr.total_amount ELSE 0 END) AS todayReturns,
-        SUM(CASE WHEN sr.date >= ? AND sr.date <= ? THEN sr.total_amount ELSE 0 END) AS monthReturns,
+        SUM(CASE WHEN sr.date = ? THEN sr.total_amount - CASE WHEN si.total_amount > 0
+          THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2) ELSE 0 END ELSE 0 END) AS todayReturns,
+        SUM(CASE WHEN sr.date >= ? AND sr.date <= ? THEN sr.total_amount - CASE WHEN si.total_amount > 0
+          THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2) ELSE 0 END ELSE 0 END) AS monthReturns,
         SUM(CASE WHEN sr.date >= ? AND sr.date <= ?
           THEN (SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0)
                 FROM sales_return_items sri WHERE sri.return_id = sr.id)
@@ -77,9 +79,10 @@ export class AccountingService {
 
     const prevMonthSales = Number(this.db.query<any>(`
       SELECT
-        COALESCE((SELECT SUM(total_amount) FROM sales_invoices
+        COALESCE((SELECT SUM(subtotal - discount_amount) FROM sales_invoices
           WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'), 0)
-        - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
+        - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2) ELSE 0 END) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'), 0) AS sales
     `, [prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd])[0]?.sales || 0);
@@ -227,14 +230,16 @@ export class AccountingService {
 
       const row = this.db.query<any>(`
         SELECT
-          COALESCE((SELECT SUM(total_amount) FROM sales_invoices
+          COALESCE((SELECT SUM(subtotal - discount_amount) FROM sales_invoices
             WHERE date = ? AND invoice_status != 'VOID'), 0)
-          - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
+          - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
+              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END) FROM sales_returns sr
             JOIN sales_invoices si ON si.id = sr.original_invoice_id
             WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0) AS sales,
           COALESCE((SELECT SUM(gross_profit) FROM sales_invoices
             WHERE date = ? AND invoice_status != 'VOID'), 0)
-          - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
+          - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
+              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END) FROM sales_returns sr
             JOIN sales_invoices si ON si.id = sr.original_invoice_id
             WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0)
           + COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
@@ -538,6 +543,7 @@ export class AccountingService {
   } {
     this.requireView('dashboard.view');
     const now = new Date();
+    const today = localDateString();
     const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
     const prevMonth = new Date();
@@ -545,23 +551,34 @@ export class AccountingService {
     const prevMonthStart = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
     const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()}`;
 
-    const current = this.db.query<any>(`
-      SELECT 
-        SUM(total_amount) as sales,
-        SUM(gross_profit) as profit,
-        COUNT(*) as invoices
-      FROM sales_invoices
-      WHERE date >= ? AND invoice_status != 'VOID'
-    `, [currentMonthStart])[0] || {};
+    const loadSalesSummary = (from: string, to: string) => {
+      const sales = this.db.query<any>(`
+        SELECT COALESCE(SUM(subtotal - discount_amount),0) AS revenue,
+          COALESCE(SUM(gross_profit),0) AS profit, COUNT(*) AS invoices
+        FROM sales_invoices
+        WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'
+      `, [from, to])[0] || {};
+      const returnedRevenue = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(sr.total_amount - CASE WHEN si.total_amount > 0
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END),0) AS revenue
+        FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      `, [from, to])[0]?.revenue || 0);
+      const returnedCost = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(sri.quantity_m2*sri.unit_cost),0) AS cost
+        FROM sales_return_items sri JOIN sales_returns sr ON sr.id=sri.return_id
+        JOIN sales_invoices si ON si.id=sr.original_invoice_id
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      `, [from, to])[0]?.cost || 0);
+      return {
+        sales: Number(sales.revenue || 0) - returnedRevenue,
+        profit: Number(sales.profit || 0) - returnedRevenue + returnedCost,
+        invoices: Number(sales.invoices || 0),
+      };
+    };
 
-    const previous = this.db.query<any>(`
-      SELECT 
-        SUM(total_amount) as sales,
-        SUM(gross_profit) as profit,
-        COUNT(*) as invoices
-      FROM sales_invoices
-      WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'
-    `, [prevMonthStart, prevMonthEnd])[0] || {};
+    const current = loadSalesSummary(currentMonthStart, today);
+    const previous = loadSalesSummary(prevMonthStart, prevMonthEnd);
 
     return {
       currentMonth: {

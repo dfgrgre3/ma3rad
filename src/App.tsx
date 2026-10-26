@@ -138,10 +138,10 @@ export const App: React.FC = () => {
       const unsubscribe = window.ceramisys.app.onBeforeClose(async () => {
         try {
           await DatabaseManager.getInstance().flush();
+          window.ceramisys?.app?.notifyCloseReady?.();
         } catch (err) {
           console.error('Failed to flush database on app close:', err);
-        } finally {
-          window.ceramisys?.app?.notifyCloseReady?.();
+          window.alert(`تعذر حفظ آخر التغييرات؛ أغلق التطبيق بعد معالجة مشكلة التخزين. ${err instanceof Error ? err.message : String(err)}`);
         }
       });
       return unsubscribe;
@@ -304,9 +304,33 @@ export const App: React.FC = () => {
               />
             </HashRouter>
           )}
+          {dbReady && currentUser && <DatabasePersistenceStatus />}
         </ErrorBoundary>
       </ToastProvider>
     </ThemeProvider>
+  );
+};
+
+const DatabasePersistenceStatus: React.FC = () => {
+  const [state, setState] = useState(DatabaseManager.getInstance().getPersistenceStatus());
+
+  useEffect(() => {
+    const refresh = () => setState(DatabaseManager.getInstance().getPersistenceStatus());
+    refresh();
+    const timer = window.setInterval(refresh, 500);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (state.status === 'saved') {
+    return <div role="status" aria-live="polite" className="fixed bottom-3 left-3 z-[100] rounded-full border border-emerald-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-emerald-700 shadow-lg">تم حفظ البيانات</div>;
+  }
+  if (state.status === 'saving') {
+    return <div role="status" aria-live="polite" className="fixed bottom-3 left-3 z-[100] rounded-full border border-amber-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-amber-700 shadow-lg">جارٍ حفظ التغييرات…</div>;
+  }
+  return (
+    <div role="alert" aria-live="assertive" className="fixed bottom-3 left-3 z-[100] max-w-[min(92vw,36rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800 shadow-xl">
+      {state.status === 'unavailable' ? 'تعذر تحديد وسيط حفظ قاعدة البيانات.' : `فشل حفظ قاعدة البيانات: ${state.error || 'خطأ غير معروف'}`}
+    </div>
   );
 };
 

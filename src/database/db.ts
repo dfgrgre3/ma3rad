@@ -498,6 +498,9 @@ export class DatabaseManager {
     do {
       await this.persistQueue;
     } while (this.isPersisting || this.pendingSnapshot);
+    if (this.lastPersistError) {
+      throw new Error(`Database changes are not saved: ${this.lastPersistError}`);
+    }
   }
 
   public getStorageBackend(): 'file' | 'localStorage' | 'none' {
@@ -506,6 +509,13 @@ export class DatabaseManager {
 
   public getLastPersistError(): string | null {
     return this.lastPersistError;
+  }
+
+  public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unavailable'; error?: string } {
+    if (this.lastPersistError) return { status: 'error', error: this.lastPersistError };
+    if (this.storageBackend === 'none') return { status: 'unavailable' };
+    if (this.debounceSaveTimer || this.isPersisting || this.pendingSnapshot) return { status: 'saving' };
+    return { status: 'saved' };
   }
 
   public getDatabase(): Database {

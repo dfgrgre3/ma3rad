@@ -177,6 +177,8 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'admin.view', name: 'الدخول إلى مركز التحكم', module: 'ADMIN' },
   { code: 'admin.navigation', name: 'تخصيص قوائم التنقل', module: 'ADMIN' },
   { code: 'admin.data', name: 'أدوات البيانات والصيانة', module: 'ADMIN' },
+  { code: 'admin.data.export', name: 'تصدير بيانات النظام', module: 'ADMIN' },
+  { code: 'admin.data.delete', name: 'حذف بيانات النظام', module: 'ADMIN' },
 
   // Electronic invoicing
   { code: 'electronic_invoices.view', name: 'عرض الفواتير الإلكترونية', module: 'E_INVOICING' },
@@ -217,11 +219,12 @@ const MANAGER_RESTRICTED = new Set([
   'users.permissions',
   'settings.update',
   'settings.backup',
+  'admin.data',
 ]);
 
 export const ROLE_DEFAULTS: Record<string, string[]> = {
   ADMIN: [...ALL],
-  MANAGER: ALL.filter((code) => !MANAGER_RESTRICTED.has(code)),
+  MANAGER: [...ALL.filter((code) => !MANAGER_RESTRICTED.has(code)), 'admin.data', 'admin.data.export'],
   ACCOUNTANT: [
     'dashboard.view', 'dashboard.export',
     'products.view', 'categories.view', 'brands.view',
@@ -318,12 +321,27 @@ export class PermissionService {
       const markerKey = `rbac.seeded.${roleCode}`;
       const seeded = db.query('SELECT value FROM system_settings WHERE key = ?', [markerKey]);
       if (seeded.length > 0) {
+        if (roleCode === 'ADMIN') {
+          for (const permission of ['admin.data.export', 'admin.data.delete']) {
+            db.run(
+              'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+              [roleCode, permission]
+            );
+          }
+        }
         if (roleCode === 'MANAGER') {
-          const current = PermissionService.getRolePermissions(roleCode);
-          const retainsOriginalFullGrant = current.length === ALL.length &&
-            ALL.every((permission) => current.includes(permission));
-          if (retainsOriginalFullGrant) {
-            db.executeTransaction(() => {
+          const current = db.query<{ permissionCode: string }>(
+            'SELECT permission_code AS permissionCode FROM role_permissions WHERE role_code = ?',
+            [roleCode]
+          ).map((row) => row.permissionCode);
+          const legacyPermissions = ALL.filter((permission) =>
+            permission !== 'admin.data.export' && permission !== 'admin.data.delete'
+          );
+          const retainsOriginalFullGrant =
+            (current.length === ALL.length && ALL.every((permission) => current.includes(permission))) ||
+            (current.length === legacyPermissions.length && legacyPermissions.every((permission) => current.includes(permission)));
+          db.executeTransaction(() => {
+            if (retainsOriginalFullGrant) {
               db.run('DELETE FROM role_permissions WHERE role_code = ?', [roleCode]);
               for (const permission of defaults) {
                 db.run(
@@ -331,8 +349,13 @@ export class PermissionService {
                   [roleCode, permission]
                 );
               }
-            });
-          }
+            } else {
+              // Keep view/export grants for customized managers, but strip deletion.
+              db.run('DELETE FROM role_permissions WHERE role_code = ? AND permission_code = ?', [roleCode, 'admin.data.delete']);
+              db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, 'admin.data']);
+              db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, 'admin.data.export']);
+            }
+          });
         }
         continue;
       }

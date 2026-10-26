@@ -25,7 +25,7 @@ const ROW_PAGE_SIZE = 50;
 export const DataDeletionPage: React.FC = () => {
   const toast = useToast();
   const can = usePermission();
-  const allowed = can('admin.data');
+  const allowed = can('admin.data.delete');
   const service = useMemo(() => new DataAdminService(), []);
 
   const [mode, setMode] = useState<Mode>('all');
@@ -97,13 +97,15 @@ export const DataDeletionPage: React.FC = () => {
     });
   };
 
-  const runReset = () => {
+  const runReset = async () => {
     if (resetTargets.length === 0) return toast.warning('لم تحدد أي جدول.');
     if (confirmText.trim() !== 'حذف') return toast.warning('اكتب كلمة "حذف" للتأكيد.');
+    const reason = window.prompt('اكتب سبب حذف البيانات (سيُحفظ في سجل التدقيق):');
+    if (!reason?.trim()) return toast.warning('سبب الحذف مطلوب.');
     if (!window.confirm(`سيتم حذف ${resetRowTotal.toLocaleString('en-US')} سجل من ${resetTargets.length} جدول. لا يمكن التراجع. متابعة؟`)) return;
     setBusy(true);
     try {
-      report(service.deleteTableData(resetTargets.map((t) => t.name)), 'تم تصفير البيانات المحددة.');
+      report(await service.deleteTableData(resetTargets.map((t) => t.name), reason), 'تم تصفير البيانات المحددة.');
     } catch (error: any) {
       toast.error('تعذر الحذف', error?.message);
     } finally {
@@ -114,13 +116,15 @@ export const DataDeletionPage: React.FC = () => {
   // ── mode: table ────────────────────────────────────────────────────────────
   const singleTable = tables.find((t) => t.name === tableTarget) || null;
 
-  const runTableDelete = () => {
+  const runTableDelete = async () => {
     if (!singleTable) return toast.warning('اختر جدولاً أولاً.');
     if (confirmText.trim() !== singleTable.name) return toast.warning(`اكتب اسم الجدول "${singleTable.name}" للتأكيد.`);
+    const reason = window.prompt('اكتب سبب حذف البيانات (سيُحفظ في سجل التدقيق):');
+    if (!reason?.trim()) return toast.warning('سبب الحذف مطلوب.');
     if (!window.confirm(`سيتم حذف كل سجلات الجدول ${singleTable.name} (${singleTable.rows}). متابعة؟`)) return;
     setBusy(true);
     try {
-      report(service.deleteTableData([singleTable.name]), `تم تفريغ الجدول ${singleTable.name}.`);
+      report(await service.deleteTableData([singleTable.name], reason), `تم تفريغ الجدول ${singleTable.name}.`);
     } catch (error: any) {
       toast.error('تعذر الحذف', error?.message);
     } finally {
@@ -142,7 +146,7 @@ export const DataDeletionPage: React.FC = () => {
     }
   };
 
-  const runRowsDelete = () => {
+  const runRowsDelete = async () => {
     if (!rowsTable) return toast.warning('اختر جدولاً أولاً.');
     if (selectedRows.size === 0) return toast.warning('حدد سجلاً واحداً على الأقل.');
     const keys = service.getPrimaryKeyColumns(rowsTable);
@@ -153,10 +157,12 @@ export const DataDeletionPage: React.FC = () => {
       keys.forEach((k) => { key[k] = row[k]; });
       return key;
     });
+    const reason = window.prompt('اكتب سبب حذف السجلات (سيُحفظ في سجل التدقيق):');
+    if (!reason?.trim()) return toast.warning('سبب الحذف مطلوب.');
     if (!window.confirm(`سيتم حذف ${payload.length} سجل من ${rowsTable}. متابعة؟`)) return;
     setBusy(true);
     try {
-      report(service.deleteRows(rowsTable, payload), 'تم حذف السجلات المحددة.');
+      report(await service.deleteRows(rowsTable, payload, reason), 'تم حذف السجلات المحددة.');
     } catch (error: any) {
       toast.error('تعذر الحذف', error?.message);
     } finally {
@@ -192,15 +198,17 @@ export const DataDeletionPage: React.FC = () => {
     }
   };
 
-  const runRangeDelete = () => {
+  const runRangeDelete = async () => {
     if (!rangeTable || !rangeColumn) return toast.warning('اختر الجدول والعمود الزمني.');
     if (rangeCount === null) return toast.warning('اعرض عدد السجلات أولاً.');
     if (rangeCount === 0) return toast.info('لا توجد سجلات في هذا النطاق.');
     if (confirmText.trim() !== 'حذف') return toast.warning('اكتب كلمة "حذف" للتأكيد.');
+    const reason = window.prompt('اكتب سبب حذف البيانات (سيُحفظ في سجل التدقيق):');
+    if (!reason?.trim()) return toast.warning('سبب الحذف مطلوب.');
     if (!window.confirm(`سيتم حذف ${rangeCount} سجل من ${rangeTable} بين ${rangeFrom} و ${rangeTo}. متابعة؟`)) return;
     setBusy(true);
     try {
-      report(service.deleteByDateRange(rangeTable, rangeColumn, rangeFrom, rangeTo), 'تم حذف سجلات النطاق الزمني.');
+      report(await service.deleteByDateRange(rangeTable, rangeColumn, rangeFrom, rangeTo, reason), 'تم حذف سجلات النطاق الزمني.');
     } catch (error: any) {
       toast.error('تعذر الحذف', error?.message);
     } finally {
@@ -216,7 +224,7 @@ export const DataDeletionPage: React.FC = () => {
             <ShieldAlert className="h-8 w-8 text-rose-500" />
           </div>
           <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">الصفحة غير متاحة</h2>
-          <p className="text-sm text-slate-500">تحتاج صلاحية أدوات البيانات (admin.data) للوصول إلى أدوات الحذف.</p>
+          <p className="text-sm text-slate-500">تحتاج صلاحية حذف بيانات النظام (admin.data.delete) للوصول إلى أدوات الحذف.</p>
         </div>
       </div>
     );

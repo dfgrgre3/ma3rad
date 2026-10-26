@@ -81,22 +81,40 @@ export const ExecutiveDashboard: React.FC = () => {
 
       // ── KPIs ──────────────────────────────────────────────────────────────────
       const salesRow = db.exec(
-        `SELECT COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(gross_profit), 0) as profit
+        `SELECT COALESCE(SUM(subtotal - discount_amount),0) as total, COALESCE(SUM(gross_profit), 0) as profit
          FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
         [fromStr, toStr]
       );
-      const total = salesRow[0]?.values[0]?.[0] as number ?? 0;
-      const profit = salesRow[0]?.values[0]?.[1] as number ?? 0;
+      const returnsRow = db.exec(
+        `SELECT COALESCE(SUM(sr.total_amount - CASE WHEN si.total_amount > 0
+           THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END),0)
+         FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
+         WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'`, [fromStr, toStr]
+      );
+      const returnedCostRow = db.exec(
+        `SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost),0)
+         FROM sales_return_items sri JOIN sales_returns sr ON sr.id=sri.return_id
+         JOIN sales_invoices si ON si.id=sr.original_invoice_id
+         WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'`, [fromStr, toStr]
+      );
+      const netReturns = Number(returnsRow[0]?.values[0]?.[0] ?? 0);
+      const returnedCost = Number(returnedCostRow[0]?.values[0]?.[0] ?? 0);
+      const total = Number(salesRow[0]?.values[0]?.[0] ?? 0) - netReturns;
+      const profit = Number(salesRow[0]?.values[0]?.[1] ?? 0) - netReturns + returnedCost;
 
       const yesterdayRow = db.exec(
-        `SELECT COALESCE(SUM(total_amount),0) as total FROM sales_invoices
-         WHERE date = ? AND invoice_status != 'VOID'`,
-        [yesterday]
+        `SELECT COALESCE((SELECT SUM(subtotal-discount_amount) FROM sales_invoices
+           WHERE date=? AND invoice_status!='VOID'),0) - COALESCE((SELECT SUM(sr.total_amount -
+             CASE WHEN si.total_amount>0 THEN ROUND(sr.total_amount*COALESCE(si.tax_amount,0)/si.total_amount,2) ELSE 0 END)
+           FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
+           WHERE sr.date=? AND si.invoice_status!='VOID'),0)`, [yesterday, yesterday]
       );
       const todayRow = db.exec(
-        `SELECT COALESCE(SUM(total_amount),0) as total FROM sales_invoices
-         WHERE date = ? AND invoice_status != 'VOID'`,
-        [today]
+        `SELECT COALESCE((SELECT SUM(subtotal-discount_amount) FROM sales_invoices
+           WHERE date=? AND invoice_status!='VOID'),0) - COALESCE((SELECT SUM(sr.total_amount -
+             CASE WHEN si.total_amount>0 THEN ROUND(sr.total_amount*COALESCE(si.tax_amount,0)/si.total_amount,2) ELSE 0 END)
+           FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
+           WHERE sr.date=? AND si.invoice_status!='VOID'),0)`, [today, today]
       );
       const todaySales = todayRow[0]?.values[0]?.[0] as number ?? 0;
       const yesterdaySales = yesterdayRow[0]?.values[0]?.[0] as number ?? 0;
@@ -208,7 +226,7 @@ export const ExecutiveDashboard: React.FC = () => {
       const days30From = format(subDays(new Date(), 29), 'yyyy-MM-dd');
       const salesByDayRow = db.exec(
         `SELECT date as day,
-                COALESCE(SUM(total_amount),0) as sales,
+                COALESCE(SUM(subtotal-discount_amount),0) as sales,
                 COALESCE(SUM(gross_profit),0) as profit
          FROM sales_invoices
          WHERE date >= ? AND invoice_status != 'VOID'
@@ -222,6 +240,26 @@ export const ExecutiveDashboard: React.FC = () => {
         salesByDayRow[0].values.forEach((row: any[]) => {
           const [d, s, p] = row;
           salesMap[d as string] = { sales: s as number, profit: p as number };
+        });
+      }
+
+      const returnByDayRow = db.exec(
+        `SELECT sr.date,
+                SUM(sr.total_amount - CASE WHEN si.total_amount>0
+                  THEN ROUND(sr.total_amount*COALESCE(si.tax_amount,0)/si.total_amount,2) ELSE 0 END) AS revenue,
+                (SELECT COALESCE(SUM(sri.quantity_m2*sri.unit_cost),0)
+                 FROM sales_return_items sri WHERE sri.return_id=sr.id) AS returnedCost
+         FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
+         WHERE sr.date>=? AND si.invoice_status!='VOID' GROUP BY sr.id`,
+        [days30From]
+      );
+      if (returnByDayRow[0]) {
+        returnByDayRow[0].values.forEach((row: any[]) => {
+          const [date, revenue, returnedCost] = row;
+          const key = date as string;
+          if (!salesMap[key]) salesMap[key] = { sales: 0, profit: 0 };
+          salesMap[key].sales -= Number(revenue || 0);
+          salesMap[key].profit += Number(returnedCost || 0) - Number(revenue || 0);
         });
       }
 
@@ -239,15 +277,30 @@ export const ExecutiveDashboard: React.FC = () => {
 
       // ── Top Products ──────────────────────────────────────────────────────────
       const topProdRow = db.exec(
-        `SELECT p.name, p.product_type, p.base_unit, p.custom_unit,
-                COALESCE(SUM(sii.quantity_m2), 0) as qty,
-                COALESCE(SUM(sii.total_price), 0) as revenue
-         FROM sales_invoice_items sii
-         JOIN products p ON p.id = sii.product_id
-         JOIN sales_invoices si ON si.id = sii.invoice_id
-         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
-         GROUP BY p.id ORDER BY revenue DESC LIMIT 6`,
-        [fromStr, toStr]
+        `WITH activity AS (
+           SELECT p.id, p.name, p.product_type, p.base_unit, p.custom_unit,
+             sii.quantity_m2 AS qty,
+             sii.total_price - CASE WHEN si.subtotal > 0
+               THEN si.discount_amount * sii.total_price / si.subtotal ELSE 0 END AS revenue
+           FROM sales_invoice_items sii
+           JOIN products p ON p.id=sii.product_id
+           JOIN sales_invoices si ON si.id=sii.invoice_id
+           WHERE si.date BETWEEN ? AND ? AND si.invoice_status!='VOID'
+           UNION ALL
+           SELECT p.id, p.name, p.product_type, p.base_unit, p.custom_unit,
+             -sri.quantity_m2 AS qty,
+             -sri.total_refund + CASE WHEN sr.total_amount>0 AND si.total_amount>0
+               THEN ROUND(sr.total_amount*COALESCE(si.tax_amount,0)/si.total_amount,2)
+                 * sri.total_refund / sr.total_amount ELSE 0 END AS revenue
+           FROM sales_return_items sri
+           JOIN sales_returns sr ON sr.id=sri.return_id
+           JOIN sales_invoices si ON si.id=sr.original_invoice_id
+           JOIN products p ON p.id=sri.product_id
+           WHERE sr.date BETWEEN ? AND ? AND si.invoice_status!='VOID'
+         )
+         SELECT name, product_type, base_unit, custom_unit, SUM(qty) AS qty, SUM(revenue) AS revenue
+         FROM activity GROUP BY id ORDER BY revenue DESC LIMIT 6`,
+        [fromStr, toStr, fromStr, toStr]
       );
       const topProdsData: TopProduct[] = topProdRow[0]?.values.map((row: any[]) => {
         const [n, productType, baseUnit, customUnit, q, r] = row;
@@ -298,13 +351,19 @@ export const ExecutiveDashboard: React.FC = () => {
 
       // Branch sales from recorded invoices.
       const branchRow = db.exec(
-        `SELECT COALESCE(w.name,'غير محدد') as branch,
-                COALESCE(SUM(si.total_amount),0) as total
-         FROM sales_invoices si
-         LEFT JOIN warehouses w ON w.id = si.warehouse_id
-         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID'
-         GROUP BY w.id LIMIT 5`,
-        [fromStr, toStr]
+        `WITH activity AS (
+          SELECT warehouse_id, subtotal-discount_amount AS revenue
+          FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status!='VOID'
+          UNION ALL
+          SELECT sr.warehouse_id, -(sr.total_amount - CASE WHEN si.total_amount>0
+            THEN ROUND(sr.total_amount*COALESCE(si.tax_amount,0)/si.total_amount,2) ELSE 0 END)
+          FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
+          WHERE sr.date BETWEEN ? AND ? AND si.invoice_status!='VOID'
+        )
+        SELECT COALESCE(w.name,'غير محدد') AS branch, COALESCE(SUM(a.revenue),0) AS total
+        FROM activity a LEFT JOIN warehouses w ON w.id=a.warehouse_id
+        GROUP BY w.id ORDER BY total DESC LIMIT 5`,
+        [fromStr, toStr, fromStr, toStr]
       );
       const branchSales: { name: string; value: number }[] = branchRow[0]?.values.map((row: any[]) => {
         const [n, v] = row;

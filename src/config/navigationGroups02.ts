@@ -68,7 +68,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'سجل التدقيق', to: '/audit', icon: ShieldCheck, perm: 'audit.view' },
       { label: 'مركز الأمان', to: '/security', icon: ShieldCheck, perm: 'users.view' },
       { label: 'المستخدمون', to: '/users', icon: UserRound, perm: 'users.view' },
-      { label: 'حذف البيانات', to: '/admin/data-deletion', icon: Trash2, perm: 'admin.data' },
+      { label: 'حذف البيانات', to: '/admin/data-deletion', icon: Trash2, perm: 'admin.data.delete' },
       { label: 'النسخ الاحتياطي', to: '/backup', icon: Download, perm: 'settings.backup' },
       { label: 'صحة النظام', to: '/system-health', icon: Cpu, perm: 'settings.view' },
       { label: 'الإعدادات', to: '/settings', icon: Settings, perm: 'settings.view' },

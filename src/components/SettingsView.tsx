@@ -64,11 +64,11 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleExportBackup = () => {
+  const handleExportBackup = async () => {
     try {
-      backupService.exportBackupFile();
+      await backupService.exportBackupFile();
       loadData();
-      alert('تم تنزيل نسخة احتياطية آمنة من قاعدة البيانات بنجاح.');
+      alert('تم تنزيل نسخة احتياطية من قاعدة البيانات. الملف غير مشفر؛ احفظه في موقع آمن.');
     } catch (e: any) {
       alert(`خطأ في التصدير: ${e.message || e}`);
     }

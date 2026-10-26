@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
+import { PermissionService, ROLE_DEFAULTS } from '../src/services/PermissionService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -99,6 +99,7 @@ test('permissions: manager defaults exclude full-access privileges, including le
     'roles.manage', 'users.create', 'users.update', 'users.delete',
     'users.reset_password', 'users.permissions', 'settings.update',
     'settings.backup', 'products.delete',
+    'admin.data.delete',
   ]) {
     assert.ok(!defaultPermissions.includes(permission), `manager must not have ${permission}`);
   }
@@ -109,6 +110,14 @@ test('permissions: manager defaults exclude full-access privileges, including le
   }
   PermissionService.seed();
   assert.deepEqual(PermissionService.getRolePermissions('MANAGER').sort(), defaultPermissions.sort());
+});
+
+test('permissions: destructive data deletion is limited to ADMIN across built-in role defaults', () => {
+  for (const [role, permissions] of Object.entries(ROLE_DEFAULTS)) {
+    assert.equal(permissions.includes('admin.data.delete'), role === 'ADMIN', `${role} deletion grant`);
+  }
+  assert.ok(ROLE_DEFAULTS.MANAGER.includes('admin.data.export'));
+  assert.ok(!ROLE_DEFAULTS.MANAGER.includes('admin.data.delete'));
 });
 
 test('auth: wrong password fails, and repeated failures lock the account for 15 minutes', async () => {

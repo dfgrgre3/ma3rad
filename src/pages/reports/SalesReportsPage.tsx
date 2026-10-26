@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   BarChart3, TrendingUp, TrendingDown, Download, CalendarDays, Users,
   Package, MapPin, Award, Loader2, AlertCircle, RefreshCw, Filter,
-  ShoppingCart, Percent, DollarSign, ArrowUpRight, ArrowDownRight, Star,
+  ShoppingCart, Percent, DollarSign, ArrowUpRight, ArrowDownRight, Star, Scale,
 } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
 import { AuthService } from '../../services/AuthService';
@@ -10,6 +10,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { localDateString } from '../../utils/date';
 import { exportToExcel } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
+import { SalesFinancialReconciliation } from '../../components/reports/SalesFinancialReconciliation';
 
 const db = DatabaseManager.getInstance();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
@@ -91,9 +92,8 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         SELECT c.id AS groupId, COALESCE(c.name, 'غير مصنف') AS label, NULL AS invoiceId,
           -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
             THEN ROUND(
-              ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
-              * sri.total_refund / sr.total_amount, 2
-            )
+              sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2
+            ) * sri.total_refund / sr.total_amount
             ELSE 0
           END AS revenue,
           -(sri.quantity_m2 * sri.unit_cost) AS cost
@@ -131,9 +131,8 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         SELECT p.id AS groupId, p.name AS label, NULL AS invoiceId,
           -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
             THEN ROUND(
-              ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
-              * sri.total_refund / sr.total_amount, 2
-            )
+              sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2
+            ) * sri.total_refund / sr.total_amount
             ELSE 0
           END AS revenue,
           -(sri.quantity_m2 * sri.unit_cost) AS cost
@@ -363,6 +362,7 @@ export const SalesReportsPage: React.FC = () => {
   const canView = PermissionService.can(user, 'reports.view');
 
   const [reportType, setReportType] = useState<ReportType>('by_category');
+  const [activeSection, setActiveSection] = useState<'reports' | 'reconciliation'>('reports');
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [data, setData] = useState<SalesRow[] | DailyRow[]>([]);
@@ -383,7 +383,7 @@ export const SalesReportsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { if (canView) load(); }, [reportType, from, to]);
+  useEffect(() => { if (canView && activeSection === 'reports') load(); }, [canView, activeSection, reportType, from, to]);
 
   const handleExport = () => {
     try {
@@ -456,17 +456,27 @@ export const SalesReportsPage: React.FC = () => {
             <BarChart3 className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-black text-slate-900">تقارير المبيعات المتقدمة</h1>
-            <p className="text-xs text-slate-400">تحليل مفصل حسب الفئة والمنتج والعميل والمندوب والمنطقة</p>
+            <h1 className="text-base font-black text-slate-900">
+              {activeSection === 'reports' ? 'تقارير المبيعات المتقدمة' : 'بوابة المصالحة المالية'}
+            </h1>
+            <p className="text-xs text-slate-400">
+              {activeSection === 'reports'
+                ? 'تحليل مفصل حسب الفئة والمنتج والعميل والمندوب والمنطقة'
+                : 'مراجعة المبيعات والمرتجعات والدفتر العام والأرصدة التشغيلية'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExport} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
-            <Download className="w-3.5 h-3.5" /> تصدير
-          </button>
-          <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
-            <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          {activeSection === 'reports' && (
+            <button onClick={handleExport} className="text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 transition px-3 py-2 rounded-lg flex items-center gap-1.5">
+              <Download className="w-3.5 h-3.5" /> تصدير
+            </button>
+          )}
+          {activeSection === 'reports' && (
+            <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
+              <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -497,52 +507,64 @@ export const SalesReportsPage: React.FC = () => {
       <div className="bg-white border-b border-slate-100 px-6 py-2 flex gap-1 overflow-x-auto flex-shrink-0">
         {REPORT_TYPES.map(type => {
           const Icon = type.icon;
-          const isActive = reportType === type.id;
+          const isActive = activeSection === 'reports' && reportType === type.id;
           const colorClass = isActive ? COLOR_MAP[type.color] : 'text-slate-500 hover:bg-slate-50';
           return (
-            <button key={type.id} onClick={() => setReportType(type.id)}
+            <button key={type.id} onClick={() => { setActiveSection('reports'); setReportType(type.id); }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition whitespace-nowrap ${isActive ? colorClass + ' border' : 'border-transparent ' + colorClass}`}
             >
               <Icon className="w-3.5 h-3.5" /> {type.label}
             </button>
           );
         })}
+        <button onClick={() => setActiveSection('reconciliation')}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border transition whitespace-nowrap ${
+            activeSection === 'reconciliation'
+              ? 'bg-teal-50 text-teal-700 border-teal-200'
+              : 'border-transparent text-slate-500 hover:bg-slate-50'
+          }`}>
+          <Scale className="w-3.5 h-3.5" /> مصالحة الفروقات المالية
+        </button>
       </div>
 
       {/* Content */}
-      {error && (
+      {activeSection === 'reports' && error && (
         <div className="mx-6 mt-3 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
           <AlertCircle className="w-4 h-4" /> {error}
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <currentType.icon className={`w-5 h-5 ${COLOR_MAP[currentType.color].split(' ')[1]}`} />
-              <h2 className="text-sm font-black text-slate-900">{currentType.label}</h2>
-              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
-                {from} — {to}
-              </span>
+        {activeSection === 'reconciliation' ? (
+          <SalesFinancialReconciliation dateFrom={from} dateTo={to} />
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <currentType.icon className={`w-5 h-5 ${COLOR_MAP[currentType.color].split(' ')[1]}`} />
+                <h2 className="text-sm font-black text-slate-900">{currentType.label}</h2>
+                <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                  {from} — {to}
+                </span>
+              </div>
+              {!loading && (
+                <span className="text-xs font-bold text-slate-400">
+                  {data.length} {reportType === 'daily' ? 'يوم' : 'نتيجة'}
+                </span>
+              )}
             </div>
-            {!loading && (
-              <span className="text-xs font-bold text-slate-400">
-                {data.length} {reportType === 'daily' ? 'يوم' : 'نتيجة'}
-              </span>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+              </div>
+            ) : reportType === 'daily' ? (
+              <DailyChart rows={data as DailyRow[]} />
+            ) : (
+              <SalesBarChart rows={data as SalesRow[]} color={currentType.color} reportType={reportType} />
             )}
           </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
-            </div>
-          ) : reportType === 'daily' ? (
-            <DailyChart rows={data as DailyRow[]} />
-          ) : (
-            <SalesBarChart rows={data as SalesRow[]} color={currentType.color} reportType={reportType} />
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

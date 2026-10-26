@@ -103,6 +103,57 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '053_sales_batch_return_traceability',
+    description: 'Track batch consumption per sale line and batch restoration per return line',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sales_invoice_batch_allocations (
+          id TEXT PRIMARY KEY,
+          invoice_item_id TEXT NOT NULL,
+          batch_id TEXT NOT NULL,
+          quantity_m2 REAL NOT NULL CHECK(quantity_m2 > 0),
+          returned_m2 REAL NOT NULL DEFAULT 0 CHECK(returned_m2 >= 0),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (invoice_item_id) REFERENCES sales_invoice_items(id) ON DELETE CASCADE,
+          FOREIGN KEY (batch_id) REFERENCES product_batches(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_sale_batch_alloc_item ON sales_invoice_batch_allocations(invoice_item_id);
+        CREATE TABLE IF NOT EXISTS sales_return_batch_allocations (
+          id TEXT PRIMARY KEY,
+          return_item_id TEXT NOT NULL,
+          sale_allocation_id TEXT,
+          batch_id TEXT NOT NULL,
+          quantity_m2 REAL NOT NULL CHECK(quantity_m2 > 0),
+          is_pending INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (return_item_id) REFERENCES sales_return_items(id) ON DELETE CASCADE,
+          FOREIGN KEY (sale_allocation_id) REFERENCES sales_invoice_batch_allocations(id),
+          FOREIGN KEY (batch_id) REFERENCES product_batches(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_return_batch_alloc_item ON sales_return_batch_allocations(return_item_id);
+      `);
+    },
+  },
+  {
+    id: '054_sales_financial_reconciliations',
+    description: 'Store reviewed sales financial reconciliation snapshots',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sales_financial_reconciliations (
+          id TEXT PRIMARY KEY,
+          date_from TEXT NOT NULL,
+          date_to TEXT NOT NULL,
+          checks_json TEXT NOT NULL,
+          notes TEXT NOT NULL,
+          closed_by TEXT NOT NULL,
+          closed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_sales_financial_reconciliations_period
+          ON sales_financial_reconciliations(date_from, date_to, closed_at);
+      `);
+    },
+  },
 ].flat();
 
 export interface MigrationReport {

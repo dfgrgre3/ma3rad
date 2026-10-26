@@ -121,6 +121,9 @@ test('FIFO sales post layer cost and a sales return restores the original lot', 
     [productId,'FIFO-S','FIFO-S','FIFO sale test','cat_floor','br_cleo','GRADE_1','60x60','M2','M2',4,1.44,15,100,90,0,0]);
   db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2) VALUES (?,?,?,?,0)`,
     ['stk_fifo_sale_test','wh_main',productId,10]);
+  db.run(`INSERT INTO product_batches (id,product_id,warehouse_id,batch_number,tone_shade,caliber,cost_price,quantity_m2,quantity_remaining_m2)
+    VALUES ('pb_fifo_first',?,'wh_main','LOT-A','TONE-A','0',10,4,4),
+           ('pb_fifo_second',?,'wh_main','LOT-B','TONE-B','0',20,6,6)`, [productId, productId]);
   InventoryCostingService.addLayer(db,{productId,warehouseId:'wh_main',sourceType:'TEST',sourceId:'lot1',date:'2026-01-01',quantity:5,unitCost:10});
   InventoryCostingService.addLayer(db,{productId,warehouseId:'wh_main',sourceType:'TEST',sourceId:'lot2',date:'2026-02-01',quantity:5,unitCost:20});
   db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','FIFO')`);
@@ -130,9 +133,18 @@ test('FIFO sales post layer cost and a sales return restores the original lot', 
   const invoice = sales.createSale({customerId:customer.id,warehouseId:'wh_main',items:[{
     productId,soldBy:'M2',quantityM2:7,boxesCount:5,piecesCount:20,unitPrice:100,
   }],paidAmount:700,paymentType:'CASH'});
+  assert.deepEqual(q(`SELECT batch_id AS batchId, quantity_m2 AS quantity FROM sales_invoice_batch_allocations WHERE invoice_item_id IN (SELECT id FROM sales_invoice_items WHERE invoice_id=?) ORDER BY batch_id`, [invoice.id]), [
+    { batchId: 'pb_fifo_first', quantity: 4 },
+    { batchId: 'pb_fifo_second', quantity: 3 },
+  ]);
   assert.equal(invoice.totalCost,90);
   const issue = q(`SELECT id FROM inventory_transactions WHERE reference_type='INVOICE' AND reference_id=? AND type='SALE'`,[invoice.id])[0];
   sales.returnSale(invoice.id,[{productId,quantityM2:2,boxesCount:1,unitPrice:100,unitCost:15,reason:'FIFO test'}],false);
+  assert.deepEqual(q(`SELECT id, quantity_remaining_m2 AS remaining FROM product_batches WHERE id IN ('pb_fifo_first','pb_fifo_second') ORDER BY id`), [
+    { id: 'pb_fifo_first', remaining: 2 },
+    { id: 'pb_fifo_second', remaining: 3 },
+  ]);
+  assert.equal(q(`SELECT batch_id AS batchId, quantity_m2 AS quantity FROM sales_return_batch_allocations WHERE return_item_id IN (SELECT id FROM sales_return_items WHERE return_id IN (SELECT id FROM sales_returns WHERE original_invoice_id=?))`, [invoice.id])[0].batchId, 'pb_fifo_first');
   db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','AVERAGE_COST')`);
   assert.equal(q(`SELECT SUM(l.debit) AS cost FROM journal_entry_lines l JOIN chart_of_accounts a ON a.id=l.account_id
     JOIN journal_entries e ON e.id=l.entry_id WHERE e.reference_type='SALES_INVOICE' AND e.reference_id=? AND a.code='5101'`,[invoice.id])[0].cost,90);

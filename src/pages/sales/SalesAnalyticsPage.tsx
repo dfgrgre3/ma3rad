@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
+import { AnalyticsService } from '../../services/AnalyticsService';
 import { formatProductQuantity } from '../../utils/productUnits';
 
 type Summary = { count: number; revenue: number; collected: number; outstanding: number; profit: number };
@@ -26,10 +27,49 @@ export const SalesAnalyticsPage: React.FC = () => {
   const [data] = useMemo(() => {
     const where = `WHERE invoice_status = 'COMPLETED' ${range.from ? 'AND date(date) >= date(?)' : ''} AND date(date) <= date(?)`;
     const params = range.from ? [range.from, range.to] : [range.to];
-    const summary = db.query<Summary>(`SELECT COUNT(*) count, COALESCE(SUM(total_amount),0) revenue, COALESCE(SUM(paid_amount),0) collected, COALESCE(SUM(remaining_amount),0) outstanding, COALESCE(SUM(gross_profit),0) profit FROM sales_invoices ${where}`, params)[0] || { count: 0, revenue: 0, collected: 0, outstanding: 0, profit: 0 };
-    const products = db.query<ProductRow>(`SELECT sii.product_name productName, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit, SUM(sii.quantity_m2) quantity, SUM(sii.total_price) revenue FROM sales_invoice_items sii JOIN products p ON p.id=sii.product_id JOIN sales_invoices si ON si.id=sii.invoice_id ${where.replaceAll('invoice_status', 'si.invoice_status').replaceAll('date(date)', 'date(si.date)')} GROUP BY sii.product_id ORDER BY revenue DESC LIMIT 6`, params);
-    const customers = db.query<CustomerRow>(`SELECT c.name, COUNT(*) count, SUM(si.total_amount) revenue FROM sales_invoices si JOIN customers c ON c.id=si.customer_id ${where.replaceAll('invoice_status', 'si.invoice_status').replaceAll('date(date)', 'date(si.date)')} GROUP BY si.customer_id ORDER BY revenue DESC LIMIT 6`, params);
-    const daily = db.query<{ day: string; revenue: number; count: number }>(`SELECT date(date) day, SUM(total_amount) revenue, COUNT(*) count FROM sales_invoices ${where} GROUP BY date(date) ORDER BY day DESC LIMIT 7`, params).reverse();
+    const financials = db.query<{ count: number; collected: number; outstanding: number }>(`
+      SELECT COUNT(*) count, COALESCE(SUM(paid_amount),0) collected,
+        COALESCE(SUM(remaining_amount),0) outstanding
+      FROM sales_invoices ${where}
+    `, params)[0] || { count: 0, collected: 0, outstanding: 0 };
+    const returnSettlements = db.query<{ refunded: number; credited: number }>(`
+      SELECT COALESCE(SUM(sr.refunded_amount),0) refunded,
+        COALESCE(SUM(sr.remaining_to_balance),0) credited
+      FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
+      WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status='COMPLETED'
+    `, [range.from || '0001-01-01', range.to])[0] || { refunded: 0, credited: 0 };
+    const analytics = new AnalyticsService().getSalesAnalytics(range.from || '0001-01-01', range.to);
+    const productIds = analytics.topProducts.map((product) => product.productId);
+    const productMeta = productIds.length
+      ? db.query<{ productId: string; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }>(
+          `SELECT id AS productId, product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit FROM products WHERE id IN (${productIds.map(() => '?').join(',')})`,
+          productIds
+        )
+      : [];
+    const metaById = new Map(productMeta.map((product) => [product.productId, product]));
+    const summary: Summary = {
+      count: financials.count,
+      revenue: analytics.totalSales,
+      collected: Number(financials.collected) - Number(returnSettlements.refunded),
+      outstanding: Number(financials.outstanding) - Number(returnSettlements.credited),
+      profit: analytics.totalProfit,
+    };
+    const products: ProductRow[] = analytics.topProducts.map((product) => ({
+      ...product,
+      productType: metaById.get(product.productId)?.productType || 'GENERAL',
+      baseUnit: metaById.get(product.productId)?.baseUnit || 'UNIT',
+      customUnit: metaById.get(product.productId)?.customUnit,
+    }));
+    const customers: CustomerRow[] = analytics.topCustomers.map((customer) => ({
+      name: customer.customerName,
+      count: customer.orderCount,
+      revenue: customer.totalSpent,
+    }));
+    const daily = analytics.salesByDay.slice(-7).map((entry) => ({
+      day: entry.date,
+      revenue: entry.amount,
+      count: entry.count,
+    }));
     return [{ summary, products, customers, daily }];
   }, [db, range, refresh]);
   const avg = data.summary.count ? data.summary.revenue / data.summary.count : 0;
