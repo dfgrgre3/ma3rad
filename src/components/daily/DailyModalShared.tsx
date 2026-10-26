@@ -31,6 +31,26 @@ export const ModalShell: React.FC<{
     dialogRef.current?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !busyRef.current) closeRef.current();
+      if (event.key !== 'Tab') return;
+
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable?.length) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => {
@@ -88,22 +108,34 @@ export const useLists = () => {
   return { customers, products, warehouses, error };
 };
 
-export const useCashierLists = () => {
+export const useRegisters = () => {
   const [registers, setRegisters] = useState<CashRegister[]>([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    try {
+      setRegisters(new CashierService().getAllRegisters());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'تعذر تحميل الخزائن');
+    }
+  }, []);
+
+  return { registers, error };
+};
+
+export const useExpenseCategories = () => {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     try {
-      const service = new CashierService();
-      setRegisters(service.getAllRegisters());
-      setCategories(service.getExpenseCategories());
+      setCategories(new CashierService().getExpenseCategories());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تحميل بيانات الخزائن والمصروفات');
+      setError(e instanceof Error ? e.message : 'تعذر تحميل تصنيفات المصروفات');
     }
   }, []);
 
-  return { registers, categories, error };
+  return { categories, error };
 };
 
 export const useSuppliers = () => {

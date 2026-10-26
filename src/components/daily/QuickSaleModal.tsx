@@ -4,6 +4,7 @@ import { SalesService } from '../../services/SalesService';
 import { useToast } from '../ui/Toast';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import type { PaymentType } from '../../types';
+import { round2 } from '../../services/financials';
 import { fmt, input, label, LoadErrorNotice, ModalShell, useLists } from './DailyModalShared';
 
 interface SaleLine {
@@ -30,9 +31,9 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
   }, [warehouses, warehouseId]);
 
   const productOf = (id: string) => products.find((p) => p.id === id);
-  const total = useMemo(() => lines.reduce((sum, line) => {
-    return sum + (Number(line.quantityM2) || 0) * (Number(line.unitPrice) || 0);
-  }, 0), [lines]);
+  const total = useMemo(() => round2(lines.reduce((sum, line) => {
+    return sum + round2((Number(line.quantityM2) || 0) * (Number(line.unitPrice) || 0));
+  }, 0)), [lines]);
 
   const setLine = (index: number, patch: Partial<SaleLine>) => {
     setLines((prev) => prev.map((line, i) => i === index ? { ...line, ...patch } : line));
@@ -113,7 +114,8 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
           <div>
             <label className={label}>المخزن *</label>
             <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={input} disabled={Boolean(listsError)}>
-              {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              <option value="">اختر المخزن</option>
+              {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </div>
           <div>
@@ -155,7 +157,7 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
                   <label className={label}>سعر {unit}</label>
                   <input type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => setLine(index, { unitPrice: e.target.value })} className={input} />
                 </div>
-                <div className="sm:col-span-1 pb-2 text-xs font-bold text-slate-600">{fmt((Number(line.quantityM2) || 0) * (Number(line.unitPrice) || 0))}</div>
+                <div className="sm:col-span-1 pb-2 text-xs font-bold text-slate-600">{fmt(round2((Number(line.quantityM2) || 0) * (Number(line.unitPrice) || 0)))}</div>
                 <div className="sm:col-span-1 pb-1">
                   <button type="button" aria-label="حذف الصنف" onClick={() => setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== index) : prev)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg">
                     <Trash2 className="w-4 h-4" />

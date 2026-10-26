@@ -3,11 +3,13 @@ import { Loader2, Save } from 'lucide-react';
 import { CashierService } from '../../services/CashierService';
 import { useToast } from '../ui/Toast';
 import type { PaymentType } from '../../types';
-import { input, label, LoadErrorNotice, ModalShell, useCashierLists } from './DailyModalShared';
+import { input, label, LoadErrorNotice, ModalShell, useExpenseCategories, useRegisters } from './DailyModalShared';
 
 export const ExpenseModal: React.FC<{ initial?: any; onClose: () => void; onSaved: () => void }> = ({ initial, onClose, onSaved }) => {
   const toast = useToast();
-  const { categories, registers, error: listsError } = useCashierLists();
+  const { categories, error: categoriesError } = useExpenseCategories();
+  const { registers, error: registersError } = useRegisters();
+  const listsError = categoriesError || registersError;
   const [form, setForm] = useState({
     category: initial?.category || categories[0]?.name || '',
     amount: initial ? String(initial.amount) : '',
@@ -62,12 +64,12 @@ export const ExpenseModal: React.FC<{ initial?: any; onClose: () => void; onSave
     <ModalShell title={initial ? 'تعديل مصروف' : 'إضافة مصروف'} subtitle="يُخصم المصروف النقدي من الخزينة المحددة" onClose={onClose} busy={saving}>
       <div className="space-y-3">
         {listsError && <LoadErrorNotice message={listsError} />}
-        {!listsError && categories.length === 0 && <LoadErrorNotice message="لا توجد بنود مصروفات مهيأة." />}
-        {!listsError && registers.length === 0 && <LoadErrorNotice message="لا توجد خزائن نشطة للاختيار." />}
+        {!categoriesError && categories.length === 0 && <LoadErrorNotice message="لا توجد بنود مصروفات مهيأة." />}
+        {!registersError && registers.length === 0 && <LoadErrorNotice message="لا توجد خزائن نشطة للاختيار." />}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label className={label}>البند *</label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={input} disabled={Boolean(listsError) || categories.length === 0}>
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={input} disabled={Boolean(categoriesError) || categories.length === 0}>
               {categories.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
@@ -94,7 +96,7 @@ export const ExpenseModal: React.FC<{ initial?: any; onClose: () => void; onSave
           </div>
           <div>
             <label className={label}>الخزينة</label>
-            <select value={form.registerId} onChange={(e) => setForm({ ...form, registerId: e.target.value })} className={input} disabled={Boolean(listsError) || registers.length === 0}>
+            <select value={form.registerId} onChange={(e) => setForm({ ...form, registerId: e.target.value })} className={input} disabled={Boolean(registersError) || registers.length === 0}>
               <option value="">اختر الخزينة</option>
               {registers.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>

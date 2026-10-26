@@ -6,7 +6,7 @@ import { PurchaseService } from '../../services/PurchaseService';
 import { useToast } from '../ui/Toast';
 import { formatProductQuantity } from '../../utils/productUnits';
 import type { PaymentType } from '../../types';
-import { fmt, input, label, LoadErrorNotice, ModalShell, useCashierLists } from './DailyModalShared';
+import { fmt, input, label, LoadErrorNotice, ModalShell, useRegisters } from './DailyModalShared';
 
 export type PaymentTarget =
   | { kind: 'sale'; id: string; name: string; remaining: number }
@@ -15,7 +15,7 @@ export type PaymentTarget =
 
 export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void; onSaved: () => void }> = ({ target, onClose, onSaved }) => {
   const toast = useToast();
-  const { registers, error: registersError } = useCashierLists();
+  const { registers, error: registersError } = useRegisters();
   const [amount, setAmount] = useState(String(target.remaining));
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
   const [registerId, setRegisterId] = useState('');
@@ -106,6 +106,8 @@ export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onC
   const load = useCallback(() => {
     setLoading(true);
     setLoadError('');
+    setInvoice(null);
+    setPayments([]);
     try {
       if (kind === 'sale') {
         const loadedInvoice = new SalesService().getInvoiceById(id);
