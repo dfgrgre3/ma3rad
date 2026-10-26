@@ -51,7 +51,7 @@ export const ReceiveTransferModal: React.FC<ReceiveTransferModalProps> = ({
                       onChange={(e) => {
                         onReceiptInputsChange({
                           ...receiptInputs,
-                          [item.id]: { ...input, receivedM2: parseFloat(e.target.value) || 0 }
+                          [item.id]: { ...input, receivedM2: Number.parseFloat(e.target.value) || 0 }
                         });
                       }}
                       className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-center"
@@ -69,7 +69,7 @@ export const ReceiveTransferModal: React.FC<ReceiveTransferModalProps> = ({
                       onChange={(e) => {
                         onReceiptInputsChange({
                           ...receiptInputs,
-                          [item.id]: { ...input, lostM2: parseFloat(e.target.value) || 0 }
+                          [item.id]: { ...input, lostM2: Number.parseFloat(e.target.value) || 0 }
                         });
                       }}
                       className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-center"
@@ -86,7 +86,7 @@ export const ReceiveTransferModal: React.FC<ReceiveTransferModalProps> = ({
                       onChange={(e) => {
                         onReceiptInputsChange({
                           ...receiptInputs,
-                          [item.id]: { ...input, damagedM2: parseFloat(e.target.value) || 0 }
+                          [item.id]: { ...input, damagedM2: Number.parseFloat(e.target.value) || 0 }
                         });
                       }}
                       className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-center"

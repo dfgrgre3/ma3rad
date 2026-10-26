@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Barcode, ShoppingCart, Trash2, Plus, Minus,
@@ -26,7 +26,7 @@ import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { exportToExcel } from '../utils/export';
 import { LayoutContext } from '../layouts/MainLayout';
 import {
-  HELD_STORAGE_KEY, round2, compareText,
+  HELD_STORAGE_KEY, round2,
   type CartItem, type HeldOrder, type PosUnit, type SortMode, type Toast,
 } from './pos/types';
 import {
@@ -86,11 +86,11 @@ export const PosView: React.FC = () => {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
+  const [closingCash, setClosingCash] = useState(0);
   const [closingNotes, setClosingNotes] = useState('');
   // Tone/Shade mixing warning before checkout
   const [toneConflicts, setToneConflicts] = useState<ToneMixingConflict[]>([]);
   const [isToneWarningOpen, setIsToneWarningOpen] = useState(false);
-  const [pendingCheckout, setPendingCheckout] = useState(false);
 
   // New-customer form
   const [newCustName, setNewCustName] = useState('');
@@ -100,7 +100,7 @@ export const PosView: React.FC = () => {
   const [customerError, setCustomerError] = useState('');
 
   // Open-shift form
-  const [shiftRegisterId, setShiftRegisterId] = useState('');
+  const [shiftRegisterId, setShiftRegisterId] = useState('cr_main');
   const [openingBalance, setOpeningBalance] = useState(0);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
@@ -168,7 +168,7 @@ export const PosView: React.FC = () => {
       const allRegs = cashierService.getAllRegisters();
       const sysSettings = printService.getSettings();
       const defaultWarehouse = allWhs[0];
-      const shift = cashierService.getActiveShift(currentUser?.id, defaultWarehouse?.branchId);
+      const shift = cashierService.getActiveShift();
 
       setProducts(allProds);
       setCustomers(allCusts);
@@ -179,22 +179,20 @@ export const PosView: React.FC = () => {
       setSettings(sysSettings);
       setTaxPercentage(sysSettings.defaultTaxPercentage || 0);
 
-      setSelectedWarehouseId(defaultWarehouse?.id || '');
-      if (defaultWarehouse) loadStock(defaultWarehouse.id);
+      const defaultWarehouseId = defaultWarehouse?.id || '';
+      setSelectedWarehouseId(defaultWarehouseId);
+      if (defaultWarehouseId) loadStock(defaultWarehouseId);
 
       const walkIn = allCusts.find((c) => c.id === 'cust_cash') || allCusts[0] || null;
       setSelectedCustomer(walkIn);
 
-      const defaultReg = allRegs.find((r) => r.branchId === defaultWarehouse?.branchId && r.isDefault)
-        || allRegs.find((r) => r.branchId === defaultWarehouse?.branchId)
-        || allRegs.find((r) => r.isDefault)
-        || allRegs[0];
+      const defaultReg = allRegs.find((r) => r.isDefault) || allRegs[0];
       if (defaultReg) setShiftRegisterId(defaultReg.id);
     } catch (e) {
       console.error(e);
       notify('تعذر تحميل بيانات نقطة البيع', 'error');
     }
-  }, [productService, customerService, inventoryService, categoryService, cashierService, printService, loadStock, notify, currentUser?.id]);
+  }, [productService, customerService, inventoryService, categoryService, cashierService, printService, loadStock, notify]);
 
   useEffect(() => {
     loadInitialData();
@@ -235,7 +233,7 @@ export const PosView: React.FC = () => {
         case 'PRICE_ASC': return a.sellingPriceM2 - b.sellingPriceM2;
         case 'PRICE_DESC': return b.sellingPriceM2 - a.sellingPriceM2;
         case 'STOCK_DESC': return stockOf(b.id) - stockOf(a.id);
-        default: return compareText(a.name, b.name);
+        default: return a.name.localeCompare(b.name, 'ar');
       }
     });
     return list;
@@ -247,11 +245,11 @@ export const PosView: React.FC = () => {
   );
   const visibleBrands = useMemo(() => [...new Map(products.filter((p) => p.brandId).map((p) => [p.brandId, p.brandName || ''])).entries()], [products]);
   const visibleSizes = useMemo(
-    () => [...new Set(products.map((p) => p.size).filter(Boolean))].sort(compareText),
+    () => [...new Set(products.map((p) => p.size).filter(Boolean))].sort(),
     [products]
   );
   const visibleColors = useMemo(
-    () => [...new Set(products.map((p) => p.color).filter(Boolean) as string[])].sort(compareText),
+    () => [...new Set(products.map((p) => p.color).filter(Boolean) as string[])].sort(),
     [products]
   );
 
@@ -321,7 +319,7 @@ export const PosView: React.FC = () => {
       }
       return [...prev, makeCartItem(product, stepM2)];
     });
-  }, [stockOf]);
+  }, [stockOf, selectedCustomer]);
 
   const addCalculatedToCart = (product: Product, quantityM2: number) => {
     addToCart(product, quantityM2);
@@ -586,6 +584,12 @@ export const PosView: React.FC = () => {
     persistHeld(heldOrders.filter((h) => h.id !== id));
   };
 
+  useEffect(() => {
+    if (isCloseShiftModalOpen && activeShift) {
+      setClosingCash(expectedClosingCash);
+    }
+  }, [isCloseShiftModalOpen, activeShift, expectedClosingCash]);
+
   // ── Shifts ──────────────────────────────────────────────────────────────────
   const handleOpenShift = () => {
     if (!can('cashier.shift.open')) {
@@ -614,9 +618,10 @@ export const PosView: React.FC = () => {
       return;
     }
     try {
-      cashierService.closeShift(activeShift.id, expectedClosingCash, closingNotes, currentUser?.id || 'usr_admin');
+      cashierService.closeShift(activeShift.id, Math.max(0, closingCash), closingNotes, currentUser?.id || 'usr_admin');
       setActiveShift(null);
       setIsCloseShiftModalOpen(false);
+      setClosingCash(0);
       setClosingNotes('');
       notify('تم إغلاق الوردية وحفظ فرق الصندوق', 'success');
     } catch (e: any) {
@@ -625,7 +630,7 @@ export const PosView: React.FC = () => {
   };
 
   // ── Checkout ────────────────────────────────────────────────────────────────
-  const handleCheckout = useCallback(() => {
+  const handleCheckout = useCallback((skipToneCheck = false) => {
     if (isProcessing) return;
     if (cart.length === 0) {
       notify('السلة فارغة، أضف أصنافاً أولاً', 'error');
@@ -724,7 +729,7 @@ export const PosView: React.FC = () => {
 
       // ── Tone/Shade mixing guard ─────────────────────────────────────────────
       // Only run when not already bypassed via the warning modal
-      if (!pendingCheckout) {
+      if (!skipToneCheck) {
         const checkItems = cart
           .filter((ci) => ci.product.productType !== 'GENERAL')
           .map((ci) => ({
@@ -743,7 +748,6 @@ export const PosView: React.FC = () => {
           }
         }
       }
-      setPendingCheckout(false);
       // ── End tone guard ──────────────────────────────────────────────────────
 
       const invoice = salesService.createSale({
@@ -776,13 +780,9 @@ export const PosView: React.FC = () => {
       setShippingCost(0);
       setNotes('');
       setPaidAmount(0);
-      setPendingCheckout(false);
       setProducts(productService.getAllProducts());
       if (selectedWarehouseId) loadStock(selectedWarehouseId);
-      setActiveShift(cashierService.getActiveShift(
-        currentUser?.id,
-        warehouses.find((warehouse) => warehouse.id === selectedWarehouseId)?.branchId
-      ));
+      setActiveShift(cashierService.getActiveShift());
       notify(`تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح`, 'success');
     } catch (e: any) {
       notify(e.message || 'خطأ أثناء حفظ الفاتورة', 'error');
@@ -794,7 +794,6 @@ export const PosView: React.FC = () => {
     discountAmount, lineDiscountTotal, remainingAmount, activeShift, taxPercentage,
     taxAmount, shippingCost, paidAmount, paymentType, notes, currentUser,
     salesService, batchService, productService, cashierService, loadStock, notify,
-    pendingCheckout,
   ]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
@@ -971,10 +970,13 @@ export const PosView: React.FC = () => {
         <div className="px-4 py-3 bg-white border-b border-slate-200 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <form onSubmit={handleSearchSubmit} className="flex-1 min-w-[220px] relative">
+              <label htmlFor="pos-product-search" className="sr-only">بحث عن منتج</label>
               <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
+                id="pos-product-search"
                 ref={barcodeInputRef}
                 type="text"
+                aria-label="بحث عن منتج"
                 placeholder="امسح الباركود أو ابحث بالاسم/الكود/المقاس (F2)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -991,7 +993,10 @@ export const PosView: React.FC = () => {
               )}
             </form>
 
-              <select
+            <label htmlFor="pos-warehouse-filter" className="sr-only">اختيار المخزن</label>
+            <select
+              id="pos-warehouse-filter"
+              aria-label="اختيار المخزن"
               value={selectedWarehouseId}
               onChange={(e) => {
                 const warehouseId = e.target.value;
@@ -1010,7 +1015,10 @@ export const PosView: React.FC = () => {
               ))}
             </select>
 
+            <label htmlFor="pos-sort-mode" className="sr-only">ترتيب المنتجات</label>
             <select
+              id="pos-sort-mode"
+              aria-label="ترتيب المنتجات"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
               className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-sky-500"
@@ -1033,18 +1041,24 @@ export const PosView: React.FC = () => {
               <Package className="w-4 h-4" /> المتوفر فقط
             </button>
 
-            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+            <label htmlFor="pos-brand-filter" className="sr-only">فلتر الماركة</label>
+            <select id="pos-brand-filter" aria-label="فلتر الماركة" value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
               <option value="ALL">كل الماركات</option>{visibleBrands.map(([id, name]) => <option key={id} value={id}>{name || 'بدون ماركة'}</option>)}
             </select>
-            <select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+            <label htmlFor="pos-grade-filter" className="sr-only">فلتر الفرز</label>
+            <select id="pos-grade-filter" aria-label="فلتر الفرز" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
               <option value="ALL">كل الأنواع والفرز</option><option value="GRADE_1">فرز أول</option><option value="GRADE_2">فرز ثاني</option><option value="GRADE_3">فرز ثالث</option><option value="COMMERCIAL">تجاري</option>
             </select>
-            <select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+            <label htmlFor="pos-size-filter" className="sr-only">فلتر المقاس</label>
+            <select id="pos-size-filter" aria-label="فلتر المقاس" value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
               <option value="ALL">كل المقاسات</option>{visibleSizes.map((size) => <option key={size} value={size}>{size}</option>)}
             </select>
-            {visibleColors.length > 0 && <select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
-              <option value="ALL">كل الألوان</option>{visibleColors.map((color) => <option key={color} value={color}>{color}</option>)}
-            </select>}
+            {visibleColors.length > 0 && (<>
+              <label htmlFor="pos-color-filter" className="sr-only">فلتر اللون</label>
+              <select id="pos-color-filter" aria-label="فلتر اللون" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
+                <option value="ALL">كل الألوان</option>{visibleColors.map((color) => <option key={color} value={color}>{color}</option>)}
+              </select>
+            </>)}
 
             <button
               type="button"
@@ -1165,9 +1179,11 @@ export const PosView: React.FC = () => {
           </div>
           <div className="relative">
             <input
+              id="pos-customer-search"
               value={selectedCustomer ? selectedCustomer.name : customerSearch}
               onChange={(e) => { setCustomerSearch(e.target.value); setSelectedCustomer(null); }}
               placeholder="ابحث عن عميل بالاسم أو الهاتف..."
+              aria-label="بحث العميل"
               className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:border-sky-500"
             />
             {!selectedCustomer && customerSearch.trim() && (
@@ -1277,7 +1293,8 @@ export const PosView: React.FC = () => {
                           ? item.product.baseUnit === 'BOX' || item.product.baseUnit === 'PIECE' || item.product.baseUnit === 'SET' ? 1 : 0.01
                           : item.soldBy === 'BOX' ? 1 : 0.01}
                         value={displayQty}
-                        onChange={(e) => { if (e.target.value !== '') updateCartQuantity(idx, parseFloat(e.target.value)); }}
+                        onChange={(e) => { if (e.target.value !== '') updateCartQuantity(idx, Number.parseFloat(e.target.value)); }}
+                        aria-label={`تغيير الكمية للمنتج ${item.product.name}`}
                         className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-slate-900"
                       />
                       <button
@@ -1292,7 +1309,8 @@ export const PosView: React.FC = () => {
                       <input
                         type="number"
                         value={displayPrice}
-                        onChange={(e) => { if (e.target.value !== '') updateCartPrice(idx, parseFloat(e.target.value)); }}
+                        onChange={(e) => { if (e.target.value !== '') updateCartPrice(idx, Number.parseFloat(e.target.value)); }}
+                        aria-label={`تغيير السعر للمنتج ${item.product.name}`}
                         className="w-16 text-center font-bold bg-white border border-slate-200 rounded-lg p-1 text-xs text-slate-900"
                       />
                       <span className="text-[10px] text-slate-500">ج.م</span>
@@ -1309,7 +1327,8 @@ export const PosView: React.FC = () => {
                       type="number"
                       value={item.discountAmount || ''}
                       placeholder="0"
-                      onChange={(e) => updateCartLineDiscount(idx, e.target.value === '' ? 0 : parseFloat(e.target.value))}
+                      onChange={(e) => updateCartLineDiscount(idx, e.target.value === '' ? 0 : Number.parseFloat(e.target.value))}
+                      aria-label={`خصم الصنف ${item.product.name}`}
                       className="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900"
                     />
                   </div>
@@ -1324,32 +1343,35 @@ export const PosView: React.FC = () => {
           {/* Order extras */}
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div>
-              <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Percent className="w-3 h-3" /> خصم الفاتورة</label>
+              <label htmlFor="pos-invoice-discount" className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Percent className="w-3 h-3" /> خصم الفاتورة</label>
               <input
+                id="pos-invoice-discount"
                 type="number"
                 value={discountAmount || ''}
                 placeholder="0"
-                onChange={(e) => setDiscountAmount(e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value) || 0))}
+                onChange={(e) => setDiscountAmount(e.target.value === '' ? 0 : Math.max(0, Number.parseFloat(e.target.value) || 0))}
                 className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Percent className="w-3 h-3" /> ضريبة %</label>
+              <label htmlFor="pos-tax-percentage" className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Percent className="w-3 h-3" /> ضريبة %</label>
               <input
+                id="pos-tax-percentage"
                 type="number"
                 value={taxPercentage || ''}
                 placeholder="0"
-                onChange={(e) => setTaxPercentage(e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value) || 0))}
+                onChange={(e) => setTaxPercentage(e.target.value === '' ? 0 : Math.max(0, Number.parseFloat(e.target.value) || 0))}
                 className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Truck className="w-3 h-3" /> مشال / نقل</label>
+              <label htmlFor="pos-shipping-cost" className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Truck className="w-3 h-3" /> مشال / نقل</label>
               <input
+                id="pos-shipping-cost"
                 type="number"
                 value={shippingCost || ''}
                 placeholder="0"
-                onChange={(e) => setShippingCost(e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value) || 0))}
+                onChange={(e) => setShippingCost(e.target.value === '' ? 0 : Math.max(0, Number.parseFloat(e.target.value) || 0))}
                 className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5"
               />
             </div>
@@ -1357,8 +1379,8 @@ export const PosView: React.FC = () => {
 
           {/* Payment type */}
           <div>
-            <label className="text-[10px] font-bold text-slate-500 block mb-1">طريقة السداد</label>
-            <div className="grid grid-cols-3 gap-1">
+            <p className="text-[10px] font-bold text-slate-500 block mb-1">طريقة السداد</p>
+            <div role="group" aria-label="طريقة السداد" className="grid grid-cols-3 gap-1">
               {(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT', 'MIXED'] as PaymentType[]).map((type) => {
                 const Icon = type === 'CASH' ? Banknote : CreditCard;
                 return (
@@ -1382,12 +1404,14 @@ export const PosView: React.FC = () => {
 
           {/* Paid amount */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500">المبلغ المدفوع (F4):</span>
+            <label htmlFor="pos-paid-amount" className="text-xs font-bold text-slate-500">المبلغ المدفوع (F4):</label>
             <input
+              id="pos-paid-amount"
               ref={paidInputRef}
               type="number"
               value={paidAmount}
-              onChange={(e) => setPaidAmount(e.target.value === '' ? 0 : parseFloat(e.target.value))}
+              onChange={(e) => setPaidAmount(e.target.value === '' ? 0 : Number.parseFloat(e.target.value))}
+              aria-label="المبلغ المدفوع"
               className="w-32 text-left font-black px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-500"
             />
           </div>
@@ -1441,11 +1465,14 @@ export const PosView: React.FC = () => {
           </div>
 
           {/* Notes */}
+                    <label htmlFor="pos-notes" className="sr-only">ملاحظات الفاتورة</label>
           <input
+            id="pos-notes"
             type="text"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="ملاحظات على الفاتورة (اختياري)..."
+            aria-label="ملاحظات الفاتورة"
             className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-sky-500"
           />
 
@@ -1474,7 +1501,7 @@ export const PosView: React.FC = () => {
           </div>
 
           <button
-            onClick={handleCheckout}
+            onClick={() => handleCheckout()}
             disabled={isProcessing || cart.length === 0}
             className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-[0.99]"
           >
@@ -1551,10 +1578,15 @@ export const PosView: React.FC = () => {
         <CloseShiftModal
           shift={activeShift}
           expectedClosingCash={expectedClosingCash}
+          actualClosingCash={closingCash}
           notes={closingNotes}
+          onActualClosingCashChange={(value) => setClosingCash(Math.max(0, Number(value) || 0))}
           onNotesChange={setClosingNotes}
           onConfirm={handleCloseShift}
-          onClose={() => setIsCloseShiftModalOpen(false)}
+          onClose={() => {
+            setIsCloseShiftModalOpen(false);
+            setClosingCash(expectedClosingCash);
+          }}
         />
       )}
 
@@ -1564,14 +1596,11 @@ export const PosView: React.FC = () => {
           onCancel={() => {
             setIsToneWarningOpen(false);
             setToneConflicts([]);
-            setPendingCheckout(false);
           }}
           onContinue={() => {
             setIsToneWarningOpen(false);
             setToneConflicts([]);
-            setPendingCheckout(true); // bypass check on retry
-            // trigger checkout immediately
-            setTimeout(handleCheckout, 0);
+            handleCheckout(true);
           }}
         />
       )}

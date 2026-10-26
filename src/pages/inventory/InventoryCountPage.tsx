@@ -134,7 +134,7 @@ export const InventoryCountPage: React.FC = () => {
 
   const handleItemCountChange = (index: number, valStr: string) => {
     const next = [...sessionItems];
-    const val = valStr === '' ? null : parseFloat(valStr);
+    const val = valStr === '' ? null : Number.parseFloat(valStr);
     next[index].countedQuantityM2 = val;
 
     if (val !== null) {

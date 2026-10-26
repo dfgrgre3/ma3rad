@@ -476,8 +476,9 @@ export const SuppliersView: React.FC = () => {
 
             <form onSubmit={handleSaveSupplier} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">اسم المورد / المسؤول *</label>
+                <label htmlFor="supplier-name" className="font-bold text-slate-700 block mb-1">اسم المورد / المسؤول *</label>
                 <input
+                  id="supplier-name"
                   type="text"
                   required
                   value={formData.name}
@@ -488,8 +489,9 @@ export const SuppliersView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">اسم المصنع / الشركة</label>
+                  <label htmlFor="supplier-company" className="font-bold text-slate-700 block mb-1">اسم المصنع / الشركة</label>
                   <input
+                    id="supplier-company"
                     type="text"
                     value={formData.companyName}
                     onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
@@ -497,8 +499,9 @@ export const SuppliersView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">رقم الهاتف *</label>
+                  <label htmlFor="supplier-phone" className="font-bold text-slate-700 block mb-1">رقم الهاتف *</label>
                   <input
+                    id="supplier-phone"
                     type="tel"
                     required
                     value={formData.phone}
@@ -510,38 +513,39 @@ export const SuppliersView: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">البريد الإلكتروني</label>
-                  <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="supplier-email" className="font-bold text-slate-700 block mb-1">البريد الإلكتروني</label>
+                  <input id="supplier-email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الرقم الضريبي</label>
-                  <input value={formData.taxNumber} onChange={(e) => setFormData({ ...formData, taxNumber: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="supplier-tax-number" className="font-bold text-slate-700 block mb-1">الرقم الضريبي</label>
+                  <input id="supplier-tax-number" value={formData.taxNumber} onChange={(e) => setFormData({ ...formData, taxNumber: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">السجل التجاري</label>
-                  <input value={formData.commercialRecord} onChange={(e) => setFormData({ ...formData, commercialRecord: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="supplier-commercial-record" className="font-bold text-slate-700 block mb-1">السجل التجاري</label>
+                  <input id="supplier-commercial-record" value={formData.commercialRecord} onChange={(e) => setFormData({ ...formData, commercialRecord: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">مدة السداد بالأيام</label>
-                  <input type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: Number(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                  <label htmlFor="supplier-payment-terms" className="font-bold text-slate-700 block mb-1">مدة السداد بالأيام</label>
+                  <input id="supplier-payment-terms" type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: Number(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">العنوان</label>
-                  <input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="supplier-address" className="font-bold text-slate-700 block mb-1">العنوان</label>
+                  <input id="supplier-address" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">ملاحظات</label>
-                  <textarea rows={2} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="supplier-notes" className="font-bold text-slate-700 block mb-1">ملاحظات</label>
+                  <textarea id="supplier-notes" rows={2} value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
               </div>
 
               {!editingSupplier && <div>
-                <label className="font-bold text-slate-700 block mb-1">الرصيد الافتتاحي (المستحق للمورد موجب، ورصيدنا لديه سالب)</label>
+                <label htmlFor="supplier-initial-balance" className="font-bold text-slate-700 block mb-1">الرصيد الافتتاحي (المستحق للمورد موجب، ورصيدنا لديه سالب)</label>
                 <input
+                  id="supplier-initial-balance"
                   type="number"
                   step="0.01"
                   value={formData.initialBalance}
-                  onChange={(e) => setFormData({ ...formData, initialBalance: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, initialBalance: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                 />
               </div>
@@ -578,21 +582,23 @@ export const SuppliersView: React.FC = () => {
 
             <form onSubmit={handleRecordPayment} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">المبلغ المسدد (ج.م) *</label>
+                <label htmlFor="supplier-payment-amount" className="font-bold text-slate-700 block mb-1">المبلغ المسدد (ج.م) *</label>
                 <input
+                  id="supplier-payment-amount"
                   type="number"
                   required
                   min="0.01"
                   step="0.01"
                   value={paymentData.amount}
-                  onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setPaymentData({ ...paymentData, amount: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-black text-sm text-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
+                <label htmlFor="supplier-payment-type" className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
                 <select
+                  id="supplier-payment-type"
                   value={paymentData.paymentType}
                   onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value as PaymentType })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
@@ -605,8 +611,9 @@ export const SuppliersView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">البيان / الملاحظات</label>
+                <label htmlFor="supplier-payment-notes" className="font-bold text-slate-700 block mb-1">البيان / الملاحظات</label>
                 <input
+                  id="supplier-payment-notes"
                   type="text"
                   value={paymentData.notes}
                   onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}

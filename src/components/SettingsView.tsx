@@ -107,8 +107,9 @@ export const SettingsView: React.FC = () => {
           <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">اسم المعرض الرئيسي *</label>
+                <label htmlFor="settings-showroom-name" className="font-bold text-slate-700 block mb-1">اسم المعرض الرئيسي *</label>
                 <input
+                  id="settings-showroom-name"
                   type="text"
                   required
                   value={settings.showroomName}
@@ -117,8 +118,9 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الشعار النصي / الوصف</label>
+                <label htmlFor="settings-tagline" className="font-bold text-slate-700 block mb-1">الشعار النصي / الوصف</label>
                 <input
+                  id="settings-tagline"
                   type="text"
                   value={settings.tagline}
                   onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
@@ -129,8 +131,9 @@ export const SettingsView: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">رقم الهاتف الأساسي *</label>
+                <label htmlFor="settings-phone" className="font-bold text-slate-700 block mb-1">رقم الهاتف الأساسي *</label>
                 <input
+                  id="settings-phone"
                   type="text"
                   required
                   value={settings.phone}
@@ -139,8 +142,9 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">رقم هاتف إضافي</label>
+                <label htmlFor="settings-phone-2" className="font-bold text-slate-700 block mb-1">رقم هاتف إضافي</label>
                 <input
+                  id="settings-phone-2"
                   type="text"
                   value={settings.phone2}
                   onChange={(e) => setSettings({ ...settings, phone2: e.target.value })}
@@ -150,8 +154,9 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">عنوان المعرض *</label>
+              <label htmlFor="settings-address" className="font-bold text-slate-700 block mb-1">عنوان المعرض *</label>
               <input
+                id="settings-address"
                 type="text"
                 required
                 value={settings.address}
@@ -162,8 +167,9 @@ export const SettingsView: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الرقم الضريبي</label>
+                <label htmlFor="settings-tax-number" className="font-bold text-slate-700 block mb-1">الرقم الضريبي</label>
                 <input
+                  id="settings-tax-number"
                   type="text"
                   value={settings.taxNumber}
                   onChange={(e) => setSettings({ ...settings, taxNumber: e.target.value })}
@@ -171,8 +177,9 @@ export const SettingsView: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">السجل التجاري</label>
+                <label htmlFor="settings-commercial-record" className="font-bold text-slate-700 block mb-1">السجل التجاري</label>
                 <input
+                  id="settings-commercial-record"
                   type="text"
                   value={settings.commercialRecord}
                   onChange={(e) => setSettings({ ...settings, commercialRecord: e.target.value })}
@@ -182,8 +189,9 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1">تذييل الفاتورة وشروط الاسترجاع</label>
+              <label htmlFor="settings-receipt-footer" className="font-bold text-slate-700 block mb-1">تذييل الفاتورة وشروط الاسترجاع</label>
               <textarea
+                id="settings-receipt-footer"
                 rows={3}
                 value={settings.receiptFooter}
                 onChange={(e) => setSettings({ ...settings, receiptFooter: e.target.value })}

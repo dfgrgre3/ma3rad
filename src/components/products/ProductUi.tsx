@@ -12,15 +12,24 @@ export const ListPagination: React.FC<{ page: number; totalPages: number; totalI
   </div>
 );
 
-export const Field: React.FC<{ label: string; required?: boolean; hint?: string; children: React.ReactNode }> = ({ label, required, hint, children }) => (
-  <div>
-    <label className="mb-1 block font-bold text-slate-700">
-      {label} {required && <span className="text-rose-500">*</span>}
-    </label>
-    {children}
-    {hint && <p className="mt-1 text-[10px] text-slate-400">{hint}</p>}
-  </div>
-);
+export const Field: React.FC<{ id?: string; label: string; required?: boolean; hint?: string; children: React.ReactNode }> = ({ id, label, required, hint, children }) => {
+  const controlId = id || `field-${label.replace(/\s+/g, '-').toLowerCase()}`;
+  const fieldChildren = React.isValidElement(children)
+    ? React.cloneElement(children as React.ReactElement<{ id?: string }>, {
+        id: (children as React.ReactElement<{ id?: string }>).props.id || controlId,
+      })
+    : children;
+
+  return (
+    <div>
+      <label htmlFor={controlId} className="mb-1 block font-bold text-slate-700">
+        {label} {required && <span className="text-rose-500">*</span>}
+      </label>
+      {fieldChildren}
+      {hint && <p className="mt-1 text-[10px] text-slate-400">{hint}</p>}
+    </div>
+  );
+};
 
 export const StatCard: React.FC<{ label: string; value: string; hint?: string; icon: React.ReactNode; tone: string }> = ({ label, value, hint, icon, tone }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">

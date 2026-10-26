@@ -142,8 +142,9 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[110] flex items-start justify-center bg-slate-950/30 p-4 pt-[12vh] backdrop-blur-sm" onMouseDown={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="بحث شامل" className="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" onMouseDown={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[110] flex items-start justify-center bg-slate-950/30 p-4 pt-[12vh] backdrop-blur-sm">
+      <button type="button" aria-label="إغلاق البحث" className="absolute inset-0 h-full w-full border-0 bg-transparent p-0" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-label="بحث شامل" className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 ">
           <Search className="h-5 w-5 text-sky-500" />
           <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} placeholder="ابحث في الصفحات والأصناف والعملاء والموردين والفواتير..." className="h-14 flex-1 select-text bg-transparent text-sm outline-none text-slate-900 dark:text-slate-100" />

@@ -122,15 +122,15 @@ export const NewCustomerModal: React.FC<{
 }> = ({ name, phone, type, creditLimit, error, onNameChange, onPhoneChange, onTypeChange, onCreditLimitChange, onSave, onClose }) => (
   <Modal title="إضافة عميل سريع" icon={<UserPlus className="w-5 h-5" />} onClose={onClose}>
     <div className="space-y-3">
-      <Field label="اسم العميل *">
+      <Field label="اسم العميل *" id="new-customer-name">
         <input value={name} onChange={(e) => onNameChange(e.target.value)} placeholder="مثال: أحمد محمد" className={inputCls} />
       </Field>
-      <Field label="رقم الهاتف *">
+      <Field label="رقم الهاتف *" id="new-customer-phone">
         <input value={phone} onChange={(e) => onPhoneChange(e.target.value)} placeholder="01xxxxxxxxx" className={inputCls} />
       </Field>
       {error && <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">{error}</div>}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="نوع العميل">
+        <Field label="نوع العميل" id="new-customer-type">
           <select value={type} onChange={(e) => onTypeChange(e.target.value as Customer['customerType'])} className={inputCls}>
             <option value="RETAIL">قطاعي</option>
             <option value="WHOLESALE">جملة</option>
@@ -138,8 +138,8 @@ export const NewCustomerModal: React.FC<{
             <option value="ENGINEER">مهندس</option>
           </select>
         </Field>
-        <Field label="حد الائتمان">
-          <input type="number" value={creditLimit || ''} placeholder="0" onChange={(e) => onCreditLimitChange(parseFloat(e.target.value) || 0)} className={inputCls} />
+        <Field label="حد الائتمان" id="new-customer-credit-limit">
+          <input type="number" value={creditLimit || ''} placeholder="0" onChange={(e) => onCreditLimitChange(Number.parseFloat(e.target.value) || 0)} className={inputCls} />
         </Field>
       </div>
       <button
@@ -163,7 +163,7 @@ export const OpenShiftModal: React.FC<{
 }> = ({ registers, registerId, openingBalance, onRegisterChange, onOpeningBalanceChange, onConfirm, onClose }) => (
   <Modal title="فتح وردية كاشير" icon={<Unlock className="w-5 h-5" />} onClose={onClose}>
     <div className="space-y-3">
-      <Field label="الخزينة / نقطة الكاشير">
+      <Field label="الخزينة / نقطة الكاشير" id="open-shift-register">
         <select value={registerId} onChange={(e) => onRegisterChange(e.target.value)} className={inputCls}>
           {registers.length === 0 ? (
             <option value="">لا توجد خزائن متاحة لهذا المستخدم</option>
@@ -175,8 +175,8 @@ export const OpenShiftModal: React.FC<{
           )}
         </select>
       </Field>
-      <Field label="الرصيد الافتتاحي (نقدي)">
-        <input type="number" value={openingBalance || ''} placeholder="0" onChange={(e) => onOpeningBalanceChange(parseFloat(e.target.value) || 0)} className={inputCls} />
+      <Field label="الرصيد الافتتاحي (نقدي)" id="open-shift-opening-balance">
+        <input type="number" value={openingBalance || ''} placeholder="0" onChange={(e) => onOpeningBalanceChange(Number.parseFloat(e.target.value) || 0)} className={inputCls} />
       </Field>
       <button
         onClick={onConfirm}
@@ -192,32 +192,56 @@ export const OpenShiftModal: React.FC<{
 export const CloseShiftModal: React.FC<{
   shift: CashShift;
   expectedClosingCash: number;
+  actualClosingCash: number;
   notes: string;
+  onActualClosingCashChange: (value: number) => void;
   onNotesChange: (value: string) => void;
   onConfirm: () => void;
   onClose: () => void;
-}> = ({ shift, expectedClosingCash, notes, onNotesChange, onConfirm, onClose }) => (
-  <Modal title="إقفال الوردية ومطابقة الصندوق" icon={<Lock className="w-5 h-5" />} onClose={onClose}>
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
-        <div className="flex justify-between"><span className="text-slate-500">رقم الوردية</span><strong>{shift.shiftNumber}</strong></div>
-        <div className="flex justify-between"><span className="text-slate-500">الرصيد الافتتاحي</span><strong>{CeramicMath.formatCurrency(shift.openingBalance)}</strong></div>
-        <div className="flex justify-between"><span className="text-slate-500">مبيعات نقدية</span><strong>{CeramicMath.formatCurrency(shift.totalSalesCash)}</strong></div>
-        <div className="flex justify-between"><span className="text-slate-500">تحصيلات العملاء</span><strong>{CeramicMath.formatCurrency(shift.totalCustomerPayments)}</strong></div>
-        <div className="flex justify-between"><span className="text-slate-500">مصروفات / مرتجعات</span><strong>{CeramicMath.formatCurrency((shift.totalExpenses || 0) + (shift.totalRefunds || 0))}</strong></div>
-        <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold">النقد المتوقع بالصندوق</span><strong className="text-emerald-700">{CeramicMath.formatCurrency(expectedClosingCash)}</strong></div>
+}> = ({
+  shift,
+  expectedClosingCash,
+  actualClosingCash,
+  notes,
+  onActualClosingCashChange,
+  onNotesChange,
+  onConfirm,
+  onClose,
+}) => {
+  const cashDifference = Number((actualClosingCash - expectedClosingCash).toFixed(2));
+  const cashDifferenceTone = cashDifference === 0 ? 'text-emerald-700' : cashDifference > 0 ? 'text-sky-700' : 'text-rose-700';
+
+  return (
+    <Modal title="إقفال الوردية ومطابقة الصندوق" icon={<Lock className="w-5 h-5" />} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
+          <div className="flex justify-between"><span className="text-slate-500">رقم الوردية</span><strong>{shift.shiftNumber}</strong></div>
+          <div className="flex justify-between"><span className="text-slate-500">الرصيد الافتتاحي</span><strong>{CeramicMath.formatCurrency(shift.openingBalance)}</strong></div>
+          <div className="flex justify-between"><span className="text-slate-500">مبيعات نقدية</span><strong>{CeramicMath.formatCurrency(shift.totalSalesCash)}</strong></div>
+          <div className="flex justify-between"><span className="text-slate-500">تحصيلات العملاء</span><strong>{CeramicMath.formatCurrency(shift.totalCustomerPayments)}</strong></div>
+          <div className="flex justify-between"><span className="text-slate-500">مصروفات / مرتجعات</span><strong>{CeramicMath.formatCurrency((shift.totalExpenses || 0) + (shift.totalRefunds || 0))}</strong></div>
+          <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold">النقد المتوقع بالصندوق</span><strong className="text-emerald-700">{CeramicMath.formatCurrency(expectedClosingCash)}</strong></div>
+        </div>
+        <Field label="النقد الفعلي بعد العد" id="close-shift-actual-cash">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={actualClosingCash || ''}
+            onChange={(e) => onActualClosingCashChange(Number.parseFloat(e.target.value) || 0)}
+            placeholder="0"
+            className={inputCls}
+          />
+        </Field>
+        <div className={`rounded-xl px-3 py-2 text-sm font-bold ${cashDifferenceTone} bg-emerald-50`}>فرق الصندوق المحسوب: {CeramicMath.formatCurrency(cashDifference)}</div>
+        <Field label="ملاحظات الإقفال" id="close-shift-notes">
+          <textarea rows={2} value={notes} onChange={(e) => onNotesChange(e.target.value)} placeholder="سبب العجز أو الزيادة، إن وجد..." className={inputCls} />
+        </Field>
+        <button onClick={onConfirm} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد الرصيد المحسوب وإغلاق الوردية</button>
       </div>
-      <Field label="النقد الفعلي بعد العد">
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-800">سيُسجّل الرصيد المتوقع تلقائيًا: {CeramicMath.formatCurrency(expectedClosingCash)}</div>
-      </Field>
-      <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">فرق الصندوق المحسوب: {CeramicMath.formatCurrency(0)}</div>
-      <Field label="ملاحظات الإقفال">
-        <textarea rows={2} value={notes} onChange={(e) => onNotesChange(e.target.value)} placeholder="سبب العجز أو الزيادة، إن وجد..." className={inputCls} />
-      </Field>
-      <button onClick={onConfirm} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد الرصيد المحسوب وإغلاق الوردية</button>
-    </div>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 export const ToneWarningModal: React.FC<{
   conflicts: ToneMixingConflict[];

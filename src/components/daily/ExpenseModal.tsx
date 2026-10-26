@@ -68,35 +68,35 @@ export const ExpenseModal: React.FC<{ initial?: any; onClose: () => void; onSave
         {!registersError && registers.length === 0 && <LoadErrorNotice message="لا توجد خزائن نشطة للاختيار." />}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className={label}>البند *</label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={input} disabled={Boolean(categoriesError) || categories.length === 0}>
+            <label htmlFor="expense-category" className={label}>البند *</label>
+            <select id="expense-category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={input} disabled={Boolean(categoriesError) || categories.length === 0}>
               {categories.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
           <div>
-            <label className={label}>المبلغ *</label>
-            <input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={input} />
+            <label htmlFor="expense-amount" className={label}>المبلغ *</label>
+            <input id="expense-amount" type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={input} />
           </div>
         </div>
         <div>
-          <label className={label}>البيان *</label>
-          <input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={input} />
+          <label htmlFor="expense-description" className={label}>البيان *</label>
+          <input id="expense-description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={input} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className={label}>المستفيد</label>
-            <input value={form.recipient} onChange={(e) => setForm({ ...form, recipient: e.target.value })} className={input} />
+            <label htmlFor="expense-recipient" className={label}>المستفيد</label>
+            <input id="expense-recipient" value={form.recipient} onChange={(e) => setForm({ ...form, recipient: e.target.value })} className={input} />
           </div>
           <div>
-            <label className={label}>طريقة الدفع</label>
-            <select value={form.paymentType} onChange={(e) => setForm({ ...form, paymentType: e.target.value as PaymentType })} className={input}>
+            <label htmlFor="expense-payment-type" className={label}>طريقة الدفع</label>
+            <select id="expense-payment-type" value={form.paymentType} onChange={(e) => setForm({ ...form, paymentType: e.target.value as PaymentType })} className={input}>
               <option value="CASH">نقدي</option>
               <option value="BANK_TRANSFER">بنكي</option>
             </select>
           </div>
           <div>
-            <label className={label}>الخزينة</label>
-            <select value={form.registerId} onChange={(e) => setForm({ ...form, registerId: e.target.value })} className={input} disabled={Boolean(registersError) || registers.length === 0}>
+            <label htmlFor="expense-register" className={label}>الخزينة</label>
+            <select id="expense-register" value={form.registerId} onChange={(e) => setForm({ ...form, registerId: e.target.value })} className={input} disabled={Boolean(registersError) || registers.length === 0}>
               <option value="">اختر الخزينة</option>
               {registers.map((r: any) => <option key={r.id} value={r.id}>{r.name}{r.branchName ? ` — ${r.branchName}` : ''}</option>)}
             </select>

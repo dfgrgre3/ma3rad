@@ -433,7 +433,7 @@ export const WarehouseLocationsPage: React.FC = () => {
                   type="number"
                   min="1"
                   value={formData.maxCapacityM2}
-                  onChange={(e) => setFormData({ ...formData, maxCapacityM2: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setFormData({ ...formData, maxCapacityM2: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
               </div>
@@ -581,7 +581,7 @@ export const WarehouseLocationsPage: React.FC = () => {
                   min="0.1"
                   step="0.1"
                   value={assignForm.quantityM2}
-                  onChange={(e) => setAssignForm({ ...assignForm, quantityM2: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setAssignForm({ ...assignForm, quantityM2: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-violet-500"
                   required
                 />

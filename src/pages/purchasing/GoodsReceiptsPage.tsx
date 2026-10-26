@@ -446,8 +446,9 @@ export const GoodsReceiptsPage: React.FC = () => {
               {/* Linked PO & Supplier */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">ربط بأمر شراء مفتوح (اختياري)</label>
+                  <label htmlFor="grn-po" className="block text-xs font-bold text-slate-700 mb-1">ربط بأمر شراء مفتوح (اختياري)</label>
                   <select
+                    id="grn-po"
                     value={selectedPoId}
                     onChange={(e) => handleSelectPo(e.target.value)}
                     className="w-full px-3 py-2 border rounded-xl text-xs font-bold bg-white"
@@ -461,8 +462,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">المورد / المصنع</label>
+                  <label htmlFor="grn-supplier" className="block text-xs font-bold text-slate-700 mb-1">المورد / المصنع</label>
                   <select
+                    id="grn-supplier"
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
                     required
@@ -475,8 +477,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">المخزن المستلم للبضاعة</label>
+                  <label htmlFor="grn-warehouse" className="block text-xs font-bold text-slate-700 mb-1">المخزن المستلم للبضاعة</label>
                   <select
+                    id="grn-warehouse"
                     value={selectedWarehouseId}
                     onChange={(e) => setSelectedWarehouseId(e.target.value)}
                     required
@@ -492,8 +495,9 @@ export const GoodsReceiptsPage: React.FC = () => {
               {/* Transport & Note info */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">رقم إذن تسليم / بوليصة المورد</label>
+                  <label htmlFor="grn-delivery-note" className="block text-xs font-bold text-slate-700 mb-1">رقم إذن تسليم / بوليصة المورد</label>
                   <input
+                    id="grn-delivery-note"
                     type="text"
                     value={deliveryNoteNumber}
                     onChange={(e) => setDeliveryNoteNumber(e.target.value)}
@@ -502,8 +506,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">رقم سيارة التوريد</label>
+                  <label htmlFor="grn-vehicle-number" className="block text-xs font-bold text-slate-700 mb-1">رقم سيارة التوريد</label>
                   <input
+                    id="grn-vehicle-number"
                     type="text"
                     value={vehicleNumber}
                     onChange={(e) => setVehicleNumber(e.target.value)}
@@ -512,8 +517,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">اسم السائق الموصل</label>
+                  <label htmlFor="grn-driver-name" className="block text-xs font-bold text-slate-700 mb-1">اسم السائق الموصل</label>
                   <input
+                    id="grn-driver-name"
                     type="text"
                     value={driverName}
                     onChange={(e) => setDriverName(e.target.value)}
@@ -526,7 +532,7 @@ export const GoodsReceiptsPage: React.FC = () => {
               {/* Items inspection table */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-black text-slate-800">الأصناف وفحص الجودة والدفعة:</label>
+                  <div className="text-xs font-black text-slate-800">الأصناف وفحص الجودة والدفعة:</div>
                   {!selectedPoId && (
                     <button type="button" onClick={handleAddItem} className="text-xs text-amber-600 font-bold hover:underline">
                       + إضافة صنف
@@ -539,8 +545,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                     <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                         <div className="sm:col-span-4">
-                          <label className="block text-[10px] text-slate-500 font-bold mb-0.5">الصنف</label>
+                          <label htmlFor={`grn-item-${idx}-product`} className="block text-[10px] text-slate-500 font-bold mb-0.5">الصنف</label>
                           <select
+                            id={`grn-item-${idx}-product`}
                             value={it.productId}
                             onChange={(e) => {
                               const prod = products.find((p) => p.id === e.target.value);
@@ -555,8 +562,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                           </select>
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] text-slate-500 font-bold mb-0.5">المستلم ({unitForProduct(it.productId)})</label>
+                          <label htmlFor={`grn-item-${idx}-received`} className="block text-[10px] text-slate-500 font-bold mb-0.5">المستلم ({unitForProduct(it.productId)})</label>
                           <input
+                            id={`grn-item-${idx}-received`}
                             type="number"
                             step="0.01"
                             value={it.receivedQuantityM2}
@@ -565,8 +573,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] text-rose-600 font-bold mb-0.5">التالف/مكسور ({unitForProduct(it.productId)})</label>
+                          <label htmlFor={`grn-item-${idx}-damaged`} className="block text-[10px] text-rose-600 font-bold mb-0.5">التالف/مكسور ({unitForProduct(it.productId)})</label>
                           <input
+                            id={`grn-item-${idx}-damaged`}
                             type="number"
                             step="0.01"
                             value={it.damagedQuantityM2}
@@ -575,8 +584,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] text-amber-600 font-bold mb-0.5">العجز/نقص ({unitForProduct(it.productId)})</label>
+                          <label htmlFor={`grn-item-${idx}-shortage`} className="block text-[10px] text-amber-600 font-bold mb-0.5">العجز/نقص ({unitForProduct(it.productId)})</label>
                           <input
+                            id={`grn-item-${idx}-shortage`}
                             type="number"
                             step="0.01"
                             value={it.shortageQuantityM2}
@@ -585,7 +595,7 @@ export const GoodsReceiptsPage: React.FC = () => {
                           />
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="block text-[10px] text-emerald-700 font-bold mb-0.5">السليم (المضاف للمخزن)</label>
+                          <div className="block text-[10px] text-emerald-700 font-bold mb-0.5">السليم (المضاف للمخزن)</div>
                           <div className="w-full py-1.5 px-2 bg-emerald-50 border border-emerald-200 rounded-lg text-center font-black text-emerald-800">
                             {formatProductQuantity(it.acceptedQuantityM2, products.find((product) => product.id === it.productId) || { productType: 'CERAMIC' })}
                           </div>
@@ -595,8 +605,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                       {/* Batch & Shade info */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-200">
                         <div>
-                          <label className="block text-[10px] text-slate-500">رقم التشغيلة / اللوت</label>
+                          <label htmlFor={`grn-item-${idx}-batch`} className="block text-[10px] text-slate-500">رقم التشغيلة / اللوت</label>
                           <input
+                            id={`grn-item-${idx}-batch`}
                             type="text"
                             value={it.batchNumber}
                             onChange={(e) => handleItemChange(idx, { batchNumber: e.target.value })}
@@ -604,8 +615,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-500">الشيد / درجة اللون (Tone)</label>
+                          <label htmlFor={`grn-item-${idx}-tone`} className="block text-[10px] text-slate-500">الشيد / درجة اللون (Tone)</label>
                           <input
+                            id={`grn-item-${idx}-tone`}
                             type="text"
                             value={it.toneShade}
                             onChange={(e) => handleItemChange(idx, { toneShade: e.target.value })}
@@ -613,8 +625,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-500">الكاليبر (المقاس)</label>
+                          <label htmlFor={`grn-item-${idx}-caliber`} className="block text-[10px] text-slate-500">الكاليبر (المقاس)</label>
                           <input
+                            id={`grn-item-${idx}-caliber`}
                             type="text"
                             value={it.caliber}
                             onChange={(e) => handleItemChange(idx, { caliber: e.target.value })}
@@ -622,8 +635,9 @@ export const GoodsReceiptsPage: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-slate-500">ملاحظات الفحص</label>
+                          <label htmlFor={`grn-item-${idx}-inspection-note`} className="block text-[10px] text-slate-500">ملاحظات الفحص</label>
                           <input
+                            id={`grn-item-${idx}-inspection-note`}
                             type="text"
                             value={it.inspectionNotes}
                             onChange={(e) => handleItemChange(idx, { inspectionNotes: e.target.value })}
@@ -638,8 +652,9 @@ export const GoodsReceiptsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">ملاحظات عامة على الاستلام</label>
+                <label htmlFor="grn-notes" className="block text-xs font-bold text-slate-700 mb-1">ملاحظات عامة على الاستلام</label>
                 <textarea
+                  id="grn-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="ملاحظات الحراسة، التفريغ، أو حالة الشحنة..."

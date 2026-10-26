@@ -367,8 +367,9 @@ export const PurchasesView: React.FC = () => {
               {/* Linked GRN and PO */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-amber-50/60 border border-amber-200 rounded-xl">
                 <div>
-                  <label className="font-bold text-amber-900 block mb-1">ربط بإذن استلام مخزني (GRN)</label>
+                  <label htmlFor="purchase-grn" className="font-bold text-amber-900 block mb-1">ربط بإذن استلام مخزني (GRN)</label>
                   <select
+                    id="purchase-grn"
                     value={dto.grnId || ''}
                     onChange={(e) => handleSelectGrn(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-amber-300 font-bold"
@@ -380,8 +381,9 @@ export const PurchasesView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-amber-900 block mb-1">أمر الشراء المرتبط (PO)</label>
+                  <label htmlFor="purchase-po" className="font-bold text-amber-900 block mb-1">أمر الشراء المرتبط (PO)</label>
                   <select
+                    id="purchase-po"
                     value={dto.purchaseOrderId || ''}
                     onChange={(e) => setDto({ ...dto, purchaseOrderId: e.target.value || undefined })}
                     className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-amber-300 font-bold"
@@ -393,8 +395,9 @@ export const PurchasesView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-amber-900 block mb-1">المخزن المستلم</label>
+                  <label htmlFor="purchase-warehouse" className="font-bold text-amber-900 block mb-1">المخزن المستلم</label>
                   <select
+                    id="purchase-warehouse"
                     value={dto.warehouseId}
                     onChange={(e) => setDto({ ...dto, warehouseId: e.target.value })}
                     required
@@ -410,8 +413,9 @@ export const PurchasesView: React.FC = () => {
               {/* Supplier & Invoice Number */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">المورد / الشركة المصنعة *</label>
+                  <label htmlFor="purchase-supplier" className="font-bold text-slate-700 block mb-1">المورد / الشركة المصنعة *</label>
                   <select
+                    id="purchase-supplier"
                     value={dto.supplierId}
                     onChange={(e) => setDto({ ...dto, supplierId: e.target.value })}
                     required
@@ -423,8 +427,9 @@ export const PurchasesView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">رقم فاتورة المورد</label>
+                  <label htmlFor="purchase-supplier-invoice-number" className="font-bold text-slate-700 block mb-1">رقم فاتورة المورد</label>
                   <input
+                    id="purchase-supplier-invoice-number"
                     type="text"
                     value={dto.supplierInvoiceNumber}
                     disabled={dto.isNoNumberSupplier}
@@ -439,8 +444,9 @@ export const PurchasesView: React.FC = () => {
                   )}
                 </div>
                 <div className="flex items-center pt-5">
-                  <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+                  <label htmlFor="purchase-no-number-supplier" className="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
                     <input
+                      id="purchase-no-number-supplier"
                       type="checkbox"
                       checked={dto.isNoNumberSupplier}
                       onChange={(e) => setDto({ ...dto, isNoNumberSupplier: e.target.checked })}
@@ -567,8 +573,9 @@ export const PurchasesView: React.FC = () => {
 
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <div>
-                    <label className="block text-[11px] text-indigo-900 font-bold mb-0.5">النقل والشحن (ج)</label>
+                    <label htmlFor="purchase-landed-freight" className="block text-[11px] text-indigo-900 font-bold mb-0.5">النقل والشحن (ج)</label>
                     <input
+                      id="purchase-landed-freight"
                       type="number"
                       step="0.01"
                       value={dto.landedFreight || ''}
@@ -578,8 +585,9 @@ export const PurchasesView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-indigo-900 font-bold mb-0.5">العتالة والتفريغ (ج)</label>
+                    <label htmlFor="purchase-landed-loading" className="block text-[11px] text-indigo-900 font-bold mb-0.5">العتالة والتفريغ (ج)</label>
                     <input
+                      id="purchase-landed-loading"
                       type="number"
                       step="0.01"
                       value={dto.landedLoading || ''}
@@ -589,8 +597,9 @@ export const PurchasesView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-indigo-900 font-bold mb-0.5">جمارك ورسوم (ج)</label>
+                    <label htmlFor="purchase-landed-customs-taxes" className="block text-[11px] text-indigo-900 font-bold mb-0.5">جمارك ورسوم (ج)</label>
                     <input
+                      id="purchase-landed-customs-taxes"
                       type="number"
                       step="0.01"
                       value={dto.landedCustomsTaxes || ''}
@@ -600,8 +609,9 @@ export const PurchasesView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-indigo-900 font-bold mb-0.5">التأمين (ج)</label>
+                    <label htmlFor="purchase-landed-insurance" className="block text-[11px] text-indigo-900 font-bold mb-0.5">التأمين (ج)</label>
                     <input
+                      id="purchase-landed-insurance"
                       type="number"
                       step="0.01"
                       value={dto.landedInsurance || ''}
@@ -611,8 +621,9 @@ export const PurchasesView: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] text-indigo-900 font-bold mb-0.5">أخرى (ج)</label>
+                    <label htmlFor="purchase-landed-other" className="block text-[11px] text-indigo-900 font-bold mb-0.5">أخرى (ج)</label>
                     <input
+                      id="purchase-landed-other"
                       type="number"
                       step="0.01"
                       value={dto.landedOther || ''}
@@ -631,8 +642,9 @@ export const PurchasesView: React.FC = () => {
               {/* Payment & Totals */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-100 rounded-xl">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الخصم المكتسب (ج.م)</label>
+                  <label htmlFor="purchase-discount-amount" className="font-bold text-slate-700 block mb-1">الخصم المكتسب (ج.م)</label>
                   <input
+                    id="purchase-discount-amount"
                     type="number"
                     value={dto.discountAmount || ''}
                     onChange={(e) => setDto({ ...dto, discountAmount: Number(e.target.value) || 0 })}
@@ -641,8 +653,9 @@ export const PurchasesView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">المبلغ المسدد نقداً فوراً (ج.م)</label>
+                  <label htmlFor="purchase-paid-amount" className="font-bold text-slate-700 block mb-1">المبلغ المسدد نقداً فوراً (ج.م)</label>
                   <input
+                    id="purchase-paid-amount"
                     type="number"
                     value={dto.paidAmount}
                     onChange={(e) => setDto({ ...dto, paidAmount: Number(e.target.value) || 0 })}
@@ -650,8 +663,9 @@ export const PurchasesView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
+                  <label htmlFor="purchase-payment-type" className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
                   <select
+                    id="purchase-payment-type"
                     value={dto.paymentType}
                     onChange={(e) => setDto({ ...dto, paymentType: e.target.value as PaymentType })}
                     className="w-full px-3 py-1.5 bg-white rounded-lg border font-bold"

@@ -129,11 +129,11 @@ export const ProductImportModal: React.FC<Props> = ({ open, onClose, onImported 
               <button onClick={downloadTemplate} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
                 <Download className="w-4 h-4" /> تنزيل قالب Excel جاهز
               </button>
-              <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-2xl py-10 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition">
+              <label htmlFor="product-import-file" className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 rounded-2xl py-10 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition">
                 <Upload className="w-8 h-8 text-slate-400" />
                 <span className="text-sm font-bold text-slate-700">اختر ملف Excel</span>
                 <span className="text-[11px] text-slate-400">سيتم التحقق من التصنيفات والماركات والأسعار تلقائيًا</span>
-                <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFile(file); }} />
+                <input id="product-import-file" ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFile(file); }} />
               </label>
             </div>
           )}

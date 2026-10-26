@@ -40,9 +40,14 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     <div
       className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-5"
       dir="rtl"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-6xl h-[94vh] flex flex-col overflow-hidden">
+      <button
+        type="button"
+        aria-label="إغلاق المعاينة"
+        className="absolute inset-0 w-full h-full cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative z-10 bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-6xl h-[94vh] flex flex-col overflow-hidden">
         <div className="px-4 sm:px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3 bg-slate-50">
           <div className="min-w-0">
             <h3 className="text-sm font-black text-slate-900 truncate">{title}</h3>

@@ -91,26 +91,26 @@ export const QuickPurchaseModal: React.FC<{ onClose: () => void; onSaved: () => 
         {loadError && <LoadErrorNotice message={loadError} />}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
-            <label className={label}>المورد *</label>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={input} disabled={Boolean(suppliersError)}>
+            <label htmlFor="purchase-supplier" className={label}>المورد *</label>
+            <select id="purchase-supplier" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={input} disabled={Boolean(suppliersError)}>
               <option value="">اختر المورد</option>
               {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name} — {s.phone}</option>)}
             </select>
           </div>
           <div>
-            <label className={label}>المخزن *</label>
-            <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={input} disabled={Boolean(listsError)}>
+            <label htmlFor="purchase-warehouse" className={label}>المخزن *</label>
+            <select id="purchase-warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={input} disabled={Boolean(listsError)}>
               <option value="">اختر المخزن</option>
               {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </div>
           <div>
-            <label className={label}>فاتورة المورد</label>
-            <input value={supplierInvoice} onChange={(e) => setSupplierInvoice(e.target.value)} className={input} />
+            <label htmlFor="purchase-supplier-invoice" className={label}>فاتورة المورد</label>
+            <input id="purchase-supplier-invoice" value={supplierInvoice} onChange={(e) => setSupplierInvoice(e.target.value)} className={input} />
           </div>
           <div>
-            <label className={label}>طريقة السداد</label>
-            <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={input}>
+            <label htmlFor="purchase-payment-type" className={label}>طريقة السداد</label>
+            <select id="purchase-payment-type" value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={input}>
               <option value="CASH">نقدي</option>
               <option value="CREDIT">آجل</option>
               <option value="BANK_TRANSFER">تحويل بنكي</option>
@@ -129,22 +129,25 @@ export const QuickPurchaseModal: React.FC<{ onClose: () => void; onSaved: () => 
             {lines.map((line, index) => {
               const product = productOf(line.productId);
               const unit = product ? getProductUnitLabel(product) : 'م²';
+              const productId = `purchase-product-${index}`;
+              const quantityId = `purchase-qty-${index}`;
+              const costId = `purchase-cost-${index}`;
               return (
               <div key={index} className="p-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                 <div className="sm:col-span-6">
-                  <label className={label}>الصنف</label>
-                  <select value={line.productId} onChange={(e) => chooseProduct(index, e.target.value)} className={input} disabled={Boolean(listsError)}>
+                  <label htmlFor={productId} className={label}>الصنف</label>
+                  <select id={productId} value={line.productId} onChange={(e) => chooseProduct(index, e.target.value)} className={input} disabled={Boolean(listsError)}>
                     <option value="">اختر الصنف</option>
                     {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.sku}</option>)}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className={label}>الكمية {unit}</label>
-                  <input type="number" min="0" step="0.01" value={line.quantityM2} onChange={(e) => setLine(index, { quantityM2: e.target.value })} className={input} />
+                  <label htmlFor={quantityId} className={label}>الكمية {unit}</label>
+                  <input id={quantityId} type="number" min="0" step="0.01" value={line.quantityM2} onChange={(e) => setLine(index, { quantityM2: e.target.value })} className={input} />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className={label}>تكلفة {unit}</label>
-                  <input type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => setLine(index, { unitCost: e.target.value })} className={input} />
+                  <label htmlFor={costId} className={label}>تكلفة {unit}</label>
+                  <input id={costId} type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => setLine(index, { unitCost: e.target.value })} className={input} />
                 </div>
                 <div className="sm:col-span-1 pb-2 text-xs font-bold text-slate-600">{fmt(round2((Number(line.quantityM2) || 0) * (Number(line.unitCost) || 0)))}</div>
                 <div className="sm:col-span-1 pb-1">
@@ -159,12 +162,12 @@ export const QuickPurchaseModal: React.FC<{ onClose: () => void; onSaved: () => 
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className={label}>المبلغ المدفوع</label>
-            <input type="number" min="0" max={total} step="0.01" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className={input} />
+            <label htmlFor="purchase-paid-amount" className={label}>المبلغ المدفوع</label>
+            <input id="purchase-paid-amount" type="number" min="0" max={total} step="0.01" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} className={input} />
           </div>
           <div className="md:col-span-2">
-            <label className={label}>ملاحظات</label>
-            <input value={notes} onChange={(e) => setNotes(e.target.value)} className={input} />
+            <label htmlFor="purchase-notes" className={label}>ملاحظات</label>
+            <input id="purchase-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={input} />
           </div>
         </div>
 

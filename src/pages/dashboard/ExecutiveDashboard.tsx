@@ -178,7 +178,7 @@ export const ExecutiveDashboard: React.FC = () => {
           label: 'إجمالي المبيعات',
           value: formatCurrency(total),
           sub: `${invoiceCount} فاتورة`,
-          trend: parseFloat(salesTrend) >= 0 ? 'up' : 'down',
+          trend: Number.parseFloat(salesTrend) >= 0 ? 'up' : 'down',
           trendValue: `${salesTrend}% مقارنة بالأمس`,
           icon: ShoppingCart,
           color: 'text-sky-600',

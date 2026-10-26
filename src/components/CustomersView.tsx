@@ -156,7 +156,9 @@ export const CustomersView: React.FC = () => {
       <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
         <div className="flex-1 relative">
           <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <label htmlFor="customer-search" className="sr-only">بحث بالاسم، رقم الهاتف، أو كود العميل</label>
           <input
+            id="customer-search"
             type="text"
             placeholder="بحث بالاسم، رقم الهاتف، أو كود العميل..."
             value={search}
@@ -311,8 +313,9 @@ export const CustomersView: React.FC = () => {
 
             <form onSubmit={handleSaveCustomer} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">اسم العميل *</label>
+                <label htmlFor="customer-name" className="font-bold text-slate-700 block mb-1">اسم العميل *</label>
                 <input
+                  id="customer-name"
                   type="text"
                   required
                   value={formData.name}
@@ -323,8 +326,9 @@ export const CustomersView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">رقم الهاتف *</label>
+                  <label htmlFor="customer-phone" className="font-bold text-slate-700 block mb-1">رقم الهاتف *</label>
                   <input
+                    id="customer-phone"
                     type="tel"
                     required
                     value={formData.phone}
@@ -333,8 +337,9 @@ export const CustomersView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">نوع العميل</label>
+                  <label htmlFor="customer-type" className="font-bold text-slate-700 block mb-1">نوع العميل</label>
                   <select
+                    id="customer-type"
                     value={formData.customerType}
                     onChange={(e) => setFormData({ ...formData, customerType: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
@@ -348,32 +353,35 @@ export const CustomersView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الحد الائتماني (ج.م)</label>
+                  <label htmlFor="customer-credit-limit" className="font-bold text-slate-700 block mb-1">الحد الائتماني (ج.م)</label>
                   <input
+                    id="customer-credit-limit"
                     type="number"
                     value={formData.creditLimit}
-                    onChange={(e) => setFormData({ ...formData, creditLimit: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, creditLimit: Number.parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">أجل السداد (أيام)</label>
-                  <input type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: parseInt(e.target.value,10) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                  <label htmlFor="customer-payment-terms" className="font-bold text-slate-700 block mb-1">أجل السداد (أيام)</label>
+                  <input id="customer-payment-terms" type="number" min="0" value={formData.paymentTermsDays} onChange={(e) => setFormData({ ...formData, paymentTermsDays: Number.parseInt(e.target.value, 10) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">رصيد افتتاحي (إن وجد)</label>
+                  <label htmlFor="customer-initial-balance" className="font-bold text-slate-700 block mb-1">رصيد افتتاحي (إن وجد)</label>
                   <input
+                    id="customer-initial-balance"
                     type="number"
                     value={formData.initialBalance}
-                    onChange={(e) => setFormData({ ...formData, initialBalance: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, initialBalance: Number.parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">العنوان</label>
+                <label htmlFor="customer-address" className="font-bold text-slate-700 block mb-1">العنوان</label>
                 <input
+                  id="customer-address"
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -412,19 +420,21 @@ export const CustomersView: React.FC = () => {
 
             <form onSubmit={handleRecordPayment} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">المبلغ المحصل (ج.م) *</label>
+                <label htmlFor="customer-payment-amount" className="font-bold text-slate-700 block mb-1">المبلغ المحصل (ج.م) *</label>
                 <input
+                  id="customer-payment-amount"
                   type="number"
                   required
                   value={paymentData.amount}
-                  onChange={(e) => setPaymentData({ ...paymentData, amount: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setPaymentData({ ...paymentData, amount: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-black text-sm text-emerald-600"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
+                <label htmlFor="customer-payment-type" className="font-bold text-slate-700 block mb-1">طريقة السداد</label>
                 <select
+                  id="customer-payment-type"
                   value={paymentData.paymentType}
                   onChange={(e) => setPaymentData({ ...paymentData, paymentType: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
@@ -436,8 +446,9 @@ export const CustomersView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">البيان / الملاحظات</label>
+                <label htmlFor="customer-payment-notes" className="font-bold text-slate-700 block mb-1">البيان / الملاحظات</label>
                 <input
+                  id="customer-payment-notes"
                   type="text"
                   value={paymentData.notes}
                   onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}

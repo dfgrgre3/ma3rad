@@ -76,11 +76,12 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
           )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+            <label htmlFor="current-password" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               كلمة المرور الحالية (الافتراضية: admin123)
             </label>
             <div className="relative">
               <input
+                id="current-password"
                 type={showCurrent ? 'text' : 'password'}
                 required
                 value={currentPassword}
@@ -99,11 +100,12 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+            <label htmlFor="new-password" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               كلمة المرور الجديدة
             </label>
             <div className="relative">
               <input
+                id="new-password"
                 type={showNew ? 'text' : 'password'}
                 required
                 value={newPassword}
@@ -122,10 +124,11 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+            <label htmlFor="confirm-password" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
               تأكيد كلمة المرور الجديدة
             </label>
             <input
+              id="confirm-password"
               type="password"
               required
               value={confirmPassword}

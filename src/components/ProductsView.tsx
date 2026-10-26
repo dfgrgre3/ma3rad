@@ -1226,12 +1226,12 @@ export const ProductsView: React.FC = () => {
                       </Field>
                     </div>
                     <div className="space-y-2">
-                      <label className="block font-bold text-slate-700">صورة الصنف</label>
-                      <div onClick={() => imageInputRef.current?.click()} className="flex h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-sky-400 hover:text-sky-500">
+                      <label htmlFor="product-image-upload" className="block font-bold text-slate-700">صورة الصنف</label>
+                      <button type="button" onClick={() => imageInputRef.current?.click()} className="flex h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-sky-400 hover:text-sky-500">
                         <ImagePlus className="w-7 h-7" />
                         <span className="text-[10px] font-bold">اضغط لإضافة صور</span>
-                      </div>
-                      <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageFiles(e.target.files)} />
+                      </button>
+                      <input id="product-image-upload" ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageFiles(e.target.files)} />
                       {(existingImages.length > 0 || pendingImages.length > 0) && (
                         <div className="grid grid-cols-3 gap-1.5">
                           {existingImages.map((img) => (
@@ -1274,7 +1274,7 @@ export const ProductsView: React.FC = () => {
                           <input required value={formData.customUnit} onChange={(e) => setFormData({ ...formData, customUnit: e.target.value })} placeholder="جردل، شيكارة، لفة..." className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
                         </Field>}
                         <Field label={`سعر البيع / ${unitLabel}`}>
-                          <input type="number" min="0" step="0.01" value={formData.sellingPriceM2} onChange={(e) => setFormData({ ...formData, sellingPriceM2: parseFloat(e.target.value) || 0, sellingPriceBox: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
+                          <input type="number" min="0" step="0.01" value={formData.sellingPriceM2} onChange={(e) => setFormData({ ...formData, sellingPriceM2: Number.parseFloat(e.target.value) || 0, sellingPriceBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
                         </Field>
                       </div>
                     </section>
@@ -1290,7 +1290,7 @@ export const ProductsView: React.FC = () => {
                         </div>
                       </Field>
                       <Field label="السمك (مم)">
-                        <input type="number" step="0.1" value={formData.thickness} onChange={(e) => setFormData({ ...formData, thickness: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
+                        <input type="number" step="0.1" value={formData.thickness} onChange={(e) => setFormData({ ...formData, thickness: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
                       </Field>
                       <Field label="اللون">
                         <input value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder="رمادي رخامي" className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
@@ -1323,13 +1323,13 @@ export const ProductsView: React.FC = () => {
                         </select>
                       </Field>
                       <Field label={`المترات / ${unitLabel} بالكرتونة`}>
-                        <input type="number" step="0.001" value={formData.metersPerBox} onChange={(e) => handleMetersPerBoxChange(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
+                        <input type="number" step="0.001" value={formData.metersPerBox} onChange={(e) => handleMetersPerBoxChange(Number.parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
                       </Field>
                       <Field label="عدد القطع بالكرتونة">
-                        <input type="number" min="1" step="1" value={formData.piecesPerBox} onChange={(e) => handlePiecesPerBoxChange(parseInt(e.target.value) || 1)} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
+                        <input type="number" min="1" step="1" value={formData.piecesPerBox} onChange={(e) => handlePiecesPerBoxChange(Number.parseInt(e.target.value, 10) || 1)} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
                       </Field>
                       <Field label="وزن الكرتونة (كجم)">
-                        <input type="number" step="0.01" value={formData.weightPerBox} onChange={(e) => setFormData({ ...formData, weightPerBox: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
+                        <input type="number" step="0.01" value={formData.weightPerBox} onChange={(e) => setFormData({ ...formData, weightPerBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
                       </Field>
                       <div className="md:col-span-3 grid grid-cols-3 gap-3">
                         <div className="rounded-xl border border-sky-200 bg-white px-3 py-2">
@@ -1356,19 +1356,19 @@ export const ProductsView: React.FC = () => {
                   <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Banknote className="w-4 h-4 text-emerald-600" /> التسعير</div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <Field label="سعر الشراء / التكلفة (للمتر)">
-                      <input type="number" step="0.01" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                      <input type="number" step="0.01" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <Field label="سعر بيع المتر (قطاعي)">
-                      <input type="number" step="0.01" value={formData.sellingPriceM2} onChange={(e) => { const price = parseFloat(e.target.value) || 0; setFormData({ ...formData, sellingPriceM2: price, sellingPriceBox: round(price * formData.metersPerBox) }); }} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold text-sky-600" />
+                      <input type="number" step="0.01" value={formData.sellingPriceM2} onChange={(e) => { const price = Number.parseFloat(e.target.value) || 0; setFormData({ ...formData, sellingPriceM2: price, sellingPriceBox: round(price * formData.metersPerBox) }); }} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold text-sky-600" />
                     </Field>
                     <Field label="سعر الكرتونة">
-                      <input type="number" step="0.01" value={formData.sellingPriceBox} onChange={(e) => setFormData({ ...formData, sellingPriceBox: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                      <input type="number" step="0.01" value={formData.sellingPriceBox} onChange={(e) => setFormData({ ...formData, sellingPriceBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <Field label="سعر الجملة (للمتر)">
-                      <input type="number" step="0.01" value={formData.wholesalePriceM2} onChange={(e) => setFormData({ ...formData, wholesalePriceM2: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                      <input type="number" step="0.01" value={formData.wholesalePriceM2} onChange={(e) => setFormData({ ...formData, wholesalePriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <Field label="الحد الأدنى لسعر المتر">
-                      <input type="number" step="0.01" value={formData.minSellingPriceM2} onChange={(e) => setFormData({ ...formData, minSellingPriceM2: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                      <input type="number" step="0.01" value={formData.minSellingPriceM2} onChange={(e) => setFormData({ ...formData, minSellingPriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <div className="grid grid-cols-2 gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
                       <div>
@@ -1383,10 +1383,10 @@ export const ProductsView: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                     <Field label="حد الطلب الأدنى (للمتر)">
-                      <input type="number" step="0.01" value={formData.minStockLevel} onChange={(e) => setFormData({ ...formData, minStockLevel: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                      <input type="number" step="0.01" value={formData.minStockLevel} onChange={(e) => setFormData({ ...formData, minStockLevel: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <Field label="الحد الأقصى للمخزون">
-                      <input type="number" step="0.01" value={formData.maxStockLevel} onChange={(e) => setFormData({ ...formData, maxStockLevel: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
+                      <input type="number" step="0.01" value={formData.maxStockLevel} onChange={(e) => setFormData({ ...formData, maxStockLevel: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2">
                       <div className="text-[10px] font-bold text-sky-700">قيمة المخزون الافتتاحي</div>
@@ -1425,13 +1425,13 @@ export const ProductsView: React.FC = () => {
                             </select>
                           </Field>
                           {formData.productType === 'CERAMIC' && <Field label="عدد الكراتين">
-                            <input type="number" min="0" step="0.01" value={row.boxes} onChange={(e) => setOpeningBy(index, 'boxes', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
+                            <input type="number" min="0" step="0.01" value={row.boxes} onChange={(e) => setOpeningBy(index, 'boxes', Number.parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
                           </Field>}
                           {formData.productType === 'CERAMIC' && <Field label="عدد القطع">
-                            <input type="number" min="0" step="1" value={row.pieces} onChange={(e) => setOpeningBy(index, 'pieces', parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
+                            <input type="number" min="0" step="1" value={row.pieces} onChange={(e) => setOpeningBy(index, 'pieces', Number.parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
                           </Field>}
                           <Field label={`الكمية (${unitLabel})`}>
-                            <input type="number" min="0" step="0.001" value={row.meters} onChange={(e) => formData.productType === 'CERAMIC' ? setOpeningBy(index, 'meters', parseFloat(e.target.value) || 0) : setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, meters: Math.max(0, parseFloat(e.target.value) || 0) } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
+                            <input type="number" min="0" step="0.001" value={row.meters} onChange={(e) => formData.productType === 'CERAMIC' ? setOpeningBy(index, 'meters', Number.parseFloat(e.target.value) || 0) : setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, meters: Math.max(0, Number.parseFloat(e.target.value) || 0) } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
                           </Field>
                           <button type="button" onClick={() => removeOpeningRow(index)} className="rounded-xl border border-rose-200 px-2 py-2 text-rose-500 hover:bg-rose-50" title="حذف السطر"><Trash2 className="w-4 h-4" /></button>
                         </div>
@@ -1468,7 +1468,7 @@ export const ProductsView: React.FC = () => {
                           </select>
                         </Field>
                         <div className="flex items-end gap-1">
-                          <Field label="سعر المتر"><input type="number" value={v.sellingPriceM2} onChange={(e) => updateVariantDraft(index, { sellingPriceM2: parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200" /></Field>
+                          <Field label="سعر المتر"><input type="number" value={v.sellingPriceM2} onChange={(e) => updateVariantDraft(index, { sellingPriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200" /></Field>
                           <button type="button" onClick={() => removeVariantDraft(index)} className="mb-0.5 rounded-lg border border-rose-200 p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </div>
@@ -1542,7 +1542,7 @@ export const ProductsView: React.FC = () => {
                       <div className="font-black text-emerald-700">{stockProduct.productType === 'GENERAL' ? `${round(row.currentM2, 3)} ${getProductUnitLabel(stockProduct)}` : CeramicMath.formatM2(row.currentM2)}</div>
                     </div>
                     <Field label={stockProduct.productType === 'GENERAL' ? `الكمية المضافة (${getProductUnitLabel(stockProduct)})` : 'عدد الكراتين المضافة'}>
-                      <input type="number" min="0" step="0.01" value={row.addBoxes || ''} onChange={(e) => { const value = parseFloat(e.target.value) || 0; setStockRows((prev) => prev.map((r, i) => i === index ? { ...r, addBoxes: value } : r)); }} className="w-full px-3 py-2 bg-white rounded-xl border border-emerald-300 font-bold" placeholder="0" />
+                      <input type="number" min="0" step="0.01" value={row.addBoxes || ''} onChange={(e) => { const value = Number.parseFloat(e.target.value) || 0; setStockRows((prev) => prev.map((r, i) => i === index ? { ...r, addBoxes: value } : r)); }} className="w-full px-3 py-2 bg-white rounded-xl border border-emerald-300 font-bold" placeholder="0" />
                     </Field>
                   </div>
                 ))}
@@ -1588,11 +1588,11 @@ export const ProductsView: React.FC = () => {
                 <span className="flex items-center gap-2"><Download className="w-4 h-4 text-sky-600" /> تحميل قالب Excel جاهز</span>
                 <span className="text-[10px] text-slate-400">xlsx</span>
               </button>
-              <div onClick={() => importInputRef.current?.click()} className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-300 bg-sky-50/50 px-4 py-10 text-center hover:border-sky-500">
+              <button type="button" onClick={() => importInputRef.current?.click()} className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-300 bg-sky-50/50 px-4 py-10 text-center hover:border-sky-500">
                 {isImporting ? <Loader2 className="w-8 h-8 animate-spin text-sky-600" /> : <Upload className="w-8 h-8 text-sky-500" />}
                 <span className="text-sm font-bold text-slate-700">{isImporting ? 'جاري استيراد الأصناف...' : 'اضغط لاختيار ملف Excel'}</span>
                 <span className="text-[10px] text-slate-500">يتم إنشاء الأنواع والماركات غير الموجودة تلقائيًا</span>
-              </div>
+              </button>
               <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImportFile(file); e.target.value = ''; }} />
               {importResult && (
                 <div className={`rounded-xl border p-3 ${importResult.errors.length > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>

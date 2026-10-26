@@ -157,9 +157,12 @@ export const InventoryView: React.FC = () => {
           {/* Filters */}
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-[240px] relative">
+              <label htmlFor="inventory-stock-search" className="sr-only">بحث في المخزون</label>
               <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
+                id="inventory-stock-search"
                 type="text"
+                aria-label="بحث في المخزون"
                 placeholder="بحث في المخزون بالصنف أو الكود..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -167,7 +170,10 @@ export const InventoryView: React.FC = () => {
               />
             </div>
 
+            <label htmlFor="inventory-warehouse-filter" className="sr-only">تصفية حسب المخزن</label>
             <select
+              id="inventory-warehouse-filter"
+              aria-label="تصفية حسب المخزن"
               value={selectedWarehouseId}
               onChange={(e) => setSelectedWarehouseId(e.target.value)}
               className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 "
@@ -315,8 +321,9 @@ export const InventoryView: React.FC = () => {
 
             <form onSubmit={handleStockTransfer} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">من مخزن (المصدر)</label>
+                <label htmlFor="transfer-from-warehouse" className="font-bold text-slate-700 block mb-1">من مخزن (المصدر)</label>
                 <select
+                  id="transfer-from-warehouse"
                   value={transferData.fromWarehouseId}
                   onChange={(e) => setTransferData({ ...transferData, fromWarehouseId: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
@@ -328,8 +335,9 @@ export const InventoryView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">إلى مخزن (الوجهة)</label>
+                <label htmlFor="transfer-to-warehouse" className="font-bold text-slate-700 block mb-1">إلى مخزن (الوجهة)</label>
                 <select
+                  id="transfer-to-warehouse"
                   value={transferData.toWarehouseId}
                   onChange={(e) => setTransferData({ ...transferData, toWarehouseId: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
@@ -341,8 +349,9 @@ export const InventoryView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الصنف المراد تحويله</label>
+                <label htmlFor="transfer-product" className="font-bold text-slate-700 block mb-1">الصنف المراد تحويله</label>
                 <select
+                  id="transfer-product"
                   value={transferData.productId}
                   onChange={(e) => setTransferData({ ...transferData, productId: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
@@ -354,20 +363,22 @@ export const InventoryView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">{`الكمية المراد تحويلها (${transferringProduct ? getProductUnitLabel(transferringProduct) : 'م²'})`}</label>
+                <label htmlFor="transfer-quantity" className="font-bold text-slate-700 block mb-1">{`الكمية المراد تحويلها (${transferringProduct ? getProductUnitLabel(transferringProduct) : 'م²'})`}</label>
                 <input
+                  id="transfer-quantity"
                   type="number"
                   step="0.01"
                   required
                   value={transferData.quantityM2}
-                  onChange={(e) => setTransferData({ ...transferData, quantityM2: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setTransferData({ ...transferData, quantityM2: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">ملاحظات التحويل</label>
+                <label htmlFor="transfer-notes" className="font-bold text-slate-700 block mb-1">ملاحظات التحويل</label>
                 <input
+                  id="transfer-notes"
                   type="text"
                   placeholder="مثال: نقل عينات لصالة العرض"
                   value={transferData.notes}
@@ -409,20 +420,22 @@ export const InventoryView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">{`الرصيد الفعلي بعد الجرد (${adjustingProduct ? getProductUnitLabel(adjustingProduct) : 'م²'}) *`}</label>
+                <label htmlFor="adjust-actual-m2" className="font-bold text-slate-700 block mb-1">{`الرصيد الفعلي بعد الجرد (${adjustingProduct ? getProductUnitLabel(adjustingProduct) : 'م²'}) *`}</label>
                 <input
+                  id="adjust-actual-m2"
                   type="number"
                   step="0.01"
                   required
                   value={adjustData.actualM2}
-                  onChange={(e) => setAdjustData({ ...adjustData, actualM2: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setAdjustData({ ...adjustData, actualM2: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-black text-sm"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">سبب التسوية / الفروقات *</label>
+                <label htmlFor="adjust-reason" className="font-bold text-slate-700 block mb-1">سبب التسوية / الفروقات *</label>
                 <input
+                  id="adjust-reason"
                   type="text"
                   required
                   value={adjustData.reason}

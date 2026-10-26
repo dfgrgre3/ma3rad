@@ -222,8 +222,9 @@ export const CategoriesView: React.FC = () => {
 
             <form onSubmit={handleSave} className="space-y-4 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">اسم النوع *</label>
+                <label htmlFor="category-name" className="font-bold text-slate-700 block mb-1">اسم النوع *</label>
                 <input
+                  id="category-name"
                   type="text"
                   required
                   placeholder="مثال: سيراميك أرضيات"
@@ -234,8 +235,9 @@ export const CategoriesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">النوع الأب (اختياري)</label>
+                <label htmlFor="category-parent" className="font-bold text-slate-700 block mb-1">النوع الأب (اختياري)</label>
                 <select
+                  id="category-parent"
                   value={formData.parentId}
                   onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
@@ -248,8 +250,9 @@ export const CategoriesView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الوصف</label>
+                <label htmlFor="category-description" className="font-bold text-slate-700 block mb-1">الوصف</label>
                 <textarea
+                  id="category-description"
                   placeholder="وصف النوع..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}

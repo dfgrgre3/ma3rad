@@ -37,8 +37,8 @@ export const calcMetersFromSize = (size: string, pieces: number): number | null 
   const normalized = (size || '').replace(/[×*]/g, 'x');
   const match = normalized.match(/^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*$/i);
   if (!match) return null;
-  const width = parseFloat(match[1]);
-  const height = parseFloat(match[2]);
+  const width = Number.parseFloat(match[1]);
+  const height = Number.parseFloat(match[2]);
   if (!width || !height || !pieces || pieces <= 0) return null;
   return round((width / 100) * (height / 100) * pieces, 3);
 };

@@ -545,7 +545,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                     step={selectedProduct?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(selectedProduct.baseUnit) ? 1 : 0.01}
                     min="0.01"
                     value={qtyM2 || ''}
-                    onChange={(e) => setQtyM2(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setQtyM2(Number.parseFloat(e.target.value) || 0)}
                     placeholder={`كمية ${selectedUnit}`}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-orange-500"
                   />

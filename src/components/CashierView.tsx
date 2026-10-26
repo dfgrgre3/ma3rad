@@ -278,8 +278,9 @@ export const CashierView: React.FC = () => {
           <p className="text-[11px] text-slate-400 mt-1">الإقفال التلقائي يسجل الرصيد المتوقع، ويُنفّذ عند وقت الجدول إذا كان التطبيق يعمل أو عند تشغيله/تسجيل الدخول بعد الموعد.</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+          <label htmlFor="auto-close-enabled" className="flex items-center gap-2 text-xs font-bold text-slate-700">
             <input
+              id="auto-close-enabled"
               type="checkbox"
               checked={autoCloseEnabled}
               disabled={!canManageShifts}
@@ -431,8 +432,9 @@ export const CashierView: React.FC = () => {
             <form onSubmit={handleOpenShift} className="space-y-4">
               {registers.length > 1 && (
                 <div>
-                  <label className="font-bold text-xs text-slate-700 block mb-1.5">الخزينة</label>
+                  <label htmlFor="shift-register" className="font-bold text-xs text-slate-700 block mb-1.5">الخزينة</label>
                   <select
+                    id="shift-register"
                     value={shiftRegisterId}
                     onChange={(event) => {
                       setShiftRegisterId(event.target.value);
@@ -445,12 +447,13 @@ export const CashierView: React.FC = () => {
                 </div>
               )}
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">الرصيد الافتتاحي (ج.م) — رصيد آخر إغلاق مُرحّل تلقائيًا *</label>
+                <label htmlFor="opening-balance" className="font-bold text-xs text-slate-700 block mb-1.5">الرصيد الافتتاحي (ج.م) — رصيد آخر إغلاق مُرحّل تلقائيًا *</label>
                 <input
+                  id="opening-balance"
                   type="number"
                   required
                   value={openingBalance}
-                  onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setOpeningBalance(Number.parseFloat(e.target.value) || 0)}
                   className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 font-black text-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
                 />
               </div>
@@ -505,15 +508,16 @@ export const CashierView: React.FC = () => {
 
             <form onSubmit={handleCloseShift} className="space-y-4">
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">الرصيد الختامي المحسوب تلقائيًا</label>
+                <p className="font-bold text-xs text-slate-700 block mb-1.5">الرصيد الختامي المحسوب تلقائيًا</p>
                 <div className="w-full px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-200 font-black text-lg text-emerald-700">
                   {CeramicMath.formatCurrency(expectedEndingCash)}
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">ملاحظات الإغلاق</label>
+                <label htmlFor="closing-notes" className="font-bold text-xs text-slate-700 block mb-1.5">ملاحظات الإغلاق</label>
                 <textarea
+                  id="closing-notes"
                   rows={2}
                   placeholder="اكتب سبب العجز أو الزيادة إن وجد..."
                   value={closingNotes}
@@ -556,8 +560,9 @@ export const CashierView: React.FC = () => {
             <form onSubmit={handleAddExpense} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="font-bold text-xs text-slate-700 block mb-1.5">بند المصروف *</label>
+                  <label htmlFor="expense-category" className="font-bold text-xs text-slate-700 block mb-1.5">بند المصروف *</label>
                   <select
+                    id="expense-category"
                     required
                     value={expenseData.category}
                     onChange={(e) => setExpenseData({ ...expenseData, category: e.target.value })}
@@ -569,22 +574,24 @@ export const CashierView: React.FC = () => {
                   </select>
                 </div>
                  <div className="col-span-2 sm:col-span-1">
-                  <label className="font-bold text-xs text-slate-700 block mb-1.5">المبلغ (ج.م) *</label>
+                  <label htmlFor="expense-amount" className="font-bold text-xs text-slate-700 block mb-1.5">المبلغ (ج.م) *</label>
                   <input
+                    id="expense-amount"
                     type="number"
                     required
                     min="0"
                     step="0.5"
                     value={expenseData.amount}
-                    onChange={(e) => setExpenseData({ ...expenseData, amount: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setExpenseData({ ...expenseData, amount: Number.parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-3 bg-slate-50 rounded-xl border border-slate-200 font-black text-sm text-red-600 outline-none focus:border-red-500"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">المستلم / الجهة</label>
+                <label htmlFor="expense-recipient" className="font-bold text-xs text-slate-700 block mb-1.5">المستلم / الجهة</label>
                 <input
+                  id="expense-recipient"
                   type="text"
                   placeholder="مثال: عامل النظافة / شركة الكهرباء"
                   value={expenseData.recipient}
@@ -594,8 +601,9 @@ export const CashierView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">البيان والشرح *</label>
+                <label htmlFor="expense-description" className="font-bold text-xs text-slate-700 block mb-1.5">البيان والشرح *</label>
                 <input
+                  id="expense-description"
                   type="text"
                   required
                   placeholder="تفاصيل الغرض من الصرف..."

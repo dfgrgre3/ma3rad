@@ -69,12 +69,12 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className={label}>المبلغ *</label>
-            <input type="number" min="0" max={target.remaining} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className={input} />
+            <label htmlFor="payment-amount" className={label}>المبلغ *</label>
+            <input id="payment-amount" type="number" min="0" max={target.remaining} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className={input} />
           </div>
           <div>
-            <label className={label}>طريقة الدفع</label>
-            <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={input}>
+            <label htmlFor="payment-type" className={label}>طريقة الدفع</label>
+            <select id="payment-type" value={paymentType} onChange={(e) => setPaymentType(e.target.value as PaymentType)} className={input}>
               <option value="CASH">نقدي</option>
               <option value="BANK_TRANSFER">بنكي</option>
               <option value="CARD">بطاقة</option>
@@ -82,15 +82,15 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
           </div>
         </div>
         <div>
-          <label className={label}>الخزينة</label>
-          <select value={registerId} onChange={(e) => setRegisterId(e.target.value)} className={input} disabled={Boolean(registersError) || availableRegisters.length === 0}>
+          <label htmlFor="payment-register" className={label}>الخزينة</label>
+          <select id="payment-register" value={registerId} onChange={(e) => setRegisterId(e.target.value)} className={input} disabled={Boolean(registersError) || availableRegisters.length === 0}>
             <option value="">اختر الخزينة</option>
             {availableRegisters.map((r) => <option key={r.id} value={r.id}>{r.name}{r.branchName ? ` — ${r.branchName}` : ''}</option>)}
           </select>
         </div>
         <div>
-          <label className={label}>ملاحظات</label>
-          <input value={notes} onChange={(e) => setNotes(e.target.value)} className={input} />
+          <label htmlFor="payment-notes" className={label}>ملاحظات</label>
+          <input id="payment-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className={input} />
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50">إلغاء</button>
@@ -251,8 +251,8 @@ export const VoidModal: React.FC<{ target: { kind: 'sale' | 'purchase'; id: stri
           </p>
         </div>
         <div>
-          <label className={label}>السبب *</label>
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className={input} />
+          <label htmlFor="void-reason" className={label}>السبب *</label>
+          <textarea id="void-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className={input} />
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-100 disabled:opacity-50">رجوع</button>

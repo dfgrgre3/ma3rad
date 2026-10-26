@@ -462,7 +462,7 @@ export const DamageQuarantinePage: React.FC = () => {
                   min="0.1"
                   step={selectedProduct?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(selectedProduct.baseUnit) ? 1 : 0.01}
                   value={createForm.quantityM2}
-                  onChange={(e) => setCreateForm({ ...createForm, quantityM2: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setCreateForm({ ...createForm, quantityM2: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
                   required
                 />

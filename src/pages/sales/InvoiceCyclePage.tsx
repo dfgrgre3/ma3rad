@@ -93,7 +93,7 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
 
   const handleSubmit = async () => {
     setError(null);
-    const val = parseFloat(amount);
+    const val = Number.parseFloat(amount);
     if (isNaN(val) || val <= 0) { setError('يجب إدخال مبلغ صحيح.'); return; }
     setBusy(true);
     try {

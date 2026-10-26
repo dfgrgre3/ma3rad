@@ -445,7 +445,7 @@ export const ReorderPlanningPage: React.FC = () => {
                   min="0"
                   step="0.1"
                   value={editForm.reorderPoint}
-                  onChange={(e) => setEditForm({ ...editForm, reorderPoint: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setEditForm({ ...editForm, reorderPoint: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -457,7 +457,7 @@ export const ReorderPlanningPage: React.FC = () => {
                   min="0"
                   step="0.1"
                   value={editForm.safetyStock}
-                  onChange={(e) => setEditForm({ ...editForm, safetyStock: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => setEditForm({ ...editForm, safetyStock: Number.parseFloat(e.target.value) || 0 })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -468,7 +468,7 @@ export const ReorderPlanningPage: React.FC = () => {
                   type="number"
                   min="1"
                   value={editForm.leadTimeDays}
-                  onChange={(e) => setEditForm({ ...editForm, leadTimeDays: parseInt(e.target.value) || 1 })}
+                  onChange={(e) => setEditForm({ ...editForm, leadTimeDays: Number.parseInt(e.target.value, 10) || 1 })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
@@ -481,7 +481,7 @@ export const ReorderPlanningPage: React.FC = () => {
                     min="0"
                     step="0.1"
                     value={editForm.minStockLevel}
-                    onChange={(e) => setEditForm({ ...editForm, minStockLevel: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setEditForm({ ...editForm, minStockLevel: Number.parseFloat(e.target.value) || 0 })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
@@ -492,7 +492,7 @@ export const ReorderPlanningPage: React.FC = () => {
                     min="1"
                     step="0.1"
                     value={editForm.maxStockLevel}
-                    onChange={(e) => setEditForm({ ...editForm, maxStockLevel: parseFloat(e.target.value) || 1 })}
+                    onChange={(e) => setEditForm({ ...editForm, maxStockLevel: Number.parseFloat(e.target.value) || 1 })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>

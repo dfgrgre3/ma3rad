@@ -463,8 +463,9 @@ export const SupplierQuotationsPage: React.FC = () => {
             <form onSubmit={handleCreateRfq} className="mt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">تاريخ أقصى موعد لتلقي العروض (Due Date)</label>
+                  <label htmlFor="rfq-due-date" className="block text-xs font-bold text-slate-700 mb-1">تاريخ أقصى موعد لتلقي العروض (Due Date)</label>
                   <input
+                    id="rfq-due-date"
                     type="date"
                     value={rfqDueDate}
                     onChange={(e) => setRfqDueDate(e.target.value)}
@@ -472,8 +473,9 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">ملاحظات أو مواصفات خاصة للتوريد</label>
+                  <label htmlFor="rfq-notes" className="block text-xs font-bold text-slate-700 mb-1">ملاحظات أو مواصفات خاصة للتوريد</label>
                   <input
+                    id="rfq-notes"
                     type="text"
                     value={rfqNotes}
                     onChange={(e) => setRfqNotes(e.target.value)}
@@ -486,7 +488,7 @@ export const SupplierQuotationsPage: React.FC = () => {
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-black text-slate-800">الأصناف المطلوبة لعروض الأسعار</label>
+                  <div className="text-xs font-black text-slate-800">الأصناف المطلوبة لعروض الأسعار</div>
                   <button
                     type="button"
                     onClick={() => setRfqLines([...rfqLines, { productId: '', quantityM2: 100, notes: '' }])}
@@ -499,6 +501,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                   {rfqLines.map((line, idx) => (
                     <div key={idx} className="flex gap-2 items-center border border-slate-200 rounded-xl p-2.5 bg-slate-50">
                       <select
+                        aria-label={`الصنف ${idx + 1}`}
                         value={line.productId}
                         onChange={(e) => {
                           const updated = [...rfqLines];
@@ -518,6 +521,7 @@ export const SupplierQuotationsPage: React.FC = () => {
                         ))}
                       </select>
                       <input
+                        aria-label={`الكمية ${idx + 1}`}
                         type="number"
                         min="1"
                         step="0.01"
@@ -572,8 +576,9 @@ export const SupplierQuotationsPage: React.FC = () => {
             <form onSubmit={handleSubmitQuote} className="mt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">المورد / المصنع المقدم للعرض</label>
+                  <label htmlFor="quote-supplier" className="block text-xs font-bold text-slate-700 mb-1">المورد / المصنع المقدم للعرض</label>
                   <select
+                    id="quote-supplier"
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
                     required
@@ -585,8 +590,9 @@ export const SupplierQuotationsPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">رقم عرض سعر المورد</label>
+                  <label htmlFor="quote-number" className="block text-xs font-bold text-slate-700 mb-1">رقم عرض سعر المورد</label>
                   <input
+                    id="quote-number"
                     type="text"
                     value={quoteNumber}
                     onChange={(e) => setQuoteNumber(e.target.value)}
@@ -595,8 +601,9 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">مدة التوريد (أيام عمل)</label>
+                  <label htmlFor="quote-delivery-days" className="block text-xs font-bold text-slate-700 mb-1">مدة التوريد (أيام عمل)</label>
                   <input
+                    id="quote-delivery-days"
                     type="number"
                     min="1"
                     value={deliveryDays}
@@ -605,8 +612,9 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">شروط الدفع المقترحة</label>
+                  <label htmlFor="quote-payment-terms" className="block text-xs font-bold text-slate-700 mb-1">شروط الدفع المقترحة</label>
                   <input
+                    id="quote-payment-terms"
                     type="text"
                     value={paymentTerms}
                     onChange={(e) => setPaymentTerms(e.target.value)}
@@ -615,8 +623,9 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">درجة الجودة والفرز</label>
+                  <label htmlFor="quote-quality-rating" className="block text-xs font-bold text-slate-700 mb-1">درجة الجودة والفرز</label>
                   <input
+                    id="quote-quality-rating"
                     type="text"
                     value={qualityRating}
                     onChange={(e) => setQualityRating(e.target.value)}
@@ -625,8 +634,9 @@ export const SupplierQuotationsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">صلاحية العرض حتى تاريخ</label>
+                  <label htmlFor="quote-valid-until" className="block text-xs font-bold text-slate-700 mb-1">صلاحية العرض حتى تاريخ</label>
                   <input
+                    id="quote-valid-until"
                     type="date"
                     value={validUntil}
                     onChange={(e) => setValidUntil(e.target.value)}
@@ -637,7 +647,7 @@ export const SupplierQuotationsPage: React.FC = () => {
 
               {/* Price per item */}
               <div className="pt-2">
-                <label className="block text-xs font-black text-slate-800 mb-2">أسعار الأصناف في هذا العرض:</label>
+                <div className="block text-xs font-black text-slate-800 mb-2">أسعار الأصناف في هذا العرض:</div>
                 <div className="space-y-2">
                   {quoteItems.map((qi, idx) => (
                     <div key={qi.productId} className="flex items-center justify-between p-3 border rounded-xl bg-slate-50 text-xs">

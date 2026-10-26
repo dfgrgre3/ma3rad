@@ -98,7 +98,7 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
                   value={item.quantityM2}
                   onChange={(e) => {
                     const next = [...requestItems];
-                    next[idx].quantityM2 = parseFloat(e.target.value) || 0;
+                    next[idx].quantityM2 = Number.parseFloat(e.target.value) || 0;
                     onRequestItemsChange(next);
                   }}
                   className="w-24 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-center"

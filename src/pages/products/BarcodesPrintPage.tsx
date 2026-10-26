@@ -226,7 +226,7 @@ export const BarcodesPrintPage: React.FC = () => {
               min="1"
               max="100"
               value={labelCopies}
-              onChange={(e) => setLabelCopies(parseInt(e.target.value) || 1)}
+              onChange={(e) => setLabelCopies(Number.parseInt(e.target.value, 10) || 1)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500 font-mono"
             />
           </div>

@@ -98,8 +98,8 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1">
           {/* Target Area Mode */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">نوع المساحة المراد تبليطها</label>
+          <fieldset>
+            <legend className="block text-xs font-bold text-slate-700 mb-2">نوع المساحة المراد تبليطها</legend>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
@@ -135,12 +135,13 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
                 أرضيات + حوائط (حمام/مطبخ)
               </button>
             </div>
-          </div>
+          </fieldset>
 
           {/* Product Selector */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">اختر صنف السيراميك / البورسلين</label>
+            <label htmlFor="ceramic-product" className="block text-xs font-bold text-slate-700 mb-1.5">اختر صنف السيراميك / البورسلين</label>
             <select
+              id="ceramic-product"
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
@@ -156,36 +157,39 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
           {/* Dimensions Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-4 rounded-2xl border border-slate-200/80">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">طول الغرفة (متر)</label>
+              <label htmlFor="ceramic-room-length" className="block text-[11px] font-semibold text-slate-500 mb-1">طول الغرفة (متر)</label>
               <input
+                id="ceramic-room-length"
                 type="number"
                 step="0.05"
                 min="0.5"
                 value={length}
-                onChange={(e) => setLength(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setLength(Number.parseFloat(e.target.value) || 0)}
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">عرض الغرفة (متر)</label>
+              <label htmlFor="ceramic-room-width" className="block text-[11px] font-semibold text-slate-500 mb-1">عرض الغرفة (متر)</label>
               <input
+                id="ceramic-room-width"
                 type="number"
                 step="0.05"
                 min="0.5"
                 value={width}
-                onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setWidth(Number.parseFloat(e.target.value) || 0)}
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">ارتفاع الجدار (متر)</label>
+              <label htmlFor="ceramic-wall-height" className="block text-[11px] font-semibold text-slate-500 mb-1">ارتفاع الجدار (متر)</label>
               <input
+                id="ceramic-wall-height"
                 type="number"
                 step="0.05"
                 min="1.0"
                 value={height}
                 disabled={calculationMode === 'FLOOR'}
-                onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setHeight(Number.parseFloat(e.target.value) || 0)}
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 font-mono disabled:opacity-40"
               />
             </div>
@@ -197,23 +201,25 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
               <span className="text-xs font-bold text-slate-700 block">خصومات الفتحات (أبواب وشبابيك)</span>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">الأبواب:</span>
+                  <label htmlFor="ceramic-doors-count" className="text-xs text-slate-500">الأبواب:</label>
                   <input
+                    id="ceramic-doors-count"
                     type="number"
                     min="0"
                     value={doorsCount}
-                    onChange={(e) => setDoorsCount(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setDoorsCount(Number.parseInt(e.target.value, 10) || 0)}
                     className="w-16 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-900 text-center"
                   />
                   <span className="text-[11px] text-slate-500">باب</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">الشبابيك:</span>
+                  <label htmlFor="ceramic-windows-count" className="text-xs text-slate-500">الشبابيك:</label>
                   <input
+                    id="ceramic-windows-count"
                     type="number"
                     min="0"
                     value={windowsCount}
-                    onChange={(e) => setWindowsCount(parseInt(e.target.value) || 0)}
+                    onChange={(e) => setWindowsCount(Number.parseInt(e.target.value, 10) || 0)}
                     className="w-16 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-900 text-center"
                   />
                   <span className="text-[11px] text-slate-500">شباك</span>
@@ -223,10 +229,10 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
           )}
 
           {/* Waste pattern selector */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">
+          <fieldset>
+            <legend className="block text-xs font-bold text-slate-700 mb-2">
               طريقة التركيب ونسبة الهدر الموصى بها (Waste Allowance)
-            </label>
+            </legend>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
@@ -267,7 +273,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
                 <div className="text-[10px] text-slate-500 mt-0.5">قصات كثيرة ومساحات غير منتظمة</div>
               </button>
             </div>
-          </div>
+          </fieldset>
 
           {/* Result Card */}
           <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-slate-50 border border-amber-500/20 rounded-2xl p-5">
