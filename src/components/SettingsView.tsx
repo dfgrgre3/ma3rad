@@ -68,7 +68,7 @@ export const SettingsView: React.FC = () => {
     try {
       await backupService.exportBackupFile();
       loadData();
-      alert('تم تنزيل نسخة احتياطية من قاعدة البيانات. الملف غير مشفر؛ احفظه في موقع آمن.');
+      alert('تم تنزيل نسخة احتياطية مشفرة بكلمة المرور التي اخترتها. احتفظ بكلمة المرور منفصلة عن الملف.');
     } catch (e: any) {
       alert(`خطأ في التصدير: ${e.message || e}`);
     }
@@ -89,11 +89,11 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 overflow-y-auto h-full">
+      <div className="p-6 space-y-6 overflow-y-auto h-full">
       {/* Header */}
       <div>
         <h2 className="text-xl font-extrabold text-slate-900">إعدادات النظام والنسخ الاحتياطي</h2>
-        <p className="text-xs text-slate-500">تخصيص بيانات المعرض، الفواتير، والنسخ الاحتياطي المحلي لقاعدة البيانات SQLite</p>
+        <p className="text-xs text-slate-500">تخصيص بيانات المعرض والفواتير؛ في تطبيق سطح المكتب تُشفّر قاعدة البيانات والنسخ الخارجية محمية بكلمة مرور</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -261,7 +261,7 @@ export const SettingsView: React.FC = () => {
               </h3>
 
               <p className="text-xs text-slate-500 leading-relaxed">
-                يتم حفظ قاعدة البيانات SQLite محلياً. يُنصح بتحميل نسخة احتياطية دورياً وحفظها على قرص خارجي (Flash Drive / Cloud Storage) لحماية بيانات المعرض.
+                في تطبيق سطح المكتب تُشفّر قاعدة البيانات المحلية بمفتاح نظام التشغيل. النسخ الخارجية محمية بكلمة مرور منفصلة.
               </p>
 
               <div className="space-y-2 pt-2">
@@ -270,7 +270,7 @@ export const SettingsView: React.FC = () => {
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 text-xs"
                 >
                   <Download className="w-4 h-4" />
-                  <span>تنزيل نسخة احتياطية (SQLite Backup)</span>
+                  <span>تنزيل نسخة احتياطية مشفرة</span>
                 </button>
 
                 <label className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 text-xs cursor-pointer border border-dashed border-slate-300">
@@ -278,7 +278,7 @@ export const SettingsView: React.FC = () => {
                   <span>استعادة قاعدة البيانات من ملف</span>
                   <input
                     type="file"
-                    accept=".sqlite,.db"
+                    accept=".ceramisys-backup,.sqlite.enc,.sqlite,.db"
                     onChange={handleImportBackup}
                     className="hidden"
                   />

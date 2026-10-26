@@ -1,38 +1,123 @@
+﻿const { createCipheriv, createDecipheriv, randomBytes } = require('node:crypto');
+
+const DB_MAGIC = Buffer.from('CERAMISYS-DB\0v1\0', 'utf8');
+const DB_KEY_FILE = 'database-key.enc';
+
+function hasDatabaseMagic(bytes) {
+  return Buffer.from(bytes).subarray(0, DB_MAGIC.length).equals(DB_MAGIC);
+}
+
+async function readOrCreateDatabaseKey({ appDataDir, fs, safeStorage, path, createIfMissing = true }) {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('تشفير قاعدة البيانات غير متاح في مخزن النظام الآمن على هذا الجهاز.');
+  }
+  const keyPath = path.join(appDataDir, DB_KEY_FILE);
+  try {
+    const encryptedKey = await fs.readFile(keyPath);
+    const key = Buffer.from(safeStorage.decryptString(encryptedKey), 'base64');
+    if (key.length !== 32) throw new Error('Invalid database encryption key.');
+    return key;
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw new Error(`تعذر فتح مفتاح تشفير قاعدة البيانات: ${error.message || error}`);
+    if (!createIfMissing) throw new Error('مفتاح تشفير قاعدة البيانات غير موجود؛ لم يتم تعديل ملف البيانات. استعد مفتاح النظام أو نسخة احتياطية خارجية.');
+  }
+
+  const key = randomBytes(32);
+  const temporaryPath = `${keyPath}.tmp`;
+  const encryptedKey = safeStorage.encryptString(key.toString('base64'));
+  await fs.writeFile(temporaryPath, encryptedKey, { mode: 0o600 });
+  await fs.rename(temporaryPath, keyPath);
+  return key;
+}
+
+function encryptDatabaseBytes(bytes, key) {
+  if (hasDatabaseMagic(bytes)) return Buffer.from(bytes);
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const ciphertext = Buffer.concat([cipher.update(Buffer.from(bytes)), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([DB_MAGIC, iv, tag, ciphertext]);
+}
+
+function decryptDatabaseBytes(bytes, key) {
+  const data = Buffer.from(bytes);
+  if (!hasDatabaseMagic(data)) return data;
+  const offset = DB_MAGIC.length;
+  const iv = data.subarray(offset, offset + 12);
+  const tag = data.subarray(offset + 12, offset + 28);
+  const ciphertext = data.subarray(offset + 28);
+  if (iv.length !== 12 || tag.length !== 16 || ciphertext.length === 0) {
+    throw new Error('ملف قاعدة البيانات المشفر تالف أو غير مكتمل.');
+  }
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  } catch {
+    throw new Error('تعذر فك تشفير قاعدة البيانات. مفتاح النظام غير متاح أو الملف تالف.');
+  }
+}
+
+async function atomicWrite(fs, filePath, bytes) {
+  const temporaryPath = `${filePath}.tmp`;
+  try {
+    await fs.writeFile(temporaryPath, bytes, { mode: 0o600 });
+    await fs.rename(temporaryPath, filePath);
+  } catch (error) {
+    try { await fs.unlink(temporaryPath); } catch (cleanupError) {
+      if (cleanupError.code !== 'ENOENT') throw cleanupError;
+    }
+    throw error;
+  }
+}
+
 function registerDatabaseHandlers({
   ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
   APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
 }) {
+  const getKey = () => readOrCreateDatabaseKey({ appDataDir: APP_DATA_DIR, fs, fsSync, safeStorage, path });
+
   ipcMain.handle('db:load', async (event) => {
     validateIpcSender(event);
     ensureDirs();
     if (!(await databaseFileExists())) return null;
-    const buffer = await fs.readFile(DB_FILE);
-    if (buffer.length > MAX_DB_SIZE) {
+    const fileBytes = await fs.readFile(DB_FILE);
+    if (fileBytes.length > MAX_DB_SIZE + 64) {
       throw new Error('Database file exceeds maximum allowed size');
     }
-    return new Uint8Array(buffer);
+    const plaintext = hasDatabaseMagic(fileBytes)
+      ? decryptDatabaseBytes(fileBytes, await readOrCreateDatabaseKey({
+          appDataDir: APP_DATA_DIR, fs, safeStorage, path, createIfMissing: false,
+        }))
+      : fileBytes;
+    if (plaintext.length > MAX_DB_SIZE) throw new Error('Database file exceeds maximum allowed size');
+    return new Uint8Array(plaintext);
   });
 
   ipcMain.handle('db:preserve-corrupt', async (event) => {
     validateIpcSender(event);
     ensureDirs();
-    if (!(await databaseFileExists())) {
-      throw new Error('قاعدة البيانات الأصلية غير موجودة لإنشاء نسخة استعادة.');
-    }
+    if (!(await databaseFileExists())) throw new Error('قاعدة البيانات الأصلية غير موجودة لإنشاء نسخة استعادة.');
+    const raw = await fs.readFile(DB_FILE);
+    const protectedBytes = hasDatabaseMagic(raw)
+      ? raw
+      : encryptDatabaseBytes(raw, await getKey());
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const target = path.join(BACKUP_DIR, `ceramisys_corrupt_${stamp}.sqlite`);
-    await fs.copyFile(DB_FILE, target, fsSync.constants.COPYFILE_EXCL);
-    return { path: target, bytes: (await fs.stat(target)).size };
+    const target = path.join(BACKUP_DIR, `ceramisys_corrupt_${stamp}.sqlite.enc`);
+    await fs.writeFile(target, protectedBytes, { mode: 0o600, flag: 'wx' });
+    return { path: target, bytes: protectedBytes.length };
   });
 
   ipcMain.handle('db:create-fresh-after-recovery', async (event) => {
     validateIpcSender(event);
     ensureDirs();
     if (!(await databaseFileExists())) return { ok: true };
-
+    const raw = await fs.readFile(DB_FILE);
+    const protectedBytes = hasDatabaseMagic(raw) ? raw : encryptDatabaseBytes(raw, await getKey());
+    await atomicWrite(fs, DB_FILE, protectedBytes);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const target = path.join(BACKUP_DIR, `ceramisys_replaced_${stamp}.sqlite`);
+    const target = path.join(BACKUP_DIR, `ceramisys_replaced_${stamp}.sqlite.enc`);
     await fs.copyFile(DB_FILE, target, fsSync.constants.COPYFILE_EXCL);
     await fs.rename(DB_FILE, `${DB_FILE}.replaced-${stamp}`);
     return { ok: true, path: target };
@@ -43,24 +128,29 @@ function registerDatabaseHandlers({
     try {
       ensureDirs();
       const data = Buffer.from(bytes);
-      if (data.length > MAX_DB_SIZE) {
-        throw new Error('Database data exceeds maximum allowed size');
-      }
-      const tmp = `${DB_FILE}.tmp`;
-      try {
-        await fs.writeFile(tmp, data);
-        await fs.rename(tmp, DB_FILE);
-      } catch (error) {
-        try { await fs.unlink(tmp); } catch (cleanupError) {
-          if (cleanupError.code !== 'ENOENT') throw cleanupError;
-        }
-        throw error;
-      }
-      return { ok: true, path: DB_FILE, bytes: data.length };
+      if (data.length > MAX_DB_SIZE) throw new Error('Database data exceeds maximum allowed size');
+      const key = await getKey();
+      const encrypted = encryptDatabaseBytes(data, key);
+      await atomicWrite(fs, DB_FILE, encrypted);
+      return { ok: true, path: DB_FILE, bytes: encrypted.length };
     } catch (error) {
-      console.error('Failed to save database file:', error);
+      console.error('Failed to save encrypted database file:', error);
       return { ok: false, error: error.message || String(error) };
     }
+  });
+
+  ipcMain.handle('db:decrypt-local-backup', async (event, bytes) => {
+    validateIpcSender(event);
+    const encrypted = Buffer.from(bytes || []);
+    if (encrypted.length > MAX_DB_SIZE + 64 || !hasDatabaseMagic(encrypted)) {
+      throw new Error('ملف النسخة المحلية ليس نسخة مشفرة صالحة.');
+    }
+    const key = await readOrCreateDatabaseKey({
+      appDataDir: APP_DATA_DIR, fs, safeStorage, path, createIfMissing: false,
+    });
+    const plaintext = decryptDatabaseBytes(encrypted, key);
+    if (plaintext.length > MAX_DB_SIZE) throw new Error('Database file exceeds maximum allowed size');
+    return new Uint8Array(plaintext);
   });
 
   ipcMain.handle('db:backup', async (event, label) => {
@@ -68,14 +158,15 @@ function registerDatabaseHandlers({
     try {
       ensureDirs();
       if (!fsSync.existsSync(DB_FILE)) return { ok: false, error: 'قاعدة البيانات غير موجودة بعد' };
+      const raw = await fs.readFile(DB_FILE);
+      const protectedBytes = hasDatabaseMagic(raw) ? raw : encryptDatabaseBytes(raw, await getKey());
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const safeLabel = String(label || 'manual').replace(/[^a-zA-Z0-9_-]/g, '-');
-      const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite`);
-      await fs.copyFile(DB_FILE, target);
-      const stat = await fs.stat(target);
-      return { ok: true, path: target, bytes: stat.size };
+      const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite.enc`);
+      await fs.writeFile(target, protectedBytes, { mode: 0o600, flag: 'wx' });
+      return { ok: true, path: target, bytes: protectedBytes.length };
     } catch (error) {
-      console.error('Failed to create backup:', error);
+      console.error('Failed to create encrypted database backup:', error);
       return { ok: false, error: error.message || String(error) };
     }
   });
@@ -83,15 +174,13 @@ function registerDatabaseHandlers({
   ipcMain.handle('db:remove-backup', async (event, fileName) => {
     validateIpcSender(event);
     if (typeof fileName !== 'string' || path.basename(fileName) !== fileName ||
-      !/^ceramisys_auto_[A-Za-z0-9_-]+\.sqlite$/.test(fileName)) {
+      !/^ceramisys_auto_[A-Za-z0-9_-]+\.sqlite\.enc$/.test(fileName)) {
       throw new Error('Invalid automatic backup file name');
     }
     ensureDirs();
     const backupRoot = path.resolve(BACKUP_DIR);
     const target = path.resolve(backupRoot, fileName);
-    if (path.dirname(target) !== backupRoot) {
-      throw new Error('Backup file is outside the backup directory');
-    }
+    if (path.dirname(target) !== backupRoot) throw new Error('Backup file is outside the backup directory');
     try {
       await fs.unlink(target);
       return { ok: true, deleted: true };
@@ -116,9 +205,7 @@ function registerDatabaseHandlers({
   ipcMain.handle('credentials:get', async (event) => {
     validateIpcSender(event);
     if (!fsSync.existsSync(REMEMBERED_CREDENTIALS_FILE)) return null;
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
-    }
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
     const encrypted = await fs.readFile(REMEMBERED_CREDENTIALS_FILE);
     const credentials = JSON.parse(safeStorage.decryptString(encrypted));
     if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
@@ -133,29 +220,22 @@ function registerDatabaseHandlers({
 
   ipcMain.handle('credentials:set', async (event, { username, password }) => {
     validateIpcSender(event);
-    if (typeof username !== 'string' || typeof password !== 'string') {
-      throw new Error('بيانات الدخول غير صالحة للحفظ.');
-    }
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
-    }
+    if (typeof username !== 'string' || typeof password !== 'string') throw new Error('بيانات الدخول غير صالحة للحفظ.');
+    if (!safeStorage.isEncryptionAvailable()) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
     ensureDirs();
     const encrypted = safeStorage.encryptString(JSON.stringify({ username, password, consented: true }));
     const temporaryFile = `${REMEMBERED_CREDENTIALS_FILE}.tmp`;
-    await fs.writeFile(temporaryFile, encrypted);
+    await fs.writeFile(temporaryFile, encrypted, { mode: 0o600 });
     await fs.rename(temporaryFile, REMEMBERED_CREDENTIALS_FILE);
     return { ok: true };
   });
 
   ipcMain.handle('credentials:clear', async (event) => {
     validateIpcSender(event);
-    try {
-      await fs.unlink(REMEMBERED_CREDENTIALS_FILE);
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
+    try { await fs.unlink(REMEMBERED_CREDENTIALS_FILE); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
     return { ok: true };
   });
 }
 
-module.exports = { registerDatabaseHandlers };
+module.exports = { registerDatabaseHandlers, encryptDatabaseBytes, decryptDatabaseBytes, hasDatabaseMagic };

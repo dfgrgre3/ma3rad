@@ -72,12 +72,18 @@ test('registered database handlers initialize directories and load/save within t
     assert.ok(fsSync.existsSync(dataDir));
     assert.ok(fsSync.existsSync(backupDir));
 
-    assert.deepEqual(
-      await handlers.get('db:save')(event, new Uint8Array([1, 2, 3, 4])),
-      { ok: true, path: dbFile, bytes: 4 },
-    );
+    const saved = await handlers.get('db:save')(event, new Uint8Array([1, 2, 3, 4]));
+    assert.equal(saved.ok, true);
+    assert.equal(saved.path, dbFile);
+    assert.ok(saved.bytes > 4);
+    const encryptedOnDisk = await fs.readFile(dbFile);
+    assert.equal(encryptedOnDisk.subarray(0, 16).toString(), 'CERAMISYS-DB\0v1\0');
     assert.deepEqual(
       Array.from(await handlers.get('db:load')(event)),
+      [1, 2, 3, 4],
+    );
+    assert.deepEqual(
+      Array.from(await handlers.get('db:decrypt-local-backup')(event, encryptedOnDisk)),
       [1, 2, 3, 4],
     );
     const originalConsoleError = console.error;
@@ -135,6 +141,8 @@ test('database backup removal is limited to automatic backup files', async () =>
     await fs.writeFile(dbFile, Buffer.from([1, 2, 3]));
     const backup = await handlers.get('db:backup')(event, 'auto');
     const fileName = path.basename(backup.path);
+    assert.match(fileName, /^ceramisys_auto_.*\.sqlite\.enc$/);
+    assert.equal((await fs.readFile(backup.path)).subarray(0, 16).toString(), 'CERAMISYS-DB\0v1\0');
     assert.ok(fsSync.existsSync(path.join(backupDir, fileName)));
 
     assert.deepEqual(await handlers.get('db:remove-backup')(event, fileName), {

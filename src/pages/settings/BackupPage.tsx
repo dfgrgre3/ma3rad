@@ -76,7 +76,7 @@ export const BackupPage: React.FC = () => {
           <div>
             <h1 className="text-base font-black text-slate-900">النسخ الاحتياطي واستعادة البيانات (Backup & Recovery)</h1>
             <p className="text-xs text-slate-500 font-medium">
-              ملفات SQLite المصدرة غير مشفرة على مستوى التطبيق؛ احفظها في موقع آمن
+              يعمل النظام محليًا على هذا الجهاز فقط؛ النسخ الاحتياطي لحماية بياناته وليس لمزامنتها بين الأجهزة
             </p>
           </div>
         </div>
@@ -118,9 +118,9 @@ export const BackupPage: React.FC = () => {
             <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-600 mb-4">
               <HardDrive className="w-6 h-6" />
             </div>
-            <h2 className="text-base font-bold text-slate-900 mb-1.5">تصدير قاعدة بيانات SQLite كاملة</h2>
+            <h2 className="text-base font-bold text-slate-900 mb-1.5">تصدير نسخة مشفرة من قاعدة البيانات</h2>
             <p className="text-xs text-slate-500 leading-relaxed mb-4">
-              يقوم النظام بتصدير لقطة (Snapshot) فورية مطابقة تماماً لكافة بيانات المعرض: المنتجات، العملاء، فواتير المبيعات، المخازن، والقيود المالية بصيغة ملف SQLite ثنائي يمكن تشغيله على أي جهاز.
+              يصدر النظام نسخة كاملة مشفرة بـ AES-256-GCM. احتفظ بالملف وكلمة مروره لاستعادة بيانات هذا الجهاز عند الحاجة.
             </p>
           </div>
 
@@ -129,7 +129,7 @@ export const BackupPage: React.FC = () => {
             className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl text-xs font-bold border border-slate-300 flex items-center justify-center gap-2 transition"
           >
             <Download className="w-4 h-4 text-sky-600" />
-            تحميل ملف النسخة الاحتياطية (.sqlite)
+            تحميل نسخة مشفرة (.ceramisys-backup)
           </button>
         </div>
 
@@ -141,16 +141,16 @@ export const BackupPage: React.FC = () => {
             </div>
             <h2 className="text-base font-bold text-slate-900 mb-1.5">استرجاع قاعدة البيانات من ملف</h2>
             <p className="text-xs text-slate-500 leading-relaxed mb-4">
-              استيراد ملف قاعدة بيانات SQLite سابق لاستعادة كافة الفواتير والمخازن إلى نقطة زمنية سابقة في حال تلف الجهاز أو نقل النظام إلى حاسوب جديد.
+              استعد بيانات النظام على هذا الجهاز من نسخة مشفرة، أو استورد ملف SQLite قديمًا بعد تأكيد أنه غير مشفر.
             </p>
           </div>
 
           <label className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
             <Upload className="w-4 h-4" />
-            <span>{isRestoring ? 'جاري الاستيراد...' : 'اختيار ملف النسخة الاحتياطية (.sqlite)'}</span>
-            <input
+            <span>{isRestoring ? 'جاري الاستيراد...' : 'اختيار ملف النسخة الاحتياطية'}</span>
+              <input
               type="file"
-              accept=".sqlite,.db"
+              accept=".ceramisys-backup,.sqlite.enc,.sqlite,.db"
               onChange={handleFileChange}
               disabled={isRestoring}
               className="hidden"

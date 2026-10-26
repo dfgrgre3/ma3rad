@@ -511,10 +511,11 @@ export class DatabaseManager {
     return this.lastPersistError;
   }
 
-  public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unavailable'; error?: string } {
+  public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable'; error?: string } {
     if (this.lastPersistError) return { status: 'error', error: this.lastPersistError };
     if (this.storageBackend === 'none') return { status: 'unavailable' };
     if (this.debounceSaveTimer || this.isPersisting || this.pendingSnapshot) return { status: 'saving' };
+    if (this.storageBackend === 'localStorage') return { status: 'unencrypted' };
     return { status: 'saved' };
   }
 

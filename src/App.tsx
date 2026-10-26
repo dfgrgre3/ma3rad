@@ -327,6 +327,9 @@ const DatabasePersistenceStatus: React.FC = () => {
   if (state.status === 'saving') {
     return <div role="status" aria-live="polite" className="fixed bottom-3 left-3 z-[100] rounded-full border border-amber-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-amber-700 shadow-lg">جارٍ حفظ التغييرات…</div>;
   }
+  if (state.status === 'unencrypted') {
+    return <div role="alert" aria-live="polite" className="fixed bottom-3 left-3 z-[100] rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800 shadow-xl">تُحفظ البيانات في تخزين المتصفح غير المشفر. استخدم تطبيق سطح المكتب لحماية قاعدة البيانات المحلية.</div>;
+  }
   return (
     <div role="alert" aria-live="assertive" className="fixed bottom-3 left-3 z-[100] max-w-[min(92vw,36rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800 shadow-xl">
       {state.status === 'unavailable' ? 'تعذر تحديد وسيط حفظ قاعدة البيانات.' : `فشل حفظ قاعدة البيانات: ${state.error || 'خطأ غير معروف'}`}

@@ -7,6 +7,7 @@ declare global {
       db?: {
         load?: () => Promise<Uint8Array | null>;
         save?: (bytes: Uint8Array) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
+        decryptLocalBackup?: (bytes: Uint8Array) => Promise<Uint8Array>;
         backup?: (label?: string) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
         removeBackup?: (fileName: string) => Promise<{ ok: boolean; deleted: boolean; error?: string }>;
         preserveCorrupt?: () => Promise<{ path: string; bytes: number }>;

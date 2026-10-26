@@ -41,7 +41,11 @@ test('Electron database initialization loads and persists through the registered
     path,
     fs: fsPromises,
     fsSync: fs,
-    safeStorage: {},
+    safeStorage: {
+      isEncryptionAvailable: () => true,
+      encryptString: (value: string) => Buffer.from(value),
+      decryptString: (value: Buffer) => value.toString(),
+    },
     APP_DATA_DIR: appDataDir,
     DATA_DIR: dataDir,
     BACKUP_DIR: backupDir,

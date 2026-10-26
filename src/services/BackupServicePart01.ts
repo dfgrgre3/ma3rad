@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { AuditService } from './AuditService';
 import { localDateString } from '../utils/date';
+import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup, isEncryptedLocalDatabase } from './backupEncryption';
 
 export class BackupServicePart01 {
 protected db = DatabaseManager.getInstance();
@@ -16,14 +17,20 @@ private require(): { id: string; fullName: string } {
 
 public async exportBackupFile(): Promise<void> {
     const user = this.require();
+    const password = window.prompt('أنشئ كلمة مرور للنسخة المشفرة (12 حرفًا على الأقل). لن تُحفظ كلمة المرور داخل التطبيق:');
+    if (!password) throw new Error('أُلغي تصدير النسخة المشفرة.');
+    if (password.length < 12) throw new Error('يجب أن تكون كلمة مرور النسخة 12 حرفًا على الأقل.');
+    const repeatedPassword = window.prompt('أعد إدخال كلمة مرور النسخة للتأكيد:');
+    if (password !== repeatedPassword) throw new Error('كلمتا المرور غير متطابقتين.');
     await this.db.flush();
     const binary = this.db.exportDatabaseBinary();
     const inspection = this.verifyBackupFile(binary);
     if (!inspection.valid) throw new Error(`تعذر التحقق من النسخة الحالية: ${inspection.error || inspection.integrity}`);
-    const blob = new Blob([binary as any], { type: 'application/octet-stream' });
+    const encrypted = await encryptExternalBackup(binary, password);
+    const blob = new Blob([encrypted as any], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const fileName = `ceramics_erp_backup_${localDateString()}_${Date.now().toString().slice(-4)}.sqlite`;
+    const fileName = `ceramisys_backup_${localDateString()}_${Date.now().toString().slice(-4)}.ceramisys-backup`;
     a.href = url;
     a.download = fileName;
     a.click();
@@ -31,8 +38,8 @@ public async exportBackupFile(): Promise<void> {
 
     this.db.run(
       `INSERT INTO backup_history (id, file_name, file_path, file_size_bytes, backup_type, status)
-       VALUES (?, ?, ?, ?, 'MANUAL_DOWNLOAD', 'SUCCESS')`,
-      [`bak_${uuidv4().substring(0, 8)}`, fileName, 'Browser / User Download', binary.length]
+       VALUES (?, ?, ?, ?, 'MANUAL_DOWNLOAD_ENCRYPTED', 'SUCCESS')`,
+      [`bak_${uuidv4().substring(0, 8)}`, fileName, 'Browser / User Download', encrypted.length]
     );
 
     new AuditService().log({
@@ -40,7 +47,7 @@ public async exportBackupFile(): Promise<void> {
       userName: user.fullName,
       action: 'تصدير نسخة احتياطية',
       module: 'SYSTEM',
-      newValues: JSON.stringify({ fileName, bytes: binary.length }),
+      newValues: JSON.stringify({ fileName, bytes: encrypted.length, encryption: 'AES-256-GCM/PBKDF2-SHA-256' }),
     });
   }
 
@@ -56,7 +63,22 @@ public async restoreBackupFromFile(file: File): Promise<{
   }> {
     const user = this.require();
     const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
+    const fileBytes = new Uint8Array(arrayBuffer);
+    let bytes: Uint8Array;
+    if (isEncryptedBackup(fileBytes)) {
+      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
+      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
+      bytes = await decryptExternalBackup(fileBytes, password);
+    } else if (isEncryptedLocalDatabase(fileBytes)) {
+      const decryptLocal = typeof window !== 'undefined' ? window.ceramisys?.db?.decryptLocalBackup : undefined;
+      if (!decryptLocal) throw new Error('هذه نسخة محلية مرتبطة بمفتاح هذا الجهاز؛ استعدها من تطبيق سطح المكتب الذي أنشأها.');
+      bytes = await decryptLocal(fileBytes);
+    } else {
+      if (!window.confirm('هذا ملف SQLite قديم غير مشفر. استيراده قد يعرّض بياناته للقراءة خارج التطبيق. هل تريد المتابعة؟')) {
+        throw new Error('أُلغي استيراد الملف غير المشفر.');
+      }
+      bytes = fileBytes;
+    }
 
     // Validate integrity and inspect contents before replacing live database
     const inspection = this.verifyBackupFile(bytes);
