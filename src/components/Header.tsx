@@ -27,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const { settings, resolvedMode, toggleMode } = useTheme();
 
   const visibleGroups = useMemo(() => {
@@ -40,7 +41,11 @@ export const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !menuRef.current?.contains(target) &&
+        !mobileMenuRef.current?.contains(target)
+      ) {
         setOpenMenu(null);
       }
     };
@@ -155,6 +160,8 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition"
           aria-label="القائمة"
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-navigation-menu"
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -198,8 +205,12 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* ── Mobile Menu ───────────────────────────────────────────────────────── */}
       {mobileMenuOpen && createPortal(
-        <div className="lg:hidden fixed top-16 right-0 bottom-0 left-0 z-[100] overflow-y-auto overscroll-contain bg-white dark:bg-slate-900">
-          <nav className="p-4 space-y-2" dir="rtl">
+        <div
+          ref={mobileMenuRef}
+          id="mobile-navigation-menu"
+          className="lg:hidden fixed top-16 right-0 bottom-0 left-0 z-[100] overflow-y-auto overscroll-contain bg-white dark:bg-slate-900"
+        >
+          <nav className="p-4 space-y-2" dir="rtl" aria-label="التنقل الرئيسي">
             <button
               onClick={() => { setMobileMenuOpen(false); navigate('/dashboard'); }}
               className="w-full px-4 py-3 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -217,6 +228,7 @@ export const Header: React.FC<HeaderProps> = ({
                         ? 'bg-sky-50 text-sky-600 dark:bg-slate-800 dark:text-sky-400'
                         : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
                     }`}
+                    aria-expanded={isOpen}
                   >
                     <span className="flex-1 text-right">{group.label}</span>
                     {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -229,7 +241,7 @@ export const Header: React.FC<HeaderProps> = ({
                           <NavLink
                             key={item.to + item.label}
                             to={item.to}
-                          onClick={() => setMobileMenuOpen(false)}
+                            onClick={() => setMobileMenuOpen(false)}
                             className={({ isActive }) =>
                               `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
                                 isActive

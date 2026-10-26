@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { ArrowDownAZ, Download, FilePlus2, Pencil, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { DynamicDataService, DynamicEntity, DynamicField, DynamicRecord } from '../../services/DynamicDataService';
@@ -28,7 +29,23 @@ export const DynamicDataPage: React.FC = () => {
   const rollback=(batchId:string)=>{if(!window.confirm('سيتم حذف كل السجلات التي أضافتها هذه الدفعة. متابعة؟'))return;try{const count=service.rollbackBatch(batchId);setMessage(`تم التراجع عن الدفعة وحذف ${count} سجل.`);setLoadedPage(1);setRecords(service.listRecords(entityId,search,1,200).rows);setBatches(service.getBatches(entityId));refresh();}catch(e:any){setMessage(e.message);}};
 
   return <div className="mx-auto max-w-7xl space-y-5 p-4 md:p-8" dir="rtl">
-    <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-black text-slate-900">إدارة أنواع البيانات المرنة</h1><p className="mt-1 text-sm text-slate-500">تعريفات الأنواع والحقول تبقى محفوظة لإعادة استخدامها بعد كل استيراد.</p></div><a href="#/data-import" className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-black text-white">استيراد ملف جديد</a></header>
+    {/* Sub Navigation Bar */}
+    <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+      <Link
+        to="/data-import"
+        className="px-4 py-2 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-100 transition"
+      >
+        مركز استيراد الملفات (Excel / CSV)
+      </Link>
+      <Link
+        to="/data-import/types"
+        className="px-4 py-2 rounded-xl text-xs font-black bg-sky-600 text-white shadow-sm"
+      >
+        إدارة أنواع البيانات المرنة والسجلات
+      </Link>
+    </div>
+
+    <header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-black text-slate-900">إدارة أنواع البيانات المرنة</h1><p className="mt-1 text-sm text-slate-500">تعريفات الأنواع والحقول تبقى محفوظة لإعادة استخدامها بعد كل استيراد.</p></div><Link to="/data-import" className="rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2.5 text-sm font-black text-white transition">استيراد ملف جديد</Link></header>
     {message&&<div className="rounded-xl bg-sky-50 p-3 text-sm font-bold text-sky-900">{message}</div>}
     <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
       <aside className="rounded-2xl border border-slate-200 bg-white p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-black">أنواع البيانات</h2><button onClick={refresh} className="text-xs font-bold text-sky-700">تحديث</button></div><div className="space-y-2">{entities.map(e=><button key={e.id} onClick={()=>setEntityId(e.id)} className={`w-full rounded-xl p-3 text-right ${entityId===e.id?'bg-sky-100 text-sky-900':'bg-slate-50 text-slate-700'}`}><span className="block text-sm font-black">{e.name}</span><span className="mt-1 block text-xs">{e.fields.length} حقل · {e.recordCount||0} سجل</span></button>)}{!entities.length&&<p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">لا توجد أنواع مرنة بعد. ارفع ملفًا غير مطابق للأنواع المعروفة.</p>}</div></aside>

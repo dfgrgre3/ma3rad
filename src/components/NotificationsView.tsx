@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Bell, BellOff, Check, CheckCheck, Trash2, 
-  AlertTriangle, Package, DollarSign, Clock, Settings
+  AlertTriangle, Package, DollarSign, Clock, Settings, UserRoundX, ExternalLink
 } from 'lucide-react';
 import { NotificationService, Notification, NotificationType } from '../services/NotificationService';
 
 export const NotificationsView: React.FC = () => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -54,6 +56,11 @@ export const NotificationsView: React.FC = () => {
     loadData();
   };
 
+  const handleNavigateToCustomer = (notif: Notification) => {
+    if (!notif.isRead) notificationService.markAsRead(notif.id);
+    navigate(`/customers/${notif.referenceId}`);
+  };
+
   const getTypeIcon = (type: NotificationType) => {
     switch (type) {
       case 'LOW_STOCK':
@@ -68,6 +75,8 @@ export const NotificationsView: React.FC = () => {
         return <Check className="w-4 h-4 text-emerald-500" />;
       case 'EXPENSE_RECORDED':
         return <DollarSign className="w-4 h-4 text-rose-500" />;
+      case 'INCOMPLETE_CUSTOMER':
+        return <UserRoundX className="w-4 h-4 text-orange-500" />;
       default:
         return <Bell className="w-4 h-4 text-slate-500" />;
     }
@@ -87,6 +96,8 @@ export const NotificationsView: React.FC = () => {
         return 'border-r-emerald-500 bg-emerald-50/50 ';
       case 'EXPENSE_RECORDED':
         return 'border-r-rose-500 bg-rose-50/50 ';
+      case 'INCOMPLETE_CUSTOMER':
+        return 'border-r-orange-500 bg-orange-50/50 ';
       default:
         return 'border-r-slate-500 bg-slate-100 ';
     }
@@ -168,13 +179,13 @@ export const NotificationsView: React.FC = () => {
             <div
               key={notif.id}
               className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden border-r-4 ${
- !notif.isRead ? getTypeColor(notif.type) : 'border-r-slate-200 border-r-slate-700'
+ notif.isRead ? 'border-r-slate-200' : getTypeColor(notif.type)
  }`}
             >
               <div className="p-4 flex items-start gap-4">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
  !notif.isRead ? 'bg-slate-100' : 'bg-slate-50 '
- }`}>
+}`}>
                   {getTypeIcon(notif.type)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -188,6 +199,16 @@ export const NotificationsView: React.FC = () => {
                   </div>
                   <p className="text-xs text-slate-500 mt-1 line-clamp-2">{notif.message}</p>
                   <div className="text-[10px] text-slate-500 mt-2">{notif.createdAt}</div>
+                  {/* Navigate-to-customer button */}
+                  {notif.type === 'INCOMPLETE_CUSTOMER' && notif.referenceId && (
+                    <button
+                      onClick={() => handleNavigateToCustomer(notif)}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 px-3 py-1.5 text-[11px] font-black text-white transition"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      إكمال بيانات العميل
+                    </button>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {!notif.isRead && (

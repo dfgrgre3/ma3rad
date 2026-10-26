@@ -6,6 +6,7 @@ import { localDateString } from '../utils/date';
 import { postLedgerEntry } from '../database/ledger';
 import { round2 } from './financials';
 import { InventoryCostingService } from './InventoryCostingService';
+import { getProductUnitLabel } from '../utils/productUnits';
 
 export interface ReturnablePurchaseItem {
   productId: string;
@@ -16,7 +17,12 @@ export interface ReturnablePurchaseItem {
   returnedM2: number;
   returnableM2: number;
   metersPerBox: number;
+  productType: 'CERAMIC' | 'GENERAL';
+  baseUnit?: string;
+  customUnit?: string;
 }
+
+export type PurchaseRefundMethod = 'CASH' | 'BALANCE';
 
 export interface PurchaseReturnRow {
   id: string;
@@ -31,11 +37,24 @@ export interface PurchaseReturnRow {
   totalAmount: number;
   refundedAmount: number;
   remainingToBalance: number;
+  /** مستخلص من refunded_amount: نقدي إن وُجد مبلغ مردود وإلا خصم من حساب المورد. */
+  refundMethod: PurchaseRefundMethod;
   reason: string;
   createdByName?: string;
   createdAt: string;
   itemsCount?: number;
 }
+
+export interface PurchaseReturnStats {
+  count: number;
+  totalAmount: number;
+  cashRefunded: number;
+  creditedToBalance: number;
+  todayCount: number;
+  todayAmount: number;
+}
+
+type RawReturnRow = Omit<PurchaseReturnRow, 'refundMethod'>;
 
 export interface CreatePurchaseReturnDTO {
   purchaseId: string;
@@ -47,7 +66,12 @@ export interface CreatePurchaseReturnDTO {
 export class PurchaseReturnService {
   private db = DatabaseManager.getInstance();
 
-  public getAllReturns(search = ''): PurchaseReturnRow[] {
+  /** طريقة التسوية مستخلصة من المبلغ المردود فعليًا (نقدي) أو المرحّل لحساب المورد. */
+  private inferRefundMethod(row: { refundedAmount: number }): PurchaseRefundMethod {
+    return Number(row.refundedAmount) > 0 ? 'CASH' : 'BALANCE';
+  }
+
+  public getAllReturns(search = '', dateFrom?: string, dateTo?: string): PurchaseReturnRow[] {
     let sql = `
       SELECT pr.*, s.name AS supplierName, w.name AS warehouseName, u.full_name AS createdByName,
         (SELECT COUNT(*) FROM purchase_return_items i WHERE i.return_id = pr.id) AS itemsCount
@@ -63,12 +87,22 @@ export class PurchaseReturnService {
       const term = `%${search.trim()}%`;
       params.push(term, term, term, term);
     }
-    sql += ` ORDER BY pr.created_at DESC`;
-    return this.db.query<PurchaseReturnRow>(sql, params);
+    if (dateFrom) {
+      sql += ` AND pr.date >= ?`;
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      sql += ` AND pr.date <= ?`;
+      params.push(dateTo);
+    }
+    sql += ` ORDER BY pr.date DESC, pr.created_at DESC`;
+    return this.db
+      .query<RawReturnRow>(sql, params)
+      .map((row) => ({ ...row, refundMethod: this.inferRefundMethod(row) }));
   }
 
   public getReturnById(id: string): (PurchaseReturnRow & { items: any[] }) | null {
-    const row = this.db.query<PurchaseReturnRow>(`
+    const row = this.db.query<RawReturnRow>(`
       SELECT pr.*, s.name AS supplierName, w.name AS warehouseName, u.full_name AS createdByName
       FROM purchase_returns pr
       JOIN suppliers s ON s.id = pr.supplier_id
@@ -78,12 +112,16 @@ export class PurchaseReturnService {
     `, [id])[0];
     if (!row) return null;
     const items = this.db.query(`
-      SELECT id, product_id AS productId, product_name AS productName, grade,
-             quantity_m2 AS quantityM2, boxes_count AS boxesCount,
-             unit_cost AS unitCost, total_refund AS totalRefund
-      FROM purchase_return_items WHERE return_id = ?
+      SELECT pri.id, pri.product_id AS productId, pri.product_name AS productName, pri.grade,
+             pri.quantity_m2 AS quantityM2, pri.boxes_count AS boxesCount,
+             pri.unit_cost AS unitCost, pri.total_refund AS totalRefund,
+             COALESCE(p.product_type, 'CERAMIC') AS productType,
+             p.base_unit AS baseUnit, p.custom_unit AS customUnit
+      FROM purchase_return_items pri
+      LEFT JOIN products p ON p.id = pri.product_id
+      WHERE pri.return_id = ?
     `, [id]);
-    return { ...row, items };
+    return { ...row, refundMethod: this.inferRefundMethod(row), items };
   }
 
   public getReturnableItems(purchaseId: string): ReturnablePurchaseItem[] {
@@ -91,7 +129,9 @@ export class PurchaseReturnService {
       SELECT pii.product_id AS productId, pii.product_name AS productName, pii.grade,
         pii.unit_cost AS unitCost, pii.quantity_m2 AS purchasedM2,
         COALESCE(SUM(pri.quantity_m2), 0) AS returnedM2,
-        COALESCE(p.meters_per_box, 1.44) AS metersPerBox
+        COALESCE(p.meters_per_box, 1.44) AS metersPerBox,
+        COALESCE(p.product_type, 'CERAMIC') AS productType,
+        p.base_unit AS baseUnit, p.custom_unit AS customUnit
       FROM purchase_invoice_items pii
       LEFT JOIN products p ON p.id = pii.product_id
       LEFT JOIN purchase_returns pr ON pr.original_purchase_id = pii.purchase_id
@@ -134,7 +174,8 @@ export class PurchaseReturnService {
       const qty = Number(line.quantityM2) || 0;
       if (qty <= 0) continue;
       if (qty > source.returnableM2 + 0.009) {
-        throw new Error(`الكمية المرتجعة من "${source.productName}" تتجاوز المتاح (${source.returnableM2} م²).`);
+        const unitLabel = getProductUnitLabel(source);
+        throw new Error(`الكمية المرتجعة من "${source.productName}" تتجاوز المتاح (${source.returnableM2} ${unitLabel}).`);
       }
       const stock = this.db.query<any>(
         `SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
@@ -150,7 +191,9 @@ export class PurchaseReturnService {
         productName: source.productName,
         grade: source.grade,
         quantityM2: qty,
-        boxesCount: line.boxesCount || round2(qty / (source.metersPerBox || 1.44)),
+        boxesCount: line.boxesCount ?? (source.productType === 'GENERAL'
+          ? source.baseUnit === 'BOX' ? qty : 0
+          : round2(qty / (source.metersPerBox || 1.44))),
         unitCost: Number(source.unitCost),
         totalRefund: amount,
       });
@@ -240,16 +283,39 @@ export class PurchaseReturnService {
     });
   }
 
-  public getStats(): { count: number; total: number; cashRefunded: number } {
+  public getStats(): PurchaseReturnStats {
+    const today = localDateString();
     const row = this.db.query<any>(`
-      SELECT COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS total,
-             COALESCE(SUM(refunded_amount), 0) AS cashRefunded
+      SELECT COUNT(*) AS count,
+             COALESCE(SUM(total_amount), 0) AS totalAmount,
+             COALESCE(SUM(refunded_amount), 0) AS cashRefunded,
+             COALESCE(SUM(remaining_to_balance), 0) AS creditedToBalance,
+             COALESCE(SUM(CASE WHEN date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
+             COALESCE(SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END), 0) AS todayAmount
       FROM purchase_returns
-    `)[0];
+    `, [today, today])[0] || {};
     return {
-      count: Number(row?.count) || 0,
-      total: Number(row?.total) || 0,
-      cashRefunded: Number(row?.cashRefunded) || 0,
+      count: Number(row.count) || 0,
+      totalAmount: Number(row.totalAmount) || 0,
+      cashRefunded: Number(row.cashRefunded) || 0,
+      creditedToBalance: Number(row.creditedToBalance) || 0,
+      todayCount: Number(row.todayCount) || 0,
+      todayAmount: Number(row.todayAmount) || 0,
     };
+  }
+
+  /** أكثر أسباب الإرجاع تكرارًا لقيمة أكبر أثر مالي. */
+  public getTopReturnReasons(limit = 5): { reason: string; count: number; amount: number }[] {
+    return this.db.query<any>(`
+      SELECT reason, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS amount
+      FROM purchase_returns
+      GROUP BY reason
+      ORDER BY count DESC, amount DESC
+      LIMIT ?
+    `, [Math.max(1, Math.min(20, limit))]).map((row) => ({
+      reason: row.reason || 'غير محدد',
+      count: Number(row.count) || 0,
+      amount: Number(row.amount) || 0,
+    }));
   }
 }

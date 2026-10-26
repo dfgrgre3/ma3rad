@@ -7,6 +7,7 @@ import { InventoryService } from '../services/InventoryService';
 import { ProductService } from '../services/ProductService';
 import { WarehouseStock, InventoryTransaction, Warehouse as IWarehouse, Product } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
 
 export const InventoryView: React.FC = () => {
   const [stockList, setStockList] = useState<any[]>([]);
@@ -37,6 +38,8 @@ export const InventoryView: React.FC = () => {
     actualM2: 0,
     reason: 'جرد فعلي دوري'
   });
+  const adjustingProduct = products.find((product) => product.id === adjustData.productId);
+  const transferringProduct = products.find((product) => product.id === transferData.productId);
 
   const inventoryService = new InventoryService();
   const productService = new ProductService();
@@ -111,7 +114,7 @@ export const InventoryView: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900">إدارة المخازن وحركات المخزون</h2>
-          <p className="text-xs text-slate-500">مراقبة الأرصدة بالمتر والكرتونة، التحويلات بين المخازن، وسجل الحركات غير القابل للتعديل</p>
+          <p className="text-xs text-slate-500">مراقبة الأرصدة بوحدة كل صنف، والتحويلات بين المخازن، وسجل الحركات</p>
         </div>
 
         <div className="flex gap-2">
@@ -185,7 +188,9 @@ export const InventoryView: React.FC = () => {
                     <th className="p-3.5">المخزن</th>
                     <th className="p-3.5">اسم صنف السيراميك</th>
                     <th className="p-3.5">المقاس والفرز</th>
-                    <th className="p-3.5">الرصيد الفعلي (م²)</th>
+                    <th className="p-3.5">الرصيد بوحدة الصنف</th>
+                    <th className="p-3.5">الوارد</th>
+                    <th className="p-3.5">الصادر</th>
                     <th className="p-3.5">الرصيد بالكرتونة</th>
                     <th className="p-3.5">الرصيد بالقطع</th>
                     <th className="p-3.5">قيمة الرصيد (تكلفة)</th>
@@ -195,7 +200,7 @@ export const InventoryView: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 ">
                   {stockList.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-500">
+                      <td colSpan={10} className="py-12 text-center text-slate-500">
                         لا يوجد رصيد مسجل بالمخازن المحددة.
                       </td>
                     </tr>
@@ -208,16 +213,22 @@ export const InventoryView: React.FC = () => {
                           <div className="text-[10px] text-slate-500">كود: {stk.sku} | باركود: {stk.barcode}</div>
                         </td>
                         <td className="p-3.5 font-semibold text-slate-700">
-                          {stk.size} ({stk.grade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'})
+                          {stk.productType === 'GENERAL' ? getProductUnitLabel(stk) : `${stk.size} (${stk.grade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'})`}
                         </td>
                         <td className="p-3.5 font-black text-emerald-600 text-sm">
-                          {CeramicMath.formatM2(stk.quantityM2)}
+                          {stk.productType === 'GENERAL' ? formatProductQuantity(stk.quantityM2, stk) : CeramicMath.formatM2(stk.quantityM2)}
+                        </td>
+                        <td className="p-3.5 font-bold text-sky-700">
+                          {formatProductQuantity(stk.quantityIn || 0, stk)}
+                        </td>
+                        <td className="p-3.5 font-bold text-rose-700">
+                          {formatProductQuantity(stk.quantityOut || 0, stk)}
                         </td>
                         <td className="p-3.5 font-bold text-slate-900">
-                          {stk.quantityBoxes} كرتونة
+                          {stk.productType === 'GENERAL' ? '—' : `${stk.quantityBoxes} كرتونة`}
                         </td>
                         <td className="p-3.5 text-slate-600 ">
-                          {stk.quantityPieces} قطعة
+                          {stk.productType === 'GENERAL' ? '—' : `${stk.quantityPieces} قطعة`}
                         </td>
                         <td className="p-3.5 font-mono font-bold text-slate-700">
                           {CeramicMath.formatCurrency(stk.quantityM2 * stk.costPrice)}
@@ -258,7 +269,7 @@ export const InventoryView: React.FC = () => {
                   <th className="p-3.5">نوع الحركة</th>
                   <th className="p-3.5">الصنف</th>
                   <th className="p-3.5">المخزن</th>
-                  <th className="p-3.5">الكمية (م²)</th>
+                  <th className="p-3.5">الكمية</th>
                   <th className="p-3.5">البيان والملاحظات</th>
                   <th className="p-3.5">المستخدم</th>
                   <th className="p-3.5">التاريخ والوقت</th>
@@ -282,7 +293,7 @@ export const InventoryView: React.FC = () => {
                       <td className="p-3.5 font-bold">{tx.productName}</td>
                       <td className="p-3.5 text-slate-600 ">{tx.warehouseName}</td>
                       <td className={`p-3.5 font-black text-sm ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {isPositive ? `+${tx.quantityM2}` : tx.quantityM2} م²
+                        {isPositive ? `+${formatProductQuantity(tx.quantityM2, tx)}` : formatProductQuantity(tx.quantityM2, tx)}
                       </td>
                       <td className="p-3.5 text-slate-500 max-w-xs truncate">{tx.notes || '-'}</td>
                       <td className="p-3.5 text-slate-600">{tx.performedByName || 'المدير'}</td>
@@ -330,20 +341,20 @@ export const InventoryView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">صنف السيراميك المراد تحويله</label>
+                <label className="font-bold text-slate-700 block mb-1">الصنف المراد تحويله</label>
                 <select
                   value={transferData.productId}
                   onChange={(e) => setTransferData({ ...transferData, productId: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold"
                 >
                   {products.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.size})</option>
+                    <option key={p.id} value={p.id}>{p.name}{p.productType === 'GENERAL' ? ` (${getProductUnitLabel(p)})` : ` (${p.size})`}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الكمية المراد تحويلها بالمتر (م²)</label>
+                <label className="font-bold text-slate-700 block mb-1">{`الكمية المراد تحويلها (${transferringProduct ? getProductUnitLabel(transferringProduct) : 'م²'})`}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -394,11 +405,11 @@ export const InventoryView: React.FC = () => {
             <form onSubmit={handleStockAdjustment} className="space-y-3 text-xs">
               <div className="bg-slate-50 p-3 rounded-xl">
                 <div className="text-slate-500">الرصيد الدفتري الحالي:</div>
-                <div className="text-lg font-black text-sky-600">{adjustData.currentM2} م²</div>
+                <div className="text-lg font-black text-sky-600">{adjustingProduct ? formatProductQuantity(adjustData.currentM2, adjustingProduct) : `${adjustData.currentM2} م²`}</div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الرصيد الفعلي بعد الجرد بالمتر (م²) *</label>
+                <label className="font-bold text-slate-700 block mb-1">{`الرصيد الفعلي بعد الجرد (${adjustingProduct ? getProductUnitLabel(adjustingProduct) : 'م²'}) *`}</label>
                 <input
                   type="number"
                   step="0.01"

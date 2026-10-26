@@ -8,6 +8,7 @@ import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import type { Product, Supplier } from '../../types';
 import { useToast } from '../../components/ui/Toast';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -192,14 +193,14 @@ export const PurchaseOrdersPage: React.FC = () => {
                       <tr className="bg-slate-50/80">
                         <td colSpan={9} className="px-6 py-3">
                           <table className="w-full text-right text-[11px] bg-white border border-slate-200 rounded-lg overflow-hidden">
-                            <thead className="bg-slate-100 text-slate-500"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية (م²)</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">المستلم (م²)</th><th className="px-3 py-2">سعر التكلفة</th><th className="px-3 py-2">الإجمالي</th></tr></thead>
+                            <thead className="bg-slate-100 text-slate-500"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية بوحدة الصنف</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">المستلم</th><th className="px-3 py-2">تكلفة الوحدة</th><th className="px-3 py-2">الإجمالي</th></tr></thead>
                             <tbody className="divide-y divide-slate-100">
                               {details.items.map((item: any) => (
                                 <tr key={item.id}>
                                   <td className="px-3 py-2 font-semibold">{item.productName}</td>
-                                  <td className="px-3 py-2 font-mono">{item.quantityM2}</td>
-                                  <td className="px-3 py-2 font-mono">{item.boxesCount}</td>
-                                  <td className="px-3 py-2 font-mono">{item.receivedM2}</td>
+                                  <td className="px-3 py-2 font-mono">{formatProductQuantity(item.quantityM2, item)}</td>
+                                  <td className="px-3 py-2 font-mono">{item.productType === 'GENERAL' ? '—' : item.boxesCount}</td>
+                                  <td className="px-3 py-2 font-mono">{formatProductQuantity(item.receivedM2, item)}</td>
                                   <td className="px-3 py-2 font-mono">{fmt(item.unitCost)}</td>
                                   <td className="px-3 py-2 font-mono font-bold">{fmt(item.totalCost)}</td>
                                 </tr>
@@ -250,19 +251,19 @@ export const PurchaseOrdersPage: React.FC = () => {
 
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <table className="w-full text-right text-[11px]">
-                  <thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-24">الكمية (م²)</th><th className="px-3 py-2 w-28">سعر التكلفة</th><th className="px-3 py-2 w-24">الكراتين</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr></thead>
+                  <thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-24">الكمية / الوحدة</th><th className="px-3 py-2 w-28">تكلفة الوحدة</th><th className="px-3 py-2 w-24">الكراتين</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {lines.map((line, idx) => (
                       <tr key={idx}>
                         <td className="px-3 py-2">
                           <select value={line.productId} onChange={(e) => pickProduct(idx, e.target.value)} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold">
                             <option value="">— اختر الصنف —</option>
-                            {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.size}</option>)}
+                            {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {getProductUnitLabel(p)}</option>)}
                           </select>
                         </td>
-                        <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                        <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })} placeholder={products.find((product) => product.id === line.productId) ? getProductUnitLabel(products.find((product) => product.id === line.productId)!) : 'الوحدة'} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
                         <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.unitCost || ''} onChange={(e) => setLine(idx, { unitCost: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                        <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.boxesCount || ''} onChange={(e) => setLine(idx, { boxesCount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                        <td className="px-3 py-2"><input type="number" min={0} step="0.01" disabled={products.find((product) => product.id === line.productId)?.productType === 'GENERAL'} value={line.boxesCount || ''} onChange={(e) => setLine(idx, { boxesCount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono disabled:bg-slate-100" /></td>
                         <td className="px-3 py-2 font-bold">{fmt((Number(line.quantityM2) || 0) * (Number(line.unitCost) || 0))}</td>
                         <td className="px-3 py-2"><button type="button" onClick={() => setLines((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev)} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
                       </tr>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2, MessageCircle, Search, Truck } from 'lucide-react';
 import { CustomerSupplyService, CustomerSupplyRequest } from '../../services/CustomerSupplyService';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
 
@@ -43,7 +44,7 @@ export const ReadyDeliveriesPage: React.FC = () => {
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold"><CheckCircle2 className="w-4 h-4" />جاهزة</div>
         </div>
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="text-right p-3">المنتج</th><th className="text-right p-3">المطلوب</th><th className="text-right p-3">الوارد</th><th className="text-right p-3">السعر</th></tr></thead><tbody>{request.items.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="p-3 font-semibold">{item.productName}</td><td className="p-3">{fmt(item.quantityRequested)} م²</td><td className="p-3 text-emerald-700 font-bold">{fmt(item.quantityReceived)} م²</td><td className="p-3">{fmt(item.unitPrice)} ج</td></tr>)}</tbody></table></div>
+        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="text-right p-3">المنتج</th><th className="text-right p-3">المطلوب</th><th className="text-right p-3">الوارد</th><th className="text-right p-3">السعر / الوحدة</th></tr></thead><tbody>{request.items.map((item) => <tr key={item.id} className="border-t border-slate-100"><td className="p-3 font-semibold">{item.productName}</td><td className="p-3">{formatProductQuantity(item.quantityRequested, item)}</td><td className="p-3 text-emerald-700 font-bold">{formatProductQuantity(item.quantityReceived, item)}</td><td className="p-3">{fmt(item.unitPrice)} ج / {getProductUnitLabel(item)}</td></tr>)}</tbody></table></div>
         <div className="px-5 py-3 bg-slate-50/70 flex flex-wrap justify-between items-center gap-3"><div className="text-xs text-slate-600">المخزن: <b>{request.warehouseName || '—'}</b></div><button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"><MessageCircle className="w-4 h-4"/>إرسال واتساب</button></div>
       </article>)}
       {!loading && rows.length === 0 && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center text-slate-500">لا توجد طلبات جاهزة للتسليم حاليًا</div>}

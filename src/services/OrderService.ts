@@ -1,4 +1,4 @@
-﻿import { DatabaseManager } from '../database/db';
+import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
@@ -6,6 +6,7 @@ import { SalesService } from './SalesService';
 import { round2 } from './financials';
 import type { PaymentType, SalesInvoice } from '../types';
 import { localDateString } from '../utils/date';
+import { getProductUnitLabel } from '../utils/productUnits';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED';
 
@@ -37,6 +38,7 @@ export interface Order {
   totalM2?: number;
   deliveredM2?: number;
   invoicedM2?: number;
+  deliveryProgress?: number;
   createdAt: string;
   updatedAt?: string;
   items?: OrderItem[];
@@ -59,6 +61,9 @@ export interface OrderItem {
   invoicedM2?: number;
   notes?: string | null;
   metersPerBox?: number;
+  productType?: 'CERAMIC' | 'GENERAL';
+  baseUnit?: string;
+  customUnit?: string;
 }
 
 export interface OrderDeliveryLine {
@@ -134,6 +139,7 @@ export class OrderService {
               (SELECT COALESCE(SUM(oi.quantity_m2), 0) FROM order_items oi WHERE oi.order_id = o.id) AS total_m2,
               (SELECT COALESCE(SUM(oi.delivered_m2), 0) FROM order_items oi WHERE oi.order_id = o.id) AS delivered_m2,
               (SELECT COALESCE(SUM(oi.invoiced_m2), 0) FROM order_items oi WHERE oi.order_id = o.id) AS invoiced_m2
+              ,(SELECT COALESCE(AVG(CASE WHEN oi.quantity_m2 > 0 THEN MIN(1.0, oi.delivered_m2 / oi.quantity_m2) ELSE 0 END), 0) FROM order_items oi WHERE oi.order_id = o.id) * 100 AS deliveryProgress
        FROM orders o
       JOIN customers c ON c.id = o.customer_id
       JOIN warehouses w ON w.id = o.warehouse_id
@@ -179,7 +185,8 @@ export class OrderService {
 
   public getOrderItems(orderId: string): OrderItem[] {
     return this.db.query<OrderItem>(
-      `SELECT oi.*, p.sku, p.size, p.meters_per_box
+      `SELECT oi.*, p.sku, p.size, p.meters_per_box,
+              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM order_items oi
        LEFT JOIN products p ON p.id = oi.product_id
        WHERE oi.order_id = ?
@@ -425,6 +432,39 @@ export class OrderService {
     );
   }
 
+  public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string): Order {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'sales.create');
+    const order = this.getOrder(id);
+    if (!order) throw new Error('الطلب غير موجود.');
+    if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
+      throw new Error('لا يمكن تسجيل عربون لطلب مكتمل أو ملغي.');
+    }
+    const deposit = round2(Math.max(0, amount));
+    if (deposit <= 0) throw new Error('مبلغ العربون يجب أن يكون أكبر من صفر.');
+    const newPaid = round2(Number(order.paidAmount || 0) + deposit);
+    if (newPaid > order.totalAmount) {
+      throw new Error(`مجموع المدفوع (${newPaid} ج) يتجاوز إجمالي الطلب (${order.totalAmount} ج).`);
+    }
+    const newRemaining = round2(order.totalAmount - newPaid);
+
+    return this.db.executeTransaction((db) => {
+      db.run(
+        `UPDATE orders SET paid_amount = ?, remaining_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newPaid, newRemaining, id]
+      );
+      this.logStatus(
+        db, id, order.status, order.status,
+        `تسجيل عربون/دفعة بقيمة ${deposit} ج (${paymentType}) ${notes || ''}`.trim(),
+        actor.id, actor.fullName
+      );
+      this.audit(actor.id, actor.fullName, 'تسجيل عربون طلب', id, {
+        orderNumber: order.orderNumber, deposit, totalPaid: newPaid, remaining: newRemaining
+      });
+      return this.getOrder(id)!;
+    });
+  }
+
   public cancelOrder(id: string): void {
     this.updateStatus(id, 'CANCELLED');
   }
@@ -530,7 +570,9 @@ export class OrderService {
     const filtered = (items || []).filter((i) => i.productId && Number(i.quantityM2) > 0);
     return filtered.map((item) => {
       const product = this.db.query<any>(
-        `SELECT id, name, grade, meters_per_box, is_active FROM products WHERE id = ?`,
+        `SELECT id, name, grade, meters_per_box, is_active,
+                product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit
+         FROM products WHERE id = ?`,
         [item.productId]
       )[0];
       if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
@@ -541,7 +583,10 @@ export class OrderService {
         Math.max(0, Number(item.discountAmount) || 0),
         quantityM2 * unitPrice
       ));
-      const metersPerBox = Number(product.metersPerBox) || 1.44;
+      const metersPerBox = Number(product.metersPerBox ?? product.meters_per_box) || 1.44;
+      const boxesCount = product.productType === 'GENERAL'
+        ? product.baseUnit === 'BOX' ? quantityM2 : 0
+        : round2(quantityM2 / metersPerBox);
       return {
         productId: product.id as string,
         productName: product.name as string,
@@ -549,7 +594,10 @@ export class OrderService {
         quantityM2,
         unitPrice,
         discountAmount,
-        boxesCount: round2(quantityM2 / metersPerBox),
+        boxesCount,
+        productType: product.productType,
+        baseUnit: product.baseUnit,
+        customUnit: product.customUnit,
         totalPrice: round2(quantityM2 * unitPrice - discountAmount),
       };
     });
@@ -591,7 +639,12 @@ export class OrderService {
         throw new Error(`لا يوجد رصيد مخزني للصنف "${entry.name}" في المخزن المحدد.`);
       }
       if (available < entry.qty) {
-        throw new Error(`الرصيد المتاح من الصنف "${entry.name}" غير كافٍ للحجز. المتاح: ${round2(available)} م²، المطلوب: ${entry.qty} م²`);
+        const product = db.query<any>(
+          `SELECT product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit FROM products WHERE id = ?`,
+          [productId]
+        )[0];
+        const unitLabel = product ? getProductUnitLabel(product) : 'وحدة';
+        throw new Error(`الرصيد المتاح من الصنف "${entry.name}" غير كافٍ للحجز. المتاح: ${round2(available)} ${unitLabel}، المطلوب: ${entry.qty} ${unitLabel}`);
       }
       db.run(
         `UPDATE warehouse_stock SET reserved_m2 = reserved_m2 + ?, last_updated = CURRENT_TIMESTAMP

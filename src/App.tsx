@@ -7,6 +7,7 @@ import { SettingsService } from './services/SettingsService';
 import { User } from './types';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SetupWizard } from './components/SetupWizard';
+import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -123,24 +124,27 @@ export const App: React.FC = () => {
 
   // Ensure the latest snapshot reaches disk before the window closes.
   useEffect(() => {
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Note: beforeunload cannot be fully async in browsers, but we attempt a synchronous-like approach
-      // In Electron, we can request a controlled shutdown through IPC if available
+    // 1. Electron-controlled graceful shutdown: ensures pending disk writes finish before destroying the window
+    if (typeof window !== 'undefined' && window.ceramisys?.app?.onBeforeClose) {
+      const unsubscribe = window.ceramisys.app.onBeforeClose(async () => {
+        try {
+          await DatabaseManager.getInstance().flush();
+        } catch (err) {
+          console.error('Failed to flush database on app close:', err);
+        } finally {
+          window.ceramisys?.app?.notifyCloseReady?.();
+        }
+      });
+      return unsubscribe;
+    }
+
+    // 2. Browser fallback for web/tab close
+    const onBeforeUnload = () => {
       try {
-        const db = DatabaseManager.getInstance();
-        // Attempt to flush synchronously - this won't fully work in all browsers
-        // but provides best-effort attempt. For reliable shutdown, use app's exit handler.
-        void db.flush().then(() => {
-          // Flush completed successfully
-        }).catch((err) => {
-          console.error('Failed to flush database on close:', err);
-          // In production, this should show a user-facing error
-        });
+        void DatabaseManager.getInstance().flush();
       } catch (err) {
         console.error('Error during database flush attempt:', err);
       }
-      // Return undefined to allow default browser behavior
-      // Do not return a string to avoid showing the generic browser confirmation dialog
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
@@ -254,6 +258,12 @@ export const App: React.FC = () => {
     <ThemeProvider>
       <ToastProvider>
         <ErrorBoundary>
+          {currentUser?.mustChangePassword && (
+            <ForcePasswordChangeModal
+              user={currentUser}
+              onSuccess={(updated) => setCurrentUser(updated)}
+            />
+          )}
           {showSetup ? (
             <SetupWizard onComplete={() => setShowSetup(false)} />
           ) : (
@@ -301,6 +311,10 @@ const QuotationsPage         = lazy(() => import('./pages/sales/QuotationsPage')
 const OrdersPage             = lazy(() => import('./pages/sales/OrdersPage').then(m => ({ default: m.OrdersPage })));
 const ReturnsPage            = lazy(() => import('./pages/sales/ReturnsPage').then(m => ({ default: m.ReturnsPage })));
 const SalesAnalyticsPage     = lazy(() => import('./pages/sales/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
+const InvoiceCyclePage        = lazy(() => import('./pages/sales/InvoiceCyclePage').then(m => ({ default: m.InvoiceCyclePage })));
+const CustomerStatementPage   = lazy(() => import('./pages/sales/CustomerStatementPage').then(m => ({ default: m.CustomerStatementPage })));
+const ReservationsDepositPage = lazy(() => import('./pages/sales/ReservationsDepositPage').then(m => ({ default: m.ReservationsDepositPage })));
+const AfterSalesPage          = lazy(() => import('./pages/sales/AfterSalesPage').then(m => ({ default: m.AfterSalesPage })));
 const ProductsView           = lazy(() => import('./components/ProductsView').then(m => ({ default: m.ProductsView })));
 const ProductDetailPage      = lazy(() => import('./pages/products/ProductDetailPage').then(m => ({ default: m.ProductDetailPage })));
 const ProductAttributesPage  = lazy(() => import('./pages/products/ProductAttributesPage').then(m => ({ default: m.ProductAttributesPage })));
@@ -317,6 +331,10 @@ const InventoryCountPage     = lazy(() => import('./pages/inventory/InventoryCou
 const InventoryValuationPage = lazy(() => import('./pages/inventory/InventoryValuationPage').then(m => ({ default: m.InventoryValuationPage })));
 const InventoryAdjustmentsPage = lazy(() => import('./pages/inventory/InventoryAdjustmentsPage').then(m => ({ default: m.InventoryAdjustmentsPage })));
 const ReservationsPage       = lazy(() => import('./pages/inventory/ReservationsPage').then(m => ({ default: m.ReservationsPage })));
+const ReorderPlanningPage    = lazy(() => import('./pages/inventory/ReorderPlanningPage').then(m => ({ default: m.ReorderPlanningPage })));
+const WarehouseLocationsPage = lazy(() => import('./pages/inventory/WarehouseLocationsPage').then(m => ({ default: m.WarehouseLocationsPage })));
+const DamageQuarantinePage   = lazy(() => import('./pages/inventory/DamageQuarantinePage').then(m => ({ default: m.DamageQuarantinePage })));
+const InventoryReconciliationPage = lazy(() => import('./pages/inventory/InventoryReconciliationPage').then(m => ({ default: m.InventoryReconciliationPage })));
 const BranchesPage           = lazy(() => import('./pages/operations/BranchesPage').then(m => ({ default: m.BranchesPage })));
 const WarehousesPage         = lazy(() => import('./pages/operations/WarehousesPage').then(m => ({ default: m.WarehousesPage })));
 const CustomersView          = lazy(() => import('./components/CustomersView').then(m => ({ default: m.CustomersView })));
@@ -324,7 +342,9 @@ const CustomerDetailPage     = lazy(() => import('./pages/customers/CustomerDeta
 const LeadsPage              = lazy(() => import('./pages/crm/LeadsPage').then(m => ({ default: m.LeadsPage })));
 const PipelinePage           = lazy(() => import('./pages/crm/PipelinePage').then(m => ({ default: m.PipelinePage })));
 const CrmActivitiesPage      = lazy(() => import('./pages/crm/CrmActivitiesPage').then(m => ({ default: m.CrmActivitiesPage })));
+const CrmDashboardPage       = lazy(() => import('./pages/crm/CrmDashboardPage').then(m => ({ default: m.CrmDashboardPage })));
 const SuppliersView          = lazy(() => import('./components/SuppliersView').then(m => ({ default: m.SuppliersView })));
+const SupplierDetailPage    = lazy(() => import('./pages/purchasing/SupplierDetailPage').then(m => ({ default: m.SupplierDetailPage })));
 const PurchasesView          = lazy(() => import('./components/PurchasesView').then(m => ({ default: m.PurchasesView })));
 const PurchaseRequestsPage   = lazy(() => import('./pages/purchasing/PurchaseRequestsPage').then(m => ({ default: m.PurchaseRequestsPage })));
 const PurchaseOrdersPage     = lazy(() => import('./pages/purchasing/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
@@ -332,6 +352,10 @@ const IncomingProductsPage   = lazy(() => import('./pages/purchasing/IncomingPro
 const CustomerImportedProductsPage = lazy(() => import('./pages/customers/CustomerImportedProductsPage').then(m => ({ default: m.CustomerImportedProductsPage })));
 const ReadyDeliveriesPage    = lazy(() => import('./pages/customers/ReadyDeliveriesPage').then(m => ({ default: m.ReadyDeliveriesPage })));
 const PurchaseReturnsPage    = lazy(() => import('./pages/purchasing/PurchaseReturnsPage').then(m => ({ default: m.PurchaseReturnsPage })));
+const SupplierQuotationsPage = lazy(() => import('./pages/purchasing/SupplierQuotationsPage').then(m => ({ default: m.SupplierQuotationsPage })));
+const GoodsReceiptsPage      = lazy(() => import('./pages/purchasing/GoodsReceiptsPage').then(m => ({ default: m.GoodsReceiptsPage })));
+const SupplierClaimsPage     = lazy(() => import('./pages/purchasing/SupplierClaimsPage').then(m => ({ default: m.SupplierClaimsPage })));
+const SupplierStatementPage  = lazy(() => import('./pages/purchasing/SupplierStatementPage').then(m => ({ default: m.SupplierStatementPage })));
 const CashierView            = lazy(() => import('./components/CashierView').then(m => ({ default: m.CashierView })));
 const FinanceOverviewPage    = lazy(() => import('./pages/finance/FinanceOverviewPage').then(m => ({ default: m.FinanceOverviewPage })));
 const DebtsDashboardPage     = lazy(() => import('./pages/finance/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
@@ -341,19 +365,28 @@ const ExpensesPage           = lazy(() => import('./pages/finance/ExpensesPage')
 const ChartOfAccountsPage    = lazy(() => import('./pages/finance/ChartOfAccountsPage').then(m => ({ default: m.ChartOfAccountsPage })));
 const JournalEntriesPage     = lazy(() => import('./pages/finance/JournalEntriesPage').then(m => ({ default: m.JournalEntriesPage })));
 const ChequesPage            = lazy(() => import('./pages/finance/ChequesPage').then(m => ({ default: m.ChequesPage })));
+const FiscalClosingPage       = lazy(() => import('./pages/finance/FiscalClosingPage').then(m => ({ default: m.FiscalClosingPage })));
+const BankReconciliationPage  = lazy(() => import('./pages/finance/BankReconciliationPage').then(m => ({ default: m.BankReconciliationPage })));
+const BudgetsCostCentersPage  = lazy(() => import('./pages/finance/BudgetsCostCentersPage').then(m => ({ default: m.BudgetsCostCentersPage })));
+const CashFlowForecastPage    = lazy(() => import('./pages/finance/CashFlowForecastPage').then(m => ({ default: m.CashFlowForecastPage })));
+const EPaymentSettlementPage  = lazy(() => import('./pages/finance/EPaymentSettlementPage').then(m => ({ default: m.EPaymentSettlementPage })));
 const FixedAssetsPage        = lazy(() => import('./pages/finance/FixedAssetsPage').then(m => ({ default: m.FixedAssetsPage })));
 const TaxReportPage          = lazy(() => import('./pages/reports/TaxReportPage').then(m => ({ default: m.TaxReportPage })));
 const ProfitLossPage         = lazy(() => import('./pages/reports/ProfitLossPage').then(m => ({ default: m.ProfitLossPage })));
 const FinancialStatementsPage = lazy(() => import('./pages/reports/FinancialStatementsPage').then(m => ({ default: m.FinancialStatementsPage })));
+const SalesReportsPage       = lazy(() => import('./pages/reports/SalesReportsPage').then(m => ({ default: m.SalesReportsPage })));
+const PurchaseInventoryReportPage = lazy(() => import('./pages/reports/PurchaseInventoryReportPage').then(m => ({ default: m.PurchaseInventoryReportPage })));
 const AttendancePage         = lazy(() => import('./pages/operations/AttendancePage').then(m => ({ default: m.AttendancePage })));
 const PayrollPage            = lazy(() => import('./pages/operations/PayrollPage').then(m => ({ default: m.PayrollPage })));
 const CommissionsPage        = lazy(() => import('./pages/hr/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
+const HrDashboardPage        = lazy(() => import('./pages/hr/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
 const CampaignsPage          = lazy(() => import('./pages/crm/CampaignsPage').then(m => ({ default: m.CampaignsPage })));
 const ProjectsPage           = lazy(() => import('./pages/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 const ProjectDetailPage      = lazy(() => import('./pages/projects/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
 const DeliveriesPage         = lazy(() => import('./pages/operations/DeliveriesPage').then(m => ({ default: m.DeliveriesPage })));
 const DriversPage            = lazy(() => import('./pages/operations/DriversPage').then(m => ({ default: m.DriversPage })));
 const VehiclesPage           = lazy(() => import('./pages/operations/VehiclesPage').then(m => ({ default: m.VehiclesPage })));
+const FleetDashboardPage     = lazy(() => import('./pages/operations/FleetDashboardPage').then(m => ({ default: m.FleetDashboardPage })));
 const EmployeesPage          = lazy(() => import('./pages/operations/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
 const ReportsView            = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
 const ApprovalsPage          = lazy(() => import('./pages/approvals/ApprovalsPage').then(m => ({ default: m.ApprovalsPage })));
@@ -366,6 +399,7 @@ const SystemHealthPage       = lazy(() => import('./pages/settings/SystemHealthP
 const AdminPage              = lazy(() => import('./pages/admin/AdminPage').then(m => ({ default: m.AdminPage })));
 const SecurityCenterPage     = lazy(() => import('./pages/admin/SecurityCenterPage').then(m => ({ default: m.SecurityCenterPage })));
 const DataDeletionPage       = lazy(() => import('./pages/admin/DataDeletionPage').then(m => ({ default: m.DataDeletionPage })));
+const NotFoundPage           = lazy(() => import('./pages/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
 function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
@@ -389,10 +423,14 @@ const AppRouterWithProps: React.FC<{
 
       {/* Dashboard */}
       <Route path="dashboard" element={<S><DashboardView /></S>} />
-      <Route path="dashboard/executive" element={<S><ExecutiveDashboard /></S>} />
+      <Route path="dashboard/executive" element={<Navigate to="/dashboard" replace />} />
 
       {/* Sales / POS */}
       <Route path="sales/analytics" element={<S><SalesAnalyticsPage /></S>} />
+      <Route path="sales/cycle" element={<S><InvoiceCyclePage /></S>} />
+      <Route path="sales/statement" element={<S><CustomerStatementPage /></S>} />
+      <Route path="sales/reservations" element={<S><ReservationsDepositPage /></S>} />
+      <Route path="sales/after-sales" element={<S><AfterSalesPage /></S>} />
       <Route path="pos" element={<S><PosView /></S>} />
             <Route path="sales" element={<S><SalesView /></S>} />
             <Route path="daily/sales" element={<S><TodaySalesPage /></S>} />
@@ -425,6 +463,10 @@ const AppRouterWithProps: React.FC<{
       <Route path="inventory/valuation" element={<S><InventoryValuationPage /></S>} />
           <Route path="inventory/adjustments" element={<S><InventoryAdjustmentsPage /></S>} />
           <Route path="inventory/reservations" element={<S><ReservationsPage /></S>} />
+          <Route path="inventory/reorder-planning" element={<S><ReorderPlanningPage /></S>} />
+          <Route path="inventory/locations" element={<S><WarehouseLocationsPage /></S>} />
+          <Route path="inventory/damage-quarantine" element={<S><DamageQuarantinePage /></S>} />
+          <Route path="inventory/reconciliation" element={<S><InventoryReconciliationPage /></S>} />
 
       {/* Branches / Warehouses */}
       <Route path="branches" element={<S><BranchesPage /></S>} />
@@ -436,6 +478,8 @@ const AppRouterWithProps: React.FC<{
       <Route path="customers/ready-deliveries" element={<S><ReadyDeliveriesPage /></S>} />
       <Route path="customers/:id/imported-products" element={<S><CustomerImportedProductsPage /></S>} />
       <Route path="customers/:id" element={<S><CustomerDetailPage /></S>} />
+      <Route path="crm" element={<Navigate to="/dashboard" replace />} />
+      <Route path="crm/dashboard" element={<S><CrmDashboardPage /></S>} />
       <Route path="crm/leads" element={<S><LeadsPage /></S>} />
       <Route path="crm/pipeline" element={<S><PipelinePage /></S>} />
       <Route path="crm/activities" element={<S><CrmActivitiesPage /></S>} />
@@ -443,22 +487,32 @@ const AppRouterWithProps: React.FC<{
 
       {/* Purchasing */}
       <Route path="suppliers" element={<S><SuppliersView /></S>} />
+      <Route path="suppliers/:id" element={<S><SupplierDetailPage /></S>} />
       <Route path="purchases" element={<S><PurchasesView /></S>} />
       <Route path="purchases/requests" element={<S><PurchaseRequestsPage /></S>} />
+      <Route path="purchases/quotations" element={<S><SupplierQuotationsPage /></S>} />
       <Route path="purchases/orders" element={<S><PurchaseOrdersPage /></S>} />
+      <Route path="purchases/receipts" element={<S><GoodsReceiptsPage /></S>} />
       <Route path="purchases/incoming" element={<S><IncomingProductsPage /></S>} />
       <Route path="purchases/returns" element={<S><PurchaseReturnsPage /></S>} />
+      <Route path="purchases/claims" element={<S><SupplierClaimsPage /></S>} />
+      <Route path="purchases/statement" element={<S><SupplierStatementPage /></S>} />
 
       {/* Finance */}
       <Route path="cashboxes" element={<S><CashierView /></S>} />
       <Route path="finance" element={<S><FinanceOverviewPage /></S>} />
-      <Route path="finance/debts" element={<S><DebtsDashboardPage /></S>} />
+      <Route path="finance/debts" element={<Navigate to="/dashboard" replace />} />
       <Route path="finance/other-receivables" element={<S><OtherReceivablesPage /></S>} />
       <Route path="finance/installments" element={<S><InstallmentsPage /></S>} />
       <Route path="finance/expenses" element={<S><ExpensesPage /></S>} />
       <Route path="finance/accounts" element={<S><ChartOfAccountsPage /></S>} />
       <Route path="finance/journal" element={<S><JournalEntriesPage /></S>} />
       <Route path="finance/cheques" element={<S><ChequesPage /></S>} />
+      <Route path="finance/fiscal-closing" element={<S><FiscalClosingPage /></S>} />
+      <Route path="finance/bank-reconciliation" element={<S><BankReconciliationPage /></S>} />
+      <Route path="finance/budgets-cost-centers" element={<S><BudgetsCostCentersPage /></S>} />
+      <Route path="finance/cash-forecast" element={<S><CashFlowForecastPage /></S>} />
+      <Route path="finance/epayment-settlements" element={<S><EPaymentSettlementPage /></S>} />
       <Route path="finance/assets" element={<S><FixedAssetsPage /></S>} />
 
       {/* Projects */}
@@ -466,19 +520,23 @@ const AppRouterWithProps: React.FC<{
       <Route path="projects/:id" element={<S><ProjectDetailPage /></S>} />
 
       {/* Operations */}
+      <Route path="fleet/dashboard" element={<S><FleetDashboardPage /></S>} />
       <Route path="deliveries" element={<S><DeliveriesPage /></S>} />
       <Route path="drivers" element={<S><DriversPage /></S>} />
       <Route path="vehicles" element={<S><VehiclesPage /></S>} />
       <Route path="employees" element={<S><EmployeesPage /></S>} />
       <Route path="employees/attendance" element={<S><AttendancePage /></S>} />
-          <Route path="employees/payroll" element={<S><PayrollPage /></S>} />
-          <Route path="employees/commissions" element={<S><CommissionsPage /></S>} />
+      <Route path="employees/payroll" element={<S><PayrollPage /></S>} />
+      <Route path="employees/commissions" element={<S><CommissionsPage /></S>} />
+      <Route path="hr/dashboard" element={<S><HrDashboardPage /></S>} />
 
       {/* Reports */}
       <Route path="reports" element={<S><ReportsView /></S>} />
       <Route path="reports/tax" element={<S><TaxReportPage /></S>} />
-          <Route path="reports/profit-loss" element={<S><ProfitLossPage /></S>} />
-          <Route path="reports/statements" element={<S><FinancialStatementsPage /></S>} />
+      <Route path="reports/profit-loss" element={<S><ProfitLossPage /></S>} />
+      <Route path="reports/statements" element={<S><FinancialStatementsPage /></S>} />
+      <Route path="reports/sales" element={<S><SalesReportsPage /></S>} />
+      <Route path="reports/purchases" element={<S><PurchaseInventoryReportPage /></S>} />
 
       {/* Approvals */}
       <Route path="approvals" element={<S><ApprovalsPage /></S>} />
@@ -501,7 +559,7 @@ const AppRouterWithProps: React.FC<{
       <Route path="system-health" element={<S><SystemHealthPage /></S>} />
 
       {/* Fallback */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<S><NotFoundPage /></S>} />
     </Route>
   </Routes>
 );

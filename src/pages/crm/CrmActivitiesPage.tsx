@@ -4,17 +4,8 @@ import { CrmService, CrmActivity } from '../../services/CrmService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 
-const TYPE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  CALL: { label: 'اتصال هاتف', color: 'text-sky-600 bg-sky-50 border-sky-200', icon: Phone },
-  MEETING: { label: 'اجتماع', color: 'text-violet-600 bg-violet-50 border-violet-200', icon: User },
-  VISIT: { label: 'زيارة موقع', color: 'text-amber-600 bg-amber-50 border-amber-200', icon: Calendar },
-  WHATSAPP: { label: 'واتساب', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: MessageSquare },
-  EMAIL: { label: 'بريد إلكتروني', color: 'text-indigo-600 bg-indigo-50 border-indigo-200', icon: MessageSquare },
-  QUOTATION_SENT: { label: 'عرض سعر', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: Activity },
-  SAMPLE_GIVEN: { label: 'تسليم عينة', color: 'text-teal-600 bg-teal-50 border-teal-200', icon: Activity },
-  NOTE: { label: 'ملاحظة', color: 'text-slate-600 bg-slate-100 border-slate-200', icon: MessageSquare },
-  STAGE_CHANGE: { label: 'تغيير مرحلة', color: 'text-orange-600 bg-orange-50 border-orange-200', icon: Activity },
-};
+import { TYPE_CONFIG } from './crmActivityConfig';
+import { CrmActivityModal } from './CrmActivityModal';
 
 export const CrmActivitiesPage: React.FC = () => {
   const service = new CrmService();
@@ -167,51 +158,7 @@ export const CrmActivitiesPage: React.FC = () => {
         )}
       </div>
 
-      {modalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-slate-900">جدولة نشاط جديد</h3>
-              <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-            </div>
-            <form onSubmit={handleCreate} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">العميل المحتمل *</label>
-                <select required value={form.leadId} onChange={(e) => setForm({ ...form, leadId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                  <option value="">— اختر —</option>
-                  {leads.map((l) => <option key={l.id} value={l.id}>{l.name} — {l.phone}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">نوع النشاط</label>
-                  <select value={form.activityType} onChange={(e) => setForm({ ...form, activityType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                    {Object.entries(TYPE_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">الموعد</label>
-                  <input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
-                </div>
-              </div>
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">العنوان *</label>
-                <input required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
-              </div>
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">تفاصيل / ملاحظات</label>
-                <textarea rows={3} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
-              </div>
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-                <button type="submit" disabled={saving} className="px-5 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-bold rounded-xl flex items-center gap-2">
-                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} حفظ
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {modalOpen && <CrmActivityModal leads={leads} form={form} setForm={setForm} saving={saving} onClose={() => setModalOpen(false)} onSubmit={handleCreate} />}
     </div>
   );
 };

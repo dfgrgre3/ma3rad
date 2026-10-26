@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Plus, Search, DollarSign, FileText, Download, Printer,
   ArrowUpRight, ArrowDownRight, Phone, Building2, Pencil, Power,
-  CalendarDays, Upload
+  CalendarDays, Upload, ExternalLink
 } from 'lucide-react';
 import { SupplierService } from '../services/SupplierService';
 import { Supplier, PaymentType } from '../types';
@@ -334,14 +334,23 @@ export const SuppliersView: React.FC = () => {
                           <Power className="w-4 h-4" />
                         </button>}
                         <button
+                          title="عرض كشف الحساب السريع"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenStatement(s);
                           }}
-                          className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 hover:bg-sky-600 hover:text-slate-900 transition"
+                          className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 hover:bg-sky-600 hover:text-white transition"
                         >
                           <FileText className="w-4 h-4" />
                         </button>
+                        <Link
+                          to={`/suppliers/${s.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          title="عرض ملف المورد الكامل"
+                          className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-700 hover:bg-indigo-600 hover:text-white transition"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
                         </div>
                       </td>
                     </tr>
@@ -363,6 +372,14 @@ export const SuppliersView: React.FC = () => {
                   <p className="text-[11px] text-slate-500 font-mono">{selectedSupplier.phone}</p>
                 </div>
                 <div className="flex items-center gap-1 no-print">
+                <Link
+                  to={`/suppliers/${selectedSupplier.id}`}
+                  className="px-2.5 py-1.5 bg-sky-50 text-sky-700 hover:bg-sky-100 font-bold rounded-xl text-xs flex items-center gap-1 border border-sky-200 transition"
+                  title="فتح ملف المورد الكامل"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>الملف الكامل</span>
+                </Link>
                 {canUpdate && <button
                   title="تعديل بيانات المورد"
                   onClick={() => openEditSupplier(selectedSupplier)}

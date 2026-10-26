@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Clock3, Loader2, MapPin, MessageCircle, PackageCheck, Phone, RefreshCw, Search, X } from 'lucide-react';
 import { CustomerSupplyService } from '../../services/CustomerSupplyService';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 
 type PendingItem = {
   invoiceId: string; invoiceNumber: string; invoiceDate: string; customerId: string; customerName: string;
   phone: string; address: string; productId: string; productName: string; size: string;
   quantityM2: number; unitPrice: number; totalPrice: number; shippingCost: number;
   warehouseId: string; warehouseName: string; availableM2: number;
+  unit: string; productType?: 'CERAMIC' | 'GENERAL'; baseUnit?: string; customUnit?: string;
 };
 type InvoiceGroup = {
   invoiceId: string; invoiceNumber: string; invoiceDate: string; customerId: string; customerName: string;
@@ -57,6 +59,10 @@ export const CustomerImportedProductsPage: React.FC = () => {
         warehouseId: request.warehouseId || '',
         warehouseName: request.warehouseName || 'المخزن',
         availableM2: Number(item.quantityReceived || 0),
+        unit: item.unit,
+        productType: item.productType,
+        baseUnit: item.baseUnit,
+        customUnit: item.customUnit,
       })));
 
       const grouped = new Map<string, InvoiceGroup>();
@@ -84,7 +90,7 @@ export const CustomerImportedProductsPage: React.FC = () => {
   }, [refresh]);
 
   const buildMessage = (group: InvoiceGroup, fee: number) => {
-    const lines = group.items.map((item) => `• ${item.productName}${item.size ? ` (${item.size})` : ''} — ${fmt(item.quantityM2)} م² × ${fmt(item.unitPrice)} ج = ${fmt(item.totalPrice)} ج`).join('\n');
+    const lines = group.items.map((item) => `• ${item.productName}${item.size ? ` (${item.size})` : ''} — ${formatProductQuantity(item.quantityM2, item)} × ${fmt(item.unitPrice)} ج = ${fmt(item.totalPrice)} ج`).join('\n');
     const ready = group.items.every((item) => item.availableM2 >= item.quantityM2);
     return `أهلًا ${group.customerName}،\n${ready ? 'المنتجات المطلوبة في الفاتورة' : 'نتابع معك المنتجات المطلوبة في الفاتورة'} رقم ${group.invoiceNumber}:\n${lines}\n\nالتوصيل: ${fmt(fee)} ج\n${ready ? 'الكمية المطلوبة متوفرة بالكامل. يمكن ترتيب الاستلام أو التوصيل.' : 'سنتواصل معك فور اكتمال الكمية المطلوبة.'}${group.address ? `\nالعنوان المسجل: ${group.address}` : ''}`;
   };
@@ -109,7 +115,7 @@ export const CustomerImportedProductsPage: React.FC = () => {
         const ready = group.items.every((item) => item.availableM2 >= item.quantityM2);
         return <article key={group.invoiceId} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100"><div><button onClick={() => navigate(`/customers/${group.customerId}`)} className="font-black text-slate-900 hover:text-sky-700">{group.customerName}</button><div className="text-xs text-slate-500 mt-1">فاتورة {group.invoiceNumber} · {group.invoiceDate} · {group.warehouseName || 'المخزن'}</div><div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">{group.phone && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3"/>{group.phone}</span>}{group.address && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3"/>{group.address}</span>}</div></div><div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${ready ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{ready ? <CheckCircle2 className="w-4 h-4"/> : <Clock3 className="w-4 h-4"/>}{ready ? 'الكمية المطلوبة متوفرة' : 'بانتظار اكتمال الكمية'}</div></div>
-          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="text-right p-3">المنتج</th><th className="text-right p-3">المطلوب</th><th className="text-right p-3">المتوفر</th><th className="text-right p-3">سعر الوحدة</th><th className="text-right p-3">الإجمالي</th></tr></thead><tbody>{group.items.map((item, index) => <tr key={`${item.productId}-${index}`} className="border-t border-slate-100"><td className="p-3 font-semibold">{item.productName} {item.size && <span className="text-xs text-slate-400">({item.size})</span>}</td><td className="p-3">{fmt(item.quantityM2)} م²</td><td className={`p-3 font-bold ${item.availableM2 >= item.quantityM2 ? 'text-emerald-700' : 'text-amber-700'}`}>{fmt(item.availableM2)} م²</td><td className="p-3">{fmt(item.unitPrice)} ج</td><td className="p-3">{fmt(item.totalPrice)} ج</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="text-right p-3">المنتج</th><th className="text-right p-3">المطلوب</th><th className="text-right p-3">المتوفر</th><th className="text-right p-3">سعر الوحدة</th><th className="text-right p-3">الإجمالي</th></tr></thead><tbody>{group.items.map((item, index) => <tr key={`${item.productId}-${index}`} className="border-t border-slate-100"><td className="p-3 font-semibold">{item.productName} {item.size && <span className="text-xs text-slate-400">({item.size})</span>}</td><td className="p-3">{formatProductQuantity(item.quantityM2, item)}</td><td className={`p-3 font-bold ${item.availableM2 >= item.quantityM2 ? 'text-emerald-700' : 'text-amber-700'}`}>{formatProductQuantity(item.availableM2, item)}</td><td className="p-3">{fmt(item.unitPrice)} ج / {getProductUnitLabel(item)}</td><td className="p-3">{fmt(item.totalPrice)} ج</td></tr>)}</tbody></table></div>
           <div className="px-5 py-3 bg-slate-50/70 flex flex-wrap justify-between items-center gap-3"><div className="text-xs text-slate-600">التوصيل: <b>{fmt(group.shippingCost)} ج</b></div><button onClick={() => { const fee = group.shippingCost; setDraft({ group, fee: String(fee), text: buildMessage(group, fee) }); }} disabled={!normalizeEgyptianPhone(group.phone)} title={!normalizeEgyptianPhone(group.phone) ? 'أضف رقم هاتف صحيح للعميل أولاً' : undefined} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold"><MessageCircle className="w-4 h-4"/>معاينة رسالة واتساب</button></div>
         </article>;
       })}

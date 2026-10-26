@@ -204,18 +204,36 @@ export class SupplierService {
       WHERE supplier_id = ? AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
     `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
 
-    const totals = this.db.query<{ purchases: number; payments: number }>(`
+    const returns = this.db.query<any>(`
+      SELECT id, date, return_number as docNumber, total_amount as debit, created_at, reason
+      FROM purchase_returns
+      WHERE supplier_id = ? AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
+
+    const claims = this.db.query<any>(`
+      SELECT id, date, claim_number as docNumber, agreed_amount as debit, created_at, notes
+      FROM supplier_claims
+      WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE'
+        AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
+
+    const totals = this.db.query<{ purchases: number; payments: number; returns: number; claims: number }>(`
       SELECT
         COALESCE((SELECT SUM(total_amount) FROM purchase_invoices WHERE supplier_id = ?), 0) AS purchases,
-        COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ?), 0) AS payments
-    `, [supplierId, supplierId])[0];
+        COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ?), 0) AS payments,
+        COALESCE((SELECT SUM(total_amount) FROM purchase_returns WHERE supplier_id = ?), 0) AS returns,
+        COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE'), 0) AS claims
+    `, [supplierId, supplierId, supplierId, supplierId])[0];
+
     const beforeRange = fromDate
-      ? this.db.query<{ purchases: number; payments: number }>(`
+      ? this.db.query<{ purchases: number; payments: number; returns: number; claims: number }>(`
         SELECT
           COALESCE((SELECT SUM(total_amount) FROM purchase_invoices WHERE supplier_id = ? AND date < ?), 0) AS purchases,
-          COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ? AND date < ?), 0) AS payments
-      `, [supplierId, fromDate, supplierId, fromDate])[0]
-      : { purchases: 0, payments: 0 };
+          COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ? AND date < ?), 0) AS payments,
+          COALESCE((SELECT SUM(total_amount) FROM purchase_returns WHERE supplier_id = ? AND date < ?), 0) AS returns,
+          COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND date < ?), 0) AS claims
+      `, [supplierId, fromDate, supplierId, fromDate, supplierId, fromDate, supplierId, fromDate])[0]
+      : { purchases: 0, payments: 0, returns: 0, claims: 0 };
 
     const allRecords: any[] = [
       ...purchases.map(p => ({
@@ -237,15 +255,39 @@ export class SupplierService {
         debit: py.debit,
         credit: 0,
         createdAt: py.createdAt
+      })),
+      ...returns.map(r => ({
+        id: r.id,
+        date: r.date,
+        type: 'RETURN' as const,
+        docNumber: r.docNumber,
+        description: `مرتجع مشتريات رقم ${r.docNumber} (${r.reason || ''})`,
+        debit: r.debit,
+        credit: 0,
+        createdAt: r.createdAt
+      })),
+      ...claims.map(c => ({
+        id: c.id,
+        date: c.date,
+        type: 'DEBIT_NOTE' as const,
+        docNumber: c.docNumber,
+        description: `إشعار مدين / تسوية مطالبة مورد رقم ${c.docNumber}`,
+        debit: c.debit,
+        credit: 0,
+        createdAt: c.createdAt
       }))
     ];
 
     allRecords.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
+    const totalDebits = Number(totals?.payments || 0) + Number(totals?.returns || 0) + Number(totals?.claims || 0);
     const historicalOpening = Number(sup.currentBalance || 0) -
-      (Number(totals?.purchases || 0) - Number(totals?.payments || 0));
+      (Number(totals?.purchases || 0) - totalDebits);
+
+    const beforeDebits = Number(beforeRange.payments || 0) + Number(beforeRange.returns || 0) + Number(beforeRange.claims || 0);
     let runningBalance = historicalOpening +
-      Number(beforeRange.purchases || 0) - Number(beforeRange.payments || 0);
+      Number(beforeRange.purchases || 0) - beforeDebits;
+
     const finalStatement = allRecords.map(item => {
       runningBalance += (item.credit - item.debit);
       return {
@@ -256,9 +298,103 @@ export class SupplierService {
 
     return {
       supplier: sup,
-      openingBalance: Number((historicalOpening + Number(beforeRange.purchases || 0) - Number(beforeRange.payments || 0)).toFixed(2)),
+      openingBalance: Number((historicalOpening + Number(beforeRange.purchases || 0) - beforeDebits).toFixed(2)),
       closingBalance: Number(runningBalance.toFixed(2)),
       transactions: finalStatement
     };
+  }
+
+  public getInvoicesWithAllocations(supplierId: string) {
+    const invoices = this.db.query<any>(`
+      SELECT id, invoice_number, supplier_invoice_number, date, total_amount, paid_amount, remaining_amount, payment_status
+      FROM purchase_invoices
+      WHERE supplier_id = ?
+      ORDER BY date DESC, created_at DESC
+    `, [supplierId]);
+
+    return invoices.map(inv => {
+      const allocations = this.db.query<any>(`
+        SELECT a.id, a.amount, sp.receipt_number AS receiptNumber, sp.date AS paymentDate, sp.payment_type AS paymentType
+        FROM supplier_payment_allocations a
+        JOIN supplier_payments sp ON sp.id = a.payment_id
+        WHERE a.purchase_invoice_id = ?
+        ORDER BY sp.date DESC
+      `, [inv.id]);
+      return {
+        ...inv,
+        allocations
+      };
+    });
+  }
+
+  public getPaymentsWithAllocations(supplierId: string) {
+    const payments = this.db.query<any>(`
+      SELECT id, receipt_number, date, amount, payment_type, notes
+      FROM supplier_payments
+      WHERE supplier_id = ?
+      ORDER BY date DESC, created_at DESC
+    `, [supplierId]);
+
+    return payments.map(pay => {
+      const allocations = this.db.query<any>(`
+        SELECT a.id, a.amount, pi.invoice_number AS invoiceNumber, pi.date AS invoiceDate, pi.total_amount AS invoiceTotal
+        FROM supplier_payment_allocations a
+        JOIN purchase_invoices pi ON pi.id = a.purchase_invoice_id
+        WHERE a.payment_id = ?
+      `, [pay.id]);
+      const totalAllocated = allocations.reduce((sum: number, a: any) => sum + Number(a.amount), 0);
+      return {
+        ...pay,
+        allocatedAmount: totalAllocated,
+        unallocatedAmount: Math.max(0, Number(pay.amount) - totalAllocated),
+        allocations
+      };
+    });
+  }
+
+  public reallocateSupplierPayment(paymentId: string, allocations: { purchaseInvoiceId: string; amount: number }[]) {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'suppliers.payment');
+
+    const payment = this.db.query<any>(`SELECT * FROM supplier_payments WHERE id = ?`, [paymentId])[0];
+    if (!payment) throw new Error('سند الصرف غير موجود.');
+
+    const totalAlloc = allocations.reduce((s, a) => s + Number(a.amount || 0), 0);
+    if (totalAlloc > Number(payment.amount) + 0.01) {
+      throw new Error(`مجموع التوزيعات (${totalAlloc} ج) يتجاوز قيمة السند (${payment.amount} ج).`);
+    }
+
+    this.db.executeTransaction((db) => {
+      // 1. Remove previous allocations for this payment and revert invoice paid amounts
+      const oldAllocations = db.query<any>(`SELECT purchase_invoice_id, amount FROM supplier_payment_allocations WHERE payment_id = ?`, [paymentId]);
+      for (const old of oldAllocations) {
+        db.run(`
+          UPDATE purchase_invoices
+          SET paid_amount = MAX(0, paid_amount - ?),
+              remaining_amount = total_amount - MAX(0, paid_amount - ?),
+              payment_status = CASE WHEN total_amount - MAX(0, paid_amount - ?) <= 0.01 THEN 'PAID' ELSE 'PARTIAL' END
+          WHERE id = ?
+        `, [old.amount, old.amount, old.amount, old.purchase_invoice_id]);
+      }
+      db.run(`DELETE FROM supplier_payment_allocations WHERE payment_id = ?`, [paymentId]);
+
+      // 2. Insert new allocations and update invoices
+      for (const item of allocations) {
+        const val = Math.round(Number(item.amount) * 100) / 100;
+        if (val <= 0) continue;
+        db.run(`
+          INSERT INTO supplier_payment_allocations (id, payment_id, purchase_invoice_id, amount)
+          VALUES (?, ?, ?, ?)
+        `, [`spa_${uuidv4().substring(0, 8)}`, paymentId, item.purchaseInvoiceId, val]);
+
+        db.run(`
+          UPDATE purchase_invoices
+          SET paid_amount = paid_amount + ?,
+              remaining_amount = MAX(0, total_amount - (paid_amount + ?)),
+              payment_status = CASE WHEN MAX(0, total_amount - (paid_amount + ?)) <= 0.01 THEN 'PAID' ELSE 'PARTIAL' END
+          WHERE id = ?
+        `, [val, val, val, item.purchaseInvoiceId]);
+      }
+    });
   }
 }

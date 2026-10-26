@@ -66,7 +66,8 @@ export class PurchaseRequestService {
 
   public getItems(requestId: string): any[] {
     return this.db.query(
-      `SELECT pri.*, p.sku FROM purchase_request_items pri LEFT JOIN products p ON p.id = pri.product_id WHERE pri.request_id = ?`,
+      `SELECT pri.*, p.sku, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+       FROM purchase_request_items pri LEFT JOIN products p ON p.id = pri.product_id WHERE pri.request_id = ?`,
       [requestId]
     );
   }

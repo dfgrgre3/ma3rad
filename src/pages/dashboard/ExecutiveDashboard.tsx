@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   TrendingUp, DollarSign, ShoppingCart, Package,
   AlertTriangle, ArrowUpRight, ArrowDownRight, Clock
@@ -8,6 +8,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { DatabaseManager } from '../../database/db';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+
 import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -23,10 +25,10 @@ interface KPI {
 }
 
 interface DailySale { day: string; sales: number; profit: number }
-interface TopProduct { name: string; qty: number; revenue: number }
+interface TopProduct { name: string; qty: number; revenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }
 interface RecentInvoice { id: string; customer: string; amount: number; date: string; status: string }
 interface DebtCustomer { name: string; debt: number }
-interface LowStockItem { name: string; warehouse: string; qty: number; min: number }
+interface LowStockItem { name: string; warehouse: string; qty: number; min: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }
 
 type DateRange = 'today' | 'week' | 'month' | 'year';
 
@@ -112,7 +114,30 @@ export const ExecutiveDashboard: React.FC = () => {
          WHERE date BETWEEN ? AND ?`,
         [fromStr, toStr]
       );
-      const totalPurchases = purchaseRow[0]?.values[0]?.[0] as number ?? 0;
+      const totalPurchasesRow = db.exec(
+        `SELECT COALESCE(SUM(total_amount),0) FROM purchase_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
+        [fromStr, toStr]
+      );
+      const totalPurchases = totalPurchasesRow[0]?.values[0]?.[0] as number ?? 0;
+
+      const purchaseRows = db.exec(
+        `SELECT id, date, supplier_id, total_amount, payment_status, created_at, currency_rate
+         FROM purchase_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'
+         ORDER BY created_at ASC`,
+        [fromStr, toStr]
+      );
+      const supplierById = new Map<string, string>();
+      const rowsForTrend: Array<{date: string; total: number; count: number}> = [];
+      let purchasesTotal = 0;
+      let purchasesCount = 0;
+      for (const row of purchaseRows[0]?.values ?? []) {
+        const [pid, pdate, psupplierId, ptotalAmount, ppaymentStatus, pcreatedAt, pcurrencyRate] = row;
+        supplierById.set(String(psupplierId), String(psupplierId));
+        purchasesTotal += Number(ptotalAmount) || 0;
+        purchasesCount += 1;
+        rowsForTrend.push({ date: String(pdate), total: Number(ptotalAmount) || 0, count: 1 });
+      }
+
 
       const receivedRow = db.exec(
         `SELECT COALESCE(SUM(amount),0) FROM customer_payments
@@ -128,6 +153,7 @@ export const ExecutiveDashboard: React.FC = () => {
       const invoiceCount = invoiceCountRow[0]?.values[0]?.[0] as number ?? 0;
 
       const margin = total > 0 ? ((profit / total) * 100).toFixed(1) : '0';
+
 
       setKpis([
         {
@@ -213,7 +239,7 @@ export const ExecutiveDashboard: React.FC = () => {
 
       // ── Top Products ──────────────────────────────────────────────────────────
       const topProdRow = db.exec(
-        `SELECT p.name,
+        `SELECT p.name, p.product_type, p.base_unit, p.custom_unit,
                 COALESCE(SUM(sii.quantity_m2), 0) as qty,
                 COALESCE(SUM(sii.total_price), 0) as revenue
          FROM sales_invoice_items sii
@@ -224,11 +250,14 @@ export const ExecutiveDashboard: React.FC = () => {
         [fromStr, toStr]
       );
       const topProdsData: TopProduct[] = topProdRow[0]?.values.map((row: any[]) => {
-        const [n, q, r] = row;
+        const [n, productType, baseUnit, customUnit, q, r] = row;
         return {
           name: String(n).slice(0, 20),
           qty: Math.round(Number(q)),
           revenue: Number(r),
+          productType: String(productType) as 'CERAMIC' | 'GENERAL',
+          baseUnit: String(baseUnit || ''),
+          customUnit: customUnit ? String(customUnit) : undefined,
         };
       }) ?? [];
       setTopProducts(topProdsData);
@@ -289,7 +318,8 @@ export const ExecutiveDashboard: React.FC = () => {
       // ── Low Stock Alerts ─────────────────────────────────────────────────────
       const lowStockRow = db.exec(
         `SELECT p.name, COALESCE(w.name,'-') as warehouse,
-                COALESCE(ws.quantity_m2, 0) as qty, p.min_stock_level
+                COALESCE(ws.quantity_m2, 0) as qty, p.min_stock_level,
+                p.product_type, p.base_unit, p.custom_unit
          FROM warehouse_stock ws
          JOIN products p ON ws.product_id = p.id
          JOIN warehouses w ON w.id = ws.warehouse_id
@@ -299,12 +329,15 @@ export const ExecutiveDashboard: React.FC = () => {
          LIMIT 8`
       );
       const lowStockData: LowStockItem[] = lowStockRow[0]?.values.map((row: any[]) => {
-        const [n, w, q, m] = row;
+        const [n, w, q, m, productType, baseUnit, customUnit] = row;
         return {
           name: String(n),
           warehouse: String(w),
           qty: Number(q),
           min: Number(m),
+          productType: String(productType) as 'CERAMIC' | 'GENERAL',
+          baseUnit: String(baseUnit || ''),
+          customUnit: customUnit ? String(customUnit) : undefined,
         };
       }) ?? [];
       setLowStock(lowStockData);
@@ -511,9 +544,9 @@ export const ExecutiveDashboard: React.FC = () => {
                       </div>
                       <div className="text-left shrink-0">
                         <div className={`text-xs font-bold ${out ? 'text-rose-600' : 'text-amber-600'}`}>
-                          {out ? 'نفد' : `${Math.round(item.qty)} م²`}
+                          {out ? 'نفد' : formatProductQuantity(item.qty, item)}
                         </div>
-                        <div className="text-[10px] text-slate-500">الحد: {item.min} م²</div>
+                        <div className="text-[10px] text-slate-500">الحد: {formatProductQuantity(item.min, item)}</div>
                       </div>
                     </div>
                   );

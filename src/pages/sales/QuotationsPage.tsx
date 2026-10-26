@@ -16,6 +16,7 @@ import { Customer, Product, Warehouse, PaymentType } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import { addLocalDays, localDateString } from '../../utils/date';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 
 const PAGE_SIZE = 12;
 
@@ -168,6 +169,11 @@ export const QuotationsPage: React.FC = () => {
   const pickProduct = (idx: number, productId: string) => {
     const p = products.find((x) => x.id === productId);
     setLine(idx, { productId, unitPrice: p ? (p.sellingPriceM2 || 0) : 0 });
+  };
+
+  const getFormUnit = (productId: string) => {
+    const product = products.find((item) => item.id === productId);
+    return product ? getProductUnitLabel(product) : 'وحدة';
   };
 
   const subtotal = form.lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice - (l.discountAmount || 0), 0);
@@ -445,7 +451,7 @@ export const QuotationsPage: React.FC = () => {
                             })()}
                           </span>
                         </div>
-                        <div className="flex justify-between"><span>البنود</span><span className="font-mono text-slate-700">{q.itemsCount || 0} • {Number(q.totalM2 || 0).toFixed(2)} م²</span></div>
+                        <div className="flex justify-between"><span>البنود</span><span className="font-mono text-slate-700">{q.itemsCount || 0}</span></div>
                         {q.followUpDate && (
                           <div className="flex justify-between">
                             <span>المتابعة القادمة</span>
@@ -535,7 +541,7 @@ export const QuotationsPage: React.FC = () => {
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full text-right text-[11px]">
                 <thead className="bg-slate-50 text-slate-500 font-bold">
-                  <tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-24">الكمية (م²)</th><th className="px-3 py-2 w-28">سعر المتر</th><th className="px-3 py-2 w-28">خصم البند</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
+                  <tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-24">الكمية</th><th className="px-3 py-2 w-28">سعر الوحدة</th><th className="px-3 py-2 w-28">خصم البند</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {form.lines.map((l, idx) => (
@@ -546,7 +552,7 @@ export const QuotationsPage: React.FC = () => {
                           {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.size} — {p.grade}</option>)}
                         </select>
                       </td>
-                      <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                      <td className="px-3 py-2"><input type="number" min={0} step={products.find((product) => product.id === l.productId)?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(products.find((product) => product.id === l.productId)?.baseUnit || '') ? 1 : 0.01} aria-label={`الكمية ${getFormUnit(l.productId)}`} value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
                       <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.unitPrice || ''} onChange={(e) => setLine(idx, { unitPrice: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
                       <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.discountAmount || ''} onChange={(e) => setLine(idx, { discountAmount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
                       <td className="px-3 py-2 font-bold text-slate-700">{fmt(l.quantityM2 * l.unitPrice - (l.discountAmount || 0))}</td>
@@ -604,8 +610,8 @@ export const QuotationsPage: React.FC = () => {
                 {(detail.items || []).map((i) => (
                   <tr key={i.id}>
                     <td className="px-3 py-2 font-bold text-slate-800">{i.productName}<div className="text-[9px] text-slate-400 font-normal">{i.size} • {i.grade}</div></td>
-                    <td className="px-3 py-2 font-mono">{i.quantityM2} م²</td>
-                    <td className="px-3 py-2 font-mono">{i.boxesCount}</td>
+                    <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</td>
+                    <td className="px-3 py-2 font-mono">{i.productType === 'GENERAL' ? '—' : i.boxesCount}</td>
                     <td className="px-3 py-2 font-mono">{fmt(i.unitPrice)}</td>
                     <td className="px-3 py-2 font-mono text-rose-600">{i.discountAmount ? `-${fmt(i.discountAmount)}` : '—'}</td>
                     <td className="px-3 py-2 font-bold">{fmt(i.totalPrice)}</td>

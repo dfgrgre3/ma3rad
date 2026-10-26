@@ -29,8 +29,12 @@ test('financial statements screen filters cash flow and ledger and exports the b
   const React = await import('react');
   const { ToastProvider } = await import('../src/components/ui/Toast.tsx');
   const { FinancialStatementsPage } = await import('../src/pages/reports/FinancialStatementsPage.tsx');
+  const { AuthService } = await import('../src/services/AuthService.ts');
+  const { PermissionService } = await import('../src/services/PermissionService.ts');
   const manager = DatabaseManager.getInstance();
   await manager.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
 
   const actorId = manager.query<{ id: string }>('SELECT id FROM users ORDER BY created_at, id LIMIT 1')[0]?.id;
   assert.ok(actorId);

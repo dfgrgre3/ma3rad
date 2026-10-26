@@ -14,6 +14,7 @@ import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
 import { SalesInvoice, SalesInvoiceItem, CustomerPayment, PaymentType, Customer, Warehouse as WarehouseType } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
 import { exportToExcel, buildExportHtml } from '../utils/export';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { localDateString } from '../utils/date';
@@ -289,7 +290,7 @@ export const SalesView: React.FC = () => {
       { key: 'idx', label: '#' },
       { key: 'product', label: 'الصنف' },
       { key: 'sku', label: 'الكود' },
-      { key: 'qty', label: 'الكمية (م²)' },
+      { key: 'qty', label: 'الكمية' },
       { key: 'boxes', label: 'الكراتين' },
       { key: 'price', label: 'سعر الوحدة' },
       { key: 'discount', label: 'الخصم' },
@@ -299,8 +300,8 @@ export const SalesView: React.FC = () => {
       idx: idx + 1,
       product: item.productName,
       sku: item.productSku || '',
-      qty: item.quantityM2,
-      boxes: item.boxesCount,
+      qty: formatProductQuantity(item.quantityM2, item),
+      boxes: item.productType === 'GENERAL' ? '' : item.boxesCount,
       price: item.unitPrice,
       discount: item.discountAmount,
       total: item.totalPrice,
@@ -574,7 +575,7 @@ export const SalesView: React.FC = () => {
                   <th className="px-3 py-2">المقاس / الفرز</th>
                   <th className="px-3 py-2">الكمية</th>
                   <th className="px-3 py-2">الكراتين</th>
-                  <th className="px-3 py-2">سعر المتر</th>
+                  <th className="px-3 py-2">سعر الوحدة</th>
                   <th className="px-3 py-2">الخصم</th>
                   <th className="px-3 py-2">الإجمالي</th>
                   <th className="px-3 py-2">الربح</th>
@@ -584,9 +585,9 @@ export const SalesView: React.FC = () => {
                 {selected.items.map((item) => (
                   <tr key={item.id}>
                     <td className="px-3 py-2 font-bold text-slate-800">{item.productName}</td>
-                    <td className="px-3 py-2 text-slate-500">{item.size} • {item.productGrade}</td>
-                    <td className="px-3 py-2 font-mono">{item.quantityM2} م²</td>
-                    <td className="px-3 py-2 font-mono">{item.boxesCount}</td>
+                    <td className="px-3 py-2 text-slate-500">{item.productType === 'GENERAL' ? getProductUnitLabel(item) : `${item.size} • ${item.productGrade}`}</td>
+                    <td className="px-3 py-2 font-mono">{formatProductQuantity(item.quantityM2, item)}</td>
+                    <td className="px-3 py-2 font-mono">{item.productType === 'GENERAL' ? '—' : item.boxesCount}</td>
                     <td className="px-3 py-2 font-mono">{fmt(item.unitPrice)}</td>
                     <td className="px-3 py-2 font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</td>
                     <td className="px-3 py-2 font-bold text-slate-900">{fmt(item.totalPrice)}</td>

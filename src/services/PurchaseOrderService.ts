@@ -1,4 +1,4 @@
-﻿import { DatabaseManager } from '../database/db';
+import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
@@ -51,6 +51,9 @@ export interface PurchaseOrderItem {
   brandName?: string | null;
   categoryName?: string | null;
   unit?: string;
+  productType?: 'CERAMIC' | 'GENERAL';
+  baseUnit?: string;
+  customUnit?: string;
 }
 
 export interface CreatePurchaseOrderDTO {
@@ -104,6 +107,7 @@ export class PurchaseOrderService {
              i.product_name AS productName, i.quantity_m2 AS quantityM2, i.boxes_count AS boxesCount,
              i.received_m2 AS receivedM2, i.unit_cost AS unitCost, i.total_cost AS totalCost,
              p.sku AS productCode, p.barcode, p.grade, p.size, b.name AS brandName, c.name AS categoryName,
+             p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
              COALESCE(NULLIF(p.custom_unit,''),p.base_unit) AS unit
       FROM purchase_order_items i LEFT JOIN products p ON p.id=i.product_id
       LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id
@@ -221,12 +225,29 @@ export class PurchaseOrderService {
     const receiptValue = lines.reduce((sum, line) => sum + line.quantity * line.item.unitCost, 0);
     const ratio = remainingValue > 0 ? receiptValue / remainingValue : 1;
     const invoice = this.db.executeTransaction((db) => {
+      const prevReceipts = db.query<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM purchase_order_receipts WHERE purchase_order_id = ?`,
+        [id]
+      )[0]?.count || 0;
+      const receiptInvoiceNumber = prevReceipts > 0 ? `${order.orderNumber}-R${prevReceipts + 1}` : order.orderNumber;
+
       const created = new PurchaseService().createPurchase({
-        supplierId: order.supplierId, supplierInvoiceNumber: order.orderNumber, warehouseId: order.warehouseId,
-        items: lines.map(({ item, quantity }) => ({ productId: item.productId, quantityM2: quantity,
-          boxesCount: item.quantityM2 > 0 ? round2(item.boxesCount * quantity / item.quantityM2) : 0, unitCost: item.unitCost })),
-        discountAmount: round2(order.discountAmount * ratio), taxAmount: round2(order.taxAmount * ratio),
-        shippingCost: round2(order.shippingCost * ratio), paidAmount: 0, paymentType: 'CREDIT' as PaymentType,
+        supplierId: order.supplierId,
+        supplierInvoiceNumber: receiptInvoiceNumber,
+        isNoNumberSupplier: true,
+        purchaseOrderId: id,
+        warehouseId: order.warehouseId,
+        items: lines.map(({ item, quantity }) => ({
+          productId: item.productId,
+          quantityM2: quantity,
+          boxesCount: item.quantityM2 > 0 ? round2(item.boxesCount * quantity / item.quantityM2) : 0,
+          unitCost: item.unitCost
+        })),
+        discountAmount: round2(order.discountAmount * ratio),
+        taxAmount: round2(order.taxAmount * ratio),
+        shippingCost: round2(order.shippingCost * ratio),
+        paidAmount: 0,
+        paymentType: 'CREDIT' as PaymentType,
         notes: `استلام أمر شراء ${order.orderNumber}${notes ? ` — ${notes}` : ''}`,
       });
       const receiptId = `por_${uuidv4().substring(0, 8)}`;
@@ -248,11 +269,15 @@ export class PurchaseOrderService {
     return invoice;
   }
 
-  public getReceiptHistory(orderId: string): Array<{ id: string; invoiceNumber: string; receivedAt: string; notes: string | null; productName: string; quantity: number }> {
+  public getReceiptHistory(orderId: string): Array<{ id: string; invoiceNumber: string; receivedAt: string; notes: string | null; productName: string; quantity: number; productType?: 'CERAMIC' | 'GENERAL'; baseUnit?: string; customUnit?: string }> {
     return this.db.query(`SELECT r.id, pi.invoice_number AS invoiceNumber, r.received_at AS receivedAt, r.notes,
-      poi.product_name AS productName, ri.quantity_m2 AS quantity FROM purchase_order_receipts r
+      poi.product_name AS productName, ri.quantity_m2 AS quantity,
+      p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+      FROM purchase_order_receipts r
       JOIN purchase_invoices pi ON pi.id = r.purchase_invoice_id JOIN purchase_order_receipt_items ri ON ri.receipt_id = r.id
-      JOIN purchase_order_items poi ON poi.id = ri.order_item_id WHERE r.purchase_order_id = ? ORDER BY r.created_at DESC`, [orderId]);
+      JOIN purchase_order_items poi ON poi.id = ri.order_item_id
+      LEFT JOIN products p ON p.id = poi.product_id
+      WHERE r.purchase_order_id = ? ORDER BY r.created_at DESC`, [orderId]);
   }
 
   public updateFollowUp(id: string, expectedDate: string | null, notes: string): void {

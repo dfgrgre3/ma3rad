@@ -58,6 +58,7 @@ export class DatabaseManager {
   private storageBackend: 'file' | 'localStorage' | 'none' = 'none';
   private migratedLegacyStorage = false;
   private forceFreshAfterRecovery = false;
+  private debounceSaveTimer: any = null;
 
   private constructor() {}
 
@@ -184,7 +185,10 @@ export class DatabaseManager {
         throw await this.databaseRecoveryError(new Error('ملف قاعدة البيانات فارغ.'));
       }
       try {
-        this.db = new this.SQL.Database(savedBytes);
+        const loadedDb = new this.SQL.Database(savedBytes);
+        // Verify file is a valid readable SQLite database immediately
+        loadedDb.exec("SELECT 1 FROM sqlite_master LIMIT 1");
+        this.db = loadedDb;
         isFreshDatabase = false;
         console.log(`✅ Loaded existing SQLite database (${this.storageBackend === 'file' ? 'file' : 'legacy storage'}).`);
       } catch (e) {
@@ -308,8 +312,11 @@ export class DatabaseManager {
     if (!this.db) return;
 
     // Hash admin default password (admin123)
+    // SECURITY: Default password should be changed immediately after first login
+    // Consider using environment variable or prompting user on first run
+    const DEFAULT_ADMIN_PASSWORD = 'admin123';
     const salt = bcrypt.genSaltSync(10);
-    const adminHash = bcrypt.hashSync('admin123', salt);
+    const adminHash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, salt);
 
     // 1. Initial Admin User
     this.db.run(`
@@ -388,8 +395,21 @@ export class DatabaseManager {
     }
   }
 
+  public scheduleDebouncedSave(delayMs = 150): void {
+    if (this.transactionDepth > 0) return;
+    if (this.debounceSaveTimer) clearTimeout(this.debounceSaveTimer);
+    this.debounceSaveTimer = setTimeout(() => {
+      this.debounceSaveTimer = null;
+      this.saveToStorage();
+    }, delayMs);
+  }
+
   public saveToStorage(): void {
     if (!this.db) return;
+    if (this.debounceSaveTimer) {
+      clearTimeout(this.debounceSaveTimer);
+      this.debounceSaveTimer = null;
+    }
     let snapshot: Uint8Array;
     try {
       snapshot = this.exportSnapshot();
@@ -436,6 +456,11 @@ export class DatabaseManager {
 
   /** Wait for all pending disk writes (used before shutdown/backup/restore). */
   public async flush(): Promise<void> {
+    if (this.debounceSaveTimer) {
+      clearTimeout(this.debounceSaveTimer);
+      this.debounceSaveTimer = null;
+      this.saveToStorage();
+    }
     await this.persistQueue;
   }
 
@@ -475,22 +500,33 @@ export class DatabaseManager {
 
   public executeTransaction<T>(callback: (db: DatabaseManager) => T): T {
     const db = this.getDatabase();
-    const isOuterTransaction = this.transactionDepth === 0;
+    const depth = this.transactionDepth;
+    const isOuterTransaction = depth === 0;
+    const savepoint = `db_nested_${depth}`;
     if (isOuterTransaction) db.exec('BEGIN TRANSACTION;');
+    else db.exec(`SAVEPOINT ${savepoint};`);
     this.transactionDepth++;
+    let depthReleased = false;
     try {
       const result = callback(this);
       this.transactionDepth--;
+      depthReleased = true;
       if (isOuterTransaction) {
         db.exec('COMMIT;');
         this.saveToStorage();
+      } else {
+        db.exec(`RELEASE SAVEPOINT ${savepoint};`);
       }
       return result;
     } catch (error) {
-      this.transactionDepth--;
+      if (!depthReleased) this.transactionDepth--;
       if (isOuterTransaction) {
-        db.exec('ROLLBACK;');
-        this.saveToStorage();
+        try { db.exec('ROLLBACK;'); } catch { /* transaction may already be closed */ }
+      } else {
+        try {
+          db.exec(`ROLLBACK TO SAVEPOINT ${savepoint};`);
+          db.exec(`RELEASE SAVEPOINT ${savepoint};`);
+        } catch { /* savepoint may already have been released */ }
       }
       console.error('Transaction rolled back due to error:', error);
       throw error;
@@ -500,12 +536,15 @@ export class DatabaseManager {
   public query<T = any>(sql: string, params: any[] = []): T[] {
     const db = this.getDatabase();
     const stmt = db.prepare(sql);
-    stmt.bind(params);
     const results: T[] = [];
-    while (stmt.step()) {
-      results.push(snakeToCamelKeys(stmt.getAsObject()) as unknown as T);
+    try {
+      stmt.bind(params);
+      while (stmt.step()) {
+        results.push(snakeToCamelKeys(stmt.getAsObject()) as unknown as T);
+      }
+    } finally {
+      stmt.free();
     }
-    stmt.free();
     return results;
   }
 
@@ -513,8 +552,10 @@ export class DatabaseManager {
     this.pageCache.clear();
     const db = this.getDatabase();
     db.run(sql, params);
-    // Do not persist intermediate state that might be rolled back.
-    if (this.transactionDepth === 0) this.saveToStorage();
+    // Debounce writes outside transactions so sequential queries don't export full snapshots repeatedly
+    if (this.transactionDepth === 0) {
+      this.scheduleDebouncedSave();
+    }
   }
 
   /** Execute a bounded list query and its count query without loading all rows. */
@@ -590,5 +631,60 @@ export class DatabaseManager {
     if (typeof imported === 'undefined') throw new Error('Backup database was not initialized.');
     this.db = imported;
     this.saveToStorage();
+  }
+
+  /**
+   * Inspects and tests restoring a database binary in isolation without affecting the live database.
+   * Runs SQLite PRAGMA integrity_check and counts key entities (invoices, products, customers, journal entries).
+   */
+  public inspectDatabaseBinary(bytes: Uint8Array): {
+    valid: boolean;
+    integrity: string;
+    productsCount: number;
+    invoicesCount: number;
+    customersCount: number;
+    journalEntriesCount: number;
+    error?: string;
+  } {
+    if (!this.SQL) throw new Error('SQL engine not loaded');
+    try {
+      const candidate = new this.SQL.Database(bytes);
+      const integrity = String(candidate.exec('PRAGMA integrity_check')[0]?.values[0]?.[0] || 'unknown');
+      if (integrity !== 'ok') {
+        candidate.close();
+        return {
+          valid: false,
+          integrity,
+          productsCount: 0,
+          invoicesCount: 0,
+          customersCount: 0,
+          journalEntriesCount: 0,
+          error: 'فشل فحص سلامة الملف SQLite integrity_check',
+        };
+      }
+      const count = (tbl: string) => {
+        try {
+          return Number(candidate.exec(`SELECT COUNT(*) FROM ${tbl}`)[0]?.values[0]?.[0] || 0);
+        } catch {
+          return 0;
+        }
+      };
+      const productsCount = count('products');
+      const invoicesCount = count('sales_invoices');
+      const customersCount = count('customers');
+      const journalEntriesCount = count('journal_entries');
+      candidate.close();
+      return { valid: true, integrity, productsCount, invoicesCount, customersCount, journalEntriesCount };
+    } catch (err) {
+      return {
+        valid: false,
+        integrity: 'failed',
+        productsCount: 0,
+        invoicesCount: 0,
+        customersCount: 0,
+        journalEntriesCount: 0,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 }

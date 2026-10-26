@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { getProductUnitLabel } from '../utils/productUnits';
 
 export type CustomerSupplyStatus = 'OPEN' | 'PARTIAL' | 'READY' | 'CANCELLED';
 
@@ -17,6 +18,9 @@ export interface CustomerSupplyRequestItem {
   quantityReceived: number;
   quantityRemaining: number;
   unit: string;
+  productType?: 'CERAMIC' | 'GENERAL';
+  baseUnit?: string;
+  customUnit?: string;
   unitPrice: number;
   totalPrice: number;
   status: CustomerSupplyStatus;
@@ -160,13 +164,16 @@ export class CustomerSupplyService {
     const totalPrice = Math.round(unitPrice * quantity * 100) / 100;
 
     if (existing) {
-      const nextRequested = Number(existing.quantity_requested) + quantity;
-      const nextRemaining = Math.max(0, nextRequested - Number(existing.quantity_received));
-      const nextStatus = nextRemaining <= 0 ? 'READY' : (Number(existing.quantity_received) > 0 ? 'PARTIAL' : 'OPEN');
+      const currentRequested = Number(existing.quantityRequested ?? existing.quantity_requested ?? 0);
+      const currentReceived = Number(existing.quantityReceived ?? existing.quantity_received ?? 0);
+      const nextRequested = currentRequested + quantity;
+      const nextRemaining = Math.max(0, nextRequested - currentReceived);
+      const nextStatus = nextRemaining <= 0 ? 'READY' : (currentReceived > 0 ? 'PARTIAL' : 'OPEN');
       // Preserve the value of earlier demand if the newly requested quantity
       // has a different price; unit_price remains the blended request price.
-      const nextTotalPrice = Math.round((Number(existing.total_price || 0) + totalPrice) * 100) / 100;
-      const nextUnitPrice = nextRequested > 0 ? nextTotalPrice / nextRequested : unitPrice;
+      const currentTotal = Number(existing.totalPrice ?? existing.total_price ?? 0);
+      const nextTotalPrice = Math.round((currentTotal + totalPrice) * 100) / 100;
+      const nextUnitPrice = nextRequested > 0 ? Math.round((nextTotalPrice / nextRequested) * 100) / 100 : unitPrice;
       this.db.run(`
         UPDATE customer_supply_request_items
         SET quantity_requested = ?, quantity_remaining = ?, total_price = ?, unit_price = ?, status = ?, updated_at = CURRENT_TIMESTAMP
@@ -177,12 +184,18 @@ export class CustomerSupplyService {
     }
 
     const itemId = `csi_${uuidv4().substring(0, 8)}`;
+    const productUnit = this.db.query<any>(
+      `SELECT product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit
+       FROM products WHERE id = ?`,
+      [input.productId]
+    )[0];
+    const unit = productUnit ? getProductUnitLabel(productUnit) : 'م²';
     this.db.run(`
       INSERT INTO customer_supply_request_items (
         id, request_id, product_id, product_name, product_sku, product_grade, size,
         quantity_requested, quantity_received, quantity_remaining, unit, unit_price,
         total_price, status, expected_date, notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'M2', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `, [
       itemId,
       requestId,
@@ -193,6 +206,7 @@ export class CustomerSupplyService {
       input.size || null,
       quantity,
       quantity,
+      unit,
       unitPrice,
       totalPrice,
       'OPEN',
@@ -211,8 +225,8 @@ export class CustomerSupplyService {
     if (!(qty > 0)) return 0;
 
     const rows = db.query<any>(`
-      SELECT i.id, i.request_id, i.quantity_requested, i.quantity_received, i.quantity_remaining, i.status,
-             r.customer_id, r.invoice_id, r.invoice_number
+      SELECT i.id, i.request_id AS requestId, i.quantity_requested AS quantityRequested, i.quantity_received AS quantityReceived, i.quantity_remaining AS quantityRemaining, i.status,
+             r.customer_id AS customerId, r.invoice_id AS invoiceId, r.invoice_number AS invoiceNumber
       FROM customer_supply_request_items i
       JOIN customer_supply_requests r ON r.id = i.request_id
       WHERE r.warehouse_id = ?
@@ -225,24 +239,27 @@ export class CustomerSupplyService {
     let remainingToAllocate = qty;
     for (const row of rows) {
       if (remainingToAllocate <= 0) break;
-      const alloc = Math.min(Number(row.quantity_remaining) || 0, remainingToAllocate);
+      const rem = Number(row.quantityRemaining ?? row.quantity_remaining ?? 0);
+      const alloc = Math.min(rem, remainingToAllocate);
       if (alloc <= 0) continue;
-      const nextReceived = Number(row.quantity_received) + alloc;
-      const nextRemaining = Math.max(0, Number(row.quantity_requested) - nextReceived);
+      const rec = Number(row.quantityReceived ?? row.quantity_received ?? 0);
+      const req = Number(row.quantityRequested ?? row.quantity_requested ?? 0);
+      const nextReceived = rec + alloc;
+      const nextRemaining = Math.max(0, req - nextReceived);
       const nextStatus = nextRemaining <= 0 ? 'READY' : 'PARTIAL';
       db.run(`UPDATE customer_supply_request_items SET quantity_received = ?, quantity_remaining = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextReceived, nextRemaining, nextStatus, row.id]);
       remainingToAllocate -= alloc;
     }
 
     for (const row of rows) {
-      const refreshed = db.query<any>(`SELECT quantity_requested, quantity_received, quantity_remaining, status FROM customer_supply_request_items WHERE id = ?`, [row.id])[0];
-      if (refreshed && refreshed.quantity_remaining <= 0) {
+      const refreshed = db.query<any>(`SELECT quantity_requested AS quantityRequested, quantity_received AS quantityReceived, quantity_remaining AS quantityRemaining, status FROM customer_supply_request_items WHERE id = ?`, [row.id])[0];
+      if (refreshed && Number(refreshed.quantityRemaining ?? refreshed.quantity_remaining ?? 0) <= 0) {
         db.run(`UPDATE customer_supply_request_items SET status = 'READY', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [row.id]);
       }
     }
 
     // Refresh parent request statuses after inventory allocation.
-    const requestIds = Array.from(new Set(rows.map((row) => row.request_id)));
+    const requestIds = Array.from(new Set(rows.map((row) => row.requestId ?? row.request_id).filter(Boolean)));
     for (const requestId of requestIds) {
       this.refreshRequestStatus(requestId, db);
     }
@@ -256,24 +273,28 @@ export class CustomerSupplyService {
 
   private getItemRowsForRequest(requestId: string): CustomerSupplyRequestItem[] {
     const rows = this.db.query<any>(`
-      SELECT id, request_id AS requestId, product_id AS productId, product_name AS productName,
-             product_sku AS productSku, product_grade AS productGrade, size,
-             quantity_requested AS quantityRequested, quantity_received AS quantityReceived,
-             quantity_remaining AS quantityRemaining, unit, unit_price AS unitPrice,
-             total_price AS totalPrice, status, expected_date AS expectedDate, notes, created_at AS createdAt
-      FROM customer_supply_request_items WHERE request_id = ? ORDER BY created_at ASC
+      SELECT i.id, i.request_id AS requestId, i.product_id AS productId, i.product_name AS productName,
+             i.product_sku AS productSku, i.product_grade AS productGrade, i.size,
+             i.quantity_requested AS quantityRequested, i.quantity_received AS quantityReceived,
+             i.quantity_remaining AS quantityRemaining, i.unit, i.unit_price AS unitPrice,
+             i.total_price AS totalPrice, i.status, i.expected_date AS expectedDate, i.notes, i.created_at AS createdAt,
+             p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+      FROM customer_supply_request_items i LEFT JOIN products p ON p.id = i.product_id
+      WHERE i.request_id = ? ORDER BY i.created_at ASC
     `, [requestId]);
     return rows.map((row) => ({ ...row, quantityRequested: Number(row.quantityRequested || 0), quantityReceived: Number(row.quantityReceived || 0), quantityRemaining: Number(row.quantityRemaining || 0), unitPrice: Number(row.unitPrice || 0), totalPrice: Number(row.totalPrice || 0) }));
   }
 
   private getItemById(id: string): CustomerSupplyRequestItem | null {
     const row = this.db.query<any>(`
-      SELECT id, request_id AS requestId, product_id AS productId, product_name AS productName,
-             product_sku AS productSku, product_grade AS productGrade, size,
-             quantity_requested AS quantityRequested, quantity_received AS quantityReceived,
-             quantity_remaining AS quantityRemaining, unit, unit_price AS unitPrice,
-             total_price AS totalPrice, status, expected_date AS expectedDate, notes, created_at AS createdAt
-      FROM customer_supply_request_items WHERE id = ?
+      SELECT i.id, i.request_id AS requestId, i.product_id AS productId, i.product_name AS productName,
+             i.product_sku AS productSku, i.product_grade AS productGrade, i.size,
+             i.quantity_requested AS quantityRequested, i.quantity_received AS quantityReceived,
+             i.quantity_remaining AS quantityRemaining, i.unit, i.unit_price AS unitPrice,
+             i.total_price AS totalPrice, i.status, i.expected_date AS expectedDate, i.notes, i.created_at AS createdAt,
+             p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+      FROM customer_supply_request_items i LEFT JOIN products p ON p.id = i.product_id
+      WHERE i.id = ?
     `, [id])[0];
     if (!row) return null;
     return { ...row, quantityRequested: Number(row.quantityRequested || 0), quantityReceived: Number(row.quantityReceived || 0), quantityRemaining: Number(row.quantityRemaining || 0), unitPrice: Number(row.unitPrice || 0), totalPrice: Number(row.totalPrice || 0) };
@@ -300,14 +321,14 @@ export class CustomerSupplyService {
   }
 
   private refreshRequestStatus(requestId: string, db = this.db): void {
-    const items = db.query<any>(`SELECT status, quantity_requested, quantity_received FROM customer_supply_request_items WHERE request_id = ?`, [requestId]);
+    const items = db.query<any>(`SELECT status, quantity_requested AS quantityRequested, quantity_received AS quantityReceived FROM customer_supply_request_items WHERE request_id = ?`, [requestId]);
     if (!items.length) {
       db.run(`UPDATE customer_supply_requests SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [requestId]);
       return;
     }
 
-    const allReady = items.every((item) => Number(item.quantity_received) >= Number(item.quantity_requested) || item.status === 'READY');
-    const hasProgress = items.some((item) => Number(item.quantity_received) > 0 || item.status === 'PARTIAL');
+    const allReady = items.every((item) => Number(item.quantityReceived ?? item.quantity_received ?? 0) >= Number(item.quantityRequested ?? item.quantity_requested ?? 0) || item.status === 'READY');
+    const hasProgress = items.some((item) => Number(item.quantityReceived ?? item.quantity_received ?? 0) > 0 || item.status === 'PARTIAL');
     const nextStatus = allReady ? 'READY' : (hasProgress ? 'PARTIAL' : 'OPEN');
     db.run(`UPDATE customer_supply_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [nextStatus, requestId]);
   }

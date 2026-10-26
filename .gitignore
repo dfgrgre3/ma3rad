@@ -3,7 +3,7 @@ node_modules/
 # Build output
 dist/
 build/
-/release-whitefix/
+/release/
 *.tsbuildinfo
 
 # Electron runtime data (created via app.setPath('userData', .../.electron-data))

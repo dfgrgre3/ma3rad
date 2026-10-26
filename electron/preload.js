@@ -21,6 +21,12 @@ contextBridge.exposeInMainWorld('ceramisys', {
     openFolder: (target) => ipcRenderer.invoke('app:openFolder', target),
     relaunch: () => ipcRenderer.invoke('app:relaunch'),
     requestShutdown: () => ipcRenderer.invoke('app:requestShutdown'),
+    onBeforeClose: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('app:before-close', handler);
+      return () => ipcRenderer.removeListener('app:before-close', handler);
+    },
+    notifyCloseReady: () => ipcRenderer.send('app:close-ready'),
   },
   printing: {
     listPrinters: () => ipcRenderer.invoke('print:listPrinters'),

@@ -1,9 +1,11 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { BarChart3, Calendar, DollarSign, Package, ShoppingCart, Truck, PieChart, FileSpreadsheet, FileDown } from 'lucide-react';
 import { SalesService } from '../services/SalesService';
 import { AccountingService } from '../services/AccountingService';
 import { SalesInvoice } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { formatProductQuantity } from '../utils/productUnits';
 import { exportToExcel, exportToPdf, ExportOptions } from '../utils/export';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -96,7 +98,7 @@ export const ReportsView: React.FC = () => {
         return {
           title: 'تقرير المبيعات حسب الفئة', subtitle: period, fileName: 'category-sales',
           columns: [
-            { key: 'categoryName', label: 'الفئة' }, { key: 'quantityM2', label: 'الكمية (م²)' },
+            { key: 'categoryName', label: 'الفئة' }, { key: 'quantityM2', label: 'الكمية' }, { key: 'unitLabel', label: 'الوحدة' },
             { key: 'totalRevenue', label: 'الإيراد' }, { key: 'profit', label: 'الربح' },
           ],
           rows: categoryReport,
@@ -105,7 +107,7 @@ export const ReportsView: React.FC = () => {
         return {
           title: 'تقرير المبيعات حسب الماركة', subtitle: period, fileName: 'brand-sales',
           columns: [
-            { key: 'brandName', label: 'الماركة' }, { key: 'quantityM2', label: 'الكمية (م²)' },
+            { key: 'brandName', label: 'الماركة' }, { key: 'quantityM2', label: 'الكمية' }, { key: 'unitLabel', label: 'الوحدة' },
             { key: 'totalRevenue', label: 'الإيراد' }, { key: 'profit', label: 'الربح' },
           ],
           rows: brandReport,
@@ -125,8 +127,33 @@ export const ReportsView: React.FC = () => {
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
       <div>
-        <h2 className="text-xl font-extrabold text-slate-900">التقارير المالية المتقدمة</h2>
-        <p className="text-xs text-slate-500">تقارير شاملة للمبيعات والمشتريات والمصروفات والأرباح</p>
+        <h2 className="text-xl font-extrabold text-slate-900">مركز التقارير</h2>
+        <p className="text-xs text-slate-500">تقارير شاملة للمبيعات والمشتريات والمصروفات والأرباح والمالية</p>
+      </div>
+
+      {/* Quick access to advanced report pages */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {([
+          { label: 'تقارير المبيعات المتقدمة', desc: 'حسب الفئة والمنتج والعميل والمندوب', icon: ShoppingCart, color: 'from-teal-500 to-cyan-600', href: '#/reports/sales' },
+          { label: 'تقارير المشتريات والمخزون', desc: 'الموردون وقيمة المخزون', icon: Truck, color: 'from-orange-500 to-amber-600', href: '#/reports/purchases' },
+          { label: 'القوائم المالية', desc: 'الميزانية وأعمار الذمم والتدفق', icon: PieChart, color: 'from-violet-500 to-purple-600', href: '#/reports/statements' },
+          { label: 'الأرباح والخسائر', desc: 'قائمة الدخل وتحليل الهامش', icon: BarChart3, color: 'from-emerald-500 to-green-600', href: '#/reports/profit-loss' },
+        ] as const).map(card => {
+          const Icon = card.icon;
+          return (
+            <Link key={card.href} to={card.href.replace(/^#/, '')}
+              className={`bg-gradient-to-br ${card.color} text-white rounded-2xl p-4 block hover:opacity-90 hover:shadow-lg transition-all`}
+            >
+              <Icon className="w-6 h-6 mb-2 opacity-90" />
+              <p className="text-sm font-black">{card.label}</p>
+              <p className="text-xs opacity-70 mt-0.5">{card.desc}</p>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-slate-200 pt-2">
+        <h3 className="text-sm font-black text-slate-700 mb-3">التقارير التفصيلية المباشرة</h3>
       </div>
 
       <div className="flex gap-2 bg-slate-100 p-1 rounded-xl overflow-x-auto">
@@ -372,7 +399,7 @@ export const ReportsView: React.FC = () => {
                 <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                   <tr>
                     <th className="p-3.5">التصنيف</th>
-                    <th className="p-3.5">الكمية المباعة (م²)</th>
+                    <th className="p-3.5">الكمية المباعة</th>
                     <th className="p-3.5">إجمالي الإيراد</th>
                     <th className="p-3.5">الربح</th>
                     <th className="p-3.5">نسبة الربح</th>
@@ -384,7 +411,7 @@ export const ReportsView: React.FC = () => {
                   ) : categoryReport.map((cat, idx) => (
                     <tr key={idx} className="hover:bg-slate-100">
                       <td className="p-3.5 font-bold">{cat.categoryName}</td>
-                      <td className="p-3.5">{CeramicMath.formatM2(cat.quantityM2)}</td>
+                      <td className="p-3.5">{formatProductQuantity(cat.quantityM2, cat)}</td>
                       <td className="p-3.5 font-bold">{CeramicMath.formatCurrency(cat.totalRevenue)}</td>
                       <td className="p-3.5 font-black text-emerald-600">{CeramicMath.formatCurrency(cat.profit)}</td>
                       <td className="p-3.5 font-bold text-sky-600">{cat.totalRevenue > 0 ? ((cat.profit / cat.totalRevenue) * 100).toFixed(1) : 0}%</td>
@@ -408,7 +435,7 @@ export const ReportsView: React.FC = () => {
                 <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                   <tr>
                     <th className="p-3.5">الماركة</th>
-                    <th className="p-3.5">الكمية المباعة (م²)</th>
+                    <th className="p-3.5">الكمية المباعة</th>
                     <th className="p-3.5">إجمالي الإيراد</th>
                     <th className="p-3.5">الربح</th>
                     <th className="p-3.5">نسبة الربح</th>
@@ -420,7 +447,7 @@ export const ReportsView: React.FC = () => {
                   ) : brandReport.map((br, idx) => (
                     <tr key={idx} className="hover:bg-slate-100">
                       <td className="p-3.5 font-bold">{br.brandName}</td>
-                      <td className="p-3.5">{CeramicMath.formatM2(br.quantityM2)}</td>
+                      <td className="p-3.5">{formatProductQuantity(br.quantityM2, br)}</td>
                       <td className="p-3.5 font-bold">{CeramicMath.formatCurrency(br.totalRevenue)}</td>
                       <td className="p-3.5 font-black text-emerald-600">{CeramicMath.formatCurrency(br.profit)}</td>
                       <td className="p-3.5 font-bold text-sky-600">{br.totalRevenue > 0 ? ((br.profit / br.totalRevenue) * 100).toFixed(1) : 0}%</td>
@@ -435,5 +462,3 @@ export const ReportsView: React.FC = () => {
     </div>
   );
 };
-
-

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PermissionService } from './PermissionService';
 
+// Use sessionStorage instead of localStorage for session data (cleared on tab close)
 const SESSION_KEY = 'ceramisys_session_user_id';
 const SESSION_ID_KEY = 'ceramisys_session_id';
 
@@ -144,6 +145,23 @@ export class AuthService {
     }
   }
 
+  public static validatePasswordPolicy(password: string, username?: string): void {
+    if (!password || password.length < 8) {
+      throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+    }
+    if (password === 'admin123') {
+      throw new Error('لا يمكن استخدام كلمة المرور الافتراضية.');
+    }
+    if (username && password.toLowerCase() === username.toLowerCase()) {
+      throw new Error('لا يمكن أن تطابق كلمة المرور اسم المستخدم.');
+    }
+    const hasLetter = /[a-zA-Z\u0600-\u06FF]/.test(password);
+    const hasDigit = /[0-9]/.test(password);
+    if (!hasLetter || !hasDigit) {
+      throw new Error('يجب أن تحتوي كلمة المرور على أحرف وأرقام معاً.');
+    }
+  }
+
   /** Restore a previously authenticated session (survives reloads). */
   public static restoreSession(): User | null {
     let userId: string | null = null;
@@ -155,7 +173,7 @@ export class AuthService {
     if (!userId) return null;
 
     const rows = DatabaseManager.getInstance().query<any>(
-      `SELECT id, username, full_name, role, phone, is_active, created_at, updated_at
+      `SELECT id, username, password_hash, full_name, role, phone, is_active, created_at, updated_at
        FROM users WHERE id = ? AND is_active = 1`,
       [userId]
     );
@@ -164,6 +182,7 @@ export class AuthService {
       return null;
     }
     const u = rows[0];
+    const isDefaultAdmin = u.username === 'admin' && bcrypt.compareSync('admin123', u.passwordHash);
     const user: User = {
       id: u.id,
       username: u.username,
@@ -171,6 +190,7 @@ export class AuthService {
       role: u.role,
       phone: u.phone,
       isActive: Boolean(u.isActive),
+      mustChangePassword: isDefaultAdmin,
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
     };
@@ -239,6 +259,7 @@ export class AuthService {
       throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
     }
 
+    const isDefaultAdmin = userRecord.username === 'admin' && bcrypt.compareSync('admin123', userRecord.passwordHash);
     const user: User = {
       id: userRecord.id,
       username: userRecord.username,
@@ -246,6 +267,7 @@ export class AuthService {
       role: userRecord.role,
       phone: userRecord.phone,
       isActive: Boolean(userRecord.isActive),
+      mustChangePassword: isDefaultAdmin,
       createdAt: userRecord.createdAt,
       updatedAt: userRecord.updatedAt
     };
@@ -383,15 +405,23 @@ export class AuthService {
   public resetPassword(id: string, newPassword: string, actor?: User | null): void {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'users.reset_password');
-    if (newPassword.length < 6) throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
     const existing = this.getUserRecordById(id)?.user;
     if (!existing) throw new Error('المستخدم غير موجود.');
+    AuthService.validatePasswordPolicy(newPassword, existing.username);
     const hash = bcrypt.hashSync(newPassword, bcrypt.genSaltSync(10));
-    this.db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
-      hash,
-      new Date().toISOString(),
-      id,
-    ]);
+    this.db.executeTransaction(() => {
+      this.db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
+        hash,
+        new Date().toISOString(),
+        id,
+      ]);
+      // Invalidate all active sessions for that user to prevent unauthorized access
+      this.db.run(
+        `UPDATE user_sessions SET is_active = 0, ended_at = ?, end_reason = 'REVOKED'
+         WHERE user_id = ? AND is_active = 1`,
+        [new Date().toISOString(), id]
+      );
+    });
     this.audit(subject, 'إعادة تعيين كلمة مرور مستخدم', 'USERS', id, null, { username: existing.username });
   }
 
@@ -405,12 +435,22 @@ export class AuthService {
     if (!bcrypt.compareSync(currentPassword, row.passwordHash)) {
       throw new Error('كلمة المرور الحالية غير صحيحة.');
     }
-    if (newPassword.length < 6) throw new Error('كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل.');
-    this.db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
-      bcrypt.hashSync(newPassword, bcrypt.genSaltSync(10)),
-      new Date().toISOString(),
-      currentUser.id,
-    ]);
+    AuthService.validatePasswordPolicy(newPassword, currentUser.username);
+    this.db.executeTransaction(() => {
+      this.db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
+        bcrypt.hashSync(newPassword, bcrypt.genSaltSync(10)),
+        new Date().toISOString(),
+        currentUser.id,
+      ]);
+      // Invalidate all other active sessions for this user
+      const currentSes = AuthService.currentSessionId || '';
+      this.db.run(
+        `UPDATE user_sessions SET is_active = 0, ended_at = ?, end_reason = 'REVOKED'
+         WHERE user_id = ? AND id != ? AND is_active = 1`,
+        [new Date().toISOString(), currentUser.id, currentSes]
+      );
+    });
+    currentUser.mustChangePassword = false;
   }
 
   public deleteUser(id: string, actor?: User | null): void {

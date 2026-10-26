@@ -4,21 +4,8 @@ import { DataAdminService, type StorageStats, type TableInfo } from '../../servi
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
 
-function download(fileName: string, content: string, type = 'application/json') {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
+import { download, formatBytes } from './adminDataUtils';
+import { AdminDataTable } from './AdminDataTable';
 
 export const AdminDataTab: React.FC = () => {
   const toast = useToast();
@@ -187,26 +174,7 @@ export const AdminDataTab: React.FC = () => {
           <div className="max-h-[54vh] overflow-auto">
             {selected ? (
               rows.length > 0 ? (
-                <table className="w-full text-right text-[11px]">
-                  <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800">
-                    <tr>
-                      {columns.map((column) => (
-                        <th key={column} className="whitespace-nowrap border-b border-slate-200 px-2 py-1.5 font-mono font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300">{column}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, index) => (
-                      <tr key={index} className="odd:bg-white even:bg-slate-50 dark:odd:bg-slate-900 dark:even:bg-slate-800/40">
-                        {columns.map((column) => (
-                          <td key={column} className="max-w-[220px] truncate whitespace-nowrap border-b border-slate-100 px-2 py-1.5 font-mono text-slate-600 dark:border-slate-800 dark:text-slate-400" title={String(row[column] ?? '')}>
-                            {row[column] == null ? <span className="text-slate-300">NULL</span> : String(row[column])}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AdminDataTable rows={rows} columns={columns} />
               ) : (
                 <div className="p-8 text-center text-xs text-slate-400">الجدول فارغ.</div>
               )

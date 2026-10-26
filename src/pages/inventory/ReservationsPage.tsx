@@ -5,18 +5,9 @@ import { ProductService } from '../../services/ProductService';
 import { OperationsService } from '../../services/OperationsService';
 import { useToast } from '../../components/ui/Toast';
 import { Product } from '../../types';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 
-const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' م²';
-
-const statusStyles: Record<string, string> = {
-  ACTIVE: 'bg-sky-50 text-sky-700 border-sky-200',
-  RELEASED: 'bg-slate-100 text-slate-500 border-slate-200',
-  CONSUMED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  EXPIRED: 'bg-amber-50 text-amber-700 border-amber-200',
-};
-const statusLabels: Record<string, string> = {
-  ACTIVE: 'نشط', RELEASED: 'مُفرج', CONSUMED: 'مُنفّذ', EXPIRED: 'منتهي',
-};
+import { fmt, statusStyles, statusLabels } from './reservationsDisplay';
 
 export const ReservationsPage: React.FC = () => {
   const service = useMemo(() => new ReservationService(), []);
@@ -81,7 +72,7 @@ export const ReservationsPage: React.FC = () => {
 
   const action = (row: StockReservation, kind: 'release' | 'consume') => {
     const label = kind === 'release' ? 'إفراج' : 'تنفيذ';
-    if (!confirm(`هل تريد ${label} حجز ${row.productName} (${fmt(row.quantityM2)})؟`)) return;
+    if (!confirm(`هل تريد ${label} حجز ${row.productName} (${fmt(row.quantityM2, row)})؟`)) return;
     try {
       if (kind === 'release') service.releaseReservation(row.id);
       else service.consumeReservation(row.id);
@@ -146,7 +137,7 @@ export const ReservationsPage: React.FC = () => {
                     <span className="block text-[10px] font-mono text-slate-400">{row.productSku}</span>
                   </td>
                   <td className="px-3 py-2.5 text-xs text-slate-600">{row.warehouseName}</td>
-                  <td className="px-3 py-2.5 font-mono font-bold">{fmt(row.quantityM2)}</td>
+                  <td className="px-3 py-2.5 font-mono font-bold">{fmt(row.quantityM2, row)}</td>
                   <td className="px-3 py-2.5 text-[11px] text-slate-500">{row.referenceType}{row.referenceId ? ` · ${row.referenceId}` : ''}</td>
                   <td className="px-3 py-2.5 text-[11px] text-slate-500">{row.expiresAt || '—'}</td>
                   <td className="px-3 py-2.5"><span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${statusStyles[row.status]}`}>{statusLabels[row.status]}</span></td>
@@ -184,10 +175,12 @@ export const ReservationsPage: React.FC = () => {
             </select>
             {availability && (
               <p className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                المتاح: <b className="text-emerald-700">{availability.available}</b> م² · محجوز: {availability.reserved} · إجمالي: {availability.onHand}
+                المتاح: <b className="text-emerald-700">{fmt(availability.available, products.find((product) => product.id === form.productId) || {})}</b>
+                {' · '}محجوز: {fmt(availability.reserved, products.find((product) => product.id === form.productId) || {})}
+                {' · '}إجمالي: {fmt(availability.onHand, products.find((product) => product.id === form.productId) || {})}
               </p>
             )}
-            <input required type="number" step="0.01" min="0.01" value={form.quantityM2} onChange={(e) => setForm({ ...form, quantityM2: e.target.value })} placeholder="الكمية (م²)" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
+            <input required type="number" step="0.01" min="0.01" value={form.quantityM2} onChange={(e) => setForm({ ...form, quantityM2: e.target.value })} placeholder={`الكمية (${products.find((product) => product.id === form.productId) ? getProductUnitLabel(products.find((product) => product.id === form.productId)!) : 'الوحدة'})`} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
             <input type="date" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
             <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="ملاحظات" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold" />
             <button type="submit" className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-black">حفظ الحجز</button>

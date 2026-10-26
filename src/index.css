@@ -126,3 +126,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     overflow: visible !important;
   }
 }
+
+/* No scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Dashboard embedded content normalization and animation suppression */
+#dashboard-scroll-root * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.dashboard-embedded-scope .rounded-3xl,
+.dashboard-embedded-scope .rounded-2xl {
+  border-radius: 0.75rem !important;
+}

@@ -279,14 +279,14 @@ export class FinancialStatementsService {
       throw new Error('Invalid cash flow date range.');
     }
 
-    // Operating activities: cash from sales, payments to suppliers, operating expenses
+    // Operating activities: all operating cash movements (sales, purchases, expenses, manual adjustments)
     const operatingRows = this.db.query<any>(`
       WITH cash_by_entry AS (
         SELECT e.id, substr(e.date, 1, 7) AS month,
                SUM(CASE
-                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('SALES_INVOICE', 'CUSTOMER_PAYMENT') THEN l.debit - l.credit
-                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type IN ('SUPPLIER_PAYMENT', 'PURCHASE_INVOICE') THEN l.debit - l.credit
-                 WHEN a.code IN ('1101', '1102', '1106') AND e.reference_type LIKE '%EXPENSE%' THEN l.debit - l.credit
+                 WHEN a.code IN ('1101', '1102', '1106')
+                      AND e.reference_type NOT IN ('FIXED_ASSET_PURCHASE', 'FIXED_ASSET_SALE', 'LOAN_RECEIVED', 'LOAN_REPAYMENT', 'CAPITAL_INJECTION', 'DIVIDEND_PAYMENT')
+                 THEN l.debit - l.credit
                  ELSE 0
                END) AS net_cash
         FROM journal_entries e

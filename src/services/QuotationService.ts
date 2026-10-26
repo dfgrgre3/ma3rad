@@ -7,6 +7,7 @@ import { OrderService, type Order } from './OrderService';
 import { round2 } from './financials';
 import type { PaymentType, SalesInvoice } from '../types';
 import { addLocalDays, localDateString } from '../utils/date';
+import { getProductUnitLabel } from '../utils/productUnits';
 
 export type QuotationStatus = 'PENDING' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
 
@@ -46,6 +47,9 @@ export interface QuotationItem {
   discountAmount: number;
   totalPrice: number;
   metersPerBox?: number;
+  productType?: 'CERAMIC' | 'GENERAL';
+  baseUnit?: string;
+  customUnit?: string;
 }
 
 export interface Quotation {
@@ -160,7 +164,8 @@ export class QuotationService {
 
   public getItems(quotationId: string): QuotationItem[] {
     return this.db.query<QuotationItem>(
-      `SELECT qi.*, p.meters_per_box
+      `SELECT qi.*, p.meters_per_box,
+              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM quotation_items qi
        LEFT JOIN products p ON p.id = qi.product_id
        WHERE qi.quotation_id = ?
@@ -545,18 +550,20 @@ export class QuotationService {
     }
     return items.map((item) => {
       const product = this.db.query<any>(
-        `SELECT id, name, sku, grade, size, meters_per_box, pieces_per_box, min_selling_price_m2, is_active
+        `SELECT id, name, sku, grade, size, meters_per_box, pieces_per_box, min_selling_price_m2, is_active,
+                product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit
          FROM products WHERE id = ?`,
         [item.productId]
       )[0];
       if (!product) throw new Error(`الصنف ذو المعرف ${item.productId} غير موجود.`);
       if (!product.isActive) throw new Error(`الصنف "${product.name}" غير نشط.`);
 
+      const unitLabel = getProductUnitLabel(product);
       const quantityM2 = round2(Math.max(0, item.quantityM2 || 0));
-      if (quantityM2 <= 0) throw new Error(`كمية الصنف "${product.name}" يجب أن تكون أكبر من صفر.`);
+      if (quantityM2 <= 0) throw new Error(`كمية الصنف "${product.name}" (${unitLabel}) يجب أن تكون أكبر من صفر.`);
 
       const unitPrice = round2(Math.max(0, item.unitPrice || 0));
-      if (unitPrice <= 0) throw new Error(`سعر الصنف "${product.name}" يجب أن يكون أكبر من صفر.`);
+      if (unitPrice <= 0) throw new Error(`سعر الصنف "${product.name}" لكل ${unitLabel} يجب أن يكون أكبر من صفر.`);
       if (unitPrice < Number(product.minSellingPriceM2 || 0)) {
         PermissionService.require(actor, 'sales.approve');
       }
@@ -565,10 +572,12 @@ export class QuotationService {
       const gross = round2(quantityM2 * unitPrice);
       if (discountAmount > gross) throw new Error(`خصم الصنف "${product.name}" أكبر من قيمته.`);
       const totalPrice = round2(gross - discountAmount);
-      const metersPerBox = Number(product.metersPerBox) || 1.44;
-      const boxesCount = item.boxesCount !== undefined
-        ? round2(Math.max(0, item.boxesCount))
-        : round2(quantityM2 / metersPerBox);
+      const metersPerBox = Number(product.metersPerBox ?? product.meters_per_box) || 1.44;
+      const boxesCount = product.productType === 'GENERAL'
+        ? product.baseUnit === 'BOX' ? quantityM2 : 0
+        : item.boxesCount !== undefined
+          ? round2(Math.max(0, item.boxesCount))
+          : round2(quantityM2 / metersPerBox);
 
       return {
         productId: product.id as string,

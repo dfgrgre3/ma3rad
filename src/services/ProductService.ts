@@ -210,7 +210,9 @@ export class ProductService {
         `, [
           txId, txNum, id, initialStock.warehouseId,
           initialStock.quantityM2,
-          Number((initialStock.quantityM2 / (product.metersPerBox || 1.44)).toFixed(2)),
+          product.productType === 'GENERAL'
+            ? product.baseUnit === 'BOX' ? initialStock.quantityM2 : 0
+            : Number((initialStock.quantityM2 / (product.metersPerBox || 1.44)).toFixed(2)),
           initialStock.unitCost || product.costPrice,
           (initialStock.quantityM2 * (initialStock.unitCost || product.costPrice)),
           performedBy
@@ -338,6 +340,8 @@ export class ProductService {
       name: `${source.name} (نسخة)`,
       categoryId: source.categoryId,
       brandId: source.brandId,
+      productType: source.productType,
+      customUnit: source.customUnit,
       grade: source.grade,
       size: source.size,
       thickness: source.thickness,
@@ -365,6 +369,7 @@ export class ProductService {
   public getProductStockSummary(productId: string): { totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] } {
     const rows = this.db.query<WarehouseStock>(`
       SELECT ws.*, w.name as warehouseName,
+             p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
              p.meters_per_box as metersPerBox,
              p.pieces_per_box as piecesPerBox
       FROM warehouse_stock ws
@@ -378,10 +383,15 @@ export class ProductService {
     let totalPieces = 0;
 
     const mapped = rows.map(r => {
+      const isGeneral = (r as any).productType === 'GENERAL';
       const metersPerBox = (r as any).metersPerBox || 1.44;
       const piecesPerBox = (r as any).piecesPerBox || 1;
-      const boxes = Number((r.quantityM2 / metersPerBox).toFixed(2));
-      const pieces = Math.round(boxes * piecesPerBox);
+      const boxes = isGeneral
+        ? (r as any).baseUnit === 'BOX' ? r.quantityM2 : 0
+        : Number((r.quantityM2 / metersPerBox).toFixed(2));
+      const pieces = isGeneral
+        ? (r as any).baseUnit === 'PIECE' ? r.quantityM2 : 0
+        : Math.round(boxes * piecesPerBox);
       totalM2 += r.quantityM2;
       totalBoxes += boxes;
       totalPieces += pieces;

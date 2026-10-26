@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Settings as SettingsIcon, Database, Download, Upload, 
-  Printer, Shield, Save, CheckCircle2, AlertTriangle, RefreshCw
+  Printer, Shield, Save, CheckCircle2, AlertTriangle, RefreshCw,
+  FileSpreadsheet, Layers, ExternalLink, Activity
 } from 'lucide-react';
 import { BackupService } from '../services/BackupService';
 import { SettingsService } from '../services/SettingsService';
@@ -202,43 +204,92 @@ export const SettingsView: React.FC = () => {
           </form>
         </div>
 
-        {/* Database Backup & Restore Box */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
-          <div className="space-y-4">
+        {/* Right Column: Tools & Backup */}
+        <div className="space-y-6 flex flex-col justify-between">
+          {/* Data Tools Box */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-              <Database className="w-4 h-4 text-emerald-600" />
-              <span>النسخ الاحتياطي المحلي والأمان</span>
+              <FileSpreadsheet className="w-4 h-4 text-sky-600" />
+              <span>أدوات استيراد وإدارة البيانات</span>
             </h3>
-
             <p className="text-xs text-slate-500 leading-relaxed">
-              يتم حفظ قاعدة البيانات SQLite محلياً. يُنصح بتحميل نسخة احتياطية دورياً وحفظها على قرص خارجي (Flash Drive / Cloud Storage) لحماية بيانات المعرض.
+              استيراد سجلات العملاء والموردين والمنتجات من ملفات Excel، وإدارة أنواع البيانات المرنة المخصصة.
             </p>
 
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={handleExportBackup}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 text-xs"
+            <div className="space-y-2 pt-1">
+              <Link
+                to="/data-import"
+                className="w-full py-2.5 px-4 bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold rounded-xl flex items-center justify-between text-xs border border-sky-100 transition"
               >
-                <Download className="w-4 h-4" />
-                <span>تنزيل نسخة احتياطية (SQLite Backup)</span>
-              </button>
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-sky-600" />
+                  <span>مركز استيراد الملفات (Excel / CSV)</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-sky-500" />
+              </Link>
 
-              <label className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 text-xs cursor-pointer border border-dashed border-slate-300">
-                <Upload className="w-4 h-4" />
-                <span>استعادة قاعدة البيانات من ملف</span>
-                <input
-                  type="file"
-                  accept=".sqlite,.db"
-                  onChange={handleImportBackup}
-                  className="hidden"
-                />
-              </label>
+              <Link
+                to="/data-import/types"
+                className="w-full py-2.5 px-4 bg-violet-50 hover:bg-violet-100 text-violet-900 font-bold rounded-xl flex items-center justify-between text-xs border border-violet-100 transition"
+              >
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-violet-600" />
+                  <span>إدارة أنواع البيانات المرنة والسجلات</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-violet-500" />
+              </Link>
+
+              <Link
+                to="/system-health"
+                className="w-full py-2.5 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold rounded-xl flex items-center justify-between text-xs border border-slate-200 transition"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-slate-500" />
+                  <span>فحص صحة النظام ومؤشرات الأداء</span>
+                </div>
+                <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+              </Link>
             </div>
           </div>
 
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-700 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>الاستعادة تقوم باستبدال كافة البيانات الحالية. احرص على أخذ نسخة قبل الاستعادة.</span>
+          {/* Database Backup & Restore Box */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="space-y-4">
+              <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                <Database className="w-4 h-4 text-emerald-600" />
+                <span>النسخ الاحتياطي المحلي والأمان</span>
+              </h3>
+
+              <p className="text-xs text-slate-500 leading-relaxed">
+                يتم حفظ قاعدة البيانات SQLite محلياً. يُنصح بتحميل نسخة احتياطية دورياً وحفظها على قرص خارجي (Flash Drive / Cloud Storage) لحماية بيانات المعرض.
+              </p>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={handleExportBackup}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 text-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>تنزيل نسخة احتياطية (SQLite Backup)</span>
+                </button>
+
+                <label className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 text-xs cursor-pointer border border-dashed border-slate-300">
+                  <Upload className="w-4 h-4" />
+                  <span>استعادة قاعدة البيانات من ملف</span>
+                  <input
+                    type="file"
+                    accept=".sqlite,.db"
+                    onChange={handleImportBackup}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-700 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>الاستعادة تقوم باستبدال كافة البيانات الحالية. احرص على أخذ نسخة قبل الاستعادة.</span>
+            </div>
           </div>
         </div>
       </div>

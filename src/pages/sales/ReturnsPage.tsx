@@ -12,6 +12,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 
 const PAGE_SIZE = 15;
 
@@ -156,7 +157,7 @@ export const ReturnsPage: React.FC = () => {
     if (!invoiceId) return alert('اختر الفاتورة الأصلية.');
     if (selected.length === 0) return alert('حدد كمية لصنف واحد على الأقل.');
     const over = selected.find((l) => l.quantityM2 > l.returnableM2 + 1e-6);
-    if (over) return alert(`الكمية المرتجعة من "${over.productName}" تتجاوز القابل للإرجاع (${over.returnableM2} م²).`);
+    if (over) return alert(`الكمية المرتجعة من "${over.productName}" تتجاوز القابل للإرجاع (${formatProductQuantity(over.returnableM2, over)}).`);
     setSaving(true);
     try {
       service.returnSale(
@@ -347,7 +348,7 @@ export const ReturnsPage: React.FC = () => {
                   <thead className="bg-slate-50 text-slate-500 font-bold">
                     <tr>
                       <th className="px-3 py-2">الصنف</th>
-                      <th className="px-3 py-2">المباع (م²)</th>
+                      <th className="px-3 py-2">المباع</th>
                       <th className="px-3 py-2">مُرجع سابقاً</th>
                       <th className="px-3 py-2">القابل للإرجاع</th>
                       <th className="px-3 py-2">سعر الوحدة</th>
@@ -360,12 +361,12 @@ export const ReturnsPage: React.FC = () => {
                     {lines.map((l, idx) => (
                       <tr key={l.productId}>
                         <td className="px-3 py-2 font-semibold text-slate-800">{l.productName}<div className="text-[9px] text-slate-400 font-normal">{l.size} • {l.grade}</div></td>
-                        <td className="px-3 py-2 font-mono">{l.soldM2}</td>
-                        <td className="px-3 py-2 font-mono text-slate-500">{l.returnedM2}</td>
-                        <td className="px-3 py-2 font-mono font-bold text-emerald-600">{l.returnableM2}</td>
+                        <td className="px-3 py-2 font-mono">{formatProductQuantity(l.soldM2, l)}</td>
+                        <td className="px-3 py-2 font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</td>
+                        <td className="px-3 py-2 font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</td>
                         <td className="px-3 py-2 font-mono">{l.unitPrice}</td>
                         <td className="px-3 py-2">
-                          <input type="number" min={0} max={l.returnableM2} step="0.01" value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Math.min(Number(e.target.value) || 0, l.returnableM2) })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono" />
+                          <input type="number" min={0} max={l.returnableM2} step={l.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(l.baseUnit || '') ? 1 : 0.01} value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Math.min(Number(e.target.value) || 0, l.returnableM2) })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono" aria-label={`كمية الإرجاع ${getProductUnitLabel(l)}`} />
                         </td>
                         <td className="px-3 py-2"><input list="return-reasons" value={l.reason} onChange={(e) => setLine(idx, { reason: e.target.value })} placeholder="كسر / عيب..." className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg" /></td>
                         <td className="px-3 py-2 font-bold text-rose-600">{fmt(l.quantityM2 * l.unitPrice)}</td>
@@ -428,7 +429,7 @@ export const ReturnsPage: React.FC = () => {
                 {(detail.items || []).map((i) => (
                   <tr key={i.id}>
                     <td className="px-3 py-2 font-bold text-slate-800">{i.productName}<div className="text-[9px] text-slate-400 font-normal">{i.grade}</div></td>
-                    <td className="px-3 py-2 font-mono">{i.quantityM2} م²</td>
+                    <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</td>
                     <td className="px-3 py-2 font-mono">{i.boxesCount}</td>
                     <td className="px-3 py-2 font-mono">{fmt(i.unitPrice)}</td>
                     <td className="px-3 py-2 font-bold">{fmt(i.totalRefund)}</td>

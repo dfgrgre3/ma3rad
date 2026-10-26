@@ -50,16 +50,16 @@ export class AccountingService {
     const prevMonthStart = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
     const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()}`;
 
-    // 1. Sales metrics
+    // 1. Sales metrics (bounded up to today to exclude future-dated entries from MTD)
     const salesStats = this.db.query<any>(`
       SELECT 
         SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END) as todaySales,
-        SUM(CASE WHEN date >= ? THEN total_amount ELSE 0 END) as monthSales,
-        SUM(CASE WHEN date >= ? THEN gross_profit ELSE 0 END) as monthGrossProfit,
+        SUM(CASE WHEN date >= ? AND date <= ? THEN total_amount ELSE 0 END) as monthSales,
+        SUM(CASE WHEN date >= ? AND date <= ? THEN gross_profit ELSE 0 END) as monthGrossProfit,
         COUNT(CASE WHEN date = ? THEN 1 END) as todaySalesCount
       FROM sales_invoices
       WHERE invoice_status != 'VOID'
-    `, [today, monthStart, monthStart, today])[0] || {};
+    `, [today, monthStart, today, monthStart, today, today])[0] || {};
 
     // Previous month sales for growth rate
     const prevMonthSales = this.db.query<any>(`
@@ -74,25 +74,32 @@ export class AccountingService {
       FROM purchase_invoices
     `, [today])[0] || {};
 
-    // 3. Expenses metrics
+    // 3. Expenses metrics (bounded up to today)
     const expenseStats = this.db.query<any>(`
       SELECT 
         SUM(CASE WHEN date = ? THEN amount ELSE 0 END) as todayExpenses,
-        SUM(CASE WHEN date >= ? THEN amount ELSE 0 END) as monthExpenses
+        SUM(CASE WHEN date >= ? AND date <= ? THEN amount ELSE 0 END) as monthExpenses
       FROM expenses
-    `, [today, monthStart])[0] || {};
+    `, [today, monthStart, today])[0] || {};
 
     // 4. Receivables (Customer debts)
     const customerDebts = this.db.query<any>(`
       SELECT SUM(current_balance) as totalReceivables FROM customers WHERE current_balance > 0
     `)[0]?.totalReceivables || 0;
 
-    // Urgent debts (debts > 30 days old or high amounts)
+    // Urgent debts: customers with debts overdue by > 30 days based on invoice due dates
+    const cutoff30DaysAgo = new Date();
+    cutoff30DaysAgo.setDate(cutoff30DaysAgo.getDate() - 30);
+    const cutoff30Str = localDateString(cutoff30DaysAgo);
     const urgentDebts = this.db.query<any>(`
-      SELECT COUNT(*) as count
-      FROM customers
-      WHERE current_balance > 0 AND (current_balance > 50000 OR credit_limit > 0)
-    `)[0]?.count || 0;
+      SELECT COUNT(DISTINCT si.customer_id) as count
+      FROM sales_invoices si
+      JOIN customers c ON c.id = si.customer_id
+      WHERE c.current_balance > 0
+        AND si.invoice_status != 'VOID'
+        AND COALESCE(si.due_date, si.date) < ?
+        AND (si.total_amount - si.paid_amount) > 0.01
+    `, [cutoff30Str])[0]?.count || 0;
 
     // 5. Payables (Supplier dues)
     const supplierPayables = this.db.query<any>(`
@@ -189,11 +196,14 @@ export class AccountingService {
     return results;
   }
 
-  public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number }[] {
+  public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[] {
     this.requireView('reports.view');
     return this.db.query<any>(`
       SELECT 
         p.name,
+        p.product_type AS productType,
+        p.base_unit AS baseUnit,
+        p.custom_unit AS customUnit,
         SUM(sii.quantity_m2) as quantityM2,
         SUM(sii.total_price) as totalRevenue
       FROM sales_invoice_items sii
@@ -339,7 +349,7 @@ export class AccountingService {
     return { revenue, merchandiseRevenue, shippingRevenue, otherRevenue, costOfGoodsSold, grossProfit, expenses, netProfit, margin };
   }
 
-  public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number }[] {
+  public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
     this.requireView('reports.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
@@ -356,6 +366,20 @@ export class AccountingService {
     return this.db.query<any>(`
       SELECT 
         c.name as categoryName,
+        CASE
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'CUSTOM' THEN COALESCE(NULLIF(TRIM(p.custom_unit), ''), 'وحدة')
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'BOX' THEN 'كرتونة'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'PIECE' THEN 'قطعة'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'KG' THEN 'كجم'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'TON' THEN 'طن'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'SET' THEN 'طقم'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'LINEAR_METER' THEN 'متر طولي'
+          WHEN p.product_type = 'GENERAL' THEN 'م²'
+          ELSE 'م²'
+        END as unitLabel,
+        p.product_type as productType,
+        p.base_unit as baseUnit,
+        p.custom_unit as customUnit,
         SUM(sii.quantity_m2) as quantityM2,
         SUM(sii.total_price) as totalRevenue,
         SUM(sii.profit) as profit
@@ -364,12 +388,12 @@ export class AccountingService {
       JOIN categories c ON p.category_id = c.id
       JOIN sales_invoices si ON sii.invoice_id = si.id
       ${whereClause}
-      GROUP BY c.id, c.name
+      GROUP BY c.id, c.name, p.product_type, p.base_unit, p.custom_unit
       ORDER BY totalRevenue DESC
     `, params);
   }
 
-  public getBrandSalesReport(dateFrom?: string, dateTo?: string): { brandName: string; quantityM2: number; totalRevenue: number; profit: number }[] {
+  public getBrandSalesReport(dateFrom?: string, dateTo?: string): { brandName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
     this.requireView('reports.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
@@ -386,6 +410,20 @@ export class AccountingService {
     return this.db.query<any>(`
       SELECT 
         b.name as brandName,
+        CASE
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'CUSTOM' THEN COALESCE(NULLIF(TRIM(p.custom_unit), ''), 'وحدة')
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'BOX' THEN 'كرتونة'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'PIECE' THEN 'قطعة'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'KG' THEN 'كجم'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'TON' THEN 'طن'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'SET' THEN 'طقم'
+          WHEN p.product_type = 'GENERAL' AND p.base_unit = 'LINEAR_METER' THEN 'متر طولي'
+          WHEN p.product_type = 'GENERAL' THEN 'م²'
+          ELSE 'م²'
+        END as unitLabel,
+        p.product_type as productType,
+        p.base_unit as baseUnit,
+        p.custom_unit as customUnit,
         SUM(sii.quantity_m2) as quantityM2,
         SUM(sii.total_price) as totalRevenue,
         SUM(sii.profit) as profit
@@ -394,7 +432,7 @@ export class AccountingService {
       JOIN brands b ON p.brand_id = b.id
       JOIN sales_invoices si ON sii.invoice_id = si.id
       ${whereClause}
-      GROUP BY b.id, b.name
+      GROUP BY b.id, b.name, p.product_type, p.base_unit, p.custom_unit
       ORDER BY totalRevenue DESC
     `, params);
   }

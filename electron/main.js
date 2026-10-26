@@ -2,8 +2,9 @@ const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, session } = req
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
-const { execFile } = require('child_process');
-const net = require('net');
+const { registerPrintingHandlers } = require('./printing');
+const { registerDatabaseHandlers } = require('./databaseHandlers');
+const { registerAppHandlers } = require('./appHandlers');
 
 // Keep application data in the OS-standard roaming profile. This is always
 // writable, even when the app itself is installed under Program Files.
@@ -18,20 +19,32 @@ app.disableHardwareAcceleration();
 
 // Security: Allowed origins for IPC communication
 const ALLOWED_ORIGINS = new Set([
-  'file://', // Local file protocol (production)
   'http://localhost:5173', // Vite dev server
   'http://127.0.0.1:5173', // Alternative localhost
 ]);
 
-// Security: Validate IPC sender
+// Security: Validate IPC senderFrame
 function validateIpcSender(event) {
-  const senderUrl = event.sender.getURL();
-  const origin = new URL(senderUrl).origin;
-  if (!ALLOWED_ORIGINS.has(origin) && !origin.startsWith('file://')) {
-    console.error(`Security: Blocked IPC call from unauthorized origin: ${origin}`);
-    throw new Error('Unauthorized IPC caller');
+  const frame = event.senderFrame;
+  const senderUrl = frame ? frame.url : (event.sender?.getURL?.() || '');
+  
+  // 1. Allow local files (production build)
+  if (senderUrl.startsWith('file://')) {
+    return true;
   }
-  return true;
+
+  // 2. Allow specific development origins
+  try {
+    const origin = new URL(senderUrl).origin;
+    if (ALLOWED_ORIGINS.has(origin)) {
+      return true;
+    }
+  } catch (error) {
+    // URL parsing failed
+  }
+
+  console.error(`Security: Blocked IPC call from unauthorized senderFrame: ${senderUrl}`);
+  throw new Error('Unauthorized IPC caller');
 }
 
 // Security: Validate data size limits
@@ -82,6 +95,61 @@ function createWindow() {
     }
   });
 
+  // Security: Block internal navigation away from the application
+  win.webContents.on('will-navigate', (event, navigationUrl) => {
+    try {
+      const parsedUrl = new URL(navigationUrl);
+      const isAllowedDev = !app.isPackaged && ALLOWED_ORIGINS.has(parsedUrl.origin);
+      const isAllowedProd = app.isPackaged && navigationUrl.startsWith('file://');
+      if (!isAllowedDev && !isAllowedProd) {
+        event.preventDefault();
+        console.warn(`Security: Prevented navigation to ${navigationUrl}`);
+      }
+    } catch {
+      event.preventDefault();
+    }
+  });
+
+  // Security: Prevent arbitrary new windows, open approved external web links in OS browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        shell.openExternal(url);
+      }
+    } catch {
+      // Invalid URL ignored
+    }
+    return { action: 'deny' };
+  });
+
+  // Graceful shutdown: coordinate with renderer to wait for flush() before closing
+  let isClosing = false;
+  win.on('close', async (event) => {
+    if (isClosing) return;
+    event.preventDefault();
+    isClosing = true;
+
+    try {
+      if (!win.isDestroyed() && win.webContents) {
+        win.webContents.send('app:before-close');
+        await new Promise((resolve) => {
+          const timeout = setTimeout(resolve, 3500);
+          ipcMain.once('app:close-ready', () => {
+            clearTimeout(timeout);
+            resolve();
+          });
+        });
+      }
+    } catch (err) {
+      console.error('Graceful shutdown error:', err);
+    } finally {
+      if (!win.isDestroyed()) {
+        win.destroy();
+      }
+    }
+  });
+
   if (!app.isPackaged) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173');
     win.webContents.openDevTools();
@@ -93,365 +161,12 @@ function createWindow() {
 }
 
 // ─── Database persistence (real file on disk instead of localStorage) ────────
-ipcMain.handle('db:load', async (event) => {
-  validateIpcSender(event);
-  ensureDirs();
-  if (!(await databaseFileExists())) return null;
-  const buffer = await fs.readFile(DB_FILE);
-  if (buffer.length > MAX_DB_SIZE) {
-    throw new Error('Database file exceeds maximum allowed size');
-  }
-  return new Uint8Array(buffer);
+registerDatabaseHandlers({
+  ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
+  APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
 });
-
-ipcMain.handle('db:preserve-corrupt', async () => {
-  ensureDirs();
-  if (!(await databaseFileExists())) {
-    throw new Error('قاعدة البيانات الأصلية غير موجودة لإنشاء نسخة استعادة.');
-  }
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const target = path.join(BACKUP_DIR, `ceramisys_corrupt_${stamp}.sqlite`);
-  await fs.copyFile(DB_FILE, target, fsSync.constants.COPYFILE_EXCL);
-  return { path: target, bytes: (await fs.stat(target)).size };
-});
-
-ipcMain.handle('db:backup-snapshot', async (_event, { bytes, label }) => {
-  ensureDirs();
-  const data = Buffer.from(bytes);
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const safeLabel = String(label || 'snapshot').replace(/[^a-zA-Z0-9_-]/g, '-');
-  const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite`);
-  const temporaryFile = `${target}.tmp`;
-  try {
-    await fs.writeFile(temporaryFile, data, { flag: 'wx' });
-    await fs.rename(temporaryFile, target);
-    return { ok: true, path: target, bytes: data.length };
-  } catch (error) {
-    try { await fs.unlink(temporaryFile); } catch (cleanupError) {
-      if (cleanupError.code !== 'ENOENT') throw cleanupError;
-    }
-    throw error;
-  }
-});
-
-ipcMain.handle('db:create-fresh-after-recovery', async () => {
-  ensureDirs();
-  if (!(await databaseFileExists())) return { ok: true };
-
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const target = path.join(BACKUP_DIR, `ceramisys_replaced_${stamp}.sqlite`);
-  await fs.copyFile(DB_FILE, target, fsSync.constants.COPYFILE_EXCL);
-  await fs.rename(DB_FILE, `${DB_FILE}.replaced-${stamp}`);
-  return { ok: true, path: target };
-});
-
-ipcMain.handle('db:save', async (event, bytes) => {
-  validateIpcSender(event);
-  try {
-    ensureDirs();
-    const data = Buffer.from(bytes);
-    if (data.length > MAX_DB_SIZE) {
-      throw new Error('Database data exceeds maximum allowed size');
-    }
-    const tmp = `${DB_FILE}.tmp`;
-    try {
-      await fs.writeFile(tmp, data);
-      await fs.rename(tmp, DB_FILE);
-    } catch (error) {
-      try { await fs.unlink(tmp); } catch (cleanupError) {
-        if (cleanupError.code !== 'ENOENT') throw cleanupError;
-      }
-      throw error;
-    }
-    return { ok: true, path: DB_FILE, bytes: data.length };
-  } catch (error) {
-    console.error('Failed to save database file:', error);
-    return { ok: false, error: error.message || String(error) };
-  }
-});
-
-ipcMain.handle('db:backup', async (_event, label) => {
-  try {
-    ensureDirs();
-    if (!fsSync.existsSync(DB_FILE)) return { ok: false, error: 'قاعدة البيانات غير موجودة بعد' };
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const safeLabel = String(label || 'manual').replace(/[^a-zA-Z0-9_-]/g, '-');
-    const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite`);
-    await fs.copyFile(DB_FILE, target);
-    const stat = await fs.stat(target);
-    return { ok: true, path: target, bytes: stat.size };
-  } catch (error) {
-    console.error('Failed to create backup:', error);
-    return { ok: false, error: error.message || String(error) };
-  }
-});
-
-ipcMain.handle('db:info', async () => {
-  try {
-    ensureDirs();
-    const exists = fsSync.existsSync(DB_FILE);
-    const stat = exists ? await fs.stat(DB_FILE) : null;
-    return { path: DB_FILE, exists, bytes: stat ? stat.size : 0, backupDir: BACKUP_DIR };
-  } catch (error) {
-    return { path: DB_FILE, exists: false, bytes: 0, backupDir: BACKUP_DIR, error: String(error) };
-  }
-});
-
-ipcMain.handle('credentials:get', async () => {
-  if (!fsSync.existsSync(REMEMBERED_CREDENTIALS_FILE)) return null;
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
-  }
-  const encrypted = await fs.readFile(REMEMBERED_CREDENTIALS_FILE);
-  const credentials = JSON.parse(safeStorage.decryptString(encrypted));
-  if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
-    throw new Error('بيانات الدخول المحفوظة غير صالحة.');
-  }
-  if (credentials.consented !== true) {
-    await fs.unlink(REMEMBERED_CREDENTIALS_FILE);
-    return null;
-  }
-  return credentials;
-});
-
-ipcMain.handle('credentials:set', async (_event, { username, password }) => {
-  if (typeof username !== 'string' || typeof password !== 'string') {
-    throw new Error('بيانات الدخول غير صالحة للحفظ.');
-  }
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
-  }
-  ensureDirs();
-  const encrypted = safeStorage.encryptString(JSON.stringify({ username, password, consented: true }));
-  const temporaryFile = `${REMEMBERED_CREDENTIALS_FILE}.tmp`;
-  await fs.writeFile(temporaryFile, encrypted);
-  await fs.rename(temporaryFile, REMEMBERED_CREDENTIALS_FILE);
-  return { ok: true };
-});
-
-ipcMain.handle('credentials:clear', async () => {
-  try {
-    await fs.unlink(REMEMBERED_CREDENTIALS_FILE);
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-  return { ok: true };
-});
-
-ipcMain.handle('app:info', async () => ({
-  version: app.getVersion(),
-  packaged: app.isPackaged,
-  dataDir: APP_DATA_DIR,
-  backupDir: BACKUP_DIR,
-}));
-
-// Full application restart. The renderer flushes the SQLite snapshot to disk
-// before calling this, so a relaunch never loses the newest writes.
-ipcMain.handle('app:relaunch', async () => {
-  app.relaunch();
-  app.exit(0);
-  return { ok: true };
-});
-
-ipcMain.handle('app:openFolder', async (_event, target) => {
-  try {
-    const resolved = target === 'backups' ? BACKUP_DIR : DATA_DIR;
-    ensureDirs();
-    await shell.openPath(resolved);
-    return { ok: true, path: resolved };
-  } catch (error) {
-    return { ok: false, error: String(error) };
-  }
-});
-
-// ─── PDF export ───────────────────────────────────────────────────────────────
-ipcMain.handle('export:pdf', async (_event, { html, fileName, landscape }) => {
-  const renderer = new BrowserWindow({
-    show: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
-  });
-
-  try {
-    await renderer.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(String(html || '')));
-    const pdf = await renderer.webContents.printToPDF({
-      printBackground: true,
-      pageSize: 'A4',
-      landscape: Boolean(landscape),
-      margins: { marginType: 'default' }
-    });
-
-    const safeName = String(fileName || 'document').replace(/[\\/:*?"<>|]/g, '-');
-    const { canceled, filePath } = await dialog.showSaveDialog({
-      title: 'حفظ الملف بصيغة PDF',
-      defaultPath: `${safeName}.pdf`,
-      filters: [{ name: 'PDF', extensions: ['pdf'] }]
-    });
-
-    if (canceled || !filePath) return null;
-    await fs.writeFile(filePath, pdf);
-    return filePath;
-  } catch (error) {
-    console.error('PDF export failed:', error);
-    return null;
-  } finally {
-    renderer.destroy();
-  }
-});
-
-// ─── Direct / ESC-POS thermal printing ────────────────────────────────────────
-
-function runPowerShell(script) {
-  return new Promise((resolve, reject) => {
-    execFile(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
-      { windowsHide: true, timeout: 15000, maxBuffer: 4 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        if (error) reject(new Error(String(stderr || error.message)));
-        else resolve(String(stdout));
-      }
-    );
-  });
-}
-
-ipcMain.handle('print:listPrinters', async () => {
-  try {
-    if (process.platform === 'win32') {
-      const out = await runPowerShell('Get-Printer | Select-Object -ExpandProperty Name');
-      const names = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-      return { ok: true, printers: names };
-    }
-    // macOS / Linux: CUPS lists printers via lpstat.
-    const out = await new Promise((resolve, reject) => {
-      execFile('lpstat', ['-e'], { timeout: 10000 }, (err, stdout) => {
-        if (err) reject(err); else resolve(String(stdout));
-      });
-    });
-    const names = out.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-    return { ok: true, printers: names };
-  } catch (error) {
-    return { ok: false, printers: [], error: String(error) };
-  }
-});
-
-// Sends raw bytes to a network ESC/POS printer over TCP port 9100 —
-// works on every OS and is the most common way receipt printers are wired.
-function sendRawToNetworkPrinter(bytes, host, port) {
-  return new Promise((resolve, reject) => {
-    const socket = net.createConnection({ host, port: Number(port) || 9100 });
-    let settled = false;
-    const done = (err) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      err ? reject(err) : resolve();
-    };
-    socket.setTimeout(10000, () => done(new Error('انتهت مهلة الاتصال بالطابعة')));
-    socket.on('error', (err) => done(err));
-    socket.on('connect', () => {
-      socket.end(Buffer.from(bytes), () => done(null));
-    });
-  });
-}
-
-ipcMain.handle('print:raw', async (_event, { bytes, printerName, transport, host, port }) => {
-  let tempFile = null;
-  try {
-    if (!Array.isArray(bytes) || (!printerName && transport !== 'network')) {
-      return { ok: false, error: 'معطيات الطباعة غير مكتملة' };
-    }
-    const buf = Buffer.from(bytes);
-
-    // Network (TCP 9100) transport — cross-platform by definition.
-    if (transport === 'network') {
-      if (!host) return { ok: false, error: 'عنوان الطابعة الشبكية غير محدد' };
-      await sendRawToNetworkPrinter(buf, host, port);
-      return { ok: true };
-    }
-
-    if (process.platform === 'win32') {
-      tempFile = path.join(APP_DATA_DIR, `escpos-${Date.now()}.bin`);
-      await fs.writeFile(tempFile, buf);
-    // RawPrinterHelper: writes a RAW job directly to the printer via winspool.
-    const ps = `
-      Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public class RawPrinterHelper {
-  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-  public struct DOCINFOW {
-    [MarshalAs(UnmanagedType.LPWStr)] public string DocName;
-    [MarshalAs(UnmanagedType.LPWStr)] public string OutputFile;
-    [MarshalAs(UnmanagedType.LPWStr)] public string DataType;
-  }
-  [DllImport("winspool.Drv", EntryPoint = "OpenPrinterW", SetLastError = true, CharSet = CharSet.Unicode)]
-  public static extern bool OpenPrinter(string szPrinter, out IntPtr hPrinter, IntPtr pd);
-  [DllImport("winspool.Drv", SetLastError = true)]
-  public static extern bool ClosePrinter(IntPtr hPrinter);
-  [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterW", SetLastError = true, CharSet = CharSet.Unicode)]
-  public static extern bool StartDocPrinter(IntPtr hPrinter, int level, ref DOCINFOW di);
-  [DllImport("winspool.Drv", SetLastError = true)]
-  public static extern bool EndDocPrinter(IntPtr hPrinter);
-  [DllImport("winspool.Drv", SetLastError = true)]
-  public static extern bool StartPagePrinter(IntPtr hPrinter);
-  [DllImport("winspool.Drv", SetLastError = true)]
-  public static extern bool EndPagePrinter(IntPtr hPrinter);
-  [DllImport("winspool.Drv", SetLastError = true)]
-  public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
-}
-'@
-      $bytes = [System.IO.File]::ReadAllBytes('${tempFile.replace(/\\/g, '\\\\').replace(/'/g, "''")}')
-      $h = [System.IntPtr]::Zero
-      if (-not [RawPrinterHelper]::OpenPrinter('${String(printerName).replace(/'/g, "''")}', [ref]$h, [System.IntPtr]::Zero)) { throw 'فشل فتح الطابعة' }
-      try {
-        $di = New-Object RawPrinterHelper+DOCINFOW
-        $di.DocName = 'CeramiSys Receipt'
-        $di.DataType = 'RAW'
-        if (-not [RawPrinterHelper]::StartDocPrinter($h, 1, [ref]$di)) { throw 'فشل بدء مهمة الطباعة' }
-        try {
-          [RawPrinterHelper]::StartPagePrinter($h) | Out-Null
-          $ptr = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($bytes.Length)
-          try {
-            [System.Runtime.InteropServices.Marshal]::Copy($bytes, 0, $ptr, $bytes.Length)
-            $written = 0
-            [RawPrinterHelper]::WritePrinter($h, $ptr, $bytes.Length, [ref]$written) | Out-Null
-          } finally { [System.Runtime.InteropServices.Marshal]::FreeHGlobal($ptr) }
-          [RawPrinterHelper]::EndPagePrinter($h) | Out-Null
-        } finally { [RawPrinterHelper]::EndDocPrinter($h) | Out-Null }
-      } finally { [RawPrinterHelper]::ClosePrinter($h) | Out-Null }
-    `;
-    await runPowerShell(ps);
-    return { ok: true };
-    }
-  } catch (error) {
-    return { ok: false, error: String(error) };
-  } finally {
-    if (tempFile) fsSync.rmSync(tempFile, { force: true });
-  }
-});
-
-// macOS / Linux: spool a RAW job through CUPS.
-ipcMain.handle('print:rawCups', async (_event, { bytes, printerName }) => {
-  const tempFile = path.join(APP_DATA_DIR, `escpos-${Date.now()}.bin`);
-  try {
-    if (!Array.isArray(bytes) || !printerName) {
-      return { ok: false, error: 'معطيات الطباعة غير مكتملة' };
-    }
-    await fs.writeFile(tempFile, Buffer.from(bytes));
-    await new Promise((resolve, reject) => {
-      // -o raw sends the bytes untouched (ESC/POS passthrough).
-      execFile('lp', ['-d', printerName, '-o', 'raw', tempFile], { timeout: 15000 }, (err) => {
-        err ? reject(err) : resolve();
-      });
-    });
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: String(error) };
-  } finally {
-    fsSync.rmSync(tempFile, { force: true });
-  }
-});
-
+registerAppHandlers({ ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow, appDataDir: APP_DATA_DIR });
+registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR });
 app.whenReady().then(() => {
   ensureDirs();
   createWindow();
@@ -466,7 +181,8 @@ app.on('window-all-closed', () => {
 });
 
 // Handle graceful shutdown - allow renderer to request controlled close
-ipcMain.handle('app:requestShutdown', async () => {
+ipcMain.handle('app:requestShutdown', async (event) => {
+  validateIpcSender(event);
   // In a real implementation, this would coordinate with the renderer
   // to ensure all data is flushed before closing
   return { ok: true };

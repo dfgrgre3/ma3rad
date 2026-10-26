@@ -300,7 +300,7 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
 
   new InventoryService().adjustStock(pid, 'wh_main', 279, 'تسوية اختبار');
   const adjustmentEntry = q(
-    `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' ORDER BY created_at DESC LIMIT 1`
+    `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' ORDER BY rowid DESC LIMIT 1`
   )[0];
   assert.ok(adjustmentEntry, 'inventory adjustments should post to the ledger');
   const adjustmentLines = q(

@@ -1,29 +1,13 @@
-import { DatabaseManager } from '../database/db';
+﻿import { DatabaseManager } from '../database/db';
 import { InventoryCostingService } from './InventoryCostingService';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { round2 } from './financials';
+import { getProductUnitLabel } from '../utils/productUnits';
 
-export type ReservationStatus = 'ACTIVE' | 'RELEASED' | 'CONSUMED' | 'EXPIRED';
-export type ReservationReference = 'ORDER' | 'QUOTATION' | 'PROJECT' | 'MANUAL';
-
-export interface StockReservation {
-  id: string;
-  productId: string;
-  productName: string;
-  productSku: string;
-  warehouseId: string;
-  warehouseName: string;
-  quantityM2: number;
-  referenceType: ReservationReference;
-  referenceId?: string | null;
-  status: ReservationStatus;
-  expiresAt?: string | null;
-  notes?: string | null;
-  createdAt: string;
-  releasedAt?: string | null;
-}
+export * from './reservationTypes';
+import type { StockReservation, ReservationReference } from './reservationTypes';
 
 export class ReservationService {
   private db = DatabaseManager.getInstance();
@@ -32,6 +16,7 @@ export class ReservationService {
     PermissionService.require(AuthService.requireAuth(), 'inventory.view');
     let sql = `
       SELECT r.id, r.product_id AS productId, p.name AS productName, p.sku AS productSku,
+             p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
              r.warehouse_id AS warehouseId, w.name AS warehouseName, r.quantity_m2 AS quantityM2,
              r.reference_type AS referenceType, r.reference_id AS referenceId, r.status,
              r.expires_at AS expiresAt, r.notes, r.created_at AS createdAt, r.released_at AS releasedAt
@@ -50,9 +35,12 @@ export class ReservationService {
     return this.db.query<StockReservation>(sql, params);
   }
 
-  public getAvailability(productId: string, warehouseId: string): { onHand: number; reserved: number; available: number } {
+  public getAvailability(productId: string, warehouseId: string): { onHand: number; reserved: number; available: number; productType?: 'CERAMIC' | 'GENERAL'; baseUnit?: string; customUnit?: string } {
     const row = this.db.query<any>(
-      `SELECT quantity_m2 AS onHand, reserved_m2 AS reserved FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+      `SELECT ws.quantity_m2 AS onHand, ws.reserved_m2 AS reserved, p.product_type AS productType,
+              p.base_unit AS baseUnit, p.custom_unit AS customUnit
+       FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
+       WHERE ws.product_id = ? AND ws.warehouse_id = ?`,
       [productId, warehouseId]
     )[0];
     const onHand = round2(row?.onHand || 0);
@@ -68,19 +56,22 @@ export class ReservationService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
     const quantity = round2(input.quantityM2);
-    if (!(quantity > 0)) throw new Error('كمية الحجز يجب أن تكون أكبر من صفر.');
+    if (!(quantity > 0)) throw new Error('ÙƒÙ…ÙŠØ© Ø§Ù„Ø­Ø¬Ø² ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±.');
 
     const id = `res_${uuidv4().substring(0, 8)}`;
     this.db.executeTransaction((db) => {
       const stock = db.query<any>(
-        `SELECT id, quantity_m2 AS quantity, reserved_m2 AS reserved FROM warehouse_stock
-         WHERE product_id = ? AND warehouse_id = ?`,
+        `SELECT ws.id, ws.quantity_m2 AS quantity, ws.reserved_m2 AS reserved,
+                p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+         FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
+         WHERE ws.product_id = ? AND ws.warehouse_id = ?`,
         [input.productId, input.warehouseId]
       )[0];
-      if (!stock) throw new Error('الصنف غير موجود في هذا المخزن.');
+      if (!stock) throw new Error('Ø§Ù„ØµÙ†Ù ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ù‡Ø°Ø§ Ø§Ù„Ù…Ø®Ø²Ù†.');
       const available = round2(Number(stock.quantity) - Number(stock.reserved));
       if (quantity > available) {
-        throw new Error(`الكمية المتاحة ${available} م² فقط، والمطلوب حجزه ${quantity} م².`);
+        const unit = getProductUnitLabel(stock);
+        throw new Error(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ§Ø­Ø© ${available} ${unit} ÙÙ‚Ø·ØŒ ÙˆØ§Ù„Ù…Ø·Ù„ÙˆØ¨ Ø­Ø¬Ø²Ù‡ ${quantity} ${unit}.`);
       }
 
       db.run(
@@ -111,8 +102,8 @@ export class ReservationService {
        FROM stock_reservations WHERE id = ?`,
       [id]
     )[0];
-    if (!row) throw new Error('الحجز غير موجود.');
-    if (row.status !== 'ACTIVE') throw new Error('الحجز غير نشط بالفعل.');
+    if (!row) throw new Error('Ø§Ù„Ø­Ø¬Ø² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+    if (row.status !== 'ACTIVE') throw new Error('Ø§Ù„Ø­Ø¬Ø² ØºÙŠØ± Ù†Ø´Ø· Ø¨Ø§Ù„ÙØ¹Ù„.');
 
     this.db.executeTransaction((db) => {
       db.run(
@@ -137,8 +128,8 @@ export class ReservationService {
        FROM stock_reservations WHERE id = ?`,
       [id]
     )[0];
-    if (!row) throw new Error('الحجز غير موجود.');
-    if (row.status !== 'ACTIVE') throw new Error('لا يمكن تنفيذ حجز غير نشط.');
+    if (!row) throw new Error('Ø§Ù„Ø­Ø¬Ø² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
+    if (row.status !== 'ACTIVE') throw new Error('Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªÙ†ÙÙŠØ° Ø­Ø¬Ø² ØºÙŠØ± Ù†Ø´Ø·.');
 
     this.db.executeTransaction((db) => {
       const stock = db.query<any>(
@@ -146,7 +137,7 @@ export class ReservationService {
         [row.productId, row.warehouseId]
       )[0];
       if (!stock || Number(stock.quantity) < Number(row.quantity)) {
-        throw new Error('المخزون الفعلي غير كافٍ لتنفيذ الحجز.');
+        throw new Error('Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø§Ù„ÙØ¹Ù„ÙŠ ØºÙŠØ± ÙƒØ§ÙÙ Ù„ØªÙ†ÙÙŠØ° Ø§Ù„Ø­Ø¬Ø².');
       }
       const product = db.query<any>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [row.productId])[0];
       const fifoPlan = InventoryCostingService.costingMethod(db) === 'FIFO'
@@ -166,7 +157,7 @@ export class ReservationService {
         [
           transactionId, db.nextNumber('ITX'), row.productId, row.warehouseId,
           Number(row.quantity), unitCost, round2(Number(row.quantity) * unitCost),
-          row.id, `تنفيذ حجز ${row.referenceType} ${row.referenceId || ''}`.trim(), actor.id,
+          row.id, `ØªÙ†ÙÙŠØ° Ø­Ø¬Ø² ${row.referenceType} ${row.referenceId || ''}`.trim(), actor.id,
         ]
       );
       if (fifoPlan) InventoryCostingService.consumeFifo(db, transactionId, fifoPlan);

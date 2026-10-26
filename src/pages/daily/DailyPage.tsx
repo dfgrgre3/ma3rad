@@ -18,6 +18,7 @@ import {
   QuickSaleModal, QuickPurchaseModal, ExpenseModal, PaymentModal,
   DetailsModal, VoidModal, type PaymentTarget,
 } from '../../components/daily/DailyModals';
+import { TodayPurchasesPage as PurchasesPage } from './TodayPurchasesPage';
 
 type DailyKind = 'sales' | 'purchases' | 'expenses' | 'debts';
 
@@ -785,6 +786,6 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
 };
 
 export const TodaySalesPage: React.FC = () => <DailyPage kind="sales" />;
-export const TodayPurchasesPage: React.FC = () => <DailyPage kind="purchases" />;
+export const TodayPurchasesPage: React.FC = () => <PurchasesPage />;
 export const TodayExpensesPage: React.FC = () => <DailyPage kind="expenses" />;
 export const TodayDebtsPage: React.FC = () => <DailyPage kind="debts" />;

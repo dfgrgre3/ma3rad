@@ -1,6 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import type { SalesInvoice, SystemSettings } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
 import { EscPosService } from './EscPosService';
 import { SettingsService } from './SettingsService';
 
@@ -25,8 +26,8 @@ export class PrintService {
           ${this.esc(item.productName)}
           <div style="font-size: 11px; color: #64748b;">كود: ${this.esc(item.productSku)} | مقاس: ${this.esc(item.size)} | فرز: ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري/ثاني'}</div>
         </td>
-        <td style="padding: 8px;">${item.soldBy === 'BOX' ? 'كرتونة' : 'متر مربع'}</td>
-        <td style="padding: 8px; font-weight: 700;">${item.quantityM2} م² <span style="font-size: 11px; color: #64748b;">(${item.boxesCount} كرتونة)</span></td>
+        <td style="padding: 8px;">${getProductUnitLabel(item)}</td>
+        <td style="padding: 8px; font-weight: 700;">${formatProductQuantity(item.quantityM2, item)}${item.productType === 'GENERAL' ? '' : ` <span style="font-size: 11px; color: #64748b;">(${item.boxesCount} كرتونة)</span>`}</td>
         <td style="padding: 8px;">${CeramicMath.formatCurrency(item.unitPrice)}</td>
         <td style="padding: 8px;">${item.discountAmount > 0 ? CeramicMath.formatCurrency(item.discountAmount) : '-'}</td>
         <td style="padding: 8px; font-weight: 700;">${CeramicMath.formatCurrency(item.totalPrice)}</td>
@@ -170,7 +171,7 @@ export class PrintService {
         <div class="item-name">${this.esc(item.productName)}</div>
         <div class="item-meta">${this.esc(item.productSku)} | مقاس ${this.esc(item.size)} | ${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز ثاني/تجاري'}</div>
         <div class="item-row">
-          <span>${item.quantityM2} م² (${item.boxesCount} كرتونة) × ${item.unitPrice}</span>
+          <span>${formatProductQuantity(item.quantityM2, item)}${item.productType === 'GENERAL' ? '' : ` (${item.boxesCount} كرتونة)`} × ${item.unitPrice}</span>
           <span>${CeramicMath.formatCurrency(item.totalPrice)}</span>
         </div>
         ${item.discountAmount > 0 ? `<div class="item-row discount"><span>خصم الصنف</span><span>-${CeramicMath.formatCurrency(item.discountAmount)}</span></div>` : ''}
@@ -307,8 +308,8 @@ export class PrintService {
         <td>${i + 1}</td>
         <td class="name">${this.esc(item.productName)}${item.size ? ` (${this.esc(item.size)})` : ''}</td>
         <td>${this.esc(item.grade)}</td>
-        <td>${Number(item.quantityM2 || 0)} م²</td>
-        <td>${Number(item.boxesCount || 0)}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${item.productType === 'GENERAL' ? '—' : Number(item.boxesCount || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
       </tr>`).join('');
@@ -325,7 +326,7 @@ export class PrintService {
         <div><b>عدد البنود:</b> ${(quotation.items || []).length}</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر المتر</th><th>الإجمالي</th></tr></thead>
+        <thead><tr><th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
         <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
       </table>
       <div class="totals">
@@ -347,8 +348,8 @@ export class PrintService {
         <td>${i + 1}</td>
         <td class="name">${this.esc(item.productName)}${item.size ? ` (${this.esc(item.size)})` : ''}</td>
         <td>${this.esc(item.grade)}</td>
-        <td>${Number(item.quantityM2 || 0)} م²</td>
-        <td>${Number(item.boxesCount || 0)}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${item.productType === 'GENERAL' ? '—' : Number(item.boxesCount || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
       </tr>`).join('');
@@ -362,7 +363,7 @@ export class PrintService {
         <div><b>الحالة:</b> ${this.esc(order.status)}</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر المتر</th><th>الإجمالي</th></tr></thead>
+        <thead><tr><th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
         <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
       </table>
       <div class="totals">
@@ -384,8 +385,8 @@ export class PrintService {
         <td>${i + 1}</td>
         <td class="name">${this.esc(item.productName)}</td>
         <td>${this.esc(item.grade)}</td>
-        <td>${Number(item.quantityM2 || 0)} م²</td>
-        <td>${Number(item.boxesCount || 0)}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${item.productType === 'GENERAL' ? '—' : Number(item.boxesCount || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalRefund || 0)}</td>
       </tr>`).join('');
@@ -399,7 +400,7 @@ export class PrintService {
         <div><b>عدد البنود:</b> ${(salesReturn.items || []).length}</div>
       </div>
       <table>
-        <thead><tr><th>#</th><th>الصنف</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر المتر</th><th>قيمة الارتجاع</th></tr></thead>
+        <thead><tr><th>#</th><th>الصنف</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>قيمة الارتجاع</th></tr></thead>
         <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
       </table>
       <div class="totals">
@@ -408,6 +409,43 @@ export class PrintService {
         <div class="row grand"><span>خصم من رصيد العميل</span><span>${CeramicMath.formatCurrency(salesReturn.remainingToBalance || 0)}</span></div>
       </div>
       <div class="sign"><div>توقيع العميل</div><div>إدارة المبيعات</div></div>
+      <div class="footer">${this.esc(settings.receiptFooter)}</div>
+    `);
+  }
+
+  public printPurchaseReturn(purchaseReturn: any): void {
+    const settings = this.getSettings();
+    const items = (purchaseReturn.items || []).map((item: any, i: number) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="name">${this.esc(item.productName)}</td>
+        <td>${this.esc(item.grade)}</td>
+        <td>${formatProductQuantity(Number(item.quantityM2 || 0), item)}</td>
+        <td>${item.productType === 'GENERAL' ? '—' : Number(item.boxesCount || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.unitCost || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalRefund || 0)}</td>
+      </tr>`).join('');
+
+    const isCash = Number(purchaseReturn.refundedAmount || 0) > 0;
+
+    this.openDocument(`مرتجع شراء ${purchaseReturn.returnNumber}`, `
+      ${this.header(settings, 'سند مرتجع مشتريات', purchaseReturn.returnNumber, purchaseReturn.date, `الفاتورة الأصلية: ${this.esc(purchaseReturn.originalInvoiceNumber || '')}`)}
+      <div class="meta">
+        <div><b>المورد:</b> ${this.esc(purchaseReturn.supplierName || '-')}</div>
+        <div><b>المخزن:</b> ${this.esc(purchaseReturn.warehouseName || '-')}</div>
+        <div><b>سبب الإرجاع:</b> ${this.esc(purchaseReturn.reason || '-')}</div>
+        <div><b>طريقة التسوية:</b> ${isCash ? 'استرداد نقدي من الخزينة' : 'خصم من حساب المورد'}</div>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>الصنف</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>تكلفة الوحدة</th><th>قيمة الارتجاع</th></tr></thead>
+        <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
+      </table>
+      <div class="totals">
+        <div class="row"><span>إجمالي قيمة المرتجع</span><span>${CeramicMath.formatCurrency(purchaseReturn.totalAmount || 0)}</span></div>
+        <div class="row"><span>المسترد نقداً</span><span>${CeramicMath.formatCurrency(purchaseReturn.refundedAmount || 0)}</span></div>
+        <div class="row grand"><span>خصم من حساب المورد</span><span>${CeramicMath.formatCurrency(purchaseReturn.remainingToBalance || 0)}</span></div>
+      </div>
+      <div class="sign"><div>توقيع المورد</div><div>إدارة المشتريات</div></div>
       <div class="footer">${this.esc(settings.receiptFooter)}</div>
     `);
   }

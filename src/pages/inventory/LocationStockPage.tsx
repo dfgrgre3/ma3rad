@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Package, RefreshCw, Search, Warehouse as WarehouseIcon } from 'lucide-react';
-import { CeramicMath } from '../../utils/ceramicMath';
+import { formatProductQuantity } from '../../utils/productUnits';
 import { InventoryService } from '../../services/InventoryService';
 import { ProductService } from '../../services/ProductService';
 import type { Product, Warehouse } from '../../types';
@@ -12,7 +12,6 @@ type LocationStockPageProps = {
 type StockRow = ReturnType<InventoryService['getWarehouseStock']>[number];
 type ComparisonFilter = 'all' | 'showroom-only' | 'warehouse-only' | 'both' | 'neither';
 
-const formatQuantity = (quantity: number) => CeramicMath.formatM2(quantity);
 const formatBoxes = (boxes: number) =>
   new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(boxes);
 
@@ -122,10 +121,8 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
     if (row.quantityM2 <= 0) return <span className="font-bold text-amber-600">غير متوفر (الرصيد صفر)</span>;
     return (
       <div>
-        <div className="font-black text-emerald-700">{formatQuantity(row.quantityM2)}</div>
-        <div className="mt-1 text-[11px] text-slate-500">
-          {formatBoxes(row.quantityBoxes)} كرتونة
-        </div>
+        <div className="font-black text-emerald-700">{formatProductQuantity(row.quantityM2, row)}</div>
+        {row.productType !== 'GENERAL' && <div className="mt-1 text-[11px] text-slate-500">{formatBoxes(row.quantityBoxes)} كرتونة</div>}
       </div>
     );
   };
@@ -279,7 +276,7 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
                   <th className="p-3.5">المخزن</th>
                   <th className="p-3.5">الصنف</th>
                   <th className="p-3.5">المقاس</th>
-                  <th className="p-3.5">الرصيد بالمتر</th>
+                  <th className="p-3.5">الرصيد بوحدة الصنف</th>
                   <th className="p-3.5">الرصيد بالكرتونة</th>
                 </tr>
               </thead>
@@ -292,8 +289,8 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
                       <div className="mt-1 text-[10px] text-slate-500">كود: {row.sku}</div>
                     </td>
                     <td className="p-3.5 font-semibold text-slate-700">{row.size}</td>
-                    <td className="p-3.5 font-black text-emerald-700">{formatQuantity(row.quantityM2)}</td>
-                    <td className="p-3.5 font-semibold text-slate-700">{formatBoxes(row.quantityBoxes)} كرتونة</td>
+                    <td className="p-3.5 font-black text-emerald-700">{formatProductQuantity(row.quantityM2, row)}</td>
+                    <td className="p-3.5 font-semibold text-slate-700">{row.productType === 'GENERAL' ? '—' : `${formatBoxes(row.quantityBoxes)} كرتونة`}</td>
                   </tr>
                 ))}
                 {warehouseItems.length === 0 && (

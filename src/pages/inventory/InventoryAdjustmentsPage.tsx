@@ -7,6 +7,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { localDateString } from '../../utils/date';
 import { postLedgerEntry } from '../../database/ledger';
 import { InventoryCostingService } from '../../services/InventoryCostingService';
+import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel } from '../../utils/productUnits';
 
 interface Adjustment {
   id: string;
@@ -20,12 +21,18 @@ interface Adjustment {
   status: string;
   totalQuantityM2: number;
   totalValue: number;
+  productType: 'CERAMIC' | 'GENERAL';
+  baseUnit?: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM';
+  customUnit?: string;
 }
 
 interface AdjustmentItem {
   id: string;
   productId: string;
   productName: string;
+  productType: 'CERAMIC' | 'GENERAL';
+  baseUnit?: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM';
+  customUnit?: string;
   quantityM2: number;
   boxesCount: number;
   unitCost: number;
@@ -46,7 +53,10 @@ export const InventoryAdjustmentsPage: React.FC = () => {
 
   // Form state
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
-  const [products, setProducts] = useState<{ id: string; name: string; sku: string; costPrice: number; metersPerBox: number }[]>([]);
+  const [products, setProducts] = useState<{
+    id: string; name: string; sku: string; costPrice: number; metersPerBox: number;
+    productType: 'CERAMIC' | 'GENERAL'; baseUnit: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM'; customUnit?: string;
+  }[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [adjType, setAdjType] = useState<'ADD' | 'SUBTRACT' | 'DAMAGE'>('ADD');
@@ -76,10 +86,14 @@ export const InventoryAdjustmentsPage: React.FC = () => {
           sa.adjustment_type as type,
           sa.status,
           sa.total_quantity_m2 as totalQuantityM2,
-          sa.total_value as totalValue
+          sa.total_value as totalValue,
+          COALESCE(p.product_type, 'CERAMIC') as productType,
+          p.base_unit as baseUnit, p.custom_unit as customUnit
         FROM stock_adjustments sa
         JOIN warehouses w ON sa.warehouse_id = w.id
         LEFT JOIN users u ON sa.created_by = u.id
+        LEFT JOIN stock_adjustment_items sai ON sai.adjustment_id = sa.id
+        LEFT JOIN products p ON p.id = sai.product_id
         ORDER BY sa.date DESC, sa.adjustment_number DESC
       `;
       const rows = db.query<any>(sql);
@@ -98,7 +112,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
       setWarehouses(wRows);
       if (wRows.length > 0) setSelectedWarehouseId(wRows[0].id);
 
-      const pRows = db.query<any>('SELECT id, name, sku, cost_price as costPrice, meters_per_box as metersPerBox FROM products WHERE is_active = 1 ORDER BY name');
+      const pRows = db.query<any>('SELECT id, name, sku, cost_price as costPrice, meters_per_box as metersPerBox, product_type as productType, base_unit as baseUnit, custom_unit as customUnit FROM products WHERE is_active = 1 ORDER BY name');
       setProducts(pRows);
       if (pRows.length > 0) setSelectedProductId(pRows[0].id);
     } catch (e) {
@@ -111,16 +125,19 @@ export const InventoryAdjustmentsPage: React.FC = () => {
     try {
       const sql = `
         SELECT 
-          id,
-          product_id as productId,
-          product_name as productName,
-          quantity_m2 as quantityM2,
-          boxes_count as boxesCount,
-          unit_cost as unitCost,
-          total_value as totalValue,
-          COALESCE(notes, '') as notes
-        FROM stock_adjustment_items
-        WHERE adjustment_id = ?
+          sai.id,
+          sai.product_id as productId,
+          sai.product_name as productName,
+          sai.quantity_m2 as quantityM2,
+          sai.boxes_count as boxesCount,
+          sai.unit_cost as unitCost,
+          sai.total_value as totalValue,
+          COALESCE(sai.notes, '') as notes,
+          COALESCE(p.product_type, 'CERAMIC') as productType,
+          p.base_unit as baseUnit, p.custom_unit as customUnit
+        FROM stock_adjustment_items sai
+        LEFT JOIN products p ON p.id = sai.product_id
+        WHERE sai.adjustment_id = ?
       `;
       const items = db.query<AdjustmentItem>(sql, [adj.id]);
       setSelectedAdjustment(adj);
@@ -156,13 +173,15 @@ export const InventoryAdjustmentsPage: React.FC = () => {
         const unitCost = fifoPlan?.unitCost ?? (prod.costPrice || 0);
         const totalVal = qtyM2 * unitCost;
         if (!(totalVal > 0)) throw new Error('Set a positive product cost before posting an inventory adjustment.');
-        const boxesCount = Number((qtyM2 / (prod.metersPerBox || 1.44)).toFixed(2));
+        const boxesCount = prod.productType === 'GENERAL'
+          ? prod.baseUnit === 'BOX' ? qtyM2 : 0
+          : Number((qtyM2 / (prod.metersPerBox || 1.44)).toFixed(2));
         const adjId = `adj_${uuidv4().substring(0, 8)}`;
         const adjNum = txDb.nextNumber('ADJ');
         const today = localDateString();
         const stockBefore = txDb.query<any>('SELECT quantity_m2 AS quantityM2,reserved_m2 AS reservedM2 FROM warehouse_stock WHERE warehouse_id=? AND product_id=?', [selectedWarehouseId, selectedProductId])[0];
         if (adjType !== 'ADD' && Number(stockBefore?.quantityM2 || 0) - Number(stockBefore?.reservedM2 || 0) < qtyM2) {
-          throw new Error('The adjustment cannot reduce available stock below the reserved quantity.');
+          throw new Error(`The adjustment cannot reduce available stock below the reserved quantity (${getStockQuantityLabel(prod)}).`);
         }
 
         // 2. Insert into stock_adjustments
@@ -260,6 +279,8 @@ export const InventoryAdjustmentsPage: React.FC = () => {
   );
 
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
+  const selectedProduct = products.find((product) => product.id === selectedProductId);
+  const selectedUnit = selectedProduct ? getStockQuantityLabel(selectedProduct) : 'م²';
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -313,7 +334,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  {['رقم التسوية', 'المخزن', 'نوع التسوية', 'سبب التسوية', 'الكمية م²', 'القيمة', 'التاريخ', 'القائم بالتسوية', 'الخيارات'].map(h => (
+                  {['رقم التسوية', 'المخزن', 'نوع التسوية', 'سبب التسوية', 'الكمية', 'القيمة', 'التاريخ', 'القائم بالتسوية', 'الخيارات'].map(h => (
                     <th key={h} className="px-4 py-3 text-right text-xs font-bold text-slate-500">{h}</th>
                   ))}
                 </tr>
@@ -339,7 +360,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">{adj.reason}</td>
-                    <td className="px-4 py-3 text-slate-900 font-mono font-bold">{adj.totalQuantityM2} م²</td>
+                    <td className="px-4 py-3 text-slate-900 font-mono font-bold">{formatProductQuantity(adj.totalQuantityM2, adj)}</td>
                     <td className="px-4 py-3 text-slate-700 font-mono">{fmt(adj.totalValue)}</td>
                     <td className="px-4 py-3 text-slate-500">{adj.date}</td>
                     <td className="px-4 py-3 text-slate-700">{adj.adjustedBy}</td>
@@ -400,7 +421,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                 <table className="w-full text-xs">
                   <thead className="bg-slate-50">
                     <tr>
-                      {['الصنف', 'الكمية م²', 'عدد الصناديق', 'سعر التكلفة', 'القيمة الإجمالية'].map(h => (
+                      {['الصنف', 'الكمية', 'عدد الصناديق', 'سعر التكلفة', 'القيمة الإجمالية'].map(h => (
                         <th key={h} className="px-4 py-2 text-right font-bold text-slate-500">{h}</th>
                       ))}
                     </tr>
@@ -409,7 +430,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
                     {selectedItems.map((item) => (
                       <tr key={item.id}>
                         <td className="px-4 py-3 text-slate-900 font-medium">{item.productName}</td>
-                        <td className="px-4 py-3 font-mono font-bold text-sky-600">{item.quantityM2} م²</td>
+                        <td className="px-4 py-3 font-mono font-bold text-sky-600">{formatProductQuantity(item.quantityM2, item)}</td>
                         <td className="px-4 py-3 font-mono text-slate-700">{item.boxesCount} صندوق</td>
                         <td className="px-4 py-3 font-mono text-slate-500">{fmt(item.unitCost)}</td>
                         <td className="px-4 py-3 font-mono font-bold text-emerald-600">{fmt(item.totalValue)}</td>
@@ -504,14 +525,14 @@ export const InventoryAdjustmentsPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs text-slate-455 font-bold block">الكمية (متر مربع)</label>
+                  <label className="text-xs text-slate-455 font-bold block">الكمية ({selectedUnit})</label>
                   <input
                     type="number"
-                    step="0.01"
+                    step={selectedProduct?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(selectedProduct.baseUnit) ? 1 : 0.01}
                     min="0.01"
                     value={qtyM2 || ''}
                     onChange={(e) => setQtyM2(parseFloat(e.target.value) || 0)}
-                    placeholder="كمية م²"
+                    placeholder={`كمية ${selectedUnit}`}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-orange-500"
                   />
                 </div>

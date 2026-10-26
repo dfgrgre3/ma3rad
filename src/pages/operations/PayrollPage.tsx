@@ -1,18 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Wallet, Loader2, X, Plus, Trash2, Users, Banknote } from 'lucide-react';
+import { Wallet, Loader2, Plus, Trash2, Users, Banknote } from 'lucide-react';
 import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, EmployeeFinancials } from '../../services/EmployeeService';
 import { AuthService } from '../../services/AuthService';
-import { localDateString } from '../../utils/date';
 
-const TX_LABELS: Record<PayrollTxType, string> = { SALARY_PAYOUT: 'صرف راتب', ADVANCE: 'سلفة', BONUS: 'مكافأة', DEDUCTION: 'خصم' };
-const TX_COLORS: Record<PayrollTxType, string> = {
-  SALARY_PAYOUT: 'bg-sky-50 text-sky-700 border-sky-200',
-  ADVANCE: 'bg-amber-50 text-amber-700 border-amber-200',
-  BONUS: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  DEDUCTION: 'bg-rose-50 text-rose-700 border-rose-200',
-};
-const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
-const today = () => localDateString();
+import { TX_LABELS, TX_COLORS, fmt, today } from './payrollDisplay';
+import { PayrollTransactionModal } from './PayrollTransactionModal';
 
 export const PayrollPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -189,32 +181,7 @@ export const PayrollPage: React.FC = () => {
         )}
       </div>
 
-      {target && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold">{TX_LABELS[form.type]}</h3>
-              <button onClick={() => setTarget(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="mb-3 text-xs text-slate-500">الموظف: <span className="font-bold text-slate-800">{target.name}</span></div>
-            <form onSubmit={submit} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">نوع الحركة</label>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as PayrollTxType })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                  {(Object.keys(TX_LABELS) as PayrollTxType[]).map((t) => <option key={t} value={t}>{TX_LABELS[t]}</option>)}
-                </select>
-              </div>
-              <div><label className="font-bold text-slate-700 block mb-1">المبلغ *</label><input required autoFocus type="number" min={0.01} step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold" /></div>
-              <div><label className="font-bold text-slate-700 block mb-1">التاريخ *</label><input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
-              <div><label className="font-bold text-slate-700 block mb-1">ملاحظات</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onClick={() => setTarget(null)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-                <button type="submit" disabled={saving} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} <Plus className="w-3.5 h-3.5" /> تسجيل</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {target && <PayrollTransactionModal target={target} form={form} setForm={setForm} saving={saving} onClose={() => setTarget(null)} onSubmit={submit} />}
     </div>
   );
 };

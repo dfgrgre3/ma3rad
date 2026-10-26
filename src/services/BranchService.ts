@@ -159,4 +159,24 @@ export class BranchService {
       ORDER BY totalSales DESC
     `);
   }
+
+  /**
+   * Verifies if a user has access to a specific branch at database / service layer.
+   * Admins have universal access; non-admins must be assigned via users_branches.
+   */
+  public isUserAssignedToBranch(userId: string, branchId: string): boolean {
+    const user = AuthService.getCurrentUser();
+    if (user?.role === 'ADMIN') return true;
+    const count = this.db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM users_branches WHERE user_id = ? AND branch_id = ?',
+      [userId, branchId]
+    )[0]?.count || 0;
+    return count > 0;
+  }
+
+  public requireBranchAccess(userId: string, branchId: string): void {
+    if (!this.isUserAssignedToBranch(userId, branchId)) {
+      throw new Error('ليس لديك صلاحية الوصول أو التعديل على بيانات هذا الفرع.');
+    }
+  }
 }

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Barcode, ShoppingCart, Trash2, Plus, Minus,
@@ -12,19 +12,21 @@ import { InventoryService } from '../services/InventoryService';
 import { CustomerService } from '../services/CustomerService';
 import { CategoryService, CategoryWithCount } from '../services/CategoryService';
 import { SalesService } from '../services/SalesService';
+import { BatchService } from '../services/BatchService';
 import { CashierService } from '../services/CashierService';
 import { PrintService } from '../services/PrintService';
 import { PricingService } from '../services/PricingService';
 import { ApprovalService } from '../services/ApprovalService';
 import { PermissionService } from '../services/PermissionService';
-import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, SystemSettings } from '../types';
+import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, SystemSettings, ToneMixingConflict } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
 import { CeramicCalculatorModal } from './CeramicCalculatorModal';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { exportToExcel } from '../utils/export';
 import { LayoutContext } from '../layouts/MainLayout';
 
-type PosUnit = 'M2' | 'BOX';
+type PosUnit = 'M2' | 'BOX' | 'PIECE';
 type SortMode = 'NAME' | 'PRICE_ASC' | 'PRICE_DESC' | 'STOCK_DESC';
 
 interface CartItem {
@@ -33,7 +35,7 @@ interface CartItem {
   quantityM2: number;
   boxesCount: number;
   piecesCount: number;
-  unitPrice: number; // always per m² internally
+  unitPrice: number;
   discountAmount: number;
   availableStockM2: number;
 }
@@ -115,6 +117,10 @@ export const PosView: React.FC = () => {
   const [isCloseShiftModalOpen, setIsCloseShiftModalOpen] = useState(false);
   const [closingCash, setClosingCash] = useState(0);
   const [closingNotes, setClosingNotes] = useState('');
+  // Tone/Shade mixing warning before checkout
+  const [toneConflicts, setToneConflicts] = useState<ToneMixingConflict[]>([]);
+  const [isToneWarningOpen, setIsToneWarningOpen] = useState(false);
+  const [pendingCheckout, setPendingCheckout] = useState(false);
 
   // New-customer form
   const [newCustName, setNewCustName] = useState('');
@@ -135,7 +141,8 @@ export const PosView: React.FC = () => {
   const inventoryService = useMemo(() => new InventoryService(), []);
   const customerService = useMemo(() => new CustomerService(), []);
   const categoryService = useMemo(() => new CategoryService(), []);
-  const salesService = useMemo(() => new SalesService(), []);
+  const salesService  = useMemo(() => new SalesService(), []);
+  const batchService  = useMemo(() => new BatchService(), []);
   const cashierService = useMemo(() => new CashierService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const pricingService = useMemo(() => new PricingService(), []);
@@ -270,7 +277,10 @@ export const PosView: React.FC = () => {
   const makeCartItem = (product: Product, quantityM2: number): CartItem => {
     const metersPerBox = product.metersPerBox || 1.44;
     const piecesPerBox = product.piecesPerBox || 4;
-    const boxes = CeramicMath.calculateBoxes(quantityM2, metersPerBox, true);
+    const isGeneral = product.productType === 'GENERAL';
+    const boxes = isGeneral
+      ? product.baseUnit === 'BOX' ? quantityM2 : 0
+      : CeramicMath.calculateBoxes(quantityM2, metersPerBox, true);
     let unitPrice = product.sellingPriceM2;
     try {
       unitPrice = pricingService.getEffectivePrice(product.id, selectedCustomer?.id, quantityM2).priceM2;
@@ -279,10 +289,12 @@ export const PosView: React.FC = () => {
     }
     return {
       product,
-      soldBy: 'M2',
+      soldBy: isGeneral && (product.baseUnit === 'BOX' || product.baseUnit === 'PIECE') ? product.baseUnit : 'M2',
       quantityM2: round2(quantityM2),
       boxesCount: boxes,
-      piecesCount: CeramicMath.calculatePiecesFromBoxes(boxes, piecesPerBox),
+      piecesCount: isGeneral
+        ? product.baseUnit === 'PIECE' ? quantityM2 : 0
+        : CeramicMath.calculatePiecesFromBoxes(boxes, piecesPerBox),
       unitPrice,
       discountAmount: 0,
       availableStockM2: stockOf(product.id)
@@ -302,14 +314,19 @@ export const PosView: React.FC = () => {
   const addToCart = useCallback((product: Product, requestedM2?: number) => {
     setCart((prev) => {
       const existingIndex = prev.findIndex((item) => item.product.id === product.id);
-      const stepM2 = requestedM2 ?? (product.metersPerBox || 1.44);
+      const stepM2 = requestedM2 ?? (product.productType === 'GENERAL' ? 1 : (product.metersPerBox || 1.44));
       if (existingIndex > -1) {
         const updated = [...prev];
         const current = updated[existingIndex];
         const newM2 = round2(current.quantityM2 + stepM2);
         current.quantityM2 = newM2;
-        current.boxesCount = CeramicMath.calculateBoxes(newM2, current.product.metersPerBox || 1.44, true);
-        current.piecesCount = CeramicMath.calculatePiecesFromBoxes(current.boxesCount, current.product.piecesPerBox || 4);
+        if (current.product.productType === 'GENERAL') {
+          current.boxesCount = current.product.baseUnit === 'BOX' ? newM2 : 0;
+          current.piecesCount = current.product.baseUnit === 'PIECE' ? newM2 : 0;
+        } else {
+          current.boxesCount = CeramicMath.calculateBoxes(newM2, current.product.metersPerBox || 1.44, true);
+          current.piecesCount = CeramicMath.calculatePiecesFromBoxes(current.boxesCount, current.product.piecesPerBox || 4);
+        }
         return updated;
       }
       return [...prev, makeCartItem(product, stepM2)];
@@ -318,7 +335,7 @@ export const PosView: React.FC = () => {
 
   const addCalculatedToCart = (product: Product, quantityM2: number) => {
     addToCart(product, quantityM2);
-    notify(`تمت إضافة ${product.name} (${quantityM2.toFixed(2)} م²) إلى السلة`, 'success');
+    notify(`تمت إضافة ${product.name} (${formatProductQuantity(quantityM2, product)}) إلى السلة`, 'success');
   };
 
   const updateCartQuantity = (index: number, value: number) => {
@@ -330,6 +347,12 @@ export const PosView: React.FC = () => {
     setCart((prev) => {
       const updated = [...prev];
       const item = updated[index];
+      if (item.product.productType === 'GENERAL') {
+        item.quantityM2 = round2(value);
+        item.boxesCount = item.product.baseUnit === 'BOX' ? value : 0;
+        item.piecesCount = item.product.baseUnit === 'PIECE' ? value : 0;
+        return updated;
+      }
       const metersPerBox = item.product.metersPerBox || 1.44;
       if (item.soldBy === 'BOX') {
         item.boxesCount = round2(value);
@@ -347,6 +370,11 @@ export const PosView: React.FC = () => {
   const stepCartQuantity = (index: number, direction: 1 | -1) => {
     const item = cart[index];
     if (!item) return;
+    if (item.product.productType === 'GENERAL') {
+      const step = item.product.baseUnit === 'BOX' || item.product.baseUnit === 'PIECE' || item.product.baseUnit === 'SET' ? 1 : 0.01;
+      updateCartQuantity(index, round2(item.quantityM2 + direction * step));
+      return;
+    }
     const metersPerBox = item.product.metersPerBox || 1.44;
     if (item.soldBy === 'BOX') {
       updateCartQuantity(index, round2(item.boxesCount + direction));
@@ -360,6 +388,7 @@ export const PosView: React.FC = () => {
       const updated = [...prev];
       const item = { ...updated[index] };
       if (item.soldBy !== unit) {
+        if (item.product.productType === 'GENERAL') return prev;
         const metersPerBox = item.product.metersPerBox || 1.44;
         item.soldBy = unit;
         item.unitPrice = unit === 'BOX'
@@ -379,6 +408,10 @@ export const PosView: React.FC = () => {
     setCart((prev) => {
       const updated = [...prev];
       const item = updated[index];
+      if (item.product.productType === 'GENERAL') {
+        item.unitPrice = round2(value);
+        return updated;
+      }
       const metersPerBox = item.product.metersPerBox || 1.44;
       item.unitPrice = item.soldBy === 'BOX'
         ? round2(value / metersPerBox)
@@ -421,8 +454,18 @@ export const PosView: React.FC = () => {
   const remainingAmount = round2(Math.max(0, totalAmount - (paidAmount || 0)));
   const changeDue = round2(Math.max(0, (paidAmount || 0) - totalAmount));
   const expectedClosingCash = round2((activeShift?.openingBalance || 0) + (activeShift?.totalSalesCash || 0) + (activeShift?.totalCustomerPayments || 0) - (activeShift?.totalSupplierPayments || 0) - (activeShift?.totalExpenses || 0) - (activeShift?.totalRefunds || 0));
-  const totalItems = round2(cart.reduce((sum, item) => sum + item.quantityM2, 0));
-  const totalBoxes = round2(cart.reduce((sum, item) => sum + item.boxesCount, 0));
+  const ceramicCart = cart.filter((item) => item.product.productType !== 'GENERAL');
+  const totalItems = round2(ceramicCart.reduce((sum, item) => sum + item.quantityM2, 0));
+  const totalBoxes = round2(ceramicCart.reduce((sum, item) => sum + item.boxesCount, 0));
+  const generalQuantitiesByUnit = new Map<string, number>();
+  cart.filter((item) => item.product.productType === 'GENERAL').forEach((item) => {
+    const unit = getProductUnitLabel(item.product);
+    generalQuantitiesByUnit.set(unit, (generalQuantitiesByUnit.get(unit) || 0) + item.quantityM2);
+  });
+  const cartQuantitySummary = [
+    totalItems > 0 ? `${totalItems} م² / ${totalBoxes} كرتونة` : '',
+    ...[...generalQuantitiesByUnit].map(([unit, quantity]) => `${round2(quantity)} ${unit}`),
+  ].filter(Boolean).join(' · ');
 
   // Cash sales auto-fill the paid amount with the grand total.
   useEffect(() => {
@@ -623,7 +666,7 @@ export const PosView: React.FC = () => {
         const available = stockOf(item.product.id);
         if (item.quantityM2 > available) {
           notify(
-            `الرصيد المتاح من «${item.product.name}» ${available} م² فقط، والمطلوب ${item.quantityM2} م²`,
+            `الرصيد المتاح من «${item.product.name}» ${formatProductQuantity(available, item.product)} فقط، والمطلوب ${formatProductQuantity(item.quantityM2, item.product)}`,
             'error'
           );
           return;
@@ -689,6 +732,31 @@ export const PosView: React.FC = () => {
 
     try {
       setIsProcessing(true);
+
+      // ── Tone/Shade mixing guard ─────────────────────────────────────────────
+      // Only run when not already bypassed via the warning modal
+      if (!pendingCheckout) {
+        const checkItems = cart
+          .filter((ci) => ci.product.productType !== 'GENERAL')
+          .map((ci) => ({
+            productId:   ci.product.id,
+            productName: ci.product.name,
+            warehouseId: selectedWarehouseId,
+            quantityM2:  ci.quantityM2,
+          }));
+        if (checkItems.length > 0) {
+          const conflicts = batchService.checkToneMixing(checkItems);
+          if (conflicts.length > 0) {
+            setToneConflicts(conflicts);
+            setIsToneWarningOpen(true);
+            setIsProcessing(false);
+            return; // wait for user to confirm or cancel
+          }
+        }
+      }
+      setPendingCheckout(false);
+      // ── End tone guard ──────────────────────────────────────────────────────
+
       const invoice = salesService.createSale({
         customerId: selectedCustomer.id,
         warehouseId: selectedWarehouseId,
@@ -719,6 +787,7 @@ export const PosView: React.FC = () => {
       setShippingCost(0);
       setNotes('');
       setPaidAmount(0);
+      setPendingCheckout(false);
       setProducts(productService.getAllProducts());
       if (selectedWarehouseId) loadStock(selectedWarehouseId);
       setActiveShift(cashierService.getActiveShift());
@@ -732,7 +801,8 @@ export const PosView: React.FC = () => {
     cart, selectedCustomer, selectedWarehouseId, settings, stockOf, can, isProcessing,
     discountAmount, lineDiscountTotal, remainingAmount, activeShift, taxPercentage,
     taxAmount, shippingCost, paidAmount, paymentType, notes, currentUser,
-    salesService, productService, cashierService, loadStock, notify
+    salesService, batchService, productService, cashierService, loadStock, notify,
+    pendingCheckout,
   ]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
@@ -745,7 +815,7 @@ export const PosView: React.FC = () => {
         { key: 'idx', label: '#' },
         { key: 'product', label: 'الصنف' },
         { key: 'sku', label: 'الكود' },
-        { key: 'qty', label: 'الكمية (م²)' },
+        { key: 'qty', label: 'الكمية' },
         { key: 'boxes', label: 'الكراتين' },
         { key: 'price', label: 'سعر الوحدة' },
         { key: 'discount', label: 'الخصم' },
@@ -755,8 +825,8 @@ export const PosView: React.FC = () => {
         idx: idx + 1,
         product: item.productName,
         sku: item.productSku || '',
-        qty: item.quantityM2,
-        boxes: item.boxesCount,
+        qty: formatProductQuantity(item.quantityM2, item),
+        boxes: item.productType === 'GENERAL' ? '' : item.boxesCount,
         price: item.unitPrice,
         discount: item.discountAmount,
         total: item.totalPrice,
@@ -1042,23 +1112,23 @@ export const PosView: React.FC = () => {
                   >
                     {inCart && (
                       <span className="absolute top-0 left-0 bg-sky-600 text-white text-[10px] font-black px-2 py-0.5 rounded-br-xl">
-                        في السلة: {inCart.quantityM2} م²
+                        في السلة: {formatProductQuantity(inCart.quantityM2, p)}
                       </span>
                     )}
                     <div>
                       {p.imagePath && <img src={p.imagePath} alt={p.name} loading="lazy" className="w-full h-24 object-cover rounded-xl mb-2 bg-slate-100" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
                       <div className="flex items-center justify-between gap-1 mb-1.5">
                         <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600">
-                          {gradeLabel(p.grade)}
+                          {p.productType === 'GENERAL' ? getProductUnitLabel(p) : gradeLabel(p.grade)}
                         </span>
-                        <span className="text-[10px] font-mono text-slate-500">{p.size}</span>
+                        <span className="text-[10px] font-mono text-slate-500">{p.size || p.sku}</span>
                       </div>
                       <h3 className="font-bold text-xs text-slate-900 line-clamp-2 group-hover:text-sky-600 transition min-h-[2rem]">
                         {p.name}
                       </h3>
-                      <div className="text-[10px] text-slate-500 mt-1">
+                      {p.productType !== 'GENERAL' && <div className="text-[10px] text-slate-500 mt-1">
                         الكرتونة: {p.metersPerBox} م² ({p.piecesPerBox} قطع)
-                      </div>
+                      </div>}
                       {(p.brandName || p.color) && (
                         <div className="text-[10px] text-slate-500 truncate">{[p.brandName, p.color].filter(Boolean).join(' • ')}</div>
                       )}
@@ -1067,16 +1137,16 @@ export const PosView: React.FC = () => {
                     <div className="mt-3 pt-2 border-t border-slate-200 flex items-center justify-between">
                       <div className="text-xs font-black text-sky-600">
                         {CeramicMath.formatCurrency(p.sellingPriceM2)}
-                        <span className="text-[10px] text-slate-500 font-normal"> /م²</span>
+                        <span className="text-[10px] text-slate-500 font-normal"> /{getProductUnitLabel(p)}</span>
                       </div>
                       <div className={`text-[10px] font-bold ${isLow ? 'text-amber-600' : 'text-emerald-600'}`}>
-                        {available} م²
+                        {formatProductQuantity(available, p)}
                       </div>
                     </div>
 
                     <div className="mt-2 flex items-center justify-between gap-1 text-[10px] font-bold text-sky-700">
                       <span className="flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة للسلة</span>
-                      {inCart && <span className="text-slate-500">{inCart.boxesCount} كرتونة</span>}
+                      {inCart && <span className="text-slate-500">{formatProductQuantity(inCart.quantityM2, p)}</span>}
                     </div>
                   </button>
                 );
@@ -1136,7 +1206,7 @@ export const PosView: React.FC = () => {
         {/* Cart lines */}
         <div className="px-3 pt-3 pb-2 flex items-center justify-between text-[11px]">
           <span className="font-black text-slate-700">سلة البيع <span className="text-slate-400 font-semibold">({cart.length} أصناف)</span></span>
-          {cart.length > 0 && <span className="text-slate-500">{totalItems} م² · {totalBoxes} كرتونة</span>}
+          {cart.length > 0 && <span className="text-slate-500">{cart.length} بنود{cartQuantitySummary ? ` · ${cartQuantitySummary}` : ''}</span>}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 space-y-2.5">
           {cart.length === 0 ? (
@@ -1149,8 +1219,9 @@ export const PosView: React.FC = () => {
             cart.map((item, idx) => {
               const metersPerBox = item.product.metersPerBox || 1.44;
               const lineTotal = round2(item.quantityM2 * item.unitPrice - item.discountAmount);
-              const displayQty = item.soldBy === 'BOX' ? item.boxesCount : item.quantityM2;
-              const displayPrice = item.soldBy === 'BOX' ? round2(item.unitPrice * metersPerBox) : item.unitPrice;
+              const isGeneral = item.product.productType === 'GENERAL';
+              const displayQty = !isGeneral && item.soldBy === 'BOX' ? item.boxesCount : item.quantityM2;
+              const displayPrice = !isGeneral && item.soldBy === 'BOX' ? round2(item.unitPrice * metersPerBox) : item.unitPrice;
               const overStock = item.quantityM2 > item.availableStockM2 && !(settings?.enableNegativeStock);
               return (
                 <div
@@ -1161,7 +1232,7 @@ export const PosView: React.FC = () => {
                     <div className="min-w-0">
                       <div className="font-bold text-slate-900 line-clamp-1">{item.product.name}</div>
                       <div className="text-[10px] text-slate-500">
-                        {item.product.size} • {gradeLabel(item.product.grade)} • متاح {item.availableStockM2} م²
+                        {isGeneral ? `الوحدة: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
                       </div>
                     </div>
                     <button
@@ -1179,7 +1250,7 @@ export const PosView: React.FC = () => {
                   )}
 
                   {/* Unit toggle */}
-                  <div className="flex items-center gap-1">
+                  {!isGeneral && <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => updateCartUnit(idx, 'M2')}
@@ -1193,7 +1264,7 @@ export const PosView: React.FC = () => {
                     <span className="text-[10px] text-slate-500 mr-auto">
                       {item.piecesCount} قطعة • {item.boxesCount} كرتونة
                     </span>
-                  </div>
+                  </div>}
 
                   {/* Quantity + price */}
                   <div className="flex items-center justify-between gap-2">
@@ -1206,7 +1277,9 @@ export const PosView: React.FC = () => {
                       </button>
                       <input
                         type="number"
-                        step={item.soldBy === 'BOX' ? 1 : 0.01}
+                        step={isGeneral
+                          ? item.product.baseUnit === 'BOX' || item.product.baseUnit === 'PIECE' || item.product.baseUnit === 'SET' ? 1 : 0.01
+                          : item.soldBy === 'BOX' ? 1 : 0.01}
                         value={displayQty}
                         onChange={(e) => { if (e.target.value !== '') updateCartQuantity(idx, parseFloat(e.target.value)); }}
                         className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-slate-900"
@@ -1227,6 +1300,7 @@ export const PosView: React.FC = () => {
                         className="w-16 text-center font-bold bg-white border border-slate-200 rounded-lg p-1 text-xs text-slate-900"
                       />
                       <span className="text-[10px] text-slate-500">ج.م</span>
+                      <span className="text-[10px] text-slate-500">/{isGeneral ? getProductUnitLabel(item.product) : item.soldBy === 'BOX' ? 'كرتونة' : 'م²'}</span>
                     </div>
 
                     <div className="font-black text-sky-600 w-20 text-left">{CeramicMath.formatCurrency(lineTotal)}</div>
@@ -1325,7 +1399,7 @@ export const PosView: React.FC = () => {
           {/* Totals */}
           <div className="bg-sky-500/10 p-3 rounded-xl border border-sky-500/20 space-y-1.5 text-xs">
             <div className="flex justify-between text-slate-500">
-              <span>إجمالي البنود ({totalItems} م² / {totalBoxes} كرتونة)</span>
+              <span>إجمالي البنود ({cart.length} صنف{cartQuantitySummary ? ` / ${cartQuantitySummary}` : ''})</span>
               <span>{CeramicMath.formatCurrency(lineSubtotal)}</span>
             </div>
             {lineDiscountTotal > 0 && (
@@ -1596,6 +1670,80 @@ export const PosView: React.FC = () => {
             <button onClick={handleCloseShift} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد عدّ النقد وإغلاق الوردية</button>
           </div>
         </Modal>
+      )}
+
+      {/* ═══ Tone/Shade Mixing Warning Modal ═══ */}
+      {isToneWarningOpen && toneConflicts.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-amber-200">
+            {/* Header */}
+            <div className="px-6 py-4 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-slate-900">تحذير: خلط نغمات ألوان مختلفة</h2>
+                <p className="text-xs text-amber-700">الكمية المطلوبة ستُسحب من دفعات بنغمات أو عيارات مختلفة</p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4 max-h-[55vh] overflow-y-auto">
+              {toneConflicts.map((conflict) => (
+                <div key={conflict.productId} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="font-bold text-slate-900 text-sm mb-3">{conflict.productName}</div>
+                  <div className="space-y-2">
+                    {conflict.batches.map((b, i) => (
+                      <div key={i} className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-violet-100 text-violet-700">
+                            نغمة: {b.toneShade}
+                          </span>
+                          {b.caliber && b.caliber !== '0' && (
+                            <span className="px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700">
+                              عيار: {b.caliber}
+                            </span>
+                          )}
+                          <span className="font-mono text-slate-500">دفعة: {b.batchNumber}</span>
+                        </div>
+                        <span className="font-mono font-bold text-sky-700">{b.requiredM2.toFixed(2)} م²</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-amber-700 mt-3">
+                    ⚠️ قد يؤدي خلط هذه الدفعات إلى تباين في لون البلاط عند التركيب في موقع العميل.
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setIsToneWarningOpen(false);
+                  setToneConflicts([]);
+                  setPendingCheckout(false);
+                }}
+                className="flex-1 px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-sm font-bold transition"
+              >
+                إلغاء — مراجعة الكميات
+              </button>
+              <button
+                onClick={() => {
+                  setIsToneWarningOpen(false);
+                  setToneConflicts([]);
+                  setPendingCheckout(true); // bypass check on retry
+                  // trigger checkout immediately
+                  setTimeout(handleCheckout, 0);
+                }}
+                className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold transition"
+              >
+                متابعة على مسؤوليتي
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ═══ Shortcuts modal ═══ */}

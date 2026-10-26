@@ -19,6 +19,8 @@ export interface CreatePurchaseDTO {
     quantityM2: number;
     boxesCount: number;
     unitCost: number;
+    orderedUnitCost?: number;
+    grnAcceptedQty?: number;
   }[];
   discountAmount?: number;
   taxAmount?: number;
@@ -27,6 +29,16 @@ export interface CreatePurchaseDTO {
   paymentType: PaymentType;
   notes?: string;
   performedBy?: string;
+  // Enhancements for 5.3:
+  grnId?: string;
+  purchaseOrderId?: string;
+  landedFreight?: number;
+  landedLoading?: number;
+  landedCustomsTaxes?: number;
+  landedInsurance?: number;
+  landedOther?: number;
+  landedAllocationMethod?: 'VALUE' | 'QUANTITY' | 'WEIGHT';
+  isNoNumberSupplier?: boolean;
 }
 
 export class PurchaseService {
@@ -70,7 +82,13 @@ export class PurchaseService {
     const inv = rows[0];
 
     const items = this.db.query<PurchaseInvoiceItem>(`
-      SELECT * FROM purchase_invoice_items WHERE purchase_id = ?
+      SELECT pii.*, pii.quantity_m2 AS quantityM2, pii.unit_cost AS unitCost,
+             pii.landed_cost_share AS landedCostShare, pii.total_cost AS totalCost,
+             pii.effective_unit_cost AS effectiveUnitCost, p.name AS productName,
+             p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+      FROM purchase_invoice_items pii
+      LEFT JOIN products p ON p.id = pii.product_id
+      WHERE pii.purchase_id = ?
     `, [id]);
 
     return {
@@ -86,6 +104,17 @@ export class PurchaseService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'purchases.create');
 
+    // Duplicate supplier invoice check (unless explicit override for suppliers without numbers)
+    if (!dto.isNoNumberSupplier && dto.supplierInvoiceNumber && dto.supplierInvoiceNumber.trim()) {
+      const existing = this.db.query<any>(
+        `SELECT invoice_number, date FROM purchase_invoices WHERE supplier_id = ? AND supplier_invoice_number = ? AND is_no_number_supplier = 0`,
+        [dto.supplierId, dto.supplierInvoiceNumber.trim()]
+      )[0];
+      if (existing) {
+        throw new Error(`رقم فاتورة المورد (${dto.supplierInvoiceNumber}) مكرر ومسجل بالفعل بالفاتورة ${existing.invoice_number} بتاريخ ${existing.date}.`);
+      }
+    }
+
     const purchaseId = `pur_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
     const performedBy = actor.id;
@@ -95,8 +124,9 @@ export class PurchaseService {
       let subtotal = 0;
       const preparedItems: any[] = [];
 
-      for (const item of dto.items) {
-        const prod = sqliteDb.query(`SELECT name, grade, meters_per_box, pieces_per_box, cost_price FROM products WHERE id = ?`, [item.productId])[0] as any;
+      for (let idx = 0; idx < dto.items.length; idx++) {
+        const item = dto.items[idx];
+        const prod = sqliteDb.query(`SELECT name, grade, product_type, base_unit, meters_per_box, pieces_per_box, cost_price FROM products WHERE id = ?`, [item.productId])[0] as any;
         if (!prod) throw new Error(`المنتج ${item.productId} غير موجود.`);
 
         const lineTotalCost = round2(item.quantityM2 * item.unitCost);
@@ -109,18 +139,66 @@ export class PurchaseService {
           productName: prod.name,
           grade: prod.grade,
           quantityM2: item.quantityM2,
-          boxesCount: item.boxesCount,
+          boxesCount: prod.product_type === 'GENERAL'
+            ? prod.base_unit === 'BOX' ? item.quantityM2 : 0
+            : item.boxesCount,
+          productType: prod.product_type,
           unitCost: item.unitCost,
           totalCost: lineTotalCost,
-        metersPerBox: prod.metersPerBox || 1.44,
-        piecesPerBox: prod.piecesPerBox || 4
+          metersPerBox: prod.metersPerBox || 1.44,
+          piecesPerBox: prod.piecesPerBox || 4,
+          orderedUnitCost: item.orderedUnitCost || item.unitCost,
+          grnAcceptedQty: item.grnAcceptedQty || item.quantityM2,
+          landedCostShare: 0,
+          effectiveUnitCost: item.unitCost,
         });
       }
 
       const discountAmount = round2(dto.discountAmount || 0);
       const taxAmount = round2(dto.taxAmount || 0);
-      const shippingCost = round2(dto.shippingCost || 0);
-      const totalAmount = round2(subtotal - discountAmount + taxAmount + shippingCost);
+
+      // Landed Costs Distribution
+      const landedFreight = Number(dto.landedFreight ?? dto.shippingCost ?? 0);
+      const landedLoading = Number(dto.landedLoading || 0);
+      const landedCustoms = Number(dto.landedCustomsTaxes || 0);
+      const landedInsurance = Number(dto.landedInsurance || 0);
+      const landedOther = Number(dto.landedOther || 0);
+      const totalLanded = round2(landedFreight + landedLoading + landedCustoms + landedInsurance + landedOther);
+      const allocMethod = dto.landedAllocationMethod || 'VALUE';
+
+      let denominator = 0;
+      for (const it of preparedItems) {
+        denominator += allocMethod === 'QUANTITY' ? it.quantityM2 : it.totalCost;
+      }
+      if (denominator <= 0) denominator = 1;
+
+      let allocatedShareSum = 0;
+      preparedItems.forEach((it, idx) => {
+        const val = allocMethod === 'QUANTITY' ? it.quantityM2 : it.totalCost;
+        const share = idx === preparedItems.length - 1
+          ? round2(totalLanded - allocatedShareSum)
+          : round2(totalLanded * (val / denominator));
+        allocatedShareSum = round2(allocatedShareSum + share);
+        it.landedCostShare = share;
+        it.effectiveUnitCost = it.quantityM2 > 0 ? round2((it.totalCost + share) / it.quantityM2) : it.unitCost;
+      });
+
+      // 3-Way Matching Variance
+      let priceVarianceAmount = 0;
+      let qtyVarianceAmount = 0;
+      for (const it of preparedItems) {
+        const priceDiff = round2(it.unitCost - it.orderedUnitCost);
+        const qtyDiff = round2(it.quantityM2 - it.grnAcceptedQty);
+        priceVarianceAmount = round2(priceVarianceAmount + priceDiff * it.quantityM2);
+        qtyVarianceAmount = round2(qtyVarianceAmount + qtyDiff * it.unitCost);
+      }
+      let matchingStatus = 'MATCHED';
+      if (Math.abs(priceVarianceAmount) > 0.01 && Math.abs(qtyVarianceAmount) > 0.01) matchingStatus = 'BOTH_VARIANCE';
+      else if (Math.abs(priceVarianceAmount) > 0.01) matchingStatus = 'PRICE_VARIANCE';
+      else if (Math.abs(qtyVarianceAmount) > 0.01) matchingStatus = 'QTY_VARIANCE';
+
+      const shippingCost = round2(landedFreight);
+      const totalAmount = round2(subtotal - discountAmount + taxAmount + totalLanded);
       const remainingAmount = round2(Math.max(0, totalAmount - dto.paidAmount));
       const paymentStatus: PaymentStatus = remainingAmount <= 0 ? 'PAID' : (dto.paidAmount > 0 ? 'PARTIAL' : 'UNPAID');
 
@@ -129,73 +207,82 @@ export class PurchaseService {
         INSERT INTO purchase_invoices (
           id, invoice_number, supplier_invoice_number, date, supplier_id, warehouse_id,
           subtotal, discount_amount, tax_amount, shipping_cost, total_amount,
-          paid_amount, remaining_amount, payment_type, payment_status, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          paid_amount, remaining_amount, payment_type, payment_status, notes, created_by,
+          grn_id, purchase_order_id, landed_freight, landed_loading, landed_customs_taxes,
+          landed_insurance, landed_other, landed_allocation_method, is_no_number_supplier,
+          matching_status, price_variance_amount, qty_variance_amount
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dto.supplierId, dto.warehouseId,
         subtotal, discountAmount, taxAmount, shippingCost, totalAmount,
-        dto.paidAmount, remainingAmount, dto.paymentType, paymentStatus, dto.notes || null, performedBy
+        dto.paidAmount, remainingAmount, dto.paymentType, paymentStatus, dto.notes || null, performedBy,
+        dto.grnId || null, dto.purchaseOrderId || null, landedFreight, landedLoading, landedCustoms,
+        landedInsurance, landedOther, allocMethod, dto.isNoNumberSupplier ? 1 : 0,
+        matchingStatus, priceVarianceAmount, qtyVarianceAmount,
       ]);
 
       const method = this.costingMethod();
+      const alreadyReceivedInGrn = Boolean(dto.grnId);
 
-      // 2. Insert Items, Increase Stock & Update Cost Price
+      // 2. Insert Items, Increase Stock (if not already received via GRN) & Update Cost Price
       for (const item of preparedItems) {
         sqliteDb.run(`
           INSERT INTO purchase_invoice_items (
             id, purchase_id, product_id, product_name, grade, quantity_m2, boxes_count,
-            unit_cost, total_cost, meters_per_box, pieces_per_box
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            unit_cost, total_cost, meters_per_box, pieces_per_box,
+            landed_cost_share, effective_unit_cost, ordered_unit_cost, grn_accepted_qty
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
           item.id, item.purchaseId, item.productId, item.productName, item.grade,
           item.quantityM2, item.boxesCount, item.unitCost, item.totalCost,
-          item.metersPerBox, item.piecesPerBox
+          item.metersPerBox, item.piecesPerBox,
+          item.landedCostShare, item.effectiveUnitCost, item.orderedUnitCost, item.grnAcceptedQty,
         ]);
 
-        // Stock Increase
+        // Stock Increase only if not already received and stocked through Goods Receipt Note (GRN)
         const stockRow = sqliteDb.query(`SELECT quantity_m2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`, [item.productId, dto.warehouseId])[0] as any;
-        if (stockRow) {
-          sqliteDb.run(`
-            UPDATE warehouse_stock
-            SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
-            WHERE product_id = ? AND warehouse_id = ?
-          `, [item.quantityM2, item.productId, dto.warehouseId]);
-        } else {
-          sqliteDb.run(`
-            INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
-            VALUES (?, ?, ?, ?, 0)
-          `, [`stk_${uuidv4().substring(0, 8)}`, dto.warehouseId, item.productId, item.quantityM2]);
+        if (!alreadyReceivedInGrn) {
+          if (stockRow) {
+            sqliteDb.run(`
+              UPDATE warehouse_stock
+              SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
+              WHERE product_id = ? AND warehouse_id = ?
+            `, [item.quantityM2, item.productId, dto.warehouseId]);
+          } else {
+            sqliteDb.run(`
+              INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+              VALUES (?, ?, ?, ?, 0)
+            `, [`stk_${uuidv4().substring(0, 8)}`, dto.warehouseId, item.productId, item.quantityM2]);
+          }
         }
 
-        // Costing strategy (brief §33): weighted average, or latest-cost for FIFO (lot-tracking not yet implemented).
-        // NOTE: Current implementation uses organization-wide average cost (products.cost_price).
-        // For multi-warehouse scenarios, consider implementing warehouse-specific cost tracking
-        // by adding cost_price to warehouse_stock table or a separate warehouse_product_costs table.
+        // Costing strategy uses effective landed unit cost
         const prevQty = stockRow ? stockRow.quantityM2 : 0;
         const prevCost = (stockRow ? this.db.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0] : null)?.costPrice || 0;
         const newCost = method === 'FIFO'
-          ? round2(item.unitCost)
-          : computeWeightedAverageCost(prevQty, prevCost, item.quantityM2, item.unitCost);
+          ? round2(item.effectiveUnitCost)
+          : computeWeightedAverageCost(prevQty, prevCost, item.quantityM2, item.effectiveUnitCost);
         sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
 
-        // Inventory Transaction
-        const inventoryTransactionId = `tx_${uuidv4().substring(0, 8)}`;
-        sqliteDb.run(`
-          INSERT INTO inventory_transactions (
-            id, transaction_number, type, product_id, warehouse_id,
-            quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
-            reference_id, notes, performed_by
-          ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, ?)
-        `, [
-          inventoryTransactionId, sqliteDb.nextNumber('TX-PUR'),
-          item.productId, dto.warehouseId, item.quantityM2, item.boxesCount, item.unitCost,
-          item.totalCost, purchaseId, `شراء توريد سيراميك بموجب فاتورة ${invoiceNumber}`, performedBy
-        ]);
-        InventoryCostingService.addLayer(sqliteDb, {
-          productId: item.productId, warehouseId: dto.warehouseId,
-          sourceTransactionId: inventoryTransactionId, sourceType: 'PURCHASE', sourceId: purchaseId,
-          date: today, quantity: item.quantityM2, unitCost: item.unitCost,
-        });
+        if (!alreadyReceivedInGrn) {
+          const inventoryTransactionId = `tx_${uuidv4().substring(0, 8)}`;
+          sqliteDb.run(`
+            INSERT INTO inventory_transactions (
+              id, transaction_number, type, product_id, warehouse_id,
+              quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+              reference_id, notes, performed_by
+            ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, ?)
+          `, [
+            inventoryTransactionId, sqliteDb.nextNumber('TX-PUR'),
+            item.productId, dto.warehouseId, item.quantityM2, item.boxesCount, item.effectiveUnitCost,
+            round2(item.quantityM2 * item.effectiveUnitCost), purchaseId, `شراء توريد سيراميك بموجب فاتورة ${invoiceNumber}`, performedBy,
+          ]);
+          InventoryCostingService.addLayer(sqliteDb, {
+            productId: item.productId, warehouseId: dto.warehouseId,
+            sourceTransactionId: inventoryTransactionId, sourceType: 'PURCHASE', sourceId: purchaseId,
+            date: today, quantity: item.quantityM2, unitCost: item.effectiveUnitCost,
+          });
+        }
       }
 
       // 3. Update Supplier Balance & Total Purchases
@@ -399,7 +486,11 @@ export class PurchaseService {
           )[0];
           const currentQuantity = stockRow ? Number(stockRow.quantityM2) : 0;
           if (currentQuantity < item.quantityM2) {
-            throw new Error(`لا يمكن حذف فاتورة التوريد. الرصيد الحالي للصنف (${currentQuantity} م²) أقل من كمية الفاتورة (${item.quantityM2} م²). تم استخدام جزء من الكمية في مبيعات. استخدم مرتجع بدلاً من الحذف.`);
+            const product = db.query<any>(`SELECT product_type, base_unit, custom_unit FROM products WHERE id = ?`, [item.productId])[0];
+            const unit = product?.product_type === 'GENERAL'
+              ? product.custom_unit || ({ M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة', KG: 'كجم', TON: 'طن', SET: 'طقم' } as Record<string, string>)[product.base_unit] || 'وحدة'
+              : 'م²';
+            throw new Error(`لا يمكن حذف فاتورة التوريد. الرصيد الحالي للصنف (${currentQuantity} ${unit}) أقل من كمية الفاتورة (${item.quantityM2} ${unit}). تم استخدام جزء من الكمية في مبيعات. استخدم مرتجع بدلاً من الحذف.`);
           }
         }
       }

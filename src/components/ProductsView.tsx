@@ -15,6 +15,7 @@ import { AttributeService, AttributeCategory } from '../services/AttributeServic
 import { ProductExtraService, ProductImage } from '../services/ProductExtraService';
 import { Product, CeramicGrade, UnitType, Warehouse } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { getProductUnitLabel } from '../utils/productUnits';
 import { exportToExcel } from '../utils/export';
 
 const UNITS: { value: UnitType; label: string }[] = [
@@ -23,8 +24,8 @@ const UNITS: { value: UnitType; label: string }[] = [
   { value: 'KG', label: 'كيلوجرام' },
   { value: 'TON', label: 'طن' },
   { value: 'SET', label: 'طقم' },
-  { value: 'BOX', label: 'Box' },
-  { value: 'PIECE', label: 'Piece' },
+  { value: 'BOX', label: 'كرتونة' },
+  { value: 'PIECE', label: 'قطعة' },
 ];
 const unitLabelFor = (unit: UnitType, custom = '') => custom.trim() || UNITS.find((item) => item.value === unit)?.label || unit;
 
@@ -325,7 +326,11 @@ export const ProductsView: React.FC = () => {
 
   const stockOf = (p: Product) => {
     const m2 = Number(p.totalStockM2 ?? 0);
-    if (p.productType === 'GENERAL') return { m2, boxes: 0, pieces: m2 };
+    if (p.productType === 'GENERAL') return {
+      m2,
+      boxes: p.baseUnit === 'BOX' ? m2 : 0,
+      pieces: p.baseUnit === 'PIECE' ? m2 : 0,
+    };
     const metersPerBox = p.metersPerBox || 0;
     const boxes = metersPerBox > 0 ? m2 / metersPerBox : 0;
     const pieces = metersPerBox > 0 ? boxes * (p.piecesPerBox || 0) : 0;
@@ -817,6 +822,7 @@ export const ProductsView: React.FC = () => {
           name: p.name,
           type: p.categoryName || '',
           brand: p.brandName || '',
+          unit: getProductUnitLabel(p),
           size: p.size,
           grade: p.grade,
           color: p.color || '',
@@ -844,6 +850,7 @@ export const ProductsView: React.FC = () => {
           { key: 'name', label: 'اسم المنتج' },
           { key: 'type', label: 'النوع' },
           { key: 'brand', label: 'الماركة' },
+          { key: 'unit', label: 'وحدة الصنف' },
           { key: 'size', label: 'المقاس' },
           { key: 'grade', label: 'الفرز' },
           { key: 'color', label: 'اللون' },
@@ -852,11 +859,11 @@ export const ProductsView: React.FC = () => {
           { key: 'piecesPerBox', label: 'قطع/كرتونة' },
           { key: 'metersPerBox', label: 'م²/كرتونة' },
           { key: 'costPrice', label: 'التكلفة' },
-          { key: 'sellingPriceM2', label: 'سعر المتر' },
+          { key: 'sellingPriceM2', label: 'سعر الوحدة' },
           { key: 'sellingPriceBox', label: 'سعر الكرتونة' },
           { key: 'wholesalePriceM2', label: 'سعر الجملة' },
           { key: 'minStockLevel', label: 'حد الطلب' },
-          { key: 'stockM2', label: 'المخزون م²' },
+          { key: 'stockM2', label: 'المخزون بوحدة الصنف' },
           { key: 'stockBoxes', label: 'المخزون كرتونة' },
           { key: 'stockPieces', label: 'المخزون قطعة' },
         ],
@@ -1034,7 +1041,7 @@ export const ProductsView: React.FC = () => {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatCard label="إجمالي الأصناف" value={String(stats?.totalProducts ?? totalItems)} hint={`نشط: ${stats?.activeProducts ?? 0} | موقوف: ${stats?.inactiveProducts ?? 0}`} icon={<Package className="w-5 h-5 text-sky-600" />} tone="bg-sky-50" />
-        <StatCard label="إجمالي المخزون" value={CeramicMath.formatM2(stats?.totalStockM2 ?? 0)} hint={`${stats?.totalBoxes ?? 0} كرتونة`} icon={<Boxes className="w-5 h-5 text-emerald-600" />} tone="bg-emerald-50" />
+        <StatCard label="إجمالي الكميات" value={String(stats?.totalStockM2 ?? 0)} icon={<Boxes className="w-5 h-5 text-emerald-600" />} tone="bg-emerald-50" />
         <StatCard label="قيمة المخزون" value={CeramicMath.formatCurrency(stats?.totalStockValue ?? 0)} icon={<Banknote className="w-5 h-5 text-indigo-600" />} tone="bg-indigo-50" />
         <StatCard label="أصناف قاربت على النفاذ" value={String(stats?.lowStock ?? 0)} icon={<AlertTriangle className="w-5 h-5 text-amber-600" />} tone="bg-amber-50" />
         <StatCard label="أصناف نافدة" value={String(stats?.outOfStock ?? 0)} icon={<XCircle className="w-5 h-5 text-rose-600" />} tone="bg-rose-50" />
@@ -1132,7 +1139,7 @@ export const ProductsView: React.FC = () => {
                   <th className="p-3.5">المقاس والفرز</th>
                   <th className="p-3.5">التحويل</th>
                   <th className="p-3.5">التكلفة</th>
-                  <th className="p-3.5">سعر المتر</th>
+                  <th className="p-3.5">سعر الوحدة</th>
                   <th className="p-3.5">سعر الكرتونة</th>
                   <th className="p-3.5 text-center">المخزون</th>
                   <th className="p-3.5 text-center">الإجراءات</th>
@@ -1170,17 +1177,17 @@ export const ProductsView: React.FC = () => {
                         </div>
                       </td>
                       <td className="p-3.5 font-semibold text-slate-700">
-                        {p.productType === 'GENERAL' ? <div>{p.metersPerBox} {unitLabelFor(p.baseUnit, p.customUnit)}</div> : <>
+                        {p.productType === 'GENERAL' ? <div>وحدة المخزون: {getProductUnitLabel(p)}</div> : <>
                           <div>{p.metersPerBox} {p.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
                           <div className="text-[10px] text-slate-500">{p.piecesPerBox} قطعة / كرتونة</div>
                         </>}
                       </td>
                       <td className="p-3.5 font-mono text-slate-600">{CeramicMath.formatCurrency(p.costPrice)}</td>
                       <td className="p-3.5 font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</td>
-                      <td className="p-3.5 font-bold text-slate-900">{CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
+                      <td className="p-3.5 font-bold text-slate-900">{p.productType === 'GENERAL' ? '—' : CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
                       <td className="p-3.5 text-center">
                         <span className={`inline-block px-2 py-1 rounded-lg font-black text-[11px] ${stockTone(p)}`}>
-                          {p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${unitLabelFor(p.baseUnit, p.customUnit)}` : <>
+                          {p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : <>
                             {CeramicMath.formatM2(stock.m2)}
                             <span className="mx-1 text-slate-400">|</span>
                             {round(stock.boxes)} كرتونة
@@ -1214,7 +1221,7 @@ export const ProductsView: React.FC = () => {
                 <div key={p.id} className={`flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md ${p.isActive ? '' : 'opacity-60'}`}>
                   <div className="relative h-36 bg-slate-100">
                     {p.imagePath ? <img src={p.imagePath} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-10 w-10" /></div>}
-                    <span className={`absolute right-2 top-2 rounded-lg px-2 py-1 text-[10px] font-black ${stockTone(p)}`}>{CeramicMath.formatM2(stock.m2)}</span>
+                    <span className={`absolute right-2 top-2 rounded-lg px-2 py-1 text-[10px] font-black ${stockTone(p)}`}>{p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : CeramicMath.formatM2(stock.m2)}</span>
                     <input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="absolute left-2 top-2 h-4 w-4 rounded border-slate-300 text-sky-600" />
                     {!p.isActive && <span className="absolute left-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-black text-white">موقوف</span>}
                   </div>
@@ -1224,24 +1231,30 @@ export const ProductsView: React.FC = () => {
                       <p className="text-[10px] text-slate-500">{p.categoryName || '—'} | {p.brandName || '—'}</p>
                     </div>
                     <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">{p.size}</span>
-                      <span className="rounded-md bg-amber-50 px-2 py-0.5 text-amber-700">{gradeLabel(p.grade)}</span>
-                      <span className="rounded-md bg-sky-50 px-2 py-0.5 text-sky-700">{p.piecesPerBox} قطعة / {p.metersPerBox} م²</span>
+                      {p.productType === 'GENERAL' ? <span className="rounded-md bg-sky-50 px-2 py-0.5 text-sky-700">وحدة الصنف: {getProductUnitLabel(p)}</span> : <>
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">{p.size}</span>
+                        <span className="rounded-md bg-amber-50 px-2 py-0.5 text-amber-700">{gradeLabel(p.grade)}</span>
+                        <span className="rounded-md bg-sky-50 px-2 py-0.5 text-sky-700">{p.piecesPerBox} قطعة / {p.metersPerBox} م²</span>
+                      </>}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-center">
                       <div className="rounded-lg border border-slate-200 py-1.5">
-                        <div className="text-[9px] font-bold text-slate-400">سعر المتر</div>
+                        <div className="text-[9px] font-bold text-slate-400">سعر {getProductUnitLabel(p)}</div>
                         <div className="text-xs font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</div>
                       </div>
                       <div className="rounded-lg border border-slate-200 py-1.5">
-                        <div className="text-[9px] font-bold text-slate-400">سعر الكرتونة</div>
-                        <div className="text-xs font-black text-slate-800">{CeramicMath.formatCurrency(p.sellingPriceBox || p.sellingPriceM2 * p.metersPerBox)}</div>
+                        <div className="text-[9px] font-bold text-slate-400">{p.productType === 'GENERAL' ? 'التكلفة للوحدة' : 'سعر الكرتونة'}</div>
+                        <div className="text-xs font-black text-slate-800">{CeramicMath.formatCurrency(p.productType === 'GENERAL' ? p.costPrice : p.sellingPriceBox || p.sellingPriceM2 * p.metersPerBox)}</div>
                       </div>
                     </div>
                     <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
-                      <span>كراتين: {round(stock.boxes)}</span>
-                      <span>قطع: {Math.round(stock.pieces)}</span>
-                      <span>حد الطلب: {p.minStockLevel}</span>
+                      {p.productType === 'GENERAL'
+                        ? <span>حد الطلب: {p.minStockLevel} {getProductUnitLabel(p)}</span>
+                        : <>
+                          <span>كراتين: {round(stock.boxes)}</span>
+                          <span>قطع: {Math.round(stock.pieces)}</span>
+                          <span>حد الطلب: {p.minStockLevel} م²</span>
+                        </>}
                     </div>
                   </div>
                   <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
@@ -1661,7 +1674,7 @@ export const ProductsView: React.FC = () => {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><PackagePlus className="w-5 h-5" /></div>
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900">إضافة كمية للمخزون</h3>
-                  <p className="text-[11px] text-slate-500">{stockProduct.name} • {stockProduct.size} • {stockProduct.metersPerBox} م²/كرتونة</p>
+                  <p className="text-[11px] text-slate-500">{stockProduct.name}{stockProduct.productType === 'GENERAL' ? ` • الوحدة: ${getProductUnitLabel(stockProduct)}` : ` • ${stockProduct.metersPerBox} م²/كرتونة`}</p>
                 </div>
               </div>
               <button onClick={() => setStockProduct(null)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
@@ -1673,18 +1686,18 @@ export const ProductsView: React.FC = () => {
                     <Field label="المخزن"><div className="px-3 py-2 font-bold text-slate-700">{row.warehouseName}</div></Field>
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
                       <div className="text-[10px] font-bold text-emerald-700">الرصيد الحالي</div>
-                      <div className="font-black text-emerald-700">{CeramicMath.formatM2(row.currentM2)}</div>
+                      <div className="font-black text-emerald-700">{stockProduct.productType === 'GENERAL' ? `${round(row.currentM2, 3)} ${getProductUnitLabel(stockProduct)}` : CeramicMath.formatM2(row.currentM2)}</div>
                     </div>
-                    <Field label="عدد الكراتين المضافة">
+                    <Field label={stockProduct.productType === 'GENERAL' ? `الكمية المضافة (${getProductUnitLabel(stockProduct)})` : 'عدد الكراتين المضافة'}>
                       <input type="number" min="0" step="0.01" value={row.addBoxes || ''} onChange={(e) => { const value = parseFloat(e.target.value) || 0; setStockRows((prev) => prev.map((r, i) => i === index ? { ...r, addBoxes: value } : r)); }} className="w-full px-3 py-2 bg-white rounded-xl border border-emerald-300 font-bold" placeholder="0" />
                     </Field>
                   </div>
                 ))}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="القيمة المضافة (م²)">
+                <Field label={stockProduct.productType === 'GENERAL' ? `القيمة المضافة (${getProductUnitLabel(stockProduct)})` : 'القيمة المضافة (م²)'}>
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 font-black text-emerald-700">
-                    {round(stockRows.reduce((s, r) => s + r.addBoxes, 0) * (stockProduct.metersPerBox || 0), 3)} م²
+                    {round(stockRows.reduce((s, r) => s + r.addBoxes, 0) * (stockProduct.productType === 'GENERAL' ? 1 : (stockProduct.metersPerBox || 0)), 3)} {getProductUnitLabel(stockProduct)}
                   </div>
                 </Field>
                 <Field label="سبب الإضافة / ملاحظة">

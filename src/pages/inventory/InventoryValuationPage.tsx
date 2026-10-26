@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Scale, Download, TrendingUp, DollarSign, Layers, PieChart } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
+import { getProductUnitLabel } from '../../utils/productUnits';
 
 interface WarehouseValuation {
   id: string;
   name: string;
   itemsCount: number;
-  totalQtyM2: number;
+  quantitiesByUnit: { unitLabel: string; quantity: number }[];
   costValue: number;
   retailValue: number;
 }
@@ -27,7 +28,6 @@ export const InventoryValuationPage: React.FC = () => {
           w.id,
           w.name,
           COALESCE(COUNT(DISTINCT ws.product_id), 0) as items_count,
-          COALESCE(SUM(ws.quantity_m2), 0) as total_qty_m2,
           COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) as cost_value,
           COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2), 0) as retail_value
         FROM warehouses w
@@ -38,11 +38,28 @@ export const InventoryValuationPage: React.FC = () => {
         ORDER BY w.name
       `;
       const rows = db.query<any>(sql);
+      const quantityRows = db.query<any>(`
+        SELECT ws.warehouse_id AS warehouseId, p.product_type AS productType,
+          p.base_unit AS baseUnit, p.custom_unit AS customUnit, SUM(ws.quantity_m2) AS quantity
+        FROM warehouse_stock ws
+        JOIN products p ON p.id = ws.product_id
+        WHERE p.is_active = 1
+        GROUP BY ws.warehouse_id, p.product_type, p.base_unit, p.custom_unit
+      `);
+      const quantitiesByWarehouse = new Map<string, { unitLabel: string; quantity: number }[]>();
+      for (const row of quantityRows) {
+        const quantities = quantitiesByWarehouse.get(row.warehouseId) || [];
+        quantities.push({
+          unitLabel: getProductUnitLabel(row),
+          quantity: Number(row.quantity) || 0,
+        });
+        quantitiesByWarehouse.set(row.warehouseId, quantities);
+      }
       const mapped: WarehouseValuation[] = rows.map(r => ({
         id: r.id,
         name: r.name,
         itemsCount: r.itemsCount || 0,
-        totalQtyM2: r.totalQtyM2 || 0,
+        quantitiesByUnit: quantitiesByWarehouse.get(r.id) || [],
         costValue: r.costValue || 0,
         retailValue: r.retailValue || 0
       }));
@@ -55,7 +72,6 @@ export const InventoryValuationPage: React.FC = () => {
   };
 
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
-  const fmtQty = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' م²';
 
   const totalCost = data.reduce((s, w) => s + w.costValue, 0);
   const totalRetail = data.reduce((s, w) => s + w.retailValue, 0);
@@ -123,7 +139,7 @@ export const InventoryValuationPage: React.FC = () => {
           <table className="w-full text-sm">
             <thead className="bg-slate-50">
               <tr>
-                {['المخزن', 'عدد الأصناف', 'إجمالي الكمية م²', 'القيمة بسعر الشراء', 'القيمة بسعر البيع', 'الربح المتوقع'].map(h => (
+                {['المخزن', 'عدد الأصناف', 'الكميات حسب الوحدة', 'القيمة بسعر الشراء', 'القيمة بسعر البيع', 'الربح المتوقع'].map(h => (
                   <th key={h} className="px-4 py-3 text-right text-xs font-bold text-slate-500">{h}</th>
                 ))}
               </tr>
@@ -133,7 +149,7 @@ export const InventoryValuationPage: React.FC = () => {
                 <tr key={w.id} className="hover:bg-slate-100 transition">
                   <td className="px-4 py-3 text-slate-900 font-medium">{w.name}</td>
                   <td className="px-4 py-3 text-slate-700 font-semibold">{w.itemsCount} صنف</td>
-                  <td className="px-4 py-3 text-sky-600 font-bold">{fmtQty(w.totalQtyM2)}</td>
+                  <td className="px-4 py-3 text-sky-600 font-bold">{w.quantitiesByUnit.map(({ unitLabel, quantity }) => <div key={unitLabel}>{new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(quantity)} {unitLabel}</div>)}</td>
                   <td className="px-4 py-3 text-slate-600">{fmt(w.costValue)}</td>
                   <td className="px-4 py-3 text-emerald-600 font-bold">{fmt(w.retailValue)}</td>
                   <td className="px-4 py-3 text-violet-600 font-bold">{fmt(w.retailValue - w.costValue)}</td>

@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Search, Filter, Download, TrendingUp, TrendingDown, ArrowRight, Package } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
 import { format } from 'date-fns';
+import { formatProductQuantity } from '../../utils/productUnits';
 
 interface LedgerEntry {
   id: string;
   date: string;
   product: string;
+  productType: 'CERAMIC' | 'GENERAL';
+  baseUnit: string;
+  customUnit?: string;
   warehouse: string;
   type: string;
   qtyIn: number;
@@ -56,6 +60,7 @@ export const StockLedgerPage: React.FC = () => {
     try {
       let sql = `
         SELECT it.id, it.created_at as date, p.name as product,
+               p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
                w.name as warehouse, it.type,
                CASE WHEN it.quantity_m2 > 0 THEN it.quantity_m2 ELSE 0 END as qty_in,
                CASE WHEN it.quantity_m2 < 0 THEN ABS(it.quantity_m2) ELSE 0 END as qty_out,
@@ -91,6 +96,9 @@ export const StockLedgerPage: React.FC = () => {
         id: r.id,
         date: format(new Date(r.date), 'dd/MM/yyyy HH:mm'),
         product: r.product,
+        productType: r.productType,
+        baseUnit: r.baseUnit,
+        customUnit: r.customUnit,
         warehouse: r.warehouse,
         type: r.type,
         qtyIn: r.qtyIn || 0,
@@ -111,8 +119,6 @@ export const StockLedgerPage: React.FC = () => {
 
   const paginated = entries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalPages = Math.ceil(entries.length / PAGE_SIZE);
-
-  const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -181,7 +187,7 @@ export const StockLedgerPage: React.FC = () => {
           <table className="w-full text-xs min-w-[900px]">
             <thead className="bg-white sticky top-0 z-10">
               <tr>
-                {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد م²', 'صادر م²', 'المرجع', 'المستخدم'].map(h => (
+                {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد', 'صادر', 'المرجع', 'المستخدم'].map(h => (
                   <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
                 ))}
               </tr>
@@ -198,10 +204,10 @@ export const StockLedgerPage: React.FC = () => {
                       <span className={`font-bold ${typeInfo.color}`}>{typeInfo.label}</span>
                     </td>
                     <td className="px-4 py-3 text-emerald-600 font-bold">
-                      {r.qtyIn > 0 ? `+${fmt(r.qtyIn)}` : '—'}
+                      {r.qtyIn > 0 ? `+${formatProductQuantity(r.qtyIn, r)}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-rose-600 font-bold">
-                      {r.qtyOut > 0 ? `-${fmt(r.qtyOut)}` : '—'}
+                      {r.qtyOut > 0 ? `-${formatProductQuantity(r.qtyOut, r)}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-500 font-mono">{r.ref || '—'}</td>
                     <td className="px-4 py-3 text-slate-500">{r.user}</td>

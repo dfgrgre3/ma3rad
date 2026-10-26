@@ -277,7 +277,7 @@ export const AdminSettingsTab: React.FC = () => {
             <Field label="السماح بالمخزون السالب">
               <Toggle checked={settings.enableNegativeStock} onChange={(v) => set('enableNegativeStock', v)} label={settings.enableNegativeStock ? 'مسموح' : 'ممنوع'} />
             </Field>
-            <Field label="حد تنبيه المخزون المنخفض (م²)">
+            <Field label="حد تنبيه المخزون المنخفض (بوحدة الصنف)">
               <input type="number" min={0} value={settings.lowStockAlertThresholdM2 ?? 20} onChange={(e) => set('lowStockAlertThresholdM2', Number(e.target.value))} className={inputCls} />
             </Field>
           </div>

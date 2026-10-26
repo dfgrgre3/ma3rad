@@ -33,25 +33,92 @@ export interface DailySalesResult {
 export interface DailyPurchaseRow {
   id: string;
   invoiceNumber: string;
+  supplierInvoiceNumber?: string | null;
   date: string;
   createdAt: string;
+  supplierId?: string | null;
   supplierName: string;
   supplierPhone?: string | null;
+  warehouseName?: string | null;
   itemsCount: number;
+  subtotal: number;
   total: number;
   paid: number;
   remaining: number;
   tax: number;
   discount: number;
+  shippingCost: number;
   paymentType: string;
   paymentStatus: string;
+  notes?: string | null;
   createdByName?: string | null;
+}
+
+export interface DailyPurchaseItemRow {
+  id: string;
+  purchaseId: string;
+  invoiceNumber: string;
+  supplierId?: string | null;
+  supplierName: string;
+  productId: string;
+  productName: string;
+  sku?: string | null;
+  grade: string;
+  quantityM2: number;
+  boxesCount: number;
+  unitCost: number;
+  totalCost: number;
+  productType?: 'CERAMIC' | 'GENERAL';
+  baseUnit?: string;
+  customUnit?: string;
+}
+
+export interface DailySupplierPaymentRow {
+  id: string;
+  receiptNumber: string;
+  supplierId: string;
+  supplierName: string;
+  amount: number;
+  paymentType: string;
+  notes?: string | null;
+  performedByName?: string | null;
+  createdAt?: string | null;
+  invoiceNumbers?: string | null;
+}
+
+export interface DailyPurchaseTrendPoint {
+  date: string;
+  count: number;
+  total: number;
 }
 
 export interface DailyPurchaseResult {
   date: string;
   rows: DailyPurchaseRow[];
-  summary: { count: number; total: number; paid: number; remaining: number; tax: number; discount: number };
+  items: DailyPurchaseItemRow[];
+  payments: DailySupplierPaymentRow[];
+  trend: DailyPurchaseTrendPoint[];
+  summary: {
+    count: number;
+    total: number;
+    paid: number;
+    remaining: number;
+    tax: number;
+    discount: number;
+    shipping: number;
+    subtotal: number;
+    itemsCount: number;
+    quantityM2: number;
+    boxesCount: number;
+    suppliersCount: number;
+    cashPaid: number;
+    bankPaid: number;
+    creditTotal: number;
+    averageInvoice: number;
+    supplierOutstanding: number;
+    paymentsTotal: number;
+    paymentsCount: number;
+  };
 }
 
 export interface DailyExpenseRow {
@@ -168,31 +235,112 @@ export class DailyOperationsService {
     this.requireView('purchases.view');
     const day = dateOnly(date);
     const rows = this.db.query<DailyPurchaseRow>(
-      `SELECT pi.id, pi.invoice_number AS invoiceNumber, pi.date, pi.created_at AS createdAt,
-              s.name AS supplierName, s.phone AS supplierPhone,
+      `SELECT pi.id, pi.invoice_number AS invoiceNumber, pi.supplier_invoice_number AS supplierInvoiceNumber,
+              pi.date, pi.created_at AS createdAt,
+              pi.supplier_id AS supplierId, s.name AS supplierName, s.phone AS supplierPhone,
+              w.name AS warehouseName,
               (SELECT COUNT(*) FROM purchase_invoice_items pii WHERE pii.purchase_id = pi.id) AS itemsCount,
-              pi.total_amount AS total, pi.paid_amount AS paid, pi.remaining_amount AS remaining,
-              pi.tax_amount AS tax, pi.discount_amount AS discount,
-              pi.payment_type AS paymentType, pi.payment_status AS paymentStatus,
+              pi.subtotal, pi.total_amount AS total, pi.paid_amount AS paid, pi.remaining_amount AS remaining,
+              pi.tax_amount AS tax, pi.discount_amount AS discount, pi.shipping_cost AS shippingCost,
+              pi.payment_type AS paymentType, pi.payment_status AS paymentStatus, pi.notes,
               u.full_name AS createdByName
        FROM purchase_invoices pi
        LEFT JOIN suppliers s ON s.id = pi.supplier_id
+       LEFT JOIN warehouses w ON w.id = pi.warehouse_id
        LEFT JOIN users u ON u.id = pi.created_by
        WHERE pi.date = ?
        ORDER BY pi.created_at DESC`,
       [day]
     );
 
+    const items = this.db.query<DailyPurchaseItemRow>(
+      `SELECT pii.id, pii.purchase_id AS purchaseId, pi.invoice_number AS invoiceNumber,
+              pi.supplier_id AS supplierId, s.name AS supplierName,
+              pii.product_id AS productId, pii.product_name AS productName, p.sku AS sku,
+              pii.grade, pii.quantity_m2 AS quantityM2, pii.boxes_count AS boxesCount,
+              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
+              pii.unit_cost AS unitCost, pii.total_cost AS totalCost
+       FROM purchase_invoice_items pii
+       JOIN purchase_invoices pi ON pi.id = pii.purchase_id
+       LEFT JOIN suppliers s ON s.id = pi.supplier_id
+       LEFT JOIN products p ON p.id = pii.product_id
+       WHERE pi.date = ?
+       ORDER BY pii.total_cost DESC`,
+      [day]
+    );
+
+    const payments = this.db.query<DailySupplierPaymentRow>(
+      `SELECT sp.id, sp.receipt_number AS receiptNumber, sp.supplier_id AS supplierId,
+              s.name AS supplierName, sp.amount, sp.payment_type AS paymentType,
+              sp.notes, sp.created_at AS createdAt, u.full_name AS performedByName,
+              (SELECT GROUP_CONCAT(pi.invoice_number, '، ')
+                 FROM supplier_payment_allocations spa
+                 JOIN purchase_invoices pi ON pi.id = spa.purchase_invoice_id
+                WHERE spa.payment_id = sp.id) AS invoiceNumbers
+       FROM supplier_payments sp
+       LEFT JOIN suppliers s ON s.id = sp.supplier_id
+       LEFT JOIN users u ON u.id = sp.performed_by
+       WHERE sp.date = ?
+       ORDER BY sp.created_at DESC`,
+      [day]
+    );
+
+    const start = new Date(`${day}T12:00:00`);
+    start.setDate(start.getDate() - 6);
+    const startDay = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const trendRows = this.db.query<{ date: string; count: number; total: number }>(
+      `SELECT date, COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS total
+       FROM purchase_invoices
+       WHERE date BETWEEN ? AND ?
+       GROUP BY date`,
+      [startDay, day]
+    );
+    const trendMap = new Map(trendRows.map((row) => [row.date, row]));
+    const trend: DailyPurchaseTrendPoint[] = Array.from({ length: 7 }, (_, index) => {
+      const cursor = new Date(`${startDay}T12:00:00`);
+      cursor.setDate(cursor.getDate() + index);
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+      const match = trendMap.get(key);
+      return { date: key, count: num(match?.count), total: round2(num(match?.total)) };
+    });
+
+    const supplierOutstanding = this.db.query<{ total: number }>(
+      `SELECT COALESCE(SUM(current_balance), 0) AS total FROM suppliers WHERE current_balance > 0`
+    )[0]?.total || 0;
+
+    const sumByPaymentType = (type: string) => round2(rows
+      .filter((row) => row.paymentType === type)
+      .reduce((sum, row) => sum + num(row.paid), 0));
+
+    const total = round2(rows.reduce((sum, row) => sum + num(row.total), 0));
+    const suppliers = new Set(rows.map((row) => row.supplierId).filter(Boolean));
+
     return {
       date: day,
       rows,
+      items,
+      payments,
+      trend,
       summary: {
         count: rows.length,
-        total: round2(rows.reduce((sum, row) => sum + num(row.total), 0)),
+        total,
         paid: round2(rows.reduce((sum, row) => sum + num(row.paid), 0)),
         remaining: round2(rows.reduce((sum, row) => sum + num(row.remaining), 0)),
         tax: round2(rows.reduce((sum, row) => sum + num(row.tax), 0)),
         discount: round2(rows.reduce((sum, row) => sum + num(row.discount), 0)),
+        shipping: round2(rows.reduce((sum, row) => sum + num(row.shippingCost), 0)),
+        subtotal: round2(rows.reduce((sum, row) => sum + num(row.subtotal), 0)),
+        itemsCount: items.length,
+        quantityM2: round2(items.reduce((sum, item) => sum + num(item.quantityM2), 0)),
+        boxesCount: round2(items.reduce((sum, item) => sum + num(item.boxesCount), 0)),
+        suppliersCount: suppliers.size,
+        cashPaid: sumByPaymentType('CASH'),
+        bankPaid: round2(sumByPaymentType('BANK_TRANSFER') + sumByPaymentType('CARD')),
+        creditTotal: round2(rows.filter((row) => row.paymentStatus !== 'PAID').reduce((sum, row) => sum + num(row.total), 0)),
+        averageInvoice: rows.length ? round2(total / rows.length) : 0,
+        supplierOutstanding: round2(num(supplierOutstanding)),
+        paymentsTotal: round2(payments.reduce((sum, payment) => sum + num(payment.amount), 0)),
+        paymentsCount: payments.length,
       },
     };
   }

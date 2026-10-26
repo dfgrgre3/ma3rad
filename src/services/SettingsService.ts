@@ -6,20 +6,9 @@ import { AuditService } from './AuditService';
 import type { SystemSettings, User } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export type SettingsPatch = Partial<Record<string, string | number | boolean | null | undefined>>;
-
-type Listener = (settings: SystemSettings) => void;
-
-const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
-
-function bool(value: unknown): boolean {
-  return value === true || value === '1' || value === 1 || value === 'true';
-}
-
-function num(value: unknown, fallback = 0): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
+export { HEX_COLOR, bool, num, type Listener, type SettingsPatch } from './settingsUtils';
+import { HEX_COLOR, bool, num, subscribeSettings, notifySettings, type Listener, type SettingsPatch } from './settingsUtils';
+import { validateSettings } from './settingsValidation';
 
 /**
  * Single source of truth for `system_settings`.
@@ -29,8 +18,6 @@ function num(value: unknown, fallback = 0): number {
  * - subscribers (theme provider, header, sidebar) are notified on change
  */
 export class SettingsService {
-  private static listeners = new Set<Listener>();
-
   private static db() {
     return DatabaseManager.getInstance();
   }
@@ -160,77 +147,18 @@ export class SettingsService {
     }
 
     const next = SettingsService.getSettings();
-    SettingsService.emit(next);
+    notifySettings(next);
     return next;
   }
 
   /** Validate and normalize a patch. Throws a user-facing Arabic error on bad input. */
-  public static validate(patch: SettingsPatch): Record<string, string> {
-    const out: Record<string, string> = {};
-    for (const [key, raw] of Object.entries(patch)) {
-      if (raw === undefined) continue;
-      if (raw === null) {
-        out[key] = '';
-        continue;
-      }
-      if (typeof raw === 'boolean') {
-        out[key] = raw ? '1' : '0';
-        continue;
-      }
-      if (typeof raw === 'number') {
-        if (!Number.isFinite(raw)) throw new Error(`قيمة غير صالحة للحقل ${key}.`);
-        out[key] = String(raw);
-        continue;
-      }
-      const value = String(raw).trim();
-      switch (key) {
-        case 'brandPrimaryColor':
-        case 'brandAccentColor':
-          if (!HEX_COLOR.test(value)) throw new Error('لون الهوية يجب أن يكون بصيغة HEX مثل #0284c7.');
-          out[key] = value;
-          break;
-        case 'themeMode':
-          if (!['light', 'dark', 'system'].includes(value)) throw new Error('وضع العرض غير صالح.');
-          out[key] = value;
-          break;
-        case 'sidebarStyle':
-          if (!['default', 'compact', 'hidden'].includes(value)) throw new Error('نمط القائمة غير صالح.');
-          out[key] = value;
-          break;
-        case 'costingMethod':
-          if (!['AVERAGE_COST', 'FIFO'].includes(value)) throw new Error('Invalid inventory costing method.');
-          out[key] = value;
-          break;
-        case 'showroomName':
-          if (value.length < 2) throw new Error('اسم المعرض مطلوب (حرفان على الأقل).');
-          out[key] = value;
-          break;
-        case 'currencySymbol':
-        case 'currency':
-          if (!value) throw new Error('العملة ورمزها مطلوبان.');
-          out[key] = value;
-          break;
-        default:
-          out[key] = value;
-      }
-    }
-    return out;
+    public static validate(patch: SettingsPatch): Record<string, string> {
+    return validateSettings(patch);
   }
 
   // ─── Subscriptions ──────────────────────────────────────────────────────────
 
   public static subscribe(listener: Listener): () => void {
-    SettingsService.listeners.add(listener);
-    return () => SettingsService.listeners.delete(listener);
-  }
-
-  private static emit(settings: SystemSettings): void {
-    for (const listener of SettingsService.listeners) {
-      try {
-        listener(settings);
-      } catch (error) {
-        console.error('Settings listener failed', error);
-      }
-    }
+    return subscribeSettings(listener);
   }
 }

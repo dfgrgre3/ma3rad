@@ -4,8 +4,6 @@ import { OperationsService, WarehouseRow } from '../../services/OperationsServic
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 
-const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 1 }).format(n) + ' م²';
-
 export const WarehousesPage: React.FC = () => {
   const service = new OperationsService();
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'warehouses.manage');
@@ -84,8 +82,8 @@ export const WarehousesPage: React.FC = () => {
                     <div className="flex items-center gap-1.5"><Package className="w-4 h-4" /><span>{w.productsCount || 0} صنف متوفر</span></div>
                   </div>
                   <div className="mt-3 bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
-                    <span className="text-xs text-slate-500">إجمالي الرصيد</span>
-                    <span className="text-sm font-black text-violet-600">{fmt(w.stockM2 || 0)}</span>
+                    <span className="text-xs text-slate-500">أصناف ذات رصيد</span>
+                    <span className="text-sm font-black text-violet-600">{w.productsCount || 0} صنف</span>
                   </div>
                 </div>
               </div>

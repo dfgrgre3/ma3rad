@@ -7,6 +7,8 @@ import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { SettingsService } from './SettingsService';
+import { BatchService } from './BatchService';
+import { getProductUnitLabel } from '../utils/productUnits';
 import {
   computeSaleLine,
   computeSaleTotals,
@@ -73,6 +75,9 @@ export interface ReturnableItem {
   unitCost: number;
   boxesCount: number;
   metersPerBox: number;
+  productType?: 'CERAMIC' | 'GENERAL';
+  baseUnit?: string;
+  customUnit?: string;
 }
 
 export interface ReturnStats {
@@ -155,7 +160,10 @@ export class SalesService {
     if (invoices.length === 0) return null;
     const inv = invoices[0];
     const items = this.db.query<SalesInvoiceItem>(`
-      SELECT * FROM sales_invoice_items WHERE invoice_id = ?
+      SELECT sii.*, p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+      FROM sales_invoice_items sii
+      LEFT JOIN products p ON p.id = sii.product_id
+      WHERE sii.invoice_id = ?
     `, [id]);
     return { ...inv, items };
   }
@@ -179,6 +187,13 @@ export class SalesService {
         if (quantityM2 <= 0) throw new Error('كمية أحد الأصناف في الفاتورة غير صحيحة.');
         const prod = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
         if (!prod) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
+        const isGeneralProduct = prod.product_type === 'GENERAL';
+        const unitLabel = isGeneralProduct
+          ? (prod.custom_unit || ({
+              M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة',
+              KG: 'كجم', TON: 'طن', SET: 'طقم',
+            } as Record<string, string>)[prod.base_unit] || 'وحدة')
+          : 'م²';
 
         if (item.unitPrice !== Number(prod.sellingPriceM2) && !PermissionService.can(actor, 'sales.approve')) {
           throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${prod.name}».`);
@@ -197,7 +212,7 @@ export class SalesService {
         const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
         if (availableM2 - alreadyPlanned < quantityM2) {
           throw new Error(
-            `الرصيد المتاح من الصنف (${prod.name} - فرز ${prod.grade}) غير كافٍ. المتاح: ${round2(availableM2 - alreadyPlanned)} م²، المطلوب: ${quantityM2} م²`
+            `الرصيد المتاح من الصنف (${prod.name}) غير كافٍ. المتاح: ${round2(availableM2 - alreadyPlanned)} ${unitLabel}، المطلوب: ${quantityM2} ${unitLabel}`
           );
         }
         plannedByProduct.set(item.productId, alreadyPlanned + quantityM2);
@@ -218,9 +233,11 @@ export class SalesService {
 
         const metersPerBox = Number(prod.metersPerBox) || 1.44;
         const piecesPerBox = Number(prod.piecesPerBox) || 4;
-        const boxesCount = item.boxesCount !== undefined && item.boxesCount !== null
-          ? round2(Math.max(0, item.boxesCount))
-          : round2(quantityM2 / metersPerBox);
+        const boxesCount = isGeneralProduct
+          ? prod.base_unit === 'BOX' ? quantityM2 : 0
+          : item.boxesCount !== undefined && item.boxesCount !== null
+            ? round2(Math.max(0, item.boxesCount))
+            : round2(quantityM2 / metersPerBox);
 
         preparedItems.push({
           id: `item_${uuidv4().substring(0, 8)}`,
@@ -233,7 +250,9 @@ export class SalesService {
           soldBy: item.soldBy,
           quantityM2,
           boxesCount,
-          piecesCount: item.piecesCount || Math.round(boxesCount * piecesPerBox),
+          piecesCount: isGeneralProduct
+            ? prod.base_unit === 'PIECE' ? quantityM2 : 0
+            : item.piecesCount || Math.round(boxesCount * piecesPerBox),
           unitPrice: item.unitPrice,
           originalUnitPrice: prod.sellingPriceM2,
           unitCost: line.lineCost / (quantityM2 || 1),
@@ -244,6 +263,7 @@ export class SalesService {
           fifoPlan,
           metersPerBox,
           piecesPerBox,
+          productType: prod.product_type,
         });
       }
 
@@ -347,6 +367,13 @@ export class SalesService {
           invoiceId, `بيع بموجب فاتورة ${invoiceNumber}`, actor.id
         ]);
         if (costingMethod === 'FIFO') InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan);
+
+        // ── Batch FIFO deduction (runs only if batches are tracked for this product) ──
+        try {
+          if (item.productType !== 'GENERAL') new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2);
+        } catch {
+          // Batch tracking is optional — if table is missing or empty, silently skip.
+        }
       }
 
       sqliteDb.run(`
@@ -706,7 +733,9 @@ export class SalesService {
         [invoiceId, rit.productId]
       )[0]?.q || 0;
       if (rit.quantityM2 + alreadyReturned > sold + 1e-6) {
-        throw new Error(`لا يمكن إرجاع كمية أكبر من المباعة للصنف (المباع: ${sold} م²، المُرجع سابقاً: ${alreadyReturned} م²).`);
+        const line = inv.items.find((item) => item.productId === rit.productId);
+        const unitLabel = line ? getProductUnitLabel(line) : 'وحدة';
+        throw new Error(`لا يمكن إرجاع كمية أكبر من المباعة للصنف (المباع: ${sold} ${unitLabel}، المُرجع سابقاً: ${alreadyReturned} ${unitLabel}).`);
       }
     }
 
@@ -748,12 +777,14 @@ export class SalesService {
         const lineTotal = round2(item.quantityM2 * item.unitPrice);
 
         const product = sqliteDb.query<any>(
-          `SELECT name, grade, meters_per_box, pieces_per_box, size FROM products WHERE id = ?`,
+          `SELECT name, grade, meters_per_box, pieces_per_box, size, product_type, base_unit FROM products WHERE id = ?`,
           [item.productId]
         )[0];
         if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
-        const metersPerBox = Number(product.metersPerBox) || 1.44;
-        const boxesCount = item.boxesCount > 0 ? round2(item.boxesCount) : round2(item.quantityM2 / metersPerBox);
+        const metersPerBox = Number(product.meters_per_box) || 1.44;
+        const boxesCount = product.product_type === 'GENERAL'
+          ? product.base_unit === 'BOX' ? round2(item.quantityM2) : 0
+          : item.boxesCount > 0 ? round2(item.boxesCount) : round2(item.quantityM2 / metersPerBox);
         let unitCost = item.unitCost > 0 ? item.unitCost : 0;
         if (fifoEnabled) {
           const actualCost = InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2);
@@ -914,6 +945,13 @@ export class SalesService {
           WHERE product_id = ? AND warehouse_id = ?
         `, [item.quantityM2, item.productId, inv.warehouseId]);
 
+        // ── Restore batch quantities (LIFO — add back to most recent batch) ────
+        try {
+          new BatchService().restoreToBatches(item.productId, inv.warehouseId, item.quantityM2);
+        } catch {
+          // Batch tracking is optional — skip silently.
+        }
+
         sqliteDb.run(`
           INSERT INTO inventory_transactions (
             id, transaction_number, type, product_id, warehouse_id,
@@ -1051,7 +1089,11 @@ export class SalesService {
 
   public getReturnItems(returnId: string): SalesReturnItem[] {
     return this.db.query<SalesReturnItem>(
-      `SELECT * FROM sales_return_items WHERE return_id = ?`,
+      `SELECT sri.*, COALESCE(p.product_type, 'CERAMIC') AS productType,
+              p.base_unit AS baseUnit, p.custom_unit AS customUnit
+       FROM sales_return_items sri
+       LEFT JOIN products p ON p.id = sri.product_id
+       WHERE sri.return_id = ?`,
       [returnId]
     );
   }
@@ -1059,8 +1101,12 @@ export class SalesService {
   /** Remaining returnable quantity per product for an invoice, after prior returns. */
   public getReturnableItems(invoiceId: string): ReturnableItem[] {
     const rows = this.db.query<any>(
-      `SELECT product_id, product_name, product_grade, size, quantity_m2, unit_price, unit_cost, boxes_count, meters_per_box
-       FROM sales_invoice_items WHERE invoice_id = ?`,
+      `SELECT sii.product_id, sii.product_name, sii.product_grade, sii.size, sii.quantity_m2,
+              sii.unit_price, sii.unit_cost, sii.boxes_count, sii.meters_per_box,
+              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
+       FROM sales_invoice_items sii
+       LEFT JOIN products p ON p.id = sii.product_id
+       WHERE sii.invoice_id = ?`,
       [invoiceId]
     );
     const returned = new Map<string, number>();
@@ -1093,6 +1139,9 @@ export class SalesService {
           unitCost: Number(r.unitCost || 0),
           boxesCount: Number(r.boxesCount || 0),
           metersPerBox: Number(r.metersPerBox) || 1.44,
+          productType: r.productType,
+          baseUnit: r.baseUnit,
+          customUnit: r.customUnit,
         });
       }
     }

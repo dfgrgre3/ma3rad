@@ -6,6 +6,7 @@ export interface LedgerPostingLine {
   debit: number;
   credit: number;
   description?: string;
+  costCenterId?: string;
 }
 
 export interface LedgerPosting {
@@ -68,6 +69,29 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
     throw new Error('Ledger posting metadata is incomplete.');
   }
 
+  // Enforce fiscal period closing: prevent postings to locked/closed financial periods
+  const closedPeriodRow = queryLedgerRows<{ value: string }>(
+    db,
+    "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
+  )[0];
+  if (closedPeriodRow?.value && posting.date <= closedPeriodRow.value) {
+    throw new Error(`لا يمكن الترحيل في فترة محاسبية مغلقة (الفترة مغلقة حتى تاريخ: ${closedPeriodRow.value}).`);
+  }
+
+  // Enforce period lock from fiscal_periods table if present
+  try {
+    const closedFiscalPeriod = queryLedgerRows<{ name: string; status: string }>(
+      db,
+      "SELECT name, status FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date AND status IN ('CLOSED', 'LOCKED') LIMIT 1",
+      [posting.date, posting.date]
+    )[0];
+    if (closedFiscalPeriod) {
+      throw new Error(`لا يمكن الترحيل في فترة محاسبية مقفلة: ${closedFiscalPeriod.name} (${closedFiscalPeriod.status}).`);
+    }
+  } catch (err: any) {
+    if (err.message?.includes('لا يمكن الترحيل في فترة محاسبية')) throw err;
+  }
+
   const lines = posting.lines.map((line) => {
     const debit = Number(line.debit);
     const credit = Number(line.credit);
@@ -117,9 +141,9 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
 
   for (const line of lines) {
     db.run(
-      `INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit, description)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [`jvl_${uuidv4().slice(0, 8)}`, entryId, line.accountId, line.debit, line.credit, line.description?.trim() || null]
+      `INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit, description, cost_center_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [`jvl_${uuidv4().slice(0, 8)}`, entryId, line.accountId, line.debit, line.credit, line.description?.trim() || null, line.costCenterId || null]
     );
     db.run('UPDATE chart_of_accounts SET balance = balance + ? WHERE id = ?', [
       round2(line.debit - line.credit),
