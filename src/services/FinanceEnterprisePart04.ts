@@ -43,7 +43,7 @@ public createBankReconciliation(input: {
       FROM journal_entry_lines l
       JOIN journal_entries e ON e.id = l.entry_id
       WHERE l.account_id = ? AND e.is_posted = 1 AND e.date <= ?
-    `, [bank.gl_account_id, input.statementDate])[0];
+    `, [bank.glAccountId, input.statementDate])[0];
     const bookBalance = round2(Number(glRes?.balance || 0));
 
     const clearedDeposits = round2(input.clearedTransactions.filter(t => t.type === 'DEPOSIT').reduce((s, t) => s + t.amount, 0));
@@ -106,22 +106,22 @@ public getBankReconciliations(bankAccountId?: string): BankReconciliation[] {
 
     return this.db.query<any>(sql, params).map(r => ({
       id: r.id,
-      reconciliationNumber: r.reconciliation_number,
-      bankAccountId: r.bank_account_id,
+      reconciliationNumber: r.reconciliationNumber,
+      bankAccountId: r.bankAccountId,
       bankAccountName: r.bankAccountName,
-      statementDate: r.statement_date,
-      statementBalance: Number(r.statement_balance),
-      bookBalance: Number(r.book_balance),
-      unreconciledDifference: Number(r.unreconciled_difference),
-      clearedDeposits: Number(r.cleared_deposits),
-      clearedWithdrawals: Number(r.cleared_withdrawals),
+      statementDate: r.statementDate,
+      statementBalance: Number(r.statementBalance),
+      bookBalance: Number(r.bookBalance),
+      unreconciledDifference: Number(r.unreconciledDifference),
+      clearedDeposits: Number(r.clearedDeposits),
+      clearedWithdrawals: Number(r.clearedWithdrawals),
       status: r.status,
-      reconciledBy: r.reconciled_by,
+      reconciledBy: r.reconciledBy,
       reconciledByName: r.reconciledByName,
-      approvedBy: r.approved_by,
+      approvedBy: r.approvedBy,
       approvedByName: r.approvedByName,
       notes: r.notes,
-      createdAt: r.created_at,
+      createdAt: r.createdAt,
     }));
   }
 

@@ -7,78 +7,76 @@ import { localDateString } from '../utils/date';
 import { BackupServicePart01 } from './BackupServicePart01';
 
 export class BackupServicePart02 extends BackupServicePart01 {
-public async cleanupOldBackups(retentionDays = 90, maxCount = 50): Promise<{ deleted: number; errors: string[] }> {
-    try {
-      const api = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
-      if (!api?.info) return { deleted: 0, errors: ['Backup cleanup requires desktop app'] };
-
-      const dbInfo = await api.info();
-      if (!dbInfo.backupDir) return { deleted: 0, errors: ['Backup directory not accessible'] };
-
-      // Get all backup files from filesystem (requires IPC extension)
-      // For now, we'll clean up from backup_history table only
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-      const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
-
-      // Delete old backup history records
-      const beforeDelete = this.db.query<{ count: number }>(
-        'SELECT COUNT(*) AS count FROM backup_history WHERE created_at < ? AND backup_type = ?',
-        [cutoffDateStr, 'AUTO']
-      )[0]?.count || 0;
-
-      this.db.run(
-        `DELETE FROM backup_history WHERE created_at < ? AND backup_type = 'AUTO'`,
-        [cutoffDateStr]
-      );
-
-      const afterDelete = this.db.query<{ count: number }>(
-        'SELECT COUNT(*) AS count FROM backup_history WHERE created_at < ? AND backup_type = ?',
-        [cutoffDateStr, 'AUTO']
-      )[0]?.count || 0;
-
-      const deletedOldCount = beforeDelete - afterDelete;
-
-      // Keep only the most recent maxCount records
-      const totalBackups = this.db.query<{ count: number }>(
-        'SELECT COUNT(*) AS count FROM backup_history'
-      )[0]?.count || 0;
-
-      if (totalBackups > maxCount) {
-        const toDelete = totalBackups - maxCount;
-        this.db.run(`
-          DELETE FROM backup_history
-          WHERE id IN (
-            SELECT id FROM backup_history
-            ORDER BY created_at ASC
-            LIMIT ?
-          )
-        `, [toDelete]);
-      }
-
-      return { deleted: deletedOldCount || 0, errors: [] };
-    } catch (e) {
-      return { deleted: 0, errors: [e instanceof Error ? e.message : String(e)] };
+  public async cleanupOldBackups(retentionDays = 90, maxCount = 50): Promise<{ deleted: number; errors: string[] }> {
+    if (!Number.isInteger(retentionDays) || retentionDays < 1) {
+      throw new Error('Backup retention days must be a positive integer.');
     }
+    if (!Number.isInteger(maxCount) || maxCount < 1) {
+      throw new Error('Maximum backup count must be a positive integer.');
+    }
+    const api = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    if (!api?.info || !api.removeBackup) {
+      return { deleted: 0, errors: ['Backup cleanup requires desktop file access'] };
+    }
+
+    const dbInfo = await api.info();
+    if (!dbInfo.backupDir) {
+      return { deleted: 0, errors: ['Backup directory not accessible'] };
+    }
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+    const cutoffDateStr = cutoffDate.toISOString().slice(0, 10);
+    const backups = this.db.query<{
+      id: string;
+      fileName: string;
+      createdAt: string;
+    }>(`SELECT id, file_name AS fileName, created_at AS createdAt
+       FROM backup_history
+       WHERE backup_type = 'AUTO' AND status = 'SUCCESS'
+       ORDER BY created_at DESC, id DESC`);
+
+    let deleted = 0;
+    const errors: string[] = [];
+    for (const [index, backup] of backups.entries()) {
+      if (backup.createdAt >= cutoffDateStr && index < maxCount) continue;
+      try {
+        const result = await api.removeBackup(backup.fileName);
+        if (!result.ok) {
+          errors.push(`${backup.fileName}: ${result.error || 'File deletion failed'}`);
+          continue;
+        }
+        this.db.run(
+          `DELETE FROM backup_history WHERE id = ? AND backup_type = 'AUTO'`,
+          [backup.id]
+        );
+        deleted++;
+      } catch (error) {
+        errors.push(`${backup.fileName}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return { deleted, errors };
   }
 
 public getRetentionSettings(): { retentionDays: number; maxBackups: number } {
-    try {
-      const retentionDays = parseInt(
-        this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='backupRetentionDays'`)[0]?.value || '90',
-        10
-      );
-      const maxBackups = parseInt(
-        this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='backupMaxCount'`)[0]?.value || '50',
-        10
-      );
-      return { retentionDays, maxBackups };
-    } catch {
-      return { retentionDays: 90, maxBackups: 50 };
+    const retentionDays = Number(
+      this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='backupRetentionDays'`)[0]?.value || '90'
+    );
+    const maxBackups = Number(
+      this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='backupMaxCount'`)[0]?.value || '50'
+    );
+    if (!Number.isInteger(retentionDays) || retentionDays < 1 ||
+      !Number.isInteger(maxBackups) || maxBackups < 1) {
+      throw new Error('Saved backup retention settings are invalid.');
     }
+    return { retentionDays, maxBackups };
   }
 
 public setRetentionSettings(retentionDays: number, maxBackups: number): void {
+    if (!Number.isInteger(retentionDays) || retentionDays < 1 ||
+      !Number.isInteger(maxBackups) || maxBackups < 1) {
+      throw new Error('Backup retention settings must be positive integers.');
+    }
     this.db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('backupRetentionDays', ?)`, [retentionDays.toString()]);
     this.db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('backupMaxCount', ?)`, [maxBackups.toString()]);
   }

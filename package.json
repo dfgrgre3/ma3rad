@@ -12,7 +12,7 @@
     "check": "npm run typecheck && npm test && npm run build",
     "electron:pack": "npm run build && electron-builder --dir",
     "electron:dist": "npm run build && electron-builder --win nsis",
-    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/electron-handlers.test.cjs test/electron-startup.test.ts",
+    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/finance-enterprise-lifecycle.test.ts test/product-units.test.ts test/sales-reports.test.ts test/electron-handlers.test.cjs test/electron-startup.test.ts",
     "electron:dist:mac": "npm run build && electron-builder --mac",
     "electron:dist:linux": "npm run build && electron-builder --linux"
   },

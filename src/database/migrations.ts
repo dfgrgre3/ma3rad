@@ -15,7 +15,7 @@ import { MIGRATION_PART_11 } from './migrations/part11';
 import { MIGRATION_PART_12 } from './migrations/part12';
 import { MIGRATION_PART_13 } from './migrations/part13';
 import { MIGRATION_ENTERPRISE } from './migrations/enterprise';
-import { addColumn } from './migrationSupport';
+import { addColumn, columnExists } from './migrationSupport';
 
 export { DEFAULT_SETTINGS, DEFAULT_BRANCH_ID } from './migrationSupport';
 export type { Migration } from './migrationSupport';
@@ -38,10 +38,71 @@ export const MIGRATIONS: Migration[] = [
   {
     id: '050_cash_shift_auto_close',
     description: 'Track automatically closed cashier shifts',
-    up: (db) => {
+    up: (db: Database) => {
       addColumn(db, 'cash_shifts', 'auto_closed', 'INTEGER NOT NULL DEFAULT 0');
     },
-  }
+  },
+  {
+    id: '051_cheques_represented_status',
+    description: 'Allow re-presented cheques in the cheque status lifecycle',
+    disableForeignKeys: true,
+    up: (db: Database) => {
+      const columns = [
+        'id', 'cheque_number', 'type', 'party_type', 'party_id', 'party_name', 'bank_name',
+        'amount', 'due_date', 'status', 'notes', 'created_by', 'created_at', 'updated_at',
+        'bank_account_id', 'deposited_at', 'cleared_at', 'bounced_at', 'bounce_reason',
+        'bounce_fee', 'journal_entry_id', 'clearing_entry_id', 'bounce_entry_id',
+      ].filter((column) => columnExists(db, 'cheques', column));
+      db.exec(`
+        CREATE TABLE cheques_status_update (
+          id TEXT PRIMARY KEY,
+          cheque_number TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'RECEIVED' CHECK(type IN ('RECEIVED', 'ISSUED')),
+          party_type TEXT NOT NULL DEFAULT 'OTHER' CHECK(party_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')),
+          party_id TEXT,
+          party_name TEXT NOT NULL,
+          bank_name TEXT,
+          amount REAL NOT NULL DEFAULT 0,
+          due_date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'PENDING'
+            CHECK(status IN ('PENDING', 'DEPOSITED', 'CLEARED', 'BOUNCED', 'CANCELLED', 'RE_PRESENTED')),
+          notes TEXT,
+          created_by TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          bank_account_id TEXT,
+          deposited_at TEXT,
+          cleared_at TEXT,
+          bounced_at TEXT,
+          bounce_reason TEXT,
+          bounce_fee REAL DEFAULT 0,
+          journal_entry_id TEXT,
+          clearing_entry_id TEXT,
+          bounce_entry_id TEXT
+        )
+      `);
+      db.exec(`INSERT INTO cheques_status_update (${columns.join(', ')})
+        SELECT ${columns.join(', ')} FROM cheques`);
+      db.exec('DROP TABLE cheques');
+      db.exec('ALTER TABLE cheques_status_update RENAME TO cheques');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_cheques_due ON cheques(due_date)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_cheques_status ON cheques(status, type)');
+    },
+  },
+  {
+    id: '052_purchase_invoice_due_dates',
+    description: 'Track supplier invoice due dates for cash flow forecasts',
+    up: (db: Database) => {
+      addColumn(db, 'purchase_invoices', 'due_date', 'TEXT');
+      db.run(`
+        UPDATE purchase_invoices
+        SET due_date = date(date, '+' || COALESCE(
+          (SELECT payment_terms_days FROM suppliers WHERE suppliers.id = purchase_invoices.supplier_id), 0
+        ) || ' days')
+        WHERE due_date IS NULL
+      `);
+    },
+  },
 ].flat();
 
 export interface MigrationReport {

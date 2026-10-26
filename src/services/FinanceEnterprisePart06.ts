@@ -38,13 +38,13 @@ public getCostCenters(): CostCenter[] {
       id: r.id,
       code: r.code,
       name: r.name,
-      branchId: r.branch_id,
+      branchId: r.branchId,
       branchName: r.branchName,
-      managerId: r.manager_id,
+      managerId: r.managerId,
       managerName: r.managerName,
-      isActive: r.is_active === 1,
+      isActive: r.isActive === 1,
       description: r.description,
-      createdAt: r.created_at,
+      createdAt: r.createdAt,
     }));
   }
 
@@ -88,18 +88,18 @@ public getBudgets(fiscalYearId?: string): Budget[] {
 
     const budgets = this.db.query<any>(sql, params).map(r => ({
       id: r.id,
-      budgetCode: r.budget_code,
-      fiscalYearId: r.fiscal_year_id,
+      budgetCode: r.budgetCode,
+      fiscalYearId: r.fiscalYearId,
       fiscalYearCode: r.fiscalYearCode,
-      costCenterId: r.cost_center_id,
+      costCenterId: r.costCenterId,
       costCenterName: r.costCenterName,
       name: r.name,
-      totalAllocated: Number(r.total_allocated),
+      totalAllocated: Number(r.totalAllocated),
       status: r.status,
-      approvedBy: r.approved_by,
+      approvedBy: r.approvedBy,
       approvedByName: r.approvedByName,
-      approvedAt: r.approved_at,
-      createdAt: r.created_at,
+      approvedAt: r.approvedAt,
+      createdAt: r.createdAt,
     }));
 
     return budgets;
@@ -111,8 +111,8 @@ public getBudgetWithItems(budgetId: string): Budget | null {
     if (!budget) return null;
 
     const fy = this.db.query<any>('SELECT start_date, end_date FROM fiscal_years WHERE id = ?', [budget.fiscalYearId])[0];
-    const startDate = fy?.start_date || '2000-01-01';
-    const endDate = fy?.end_date || '2099-12-31';
+    const startDate = fy?.startDate || '2000-01-01';
+    const endDate = fy?.endDate || '2099-12-31';
 
     const items = this.db.query<any>(`
       SELECT bi.*, coa.code as accountCode, coa.name as accountName
@@ -128,19 +128,19 @@ public getBudgetWithItems(budgetId: string): Budget | null {
         JOIN journal_entries e ON e.id = l.entry_id
         WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ?
       `;
-      const actualParams: any[] = [i.account_id, startDate, endDate];
+      const actualParams: any[] = [i.accountId, startDate, endDate];
       if (budget.costCenterId) {
         actualSql += ' AND l.cost_center_id = ?';
         actualParams.push(budget.costCenterId);
       }
       const actualSpent = round2(Number(this.db.query<any>(actualSql, actualParams)[0]?.spent || 0));
-      const allocatedAmount = Number(i.allocated_amount);
+      const allocatedAmount = Number(i.allocatedAmount);
       const variance = round2(allocatedAmount - actualSpent);
 
       return {
         id: i.id,
-        budgetId: i.budget_id,
-        accountId: i.account_id,
+        budgetId: i.budgetId,
+        accountId: i.accountId,
         accountCode: i.accountCode,
         accountName: i.accountName,
         allocatedAmount,

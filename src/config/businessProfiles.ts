@@ -4,7 +4,7 @@ export const BUSINESS_TYPES = [
   { id: 'sanitary', label: 'أدوات صحية', description: 'منتجات وماركات ومبيعات المعرض' },
   { id: 'lighting', label: 'إضاءة وكهرباء', description: 'كتالوج أصناف وباركود ومخزون' },
   { id: 'furniture', label: 'أثاث وديكور', description: 'طلبات ومشروعات وتسليمات' },
-  { id: 'electronics', label: 'أجهزة وإلكترونيات', description: 'أجهزة برقم تسلسلي وضمان ومتابعة مخزون' },
+  { id: 'electronics', label: 'أجهزة وإلكترونيات', description: 'كتالوج أجهزة ومبيعات ومتابعة مخزون' },
   { id: 'clothing', label: 'ملابس وأحذية', description: 'مقاسات وألوان وموديلات وبيع بالتجزئة' },
   { id: 'automotive', label: 'قطع غيار وسيارات', description: 'أصناف وموردون ومخزون وطلبات شراء' },
   { id: 'home_appliances', label: 'أجهزة منزلية', description: 'منتجات وضمانات وتوصيل ومتابعة العملاء' },
@@ -12,7 +12,7 @@ export const BUSINESS_TYPES = [
   { id: 'food', label: 'مواد غذائية وسوبر ماركت', description: 'أصناف سريعة الحركة ومشتريات ومخزون' },
   { id: 'restaurant', label: 'مطعم أو كافيه', description: 'مبيعات ومواد تشغيل ومخزون اختياري' },
   { id: 'services', label: 'شركة خدمات أو صيانة', description: 'خدمات وفواتير وعملاء دون مخزون افتراضي' },
-  { id: 'workshop', label: 'ورشة أو حجوزات', description: 'خدمات ومواعيد تنفيذ ومخزون اختياري' },
+  { id: 'workshop', label: 'ورشة أو خدمات تشغيل', description: 'خدمات ومخزون اختياري' },
   { id: 'general', label: 'معرض متعدد الأنشطة', description: 'تخصيص مرن لأي نشاط تجاري' },
   { id: 'custom', label: 'نشاط آخر مخصص', description: 'اكتب نوع نشاطك واختر الوحدات التي تحتاجها' },
 ] as const;
@@ -40,12 +40,6 @@ export interface BusinessConfiguration {
   units: string[];
   customUnits: string[];
   productAttributes: string[];
-  variantsEnabled: boolean;
-  multipleWarehouses: boolean;
-  barcodeEnabled: boolean;
-  serialNumbersEnabled: boolean;
-  appointmentsEnabled: boolean;
-  deliveryEnabled: boolean;
 }
 
 type BusinessConfigurationDefaults = Omit<BusinessConfiguration, 'businessType'>;
@@ -56,12 +50,6 @@ const COMMON_DEFAULTS: BusinessConfigurationDefaults = {
   units: ['PIECE'],
   customUnits: [],
   productAttributes: [],
-  variantsEnabled: false,
-  multipleWarehouses: true,
-  barcodeEnabled: true,
-  serialNumbersEnabled: false,
-  appointmentsEnabled: false,
-  deliveryEnabled: false,
 };
 
 const PROFILE_CONFIGURATIONS: Record<string, BusinessConfigurationDefaults> = {
@@ -69,33 +57,26 @@ const PROFILE_CONFIGURATIONS: Record<string, BusinessConfigurationDefaults> = {
     ...COMMON_DEFAULTS,
     units: ['M2', 'BOX', 'PIECE'],
     productAttributes: ['المقاس', 'الفرز', 'اللون', 'النغمة', 'التشطيب'],
-    variantsEnabled: true,
-    multipleWarehouses: true,
-    deliveryEnabled: true,
   },
   building_materials: { ...COMMON_DEFAULTS, units: ['PIECE', 'KG', 'TON', 'BOX'] },
   sanitary: { ...COMMON_DEFAULTS, units: ['PIECE', 'SET'], productAttributes: ['الماركة', 'الموديل', 'اللون'] },
   lighting: { ...COMMON_DEFAULTS, units: ['PIECE', 'BOX'], productAttributes: ['الماركة', 'الموديل', 'القدرة'] },
-  furniture: { ...COMMON_DEFAULTS, units: ['PIECE', 'SET'], productAttributes: ['الموديل', 'اللون', 'الخامة'], deliveryEnabled: true },
+  furniture: { ...COMMON_DEFAULTS, units: ['PIECE', 'SET'], productAttributes: ['الموديل', 'اللون', 'الخامة'] },
   electronics: {
     ...COMMON_DEFAULTS,
     units: ['PIECE'],
     productAttributes: ['الماركة', 'الموديل', 'الضمان'],
-    serialNumbersEnabled: true,
   },
   clothing: {
     ...COMMON_DEFAULTS,
     units: ['PIECE'],
     productAttributes: ['المقاس', 'اللون', 'الموديل'],
-    variantsEnabled: true,
   },
   automotive: { ...COMMON_DEFAULTS, units: ['PIECE', 'SET'], productAttributes: ['رقم القطعة', 'الماركة', 'الموديل'] },
   home_appliances: {
     ...COMMON_DEFAULTS,
     units: ['PIECE'],
     productAttributes: ['الماركة', 'الموديل', 'الضمان'],
-    serialNumbersEnabled: true,
-    deliveryEnabled: true,
   },
   cosmetics: { ...COMMON_DEFAULTS, units: ['PIECE', 'PACK'], productAttributes: ['الحجم', 'الرائحة', 'اللون'] },
   food: { ...COMMON_DEFAULTS, units: ['PIECE', 'KG', 'LITER', 'PACK', 'BOX'], productAttributes: ['تاريخ الصلاحية', 'العلامة التجارية'] },
@@ -104,7 +85,6 @@ const PROFILE_CONFIGURATIONS: Record<string, BusinessConfigurationDefaults> = {
     businessModel: 'mixed',
     units: ['PIECE', 'KG', 'LITER', 'SERVICE'],
     productAttributes: ['الفئة', 'الحجم'],
-    multipleWarehouses: false,
   },
   services: {
     ...COMMON_DEFAULTS,
@@ -112,17 +92,12 @@ const PROFILE_CONFIGURATIONS: Record<string, BusinessConfigurationDefaults> = {
     trackInventory: false,
     units: ['SERVICE'],
     productAttributes: [],
-    multipleWarehouses: false,
-    barcodeEnabled: false,
-    appointmentsEnabled: true,
-    deliveryEnabled: false,
   },
   workshop: {
     ...COMMON_DEFAULTS,
     businessModel: 'mixed',
     units: ['SERVICE', 'PIECE'],
     productAttributes: ['نوع الخدمة', 'الموديل'],
-    appointmentsEnabled: true,
   },
   general: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'METER', 'LINEAR_METER', 'PACK', 'SERVICE'] },
   custom: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'METER', 'LINEAR_METER', 'PACK', 'SERVICE'] },
@@ -157,12 +132,6 @@ export const parseBusinessConfiguration = (raw: string | undefined, businessType
       units: strings(saved.units, defaults.units).filter((unit) => VALID_UNITS.has(unit)),
       customUnits: strings(saved.customUnits, defaults.customUnits),
       productAttributes: strings(saved.productAttributes, defaults.productAttributes),
-      variantsEnabled: typeof saved.variantsEnabled === 'boolean' ? saved.variantsEnabled : defaults.variantsEnabled,
-      multipleWarehouses: typeof saved.multipleWarehouses === 'boolean' ? saved.multipleWarehouses : defaults.multipleWarehouses,
-      barcodeEnabled: typeof saved.barcodeEnabled === 'boolean' ? saved.barcodeEnabled : defaults.barcodeEnabled,
-      serialNumbersEnabled: typeof saved.serialNumbersEnabled === 'boolean' ? saved.serialNumbersEnabled : defaults.serialNumbersEnabled,
-      appointmentsEnabled: typeof saved.appointmentsEnabled === 'boolean' ? saved.appointmentsEnabled : defaults.appointmentsEnabled,
-      deliveryEnabled: typeof saved.deliveryEnabled === 'boolean' ? saved.deliveryEnabled : defaults.deliveryEnabled,
     };
   } catch {
     return defaults;

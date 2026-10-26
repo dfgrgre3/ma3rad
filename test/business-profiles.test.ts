@@ -36,10 +36,9 @@ test('all business navigation entries are controlled by a configurable module', 
 
 test('business templates retain ceramic defaults and provide retail and service capabilities', () => {
   assert.deepEqual(getDefaultBusinessConfiguration('ceramics').units, ['M2', 'BOX', 'PIECE']);
-  assert.equal(getDefaultBusinessConfiguration('clothing').variantsEnabled, true);
   assert.equal(getDefaultBusinessConfiguration('services').trackInventory, false);
   assert.equal(getDefaultBusinessConfiguration('services').businessModel, 'services');
-  assert.equal(getDefaultBusinessConfiguration('services').appointmentsEnabled, true);
+  assert.equal('appointmentsEnabled' in getDefaultBusinessConfiguration('services'), false);
 });
 
 test('business customizations restore from saved settings and ignore malformed values', () => {
@@ -55,6 +54,7 @@ test('business customizations restore from saved settings and ignore malformed v
   assert.equal(restored.businessModel, 'mixed');
   assert.deepEqual(restored.units, ['KG']);
   assert.deepEqual(restored.customUnits, ['صندوق']);
+  assert.equal('variantsEnabled' in restored, false);
   assert.equal(parseBusinessConfiguration('{', 'ceramics').trackInventory, true);
 });
 

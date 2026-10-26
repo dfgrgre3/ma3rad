@@ -126,3 +126,27 @@ test('registered app and printing handlers receive their directory and size depe
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }
 });
+
+test('database backup removal is limited to automatic backup files', async () => {
+  const context = await createHandlers();
+  try {
+    const { handlers, event, dbFile, backupDir } = context;
+    await fs.mkdir(path.dirname(dbFile), { recursive: true });
+    await fs.writeFile(dbFile, Buffer.from([1, 2, 3]));
+    const backup = await handlers.get('db:backup')(event, 'auto');
+    const fileName = path.basename(backup.path);
+    assert.ok(fsSync.existsSync(path.join(backupDir, fileName)));
+
+    assert.deepEqual(await handlers.get('db:remove-backup')(event, fileName), {
+      ok: true,
+      deleted: true,
+    });
+    assert.ok(!fsSync.existsSync(path.join(backupDir, fileName)));
+    await assert.rejects(
+      handlers.get('db:remove-backup')(event, '..\\outside.sqlite'),
+      /Invalid automatic backup file name/,
+    );
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});

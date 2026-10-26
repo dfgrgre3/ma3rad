@@ -281,14 +281,6 @@ export const AdminSettingsTab: React.FC = () => {
                 placeholder="وحدات مخصصة، مفصولة بفواصل"
               />
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <FeatureToggle label="خصائص أو متغيرات (لون/مقاس/موديل)" checked={businessConfig.variantsEnabled} onChange={(value) => updateBusinessConfig({ variantsEnabled: value })} />
-              <FeatureToggle label="مخازن أو فروع متعددة" checked={businessConfig.multipleWarehouses} onChange={(value) => updateBusinessConfig({ multipleWarehouses: value })} />
-              <FeatureToggle label="الباركود" checked={businessConfig.barcodeEnabled} onChange={(value) => updateBusinessConfig({ barcodeEnabled: value })} />
-              <FeatureToggle label="الأرقام التسلسلية والضمان" checked={businessConfig.serialNumbersEnabled} onChange={(value) => updateBusinessConfig({ serialNumbersEnabled: value })} />
-              <FeatureToggle label="الخدمات والمواعيد" checked={businessConfig.appointmentsEnabled} onChange={(value) => updateBusinessConfig({ appointmentsEnabled: value })} />
-              <FeatureToggle label="التوصيل" checked={businessConfig.deliveryEnabled} onChange={(value) => updateBusinessConfig({ deliveryEnabled: value })} />
-            </div>
             <Field label="خصائص المنتجات (مفصولة بفواصل)" full>
               <input
                 value={businessConfig.productAttributes.join(', ')}
@@ -560,13 +552,6 @@ const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; l
       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${checked ? 'right-0.5' : 'right-4'}`} />
     </span>
   </button>
-);
-
-const FeatureToggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string }> = ({ checked, onChange, label }) => (
-  <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
-    <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="accent-sky-600" />
-    {label}
-  </label>
 );
 
 const ColorInput: React.FC<{ value: string; onChange: (value: string) => void }> = ({ value, onChange }) => (

@@ -47,16 +47,16 @@ public getFiscalYears(): FiscalYear[] {
       ORDER BY fy.start_date DESC
     `).map(r => ({
       id: r.id,
-      yearCode: r.year_code,
+      yearCode: r.yearCode,
       name: r.name,
-      startDate: r.start_date,
-      endDate: r.end_date,
+      startDate: r.startDate,
+      endDate: r.endDate,
       status: r.status,
-      closedAt: r.closed_at,
-      closedBy: r.closed_by,
-      closingEntryId: r.closing_entry_id,
+      closedAt: r.closedAt,
+      closedBy: r.closedBy,
+      closingEntryId: r.closingEntryId,
       notes: r.notes,
-      createdAt: r.created_at,
+      createdAt: r.createdAt,
     }));
   }
 
@@ -76,16 +76,16 @@ public getFiscalPeriods(fiscalYearId?: string): FiscalPeriod[] {
 
     return this.db.query<any>(sql, params).map(r => ({
       id: r.id,
-      fiscalYearId: r.fiscal_year_id,
-      periodNumber: r.period_number,
+      fiscalYearId: r.fiscalYearId,
+      periodNumber: r.periodNumber,
       name: r.name,
-      startDate: r.start_date,
-      endDate: r.end_date,
+      startDate: r.startDate,
+      endDate: r.endDate,
       status: r.status,
-      closedAt: r.closed_at,
-      closedBy: r.closed_by,
-      closingNotes: r.closing_notes,
-      createdAt: r.created_at,
+      closedAt: r.closedAt,
+      closedBy: r.closedBy,
+      closingNotes: r.closingNotes,
+      createdAt: r.createdAt,
     }));
   }
 
@@ -133,7 +133,7 @@ public closePeriod(periodId: string, notes?: string): void {
     const unposted = this.db.query<{ count: number }>(`
       SELECT COUNT(*) as count FROM journal_entries
       WHERE date >= ? AND date <= ? AND is_posted = 0
-    `, [period.start_date, period.end_date])[0]?.count || 0;
+    `, [period.startDate, period.endDate])[0]?.count || 0;
     if (unposted > 0) throw new Error(`يوجد ${unposted} قيد غير مرحل في هذه الفترة. يجب ترحيل أو حذف جميع القيود أولاً.`);
 
     this.db.executeTransaction((tx) => {
@@ -146,15 +146,15 @@ public closePeriod(periodId: string, notes?: string): void {
 
       // Update system closed until date if this period end_date is newer
       const currentClosed = tx.query<any>("SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'")[0]?.value;
-      if (!currentClosed || period.end_date > currentClosed) {
-        tx.run("INSERT OR REPLACE INTO system_settings (key, value, description) VALUES ('accounting_closed_until_date', ?, 'Closed accounting date lock')",
-          [period.end_date]);
+      if (!currentClosed || period.endDate > currentClosed) {
+        tx.run("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('accounting_closed_until_date', ?)",
+          [period.endDate]);
       }
 
       tx.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
         VALUES (?, ?, ?, 'CLOSE_FISCAL_PERIOD', 'FINANCE', ?, ?)
-      `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, periodId, JSON.stringify({ notes, endDate: period.end_date })]);
+      `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, periodId, JSON.stringify({ notes, endDate: period.endDate })]);
     });
   }
 }

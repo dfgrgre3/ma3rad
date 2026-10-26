@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('ceramisys', {
     load: () => ipcRenderer.invoke('db:load'),
     save: (bytes) => ipcRenderer.invoke('db:save', bytes),
     backup: (label) => ipcRenderer.invoke('db:backup', label),
+    removeBackup: (fileName) => ipcRenderer.invoke('db:remove-backup', fileName),
     preserveCorrupt: () => ipcRenderer.invoke('db:preserve-corrupt'),
     createFreshAfterRecovery: () => ipcRenderer.invoke('db:create-fresh-after-recovery'),
     info: () => ipcRenderer.invoke('db:info'),

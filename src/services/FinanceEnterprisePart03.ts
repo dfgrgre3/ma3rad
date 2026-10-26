@@ -36,21 +36,21 @@ public getBankAccounts(): BankAccount[] {
       ORDER BY ba.is_active DESC, ba.account_name ASC
     `).map(r => ({
       id: r.id,
-      accountName: r.account_name,
-      bankName: r.bank_name,
-      accountNumber: r.account_number,
+      accountName: r.accountName,
+      bankName: r.bankName,
+      accountNumber: r.accountNumber,
       iban: r.iban,
-      swiftCode: r.swift_code,
+      swiftCode: r.swiftCode,
       currency: r.currency || 'EGP',
-      openingBalance: Number(r.opening_balance || 0),
-      currentBalance: Number(r.current_balance || 0),
-      glAccountId: r.gl_account_id,
+      openingBalance: Number(r.openingBalance || 0),
+      currentBalance: Number(r.currentBalance || 0),
+      glAccountId: r.glAccountId,
       glAccountCode: r.glAccountCode,
       glAccountName: r.glAccountName,
-      branchId: r.branch_id,
+      branchId: r.branchId,
       branchName: r.branchName,
-      isActive: r.is_active === 1,
-      createdAt: r.created_at,
+      isActive: r.isActive === 1,
+      createdAt: r.createdAt,
     }));
   }
 
@@ -117,7 +117,7 @@ public getUnreconciledBankTransactions(bankAccountId: string, asOfDate: string):
           WHERE journal_line_id IS NOT NULL AND is_cleared = 1
         )
       ORDER BY e.date ASC
-    `, [bank.gl_account_id, asOfDate]);
+    `, [bank.glAccountId, asOfDate]);
 
     return rows.map(r => {
       const isDeposit = Number(r.debit) > 0;

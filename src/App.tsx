@@ -73,8 +73,16 @@ export const App: React.FC = () => {
           const runBackupCheck = () => {
             try {
               const interval = SettingsService.getSettings().autoBackupIntervalHours || 24;
-              void new BackupService().runAutoBackupIfDue(interval).then((result) => {
+              const backupService = new BackupService();
+              void backupService.runAutoBackupIfDue(interval).then(async (result) => {
                 if (result.error) console.warn('Auto backup failed:', result.error);
+                const retention = backupService.getRetentionSettings();
+                const cleanup = await backupService.cleanupOldBackups(retention.retentionDays, retention.maxBackups);
+                if (cleanup.errors.length > 0) {
+                  console.warn('Automatic backup retention cleanup failed:', cleanup.errors.join('; '));
+                }
+              }).catch((error) => {
+                console.warn('Automatic backup maintenance failed:', error);
               });
             } catch (e) {
               console.warn('Auto backup skipped:', e);

@@ -169,6 +169,13 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
 
   assert.ok(inv.id);
   assert.equal(inv.supplierInvoiceNumber, 'INV-SUP-1001');
+  const invoiceDueDate = db.query<any>(`
+    SELECT pi.due_date, date(pi.date, '+' || s.payment_terms_days || ' days') AS expected_due_date
+    FROM purchase_invoices pi
+    JOIN suppliers s ON s.id = pi.supplier_id
+    WHERE pi.id = ?
+  `, [inv.id])[0];
+  assert.equal(invoiceDueDate.dueDate, invoiceDueDate.expectedDueDate);
   const costAfterGrnInvoice = Number(db.query<any>(`SELECT cost_price FROM products WHERE id = ?`, [prodId])[0].costPrice);
   assert.equal(costAfterGrnInvoice, 106.63, 'Weighted-average cost must include the GRN quantity only once');
 

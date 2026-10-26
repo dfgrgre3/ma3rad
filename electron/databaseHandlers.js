@@ -80,6 +80,27 @@ function registerDatabaseHandlers({
     }
   });
 
+  ipcMain.handle('db:remove-backup', async (event, fileName) => {
+    validateIpcSender(event);
+    if (typeof fileName !== 'string' || path.basename(fileName) !== fileName ||
+      !/^ceramisys_auto_[A-Za-z0-9_-]+\.sqlite$/.test(fileName)) {
+      throw new Error('Invalid automatic backup file name');
+    }
+    ensureDirs();
+    const backupRoot = path.resolve(BACKUP_DIR);
+    const target = path.resolve(backupRoot, fileName);
+    if (path.dirname(target) !== backupRoot) {
+      throw new Error('Backup file is outside the backup directory');
+    }
+    try {
+      await fs.unlink(target);
+      return { ok: true, deleted: true };
+    } catch (error) {
+      if (error.code === 'ENOENT') return { ok: true, deleted: false };
+      throw error;
+    }
+  });
+
   ipcMain.handle('db:info', async (event) => {
     validateIpcSender(event);
     try {

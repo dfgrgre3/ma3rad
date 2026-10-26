@@ -88,6 +88,29 @@ test('permissions: user-level DENY beats role wildcards (sales.* and *)', async 
   PermissionService.deleteRole(role.id, admin);
 });
 
+test('permissions: manager defaults exclude full-access privileges, including legacy seeded grants', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const defaultPermissions = PermissionService.getRolePermissions('MANAGER');
+  assert.ok(defaultPermissions.includes('sales.create'));
+  assert.ok(defaultPermissions.includes('approvals.approve'));
+  for (const permission of [
+    'roles.manage', 'users.create', 'users.update', 'users.delete',
+    'users.reset_password', 'users.permissions', 'settings.update',
+    'settings.backup', 'products.delete',
+  ]) {
+    assert.ok(!defaultPermissions.includes(permission), `manager must not have ${permission}`);
+  }
+
+  db.run('DELETE FROM role_permissions WHERE role_code = ?', ['MANAGER']);
+  for (const permission of PermissionService.getCatalog().map((row) => row.code)) {
+    db.run('INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)', ['MANAGER', permission]);
+  }
+  PermissionService.seed();
+  assert.deepEqual(PermissionService.getRolePermissions('MANAGER').sort(), defaultPermissions.sort());
+});
+
 test('auth: wrong password fails, and repeated failures lock the account for 15 minutes', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

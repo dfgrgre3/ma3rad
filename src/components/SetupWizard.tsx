@@ -321,14 +321,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   placeholder="وحدات مخصصة، مفصولة بفواصل"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
-                  <input type="checkbox" checked={businessConfig.variantsEnabled} onChange={(e) => updateBusinessConfig({ variantsEnabled: e.target.checked })} className="accent-sky-600" /> ألوان أو مقاسات أو موديلات
-                </label>
-                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
-                  <input type="checkbox" checked={businessConfig.multipleWarehouses} onChange={(e) => updateBusinessConfig({ multipleWarehouses: e.target.checked })} className="accent-sky-600" /> مخازن أو فروع متعددة
-                </label>
-              </div>
               <div>
                 <label className={labelClass}>خصائص المنتجات (مفصولة بفواصل)</label>
                 <input

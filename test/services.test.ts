@@ -22,6 +22,7 @@ import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
 import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
 import { SettingsService } from '../src/services/SettingsService.ts';
 import { CashierService } from '../src/services/CashierService.ts';
+import { BackupService } from '../src/services/BackupService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -29,6 +30,133 @@ function q(sql: string, params: any[] = []): any[] {
 
 test('business date uses the local calendar day', () => {
   assert.equal(localDateString(new Date(2026, 9, 24, 0, 0, 0)), '2026-10-24');
+});
+
+test('dashboard sales and gross profit reconcile invoice returns and same-period growth', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const today = localDateString();
+  const [year, month, day] = today.split('-').map(Number);
+  const previousMonth = new Date(year, month - 2, 1);
+  const previousMonthLastDay = new Date(year, month - 1, 0).getDate();
+  const previousMonthDate = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}-${String(Math.min(day, previousMonthLastDay)).padStart(2, '0')}`;
+  const customerId = q('SELECT id FROM customers LIMIT 1')[0].id;
+  const id = 'dashboard_return_reconcile';
+  const before = new AccountingService().getDashboardMetrics();
+  db.run(`INSERT INTO products
+    (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,
+     cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
+    VALUES (?, ?, ?, 'Dashboard return test', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2',
+      4, 1.44, 80, 100, 90, 0, 0, 1)`,
+    [`${id}_product`, `${id}_product`, `${id}_product`]);
+
+  db.run(`INSERT INTO sales_invoices
+    (id,invoice_number,date,customer_id,warehouse_id,subtotal,discount_amount,tax_amount,total_amount,
+     paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
+    VALUES (?, ?, ?, ?, 'wh_main', 200, 0, 0, 200, 0, 200, 'CREDIT', 'UNPAID', 'COMPLETED', 80, 120, 'usr_admin')`,
+    [`${id}_current`, `${id}_current`, today, customerId]);
+  db.run(`INSERT INTO sales_returns
+    (id,return_number,original_invoice_id,original_invoice_number,customer_id,warehouse_id,date,total_amount,
+     refunded_amount,remaining_to_balance,reason,created_by)
+    VALUES (?, ?, ?, ?, ?, 'wh_main', ?, 100, 0, 100, 'test', 'usr_admin')`,
+    [`${id}_return`, `${id}_return`, `${id}_current`, `${id}_current`, customerId, today]);
+  db.run(`INSERT INTO sales_return_items
+    (id,return_id,product_id,product_name,grade,quantity_m2,boxes_count,unit_price,unit_cost,total_refund)
+    VALUES (?, ?, ?, 'test', 'GRADE_1', 1, 1, 100, 80, 100)`,
+    [`${id}_item`, `${id}_return`, `${id}_product`]);
+  db.run(`INSERT INTO sales_invoices
+    (id,invoice_number,date,customer_id,warehouse_id,subtotal,discount_amount,tax_amount,total_amount,
+     paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
+    VALUES (?, ?, ?, ?, 'wh_main', 100, 0, 0, 100, 0, 100, 'CREDIT', 'UNPAID', 'COMPLETED', 40, 60, 'usr_admin')`,
+    [`${id}_previous`, `${id}_previous`, previousMonthDate, customerId]);
+  const after = new AccountingService().getDashboardMetrics();
+
+  assert.equal(after.monthSales - before.monthSales, 100);
+  assert.equal(after.todaySales - before.todaySales, 100);
+  assert.equal(after.grossProfit - before.grossProfit, 100);
+  assert.equal(after.previousMonthSales - before.previousMonthSales, 100);
+  assert.equal(after.salesCount - before.salesCount, 1);
+
+  db.run('DELETE FROM sales_returns WHERE id = ?', [`${id}_return`]);
+  db.run('DELETE FROM sales_invoices WHERE id IN (?, ?)', [`${id}_current`, `${id}_previous`]);
+});
+
+test('dashboard FIFO inventory valuation uses remaining layer cost', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const originalMethod = q(`SELECT value FROM system_settings WHERE key = 'costingMethod'`)[0]?.value || 'AVERAGE_COST';
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'FIFO')`);
+  const before = new AccountingService().getDashboardMetrics();
+  const productId = 'dashboard_fifo_valuation_test';
+  db.run(`INSERT INTO products
+    (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,
+     cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
+    VALUES (?, ?, ?, 'Dashboard FIFO valuation test', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2',
+      4, 1.44, 99, 100, 90, 0, 0, 1)`,
+    [productId, productId, productId]);
+  db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
+    VALUES (?, 'wh_main', ?, 10, 0)`, [`stock_${productId}`, productId]);
+  InventoryCostingService.addLayer(db, {
+    productId, warehouseId: 'wh_main', sourceType: 'TEST', sourceId: 'dashboard_fifo_1',
+    date: '2026-01-01', quantity: 5, unitCost: 10,
+  });
+  InventoryCostingService.addLayer(db, {
+    productId, warehouseId: 'wh_main', sourceType: 'TEST', sourceId: 'dashboard_fifo_2',
+    date: '2026-02-01', quantity: 5, unitCost: 20,
+  });
+
+  const after = new AccountingService().getDashboardMetrics();
+  assert.equal(after.inventoryValuationCost - before.inventoryValuationCost, 150);
+
+  db.run('DELETE FROM inventory_cost_layers WHERE product_id = ?', [productId]);
+  db.run('DELETE FROM warehouse_stock WHERE product_id = ?', [productId]);
+  db.run('DELETE FROM products WHERE id = ?', [productId]);
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', ?)`, [originalMethod]);
+});
+
+test('automatic backup retention deletes old files and preserves manual and newest backups', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const previousCeramisys = window.ceramisys;
+  window.ceramisys = { ...previousCeramisys, db: { ...previousCeramisys?.db } };
+  const api = window.ceramisys.db!;
+  const originalInfo = api.info;
+  const originalRemoveBackup = api.removeBackup;
+  const removed: string[] = [];
+  api.info = async () => ({ path: '', exists: true, bytes: 0, backupDir: 'test-backups' });
+  api.removeBackup = async (fileName) => {
+    removed.push(fileName);
+    return { ok: true, deleted: true };
+  };
+  const now = localDateString();
+  db.run(`INSERT INTO backup_history
+    (id,file_name,file_path,file_size_bytes,backup_type,status,created_at)
+    VALUES
+      ('retention_old','ceramisys_auto_old.sqlite','test',1,'AUTO','SUCCESS','2000-01-01'),
+      ('retention_extra','ceramisys_auto_extra.sqlite','test',1,'AUTO','SUCCESS',?),
+      ('retention_keep','ceramisys_auto_keep.sqlite','test',1,'AUTO','SUCCESS',?),
+      ('retention_manual','manual.sqlite','test',1,'MANUAL_DOWNLOAD','SUCCESS','2000-01-01')`,
+    [now, now]);
+  try {
+    const result = await new BackupService().cleanupOldBackups(30, 1);
+    assert.equal(result.deleted, 2);
+    assert.deepEqual(removed.sort(), ['ceramisys_auto_extra.sqlite', 'ceramisys_auto_old.sqlite']);
+    assert.deepEqual(
+      q(`SELECT id FROM backup_history WHERE id LIKE 'retention_%' ORDER BY id`).map((row) => row.id),
+      ['retention_keep', 'retention_manual'],
+    );
+  } finally {
+    if (originalInfo) api.info = originalInfo;
+    else delete api.info;
+    if (originalRemoveBackup) api.removeBackup = originalRemoveBackup;
+    else delete api.removeBackup;
+    window.ceramisys = previousCeramisys;
+    db.run(`DELETE FROM backup_history WHERE id LIKE 'retention_%'`);
+  }
 });
 
 test('scheduled shift closure records the expected till balance for the next opening', async () => {

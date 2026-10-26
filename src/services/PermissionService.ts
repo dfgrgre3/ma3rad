@@ -207,10 +207,21 @@ export const PERMISSIONS: PermissionDef[] = [
 // the first time it appears; after that the database (role_permissions) is the
 // single source of truth and the admin can change anything from the UI.
 const ALL = PERMISSIONS.map((p) => p.code);
+const MANAGER_RESTRICTED = new Set([
+  ...ALL.filter((code) => code.endsWith('.delete')),
+  'roles.manage',
+  'users.create',
+  'users.update',
+  'users.delete',
+  'users.reset_password',
+  'users.permissions',
+  'settings.update',
+  'settings.backup',
+]);
 
 export const ROLE_DEFAULTS: Record<string, string[]> = {
   ADMIN: [...ALL],
-  MANAGER: [...ALL],
+  MANAGER: ALL.filter((code) => !MANAGER_RESTRICTED.has(code)),
   ACCOUNTANT: [
     'dashboard.view', 'dashboard.export',
     'products.view', 'categories.view', 'brands.view',
@@ -306,7 +317,25 @@ export class PermissionService {
     for (const [roleCode, defaults] of Object.entries(ROLE_DEFAULTS)) {
       const markerKey = `rbac.seeded.${roleCode}`;
       const seeded = db.query('SELECT value FROM system_settings WHERE key = ?', [markerKey]);
-      if (seeded.length > 0) continue;
+      if (seeded.length > 0) {
+        if (roleCode === 'MANAGER') {
+          const current = PermissionService.getRolePermissions(roleCode);
+          const retainsOriginalFullGrant = current.length === ALL.length &&
+            ALL.every((permission) => current.includes(permission));
+          if (retainsOriginalFullGrant) {
+            db.executeTransaction(() => {
+              db.run('DELETE FROM role_permissions WHERE role_code = ?', [roleCode]);
+              for (const permission of defaults) {
+                db.run(
+                  'INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+                  [roleCode, permission]
+                );
+              }
+            });
+          }
+        }
+        continue;
+      }
       for (const perm of defaults) {
         db.run(
           'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',

@@ -18,10 +18,10 @@ const today = () => localDateString();
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
 const yearStart = () => `${new Date().getFullYear()}-01-01`;
 
-interface SalesRow { label: string; revenue: number; cost: number; profit: number; count: number; margin: number }
-interface DailyRow { date: string; revenue: number; count: number }
+interface SalesRow { label: string; revenue: number; cost: number; profit: number; count: number; margin: number; customers?: number }
+interface DailyRow { date: string; revenue: number; invoiceCount: number; returnCount: number }
 
-type ReportType = 'by_category' | 'by_product' | 'by_customer' | 'by_city' | 'by_user' | 'daily';
+export type ReportType = 'by_category' | 'by_product' | 'by_customer' | 'by_city' | 'by_user' | 'daily';
 
 const REPORT_TYPES: { id: ReportType; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'by_category',  label: 'حسب الفئة',      icon: BarChart3,    color: 'sky' },
@@ -45,87 +45,150 @@ const BAR_COLOR_MAP: Record<string, string> = {
   amber: 'bg-amber-500', orange: 'bg-orange-500', pink: 'bg-pink-500',
 };
 
-function loadReport(type: ReportType, from: string, to: string): SalesRow[] | DailyRow[] {
-  const baseWhere = `si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'`;
-  const params = [from, to];
-
+export function loadReport(type: ReportType, from: string, to: string): SalesRow[] | DailyRow[] {
   if (type === 'daily') {
     const rows = db.query<any>(`
-      SELECT si.date, 
-        COALESCE(SUM(si.total_amount), 0) AS revenue,
-        COUNT(DISTINCT si.id) AS count
-      FROM sales_invoices si
-      WHERE ${baseWhere}
-      GROUP BY si.date
-      ORDER BY si.date DESC
-    `, params);
+      WITH activity AS (
+        SELECT si.date, si.id AS invoiceId, NULL AS returnId,
+          si.subtotal - si.discount_amount AS revenue
+        FROM sales_invoices si
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        UNION ALL
+        SELECT sr.date, NULL AS invoiceId, sr.id AS returnId,
+          -(sr.total_amount - CASE WHEN si.total_amount > 0
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            ELSE 0 END) AS revenue
+        FROM sales_returns sr
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      )
+      SELECT date, COALESCE(SUM(revenue), 0) AS revenue,
+        COUNT(DISTINCT invoiceId) AS invoiceCount, COUNT(DISTINCT returnId) AS returnCount
+      FROM activity
+      GROUP BY date
+      ORDER BY date DESC
+    `, [from, to, from, to]);
     return rows.map(r => ({
       date: r.date,
       revenue: Number(r.revenue),
-      count: Number(r.count),
+      invoiceCount: Number(r.invoiceCount),
+      returnCount: Number(r.returnCount),
     })) as DailyRow[];
   }
 
   if (type === 'by_category') {
     const rows = db.query<any>(`
-      SELECT 
-        COALESCE(c.name, 'غير مصنف') AS label,
-        COALESCE(SUM(sii.total_price - CASE WHEN si.subtotal > 0 THEN si.discount_amount * sii.total_price / si.subtotal ELSE 0 END), 0) AS revenue,
-        COALESCE(SUM(sii.total_cost), 0) AS cost,
-        COUNT(DISTINCT si.id) AS count
-      FROM sales_invoices si
-      JOIN sales_invoice_items sii ON sii.invoice_id = si.id
-      JOIN products p ON p.id = sii.product_id
-      LEFT JOIN categories c ON c.id = p.category_id
-      WHERE ${baseWhere}
-      GROUP BY c.id
+      WITH activity AS (
+        SELECT c.id AS groupId, COALESCE(c.name, 'غير مصنف') AS label, si.id AS invoiceId,
+          sii.total_price - CASE WHEN si.subtotal > 0 THEN si.discount_amount * sii.total_price / si.subtotal ELSE 0 END AS revenue,
+          sii.total_cost AS cost
+        FROM sales_invoices si
+        JOIN sales_invoice_items sii ON sii.invoice_id = si.id
+        JOIN products p ON p.id = sii.product_id
+        LEFT JOIN categories c ON c.id = p.category_id
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        UNION ALL
+        SELECT c.id AS groupId, COALESCE(c.name, 'غير مصنف') AS label, NULL AS invoiceId,
+          -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
+            THEN ROUND(
+              ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+              * sri.total_refund / sr.total_amount, 2
+            )
+            ELSE 0
+          END AS revenue,
+          -(sri.quantity_m2 * sri.unit_cost) AS cost
+        FROM sales_returns sr
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        JOIN sales_return_items sri ON sri.return_id = sr.id
+        JOIN products p ON p.id = sri.product_id
+        LEFT JOIN categories c ON c.id = p.category_id
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      )
+      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
+        COALESCE(SUM(revenue - cost), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      FROM activity
+      GROUP BY groupId, label
       ORDER BY revenue DESC
-    `, params);
+    `, [from, to, from, to]);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost);
-      const profit = revenue - cost;
+      const profit = Number(r.profit);
       return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
     });
   }
 
   if (type === 'by_product') {
     const rows = db.query<any>(`
-      SELECT 
-        p.name AS label,
-        COALESCE(SUM(sii.total_price - CASE WHEN si.subtotal > 0 THEN si.discount_amount * sii.total_price / si.subtotal ELSE 0 END), 0) AS revenue,
-        COALESCE(SUM(sii.total_cost), 0) AS cost,
-        COALESCE(SUM(sii.quantity_m2), 0) AS qty,
-        COUNT(DISTINCT si.id) AS count
-      FROM sales_invoices si
-      JOIN sales_invoice_items sii ON sii.invoice_id = si.id
-      JOIN products p ON p.id = sii.product_id
-      WHERE ${baseWhere}
-      GROUP BY p.id
+      WITH activity AS (
+        SELECT p.id AS groupId, p.name AS label, si.id AS invoiceId,
+          sii.total_price - CASE WHEN si.subtotal > 0 THEN si.discount_amount * sii.total_price / si.subtotal ELSE 0 END AS revenue,
+          sii.total_cost AS cost
+        FROM sales_invoices si
+        JOIN sales_invoice_items sii ON sii.invoice_id = si.id
+        JOIN products p ON p.id = sii.product_id
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        UNION ALL
+        SELECT p.id AS groupId, p.name AS label, NULL AS invoiceId,
+          -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
+            THEN ROUND(
+              ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+              * sri.total_refund / sr.total_amount, 2
+            )
+            ELSE 0
+          END AS revenue,
+          -(sri.quantity_m2 * sri.unit_cost) AS cost
+        FROM sales_returns sr
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        JOIN sales_return_items sri ON sri.return_id = sr.id
+        JOIN products p ON p.id = sri.product_id
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      )
+      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
+        COALESCE(SUM(revenue - cost), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      FROM activity
+      GROUP BY groupId, label
       ORDER BY revenue DESC
       LIMIT 30
-    `, params);
+    `, [from, to, from, to]);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost);
-      const profit = revenue - cost;
+      const profit = Number(r.profit);
       return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
     });
   }
 
   if (type === 'by_customer') {
     const rows = db.query<any>(`
-      SELECT 
-        cu.name AS label,
-        COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS revenue,
-        COALESCE(SUM(si.total_cost), 0) AS cost,
-        COALESCE(SUM(si.gross_profit), 0) AS profit,
-        COUNT(DISTINCT si.id) AS count
-      FROM sales_invoices si
-      JOIN customers cu ON cu.id = si.customer_id
-      WHERE ${baseWhere}
-      GROUP BY cu.id
+      WITH activity AS (
+        SELECT cu.id AS groupId, cu.name AS label, si.id AS invoiceId,
+          si.subtotal - si.discount_amount AS revenue, si.total_cost AS cost, si.gross_profit AS profit
+        FROM sales_invoices si
+        JOIN customers cu ON cu.id = si.customer_id
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        UNION ALL
+        SELECT cu.id AS groupId, cu.name AS label, NULL AS invoiceId,
+          -(sr.total_amount - CASE WHEN si.total_amount > 0
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            ELSE 0 END) AS revenue,
+          -COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+            FROM sales_return_items sri WHERE sri.return_id = sr.id), 0) AS cost,
+          COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+            FROM sales_return_items sri WHERE sri.return_id = sr.id), 0)
+            - (sr.total_amount - CASE WHEN si.total_amount > 0
+              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+              ELSE 0 END) AS profit
+        FROM sales_returns sr
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        JOIN customers cu ON cu.id = sr.customer_id
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      )
+      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
+        COALESCE(SUM(profit), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      FROM activity
+      GROUP BY groupId, label
       ORDER BY revenue DESC
       LIMIT 30
-    `, params);
+    `, [from, to, from, to]);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost), profit = Number(r.profit);
       return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
@@ -134,37 +197,73 @@ function loadReport(type: ReportType, from: string, to: string): SalesRow[] | Da
 
   if (type === 'by_city') {
     const rows = db.query<any>(`
-      SELECT 
-        COALESCE(cu.city, 'غير محدد') AS label,
-        COALESCE(SUM(si.total_amount), 0) AS revenue,
-        COUNT(DISTINCT si.id) AS count,
-        COUNT(DISTINCT cu.id) AS customers
-      FROM sales_invoices si
-      JOIN customers cu ON cu.id = si.customer_id
-      WHERE ${baseWhere}
-      GROUP BY cu.city
+      WITH activity AS (
+        SELECT COALESCE(cu.city, 'غير محدد') AS label, cu.id AS customerId, si.id AS invoiceId,
+          si.subtotal - si.discount_amount AS revenue
+        FROM sales_invoices si
+        JOIN customers cu ON cu.id = si.customer_id
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        UNION ALL
+        SELECT COALESCE(cu.city, 'غير محدد') AS label, cu.id AS customerId, NULL AS invoiceId,
+          -(sr.total_amount - CASE WHEN si.total_amount > 0
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            ELSE 0 END) AS revenue
+        FROM sales_returns sr
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        JOIN customers cu ON cu.id = sr.customer_id
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      )
+      SELECT label, COALESCE(SUM(revenue), 0) AS revenue,
+        COUNT(DISTINCT invoiceId) AS count, COUNT(DISTINCT customerId) AS customers
+      FROM activity
+      GROUP BY label
       ORDER BY revenue DESC
-    `, params);
+    `, [from, to, from, to]);
     return rows.map(r => {
       const revenue = Number(r.revenue);
-      return { label: r.label, revenue, cost: 0, profit: 0, count: Number(r.count), margin: Number(r.customers) };
+      return {
+        label: r.label,
+        revenue,
+        cost: 0,
+        profit: 0,
+        count: Number(r.count),
+        margin: 0,
+        customers: Number(r.customers),
+      };
     });
   }
 
   if (type === 'by_user') {
     const rows = db.query<any>(`
-      SELECT 
-        COALESCE(u.full_name, 'غير معروف') AS label,
-        COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS revenue,
-        COALESCE(SUM(si.total_cost), 0) AS cost,
-        COALESCE(SUM(si.gross_profit), 0) AS profit,
-        COUNT(DISTINCT si.id) AS count
-      FROM sales_invoices si
-      LEFT JOIN users u ON u.id = si.created_by
-      WHERE ${baseWhere}
-      GROUP BY si.created_by
+      WITH activity AS (
+        SELECT si.created_by AS groupId, COALESCE(u.full_name, 'غير معروف') AS label, si.id AS invoiceId,
+          si.subtotal - si.discount_amount AS revenue, si.total_cost AS cost, si.gross_profit AS profit
+        FROM sales_invoices si
+        LEFT JOIN users u ON u.id = si.created_by
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        UNION ALL
+        SELECT si.created_by AS groupId, COALESCE(u.full_name, 'غير معروف') AS label, NULL AS invoiceId,
+          -(sr.total_amount - CASE WHEN si.total_amount > 0
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            ELSE 0 END) AS revenue,
+          -COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+            FROM sales_return_items sri WHERE sri.return_id = sr.id), 0) AS cost,
+          COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+            FROM sales_return_items sri WHERE sri.return_id = sr.id), 0)
+            - (sr.total_amount - CASE WHEN si.total_amount > 0
+              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+              ELSE 0 END) AS profit
+        FROM sales_returns sr
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        LEFT JOIN users u ON u.id = si.created_by
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+      )
+      SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
+        COALESCE(SUM(profit), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
+      FROM activity
+      GROUP BY groupId, label
       ORDER BY revenue DESC
-    `, params);
+    `, [from, to, from, to]);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost), profit = Number(r.profit);
       return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
@@ -174,21 +273,21 @@ function loadReport(type: ReportType, from: string, to: string): SalesRow[] | Da
   return [];
 }
 
-function SalesBarChart({ rows, color }: { rows: SalesRow[]; color: string }) {
+function SalesBarChart({ rows, color, reportType }: { rows: SalesRow[]; color: string; reportType: ReportType }) {
   if (rows.length === 0) return <p className="text-xs text-slate-400 text-center py-8">لا توجد بيانات في هذه الفترة</p>;
-  const max = Math.max(...rows.map(r => r.revenue), 1);
+  const max = Math.max(...rows.map(r => Math.abs(r.revenue)), 1);
   const barColor = BAR_COLOR_MAP[color] || 'bg-sky-500';
 
   return (
     <div className="space-y-2.5 mt-2">
       {rows.slice(0, 20).map((row, i) => {
-        const pct = Math.round((row.revenue / max) * 100);
+        const pct = Math.round((Math.abs(row.revenue) / max) * 100);
         return (
           <div key={i} className="flex items-center gap-3">
             <span className="text-xs text-slate-600 w-36 shrink-0 font-medium truncate text-left">{row.label}</span>
             <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
               <div
-                className={`h-full rounded-full ${barColor} transition-all duration-700 flex items-center justify-end pr-2`}
+                className={`h-full rounded-full ${row.revenue < 0 ? 'bg-rose-500' : barColor} transition-all duration-700 flex items-center justify-end pr-2`}
                 style={{ width: `${Math.max(pct, 3)}%` }}
               >
                 {pct > 15 && <span className="text-white text-xs font-black">{fmtM(row.revenue)}</span>}
@@ -196,7 +295,11 @@ function SalesBarChart({ rows, color }: { rows: SalesRow[]; color: string }) {
             </div>
             <div className="text-left w-24 shrink-0">
               <p className="text-xs font-black text-slate-900">{fmtM(row.revenue)} ج</p>
-              <p className="text-xs text-slate-400">{fmt(row.count)} {row.margin > 0 ? `• ${row.margin}%` : ''}</p>
+              <p className="text-xs text-slate-400">
+                {fmt(row.count)} فاتورة
+                {reportType === 'by_city' && ` • ${fmt(row.customers || 0)} عميل`}
+                {reportType !== 'by_city' && row.margin > 0 && ` • ${row.margin}%`}
+              </p>
             </div>
           </div>
         );
@@ -207,38 +310,45 @@ function SalesBarChart({ rows, color }: { rows: SalesRow[]; color: string }) {
 
 function DailyChart({ rows }: { rows: DailyRow[] }) {
   if (rows.length === 0) return <p className="text-xs text-slate-400 text-center py-8">لا توجد بيانات في هذه الفترة</p>;
-  const max = Math.max(...rows.map(r => r.revenue), 1);
+  const max = Math.max(...rows.map(r => Math.abs(r.revenue)), 1);
   const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
-  const totalCount = rows.reduce((s, r) => s + r.count, 0);
+  const totalInvoiceCount = rows.reduce((s, r) => s + r.invoiceCount, 0);
+  const totalReturnCount = rows.reduce((s, r) => s + r.returnCount, 0);
 
   return (
     <div>
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 text-center">
           <p className="text-lg font-black text-pink-700">{fmtM(totalRevenue)} ج</p>
           <p className="text-xs text-pink-500">إجمالي الإيرادات</p>
         </div>
         <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-center">
-          <p className="text-lg font-black text-violet-700">{fmt(totalCount)}</p>
+          <p className="text-lg font-black text-violet-700">{fmt(totalInvoiceCount)}</p>
           <p className="text-xs text-violet-500">إجمالي الفواتير</p>
         </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+          <p className="text-lg font-black text-amber-700">{fmt(totalReturnCount)}</p>
+          <p className="text-xs text-amber-500">إجمالي المرتجعات</p>
+        </div>
         <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-center">
-          <p className="text-lg font-black text-sky-700">{totalCount > 0 ? fmtM(totalRevenue / totalCount) : '0'} ج</p>
-          <p className="text-xs text-sky-500">متوسط الفاتورة</p>
+          <p className="text-lg font-black text-sky-700">{totalInvoiceCount > 0 ? fmtM(totalRevenue / totalInvoiceCount) : '0'} ج</p>
+          <p className="text-xs text-sky-500">صافي الإيراد لكل فاتورة</p>
         </div>
       </div>
       <div className="space-y-1.5 max-h-96 overflow-y-auto">
         {rows.map((row, i) => {
-          const pct = Math.round((row.revenue / max) * 100);
+          const pct = Math.round((Math.abs(row.revenue) / max) * 100);
           return (
             <div key={i} className="flex items-center gap-3">
               <span className="text-xs text-slate-500 w-24 shrink-0 font-medium">{row.date}</span>
               <div className="flex-1 bg-slate-100 rounded-full h-4 overflow-hidden">
-                <div className="h-full rounded-full bg-pink-500 transition-all duration-700"
+                <div className={`h-full rounded-full ${row.revenue < 0 ? 'bg-rose-500' : 'bg-pink-500'} transition-all duration-700`}
                   style={{ width: `${Math.max(pct, 2)}%` }} />
               </div>
               <span className="text-xs font-black text-slate-900 w-20 text-left">{fmtM(row.revenue)} ج</span>
-              <span className="text-xs text-slate-400 w-12 text-left">{row.count} ف</span>
+              <span className="text-xs text-slate-400 w-28 text-left">
+                {fmt(row.invoiceCount)} ف • {fmt(row.returnCount)} م
+              </span>
             </div>
           );
         })}
@@ -286,7 +396,8 @@ export const SalesReportsPage: React.FC = () => {
           columns: [
             { key: 'date', label: 'التاريخ' },
             { key: 'revenue', label: 'الإيرادات' },
-            { key: 'count', label: 'عدد الفواتير' },
+            { key: 'invoiceCount', label: 'عدد الفواتير' },
+            { key: 'returnCount', label: 'عدد المرتجعات' },
           ],
           rows: rows as any[],
         });
@@ -296,14 +407,21 @@ export const SalesReportsPage: React.FC = () => {
           title: `تقرير مبيعات - ${currentType.label}`,
           subtitle: `الفترة: ${from} — ${to}`,
           fileName: `تقرير-مبيعات-${reportType}-${from}-${to}`,
-          columns: [
-            { key: 'label', label: 'البيان' },
-            { key: 'revenue', label: 'الإيرادات' },
-            { key: 'cost', label: 'التكلفة' },
-            { key: 'profit', label: 'الربح' },
-            { key: 'margin', label: 'الهامش%' },
-            { key: 'count', label: 'العدد/الكمية' },
-          ],
+          columns: reportType === 'by_city'
+            ? [
+                { key: 'label', label: 'المنطقة' },
+                { key: 'revenue', label: 'صافي الإيرادات' },
+                { key: 'count', label: 'عدد الفواتير' },
+                { key: 'customers', label: 'عدد العملاء' },
+              ]
+            : [
+                { key: 'label', label: 'البيان' },
+                { key: 'revenue', label: 'الإيرادات' },
+                { key: 'cost', label: 'التكلفة' },
+                { key: 'profit', label: 'الربح' },
+                { key: 'margin', label: 'الهامش%' },
+                { key: 'count', label: 'عدد الفواتير' },
+              ],
           rows: rows as any[],
         });
       }
@@ -422,7 +540,7 @@ export const SalesReportsPage: React.FC = () => {
           ) : reportType === 'daily' ? (
             <DailyChart rows={data as DailyRow[]} />
           ) : (
-            <SalesBarChart rows={data as SalesRow[]} color={currentType.color} />
+            <SalesBarChart rows={data as SalesRow[]} color={currentType.color} reportType={reportType} />
           )}
         </div>
       </div>

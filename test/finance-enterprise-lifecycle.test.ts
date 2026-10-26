@@ -134,9 +134,9 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   const closingEntryId = financeService.closeFiscalYear(fyId!, '3102');
   assert.ok(closingEntryId, 'Closing entry must be generated');
 
-  const closedFy = queryOne<{ status: string; closing_entry_id: string }>(`SELECT status, closing_entry_id FROM fiscal_years WHERE id = ?`, [fyId!]);
+  const closedFy = queryOne<{ status: string; closingEntryId: string }>(`SELECT status, closing_entry_id AS closingEntryId FROM fiscal_years WHERE id = ?`, [fyId!]);
   assert.equal(closedFy?.status, 'CLOSED', 'Fiscal year must be CLOSED');
-  assert.equal(closedFy?.closing_entry_id, closingEntryId);
+  assert.equal(closedFy?.closingEntryId, closingEntryId);
 
   // ──────────────────────────────────────────────────────────
   // 3. Bank Accounts & Bank Reconciliation
@@ -188,22 +188,22 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
 
   // Transition: PENDING -> DEPOSITED
   financeService.transitionChequeStatus(chqId, 'DEPOSITED', { bankAccountId: bankAccId });
-  let chq = queryOne<any>(`SELECT status, bank_account_id, deposited_at FROM cheques WHERE id = ?`, [chqId]);
+  let chq = queryOne<any>(`SELECT status, bank_account_id AS bankAccountId, deposited_at AS depositedAt FROM cheques WHERE id = ?`, [chqId]);
   assert.equal(chq?.status, 'DEPOSITED');
-  assert.equal(chq?.bank_account_id, bankAccId);
+  assert.equal(chq?.bankAccountId, bankAccId);
 
   // Transition: DEPOSITED -> CLEARED (Posts: Dr Bank 1102 / Cr Cheques under collection 1105)
   financeService.transitionChequeStatus(chqId, 'CLEARED', { date: '2026-03-15' });
-  chq = queryOne<any>(`SELECT status, clearing_entry_id FROM cheques WHERE id = ?`, [chqId]);
+  chq = queryOne<any>(`SELECT status, clearing_entry_id AS clearingEntryId FROM cheques WHERE id = ?`, [chqId]);
   assert.equal(chq?.status, 'CLEARED');
-  assert.ok(chq?.clearing_entry_id, 'Must link clearance journal entry');
+  assert.ok(chq?.clearingEntryId, 'Must link clearance journal entry');
 
   const clearJvLines = db.query<any>(`
     SELECT a.code, l.debit, l.credit
     FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE l.entry_id = ?
-  `, [chq.clearing_entry_id]);
+  `, [chq.clearingEntryId]);
   assert.equal(clearJvLines.find((l: any) => l.code === '1102')?.debit, 75000, 'Bank debit 75,000');
   assert.equal(clearJvLines.find((l: any) => l.code === '1105')?.credit, 75000, 'Cheques under collection credit 75,000');
 
@@ -213,10 +213,10 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
     bounceFee: 100,
     date: '2026-03-16',
   });
-  chq = queryOne<any>(`SELECT status, bounce_reason, bounce_fee, bounce_entry_id FROM cheques WHERE id = ?`, [chqId]);
+  chq = queryOne<any>(`SELECT status, bounce_reason AS bounceReason, bounce_fee AS bounceFee, bounce_entry_id AS bounceEntryId FROM cheques WHERE id = ?`, [chqId]);
   assert.equal(chq?.status, 'BOUNCED');
-  assert.equal(chq?.bounce_fee, 100);
-  assert.ok(chq?.bounce_entry_id, 'Must link bounce journal entry');
+  assert.equal(chq?.bounceFee, 100);
+  assert.ok(chq?.bounceEntryId, 'Must link bounce journal entry');
 
   // Transition: BOUNCED -> RE_PRESENTED
   financeService.transitionChequeStatus(chqId, 'RE_PRESENTED', { notes: 'تم تصحيح التوقيع وإعادة تقديمه' });
@@ -282,16 +282,16 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   });
   assert.ok(settleId, 'Settlement record must be saved');
 
-  const settleRecord = queryOne<any>(`SELECT net_amount, journal_entry_id FROM payment_gateway_settlements WHERE id = ?`, [settleId]);
-  assert.equal(settleRecord?.net_amount, 9799, 'Net deposited amount must be 10,000 - 201 = 9,799');
-  assert.ok(settleRecord?.journal_entry_id, 'Must create balanced ledger entry');
+  const settleRecord = queryOne<any>(`SELECT net_amount AS netAmount, journal_entry_id AS journalEntryId FROM payment_gateway_settlements WHERE id = ?`, [settleId]);
+  assert.equal(settleRecord?.netAmount, 9799, 'Net deposited amount must be 10,000 - 201 = 9,799');
+  assert.ok(settleRecord?.journalEntryId, 'Must create balanced ledger entry');
 
   const settleJvLines = db.query<any>(`
     SELECT a.code, l.debit, l.credit
     FROM journal_entry_lines l
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE l.entry_id = ?
-  `, [settleRecord.journal_entry_id]);
+  `, [settleRecord.journalEntryId]);
   assert.equal(settleJvLines.find((l: any) => l.code === '1102')?.debit, 9799, 'Dr Bank 9,799');
   assert.equal(settleJvLines.find((l: any) => l.code === '5207')?.debit, 201, 'Dr Gateway fees 201');
   assert.equal(settleJvLines.find((l: any) => l.code === '1106')?.credit, 10000, 'Cr Gateway clearing 10,000');

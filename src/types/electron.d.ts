@@ -8,6 +8,7 @@ declare global {
         load?: () => Promise<Uint8Array | null>;
         save?: (bytes: Uint8Array) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
         backup?: (label?: string) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
+        removeBackup?: (fileName: string) => Promise<{ ok: boolean; deleted: boolean; error?: string }>;
         preserveCorrupt?: () => Promise<{ path: string; bytes: number }>;
         createFreshAfterRecovery?: () => Promise<{ ok: boolean; path?: string }>;
         info?: () => Promise<{ path: string; exists: boolean; bytes: number; backupDir: string; error?: string }>;

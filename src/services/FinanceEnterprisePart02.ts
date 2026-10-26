@@ -44,7 +44,7 @@ public reopenPeriod(periodId: string, reason: string): void {
       const latestClosed = tx.query<any>(`
         SELECT MAX(end_date) as maxDate FROM fiscal_periods WHERE status IN ('CLOSED', 'LOCKED')
       `)[0]?.maxDate || '';
-      tx.run("INSERT OR REPLACE INTO system_settings (key, value, description) VALUES ('accounting_closed_until_date', ?, 'Closed accounting date lock')",
+      tx.run("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('accounting_closed_until_date', ?)",
         [latestClosed]);
 
       tx.run(`
@@ -71,7 +71,7 @@ public closeFiscalYear(fiscalYearId: string, retainedEarningsCode = '3102'): str
         AND a.type IN ('REVENUE', 'EXPENSE')
       GROUP BY a.code, a.type
       HAVING ABS(balance) > 0.009
-    `, [fy.start_date, fy.end_date]);
+    `, [fy.startDate, fy.endDate]);
 
     // Construct year-end closing entry lines
     // To zero an account:
@@ -84,11 +84,11 @@ public closeFiscalYear(fiscalYearId: string, retainedEarningsCode = '3102'): str
     for (const b of balances) {
       const bal = Number(b.balance);
       if (bal > 0) {
-        closingLines.push({ accountCode: b.code, debit: 0, credit: bal, description: `إقفال حساب ${b.code} للسنة المالية ${fy.year_code}` });
+        closingLines.push({ accountCode: b.code, debit: 0, credit: bal, description: `إقفال حساب ${b.code} للسنة المالية ${fy.yearCode}` });
         netCredit += bal;
       } else if (bal < 0) {
         const positive = Math.abs(bal);
-        closingLines.push({ accountCode: b.code, debit: positive, credit: 0, description: `إقفال حساب ${b.code} للسنة المالية ${fy.year_code}` });
+        closingLines.push({ accountCode: b.code, debit: positive, credit: 0, description: `إقفال حساب ${b.code} للسنة المالية ${fy.yearCode}` });
         netDebit += positive;
       }
     }
@@ -97,31 +97,31 @@ public closeFiscalYear(fiscalYearId: string, retainedEarningsCode = '3102'): str
     if (Math.abs(netProfitOrLoss) > 0.009) {
       if (netProfitOrLoss > 0) {
         // Net credit needed on retained earnings (Profit)
-        closingLines.push({ accountCode: retainedEarningsCode, debit: 0, credit: netProfitOrLoss, description: `ترحيل صافي أرباح السنة المالية ${fy.year_code} إلى الأرباح المرحلة` });
+        closingLines.push({ accountCode: retainedEarningsCode, debit: 0, credit: netProfitOrLoss, description: `ترحيل صافي أرباح السنة المالية ${fy.yearCode} إلى الأرباح المرحلة` });
       } else {
         // Net debit needed on retained earnings (Loss)
         const positive = Math.abs(netProfitOrLoss);
-        closingLines.push({ accountCode: retainedEarningsCode, debit: positive, credit: 0, description: `ترحيل صافي خسائر السنة المالية ${fy.year_code} إلى الأرباح المرحلة` });
+        closingLines.push({ accountCode: retainedEarningsCode, debit: positive, credit: 0, description: `ترحيل صافي خسائر السنة المالية ${fy.yearCode} إلى الأرباح المرحلة` });
       }
     }
 
     let closingEntryId: string | null = null;
     this.db.executeTransaction((tx) => {
-      // Close all periods
-      tx.run(`UPDATE fiscal_periods SET status = 'CLOSED', closed_at = CURRENT_TIMESTAMP, closed_by = ? WHERE fiscal_year_id = ?`,
-        [actor.id, fiscalYearId]);
-
       // Post closing journal entry if there was revenue/expense activity
       if (closingLines.length >= 2) {
         closingEntryId = postLedgerEntry(tx.getDatabase(), {
-          date: fy.end_date,
-          description: `قيد الإقفال السنوي وترحيل الأرباح والخسائر للسنة المالية ${fy.year_code}`,
+          date: fy.endDate,
+          description: `قيد الإقفال السنوي وترحيل الأرباح والخسائر للسنة المالية ${fy.yearCode}`,
           referenceType: 'YEAR_END_CLOSE',
           referenceId: fiscalYearId,
           createdBy: actor.id,
           lines: closingLines,
         });
       }
+
+      // Post the year-end entry before closing its accounting period.
+      tx.run(`UPDATE fiscal_periods SET status = 'CLOSED', closed_at = CURRENT_TIMESTAMP, closed_by = ? WHERE fiscal_year_id = ?`,
+        [actor.id, fiscalYearId]);
 
       // Mark fiscal year as CLOSED
       tx.run(`
@@ -131,8 +131,8 @@ public closeFiscalYear(fiscalYearId: string, retainedEarningsCode = '3102'): str
       `, [actor.id, closingEntryId, fiscalYearId]);
 
       // Update system setting
-      tx.run("INSERT OR REPLACE INTO system_settings (key, value, description) VALUES ('accounting_closed_until_date', ?, 'Closed accounting date lock')",
-        [fy.end_date]);
+      tx.run("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('accounting_closed_until_date', ?)",
+        [fy.endDate]);
 
       tx.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)

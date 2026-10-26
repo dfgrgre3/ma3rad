@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS purchase_invoices (
   invoice_number TEXT UNIQUE NOT NULL,
   supplier_invoice_number TEXT,
   date TEXT NOT NULL,
+  due_date TEXT,
   supplier_id TEXT NOT NULL,
   warehouse_id TEXT NOT NULL,
   

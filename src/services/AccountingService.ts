@@ -44,11 +44,12 @@ export class AccountingService {
     const today = localDateString();
     const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
 
-    // Previous month for comparison
-    const prevMonth = new Date();
-    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    // Compare the elapsed days in this month with the same dates last month.
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonthStart = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
-    const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()}`;
+    const prevMonthLastDay = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate();
+    const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${String(Math.min(now.getDate(), prevMonthLastDay)).padStart(2, '0')}`;
 
     // 1. Sales metrics (bounded up to today to exclude future-dated entries from MTD)
     const salesStats = this.db.query<any>(`
@@ -61,12 +62,27 @@ export class AccountingService {
       WHERE invoice_status != 'VOID'
     `, [today, monthStart, today, monthStart, today, today])[0] || {};
 
-    // Previous month sales for growth rate
-    const prevMonthSales = this.db.query<any>(`
-      SELECT SUM(total_amount) as sales
-      FROM sales_invoices
-      WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'
-    `, [prevMonthStart, prevMonthEnd])[0]?.sales || 0;
+    const returnStats = this.db.query<any>(`
+      SELECT
+        SUM(CASE WHEN sr.date = ? THEN sr.total_amount ELSE 0 END) AS todayReturns,
+        SUM(CASE WHEN sr.date >= ? AND sr.date <= ? THEN sr.total_amount ELSE 0 END) AS monthReturns,
+        SUM(CASE WHEN sr.date >= ? AND sr.date <= ?
+          THEN (SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0)
+                FROM sales_return_items sri WHERE sri.return_id = sr.id)
+          ELSE 0 END) AS monthReturnedCost
+      FROM sales_returns sr
+      JOIN sales_invoices si ON si.id = sr.original_invoice_id
+      WHERE si.invoice_status != 'VOID'
+    `, [today, monthStart, today, monthStart, today])[0] || {};
+
+    const prevMonthSales = Number(this.db.query<any>(`
+      SELECT
+        COALESCE((SELECT SUM(total_amount) FROM sales_invoices
+          WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'), 0)
+        - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
+          JOIN sales_invoices si ON si.id = sr.original_invoice_id
+          WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'), 0) AS sales
+    `, [prevMonthStart, prevMonthEnd, prevMonthStart, prevMonthEnd])[0]?.sales || 0);
 
     // 2. Purchases metrics
     const purchaseStats = this.db.query<any>(`
@@ -107,16 +123,42 @@ export class AccountingService {
     `)[0]?.totalPayables || 0;
 
     // 6. Inventory Valuation
+    const costingMethod = this.db.query<{ value: string }>(
+      `SELECT value FROM system_settings WHERE key = 'costingMethod'`
+    )[0]?.value;
+    if (costingMethod === 'FIFO') {
+      const inconsistentStock = this.db.query<{ productId: string; warehouseId: string }>(`
+        SELECT ws.product_id AS productId, ws.warehouse_id AS warehouseId
+        FROM warehouse_stock ws
+        WHERE COALESCE((SELECT SUM(icl.quantity_remaining)
+          FROM inventory_cost_layers icl
+          WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)
+          > ws.quantity_m2 + 0.009
+        LIMIT 1
+      `)[0];
+      if (inconsistentStock) {
+        throw new Error(
+          `FIFO cost layers exceed physical stock for product ${inconsistentStock.productId} in warehouse ${inconsistentStock.warehouseId}. Reconcile inventory before viewing valuation.`
+        );
+      }
+    }
     const invStats = this.db.query<any>(`
       SELECT 
-        SUM(ws.quantity_m2 * p.cost_price) as valuationCost,
+        SUM(CASE WHEN ? = 'FIFO' THEN
+          COALESCE((SELECT SUM(icl.quantity_remaining * icl.unit_cost)
+            FROM inventory_cost_layers icl
+            WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)
+          + MAX(0, ws.quantity_m2 - COALESCE((SELECT SUM(icl.quantity_remaining)
+            FROM inventory_cost_layers icl
+            WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)) * p.cost_price
+          ELSE ws.quantity_m2 * p.cost_price END) as valuationCost,
         SUM(ws.quantity_m2 * p.selling_price_m2) as valuationSale,
         COUNT(CASE WHEN ws.quantity_m2 <= p.min_stock_level AND ws.quantity_m2 > 0 THEN 1 END) as lowStock,
         COUNT(CASE WHEN ws.quantity_m2 <= 0 THEN 1 END) as outOfStock
       FROM warehouse_stock ws
       JOIN products p ON ws.product_id = p.id
       WHERE p.is_active = 1
-    `)[0] || {};
+    `, [costingMethod])[0] || {};
 
     // 7. Top customer
     const topCustomer = this.db.query<any>(`
@@ -127,10 +169,13 @@ export class AccountingService {
       LIMIT 1
     `)[0] || null;
 
-    const monthGross = salesStats.monthGrossProfit || 0;
+    const monthGross = Number(salesStats.monthGrossProfit || 0)
+      - Number(returnStats.monthReturns || 0)
+      + Number(returnStats.monthReturnedCost || 0);
     const monthExp = expenseStats.monthExpenses || 0;
     const monthNet = monthGross - monthExp;
-    const monthSales = salesStats.monthSales || 0;
+    const monthSales = Number(salesStats.monthSales || 0) - Number(returnStats.monthReturns || 0);
+    const todaySales = Number(salesStats.todaySales || 0) - Number(returnStats.todayReturns || 0);
 
     // Calculate growth rate
     const salesGrowthRate = prevMonthSales > 0
@@ -148,7 +193,7 @@ export class AccountingService {
       : 0;
 
     return {
-      todaySales: Number((salesStats.todaySales || 0).toFixed(2)),
+      todaySales: Number(todaySales.toFixed(2)),
       monthSales: Number(monthSales.toFixed(2)),
       todayPurchases: Number((purchaseStats.todayPurchases || 0).toFixed(2)),
       todayExpenses: Number((expenseStats.todayExpenses || 0).toFixed(2)),
@@ -181,10 +226,23 @@ export class AccountingService {
       const dateStr = localDateString(d);
 
       const row = this.db.query<any>(`
-        SELECT SUM(total_amount) as sales, SUM(gross_profit) as profit
-        FROM sales_invoices
-        WHERE date = ? AND invoice_status != 'VOID'
-      `, [dateStr])[0];
+        SELECT
+          COALESCE((SELECT SUM(total_amount) FROM sales_invoices
+            WHERE date = ? AND invoice_status != 'VOID'), 0)
+          - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
+            JOIN sales_invoices si ON si.id = sr.original_invoice_id
+            WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0) AS sales,
+          COALESCE((SELECT SUM(gross_profit) FROM sales_invoices
+            WHERE date = ? AND invoice_status != 'VOID'), 0)
+          - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
+            JOIN sales_invoices si ON si.id = sr.original_invoice_id
+            WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0)
+          + COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+            FROM sales_returns sr
+            JOIN sales_invoices si ON si.id = sr.original_invoice_id
+            JOIN sales_return_items sri ON sri.return_id = sr.id
+            WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0) AS profit
+      `, [dateStr, dateStr, dateStr, dateStr, dateStr])[0];
 
       results.push({
         date: dateStr,

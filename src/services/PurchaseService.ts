@@ -118,6 +118,18 @@ export class PurchaseService {
     const purchaseId = `pur_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
     const performedBy = actor.id;
+    const supplierTerms = this.db.query<{ paymentTermsDays: number }>(
+      'SELECT payment_terms_days AS paymentTermsDays FROM suppliers WHERE id = ?',
+      [dto.supplierId]
+    )[0];
+    if (!supplierTerms) throw new Error('المورد المحدد غير موجود.');
+    const paymentTermsDays = Number(supplierTerms.paymentTermsDays);
+    if (!Number.isInteger(paymentTermsDays) || paymentTermsDays < 0) {
+      throw new Error('مدة السداد المسجلة للمورد غير صالحة.');
+    }
+    const dueDate = new Date(`${today}T00:00:00`);
+    dueDate.setDate(dueDate.getDate() + paymentTermsDays);
+    const dueDateString = localDateString(dueDate);
 
     const invoice = this.db.executeTransaction((sqliteDb) => {
       const invoiceNumber = sqliteDb.nextNumber('PUR');
@@ -205,15 +217,15 @@ export class PurchaseService {
       // 1. Insert Purchase Invoice
       sqliteDb.run(`
         INSERT INTO purchase_invoices (
-          id, invoice_number, supplier_invoice_number, date, supplier_id, warehouse_id,
+          id, invoice_number, supplier_invoice_number, date, due_date, supplier_id, warehouse_id,
           subtotal, discount_amount, tax_amount, shipping_cost, total_amount,
           paid_amount, remaining_amount, payment_type, payment_status, notes, created_by,
           grn_id, purchase_order_id, landed_freight, landed_loading, landed_customs_taxes,
           landed_insurance, landed_other, landed_allocation_method, is_no_number_supplier,
           matching_status, price_variance_amount, qty_variance_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dto.supplierId, dto.warehouseId,
+        purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dueDateString, dto.supplierId, dto.warehouseId,
         subtotal, discountAmount, taxAmount, shippingCost, totalAmount,
         dto.paidAmount, remainingAmount, dto.paymentType, paymentStatus, dto.notes || null, performedBy,
         dto.grnId || null, dto.purchaseOrderId || null, landedFreight, landedLoading, landedCustoms,

@@ -218,7 +218,7 @@ export const AfterSalesPage: React.FC = () => {
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            متابعة الضمان والتسليمات الحديثة ({recentInvoices.length})
+            سجل الفواتير الحديثة ({recentInvoices.length})
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -333,14 +333,12 @@ export const AfterSalesPage: React.FC = () => {
           </div>
         </div>
       ) : activeTab === 'warranty' ? (
-        /* Warranty & Delivery Tracking */
+        /* Invoice age list; warranty claims are not currently managed here. */
         <div className="space-y-4">
           <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 p-4 rounded-2xl flex items-start gap-3">
-            <ShieldCheck className="w-6 h-6 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
             <div className="text-xs text-sky-900 dark:text-sky-200 leading-relaxed">
-              <strong className="block text-sm font-bold mb-0.5">ضوابط وسياسة الضمان في معارض السيراميك:</strong>
-              ضمان جودة السيراميك والبورسلين سارٍ على عيوب الصناعة واختلاف اللون (Tone) والمقاس (Caliber) قبل التركيب.
-              يُنصح العملاء دائماً بمعاينة الكراتين ومطابقة رقم اللوت وتاريخ الإنتاج قبل بدء أعمال اللصق. لا يسري الضمان بعد التركيب في حال وجود عيوب ظاهرة كان يمكن فحصها مسبقاً.
+              <strong className="block text-sm font-bold mb-0.5">سجل الفواتير الحديثة</strong>
+              يعرض هذا الجدول عمر الفاتورة وملاحظاتها فقط. لا يسجل مطالبات ضمان أو يحدد أهلية الضمان.
             </div>
           </div>
 
@@ -348,7 +346,7 @@ export const AfterSalesPage: React.FC = () => {
             <div className="p-4 border-b border-slate-100 dark:border-slate-700">
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <FileText className="w-4 h-4 text-sky-600" />
-                فواتير التسليم الحديثة وحالة الضمان
+                الفواتير الحديثة وعمرها
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -360,14 +358,13 @@ export const AfterSalesPage: React.FC = () => {
                     <th className="p-3.5">العميل</th>
                     <th className="p-3.5">قيمة الفاتورة</th>
                     <th className="p-3.5">طريقة الدفع</th>
-                    <th className="p-3.5">حالة الضمان</th>
+                    <th className="p-3.5">العمر منذ الإصدار</th>
                     <th className="p-3.5">ملاحظات الفاتورة</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                   {recentInvoices.map((inv) => {
                     const daysAgo = Math.floor((Date.now() - new Date(inv.date).getTime()) / (1000 * 60 * 60 * 24));
-                    const inWarranty = daysAgo <= 30;
                     return (
                       <tr key={inv.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-700/30 transition">
                         <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
@@ -386,14 +383,8 @@ export const AfterSalesPage: React.FC = () => {
                           {inv.paymentType}
                         </td>
                         <td className="p-3.5">
-                          <span
-                            className={`px-2.5 py-1 text-xs font-bold rounded-lg border ${
-                              inWarranty
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {inWarranty ? `سارٍ (منذ ${daysAgo} يوم)` : `منتهي (أكثر من 30 يوماً)`}
+                          <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-slate-100 text-slate-600 border-slate-200">
+                            {`منذ ${daysAgo} يوم`}
                           </span>
                         </td>
                         <td className="p-3.5 text-xs text-slate-500 max-w-xs truncate">
