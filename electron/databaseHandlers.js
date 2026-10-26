@@ -1,6 +1,7 @@
 function registerDatabaseHandlers({
   ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
   APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
+  ensureDirs, databaseFileExists, MAX_DB_SIZE,
 }) {
   ipcMain.handle('db:load', async (event) => {
     validateIpcSender(event);
@@ -23,26 +24,6 @@ function registerDatabaseHandlers({
     const target = path.join(BACKUP_DIR, `ceramisys_corrupt_${stamp}.sqlite`);
     await fs.copyFile(DB_FILE, target, fsSync.constants.COPYFILE_EXCL);
     return { path: target, bytes: (await fs.stat(target)).size };
-  });
-
-  ipcMain.handle('db:backup-snapshot', async (event, { bytes, label }) => {
-    validateIpcSender(event);
-    ensureDirs();
-    const data = Buffer.from(bytes);
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const safeLabel = String(label || 'snapshot').replace(/[^a-zA-Z0-9_-]/g, '-');
-    const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite`);
-    const temporaryFile = `${target}.tmp`;
-    try {
-      await fs.writeFile(temporaryFile, data, { flag: 'wx' });
-      await fs.rename(temporaryFile, target);
-      return { ok: true, path: target, bytes: data.length };
-    } catch (error) {
-      try { await fs.unlink(temporaryFile); } catch (cleanupError) {
-        if (cleanupError.code !== 'ENOENT') throw cleanupError;
-      }
-      throw error;
-    }
   });
 
   ipcMain.handle('db:create-fresh-after-recovery', async (event) => {

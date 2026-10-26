@@ -1,5 +1,17 @@
 export type CeramicGrade = 'GRADE_1' | 'GRADE_2' | 'GRADE_3' | 'COMMERCIAL';
-export type UnitType = 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM';
+export type UnitType =
+  | 'M2'
+  | 'LINEAR_METER'
+  | 'METER'
+  | 'BOX'
+  | 'PIECE'
+  | 'PACK'
+  | 'KG'
+  | 'TON'
+  | 'LITER'
+  | 'SET'
+  | 'SERVICE'
+  | 'CUSTOM';
 
 export interface Product {
   productType?: 'CERAMIC' | 'GENERAL';

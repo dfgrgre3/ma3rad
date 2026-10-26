@@ -7,7 +7,17 @@ import { AuthService } from '../../services/AuthService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
 import type { SystemSettings } from '../../types';
-import { BUSINESS_MODULES, BUSINESS_TYPES, getManagedBusinessPaths, getProfileHiddenPaths, parseEnabledModules } from '../../config/businessProfiles';
+import {
+  BUSINESS_MODULES,
+  BUSINESS_TYPES,
+  BUSINESS_UNITS,
+  getDefaultBusinessConfiguration,
+  getManagedBusinessPaths,
+  getProfileHiddenPaths,
+  parseBusinessConfiguration,
+  parseEnabledModules,
+  type BusinessConfiguration,
+} from '../../config/businessProfiles';
 import { NAV_STORAGE_KEYS } from '../../config/navigation';
 import { NavigationService } from '../../services/NavigationService';
 
@@ -34,11 +44,13 @@ export const AdminSettingsTab: React.FC = () => {
   const [tab, setTab] = useState<Tab>('general');
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
   const [businessProfile, setBusinessProfile] = useState(readBusinessProfile);
+  const [businessConfig, setBusinessConfig] = useState(readBusinessConfiguration);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     setSettings(SettingsService.getSettings());
     setBusinessProfile(readBusinessProfile());
+    setBusinessConfig(readBusinessConfiguration());
   }, []);
 
   const set = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => {
@@ -59,10 +71,13 @@ export const AdminSettingsTab: React.FC = () => {
       const businessTypeLabel = businessProfile.type === 'custom'
         ? customName
         : BUSINESS_TYPES.find((type) => type.id === businessProfile.type)?.label || '';
+      if (businessProfile.type !== readBusinessProfile().type
+        && !window.confirm('تغيير نوع النشاط سيغيّر الوحدات والقوائم الافتراضية فقط. لن تُحذف أو تُحوّل أي بيانات سابقة. هل تريد المتابعة؟')) return;
       const next = SettingsService.update({
         ...settings,
         businessType: businessProfile.type,
         businessTypeLabel,
+        businessProfileConfig: JSON.stringify({ ...businessConfig, businessType: businessProfile.type }),
         enabledModules: JSON.stringify(businessProfile.enabledModules),
         [NAV_STORAGE_KEYS.hidden]: JSON.stringify([
           ...existingHidden,
@@ -81,6 +96,7 @@ export const AdminSettingsTab: React.FC = () => {
     if (!window.confirm('إرجاع الحقول المعروضة إلى القيم الافتراضية؟')) return;
     setSettings(SettingsService.getSettings());
     setBusinessProfile(readBusinessProfile());
+    setBusinessConfig(readBusinessConfiguration());
     setDirty(false);
   };
 
@@ -90,10 +106,27 @@ export const AdminSettingsTab: React.FC = () => {
       type,
       enabledModules: parseEnabledModules(undefined, type),
     }));
+    setBusinessConfig(getDefaultBusinessConfiguration(type));
     setDirty(true);
   };
 
+  const updateBusinessConfig = (patch: Partial<BusinessConfiguration>) => {
+    setBusinessConfig((current) => ({ ...current, ...patch }));
+    setDirty(true);
+  };
+
+  const setInventoryEnabled = (enabled: boolean) => {
+    updateBusinessConfig({ trackInventory: enabled });
+    setBusinessProfile((current) => ({
+      ...current,
+      enabledModules: enabled
+        ? [...new Set([...current.enabledModules, 'inventory'])]
+        : current.enabledModules.filter((module) => module !== 'inventory'),
+    }));
+  };
+
   const toggleBusinessModule = (moduleId: string) => {
+    if (moduleId === 'inventory' && !businessConfig.trackInventory) return;
     setBusinessProfile((current) => ({
       ...current,
       enabledModules: current.enabledModules.includes(moduleId)
@@ -214,6 +247,56 @@ export const AdminSettingsTab: React.FC = () => {
                 />
               </Field>
             )}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="نموذج العمل">
+                <select value={businessConfig.businessModel} onChange={(event) => updateBusinessConfig({ businessModel: event.target.value as BusinessConfiguration['businessModel'] })} className={inputCls}>
+                  <option value="products">بيع منتجات</option>
+                  <option value="services">تقديم خدمات</option>
+                  <option value="mixed">منتجات وخدمات</option>
+                </select>
+              </Field>
+              <Field label="إدارة المخزون">
+                <Toggle checked={businessConfig.trackInventory} onChange={setInventoryEnabled} label={businessConfig.trackInventory ? 'مفعلة' : 'معطلة'} />
+              </Field>
+            </div>
+            <div>
+              <h4 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">وحدات القياس</h4>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {BUSINESS_UNITS.map((unit) => (
+                  <label key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      checked={businessConfig.units.includes(unit.id)}
+                      onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })}
+                      className="accent-sky-600"
+                    />
+                    {unit.label}
+                  </label>
+                ))}
+              </div>
+              <input
+                value={businessConfig.customUnits.join(', ')}
+                onChange={(event) => updateBusinessConfig({ customUnits: event.target.value.split(',').map((unit) => unit.trim()).filter(Boolean) })}
+                className={`${inputCls} mt-2`}
+                placeholder="وحدات مخصصة، مفصولة بفواصل"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <FeatureToggle label="خصائص أو متغيرات (لون/مقاس/موديل)" checked={businessConfig.variantsEnabled} onChange={(value) => updateBusinessConfig({ variantsEnabled: value })} />
+              <FeatureToggle label="مخازن أو فروع متعددة" checked={businessConfig.multipleWarehouses} onChange={(value) => updateBusinessConfig({ multipleWarehouses: value })} />
+              <FeatureToggle label="الباركود" checked={businessConfig.barcodeEnabled} onChange={(value) => updateBusinessConfig({ barcodeEnabled: value })} />
+              <FeatureToggle label="الأرقام التسلسلية والضمان" checked={businessConfig.serialNumbersEnabled} onChange={(value) => updateBusinessConfig({ serialNumbersEnabled: value })} />
+              <FeatureToggle label="الخدمات والمواعيد" checked={businessConfig.appointmentsEnabled} onChange={(value) => updateBusinessConfig({ appointmentsEnabled: value })} />
+              <FeatureToggle label="التوصيل" checked={businessConfig.deliveryEnabled} onChange={(value) => updateBusinessConfig({ deliveryEnabled: value })} />
+            </div>
+            <Field label="خصائص المنتجات (مفصولة بفواصل)" full>
+              <input
+                value={businessConfig.productAttributes.join(', ')}
+                onChange={(event) => updateBusinessConfig({ productAttributes: event.target.value.split(',').map((attribute) => attribute.trim()).filter(Boolean) })}
+                className={inputCls}
+                placeholder="مثال: المقاس، اللون، الموديل"
+              />
+            </Field>
             <div>
               <h4 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">وحدات النظام</h4>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -223,6 +306,7 @@ export const AdminSettingsTab: React.FC = () => {
                       type="checkbox"
                       checked={businessProfile.enabledModules.includes(module.id)}
                       onChange={() => toggleBusinessModule(module.id)}
+                      disabled={module.id === 'inventory' && !businessConfig.trackInventory}
                       className="accent-sky-600"
                     />
                     {module.label}
@@ -355,11 +439,11 @@ export const AdminSettingsTab: React.FC = () => {
               </Field>
               {settings.thermalTransport === 'network' && (
                 <>
-                  <Field label="عنوان IP للطابعة">
+                  <Field label="عنوان IPv4 خاص بالطابعة">
                     <input value={settings.thermalHost || ''} onChange={(e) => set('thermalHost', e.target.value)} placeholder="مثال: 192.168.1.100" className={inputCls} />
                   </Field>
-                  <Field label="المنفذ (عادة 9100)">
-                    <input type="number" value={settings.thermalPort ?? 9100} onChange={(e) => set('thermalPort', Number(e.target.value))} className={inputCls} />
+                  <Field label="منفذ الطباعة الشبكية">
+                    <input value="9100" readOnly className={inputCls} />
                   </Field>
                 </>
               )}
@@ -447,6 +531,11 @@ function readBusinessProfile(): BusinessProfileForm {
   };
 }
 
+function readBusinessConfiguration(): BusinessConfiguration {
+  const type = SettingsService.getValue('businessType') || 'ceramics';
+  return parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), type);
+}
+
 const Field: React.FC<{ label: string; full?: boolean; children: React.ReactNode }> = ({ label, full, children }) => (
   <div className={full ? 'md:col-span-2' : ''}>
     <label className={labelCls}>{label}</label>
@@ -471,6 +560,13 @@ const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; l
       <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${checked ? 'right-0.5' : 'right-4'}`} />
     </span>
   </button>
+);
+
+const FeatureToggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string }> = ({ checked, onChange, label }) => (
+  <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
+    <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="accent-sky-600" />
+    {label}
+  </label>
 );
 
 const ColorInput: React.FC<{ value: string; onChange: (value: string) => void }> = ({ value, onChange }) => (

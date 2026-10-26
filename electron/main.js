@@ -5,6 +5,7 @@ const fsSync = require('fs');
 const { registerPrintingHandlers } = require('./printing');
 const { registerDatabaseHandlers } = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
+const { isAllowedAppUrl, isAllowedIpcSender } = require('./security');
 
 // Keep application data in the OS-standard roaming profile. This is always
 // writable, even when the app itself is installed under Program Files.
@@ -23,27 +24,19 @@ const ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:5173', // Alternative localhost
 ]);
 
+const APP_HTML_PATH = path.join(__dirname, '../dist/index.html');
+
 // Security: Validate IPC senderFrame
 function validateIpcSender(event) {
-  const frame = event.senderFrame;
-  const senderUrl = frame ? frame.url : (event.sender?.getURL?.() || '');
-  
-  // 1. Allow local files (production build)
-  if (senderUrl.startsWith('file://')) {
+  if (isAllowedIpcSender(event, {
+    isPackaged: app.isPackaged,
+    appHtmlPath: APP_HTML_PATH,
+    allowedOrigins: ALLOWED_ORIGINS,
+  })) {
     return true;
   }
 
-  // 2. Allow specific development origins
-  try {
-    const origin = new URL(senderUrl).origin;
-    if (ALLOWED_ORIGINS.has(origin)) {
-      return true;
-    }
-  } catch (error) {
-    // URL parsing failed
-  }
-
-  console.error(`Security: Blocked IPC call from unauthorized senderFrame: ${senderUrl}`);
+  console.error(`Security: Blocked IPC call from unauthorized senderFrame: ${event?.senderFrame?.url || 'unknown'}`);
   throw new Error('Unauthorized IPC caller');
 }
 
@@ -97,16 +90,13 @@ function createWindow() {
 
   // Security: Block internal navigation away from the application
   win.webContents.on('will-navigate', (event, navigationUrl) => {
-    try {
-      const parsedUrl = new URL(navigationUrl);
-      const isAllowedDev = !app.isPackaged && ALLOWED_ORIGINS.has(parsedUrl.origin);
-      const isAllowedProd = app.isPackaged && navigationUrl.startsWith('file://');
-      if (!isAllowedDev && !isAllowedProd) {
-        event.preventDefault();
-        console.warn(`Security: Prevented navigation to ${navigationUrl}`);
-      }
-    } catch {
+    if (!isAllowedAppUrl(navigationUrl, {
+      isPackaged: app.isPackaged,
+      appHtmlPath: APP_HTML_PATH,
+      allowedOrigins: ALLOWED_ORIGINS,
+    })) {
       event.preventDefault();
+      console.warn(`Security: Prevented navigation to ${navigationUrl}`);
     }
   });
 
@@ -164,9 +154,13 @@ function createWindow() {
 registerDatabaseHandlers({
   ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
   APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
+  ensureDirs, databaseFileExists, MAX_DB_SIZE,
 });
-registerAppHandlers({ ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow, appDataDir: APP_DATA_DIR });
-registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR });
+registerAppHandlers({
+  ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
+  appDataDir: APP_DATA_DIR, DATA_DIR, BACKUP_DIR, ensureDirs,
+});
+registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR, MAX_PRINT_DATA });
 app.whenReady().then(() => {
   ensureDirs();
   createWindow();

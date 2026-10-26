@@ -257,11 +257,19 @@ export class PurchaseService {
         }
 
         // Costing strategy uses effective landed unit cost
-        const prevQty = stockRow ? stockRow.quantityM2 : 0;
-        const prevCost = (stockRow ? this.db.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0] : null)?.costPrice || 0;
+        const prevQty = stockRow ? Number(stockRow.quantityM2) : 0;
+        const prevCost = Number(sqliteDb.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0]?.costPrice || 0);
+        const grnQuantityAlreadyInStock = alreadyReceivedInGrn
+          ? Math.min(prevQty, item.grnAcceptedQty)
+          : 0;
         const newCost = method === 'FIFO'
           ? round2(item.effectiveUnitCost)
-          : computeWeightedAverageCost(prevQty, prevCost, item.quantityM2, item.effectiveUnitCost);
+          : computeWeightedAverageCost(
+            prevQty - grnQuantityAlreadyInStock,
+            prevCost,
+            alreadyReceivedInGrn ? item.grnAcceptedQty : item.quantityM2,
+            item.effectiveUnitCost
+          );
         sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
 
         if (!alreadyReceivedInGrn) {

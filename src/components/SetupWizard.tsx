@@ -16,11 +16,15 @@ import { AuthService } from '../services/AuthService';
 import { useToast } from './ui/Toast';
 import { NAV_STORAGE_KEYS } from '../config/navigation';
 import {
+  BUSINESS_UNITS,
   BUSINESS_MODULES,
   BUSINESS_TYPES,
+  getDefaultBusinessConfiguration,
   getProfileModuleIds,
   getProfileHiddenPaths,
+  parseBusinessConfiguration,
   parseEnabledModules,
+  type BusinessConfiguration,
 } from '../config/businessProfiles';
 
 interface SetupWizardProps {
@@ -75,6 +79,10 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       costingMethod: current?.costingMethod ?? 'AVERAGE_COST',
     };
   });
+  const [businessConfig, setBusinessConfig] = useState<BusinessConfiguration>(() => {
+    const businessType = SettingsService.getValue('businessType') || 'ceramics';
+    return parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
+  });
 
   const currencySymbol = useMemo(
     () => CURRENCIES.find((c) => c.code === form.currency)?.symbol || form.currencySymbol,
@@ -84,11 +92,27 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const selectBusinessType = (businessType: string) => setForm((prev) => ({
-    ...prev,
-    businessType,
-    enabledModules: getProfileModuleIds(businessType),
-  }));
+  const selectBusinessType = (businessType: string) => {
+    setForm((prev) => ({
+      ...prev,
+      businessType,
+      enabledModules: getProfileModuleIds(businessType),
+    }));
+    setBusinessConfig(getDefaultBusinessConfiguration(businessType));
+  };
+
+  const updateBusinessConfig = (patch: Partial<BusinessConfiguration>) =>
+    setBusinessConfig((current) => ({ ...current, ...patch }));
+
+  const setInventoryEnabled = (enabled: boolean) => {
+    updateBusinessConfig({ trackInventory: enabled });
+    setForm((current) => ({
+      ...current,
+      enabledModules: enabled
+        ? [...new Set([...current.enabledModules, 'inventory'])]
+        : current.enabledModules.filter((module) => module !== 'inventory'),
+    }));
+  };
 
   const toggleModule = (id: string) => setForm((prev) => ({
     ...prev,
@@ -137,6 +161,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       SettingsService.update({
         showroomName: form.showroomName.trim(),
         businessType: form.businessType,
+        businessProfileConfig: JSON.stringify({ ...businessConfig, businessType: form.businessType }),
         businessTypeLabel: form.businessType === 'custom'
           ? form.businessTypeLabel.trim()
           : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || '',
@@ -247,7 +272,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
             <div className="space-y-4">
               <div className="flex items-start gap-3 rounded-xl border border-sky-100 bg-sky-50 p-3">
                 <Boxes className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
-                <div><h2 className="text-sm font-bold text-slate-900">خصص النظام حسب نشاط المعرض</h2><p className="mt-1 text-xs text-slate-600">اختيار النشاط يجهز القوائم المناسبة، ويمكنك تغييرها لاحقًا من مركز التحكم.</p></div>
+                <div><h2 className="text-sm font-bold text-slate-900">خصص النظام حسب طبيعة عملك</h2><p className="mt-1 text-xs text-slate-600">تُحفظ هذه الخيارات محليًا ويمكن تعديلها لاحقًا من إعدادات النشاط.</p></div>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {BUSINESS_TYPES.map((type) => <button key={type.id} type="button" onClick={() => selectBusinessType(type.id)} className={`rounded-xl border p-3 text-right transition ${form.businessType === type.id ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500' : 'border-slate-200 hover:border-sky-300'}`}>
@@ -265,8 +290,56 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   />
                 </div>
               )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>نموذج العمل</label>
+                  <select value={businessConfig.businessModel} onChange={(e) => updateBusinessConfig({ businessModel: e.target.value as BusinessConfiguration['businessModel'] })} className={inputClass}>
+                    <option value="products">بيع منتجات</option>
+                    <option value="services">تقديم خدمات</option>
+                    <option value="mixed">منتجات وخدمات</option>
+                  </select>
+                </div>
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
+                  <span>إدارة المخزون</span>
+                  <input type="checkbox" checked={businessConfig.trackInventory} onChange={(e) => setInventoryEnabled(e.target.checked)} className="h-4 w-4 accent-sky-600" />
+                </label>
+              </div>
+              <div>
+                <h3 className="mb-2 text-xs font-bold text-slate-700">وحدات المنتجات والخدمات</h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {BUSINESS_UNITS.map((unit) => (
+                    <label key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+                      <input type="checkbox" checked={businessConfig.units.includes(unit.id)} onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })} className="accent-sky-600" />
+                      {unit.label}
+                    </label>
+                  ))}
+                </div>
+                <input
+                  value={businessConfig.customUnits.join(', ')}
+                  onChange={(e) => updateBusinessConfig({ customUnits: e.target.value.split(',').map((unit) => unit.trim()).filter(Boolean) })}
+                  className={`${inputClass} mt-2`}
+                  placeholder="وحدات مخصصة، مفصولة بفواصل"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+                  <input type="checkbox" checked={businessConfig.variantsEnabled} onChange={(e) => updateBusinessConfig({ variantsEnabled: e.target.checked })} className="accent-sky-600" /> ألوان أو مقاسات أو موديلات
+                </label>
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+                  <input type="checkbox" checked={businessConfig.multipleWarehouses} onChange={(e) => updateBusinessConfig({ multipleWarehouses: e.target.checked })} className="accent-sky-600" /> مخازن أو فروع متعددة
+                </label>
+              </div>
+              <div>
+                <label className={labelClass}>خصائص المنتجات (مفصولة بفواصل)</label>
+                <input
+                  value={businessConfig.productAttributes.join(', ')}
+                  onChange={(e) => updateBusinessConfig({ productAttributes: e.target.value.split(',').map((attribute) => attribute.trim()).filter(Boolean) })}
+                  className={inputClass}
+                  placeholder="مثال: المقاس، اللون، الموديل"
+                />
+              </div>
               <div><h3 className="mb-2 text-xs font-bold text-slate-700">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {BUSINESS_MODULES.map((module) => <label key={module.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"><input type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} className="accent-sky-600" />{module.label}</label>)}
+                {BUSINESS_MODULES.map((module) => <label key={module.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 ${module.id === 'inventory' && !businessConfig.trackInventory ? 'opacity-50' : ''}`}><input type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={module.id === 'inventory' && !businessConfig.trackInventory} className="accent-sky-600" />{module.label}</label>)}
               </div></div>
             </div>
           )}
@@ -381,6 +454,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   ['المعرض', form.showroomName || '—'],
                   ['نوع النشاط', form.businessType === 'custom' ? form.businessTypeLabel || 'نشاط مخصص' : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || 'معرض متعدد الأنشطة'],
                   ['الوحدات المفعلة', `${form.enabledModules.length} وحدات`],
+                  ['نموذج العمل', businessConfig.businessModel === 'services' ? 'خدمات' : businessConfig.businessModel === 'mixed' ? 'منتجات وخدمات' : 'منتجات'],
+                  ['إدارة المخزون', businessConfig.trackInventory ? 'مفعلة' : 'معطلة'],
+                  ['وحدات القياس', `${businessConfig.units.length + businessConfig.customUnits.length} وحدات`],
                   ['الهاتف', form.phone || '—'],
                   ['العملة', `${form.currency} (${currencySymbol})`],
                   ['الضريبة الافتراضية', `${form.taxPercentage || 0}%`],

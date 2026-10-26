@@ -3,11 +3,15 @@ import type { UnitType } from '../types';
 const UNIT_LABELS: Record<Exclude<UnitType, 'CUSTOM'>, string> = {
   M2: 'م²',
   LINEAR_METER: 'متر طولي',
+  METER: 'متر',
   BOX: 'كرتونة',
   PIECE: 'قطعة',
+  PACK: 'عبوة',
   KG: 'كجم',
   TON: 'طن',
+  LITER: 'لتر',
   SET: 'طقم',
+  SERVICE: 'خدمة',
 };
 
 // Invoice rows saved before unit metadata was added may not include baseUnit.

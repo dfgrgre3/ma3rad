@@ -151,7 +151,7 @@ export class PrintService {
         const bytes = EscPosService.buildReceiptBytes(invoice, settings, width);
         const isNetwork = settings.thermalTransport === 'network';
         const res = await window.ceramisys.printing.raw(bytes, settings.thermalPrinterName, isNetwork
-          ? { transport: 'network', host: settings.thermalHost, port: settings.thermalPort }
+          ? { transport: 'network', host: settings.thermalHost, port: 9100 }
           : { transport: 'system' });
         if (res?.ok) return;
         console.warn('Direct ESC/POS printing failed, falling back to dialog:', res?.error);

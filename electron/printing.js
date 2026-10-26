@@ -4,7 +4,28 @@ const fsSync = require('fs');
 const { execFile } = require('child_process');
 const net = require('net');
 
-function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir }) {
+const NETWORK_PRINTER_PORT = 9100;
+
+function isAllowedNetworkPrinterAddress(host) {
+  if (typeof host !== 'string' || net.isIP(host) !== 4) return false;
+  const [first, second] = host.split('.').map(Number);
+  return first === 10
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168)
+    || (first === 169 && second === 254);
+}
+
+function isAllowedNetworkPrinterPort(port) {
+  return Number(port) === NETWORK_PRINTER_PORT;
+}
+
+function isValidPrintBytes(bytes, maxSize) {
+  return Array.isArray(bytes)
+    && bytes.length <= maxSize
+    && bytes.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255);
+}
+
+function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_PRINT_DATA }) {
   function runPowerShell(script) {
     return new Promise((resolve, reject) => {
       execFile(
@@ -44,7 +65,7 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir }) {
   // works on every OS and is the most common way receipt printers are wired.
   function sendRawToNetworkPrinter(bytes, host, port) {
     return new Promise((resolve, reject) => {
-      const socket = net.createConnection({ host, port: Number(port) || 9100 });
+      const socket = net.createConnection({ host, port });
       let settled = false;
       const done = (err) => {
         if (settled) return;
@@ -64,7 +85,8 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir }) {
     validateIpcSender(event);
     let tempFile = null;
     try {
-      if (!Array.isArray(bytes) || (!printerName && transport !== 'network')) {
+      if (!Array.isArray(bytes) || bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
+        || (!printerName && transport !== 'network')) {
         return { ok: false, error: 'معطيات الطباعة غير مكتملة' };
       }
       if (bytes.length > MAX_PRINT_DATA) {
@@ -72,16 +94,14 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir }) {
       }
       const buf = Buffer.from(bytes);
 
-      // Network (TCP 9100) transport — validate host and port strictly
       if (transport === 'network') {
-        if (!host || typeof host !== 'string' || !/^[a-zA-Z0-9.-]+$/.test(host)) {
-          return { ok: false, error: 'عنوان الطابعة الشبكية غير صحيح أو يحتوي على رموز غير مسموحة' };
+        if (!isAllowedNetworkPrinterAddress(host)) {
+          return { ok: false, error: 'عنوان الطابعة يجب أن يكون عنوان IPv4 خاصاً بالشبكة المحلية.' };
         }
-        const portNum = Number(port) || 9100;
-        if (portNum < 1 || portNum > 65535) {
-          return { ok: false, error: 'منفذ الطابعة الشبكية غير صحيح' };
+        if (!isAllowedNetworkPrinterPort(port)) {
+          return { ok: false, error: `اتصال الطابعة الشبكية مسموح عبر المنفذ ${NETWORK_PRINTER_PORT} فقط.` };
         }
-        await sendRawToNetworkPrinter(buf, host, portNum);
+        await sendRawToNetworkPrinter(buf, host, NETWORK_PRINTER_PORT);
         return { ok: true };
       }
 
@@ -155,7 +175,7 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir }) {
     validateIpcSender(event);
     const tempFile = path.join(appDataDir, `escpos-${Date.now()}.bin`);
     try {
-      if (!Array.isArray(bytes) || !printerName) {
+      if (!isValidPrintBytes(bytes, MAX_PRINT_DATA) || !printerName) {
         return { ok: false, error: 'معطيات الطباعة غير مكتملة' };
       }
       await fs.writeFile(tempFile, Buffer.from(bytes));
@@ -174,4 +194,9 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir }) {
   });
 }
 
-module.exports = { registerPrintingHandlers };
+module.exports = {
+  registerPrintingHandlers,
+  isAllowedNetworkPrinterAddress,
+  isAllowedNetworkPrinterPort,
+  isValidPrintBytes,
+};

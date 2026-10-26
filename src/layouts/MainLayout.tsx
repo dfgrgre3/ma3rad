@@ -4,80 +4,12 @@ import { ShieldAlert } from 'lucide-react';
 import { Header } from '../components/Header';
 import { NotificationService } from '../services/NotificationService';
 import { PermissionService } from '../services/PermissionService';
+import { NavigationService } from '../services/NavigationService';
 import { User } from '../types';
 
 interface MainLayoutProps {
   currentUser?: User | null;
   onLogout?: () => void;
-}
-
-// Route prefix -> permission required. Longest prefix wins.
-const ROUTE_PERMISSIONS: Array<[string, string]> = [
-  ['/data-import', 'settings.view'],
-  ['/dashboard/executive', 'dashboard.view'],
-  ['/dashboard', 'dashboard.view'],
-  ['/daily/sales', 'sales.view'],
-  ['/daily/purchases', 'purchases.view'],
-  ['/daily/expenses', 'cashier.expense'],
-  ['/daily/debts', 'finance.debts.view'],
-  ['/sales/analytics', 'sales.view'],
-  ['/pos', 'sales.create'],
-  ['/quotations', 'quotations.view'],
-  ['/orders', 'orders.view'],
-  ['/returns', 'returns.view'],
-  ['/sales', 'sales.view'],
-  ['/products/attributes', 'products.view'],
-  ['/products/barcodes', 'products.view'],
-  ['/products', 'products.view'],
-  ['/categories', 'categories.view'],
-  ['/brands', 'brands.view'],
-  ['/pricing', 'pricing.view'],
-  ['/promotions', 'promotions.view'],
-  ['/inventory/transfers', 'inventory.transfer'],
-  ['/inventory/counts', 'inventory.count'],
-  ['/inventory/adjustments', 'inventory.adjust'],
-  ['/inventory/damage-quarantine', 'inventory.adjust'],
-  ['/inventory/ledger', 'inventory.view'],
-  ['/inventory/valuation', 'inventory.view'],
-  ['/inventory', 'inventory.view'],
-  ['/branches', 'branches.view'],
-  ['/warehouses', 'warehouses.view'],
-  ['/employees', 'employees.view'],
-  ['/deliveries', 'deliveries.view'],
-  ['/drivers', 'drivers.view'],
-  ['/vehicles', 'vehicles.view'],
-  ['/customers', 'customers.view'],
-  ['/crm', 'crm.view'],
-  ['/fleet/dashboard', 'deliveries.view'],
-  ['/hr/dashboard', 'employees.view'],
-  ['/projects', 'projects.view'],
-  ['/suppliers', 'suppliers.view'],
-  ['/purchases/requests', 'purchases.view'],
-  ['/purchases/orders', 'purchases.view'],
-  ['/purchases/returns', 'purchases.return'],
-  ['/purchases', 'purchases.view'],
-  ['/cashboxes', 'cashier.view'],
-  ['/finance/expenses', 'cashier.expense'],
-  ['/finance/debts', 'finance.debts.view'],
-  ['/finance/installments', 'finance.installments.view'],
-  ['/finance', 'finance.view'],
-  ['/reports', 'reports.view'],
-  ['/approvals', 'approvals.view'],
-  ['/notifications', 'notifications.view'],
-  ['/audit', 'audit.view'],
-  ['/security', 'users.view'],
-  ['/users', 'users.view'],
-  ['/backup', 'settings.backup'],
-  ['/system-health', 'settings.view'],
-  ['/admin', 'admin.view'],
-  ['/settings', 'settings.view'],
-];
-
-function requiredPermission(pathname: string): string | null {
-  const match = ROUTE_PERMISSIONS.find(
-    ([prefix]) => pathname === prefix || pathname.startsWith(prefix + '/')
-  );
-  return match ? match[1] : null;
 }
 
 // ─── Context for sharing user across layout ───────────────────────────────────
@@ -93,7 +25,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const required = requiredPermission(location.pathname);
+  const required = NavigationService.getRequiredPermission(location.pathname);
   const isAllowed = !required || PermissionService.can(currentUser, required);
 
   useEffect(() => {

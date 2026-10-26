@@ -14,6 +14,7 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
   await db.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'AVERAGE_COST')`);
 
   const procurement = new ProcurementService();
   const purchaseService = new PurchaseService();
@@ -168,6 +169,8 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
 
   assert.ok(inv.id);
   assert.equal(inv.supplierInvoiceNumber, 'INV-SUP-1001');
+  const costAfterGrnInvoice = Number(db.query<any>(`SELECT cost_price FROM products WHERE id = ?`, [prodId])[0].costPrice);
+  assert.equal(costAfterGrnInvoice, 106.63, 'Weighted-average cost must include the GRN quantity only once');
 
   // Duplicate invoice check: Attempting to create another invoice with same number throws
   assert.throws(() => {

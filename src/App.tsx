@@ -4,6 +4,7 @@ import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
 import { PermissionService } from './services/PermissionService';
 import { SettingsService } from './services/SettingsService';
+import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from './config/businessProfiles';
 import { User } from './types';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SetupWizard } from './components/SetupWizard';
@@ -304,7 +305,7 @@ export const App: React.FC = () => {
 // ─── Inner component that has access to router context ────────────────────────
 // We need to pass currentUser/darkMode down to MainLayout via a wrapper
 // because AppRouter renders MainLayout as the root route element.
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { MainLayout } from './layouts/MainLayout';
 import { lazy, Suspense } from 'react';
 
@@ -423,6 +424,14 @@ const DataDeletionPage       = lazy(() => import('./pages/admin/DataDeletionPage
 const NotFoundPage           = lazy(() => import('./pages/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
 function S({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  const businessType = SettingsService.getValue('businessType') || 'ceramics';
+  const modules = parseEnabledModules(SettingsService.getValue('enabledModules'), businessType);
+  const businessConfig = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
+  const moduleId = getBusinessModuleForPath(pathname);
+  if (moduleId && (!modules.includes(moduleId) || (moduleId === 'inventory' && !businessConfig.trackInventory))) {
+    return <Navigate to="/dashboard" replace />;
+  }
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
@@ -444,7 +453,7 @@ const AppRouterWithProps: React.FC<{
 
       {/* Dashboard */}
       <Route path="dashboard" element={<S><DashboardView /></S>} />
-      <Route path="dashboard/executive" element={<Navigate to="/dashboard" replace />} />
+      <Route path="dashboard/executive" element={<S><ExecutiveDashboard /></S>} />
 
       {/* Sales / POS */}
       <Route path="sales/analytics" element={<S><SalesAnalyticsPage /></S>} />
@@ -499,7 +508,7 @@ const AppRouterWithProps: React.FC<{
       <Route path="customers/ready-deliveries" element={<S><ReadyDeliveriesPage /></S>} />
       <Route path="customers/:id/imported-products" element={<S><CustomerImportedProductsPage /></S>} />
       <Route path="customers/:id" element={<S><CustomerDetailPage /></S>} />
-      <Route path="crm" element={<Navigate to="/dashboard" replace />} />
+      <Route path="crm" element={<Navigate to="/crm/dashboard" replace />} />
       <Route path="crm/dashboard" element={<S><CrmDashboardPage /></S>} />
       <Route path="crm/leads" element={<S><LeadsPage /></S>} />
       <Route path="crm/pipeline" element={<S><PipelinePage /></S>} />
@@ -522,7 +531,7 @@ const AppRouterWithProps: React.FC<{
       {/* Finance */}
       <Route path="cashboxes" element={<S><CashierView /></S>} />
       <Route path="finance" element={<S><FinanceOverviewPage /></S>} />
-      <Route path="finance/debts" element={<Navigate to="/dashboard" replace />} />
+      <Route path="finance/debts" element={<Navigate to="/finance/other-receivables" replace />} />
       <Route path="finance/other-receivables" element={<S><OtherReceivablesPage /></S>} />
       <Route path="finance/installments" element={<S><InstallmentsPage /></S>} />
       <Route path="finance/expenses" element={<S><ExpensesPage /></S>} />

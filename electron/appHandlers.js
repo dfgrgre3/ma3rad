@@ -1,4 +1,7 @@
-function registerAppHandlers({ ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow, appDataDir }) {
+function registerAppHandlers({
+  ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
+  appDataDir, DATA_DIR, BACKUP_DIR, ensureDirs,
+}) {
   ipcMain.handle('app:info', async (event) => {
     validateIpcSender(event);
     return {

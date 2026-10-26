@@ -17,13 +17,19 @@ import { Product, CeramicGrade, UnitType, Warehouse } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { exportToExcel } from '../utils/export';
+import { SettingsService } from '../services/SettingsService';
+import { parseBusinessConfiguration } from '../config/businessProfiles';
 
 const UNITS: { value: UnitType; label: string }[] = [
   { value: 'M2', label: 'متر مربع (م²)' },
   { value: 'LINEAR_METER', label: 'متر طولي' },
+  { value: 'METER', label: 'متر' },
   { value: 'KG', label: 'كيلوجرام' },
   { value: 'TON', label: 'طن' },
+  { value: 'LITER', label: 'لتر' },
   { value: 'SET', label: 'طقم' },
+  { value: 'PACK', label: 'عبوة' },
+  { value: 'SERVICE', label: 'خدمة' },
   { value: 'BOX', label: 'كرتونة' },
   { value: 'PIECE', label: 'قطعة' },
 ];
@@ -108,8 +114,8 @@ interface VariantDraft {
 
 type TabId = 'basic' | 'units' | 'pricing' | 'stock' | 'extras';
 
-const emptyForm = (categoryId = '', brandId = ''): FormState => ({
-  productType: 'CERAMIC',
+const emptyForm = (categoryId = '', brandId = '', productType: FormState['productType'] = 'CERAMIC'): FormState => ({
+  productType,
   name: '',
   sku: '',
   barcode: '',
@@ -226,6 +232,10 @@ export const ProductsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('basic');
 
   const [formData, setFormData] = useState<FormState>(emptyForm());
+  const [businessConfig] = useState(() => {
+    const type = SettingsService.getValue('businessType') || 'ceramics';
+    return parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), type);
+  });
   const [openingRows, setOpeningRows] = useState<OpeningStockRow[]>([]);
   const [variants, setVariants] = useState<VariantDraft[]>([]);
   const [removedVariantIds, setRemovedVariantIds] = useState<string[]>([]);
@@ -235,6 +245,16 @@ export const ProductsView: React.FC = () => {
   const [removedImageIds, setRemovedImageIds] = useState<string[]>([]);
   const [editStock, setEditStock] = useState<{ warehouseName: string; quantityM2: number }[]>([]);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const profileUnitOptions = useMemo(() => {
+    const options = UNITS.filter((unit) => businessConfig.units.includes(unit.value));
+    if (businessConfig.customUnits.length > 0) options.push({ value: 'CUSTOM', label: 'وحدة مخصصة' });
+    if (!options.some((unit) => unit.value === formData.baseUnit)) {
+      const existing = UNITS.find((unit) => unit.value === formData.baseUnit);
+      options.push(existing || { value: formData.baseUnit, label: unitLabelFor(formData.baseUnit, formData.customUnit) });
+    }
+    return options;
+  }, [businessConfig, formData.baseUnit, formData.customUnit]);
 
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
   const [stockReason, setStockReason] = useState('إضافة كمية للمخزون');
@@ -360,8 +380,12 @@ export const ProductsView: React.FC = () => {
     setEditStock([]);
     const randCode = Date.now().toString().slice(-6);
     setFormData({
-      ...emptyForm(categories[0]?.id || '', brands[0]?.id || ''),
-      sku: `TILE-${randCode}`,
+      ...emptyForm(
+        categories[0]?.id || '',
+        brands[0]?.id || '',
+        businessConfig.businessType === 'ceramics' ? 'CERAMIC' : 'GENERAL',
+      ),
+      sku: `${businessConfig.businessType === 'ceramics' ? 'TILE' : 'SKU'}-${randCode}`,
       barcode: `622${randCode}01`,
     });
     setOpeningRows([defaultOpeningRow(warehouses[0]?.id || '')]);
@@ -1413,8 +1437,7 @@ export const ProductsView: React.FC = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <Field label="وحدة المخزون والبيع">
                           <select value={formData.baseUnit} onChange={(e) => setFormData({ ...formData, baseUnit: e.target.value as UnitType, sellUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
-                            {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-                            <option value="CUSTOM">أخرى (اكتب الوحدة)</option>
+                            {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                           </select>
                         </Field>
                         {formData.baseUnit === ('CUSTOM' as UnitType) && <Field label="اسم الوحدة" required>
@@ -1461,12 +1484,12 @@ export const ProductsView: React.FC = () => {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <Field label="وحدة الأساس">
                         <select value={formData.baseUnit} onChange={(e) => setFormData({ ...formData, baseUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
-                          {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                          {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                         </select>
                       </Field>
                       <Field label="وحدة البيع">
                         <select value={formData.sellUnit} onChange={(e) => setFormData({ ...formData, sellUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
-                          {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                          {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                         </select>
                       </Field>
                       <Field label={`المترات / ${unitLabel} بالكرتونة`}>

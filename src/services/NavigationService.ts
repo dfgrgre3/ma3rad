@@ -20,6 +20,27 @@ function parseJson<T>(raw: string | undefined, fallback: T): T {
 }
 
 export class NavigationService {
+  private static readonly routePermissions: Array<[string, string]> = [
+    ['/admin/data-deletion', 'admin.data'],
+    ['/data-import/types', 'settings.view'],
+    ['/finance/debts', 'finance.debts.view'],
+    ['/crm', 'crm.view'],
+    ['/dashboard/executive', 'dashboard.view'],
+  ];
+
+  public static getRequiredPermission(pathname: string): string | null {
+    const routes = [
+      ...NAV_GROUPS.flatMap((group) =>
+        group.items.flatMap((item) => item.perm ? [[item.to, item.perm] as [string, string]] : [])
+      ),
+      ...NavigationService.routePermissions,
+    ];
+    const match = routes
+      .filter(([path]) => pathname === path || pathname.startsWith(`${path}/`))
+      .sort((a, b) => b[0].length - a[0].length)[0];
+    return match?.[1] ?? null;
+  }
+
   public static getOverrides(): NavOverrides {
     return {
       hidden: parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.hidden), []),

@@ -53,6 +53,8 @@ export class DatabaseManager {
   private pageCache = new Map<string, { expiresAt: number; value: any }>();
   private readonly pageCacheTtlMs = 15000;
   private persistQueue: Promise<void> = Promise.resolve();
+  private pendingSnapshot: Uint8Array | null = null;
+  private isPersisting = false;
   private lastPersistError: string | null = null;
   private initializedSuccessfully = false;
   private storageBackend: 'file' | 'localStorage' | 'none' = 'none';
@@ -151,6 +153,7 @@ export class DatabaseManager {
     // previous localStorage snapshot is only used to migrate existing installs.
     const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
     let savedBytes: Uint8Array | null = null;
+    let loadedFromFile = false;
     let isFreshDatabase = true;
 
     if (fileApi?.load) {
@@ -163,6 +166,7 @@ export class DatabaseManager {
       if (loaded !== null) {
         savedBytes = toUint8Array(loaded);
         if (!savedBytes) throw new Error('تعذر قراءة ملف قاعدة البيانات بسبب صيغة بيانات غير صالحة.');
+        loadedFromFile = true;
         this.storageBackend = 'file';
       }
     }
@@ -209,9 +213,8 @@ export class DatabaseManager {
     if (!isFreshDatabase && !this.isMigrationApplied('045_reconcile_invoice_gross_profit')) {
       try {
         if (!savedBytes) throw new Error('تعذر الوصول إلى نسخة قاعدة البيانات الأصلية.');
-        const backupApi = typeof window !== 'undefined' ? window.ceramisys?.db?.backupSnapshot : undefined;
-        if (backupApi) {
-          const backup = await backupApi(savedBytes, 'before-gross-profit-policy');
+        if (loadedFromFile && fileApi?.backup) {
+          const backup = await fileApi.backup('before-gross-profit-policy');
           if (!backup?.ok || !backup.path) throw new Error(backup?.error || 'لم يتم إنشاء نسخة احتياطية.');
         } else if (typeof localStorage !== 'undefined') {
           localStorage.setItem(
@@ -447,31 +450,41 @@ export class DatabaseManager {
    * overwrite a newer snapshot with an older one.
    */
   private persist(snapshot: Uint8Array): void {
+    this.pendingSnapshot = snapshot;
+    if (this.isPersisting) return;
+    this.isPersisting = true;
     this.persistQueue = this.persistQueue
       .then(async () => {
-        const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
-        if (fileApi?.save) {
-          const result = await fileApi.save(snapshot);
-          if (!result?.ok) throw new Error(result?.error || 'فشل حفظ قاعدة البيانات على القرص');
-          this.storageBackend = 'file';
-          this.lastPersistError = null;
-          if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
-            try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
-            this.migratedLegacyStorage = false;
+        while (this.pendingSnapshot) {
+          const nextSnapshot = this.pendingSnapshot;
+          this.pendingSnapshot = null;
+          try {
+            const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+            if (fileApi?.save) {
+              const result = await fileApi.save(nextSnapshot);
+              if (!result?.ok) throw new Error(result?.error || 'فشل حفظ قاعدة البيانات على القرص');
+              this.storageBackend = 'file';
+              this.lastPersistError = null;
+              if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
+                try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
+                this.migratedLegacyStorage = false;
+              }
+            } else if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(DB_STORAGE_KEY, bytesToBase64(nextSnapshot));
+              this.storageBackend = 'localStorage';
+              this.lastPersistError = null;
+            } else {
+              this.storageBackend = 'none';
+            }
+          } catch (error) {
+            this.lastPersistError = error instanceof Error ? error.message : String(error);
+            console.error('Failed to persist SQLite database', error);
           }
-          return;
         }
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(DB_STORAGE_KEY, bytesToBase64(snapshot));
-          this.storageBackend = 'localStorage';
-          this.lastPersistError = null;
-          return;
-        }
-        this.storageBackend = 'none';
       })
-      .catch((e) => {
-        this.lastPersistError = e instanceof Error ? e.message : String(e);
-        console.error('Failed to persist SQLite database', e);
+      .finally(() => {
+        this.isPersisting = false;
+        if (this.pendingSnapshot) this.persist(this.pendingSnapshot);
       });
   }
 
@@ -482,7 +495,9 @@ export class DatabaseManager {
       this.debounceSaveTimer = null;
       this.saveToStorage();
     }
-    await this.persistQueue;
+    do {
+      await this.persistQueue;
+    } while (this.isPersisting || this.pendingSnapshot);
   }
 
   public getStorageBackend(): 'file' | 'localStorage' | 'none' {
