@@ -207,47 +207,81 @@ export class SupplierService {
     const sup = this.getSupplierById(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
 
+    const invoiceScope = this.branchAccess.sqlScope(
+      'pi.branch_id',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)',
+    );
+    const paymentScope = this.branchAccess.sqlScope(
+      'sp.branch_id',
+      '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = sp.register_id)',
+    );
+    const returnScope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
+    const claimScope = this.branchAccess.supplierClaimBranchScope('supplier_claims');
+
     const purchases = this.db.query<any>(`
-      SELECT id, date, invoice_number as docNumber, total_amount as credit, paid_amount, created_at
-      FROM purchase_invoices
-      WHERE supplier_id = ? AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
-    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
+      SELECT pi.id, pi.date, pi.invoice_number as docNumber, pi.total_amount as credit,
+        pi.paid_amount, pi.created_at
+      FROM purchase_invoices pi
+      WHERE pi.supplier_id = ? AND (? = '' OR pi.date >= ?) AND (? = '' OR pi.date <= ?)
+        AND ${invoiceScope.clause}
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '', ...invoiceScope.params]);
 
     const payments = this.db.query<any>(`
-      SELECT id, date, receipt_number as docNumber, amount as debit, created_at, notes
-      FROM supplier_payments
-      WHERE supplier_id = ? AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
-    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
+      SELECT sp.id, sp.date, sp.receipt_number as docNumber, sp.amount as debit, sp.created_at, sp.notes
+      FROM supplier_payments sp
+      WHERE sp.supplier_id = ? AND (? = '' OR sp.date >= ?) AND (? = '' OR sp.date <= ?)
+        AND ${paymentScope.clause}
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '', ...paymentScope.params]);
 
     const returns = this.db.query<any>(`
-      SELECT id, date, return_number as docNumber, total_amount as debit, created_at, reason
-      FROM purchase_returns
-      WHERE supplier_id = ? AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
-    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
+      SELECT pr.id, pr.date, pr.return_number as docNumber, pr.total_amount as debit, pr.created_at, pr.reason
+      FROM purchase_returns pr
+      LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
+      LEFT JOIN warehouses w ON w.id = pr.warehouse_id
+      WHERE pr.supplier_id = ? AND (? = '' OR pr.date >= ?) AND (? = '' OR pr.date <= ?)
+        AND ${returnScope.clause}
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '', ...returnScope.params]);
 
     const claims = this.db.query<any>(`
       SELECT id, date, claim_number as docNumber, agreed_amount as debit, created_at, notes
       FROM supplier_claims
       WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE'
         AND (? = '' OR date >= ?) AND (? = '' OR date <= ?)
-    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '']);
+        AND ${claimScope.clause}
+    `, [supplierId, fromDate || '', fromDate || '', toDate || '', toDate || '', ...claimScope.params]);
 
     const totals = this.db.query<{ purchases: number; payments: number; returns: number; claims: number }>(`
       SELECT
-        COALESCE((SELECT SUM(total_amount) FROM purchase_invoices WHERE supplier_id = ?), 0) AS purchases,
-        COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ?), 0) AS payments,
-        COALESCE((SELECT SUM(total_amount) FROM purchase_returns WHERE supplier_id = ?), 0) AS returns,
-        COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE'), 0) AS claims
-    `, [supplierId, supplierId, supplierId, supplierId])[0];
+        COALESCE((SELECT SUM(pi.total_amount) FROM purchase_invoices pi WHERE pi.supplier_id = ? AND ${invoiceScope.clause}), 0) AS purchases,
+        COALESCE((SELECT SUM(sp.amount) FROM supplier_payments sp WHERE sp.supplier_id = ? AND ${paymentScope.clause}), 0) AS payments,
+        COALESCE((SELECT SUM(pr.total_amount) FROM purchase_returns pr
+          LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
+          LEFT JOIN warehouses w ON w.id = pr.warehouse_id
+          WHERE pr.supplier_id = ? AND ${returnScope.clause}), 0) AS returns,
+        COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND ${claimScope.clause}), 0) AS claims
+    `, [
+      supplierId, ...invoiceScope.params,
+      supplierId, ...paymentScope.params,
+      supplierId, ...returnScope.params,
+      supplierId, ...claimScope.params,
+    ])[0];
 
     const beforeRange = fromDate
       ? this.db.query<{ purchases: number; payments: number; returns: number; claims: number }>(`
         SELECT
-          COALESCE((SELECT SUM(total_amount) FROM purchase_invoices WHERE supplier_id = ? AND date < ?), 0) AS purchases,
-          COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE supplier_id = ? AND date < ?), 0) AS payments,
-          COALESCE((SELECT SUM(total_amount) FROM purchase_returns WHERE supplier_id = ? AND date < ?), 0) AS returns,
-          COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND date < ?), 0) AS claims
-      `, [supplierId, fromDate, supplierId, fromDate, supplierId, fromDate, supplierId, fromDate])[0]
+          COALESCE((SELECT SUM(pi.total_amount) FROM purchase_invoices pi WHERE pi.supplier_id = ? AND pi.date < ? AND ${invoiceScope.clause}), 0) AS purchases,
+          COALESCE((SELECT SUM(sp.amount) FROM supplier_payments sp WHERE sp.supplier_id = ? AND sp.date < ? AND ${paymentScope.clause}), 0) AS payments,
+          COALESCE((SELECT SUM(pr.total_amount) FROM purchase_returns pr
+            LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
+            LEFT JOIN warehouses w ON w.id = pr.warehouse_id
+            WHERE pr.supplier_id = ? AND pr.date < ? AND ${returnScope.clause}), 0) AS returns,
+          COALESCE((SELECT SUM(agreed_amount) FROM supplier_claims WHERE supplier_id = ? AND status = 'SETTLED' AND resolution_type = 'DEBIT_NOTE' AND date < ? AND ${claimScope.clause}), 0) AS claims
+      `, [
+        supplierId, fromDate, ...invoiceScope.params,
+        supplierId, fromDate, ...paymentScope.params,
+        supplierId, fromDate, ...returnScope.params,
+        supplierId, fromDate, ...claimScope.params,
+      ])[0]
       : { purchases: 0, payments: 0, returns: 0, claims: 0 };
 
     const allRecords: any[] = [
@@ -320,12 +354,17 @@ export class SupplierService {
   }
 
   public getInvoicesWithAllocations(supplierId: string) {
+    const invoiceScope = this.branchAccess.sqlScope(
+      'pi.branch_id',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)',
+    );
     const invoices = this.db.query<any>(`
-      SELECT id, invoice_number, supplier_invoice_number, date, total_amount, paid_amount, remaining_amount, payment_status
-      FROM purchase_invoices
-      WHERE supplier_id = ?
-      ORDER BY date DESC, created_at DESC
-    `, [supplierId]);
+      SELECT pi.id, pi.invoice_number, pi.supplier_invoice_number, pi.date, pi.total_amount,
+             pi.paid_amount, pi.remaining_amount, pi.payment_status
+      FROM purchase_invoices pi
+      WHERE pi.supplier_id = ? AND ${invoiceScope.clause}
+      ORDER BY pi.date DESC, pi.created_at DESC
+    `, [supplierId, ...invoiceScope.params]);
 
     return invoices.map(inv => {
       const allocations = this.db.query<any>(`
@@ -343,12 +382,16 @@ export class SupplierService {
   }
 
   public getPaymentsWithAllocations(supplierId: string) {
+    const paymentScope = this.branchAccess.sqlScope(
+      'sp.branch_id',
+      '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = sp.register_id)',
+    );
     const payments = this.db.query<any>(`
-      SELECT id, receipt_number, date, amount, payment_type, notes
-      FROM supplier_payments
-      WHERE supplier_id = ?
-      ORDER BY date DESC, created_at DESC
-    `, [supplierId]);
+      SELECT sp.id, sp.receipt_number, sp.date, sp.amount, sp.payment_type, sp.notes
+      FROM supplier_payments sp
+      WHERE sp.supplier_id = ? AND ${paymentScope.clause}
+      ORDER BY sp.date DESC, sp.created_at DESC
+    `, [supplierId, ...paymentScope.params]);
 
     return payments.map(pay => {
       const allocations = this.db.query<any>(`

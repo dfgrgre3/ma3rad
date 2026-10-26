@@ -9,6 +9,7 @@ import { DatabaseManager } from '../../database/db';
 import { CustomerService } from '../../services/CustomerService';
 import { PricingService } from '../../services/PricingService';
 import { ProductService } from '../../services/ProductService';
+import { BranchAccessService } from '../../services/BranchAccessService';
 import { useToast } from '../../components/ui/Toast';
 import { format } from 'date-fns';
 import { Customer, Product } from '../../types';
@@ -79,26 +80,57 @@ export const CustomerDetailPage: React.FC = () => {
     setLoading(true);
     try {
       const db = DatabaseManager.getInstance();
+      const branchAccess = new BranchAccessService();
+      // Customer master data is shared, but every transactional row shown here must
+      // stay inside the branches the current user is allowed to see.
+      const invoiceScope = branchAccess.sqlScope(
+        'si.branch_id',
+        '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)'
+      );
+      const paymentScope = branchAccess.sqlScope(
+        'cp.branch_id',
+        '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = cp.register_id)'
+      );
+      const orderScope = branchAccess.sqlScope(
+        'o.branch_id',
+        '(SELECT w.branch_id FROM warehouses w WHERE w.id = o.warehouse_id)'
+      );
+      const quotationScope = branchAccess.sqlScope(
+        '(SELECT w.branch_id FROM warehouses w WHERE w.id = q.warehouse_id)'
+      );
+      const quotationClause = `(q.warehouse_id IS NULL OR ${quotationScope.clause})`;
+      const projectScope = branchAccess.sqlScope('pr.branch_id');
+      const projectClause = `(pr.branch_id IS NULL OR ${projectScope.clause})`;
       setCustomer(new CustomerService().getCustomerById(id));
       setLists({
-        sales: db.query(`SELECT id, invoice_number AS n1, date, total_amount AS amount, paid_amount AS paid,
-          remaining_amount AS remaining, payment_status AS status FROM sales_invoices
-          WHERE customer_id = ? AND invoice_status != 'VOID' ORDER BY date DESC LIMIT 100`, [id]),
-        quotations: db.query(`SELECT quotation_number AS n1, date, total_amount AS amount, status,
-          valid_until AS extra FROM quotations WHERE customer_id = ? ORDER BY date DESC`, [id]),
-        orders: db.query(`SELECT order_number AS n1, date, total_amount AS amount, status,
-          expected_delivery_date AS extra FROM orders WHERE customer_id = ? ORDER BY date DESC`, [id]),
-        payments: db.query(`SELECT receipt_number AS n1, date, amount, payment_type AS kind,
-          COALESCE(notes, '') AS notes FROM customer_payments WHERE customer_id = ? ORDER BY date DESC`, [id]),
-        returns: db.query(`SELECT return_number AS n1, date, total_amount AS amount, reason AS notes
-          FROM sales_returns WHERE customer_id = ? ORDER BY date DESC`, [id]),
-        projects: db.query(`SELECT code AS n1, name, total_value AS amount, status
-          FROM projects WHERE customer_id = ? ORDER BY created_at DESC`, [id]),
+        sales: db.query(`SELECT si.id, si.invoice_number AS n1, si.date, si.total_amount AS amount,
+          si.paid_amount AS paid, si.remaining_amount AS remaining, si.payment_status AS status
+          FROM sales_invoices si
+          WHERE si.customer_id = ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
+          ORDER BY si.date DESC LIMIT 100`, [id, ...invoiceScope.params]),
+        quotations: db.query(`SELECT q.quotation_number AS n1, q.date, q.total_amount AS amount, q.status,
+          q.valid_until AS extra FROM quotations q
+          WHERE q.customer_id = ? AND ${quotationClause} ORDER BY q.date DESC`, [id, ...quotationScope.params]),
+        orders: db.query(`SELECT o.order_number AS n1, o.date, o.total_amount AS amount, o.status,
+          o.expected_delivery_date AS extra FROM orders o
+          WHERE o.customer_id = ? AND ${orderScope.clause} ORDER BY o.date DESC`, [id, ...orderScope.params]),
+        payments: db.query(`SELECT cp.receipt_number AS n1, cp.date, cp.amount, cp.payment_type AS kind,
+          COALESCE(cp.notes, '') AS notes FROM customer_payments cp
+          WHERE cp.customer_id = ? AND ${paymentScope.clause} ORDER BY cp.date DESC`, [id, ...paymentScope.params]),
+        returns: db.query(`SELECT sr.return_number AS n1, sr.date, sr.total_amount AS amount, sr.reason AS notes
+          FROM sales_returns sr
+          LEFT JOIN sales_invoices si ON si.id = sr.original_invoice_id
+          WHERE sr.customer_id = ? AND ${invoiceScope.clause} ORDER BY sr.date DESC`, [id, ...invoiceScope.params]),
+        projects: db.query(`SELECT pr.code AS n1, pr.name, pr.contract_value AS amount, pr.status
+          FROM projects pr WHERE pr.customer_id = ? AND ${projectClause}
+          ORDER BY pr.created_at DESC`, [id, ...projectScope.params]),
         activities: db.query(`SELECT subject AS n1, activity_type AS kind, status, created_at AS date,
           COALESCE(body, '') AS notes FROM crm_activities WHERE customer_id = ? ORDER BY created_at DESC`, [id]),
-        debts: db.query(`SELECT invoice_number AS n1, date, total_amount AS amount, paid_amount AS paid,
-          remaining_amount AS remaining, payment_status AS status FROM sales_invoices
-          WHERE customer_id = ? AND remaining_amount > 0.009 ORDER BY date`, [id]),
+        debts: db.query(`SELECT si.invoice_number AS n1, si.date, si.total_amount AS amount,
+          si.paid_amount AS paid, si.remaining_amount AS remaining, si.payment_status AS status
+          FROM sales_invoices si
+          WHERE si.customer_id = ? AND si.remaining_amount > 0.009 AND ${invoiceScope.clause}
+          ORDER BY si.date`, [id, ...invoiceScope.params]),
         timeline: db.query(`SELECT action AS n1, module AS kind, created_at AS date, '' AS notes
           FROM audit_logs WHERE record_id = ? OR new_values LIKE ? ORDER BY created_at DESC LIMIT 100`, [id, `%${id}%`]),
       });

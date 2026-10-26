@@ -12,7 +12,7 @@
     "check": "npm run typecheck && npm test && npm run build",
     "electron:pack": "npm run build && electron-builder --dir",
     "electron:dist": "npm run build && electron-builder --win nsis",
-    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/data-integrity.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/spreadsheet-import.test.ts test/branch-access.test.ts test/branch-ledger-reports.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/finance-enterprise-lifecycle.test.ts test/product-units.test.ts test/sales-reports.test.ts test/electron-handlers.test.cjs test/electron-close.test.cjs test/electron-startup.test.ts test/backup-encryption.test.ts",
+    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/data-integrity.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/spreadsheet-import.test.ts test/branch-access.test.ts test/branch-scoped-pages.test.ts test/branch-ledger-reports.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/finance-enterprise-lifecycle.test.ts test/product-units.test.ts test/sales-reports.test.ts test/electron-handlers.test.cjs test/electron-close.test.cjs test/electron-startup.test.ts test/backup-encryption.test.ts",
     "electron:dist:mac": "npm run build && electron-builder --mac",
     "electron:dist:linux": "npm run build && electron-builder --linux"
   },
@@ -92,7 +92,6 @@
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "electron-updater": "^6.8.11",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^0.475.0",

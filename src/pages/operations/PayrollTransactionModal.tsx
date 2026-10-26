@@ -19,7 +19,7 @@ export const PayrollTransactionModal: React.FC<Props> = ({ target, form, setForm
                   {(Object.keys(TX_LABELS) as PayrollTxType[]).map((t) => <option key={t} value={t}>{TX_LABELS[t]}</option>)}
                 </select>
               </div>
-              <div><label className="font-bold text-slate-700 block mb-1">المبلغ *</label><input required autoFocus type="number" min={0.01} step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold" /></div>
+              <div><label className="font-bold text-slate-700 block mb-1">المبلغ *</label><input required type="number" min={0.01} step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold" /></div>
               <div><label className="font-bold text-slate-700 block mb-1">التاريخ *</label><input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               <div><label className="font-bold text-slate-700 block mb-1">ملاحظات</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">

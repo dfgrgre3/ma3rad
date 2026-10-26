@@ -98,7 +98,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   <input
                     type="text"
                     required
-                    autoFocus
                     autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}

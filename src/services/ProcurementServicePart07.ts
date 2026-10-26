@@ -7,19 +7,31 @@ import { round2 } from './financials';
 import { postLedgerEntry } from '../database/ledger';
 import type { ReorderSuggestion, SupplierRfqRow, SupplierRfqItem, SupplierQuotationRow, SupplierQuotationItem, GoodsReceiptRow, GoodsReceiptItem, SupplierClaimRow, SupplierClaimItem, ThreeWayMatchingResult, LandedCostBreakdownItem, SupplierScorecard, ProductPriceHistoryEntry } from './procurementTypes';
 import { ProcurementServicePart06 } from './ProcurementServicePart06';
+import { BranchAccessService } from './BranchAccessService';
 
 export abstract class ProcurementServicePart07 extends ProcurementServicePart06 {
 public getSupplierScorecard(supplierId: string): SupplierScorecard {
     const sup = this.db.query<any>(`SELECT * FROM suppliers WHERE id = ?`, [supplierId])[0];
     if (!sup) throw new Error('المورد غير موجود.');
 
+    // Supplier master data is shared, but every transactional row behind the
+    // scorecard must stay inside the branches the current user may see.
+    const branchAccess = new BranchAccessService();
+    const orderScope = branchAccess.warehouseBranchScope('w');
+    const grnScope = branchAccess.sqlScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = grn.warehouse_id ORDER BY bw.is_primary DESC, bw.branch_id ASC LIMIT 1)'
+    );
+    const claimScope = branchAccess.supplierClaimBranchScope('supplier_claims');
+
     // 1. PO punctuality
     const orders = this.db.query<any>(`
       SELECT po.id, po.date, po.expected_date, po.status, grn.date AS receiptDate
       FROM purchase_orders po
+      LEFT JOIN warehouses w ON w.id = po.warehouse_id
       LEFT JOIN goods_receipt_notes grn ON grn.purchase_order_id = po.id
-      WHERE po.supplier_id = ?
-    `, [supplierId]);
+      WHERE po.supplier_id = ? AND ${orderScope.clause}
+    `, [supplierId, ...orderScope.params]);
 
     const totalOrders = orders.length;
     let receivedOrders = 0;
@@ -40,11 +52,13 @@ public getSupplierScorecard(supplierId: string): SupplierScorecard {
     // 2. Goods receipt quality
     const grnStats = this.db.query<any>(`
       SELECT
-        COALESCE(SUM(total_received_m2), 0) AS totalReceived,
-        COALESCE(SUM(total_accepted_m2), 0) AS totalAccepted,
-        COALESCE(SUM(total_damaged_m2), 0) AS totalDamaged
-      FROM goods_receipt_notes WHERE supplier_id = ?
-    `, [supplierId])[0];
+        COALESCE(SUM(grn.total_received_m2), 0) AS totalReceived,
+        COALESCE(SUM(grn.total_accepted_m2), 0) AS totalAccepted,
+        COALESCE(SUM(grn.total_damaged_m2), 0) AS totalDamaged
+      FROM goods_receipt_notes grn
+      LEFT JOIN warehouses w ON w.id = grn.warehouse_id
+      WHERE grn.supplier_id = ? AND ${grnScope.clause}
+    `, [supplierId, ...grnScope.params])[0];
 
     const totalReceivedM2 = round2(Number(grnStats?.totalReceived || 0));
     const totalAcceptedM2 = round2(Number(grnStats?.totalAccepted || 0));
@@ -60,8 +74,8 @@ public getSupplierScorecard(supplierId: string): SupplierScorecard {
         SUM(CASE WHEN status = 'SETTLED' THEN 1 ELSE 0 END) AS settledCount,
         COALESCE(SUM(claimed_amount), 0) AS totalClaimed,
         COALESCE(SUM(agreed_amount), 0) AS totalAgreed
-      FROM supplier_claims WHERE supplier_id = ?
-    `, [supplierId])[0];
+      FROM supplier_claims WHERE supplier_id = ? AND ${claimScope.clause}
+    `, [supplierId, ...claimScope.params])[0];
 
     const totalClaimsCount = Number(claims?.totalCount || 0);
     const settledClaimsCount = Number(claims?.settledCount || 0);
@@ -105,6 +119,10 @@ public getSupplierScorecard(supplierId: string): SupplierScorecard {
   }
 
 public getProductPriceHistory(productId: string): ProductPriceHistoryEntry[] {
+    const invoiceScope = new BranchAccessService().sqlScope(
+      'pi.branch_id',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)'
+    );
     const rows = this.db.query<any>(`
       SELECT
         pii.product_id AS productId,
@@ -119,9 +137,9 @@ public getProductPriceHistory(productId: string): ProductPriceHistoryEntry[] {
       FROM purchase_invoice_items pii
       JOIN purchase_invoices pi ON pi.id = pii.purchase_id
       JOIN suppliers s ON s.id = pi.supplier_id
-      WHERE pii.product_id = ?
+      WHERE pii.product_id = ? AND ${invoiceScope.clause}
       ORDER BY pi.date DESC, pi.created_at DESC
-    `, [productId]);
+    `, [productId, ...invoiceScope.params]);
 
     return rows.map((r) => ({
       productId: r.productId,

@@ -21,7 +21,6 @@ export const ChangePasswordModal: React.FC<Props> = ({ current, next, confirm, b
                   value={current}
                   onChange={(event) => setCurrent(event.target.value)}
                   required
-                  autoFocus
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-sky-500 focus:bg-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>

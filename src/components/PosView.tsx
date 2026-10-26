@@ -25,43 +25,14 @@ import { CeramicCalculatorModal } from './CeramicCalculatorModal';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { exportToExcel } from '../utils/export';
 import { LayoutContext } from '../layouts/MainLayout';
-
-type PosUnit = 'M2' | 'BOX' | 'PIECE';
-type SortMode = 'NAME' | 'PRICE_ASC' | 'PRICE_DESC' | 'STOCK_DESC';
-
-interface CartItem {
-  product: Product;
-  soldBy: PosUnit;
-  quantityM2: number;
-  boxesCount: number;
-  piecesCount: number;
-  unitPrice: number;
-  discountAmount: number;
-  availableStockM2: number;
-}
-
-interface HeldOrder {
-  id: string;
-  label: string;
-  createdAt: string;
-  customerId: string;
-  customerName: string;
-  warehouseId: string;
-  items: CartItem[];
-  discountAmount: number;
-  shippingCost: number;
-  notes: string;
-  paidAmount?: number;
-  paymentType?: PaymentType;
-}
-
-interface Toast {
-  type: 'success' | 'error' | 'info' | 'warning';
-  message: string;
-}
-
-const HELD_STORAGE_KEY = 'ceramisys_pos_held_orders';
-const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
+import {
+  HELD_STORAGE_KEY, round2, compareText,
+  type CartItem, type HeldOrder, type PosUnit, type SortMode, type Toast,
+} from './pos/types';
+import {
+  CloseShiftModal, HeldOrdersModal, NewCustomerModal, OpenShiftModal,
+  PosToast, ShortcutsModal, SuccessInvoiceModal, ToneWarningModal,
+} from './pos/PosModals';
 
 export const PosView: React.FC = () => {
   const navigate = useNavigate();
@@ -264,7 +235,7 @@ export const PosView: React.FC = () => {
         case 'PRICE_ASC': return a.sellingPriceM2 - b.sellingPriceM2;
         case 'PRICE_DESC': return b.sellingPriceM2 - a.sellingPriceM2;
         case 'STOCK_DESC': return stockOf(b.id) - stockOf(a.id);
-        default: return a.name.localeCompare(b.name, 'ar');
+        default: return compareText(a.name, b.name);
       }
     });
     return list;
@@ -275,8 +246,14 @@ export const PosView: React.FC = () => {
     [categories]
   );
   const visibleBrands = useMemo(() => [...new Map(products.filter((p) => p.brandId).map((p) => [p.brandId, p.brandName || ''])).entries()], [products]);
-  const visibleSizes = useMemo(() => [...new Set(products.map((p) => p.size).filter(Boolean))].sort(), [products]);
-  const visibleColors = useMemo(() => [...new Set(products.map((p) => p.color).filter(Boolean) as string[])].sort(), [products]);
+  const visibleSizes = useMemo(
+    () => [...new Set(products.map((p) => p.size).filter(Boolean))].sort(compareText),
+    [products]
+  );
+  const visibleColors = useMemo(
+    () => [...new Set(products.map((p) => p.color).filter(Boolean) as string[])].sort(compareText),
+    [products]
+  );
 
   const filteredCustomers = useMemo(() => {
     const q = customerSearch.trim().toLowerCase();
@@ -909,13 +886,6 @@ export const PosView: React.FC = () => {
 
   const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
 
-  const toastColor: Record<Toast['type'], string> = {
-    success: 'bg-emerald-600 border-emerald-400',
-    error: 'bg-rose-600 border-rose-400',
-    info: 'bg-sky-600 border-sky-400',
-    warning: 'bg-amber-500 border-amber-400'
-  };
-
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col" dir="rtl">
       {/* ═══ Left: Catalog ═══ */}
@@ -1004,7 +974,6 @@ export const PosView: React.FC = () => {
               <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
                 ref={barcodeInputRef}
-                autoFocus
                 type="text"
                 placeholder="امسح الباركود أو ابحث بالاسم/الكود/المقاس (F2)..."
                 value={searchQuery}
@@ -1515,56 +1484,17 @@ export const PosView: React.FC = () => {
         </div>
       </div>
 
-      {/* ═══ Toast ═══ */}
-      {toast && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-xl border text-slate-900 text-xs font-bold shadow-2xl flex items-center gap-2 ${toastColor[toast.type]}`}>
-          {toast.type === 'error' ? <AlertCircle className="w-4 h-4" /> : toast.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <Info className="w-4 h-4" />}
-          {toast.message}
-        </div>
-      )}
+      <PosToast toast={toast} />
 
-      {/* ═══ Success modal ═══ */}
       {successInvoice && (
-        <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
-            <h3 className="text-lg font-black text-slate-900">تم إصدار الفاتورة بنجاح</h3>
-            <div className="text-xs text-slate-500 space-y-1">
-              <p>رقم الفاتورة: <strong className="font-mono text-slate-800">{successInvoice.invoiceNumber}</strong></p>
-              <p>الإجمالي: <strong className="text-sky-600">{CeramicMath.formatCurrency(successInvoice.totalAmount)}</strong></p>
-              {successInvoice.remainingAmount > 0 && (
-                <p>المتبقي: <strong className="text-amber-600">{CeramicMath.formatCurrency(successInvoice.remainingAmount)}</strong></p>
-              )}
-              <p className="text-[11px]">تم خصم الكميات من المخزن وتحديث حساب العميل آلياً.</p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              <button
-                onClick={() => printService.printThermalReceipt(successInvoice)}
-                className="py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5"
-              >
-                <Receipt className="w-4 h-4" /> إيصال حراري
-              </button>
-              <button
-                onClick={() => openInvoicePreview(successInvoice)}
-                className="py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5"
-              >
-                <Printer className="w-4 h-4" /> معاينة وطباعة
-              </button>
-              <button
-                onClick={() => setSuccessInvoice(null)}
-                className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
-              >
-                إغلاق
-              </button>
-            </div>
-          </div>
-        </div>
+        <SuccessInvoiceModal
+          invoice={successInvoice}
+          onPrintThermal={() => printService.printThermalReceipt(successInvoice)}
+          onPreview={() => openInvoicePreview(successInvoice)}
+          onClose={() => setSuccessInvoice(null)}
+        />
       )}
 
-      {/* ═══ Held orders modal ═══ */}
       {invoicePreview && (
         <DocumentPreviewModal
           title={invoicePreview.title}
@@ -1578,230 +1508,76 @@ export const PosView: React.FC = () => {
       )}
 
       {isHeldModalOpen && (
-        <Modal title="الطلبات المعلّقة" icon={<History className="w-5 h-5" />} onClose={() => setIsHeldModalOpen(false)}>
-          {heldOrders.length === 0 ? (
-            <div className="text-center text-slate-500 text-xs py-10">لا توجد طلبات معلّقة حالياً</div>
-          ) : (
-            <div className="space-y-2">
-              {heldOrders.map((h) => (
-                <div key={h.id} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-900 truncate">{h.customerName}</div>
-                    <div className="text-[10px] text-slate-500">
-                      {h.items.length} صفوف • {new Date(h.createdAt).toLocaleString('ar-EG')}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => resumeHeldOrder(h)}
-                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1"
-                    >
-                      <PlayCircle className="w-3.5 h-3.5" /> استرجاع
-                    </button>
-                    <button
-                      onClick={() => deleteHeldOrder(h.id)}
-                      className="p-1.5 text-slate-500 hover:text-rose-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Modal>
+        <HeldOrdersModal
+          orders={heldOrders}
+          onResume={resumeHeldOrder}
+          onDelete={deleteHeldOrder}
+          onClose={() => setIsHeldModalOpen(false)}
+        />
       )}
 
-      {/* ═══ New customer modal ═══ */}
       {isCustomerModalOpen && (
-        <Modal title="إضافة عميل سريع" icon={<UserPlus className="w-5 h-5" />} onClose={() => setIsCustomerModalOpen(false)}>
-          <div className="space-y-3">
-            <Field label="اسم العميل *">
-              <input value={newCustName} onChange={(e) => setNewCustName(e.target.value)} placeholder="مثال: أحمد محمد" className={inputCls} />
-            </Field>
-            <Field label="رقم الهاتف *">
-              <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="01xxxxxxxxx" className={inputCls} />
-            </Field>
-            {customerError && <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">{customerError}</div>}
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="نوع العميل">
-                <select value={newCustType} onChange={(e) => setNewCustType(e.target.value as Customer['customerType'])} className={inputCls}>
-                  <option value="RETAIL">قطاعي</option>
-                  <option value="WHOLESALE">جملة</option>
-                  <option value="CONTRACTOR">مقاول</option>
-                  <option value="ENGINEER">مهندس</option>
-                </select>
-              </Field>
-              <Field label="حد الائتمان">
-                <input type="number" value={newCustCredit || ''} placeholder="0" onChange={(e) => setNewCustCredit(parseFloat(e.target.value) || 0)} className={inputCls} />
-              </Field>
-            </div>
-            <button
-              onClick={handleCreateCustomer}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"
-            >
-              <UserPlus className="w-4 h-4" /> حفظ واختيار العميل
-            </button>
-          </div>
-        </Modal>
+        <NewCustomerModal
+          name={newCustName}
+          phone={newCustPhone}
+          type={newCustType}
+          creditLimit={newCustCredit}
+          error={customerError}
+          onNameChange={setNewCustName}
+          onPhoneChange={setNewCustPhone}
+          onTypeChange={setNewCustType}
+          onCreditLimitChange={setNewCustCredit}
+          onSave={handleCreateCustomer}
+          onClose={() => setIsCustomerModalOpen(false)}
+        />
       )}
 
-      {/* ═══ Open shift modal ═══ */}
       {isShiftModalOpen && (
-        <Modal title="فتح وردية كاشير" icon={<Unlock className="w-5 h-5" />} onClose={() => setIsShiftModalOpen(false)}>
-          <div className="space-y-3">
-            <Field label="الخزينة / نقطة الكاشير">
-              <select
-                value={shiftRegisterId}
-                onChange={(e) => {
-                  setShiftRegisterId(e.target.value);
-                  setOpeningBalance(cashierService.getSuggestedOpeningBalance(e.target.value));
-                }}
-                className={inputCls}
-              >
-                {registers.length === 0 ? (
-                  <option value="">لا توجد خزائن متاحة لهذا المستخدم</option>
-                ) : (
-                  registers.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}{r.branchName ? ` — ${r.branchName}` : ''}
-                    </option>
-                  ))
-                )}
-              </select>
-            </Field>
-            <Field label="الرصيد الافتتاحي (نقدي)">
-              <input type="number" value={openingBalance || ''} placeholder="0" onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)} className={inputCls} />
-            </Field>
-            <button
-              onClick={handleOpenShift}
-              disabled={!shiftRegisterId || registers.length === 0}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2"
-            >
-              <Unlock className="w-4 h-4" /> فتح الوردية
-            </button>
-          </div>
-        </Modal>
+        <OpenShiftModal
+          registers={registers}
+          registerId={shiftRegisterId}
+          openingBalance={openingBalance}
+          onRegisterChange={(registerId) => {
+            setShiftRegisterId(registerId);
+            setOpeningBalance(cashierService.getSuggestedOpeningBalance(registerId));
+          }}
+          onOpeningBalanceChange={setOpeningBalance}
+          onConfirm={handleOpenShift}
+          onClose={() => setIsShiftModalOpen(false)}
+        />
       )}
 
       {isCloseShiftModalOpen && activeShift && (
-        <Modal title="إقفال الوردية ومطابقة الصندوق" icon={<Lock className="w-5 h-5" />} onClose={() => setIsCloseShiftModalOpen(false)}>
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">رقم الوردية</span><strong>{activeShift.shiftNumber}</strong></div>
-              <div className="flex justify-between"><span className="text-slate-500">الرصيد الافتتاحي</span><strong>{CeramicMath.formatCurrency(activeShift.openingBalance)}</strong></div>
-              <div className="flex justify-between"><span className="text-slate-500">مبيعات نقدية</span><strong>{CeramicMath.formatCurrency(activeShift.totalSalesCash)}</strong></div>
-              <div className="flex justify-between"><span className="text-slate-500">تحصيلات العملاء</span><strong>{CeramicMath.formatCurrency(activeShift.totalCustomerPayments)}</strong></div>
-              <div className="flex justify-between"><span className="text-slate-500">مصروفات / مرتجعات</span><strong>{CeramicMath.formatCurrency((activeShift.totalExpenses || 0) + (activeShift.totalRefunds || 0))}</strong></div>
-              <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold">النقد المتوقع بالصندوق</span><strong className="text-emerald-700">{CeramicMath.formatCurrency(expectedClosingCash)}</strong></div>
-            </div>
-            <Field label="النقد الفعلي بعد العد">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-800">سيُسجّل الرصيد المتوقع تلقائيًا: {CeramicMath.formatCurrency(expectedClosingCash)}</div>
-            </Field>
-            <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">فرق الصندوق المحسوب: {CeramicMath.formatCurrency(0)}</div>
-            <Field label="ملاحظات الإقفال">
-              <textarea rows={2} value={closingNotes} onChange={(e) => setClosingNotes(e.target.value)} placeholder="سبب العجز أو الزيادة، إن وجد..." className={inputCls} />
-            </Field>
-            <button onClick={handleCloseShift} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد الرصيد المحسوب وإغلاق الوردية</button>
-          </div>
-        </Modal>
+        <CloseShiftModal
+          shift={activeShift}
+          expectedClosingCash={expectedClosingCash}
+          notes={closingNotes}
+          onNotesChange={setClosingNotes}
+          onConfirm={handleCloseShift}
+          onClose={() => setIsCloseShiftModalOpen(false)}
+        />
       )}
 
-      {/* ═══ Tone/Shade Mixing Warning Modal ═══ */}
       {isToneWarningOpen && toneConflicts.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
-          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl border border-amber-200">
-            {/* Header */}
-            <div className="px-6 py-4 bg-amber-50 border-b border-amber-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-amber-600" />
-              </div>
-              <div>
-                <h2 className="text-sm font-black text-slate-900">تحذير: خلط نغمات ألوان مختلفة</h2>
-                <p className="text-xs text-amber-700">الكمية المطلوبة ستُسحب من دفعات بنغمات أو عيارات مختلفة</p>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="p-5 space-y-4 max-h-[55vh] overflow-y-auto">
-              {toneConflicts.map((conflict) => (
-                <div key={conflict.productId} className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <div className="font-bold text-slate-900 text-sm mb-3">{conflict.productName}</div>
-                  <div className="space-y-2">
-                    {conflict.batches.map((b, i) => (
-                      <div key={i} className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold bg-violet-100 text-violet-700">
-                            نغمة: {b.toneShade}
-                          </span>
-                          {b.caliber && b.caliber !== '0' && (
-                            <span className="px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700">
-                              عيار: {b.caliber}
-                            </span>
-                          )}
-                          <span className="font-mono text-slate-500">دفعة: {b.batchNumber}</span>
-                        </div>
-                        <span className="font-mono font-bold text-sky-700">{b.requiredM2.toFixed(2)} م²</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-amber-700 mt-3">
-                    ⚠️ قد يؤدي خلط هذه الدفعات إلى تباين في لون البلاط عند التركيب في موقع العميل.
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex gap-3">
-              <button
-                onClick={() => {
-                  setIsToneWarningOpen(false);
-                  setToneConflicts([]);
-                  setPendingCheckout(false);
-                }}
-                className="flex-1 px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-sm font-bold transition"
-              >
-                إلغاء — مراجعة الكميات
-              </button>
-              <button
-                onClick={() => {
-                  setIsToneWarningOpen(false);
-                  setToneConflicts([]);
-                  setPendingCheckout(true); // bypass check on retry
-                  // trigger checkout immediately
-                  setTimeout(handleCheckout, 0);
-                }}
-                className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold transition"
-              >
-                متابعة على مسؤوليتي
-              </button>
-            </div>
-          </div>
-        </div>
+        <ToneWarningModal
+          conflicts={toneConflicts}
+          onCancel={() => {
+            setIsToneWarningOpen(false);
+            setToneConflicts([]);
+            setPendingCheckout(false);
+          }}
+          onContinue={() => {
+            setIsToneWarningOpen(false);
+            setToneConflicts([]);
+            setPendingCheckout(true); // bypass check on retry
+            // trigger checkout immediately
+            setTimeout(handleCheckout, 0);
+          }}
+        />
       )}
 
-      {/* ═══ Shortcuts modal ═══ */}
-      {isShortcutsOpen && (
-        <Modal title="اختصارات لوحة المفاتيح" icon={<Keyboard className="w-5 h-5" />} onClose={() => setIsShortcutsOpen(false)}>
-          <div className="space-y-1.5 text-xs">
-            {[
-              ['F1', 'عرض شاشة الاختصارات'],
-              ['F2', 'التركيز على حقل البحث / الباركود'],
-              ['F4', 'التركيز على المبلغ المدفوع'],
-              ['F8', 'فتح حاسبة السيراميك والمقايسة'],
-              ['F9', 'اعتماد وحفظ الفاتورة'],
-              ['Esc', 'إغلاق النوافذ المفتوحة'],
-            ].map(([key, desc]) => (
-              <div key={key} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-2">
-                <span className="text-slate-700">{desc}</span>
-                <kbd className="font-mono bg-slate-100 text-sky-700 px-2 py-0.5 rounded text-[11px]">{key}</kbd>
-              </div>
-            ))}
-          </div>
-        </Modal>
-      )}
+      {isShortcutsOpen && <ShortcutsModal onClose={() => setIsShortcutsOpen(false)} />}
 
-      {/* ═══ Calculator ═══ */}
       <CeramicCalculatorModal
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
@@ -1812,36 +1588,7 @@ export const PosView: React.FC = () => {
   );
 };
 
-// ─── Small presentational helpers ───────────────────────────────────────────
-const inputCls = 'w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-sky-500';
-
+// ─── Local presentational helper ────────────────────────────────────────────
 const RotateCcwIcon: React.FC = () => <RefreshCw className="w-4 h-4" />;
-
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div>
-    <label className="block text-[11px] font-bold text-slate-500 mb-1">{label}</label>
-    {children}
-  </div>
-);
-
-const Modal: React.FC<{ title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode }> = ({ title, icon, onClose, children }) => (
-  <div className="fixed inset-0 z-50 bg-white backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-    <div
-      className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sky-600">
-          {icon}
-          <h2 className="text-sm font-black text-slate-900">{title}</h2>
-        </div>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-900">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-      <div className="p-5 max-h-[70vh] overflow-y-auto">{children}</div>
-    </div>
-  </div>
-);
 
 export default PosView;

@@ -3,23 +3,32 @@ import type { AnalyticsSnapshot, SalesAnalytics } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 
 export class AnalyticsService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   public getSalesAnalytics(dateFrom: string, dateTo: string): SalesAnalytics {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.view');
+
+    const scope = this.branchAccess.sqlScope(
+      'si.branch_id',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)',
+      actor
+    );
 
     const invoices = this.db.query<any>(`
       SELECT si.*, c.name as customerName
       FROM sales_invoices si
       JOIN customers c ON c.id = si.customer_id
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status = 'COMPLETED'
+        AND ${scope.clause}
       ORDER BY si.date ASC
-    `, [dateFrom, dateTo]);
+    `, [dateFrom, dateTo, ...scope.params]);
 
     const saleItemsByInvoice = new Map<string, any[]>();
     const saleItems = this.db.query<any>(`
@@ -28,8 +37,9 @@ export class AnalyticsService {
       JOIN sales_invoices si ON si.id = sii.invoice_id
       JOIN products p ON p.id = sii.product_id
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status = 'COMPLETED'
+        AND ${scope.clause}
       ORDER BY si.date ASC, sii.id ASC
-    `, [dateFrom, dateTo]);
+    `, [dateFrom, dateTo, ...scope.params]);
     for (const item of saleItems) {
       const list = saleItemsByInvoice.get(item.invoiceId) || [];
       list.push(item);
@@ -87,8 +97,9 @@ export class AnalyticsService {
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
       LEFT JOIN customers c ON c.id = sr.customer_id
       WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status = 'COMPLETED'
+        AND ${scope.clause}
       ORDER BY sr.date ASC
-    `, [dateFrom, dateTo]);
+    `, [dateFrom, dateTo, ...scope.params]);
 
     const returnItemsByReturn = new Map<string, any[]>();
     const returnItems = this.db.query<any>(`
@@ -98,8 +109,9 @@ export class AnalyticsService {
       JOIN products p ON p.id = sri.product_id
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
       WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status = 'COMPLETED'
+        AND ${scope.clause}
       ORDER BY sr.date ASC, sri.id ASC
-    `, [dateFrom, dateTo]);
+    `, [dateFrom, dateTo, ...scope.params]);
     for (const item of returnItems) {
       const list = returnItemsByReturn.get(item.returnId) || [];
       list.push(item);
@@ -202,30 +214,36 @@ export class AnalyticsService {
   }
 
   public getDashboardMetrics(): Array<{ name: string; value: number; label: string; trend: 'up' | 'down' | 'stable' }> {
+    const actor = AuthService.requireAuth();
     const today = localDateString();
     const monthStartStr = `${today.slice(0, 7)}-01`;
+    const scope = this.branchAccess.sqlScope(
+      'si.branch_id',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)',
+      actor
+    );
 
     const totalSalesToday = this.db.query<any>(`
       SELECT
-        COALESCE((SELECT SUM(subtotal - discount_amount) FROM sales_invoices
-          WHERE date = ? AND invoice_status != 'VOID'), 0)
+        COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
+          WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
         - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
             THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
             ELSE 0 END) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
-          WHERE sr.date = ? AND si.invoice_status != 'VOID'), 0) AS total
-    `, [today, today])[0]?.total || 0;
+          WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
+    `, [today, ...scope.params, today, ...scope.params])[0]?.total || 0;
 
     const totalSalesMonth = this.db.query<any>(`
       SELECT
-        COALESCE((SELECT SUM(subtotal - discount_amount) FROM sales_invoices
-          WHERE date >= ? AND date <= ? AND invoice_status != 'VOID'), 0)
+        COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
+          WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
         - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
             THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
             ELSE 0 END) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
-          WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'), 0) AS total
-    `, [monthStartStr, today, monthStartStr, today])[0]?.total || 0;
+          WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
+    `, [monthStartStr, today, ...scope.params, monthStartStr, today, ...scope.params])[0]?.total || 0;
 
     const totalCustomers = this.db.query<any>('SELECT COUNT(*) as cnt FROM customers')[0]?.cnt || 0;
     const totalProducts = this.db.query<any>("SELECT COUNT(*) as cnt FROM products WHERE is_active = 1")[0]?.cnt || 0;

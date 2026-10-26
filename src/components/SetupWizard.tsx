@@ -224,7 +224,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               <div>
                 <label className={labelClass}>اسم المعرض / الشركة *</label>
                 <input
-                  autoFocus
                   value={form.showroomName}
                   onChange={(e) => set('showroomName', e.target.value)}
                   className={inputClass}

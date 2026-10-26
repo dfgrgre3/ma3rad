@@ -123,7 +123,7 @@ public getCashFlowForecast(daysAhead = 60): {
     let totalExpectedInflow = 0;
     let totalExpectedOutflow = 0;
 
-    const sortedDates = Array.from(dateMap.keys()).sort();
+    const sortedDates = Array.from(dateMap.keys()).sort((a, b) => a.localeCompare(b));
 
     for (const d of sortedDates) {
       const group = dateMap.get(d)!;

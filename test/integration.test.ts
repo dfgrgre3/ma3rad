@@ -321,7 +321,10 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
      JOIN chart_of_accounts a ON a.id=l.account_id WHERE l.entry_id=?`,
     [adjustmentEntry.id]
   );
-  assert.deepEqual(adjustmentLines.map((line) => line.code).sort(), ['1104', '5201']);
+  assert.deepEqual(
+    adjustmentLines.map((line) => line.code).sort((a, b) => a.localeCompare(b)),
+    ['1104', '5201']
+  );
   assert.equal(adjustmentLines.reduce((sum, line) => sum + line.debit, 0),
     adjustmentLines.reduce((sum, line) => sum + line.credit, 0));
 

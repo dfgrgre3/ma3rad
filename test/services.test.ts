@@ -144,7 +144,10 @@ test('automatic backup retention deletes old files and preserves manual and newe
   try {
     const result = await new BackupService().cleanupOldBackups(30, 1);
     assert.equal(result.deleted, 2);
-    assert.deepEqual(removed.sort(), ['ceramisys_auto_extra.sqlite', 'ceramisys_auto_old.sqlite']);
+    assert.deepEqual(
+      removed.sort((a, b) => a.localeCompare(b)),
+      ['ceramisys_auto_extra.sqlite', 'ceramisys_auto_old.sqlite']
+    );
     assert.deepEqual(
       q(`SELECT id FROM backup_history WHERE id LIKE 'retention_%' ORDER BY id`).map((row) => row.id),
       ['retention_keep', 'retention_manual'],
@@ -629,7 +632,10 @@ test('fixed asset acquisition uses the approved clearing liability by default', 
      JOIN chart_of_accounts a ON a.id=l.account_id WHERE l.entry_id=?`,
     [entry.id]
   );
-  assert.deepEqual(lines.map((line) => line.code).sort(), ['1601', '2201']);
+  assert.deepEqual(
+    lines.map((line) => line.code).sort((a, b) => a.localeCompare(b)),
+    ['1601', '2201']
+  );
   assert.equal(lines.find((line) => line.code === '2201')?.credit, 4500);
   assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, registerBefore);
 });

@@ -263,11 +263,11 @@ export const BrandsView: React.FC = () => {
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">اسم الماركة *</label>
+                <label htmlFor="brand-name" className="font-bold text-xs text-slate-700 block mb-1.5">اسم الماركة *</label>
                 <input
+                  id="brand-name"
                   type="text"
                   required
-                  autoFocus
                   placeholder="مثال: سيراميكا كليوباترا"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -276,10 +276,11 @@ export const BrandsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-bold text-xs text-slate-700 block mb-1.5">الدولة / المنشأ</label>
+                <label htmlFor="brand-country" className="font-bold text-xs text-slate-700 block mb-1.5">الدولة / المنشأ</label>
                 <div className="relative">
                   <Globe className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
+                    id="brand-country"
                     type="text"
                     placeholder="مثال: مصر"
                     value={formData.country}

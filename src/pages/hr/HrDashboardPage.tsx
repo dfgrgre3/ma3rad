@@ -9,8 +9,10 @@ import { EmployeeService, Employee, AttendanceStatus } from '../../services/Empl
 import { DatabaseManager } from '../../database/db';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { BranchAccessService } from '../../services/BranchAccessService';
 
 const db = DatabaseManager.getInstance();
+const branchAccess = new BranchAccessService();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n);
 const fmtK = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + 'م' : n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
 
@@ -36,8 +38,11 @@ function buildHrStats(): HrStats {
   const active = employees.filter(e => e.status === 'ACTIVE');
   const today = new Date().toISOString().split('T')[0];
 
+  const scope = branchAccess.sqlScope('e.branch_id');
   const todayAttendance = db.query<{ status: AttendanceStatus; count: number }>(
-    `SELECT status, COUNT(*) AS count FROM attendance WHERE date = ? GROUP BY status`, [today]
+    `SELECT a.status, COUNT(*) AS count
+     FROM attendance a JOIN employees e ON e.id = a.employee_id
+     WHERE a.date = ? AND ${scope.clause} GROUP BY a.status`, [today, ...scope.params]
   );
   const todayPresent = todayAttendance.find(r => r.status === 'PRESENT')?.count || 0;
   const todayAbsent = todayAttendance.find(r => r.status === 'ABSENT')?.count || 0;
@@ -49,10 +54,14 @@ function buildHrStats(): HrStats {
 
   // Advances pending
   const advanceRow = db.query<{ total: number }>(
-    `SELECT COALESCE(SUM(amount), 0) AS total FROM payroll_transactions WHERE type = 'ADVANCE'`
+    `SELECT COALESCE(SUM(pt.amount), 0) AS total
+     FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
+     WHERE pt.type = 'ADVANCE' AND ${scope.clause}`, scope.params
   )[0];
   const payoutRow = db.query<{ total: number }>(
-    `SELECT COALESCE(SUM(amount), 0) AS total FROM payroll_transactions WHERE type = 'SALARY_PAYOUT'`
+    `SELECT COALESCE(SUM(pt.amount), 0) AS total
+     FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
+     WHERE pt.type = 'SALARY_PAYOUT' AND ${scope.clause}`, scope.params
   )[0];
   const advancesPending = (advanceRow?.total || 0);
 

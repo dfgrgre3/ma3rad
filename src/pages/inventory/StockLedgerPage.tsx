@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Search, Filter, Download, TrendingUp, TrendingDown, ArrowRight, Package } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
+import { BranchAccessService } from '../../services/BranchAccessService';
 import { format } from 'date-fns';
 import { formatProductQuantity } from '../../utils/productUnits';
 
@@ -33,6 +34,8 @@ const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   DAMAGED:          { label: 'تالف', color: 'text-rose-600' },
 };
 
+const branchAccess = new BranchAccessService();
+
 export const StockLedgerPage: React.FC = () => {
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,10 +45,16 @@ export const StockLedgerPage: React.FC = () => {
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
+  const branchAccess = new BranchAccessService();
 
   useEffect(() => {
     try {
-      const wRows = DatabaseManager.getInstance().query<{ id: string; name: string }>('SELECT id, name FROM warehouses WHERE is_active = 1 ORDER BY name');
+      const scope = branchAccess.warehouseBranchScope('w');
+      const wRows = DatabaseManager.getInstance().query<{ id: string; name: string }>(
+        `SELECT w.id, w.name FROM warehouses w
+         WHERE w.is_active = 1 AND ${scope.clause} ORDER BY w.name`,
+        scope.params
+      );
       setWarehouses(wRows);
     } catch (e) { console.error(e); }
   }, []);
@@ -58,6 +67,7 @@ export const StockLedgerPage: React.FC = () => {
   const loadData = () => {
     setLoading(true);
     try {
+      const scope = branchAccess.warehouseBranchScope('w');
       let sql = `
         SELECT it.id, it.created_at as date, p.name as product,
                p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
@@ -72,9 +82,9 @@ export const StockLedgerPage: React.FC = () => {
         JOIN products p ON p.id = it.product_id
         JOIN warehouses w ON w.id = it.warehouse_id
         LEFT JOIN users u ON u.id = it.performed_by
-        WHERE 1=1
+        WHERE 1=1 AND ${scope.clause}
       `;
-      const params: string[] = [];
+      const params: string[] = [...scope.params];
 
       if (search) {
         sql += ` AND (p.name LIKE ? OR it.transaction_number LIKE ?)`;

@@ -7,7 +7,10 @@ import { PermissionService } from '../../services/PermissionService';
 import { localDateString } from '../../utils/date';
 import { postLedgerEntry } from '../../database/ledger';
 import { InventoryCostingService } from '../../services/InventoryCostingService';
+import { BranchAccessService } from '../../services/BranchAccessService';
 import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel } from '../../utils/productUnits';
+
+const branchAccess = new BranchAccessService();
 
 interface Adjustment {
   id: string;
@@ -38,6 +41,34 @@ interface AdjustmentItem {
   unitCost: number;
   totalValue: number;
   notes: string;
+}
+
+export function loadBranchAdjustments(): Adjustment[] {
+  const db = DatabaseManager.getInstance();
+  const scope = branchAccess.warehouseBranchScope('w');
+  return db.query<Adjustment>(`
+    SELECT 
+      sa.id,
+      sa.adjustment_number as code,
+      sa.warehouse_id as warehouseId,
+      w.name as warehouse,
+      sa.reason,
+      sa.date,
+      COALESCE(u.full_name, 'النظام') as adjustedBy,
+      sa.adjustment_type as type,
+      sa.status,
+      sa.total_quantity_m2 as totalQuantityM2,
+      sa.total_value as totalValue,
+      COALESCE(p.product_type, 'CERAMIC') as productType,
+      p.base_unit as baseUnit, p.custom_unit as customUnit
+    FROM stock_adjustments sa
+    JOIN warehouses w ON sa.warehouse_id = w.id
+    LEFT JOIN users u ON sa.created_by = u.id
+    LEFT JOIN stock_adjustment_items sai ON sai.adjustment_id = sa.id
+    LEFT JOIN products p ON p.id = sai.product_id
+    WHERE ${scope.clause}
+    ORDER BY sa.date DESC, sa.adjustment_number DESC
+  `, scope.params);
 }
 
 export const InventoryAdjustmentsPage: React.FC = () => {
@@ -72,32 +103,8 @@ export const InventoryAdjustmentsPage: React.FC = () => {
 
   const loadData = () => {
     setLoading(true);
-    const db = DatabaseManager.getInstance();
     try {
-      const sql = `
-        SELECT 
-          sa.id,
-          sa.adjustment_number as code,
-          sa.warehouse_id as warehouseId,
-          w.name as warehouse,
-          sa.reason,
-          sa.date,
-          COALESCE(u.full_name, 'النظام') as adjustedBy,
-          sa.adjustment_type as type,
-          sa.status,
-          sa.total_quantity_m2 as totalQuantityM2,
-          sa.total_value as totalValue,
-          COALESCE(p.product_type, 'CERAMIC') as productType,
-          p.base_unit as baseUnit, p.custom_unit as customUnit
-        FROM stock_adjustments sa
-        JOIN warehouses w ON sa.warehouse_id = w.id
-        LEFT JOIN users u ON sa.created_by = u.id
-        LEFT JOIN stock_adjustment_items sai ON sai.adjustment_id = sa.id
-        LEFT JOIN products p ON p.id = sai.product_id
-        ORDER BY sa.date DESC, sa.adjustment_number DESC
-      `;
-      const rows = db.query<any>(sql);
-      setAdjustments(rows);
+      setAdjustments(loadBranchAdjustments());
     } catch (e) {
       console.error('Error loading adjustments:', e);
     } finally {
@@ -108,7 +115,11 @@ export const InventoryAdjustmentsPage: React.FC = () => {
   const loadFormOptions = () => {
     const db = DatabaseManager.getInstance();
     try {
-      const wRows = db.query<any>('SELECT id, name FROM warehouses WHERE is_active = 1 ORDER BY name');
+      const scope = branchAccess.warehouseBranchScope('w');
+      const wRows = db.query<any>(
+        `SELECT w.id, w.name FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} ORDER BY w.name`,
+        scope.params
+      );
       setWarehouses(wRows);
       if (wRows.length > 0) setSelectedWarehouseId(wRows[0].id);
 
@@ -123,6 +134,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
   const handleViewDetails = (adj: Adjustment) => {
     const db = DatabaseManager.getInstance();
     try {
+      branchAccess.requireWarehouseAccess(adj.warehouseId);
       const sql = `
         SELECT 
           sai.id,
@@ -145,6 +157,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
       setShowDetailModal(true);
     } catch (e) {
       console.error('Error loading items:', e);
+      alert(e instanceof Error ? e.message : 'تعذر تحميل تفاصيل التسوية.');
     }
   };
 
@@ -164,6 +177,7 @@ export const InventoryAdjustmentsPage: React.FC = () => {
     try {
       const actor = AuthService.requireAuth();
       PermissionService.require(actor, 'inventory.adjust');
+      branchAccess.requireWarehouseAccess(selectedWarehouseId, actor);
       db.executeTransaction((txDb) => {
         // 1. Calculate values
         const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';

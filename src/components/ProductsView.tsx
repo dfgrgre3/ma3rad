@@ -19,184 +19,14 @@ import { getProductUnitLabel } from '../utils/productUnits';
 import { exportToExcel } from '../utils/export';
 import { SettingsService } from '../services/SettingsService';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
+import {
+  GRADES, SURFACES, UNITS, calcMetersFromSize, emptyForm, emptyVariant, gradeLabel,
+  parseGrade, pickCell, round, unitLabelFor,
+  type FormState, type OpeningStockRow, type TabId, type VariantDraft,
+} from './products/productFormModel';
+import { Field, ListPagination, StatCard } from './products/ProductUi';
 
-const UNITS: { value: UnitType; label: string }[] = [
-  { value: 'M2', label: 'متر مربع (م²)' },
-  { value: 'LINEAR_METER', label: 'متر طولي' },
-  { value: 'METER', label: 'متر' },
-  { value: 'KG', label: 'كيلوجرام' },
-  { value: 'TON', label: 'طن' },
-  { value: 'LITER', label: 'لتر' },
-  { value: 'SET', label: 'طقم' },
-  { value: 'PACK', label: 'عبوة' },
-  { value: 'SERVICE', label: 'خدمة' },
-  { value: 'BOX', label: 'كرتونة' },
-  { value: 'PIECE', label: 'قطعة' },
-];
-const unitLabelFor = (unit: UnitType, custom = '') => custom.trim() || UNITS.find((item) => item.value === unit)?.label || unit;
 
-const SURFACES = [
-  { value: 'FLOOR', label: 'أرضيات' },
-  { value: 'WALL', label: 'حوائط' },
-  { value: 'OUTDOOR', label: 'خارجي / حدائق' },
-  { value: 'GENERAL', label: 'عام / متعدد' },
-];
-
-const GRADES: { value: CeramicGrade; label: string }[] = [
-  { value: 'GRADE_1', label: 'فرز أول' },
-  { value: 'GRADE_2', label: 'فرز ثاني' },
-  { value: 'GRADE_3', label: 'فرز ثالث' },
-  { value: 'COMMERCIAL', label: 'تجاري' },
-];
-
-const round = (value: number, digits = 2) => Number(((Number.isFinite(value) ? value : 0)).toFixed(digits));
-
-const gradeLabel = (grade: CeramicGrade) => GRADES.find((g) => g.value === grade)?.label || grade;
-
-const calcMetersFromSize = (size: string, pieces: number): number | null => {
-  const normalized = (size || '').replace(/[×*]/g, 'x');
-  const match = normalized.match(/^\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*$/i);
-  if (!match) return null;
-  const width = parseFloat(match[1]);
-  const height = parseFloat(match[2]);
-  if (!width || !height || !pieces || pieces <= 0) return null;
-  return round((width / 100) * (height / 100) * pieces, 3);
-};
-
-interface FormState {
-  productType: 'CERAMIC' | 'GENERAL';
-  name: string;
-  sku: string;
-  barcode: string;
-  categoryId: string;
-  brandId: string;
-  grade: CeramicGrade;
-  size: string;
-  thickness: number;
-  color: string;
-  tone: string;
-  finish: string;
-  surfaceLocation: 'FLOOR' | 'WALL' | 'OUTDOOR' | 'GENERAL';
-  baseUnit: UnitType;
-  sellUnit: UnitType;
-  customUnit: string;
-  piecesPerBox: number;
-  metersPerBox: number;
-  weightPerBox: number;
-  costPrice: number;
-  sellingPriceM2: number;
-  sellingPriceBox: number;
-  wholesalePriceM2: number;
-  minSellingPriceM2: number;
-  minStockLevel: number;
-  maxStockLevel: number;
-  notes: string;
-}
-
-interface OpeningStockRow {
-  warehouseId: string;
-  boxes: number;
-  pieces: number;
-  meters: number;
-}
-
-interface VariantDraft {
-  id?: string;
-  variantName: string;
-  sku: string;
-  barcode: string;
-  color: string;
-  size: string;
-  grade: string;
-  costPrice: number;
-  sellingPriceM2: number;
-}
-
-type TabId = 'basic' | 'units' | 'pricing' | 'stock' | 'extras';
-
-const emptyForm = (categoryId = '', brandId = '', productType: FormState['productType'] = 'CERAMIC'): FormState => ({
-  productType,
-  name: '',
-  sku: '',
-  barcode: '',
-  categoryId,
-  brandId,
-  grade: 'GRADE_1',
-  size: '60x60',
-  thickness: 8,
-  color: '',
-  tone: '',
-  finish: 'لامع',
-  surfaceLocation: 'FLOOR',
-  baseUnit: 'M2',
-  sellUnit: 'M2',
-  customUnit: '',
-  piecesPerBox: 4,
-  metersPerBox: 1.44,
-  weightPerBox: 0,
-  costPrice: 150,
-  sellingPriceM2: 220,
-  sellingPriceBox: 316.8,
-  wholesalePriceM2: 190,
-  minSellingPriceM2: 180,
-  minStockLevel: 20,
-  maxStockLevel: 1000,
-  notes: '',
-});
-
-const emptyVariant = (): VariantDraft => ({
-  variantName: '', sku: '', barcode: '', color: '', size: '',
-  grade: 'GRADE_1', costPrice: 0, sellingPriceM2: 0,
-});
-
-const ListPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs">
-    <span className="text-slate-500">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
-    <div className="flex items-center gap-2">
-      <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5"><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select>
-      <button disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:cursor-not-allowed disabled:opacity-40">السابق</button>
-      <span className="min-w-[70px] text-center font-bold">{page} / {totalPages}</span>
-      <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="rounded-lg border border-slate-200 px-3 py-1.5 font-bold disabled:cursor-not-allowed disabled:opacity-40">التالي</button>
-    </div>
-  </div>
-);
-
-const Field: React.FC<{ label: string; required?: boolean; hint?: string; children: React.ReactNode }> = ({ label, required, hint, children }) => (
-  <div>
-    <label className="mb-1 block font-bold text-slate-700">
-      {label} {required && <span className="text-rose-500">*</span>}
-    </label>
-    {children}
-    {hint && <p className="mt-1 text-[10px] text-slate-400">{hint}</p>}
-  </div>
-);
-
-const StatCard: React.FC<{ label: string; value: string; hint?: string; icon: React.ReactNode; tone: string }> = ({ label, value, hint, icon, tone }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-    <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}>{icon}</div>
-    <div className="text-[11px] font-bold text-slate-500">{label}</div>
-    <div className="mt-0.5 text-lg font-black text-slate-900">{value}</div>
-    {hint && <div className="mt-0.5 text-[10px] text-slate-400">{hint}</div>}
-  </div>
-);
-
-const pickCell = (row: Record<string, any>, keys: string[]): string => {
-  for (const key of keys) {
-    const found = Object.keys(row).find((k) => k.trim().toLowerCase() === key.trim().toLowerCase());
-    if (found !== undefined && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== '') {
-      return String(row[found]).trim();
-    }
-  }
-  return '';
-};
-
-const parseGrade = (value: string): CeramicGrade => {
-  const v = value.trim();
-  if (v.includes('ثاني') || v.toUpperCase() === 'GRADE_2') return 'GRADE_2';
-  if (v.includes('ثالث') || v.toUpperCase() === 'GRADE_3') return 'GRADE_3';
-  if (v.includes('تجاري') || v.toUpperCase() === 'COMMERCIAL') return 'COMMERCIAL';
-  return 'GRADE_1';
-};
 
 export const ProductsView: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -1354,7 +1184,7 @@ export const ProductsView: React.FC = () => {
                         <Field label="نوع المنتج (التصنيف)" required>
                           {showNewCategory ? (
                             <div className="flex gap-2">
-                              <input autoFocus value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="اسم النوع الجديد" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
+                              <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="اسم النوع الجديد" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
                               <button type="button" onClick={handleAddCategory} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>
                               <button type="button" onClick={() => setShowNewCategory(false)} className="rounded-xl border border-slate-200 px-2 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
                             </div>
@@ -1371,7 +1201,7 @@ export const ProductsView: React.FC = () => {
                         <Field label="الماركة / المصنع" required={formData.productType === 'CERAMIC'}>
                           {showNewBrand ? (
                             <div className="flex gap-2">
-                              <input autoFocus value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="اسم الماركة الجديدة" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
+                              <input value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="اسم الماركة الجديدة" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
                               <button type="button" onClick={handleAddBrand} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>
                               <button type="button" onClick={() => setShowNewBrand(false)} className="rounded-xl border border-slate-200 px-2 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
                             </div>

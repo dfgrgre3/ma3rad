@@ -11,6 +11,9 @@ export interface PermissionDef {
 
 export type PermissionEffect = 'GRANT' | 'DENY';
 
+/** Alphabetical comparator backed by String.localeCompare for deterministic text sorts. */
+const compareAlphabetically = (a: string, b: string) => a.localeCompare(b, 'ar');
+
 // ─── Permission catalog ───────────────────────────────────────────────────────
 // Every actionable capability in the app lives here. UI guards, route guards
 // and service-layer enforcement all resolve against these codes.
@@ -580,7 +583,7 @@ export class PermissionService {
 
   public static getEffectiveCodes(user: User | null): string[] {
     if (!user) return [];
-    return Array.from(PermissionService.loadSets(user).grants).sort();
+    return Array.from(PermissionService.loadSets(user).grants).sort(compareAlphabetically);
   }
 
   public static can(user: User | null, required: string): boolean {

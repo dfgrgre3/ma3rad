@@ -12,8 +12,10 @@ import { exportToExcel } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { getProductUnitLabel } from '../../utils/productUnits';
+import { BranchAccessService } from '../../services/BranchAccessService';
 
 const db = DatabaseManager.getInstance();
+const branchAccess = new BranchAccessService();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtM = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(2) + 'م' : n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
 const today = () => localDateString();
@@ -41,9 +43,17 @@ interface InventoryKpi {
   categoryBreakdown: { category: string; items: number; value: number }[];
 }
 
-function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
-  const base = `pi.date >= ? AND pi.date <= ? AND pi.status != 'CANCELLED'`;
-  const params = [from, to];
+export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
+  const purchaseScope = branchAccess.sqlScope(
+    'pi.branch_id',
+    '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)'
+  );
+  const returnScope = branchAccess.sqlScope(
+    'pi.branch_id',
+    '(SELECT w.branch_id FROM warehouses w WHERE w.id = pr.warehouse_id)'
+  );
+  const base = `pi.date >= ? AND pi.date <= ? AND ${purchaseScope.clause}`;
+  const params = [from, to, ...purchaseScope.params];
 
   const summary = db.query<any>(`
     SELECT 
@@ -61,20 +71,22 @@ function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
 
   const topCategories = db.query<any>(`
     SELECT COALESCE(c.name, 'غير مصنف') AS category,
-      COALESCE(SUM(pii.unit_price * pii.quantity), 0) AS total,
-      COALESCE(SUM(pii.quantity), 0) AS qty,
+      COALESCE(SUM(pii.unit_cost * pii.quantity_m2), 0) AS total,
+      COALESCE(SUM(pii.quantity_m2), 0) AS qty,
       p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
     FROM purchase_invoices pi
-    JOIN purchase_invoice_items pii ON pii.invoice_id = pi.id
+    JOIN purchase_invoice_items pii ON pii.purchase_id = pi.id
     JOIN products p ON p.id = pii.product_id
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE ${base} GROUP BY c.id, p.product_type, p.base_unit, p.custom_unit ORDER BY total DESC LIMIT 8
   `, params).map(r => ({ category: r.category, total: Number(r.total), qty: Number(r.qty), productType: r.productType, baseUnit: r.baseUnit, customUnit: r.customUnit }));
 
   const returnsSummary = db.query<any>(`
-    SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
-    FROM purchase_returns WHERE created_at >= ? AND created_at <= ?
-  `, [from + 'T00:00:00', to + 'T23:59:59'])[0] || {};
+    SELECT COALESCE(SUM(pr.total_amount), 0) AS total, COUNT(*) AS count
+    FROM purchase_returns pr
+    LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
+    WHERE pr.created_at >= ? AND pr.created_at <= ? AND ${returnScope.clause}
+  `, [from + 'T00:00:00', to + 'T23:59:59', ...returnScope.params])[0] || {};
 
   return {
     totalPurchases: Number(summary.total || 0),
@@ -88,33 +100,43 @@ function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
   };
 }
 
-function loadInventoryKpi(): InventoryKpi {
+export function loadInventoryKpi(): InventoryKpi {
+  const scope = branchAccess.warehouseBranchScope('w');
   const summary = db.query<any>(`
     SELECT 
-      COUNT(*) AS skus,
-      COALESCE(SUM(quantity_m2 * avg_cost), 0) AS value,
-      SUM(CASE WHEN quantity_m2 <= min_stock_level AND min_stock_level > 0 THEN 1 ELSE 0 END) AS low_stock,
-      SUM(CASE WHEN quantity_m2 <= 0 THEN 1 ELSE 0 END) AS zero_stock
-    FROM inventory
-  `)[0] || {};
+      COUNT(DISTINCT ws.product_id) AS skus,
+      COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value,
+      SUM(CASE WHEN ws.quantity_m2 <= p.min_stock_level AND p.min_stock_level > 0 THEN 1 ELSE 0 END) AS low_stock,
+      SUM(CASE WHEN ws.quantity_m2 <= 0 THEN 1 ELSE 0 END) AS zero_stock
+    FROM warehouse_stock ws
+    JOIN warehouses w ON w.id = ws.warehouse_id
+    JOIN products p ON p.id = ws.product_id
+    WHERE p.is_active = 1 AND ${scope.clause}
+  `, scope.params)[0] || {};
 
   const topValueItems = db.query<any>(`
-    SELECT p.name, i.quantity_m2 AS qty, (i.quantity_m2 * i.avg_cost) AS value,
+    SELECT p.name, COALESCE(SUM(ws.quantity_m2), 0) AS qty,
+      COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value,
       p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
-    FROM inventory i JOIN products p ON p.id = i.product_id
-    WHERE i.quantity_m2 > 0
+    FROM warehouse_stock ws
+    JOIN warehouses w ON w.id = ws.warehouse_id
+    JOIN products p ON p.id = ws.product_id
+    WHERE ws.quantity_m2 > 0 AND ${scope.clause}
+    GROUP BY p.id
     ORDER BY value DESC LIMIT 10
-  `).map(r => ({ name: r.name, value: Number(r.value), qty: Number(r.qty), productType: r.productType, baseUnit: r.baseUnit, customUnit: r.customUnit }));
+  `, scope.params).map(r => ({ name: r.name, value: Number(r.value), qty: Number(r.qty), productType: r.productType, baseUnit: r.baseUnit, customUnit: r.customUnit }));
 
   const categoryBreakdown = db.query<any>(`
     SELECT COALESCE(c.name, 'غير مصنف') AS category,
-      COUNT(DISTINCT i.product_id) AS items,
-      COALESCE(SUM(i.quantity_m2 * i.avg_cost), 0) AS value
-    FROM inventory i
-    JOIN products p ON p.id = i.product_id
+      COUNT(DISTINCT p.id) AS items,
+      COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
+    FROM warehouse_stock ws
+    JOIN warehouses w ON w.id = ws.warehouse_id
+    JOIN products p ON p.id = ws.product_id
     LEFT JOIN categories c ON c.id = p.category_id
+    WHERE ${scope.clause}
     GROUP BY c.id ORDER BY value DESC LIMIT 8
-  `).map(r => ({ category: r.category, items: Number(r.items), value: Number(r.value) }));
+  `, scope.params).map(r => ({ category: r.category, items: Number(r.items), value: Number(r.value) }));
 
   return {
     totalValue: Number(summary.value || 0),

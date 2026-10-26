@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
 import { AnalyticsService } from '../../services/AnalyticsService';
+import { BranchAccessService } from '../../services/BranchAccessService';
 import { formatProductQuantity } from '../../utils/productUnits';
 
 type Summary = { count: number; revenue: number; collected: number; outstanding: number; profit: number };
@@ -10,6 +11,7 @@ type ProductRow = { productName: string; quantity: number; revenue: number; prod
 type CustomerRow = { name: string; count: number; revenue: number };
 
 const money = (value: number) => new Intl.NumberFormat('ar-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(value || 0);
+const branchAccess = new BranchAccessService();
 
 export const SalesAnalyticsPage: React.FC = () => {
   const db = DatabaseManager.getInstance();
@@ -25,19 +27,23 @@ export const SalesAnalyticsPage: React.FC = () => {
     return { from: period === 'all' ? '' : iso(from), to: iso(to) };
   }, [period, refresh]);
   const [data] = useMemo(() => {
-    const where = `WHERE invoice_status = 'COMPLETED' ${range.from ? 'AND date(date) >= date(?)' : ''} AND date(date) <= date(?)`;
-    const params = range.from ? [range.from, range.to] : [range.to];
+    const scope = branchAccess.sqlScope(
+      'si.branch_id',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)'
+    );
+    const where = `WHERE si.invoice_status = 'COMPLETED' ${range.from ? 'AND date(si.date) >= date(?)' : ''} AND date(si.date) <= date(?) AND ${scope.clause}`;
+    const params = [...(range.from ? [range.from] : []), range.to, ...scope.params];
     const financials = db.query<{ count: number; collected: number; outstanding: number }>(`
-      SELECT COUNT(*) count, COALESCE(SUM(paid_amount),0) collected,
-        COALESCE(SUM(remaining_amount),0) outstanding
-      FROM sales_invoices ${where}
+      SELECT COUNT(*) count, COALESCE(SUM(si.paid_amount),0) collected,
+        COALESCE(SUM(si.remaining_amount),0) outstanding
+      FROM sales_invoices si ${where}
     `, params)[0] || { count: 0, collected: 0, outstanding: 0 };
     const returnSettlements = db.query<{ refunded: number; credited: number }>(`
       SELECT COALESCE(SUM(sr.refunded_amount),0) refunded,
         COALESCE(SUM(sr.remaining_to_balance),0) credited
       FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
-      WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status='COMPLETED'
-    `, [range.from || '0001-01-01', range.to])[0] || { refunded: 0, credited: 0 };
+      WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status='COMPLETED' AND ${scope.clause}
+    `, [range.from || '0001-01-01', range.to, ...scope.params])[0] || { refunded: 0, credited: 0 };
     const analytics = new AnalyticsService().getSalesAnalytics(range.from || '0001-01-01', range.to);
     const productIds = analytics.topProducts.map((product) => product.productId);
     const productMeta = productIds.length

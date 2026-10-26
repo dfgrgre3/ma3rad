@@ -449,7 +449,6 @@ export const CashierView: React.FC = () => {
                 <input
                   type="number"
                   required
-                  autoFocus
                   value={openingBalance}
                   onChange={(e) => setOpeningBalance(parseFloat(e.target.value) || 0)}
                   className="w-full px-4 py-3 bg-slate-50 rounded-xl border border-slate-200 font-black text-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"

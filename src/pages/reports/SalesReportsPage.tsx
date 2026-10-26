@@ -11,8 +11,10 @@ import { localDateString } from '../../utils/date';
 import { exportToExcel } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
 import { SalesFinancialReconciliation } from '../../components/reports/SalesFinancialReconciliation';
+import { BranchAccessService } from '../../services/BranchAccessService';
 
 const db = DatabaseManager.getInstance();
+const branchAccess = new BranchAccessService();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtM = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(2) + 'م' : n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
 const today = () => localDateString();
@@ -47,13 +49,21 @@ const BAR_COLOR_MAP: Record<string, string> = {
 };
 
 export function loadReport(type: ReportType, from: string, to: string): SalesRow[] | DailyRow[] {
+  // Every sales report row is branch-scoped; invoices are the branch anchor and
+  // returns inherit the branch of the invoice they belong to.
+  const scope = branchAccess.sqlScope(
+    'si.branch_id',
+    '(SELECT bw.branch_id FROM warehouses bw WHERE bw.id = si.warehouse_id)'
+  );
+  const params = [from, to, ...scope.params, from, to, ...scope.params];
+
   if (type === 'daily') {
     const rows = db.query<any>(`
       WITH activity AS (
         SELECT si.date, si.id AS invoiceId, NULL AS returnId,
           si.subtotal - si.discount_amount AS revenue
         FROM sales_invoices si
-        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
         UNION ALL
         SELECT sr.date, NULL AS invoiceId, sr.id AS returnId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
@@ -61,14 +71,14 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
             ELSE 0 END) AS revenue
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
       SELECT date, COALESCE(SUM(revenue), 0) AS revenue,
         COUNT(DISTINCT invoiceId) AS invoiceCount, COUNT(DISTINCT returnId) AS returnCount
       FROM activity
       GROUP BY date
       ORDER BY date DESC
-    `, [from, to, from, to]);
+    `, params);
     return rows.map(r => ({
       date: r.date,
       revenue: Number(r.revenue),
@@ -87,7 +97,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN sales_invoice_items sii ON sii.invoice_id = si.id
         JOIN products p ON p.id = sii.product_id
         LEFT JOIN categories c ON c.id = p.category_id
-        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
         UNION ALL
         SELECT c.id AS groupId, COALESCE(c.name, 'غير مصنف') AS label, NULL AS invoiceId,
           -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
@@ -102,14 +112,14 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN sales_return_items sri ON sri.return_id = sr.id
         JOIN products p ON p.id = sri.product_id
         LEFT JOIN categories c ON c.id = p.category_id
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
       SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
         COALESCE(SUM(revenue - cost), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
       FROM activity
       GROUP BY groupId, label
       ORDER BY revenue DESC
-    `, [from, to, from, to]);
+    `, params);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost);
       const profit = Number(r.profit);
@@ -126,7 +136,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         FROM sales_invoices si
         JOIN sales_invoice_items sii ON sii.invoice_id = si.id
         JOIN products p ON p.id = sii.product_id
-        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
         UNION ALL
         SELECT p.id AS groupId, p.name AS label, NULL AS invoiceId,
           -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
@@ -140,7 +150,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
         JOIN sales_return_items sri ON sri.return_id = sr.id
         JOIN products p ON p.id = sri.product_id
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
       SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
         COALESCE(SUM(revenue - cost), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
@@ -148,7 +158,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
       GROUP BY groupId, label
       ORDER BY revenue DESC
       LIMIT 30
-    `, [from, to, from, to]);
+    `, params);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost);
       const profit = Number(r.profit);
@@ -163,7 +173,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
           si.subtotal - si.discount_amount AS revenue, si.total_cost AS cost, si.gross_profit AS profit
         FROM sales_invoices si
         JOIN customers cu ON cu.id = si.customer_id
-        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
         UNION ALL
         SELECT cu.id AS groupId, cu.name AS label, NULL AS invoiceId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
@@ -179,7 +189,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
         JOIN customers cu ON cu.id = sr.customer_id
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
       SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
         COALESCE(SUM(profit), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
@@ -187,7 +197,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
       GROUP BY groupId, label
       ORDER BY revenue DESC
       LIMIT 30
-    `, [from, to, from, to]);
+    `, params);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost), profit = Number(r.profit);
       return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
@@ -201,7 +211,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
           si.subtotal - si.discount_amount AS revenue
         FROM sales_invoices si
         JOIN customers cu ON cu.id = si.customer_id
-        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
         UNION ALL
         SELECT COALESCE(cu.city, 'غير محدد') AS label, cu.id AS customerId, NULL AS invoiceId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
@@ -210,14 +220,14 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
         JOIN customers cu ON cu.id = sr.customer_id
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
       SELECT label, COALESCE(SUM(revenue), 0) AS revenue,
         COUNT(DISTINCT invoiceId) AS count, COUNT(DISTINCT customerId) AS customers
       FROM activity
       GROUP BY label
       ORDER BY revenue DESC
-    `, [from, to, from, to]);
+    `, params);
     return rows.map(r => {
       const revenue = Number(r.revenue);
       return {
@@ -239,7 +249,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
           si.subtotal - si.discount_amount AS revenue, si.total_cost AS cost, si.gross_profit AS profit
         FROM sales_invoices si
         LEFT JOIN users u ON u.id = si.created_by
-        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID'
+        WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
         UNION ALL
         SELECT si.created_by AS groupId, COALESCE(u.full_name, 'غير معروف') AS label, NULL AS invoiceId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
@@ -255,14 +265,14 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
         LEFT JOIN users u ON u.id = si.created_by
-        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
+        WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
       SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,
         COALESCE(SUM(profit), 0) AS profit, COUNT(DISTINCT invoiceId) AS count
       FROM activity
       GROUP BY groupId, label
       ORDER BY revenue DESC
-    `, [from, to, from, to]);
+    `, params);
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost), profit = Number(r.profit);
       return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };

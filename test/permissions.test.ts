@@ -115,7 +115,10 @@ test('permissions: manager defaults exclude full-access privileges, including le
     db.run('INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)', ['MANAGER', permission]);
   }
   PermissionService.seed();
-  assert.deepEqual(PermissionService.getRolePermissions('MANAGER').sort(), defaultPermissions.sort());
+  assert.deepEqual(
+    PermissionService.getRolePermissions('MANAGER').sort((a, b) => a.localeCompare(b)),
+    defaultPermissions.sort((a, b) => a.localeCompare(b))
+  );
 });
 
 test('permissions: reverse, expense mutation, and shift closing require their dedicated grants', async () => {

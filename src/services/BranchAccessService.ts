@@ -127,6 +127,47 @@ export class BranchAccessService {
     return branchId;
   }
 
+  /**
+   * Branch scope for tables that reach a branch through a warehouse join.
+   * `warehouseAlias` must point at the joined `warehouses` row, and
+   * `branchWarehousesAlias` at an optional `branch_warehouses` join used as a fallback
+   * for warehouses without a direct `branch_id`.
+   */
+  public warehouseBranchScope(
+    warehouseAlias = 'w',
+    branchWarehousesAlias?: string,
+    user = this.actor()
+  ): BranchSqlScope {
+    const fallback = branchWarehousesAlias
+      ? `${branchWarehousesAlias}.branch_id`
+      : `(SELECT bw.branch_id FROM branch_warehouses bw
+          WHERE bw.warehouse_id = ${warehouseAlias}.id
+          ORDER BY bw.is_primary DESC, bw.branch_id ASC LIMIT 1)`;
+    return this.sqlScope(`${warehouseAlias}.branch_id`, fallback, user);
+  }
+
+  /**
+   * Branch scope for supplier claims. A claim carries no branch of its own; it
+   * reaches one through its purchase invoice, goods receipt warehouse, or
+   * purchase order (in that order of reliability). Claims with none of these
+   * links are treated as out of scope, which fails closed.
+   */
+  public supplierClaimBranchScope(alias = 'supplier_claims', user = this.actor()): BranchSqlScope {
+    return this.sqlScope(
+      `COALESCE(
+        (SELECT pi.branch_id FROM purchase_invoices pi WHERE pi.id = ${alias}.purchase_invoice_id),
+        (SELECT w.branch_id FROM goods_receipt_notes g
+           LEFT JOIN warehouses w ON w.id = g.warehouse_id
+          WHERE g.id = ${alias}.grn_id),
+        (SELECT w.branch_id FROM purchase_orders po
+           LEFT JOIN warehouses w ON w.id = po.warehouse_id
+          WHERE po.id = ${alias}.purchase_order_id)
+      )`,
+      undefined,
+      user
+    );
+  }
+
   public sqlScope(branchExpression: string, fallbackBranchExpression?: string, user = this.actor()): BranchSqlScope {
     const allowed = this.getAccessibleBranchIds(user);
     if (allowed === null) return { clause: '1 = 1', params: [] };
