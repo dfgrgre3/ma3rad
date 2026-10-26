@@ -196,6 +196,7 @@ export const AdminRolesTab: React.FC = () => {
             <div className="relative">
               <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <input
+                aria-label="بحث في الصلاحيات"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="بحث في الصلاحيات..."
@@ -259,6 +260,7 @@ export const AdminRolesTab: React.FC = () => {
                       return (
                         <label
                           key={perm.code}
+                          htmlFor={`permission-${perm.code}`}
                           className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
                             isChecked
                               ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10'
@@ -266,6 +268,7 @@ export const AdminRolesTab: React.FC = () => {
                           } ${readOnly ? 'cursor-not-allowed opacity-80' : ''}`}
                         >
                           <input
+                            id={`permission-${perm.code}`}
                             type="checkbox"
                             checked={isChecked}
                             disabled={readOnly}
@@ -295,17 +298,17 @@ export const AdminRolesTab: React.FC = () => {
             </h3>
             {modal === 'create' && (
               <div>
-                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">كود الدور (إنجليزي) *</label>
-                <input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="SALES_MANAGER" className={`${inputCls} font-mono`} />
+                <label htmlFor="role-code" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">كود الدور (إنجليزي) *</label>
+                <input id="role-code" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="SALES_MANAGER" className={`${inputCls} font-mono`} />
               </div>
             )}
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">اسم الدور *</label>
-              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
+              <label htmlFor="role-name" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">اسم الدور *</label>
+              <input id="role-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">الوصف</label>
-              <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} />
+              <label htmlFor="role-description" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">الوصف</label>
+              <textarea id="role-description" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} />
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
               <button type="button" onClick={() => setModal(null)} className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">إلغاء</button>

@@ -92,10 +92,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">اسم المستخدم</label>
+                <label htmlFor="username" className="block text-xs font-bold text-slate-700 mb-1.5">اسم المستخدم</label>
                 <div className="relative">
                   <UserIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
+                    id="username"
                     type="text"
                     required
                     autoComplete="username"
@@ -108,10 +109,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">كلمة المرور</label>
+                <label htmlFor="password" className="block text-xs font-bold text-slate-700 mb-1.5">كلمة المرور</label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
+                    id="password"
                     type={showPassword ? 'text' : 'password'}
                     required
                     autoComplete="current-password"

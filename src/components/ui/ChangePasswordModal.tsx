@@ -15,8 +15,11 @@ export const ChangePasswordModal: React.FC<Props> = ({ current, next, confirm, b
             </div>
             <form onSubmit={onSubmit} className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">كلمة المرور الحالية</label>
+                <label htmlFor="current-password" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  كلمة المرور الحالية
+                </label>
                 <input
+                  id="current-password"
                   type="password"
                   value={current}
                   onChange={(event) => setCurrent(event.target.value)}
@@ -25,8 +28,11 @@ export const ChangePasswordModal: React.FC<Props> = ({ current, next, confirm, b
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">كلمة المرور الجديدة</label>
+                <label htmlFor="new-password" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  كلمة المرور الجديدة
+                </label>
                 <input
+                  id="new-password"
                   type="password"
                   value={next}
                   onChange={(event) => setNext(event.target.value)}
@@ -36,8 +42,11 @@ export const ChangePasswordModal: React.FC<Props> = ({ current, next, confirm, b
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">تأكيد كلمة المرور</label>
+                <label htmlFor="confirm-password" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  تأكيد كلمة المرور
+                </label>
                 <input
+                  id="confirm-password"
                   type="password"
                   value={confirm}
                   onChange={(event) => setConfirm(event.target.value)}

@@ -1593,7 +1593,7 @@ export const ProductsView: React.FC = () => {
                 <span className="text-sm font-bold text-slate-700">{isImporting ? 'جاري استيراد الأصناف...' : 'اضغط لاختيار ملف Excel'}</span>
                 <span className="text-[10px] text-slate-500">يتم إنشاء الأنواع والماركات غير الموجودة تلقائيًا</span>
               </button>
-              <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleImportFile(file); e.target.value = ''; }} />
+              <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleImportFile(file); e.target.value = ''; }} />
               {importResult && (
                 <div className={`rounded-xl border p-3 ${importResult.errors.length > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
                   <div className="flex items-center gap-2 font-black">

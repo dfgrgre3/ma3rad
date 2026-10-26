@@ -281,7 +281,10 @@ function RecentLeadsList({ leads }: { leads: Lead[] }) {
             const cfg = STAGE_CONFIG[lead.stage];
             const isOverdue = lead.nextFollowUp && new Date(lead.nextFollowUp) < new Date() && !['WON', 'LOST'].includes(lead.stage);
             return (
-              <div key={lead.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition cursor-pointer"
+              <button
+                key={lead.id}
+                type="button"
+                className="flex w-full items-center gap-3 p-2.5 rounded-xl text-right hover:bg-slate-50 transition"
                 onClick={() => navigate('/crm/leads')}
               >
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${cfg.bg} ${cfg.color} ${cfg.border} border`}>
@@ -303,7 +306,7 @@ function RecentLeadsList({ leads }: { leads: Lead[] }) {
                 <div className="text-left shrink-0">
                   <p className="text-xs font-black text-slate-700">{fmtK(lead.estimatedValue || 0)} ج</p>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

@@ -225,27 +225,27 @@ export const ApprovalsPage: React.FC = () => {
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">نوع الطلب</label>
-                <select value={form.requestType} onChange={(e) => setForm({ ...form, requestType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                <label htmlFor="approval-request-type" className="font-bold text-slate-700 block mb-1">نوع الطلب</label>
+                <select id="approval-request-type" value={form.requestType} onChange={(e) => setForm({ ...form, requestType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                   {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">العنوان *</label>
-                <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
+                <label htmlFor="approval-title" className="font-bold text-slate-700 block mb-1">العنوان *</label>
+                <input id="approval-title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
               </div>
               <div>
-                <label className="font-bold text-slate-700 block mb-1">الوصف</label>
-                <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                <label htmlFor="approval-description" className="font-bold text-slate-700 block mb-1">الوصف</label>
+                <textarea id="approval-description" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">القيمة المطلوبة (ج)</label>
-                  <input type="number" min="0" step="0.01" value={form.requestedValue} onChange={(e) => setForm({ ...form, requestedValue: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                  <label htmlFor="approval-requested-value" className="font-bold text-slate-700 block mb-1">القيمة المطلوبة (ج)</label>
+                  <input id="approval-requested-value" type="number" min="0" step="0.01" value={form.requestedValue} onChange={(e) => setForm({ ...form, requestedValue: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الأولوية</label>
-                  <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <label htmlFor="approval-priority" className="font-bold text-slate-700 block mb-1">الأولوية</label>
+                  <select id="approval-priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                     {Object.entries(PRIORITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                   </select>
                 </div>

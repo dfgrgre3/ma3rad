@@ -61,19 +61,26 @@ export const ModalShell: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
       dir="rtl"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busyRef.current) closeRef.current();
-      }}
     >
+      <button
+        type="button"
+        aria-label="إغلاق النافذة"
+        tabIndex={-1}
+        disabled={busy}
+        onClick={() => {
+          if (!busyRef.current) closeRef.current();
+        }}
+        className="absolute inset-0 border-0 bg-slate-900/50 p-0 backdrop-blur-sm disabled:cursor-default"
+      />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="daily-modal-title"
         tabIndex={-1}
-        className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] flex flex-col outline-none`}
+        className={`relative z-10 bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] flex flex-col outline-none`}
       >
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200">
           <div>

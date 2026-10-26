@@ -281,10 +281,11 @@ export const SettingsView: React.FC = () => {
                   <span>تنزيل نسخة احتياطية مشفرة</span>
                 </button>
 
-                <label className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 text-xs cursor-pointer border border-dashed border-slate-300">
+                <label htmlFor="restore-backup-file" className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center justify-center gap-2 text-xs cursor-pointer border border-dashed border-slate-300">
                   <Upload className="w-4 h-4" />
                   <span>استعادة قاعدة البيانات من ملف</span>
                   <input
+                    id="restore-backup-file"
                     type="file"
                     accept=".ceramisys-backup,.sqlite.enc,.sqlite,.db"
                     onChange={handleImportBackup}

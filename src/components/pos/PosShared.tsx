@@ -83,17 +83,25 @@ export const Modal: React.FC<{
   onClose: () => void;
   children: React.ReactNode;
 }> = ({ title, icon, onClose, children }) => (
-  <div className="fixed inset-0 z-50 bg-white backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <button
+      type="button"
+      aria-label="Close dialog"
+      className="absolute inset-0 h-full w-full border-0 bg-white p-0 backdrop-blur-sm"
+      onClick={onClose}
+    />
     <div
-      className="bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      className="relative bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
     >
       <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sky-600">
           {icon}
           <h2 className="text-sm font-black text-slate-900">{title}</h2>
         </div>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-900">
+        <button onClick={onClose} aria-label="Close dialog" className="text-slate-500 hover:text-slate-900">
           <X className="w-5 h-5" />
         </button>
       </div>

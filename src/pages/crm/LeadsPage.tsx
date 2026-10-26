@@ -258,40 +258,40 @@ export const LeadsPage: React.FC = () => {
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الاسم *</label>
-                  <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
+                  <label htmlFor="lead-name" className="font-bold text-slate-700 block mb-1">الاسم *</label>
+                  <input id="lead-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الهاتف *</label>
-                  <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                  <label htmlFor="lead-phone" className="font-bold text-slate-700 block mb-1">الهاتف *</label>
+                  <input id="lead-phone" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">البريد الإلكتروني</label>
-                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="lead-email" className="font-bold text-slate-700 block mb-1">البريد الإلكتروني</label>
+                  <input id="lead-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">المدينة</label>
-                  <input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="lead-city" className="font-bold text-slate-700 block mb-1">المدينة</label>
+                  <input id="lead-city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">المصدر</label>
-                  <select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <label htmlFor="lead-source" className="font-bold text-slate-700 block mb-1">المصدر</label>
+                  <select id="lead-source" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                     {SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">نوع العميل</label>
-                  <select value={form.leadType} onChange={(e) => setForm({ ...form, leadType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <label htmlFor="lead-type" className="font-bold text-slate-700 block mb-1">نوع العميل</label>
+                  <select id="lead-type" value={form.leadType} onChange={(e) => setForm({ ...form, leadType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                     {LEAD_TYPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">القيمة التقديرية (ج)</label>
-                  <input type="number" min="0" step="0.01" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                  <label htmlFor="lead-estimated-value" className="font-bold text-slate-700 block mb-1">القيمة التقديرية (ج)</label>
+                  <input id="lead-estimated-value" type="number" min="0" step="0.01" value={form.estimatedValue} onChange={(e) => setForm({ ...form, estimatedValue: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                 </div>
                 <div className="col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">ملاحظات</label>
-                  <textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                  <label htmlFor="lead-notes" className="font-bold text-slate-700 block mb-1">ملاحظات</label>
+                  <textarea id="lead-notes" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">

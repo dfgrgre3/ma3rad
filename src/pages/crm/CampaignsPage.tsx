@@ -154,13 +154,17 @@ export const CampaignsPage: React.FC = () => {
 
       <div className="px-6 py-3 bg-white border-b border-slate-200 flex flex-wrap items-center gap-2">
         <form onSubmit={(e) => e.preventDefault()} className="relative flex-1 min-w-[220px] max-w-md">
+          <label htmlFor="campaign-search" className="sr-only">بحث الحملات</label>
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم الحملة أو الكود..." className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-pink-400" />
+          <input id="campaign-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم الحملة أو الكود..." className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-pink-400" />
         </form>
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
-          <option value="ALL">كل الحالات</option>
-          {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <label htmlFor="campaign-status-filter" className="text-[10px] font-bold text-slate-600">الحالة</label>
+          <select id="campaign-status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
+            <option value="ALL">كل الحالات</option>
+            {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -186,7 +190,7 @@ export const CampaignsPage: React.FC = () => {
                 )}
                 {c.targetAudience && <p className="text-[11px] text-slate-400 mt-2">الجمهور: {c.targetAudience}</p>}
                 <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-1">
-                  <select value={c.status} onChange={(e) => setStatus(c, e.target.value as CampaignStatus)} className="text-[10px] px-2 py-1 border border-slate-200 rounded-lg bg-white font-bold">
+                  <select aria-label={`تغيير حالة الحملة ${c.name}`} value={c.status} onChange={(e) => setStatus(c, e.target.value as CampaignStatus)} className="text-[10px] px-2 py-1 border border-slate-200 rounded-lg bg-white font-bold">
                     {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                   <div className="flex items-center gap-1">
@@ -208,30 +212,48 @@ export const CampaignsPage: React.FC = () => {
               <button onClick={() => setModal(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={submit} className="space-y-3 text-xs">
-              <div><label className="font-bold text-slate-700 block mb-1">اسم الحملة *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+              <div>
+                <label htmlFor="campaign-name" className="font-bold text-slate-700 block mb-1">اسم الحملة *</label>
+                <input id="campaign-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">القناة</label>
-                  <select value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value as Channel })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <label htmlFor="campaign-channel" className="font-bold text-slate-700 block mb-1">القناة</label>
+                  <select id="campaign-channel" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value as Channel })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                     {Object.entries(CHANNEL_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">الحالة</label>
-                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as CampaignStatus })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                  <label htmlFor="campaign-status" className="font-bold text-slate-700 block mb-1">الحالة</label>
+                  <select id="campaign-status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as CampaignStatus })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                     {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div><label className="font-bold text-slate-700 block mb-1">تاريخ البدء</label><input type="date" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
-                <div><label className="font-bold text-slate-700 block mb-1">تاريخ الانتهاء</label><input type="date" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+                <div>
+                  <label htmlFor="campaign-starts-at" className="font-bold text-slate-700 block mb-1">تاريخ البدء</label>
+                  <input id="campaign-starts-at" type="date" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                </div>
+                <div>
+                  <label htmlFor="campaign-ends-at" className="font-bold text-slate-700 block mb-1">تاريخ الانتهاء</label>
+                  <input id="campaign-ends-at" type="date" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div><label className="font-bold text-slate-700 block mb-1">الميزانية</label><input type="number" min={0} step="0.01" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
-                <div><label className="font-bold text-slate-700 block mb-1">الجمهور المستهدف</label><input value={form.targetAudience} onChange={(e) => setForm({ ...form, targetAudience: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+                <div>
+                  <label htmlFor="campaign-budget" className="font-bold text-slate-700 block mb-1">الميزانية</label>
+                  <input id="campaign-budget" type="number" min={0} step="0.01" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                </div>
+                <div>
+                  <label htmlFor="campaign-target-audience" className="font-bold text-slate-700 block mb-1">الجمهور المستهدف</label>
+                  <input id="campaign-target-audience" value={form.targetAudience} onChange={(e) => setForm({ ...form, targetAudience: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+                </div>
               </div>
-              <div><label className="font-bold text-slate-700 block mb-1">ملاحظات</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+              <div>
+                <label htmlFor="campaign-notes" className="font-bold text-slate-700 block mb-1">ملاحظات</label>
+                <textarea id="campaign-notes" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
+              </div>
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
                 <button type="submit" disabled={saving} className="px-5 py-2 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} حفظ</button>

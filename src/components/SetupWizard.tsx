@@ -222,8 +222,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
           {step === 0 && (
             <div className="space-y-4">
               <div>
-                <label className={labelClass}>اسم المعرض / الشركة *</label>
+                <label htmlFor="setup-showroom-name" className={labelClass}>اسم المعرض / الشركة *</label>
                 <input
+                  id="setup-showroom-name"
                   value={form.showroomName}
                   onChange={(e) => set('showroomName', e.target.value)}
                   className={inputClass}
@@ -232,12 +233,13 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>رقم الهاتف</label>
-                  <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputClass} placeholder="01000000000" />
+                  <label htmlFor="setup-phone" className={labelClass}>رقم الهاتف</label>
+                  <input id="setup-phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputClass} placeholder="01000000000" />
                 </div>
                 <div>
-                  <label className={labelClass}>العملة</label>
+                  <label htmlFor="setup-currency" className={labelClass}>العملة</label>
                   <select
+                    id="setup-currency"
                     value={form.currency}
                     onChange={(e) => {
                       const next = CURRENCIES.find((c) => c.code === e.target.value);
@@ -250,18 +252,18 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 </div>
               </div>
               <div>
-                <label className={labelClass}>العنوان</label>
-                <input value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} placeholder="المدينة - الشارع" />
+                <label htmlFor="setup-address" className={labelClass}>العنوان</label>
+                <input id="setup-address" value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} placeholder="المدينة - الشارع" />
               </div>
               <p className="text-xs font-semibold text-slate-600">بيانات التسجيل الاختيارية</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>الرقم الضريبي</label>
-                  <input value={form.taxNumber} onChange={(e) => set('taxNumber', e.target.value)} className={inputClass} />
+                  <label htmlFor="setup-tax-number" className={labelClass}>الرقم الضريبي</label>
+                  <input id="setup-tax-number" value={form.taxNumber} onChange={(e) => set('taxNumber', e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label className={labelClass}>السجل التجاري</label>
-                  <input value={form.commercialRecord} onChange={(e) => set('commercialRecord', e.target.value)} className={inputClass} />
+                  <label htmlFor="setup-commercial-record" className={labelClass}>السجل التجاري</label>
+                  <input id="setup-commercial-record" value={form.commercialRecord} onChange={(e) => set('commercialRecord', e.target.value)} className={inputClass} />
                 </div>
               </div>
             </div>
@@ -280,8 +282,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </div>
               {form.businessType === 'custom' && (
                 <div>
-                  <label className={labelClass}>اسم النشاط التجاري *</label>
+                  <label htmlFor="setup-business-type-label" className={labelClass}>اسم النشاط التجاري *</label>
                   <input
+                    id="setup-business-type-label"
                     value={form.businessTypeLabel}
                     onChange={(e) => set('businessTypeLabel', e.target.value)}
                     className={inputClass}
@@ -291,38 +294,41 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className={labelClass}>نموذج العمل</label>
-                  <select value={businessConfig.businessModel} onChange={(e) => updateBusinessConfig({ businessModel: e.target.value as BusinessConfiguration['businessModel'] })} className={inputClass}>
+                  <label htmlFor="setup-business-model" className={labelClass}>نموذج العمل</label>
+                  <select id="setup-business-model" value={businessConfig.businessModel} onChange={(e) => updateBusinessConfig({ businessModel: e.target.value as BusinessConfiguration['businessModel'] })} className={inputClass}>
                     <option value="products">بيع منتجات</option>
                     <option value="services">تقديم خدمات</option>
                     <option value="mixed">منتجات وخدمات</option>
                   </select>
                 </div>
-                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
-                  <span>إدارة المخزون</span>
-                  <input type="checkbox" checked={businessConfig.trackInventory} onChange={(e) => setInventoryEnabled(e.target.checked)} className="h-4 w-4 accent-sky-600" />
-                </label>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
+                  <label htmlFor="setup-track-inventory" className="cursor-pointer">إدارة المخزون</label>
+                  <input id="setup-track-inventory" type="checkbox" checked={businessConfig.trackInventory} onChange={(e) => setInventoryEnabled(e.target.checked)} className="h-4 w-4 accent-sky-600" />
+                </div>
               </div>
               <div>
                 <h3 className="mb-2 text-xs font-bold text-slate-700">وحدات المنتجات والخدمات</h3>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {BUSINESS_UNITS.map((unit) => (
-                    <label key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
-                      <input type="checkbox" checked={businessConfig.units.includes(unit.id)} onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })} className="accent-sky-600" />
-                      {unit.label}
-                    </label>
+                    <div key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+                      <input id={`setup-unit-${unit.id}`} type="checkbox" checked={businessConfig.units.includes(unit.id)} onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })} className="accent-sky-600" />
+                      <label htmlFor={`setup-unit-${unit.id}`} className="cursor-pointer">{unit.label}</label>
+                    </div>
                   ))}
                 </div>
+                <label htmlFor="setup-custom-units" className={`${labelClass} mt-2`}>وحدات مخصصة (مفصولة بفواصل)</label>
                 <input
+                  id="setup-custom-units"
                   value={businessConfig.customUnits.join(', ')}
                   onChange={(e) => updateBusinessConfig({ customUnits: e.target.value.split(',').map((unit) => unit.trim()).filter(Boolean) })}
-                  className={`${inputClass} mt-2`}
+                  className={inputClass}
                   placeholder="وحدات مخصصة، مفصولة بفواصل"
                 />
               </div>
               <div>
-                <label className={labelClass}>خصائص المنتجات (مفصولة بفواصل)</label>
+                <label htmlFor="setup-product-attributes" className={labelClass}>خصائص المنتجات (مفصولة بفواصل)</label>
                 <input
+                  id="setup-product-attributes"
                   value={businessConfig.productAttributes.join(', ')}
                   onChange={(e) => updateBusinessConfig({ productAttributes: e.target.value.split(',').map((attribute) => attribute.trim()).filter(Boolean) })}
                   className={inputClass}
@@ -330,7 +336,12 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 />
               </div>
               <div><h3 className="mb-2 text-xs font-bold text-slate-700">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {BUSINESS_MODULES.map((module) => <label key={module.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 ${module.id === 'inventory' && !businessConfig.trackInventory ? 'opacity-50' : ''}`}><input type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={module.id === 'inventory' && !businessConfig.trackInventory} className="accent-sky-600" />{module.label}</label>)}
+                {BUSINESS_MODULES.map((module) => (
+                  <div key={module.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 ${module.id === 'inventory' && !businessConfig.trackInventory ? 'opacity-50' : ''}`}>
+                    <input id={`setup-module-${module.id}`} type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={module.id === 'inventory' && !businessConfig.trackInventory} className="accent-sky-600" />
+                    <label htmlFor={`setup-module-${module.id}`} className="cursor-pointer">{module.label}</label>
+                  </div>
+                ))}
               </div></div>
             </div>
           )}
@@ -339,10 +350,11 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelClass}>نسبة ضريبة القيمة المضافة الافتراضية %</label>
+                  <label htmlFor="setup-default-tax" className={labelClass}>نسبة ضريبة القيمة المضافة الافتراضية %</label>
                   <div className="relative">
                     <Percent className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
                     <input
+                      id="setup-default-tax"
                       type="number" min="0" max="100" step="0.1"
                       value={form.taxPercentage}
                       onChange={(e) => set('taxPercentage', e.target.value)}
@@ -351,8 +363,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   </div>
                 </div>
                 <div>
-                  <label className={labelClass}>حد التنبيه للمخزون المنخفض (بوحدة الصنف)</label>
+                  <label htmlFor="setup-low-stock-threshold" className={labelClass}>حد التنبيه للمخزون المنخفض (بوحدة الصنف)</label>
                   <input
+                    id="setup-low-stock-threshold"
                     type="number" min="0" step="0.5"
                     value={form.lowStockThreshold}
                     onChange={(e) => set('lowStockThreshold', e.target.value)}
@@ -361,8 +374,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 </div>
               </div>
               <div>
-                <label className={labelClass}>حد الخصم المسموح بدون اعتماد %</label>
+                <label htmlFor="setup-discount-threshold" className={labelClass}>حد الخصم المسموح بدون اعتماد %</label>
                 <input
+                  id="setup-discount-threshold"
                   type="number" min="0" max="100" step="0.5"
                   value={form.discountThreshold}
                   onChange={(e) => set('discountThreshold', e.target.value)}
@@ -374,18 +388,18 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
-                  <span>الأسعار شاملة الضريبة</span>
-                  <input type="checkbox" checked={form.isTaxInclusive} onChange={(e) => setForm((prev) => ({ ...prev, isTaxInclusive: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
-                </label>
-                <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
-                  <span>السماح بالبيع من رصيد سالب</span>
-                  <input type="checkbox" checked={form.enableNegativeStock} onChange={(e) => setForm((prev) => ({ ...prev, enableNegativeStock: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
-                </label>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
+                  <label htmlFor="setup-is-tax-inclusive" className="cursor-pointer">الأسعار شاملة الضريبة</label>
+                  <input id="setup-is-tax-inclusive" type="checkbox" checked={form.isTaxInclusive} onChange={(e) => setForm((prev) => ({ ...prev, isTaxInclusive: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
+                  <label htmlFor="setup-enable-negative-stock" className="cursor-pointer">السماح بالبيع من رصيد سالب</label>
+                  <input id="setup-enable-negative-stock" type="checkbox" checked={form.enableNegativeStock} onChange={(e) => setForm((prev) => ({ ...prev, enableNegativeStock: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
+                </div>
               </div>
               <div>
-                <label className={labelClass}>طريقة احتساب تكلفة المخزون</label>
-                <select value={form.costingMethod} onChange={(e) => setForm((prev) => ({ ...prev, costingMethod: e.target.value as 'AVERAGE_COST' | 'FIFO' }))} className={inputClass}>
+                <label htmlFor="setup-costing-method" className={labelClass}>طريقة احتساب تكلفة المخزون</label>
+                <select id="setup-costing-method" value={form.costingMethod} onChange={(e) => setForm((prev) => ({ ...prev, costingMethod: e.target.value as 'AVERAGE_COST' | 'FIFO' }))} className={inputClass}>
                   <option value="AVERAGE_COST">متوسط التكلفة</option>
                   <option value="FIFO">الوارد أولاً يصرف أولاً (FIFO)</option>
                 </select>
@@ -403,8 +417,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className={labelClass}>كلمة المرور الجديدة</label>
+                      <label htmlFor="setup-admin-password" className={labelClass}>كلمة المرور الجديدة</label>
                       <input
+                        id="setup-admin-password"
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
@@ -413,8 +428,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                       />
                     </div>
                     <div>
-                      <label className={labelClass}>تأكيد كلمة المرور</label>
+                      <label htmlFor="setup-admin-password-confirmation" className={labelClass}>تأكيد كلمة المرور</label>
                       <input
+                        id="setup-admin-password-confirmation"
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}

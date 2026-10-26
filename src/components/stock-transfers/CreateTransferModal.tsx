@@ -32,8 +32,9 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
       <form onSubmit={onSubmit} className="mt-4 space-y-4 flex-1 overflow-y-auto">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">من مخزن (المصدر)</label>
+            <label htmlFor="transfer-from-warehouse" className="block text-xs font-bold text-slate-600 mb-1">من مخزن (المصدر)</label>
             <select
+              id="transfer-from-warehouse"
               value={fromWhId}
               onChange={(e) => onFromWhChange(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
@@ -46,8 +47,9 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">إلى مخزن (الوجهة)</label>
+            <label htmlFor="transfer-to-warehouse" className="block text-xs font-bold text-slate-600 mb-1">إلى مخزن (الوجهة)</label>
             <select
+              id="transfer-to-warehouse"
               value={toWhId}
               onChange={(e) => onToWhChange(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-sky-500"
@@ -62,7 +64,7 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-bold text-slate-700">الأصناف المراد تحويلها</label>
+            <span className="text-xs font-bold text-slate-700">الأصناف المراد تحويلها</span>
             <button
               type="button"
               onClick={onAddItemRow}
@@ -75,7 +77,9 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
           <div className="space-y-2 max-h-56 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50/50">
             {requestItems.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200">
+                <label htmlFor={`transfer-product-${idx}`} className="sr-only">الصنف {idx + 1}</label>
                 <select
+                  id={`transfer-product-${idx}`}
                   value={item.productId}
                   onChange={(e) => {
                     const next = [...requestItems];
@@ -90,7 +94,9 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
                   ))}
                 </select>
 
+                <label htmlFor={`transfer-quantity-${idx}`} className="sr-only">الكمية {idx + 1}</label>
                 <input
+                  id={`transfer-quantity-${idx}`}
                   type="number"
                   min="0.1"
                   step={resolveQuantityStep(allProducts.find((entry) => entry.id === item.productId))}
@@ -120,8 +126,9 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">ملاحظات التحويل</label>
+          <label htmlFor="transfer-notes" className="block text-xs font-bold text-slate-600 mb-1">ملاحظات التحويل</label>
           <textarea
+            id="transfer-notes"
             rows={2}
             value={requestNotes}
             onChange={(e) => onRequestNotesChange(e.target.value)}

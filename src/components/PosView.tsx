@@ -245,11 +245,11 @@ export const PosView: React.FC = () => {
   );
   const visibleBrands = useMemo(() => [...new Map(products.filter((p) => p.brandId).map((p) => [p.brandId, p.brandName || ''])).entries()], [products]);
   const visibleSizes = useMemo(
-    () => [...new Set(products.map((p) => p.size).filter(Boolean))].sort(),
+    () => [...new Set(products.map((p) => p.size).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar', { numeric: true })),
     [products]
   );
   const visibleColors = useMemo(
-    () => [...new Set(products.map((p) => p.color).filter(Boolean) as string[])].sort(),
+    () => [...new Set(products.map((p) => p.color).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'ar')),
     [products]
   );
 

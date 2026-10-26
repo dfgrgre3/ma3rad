@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Receipt, Search, Printer, RotateCcw, FileText, Plus, X, Eye, Ban,
@@ -839,13 +839,47 @@ const IconButton: React.FC<{ title: string; onClick: () => void; children: React
   </button>
 );
 
-const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; wide?: boolean }> = ({ children, onClose, wide }) => (
-  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <div className={`bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} p-6 max-h-[92vh] overflow-y-auto`}>
-      {children}
+const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; wide?: boolean }> = ({ children, onClose, wide }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="إغلاق النافذة"
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+      />
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="نافذة حوارية"
+        tabIndex={-1}
+        className={`relative z-10 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] p-6`}
+      >
+        {children}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const InfoBox: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
   <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">

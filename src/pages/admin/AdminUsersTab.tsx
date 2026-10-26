@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import {
   Search, UserPlus, Pencil, KeyRound, Trash2, ShieldCheck, RefreshCw,
   ChevronDown, ChevronLeft, UserCog, Power, Building2,
@@ -113,15 +113,18 @@ export const AdminUsersTab: React.FC = () => {
   const submitBranchScope = (event: React.FormEvent) => {
     event.preventDefault();
     if (!active) return;
-    run(() => {
-      branchService.updateUserBranchAccess(active.id, branchScope, assignedBranchIds);
-    }, 'تم تحديث نطاق الفروع.');
+    void run(
+      () => {
+        branchService.updateUserBranchAccess(active.id, branchScope, assignedBranchIds);
+      },
+      'تم تحديث نطاق الفروع.'
+    );
   };
 
-  const run = async (fn: () => void, success: string) => {
+  const run = async (fn: () => unknown | Promise<unknown>, success: string) => {
     setBusy(true);
     try {
-      fn();
+      await fn();
       toast.success(success);
       load();
       setModal(null);
@@ -134,7 +137,7 @@ export const AdminUsersTab: React.FC = () => {
 
   const submitCreate = (event: React.FormEvent) => {
     event.preventDefault();
-    run(
+    void run(
       () => {
         if (form.password.length < 6) throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
         auth.createUser({
@@ -153,7 +156,7 @@ export const AdminUsersTab: React.FC = () => {
   const submitEdit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!active) return;
-    run(
+    void run(
       () =>
         auth.updateUser(active.id, {
           fullName: form.fullName.trim(),
@@ -169,11 +172,11 @@ export const AdminUsersTab: React.FC = () => {
   const submitPassword = (event: React.FormEvent) => {
     event.preventDefault();
     if (!active) return;
-    run(() => auth.resetPassword(active.id, newPassword), 'تم تغيير كلمة المرور.');
+    void run(() => auth.resetPassword(active.id, newPassword), 'تم تغيير كلمة المرور.');
   };
 
   const toggleActive = (user: User) => {
-    run(
+    void run(
       () => auth.updateUser(user.id, { isActive: !user.isActive }),
       user.isActive ? 'تم تعطيل الحساب.' : 'تم تنشيط الحساب.'
     );
@@ -181,7 +184,7 @@ export const AdminUsersTab: React.FC = () => {
 
   const removeUser = (user: User) => {
     if (!window.confirm(`حذف المستخدم "${user.fullName}" نهائياً؟`)) return;
-    run(() => auth.deleteUser(user.id), 'تم حذف المستخدم.');
+    void run(() => auth.deleteUser(user.id), 'تم حذف المستخدم.');
   };
 
   return (
@@ -418,12 +421,23 @@ const Modal: React.FC<{ title: string; onClose: () => void; children: React.Reac
   </div>
 );
 
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div>
-    <label className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">{label}</label>
-    {children}
-  </div>
-);
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
+  const fieldId = useId();
+  const childId = React.isValidElement(children) && typeof (children as any).props?.id === 'string'
+    ? (children as any).props.id
+    : fieldId;
+
+  const enhancedChild = React.isValidElement(children)
+    ? React.cloneElement(children as React.ReactElement<any>, { id: childId })
+    : children;
+
+  return (
+    <div>
+      <label htmlFor={childId} className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">{label}</label>
+      {enhancedChild}
+    </div>
+  );
+};
 
 const ModalActions: React.FC<{ busy: boolean; onCancel: () => void; submitLabel: string }> = ({ busy, onCancel, submitLabel }) => (
   <div className="flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
