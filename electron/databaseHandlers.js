@@ -3,18 +3,25 @@
 const DB_MAGIC = Buffer.from('CERAMISYS-DB\0v1\0', 'utf8');
 const DB_KEY_FILE = 'database-key.enc';
 
+async function decryptStoredString(safeStorage, encrypted) {
+  // shouldReEncrypt is a signal to migrate the ciphertext, not to decrypt the
+  // same bytes again. Repeating that call can loop forever on some platforms.
+  const decrypted = await safeStorage.decryptStringAsync(encrypted);
+  return decrypted.result;
+}
+
 function hasDatabaseMagic(bytes) {
   return Buffer.from(bytes).subarray(0, DB_MAGIC.length).equals(DB_MAGIC);
 }
 
 async function readOrCreateDatabaseKey({ appDataDir, fs, safeStorage, path, createIfMissing = true }) {
-  if (!safeStorage.isEncryptionAvailable()) {
+  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
     throw new Error('تشفير قاعدة البيانات غير متاح في مخزن النظام الآمن على هذا الجهاز.');
   }
   const keyPath = path.join(appDataDir, DB_KEY_FILE);
   try {
     const encryptedKey = await fs.readFile(keyPath);
-    const key = Buffer.from(safeStorage.decryptString(encryptedKey), 'base64');
+    const key = Buffer.from(await decryptStoredString(safeStorage, encryptedKey), 'base64');
     if (key.length !== 32) throw new Error('Invalid database encryption key.');
     return key;
   } catch (error) {
@@ -24,7 +31,7 @@ async function readOrCreateDatabaseKey({ appDataDir, fs, safeStorage, path, crea
 
   const key = randomBytes(32);
   const temporaryPath = `${keyPath}.tmp`;
-  const encryptedKey = safeStorage.encryptString(key.toString('base64'));
+  const encryptedKey = await safeStorage.encryptStringAsync(key.toString('base64'));
   await fs.writeFile(temporaryPath, encryptedKey, { mode: 0o600 });
   await fs.rename(temporaryPath, keyPath);
   return key;
@@ -64,9 +71,9 @@ async function atomicWrite(fs, filePath, bytes) {
     await fs.writeFile(temporaryPath, bytes, { mode: 0o600 });
     await fs.rename(temporaryPath, filePath);
   } catch (error) {
-    try { await fs.unlink(temporaryPath); } catch (cleanupError) {
-      if (cleanupError.code !== 'ENOENT') throw cleanupError;
-    }
+    // Preserve the write/rename error. A failed cleanup must not hide the
+    // actual reason the database could not be committed.
+    try { await fs.unlink(temporaryPath); } catch { /* best effort */ }
     throw error;
   }
 }
@@ -84,6 +91,33 @@ async function atomicCreate(fs, filePath, bytes) {
     }
     throw error;
   }
+}
+
+function describeError(error) {
+  const seen = new Set();
+  let current = error;
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    const message = typeof current.message === 'string' ? current.message.trim() : '';
+    const code = typeof current.code === 'string' ? current.code.trim() : '';
+    const syscall = typeof current.syscall === 'string' ? current.syscall.trim() : '';
+    const path = typeof current.path === 'string' ? current.path.trim() : '';
+    const details = [code && `[${code}]`, syscall && `(${syscall})`, path && `— ${path}`]
+      .filter(Boolean).join(' ');
+    if (message || details) {
+      const description = message || 'تعذر حفظ الملف بسبب خطأ في نظام الملفات';
+      return details ? `${description} ${details}` : description;
+    }
+    current = current.cause;
+  }
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  if (error !== null && typeof error !== 'undefined') {
+    try {
+      const serialized = JSON.stringify(error);
+      if (serialized && serialized !== '{}') return serialized;
+    } catch { /* use the safe fallback below */ }
+  }
+  return 'تعذر حفظ ملف قاعدة البيانات بسبب خطأ نظام غير محدد. تحقق من مساحة القرص وصلاحية مجلد بيانات التطبيق.';
 }
 
 function registerDatabaseHandlers({
@@ -139,9 +173,16 @@ function registerDatabaseHandlers({
   });
 
   ipcMain.handle('db:save', async (event, bytes) => {
-    validateIpcSender(event);
     try {
+      // Keep IPC validation failures inside this handler's structured error
+      // response so Electron does not strip the original message on rejection.
+      validateIpcSender(event);
       ensureDirs();
+      if (!(bytes instanceof Uint8Array) && !Array.isArray(bytes)) {
+        const error = new TypeError('Database save payload must be a byte array.');
+        error.code = 'DATABASE_INVALID_PAYLOAD';
+        throw error;
+      }
       const data = Buffer.from(bytes);
       if (data.length > MAX_DB_SIZE) throw new Error('Database data exceeds maximum allowed size');
       const key = await getKey();
@@ -149,12 +190,16 @@ function registerDatabaseHandlers({
       await atomicWrite(fs, DB_FILE, encrypted);
       return { ok: true, path: DB_FILE, bytes: encrypted.length };
     } catch (error) {
+      const message = describeError(error);
+      const code = error && typeof error === 'object' && typeof error.code === 'string'
+        ? error.code
+        : 'DATABASE_SAVE_FAILED';
       console.error('Failed to save encrypted database file:', error);
       return {
         ok: false,
-        code: error.code || 'DATABASE_SAVE_FAILED',
+        code,
         retryable: true,
-        error: error.message || String(error),
+        error: message,
       };
     }
   });
@@ -225,9 +270,9 @@ function registerDatabaseHandlers({
   ipcMain.handle('credentials:get', async (event) => {
     validateIpcSender(event);
     if (!fsSync.existsSync(REMEMBERED_CREDENTIALS_FILE)) return null;
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
+    if (!(await safeStorage.isAsyncEncryptionAvailable())) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
     const encrypted = await fs.readFile(REMEMBERED_CREDENTIALS_FILE);
-    const credentials = JSON.parse(safeStorage.decryptString(encrypted));
+    const credentials = JSON.parse(await decryptStoredString(safeStorage, encrypted));
     if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
       throw new Error('بيانات الدخول المحفوظة غير صالحة.');
     }
@@ -241,9 +286,9 @@ function registerDatabaseHandlers({
   ipcMain.handle('credentials:set', async (event, { username, password }) => {
     validateIpcSender(event);
     if (typeof username !== 'string' || typeof password !== 'string') throw new Error('بيانات الدخول غير صالحة للحفظ.');
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
+    if (!(await safeStorage.isAsyncEncryptionAvailable())) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
     ensureDirs();
-    const encrypted = safeStorage.encryptString(JSON.stringify({ username, password, consented: true }));
+    const encrypted = await safeStorage.encryptStringAsync(JSON.stringify({ username, password, consented: true }));
     const temporaryFile = `${REMEMBERED_CREDENTIALS_FILE}.tmp`;
     await fs.writeFile(temporaryFile, encrypted, { mode: 0o600 });
     await fs.rename(temporaryFile, REMEMBERED_CREDENTIALS_FILE);

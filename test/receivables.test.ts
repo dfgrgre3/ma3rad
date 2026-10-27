@@ -74,7 +74,7 @@ test('supplier payment retry with the same idempotency key posts once and reject
   const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
   const supplierId = 'sup_payment_retry_test';
   db.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases) VALUES (?,?,?,?,?,0)`,
-    [supplierId,'SUP-RETRY','Ù…ÙˆØ±Ø¯ Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø©','01000000009',DATA_INTEGRITY_BASELINE.supplierPaymentRetry.initialBalance]);
+    [supplierId,'SUP-RETRY','مورد إعادة المحاولة','01000000009',DATA_INTEGRITY_BASELINE.supplierPaymentRetry.initialBalance]);
   const service = new SupplierService();
   const first = service.recordPayment(supplierId, DATA_INTEGRITY_BASELINE.supplierPaymentRetry.paymentAmount, 'BANK_TRANSFER', 'cr_main', 'retry test', 'supplier-payment-retry-key');
   const replay = service.recordPayment(supplierId, DATA_INTEGRITY_BASELINE.supplierPaymentRetry.paymentAmount, 'BANK_TRANSFER', 'cr_main', 'retry test', 'supplier-payment-retry-key');

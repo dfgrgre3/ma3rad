@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Calculator, NotebookPen } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { CalculatorPanel } from '../../components/CalculatorPanel';
+import { NotesEditor } from '../../components/NotesEditor';
 
 type Tool = 'notes' | 'calculator';
 
 export const QuickToolsPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const tool: Tool = params.get('tool') === 'calculator' ? 'calculator' : 'notes';
-  const [notes, setNotes] = useState(() => localStorage.getItem('executive-dashboard-notes') ?? '');
   return (
     <div className="h-full overflow-y-auto bg-slate-50 p-5 text-slate-900 dark:bg-slate-950 dark:text-slate-100" dir="rtl">
       <div className="mx-auto max-w-4xl space-y-5">
@@ -26,10 +26,7 @@ export const QuickToolsPage: React.FC = () => {
         </div>
 
         {tool === 'notes' ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
-            <div className="mb-3 flex items-center gap-2"><NotebookPen className="h-5 w-5 text-sky-600" /><h2 className="font-bold">ملاحظاتي</h2><span className="mr-auto text-xs text-slate-400">تُحفظ تلقائياً على هذا الجهاز</span></div>
-            <textarea value={notes} onChange={(event) => { setNotes(event.target.value); localStorage.setItem('executive-dashboard-notes', event.target.value); }} placeholder="اكتب ملاحظاتك هنا..." aria-label="ملاحظاتي" className="min-h-72 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100 dark:border-slate-700 dark:bg-slate-950" />
-          </section>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"><div className="mb-3 flex items-center gap-2"><NotebookPen className="h-5 w-5 text-sky-600" /><h2 className="font-bold">دفتر ملاحظاتي</h2></div><NotesEditor /></section>
         ) : <CalculatorPanel />}
       </div>
     </div>

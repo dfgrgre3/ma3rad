@@ -50,7 +50,11 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     watch: {
-      ignored: ['**/.electron-data/**'],
+      ignored: [
+        '**/.electron-data/**',
+        '**/release/**',
+        'release/**',
+      ],
     },
   },
   build: {

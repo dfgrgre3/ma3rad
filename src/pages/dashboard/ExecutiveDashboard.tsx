@@ -424,17 +424,17 @@ export const ExecutiveDashboard: React.FC = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 text-slate-900 p-5 space-y-5" dir="rtl">
+    <div className="h-full min-w-0 overflow-y-auto bg-slate-50 text-slate-900 p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5" dir="rtl">
       {/* ── Header ────────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-black text-slate-900">لوحة المعلومات التنفيذية</h1>
+      <div className="flex min-w-0 items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-black text-slate-900">لوحة المعلومات التنفيذية</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             آخر تحديث: {format(lastRefresh, 'HH:mm:ss')}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {/* Date Range Pills */}
           {([
             { id: 'today', label: 'اليوم' },
@@ -445,7 +445,7 @@ export const ExecutiveDashboard: React.FC = () => {
             <button
               key={r.id}
               onClick={() => setRange(r.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`min-h-9 flex-1 px-2 sm:flex-none sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
  range === r.id
  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/25'
  : 'bg-slate-100 hover:bg-slate-200 hover:text-slate-900'
@@ -459,7 +459,7 @@ export const ExecutiveDashboard: React.FC = () => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="px-3 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-9 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition disabled:cursor-not-allowed disabled:opacity-50"
             title="تحديث"
           >
             تحديث
@@ -482,13 +482,13 @@ export const ExecutiveDashboard: React.FC = () => {
             </div>
           )}
           {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid min-w-0 grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
             {kpis.map((kpi) => {
               const Icon = kpi.icon;
               return (
                 <div
                   key={kpi.label}
-                  className={`rounded-xl border p-4 ${kpi.bg} flex flex-col gap-2`}
+                  className={`min-w-0 rounded-xl border p-3 sm:p-4 ${kpi.bg} flex flex-col gap-2`}
                 >
                   <div className="flex items-center justify-between">
                     <Icon className={`w-5 h-5 ${kpi.color}`} />
@@ -506,7 +506,7 @@ export const ExecutiveDashboard: React.FC = () => {
                     )}
                   </div>
                   <div>
-                    <div className="text-xl font-black text-slate-900 leading-tight">{kpi.value}</div>
+                    <div className="break-words text-base sm:text-xl font-black text-slate-900 leading-tight">{kpi.value}</div>
                     <div className="text-[11px] text-slate-500 font-medium mt-0.5">{kpi.label}</div>
                     {kpi.sub && <div className="text-[10px] text-slate-500 mt-0.5">{kpi.sub}</div>}
                   </div>
@@ -518,7 +518,7 @@ export const ExecutiveDashboard: React.FC = () => {
           {/* ── Charts Row ──────────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Sales Line Chart — 2/3 width */}
-            <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-4">
+            <div className="min-w-0 lg:col-span-2 bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
               <h3 className="text-sm font-bold text-slate-900 mb-4">المبيعات والأرباح — آخر 30 يوم</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={dailySales} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -538,7 +538,7 @@ export const ExecutiveDashboard: React.FC = () => {
             </div>
 
             {/* Branch Pie — 1/3 width */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <div className="min-w-0 bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
               <h3 className="text-sm font-bold text-slate-900 mb-4">توزيع المبيعات بالفروع</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -617,7 +617,7 @@ export const ExecutiveDashboard: React.FC = () => {
           {/* ── Bottom Tables Row ────────────────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Top Products Bar Chart */}
-            <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+            <div className="min-w-0 lg:col-span-1 bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
               <h3 className="text-sm font-bold text-slate-900 mb-4">أكثر المنتجات مبيعاً</h3>
               {topProducts.length === 0 ? (
                 <div className="text-center text-slate-500 text-sm py-8">لا توجد بيانات</div>
@@ -638,7 +638,7 @@ export const ExecutiveDashboard: React.FC = () => {
             </div>
 
             {/* Recent Invoices */}
-            <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+            <div className="min-w-0 lg:col-span-1 bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
               <h3 className="text-sm font-bold text-slate-900 mb-3">آخر الفواتير</h3>
               <div className="space-y-2">
                 {recentInvoices.length === 0 ? (
@@ -666,7 +666,7 @@ export const ExecutiveDashboard: React.FC = () => {
             </div>
 
             {/* Top Debt Customers */}
-            <div className="lg:col-span-1 bg-white rounded-xl border border-slate-200 p-4">
+            <div className="min-w-0 lg:col-span-1 bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-slate-900">أعلى الديون</h3>
                 <AlertTriangle className="w-4 h-4 text-rose-600" />

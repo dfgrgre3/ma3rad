@@ -42,9 +42,9 @@ test('Electron database initialization loads and persists through the registered
     fs: fsPromises,
     fsSync: fs,
     safeStorage: {
-      isEncryptionAvailable: () => true,
-      encryptString: (value: string) => Buffer.from(value),
-      decryptString: (value: Buffer) => value.toString(),
+      isAsyncEncryptionAvailable: async () => true,
+      encryptStringAsync: async (value: string) => Buffer.from(value),
+      decryptStringAsync: async (value: Buffer) => ({ result: value.toString(), shouldReEncrypt: false }),
     },
     APP_DATA_DIR: appDataDir,
     DATA_DIR: dataDir,

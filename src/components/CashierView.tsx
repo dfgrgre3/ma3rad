@@ -60,7 +60,7 @@ export const CashierView: React.FC = () => {
 
   const showNotification = useCallback((type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
-    setTimeout(() => setNotification(null), 4000);
+    setTimeout(() => setNotification(null), 3000);
   }, []);
 
   // --- Data Fetching ---

@@ -20,7 +20,7 @@ export const BrandsView: React.FC = () => {
   // --- Helpers ---
   const showNotification = useCallback((type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
-    setTimeout(() => setNotification(null), 4000);
+    setTimeout(() => setNotification(null), 3000);
   }, []);
 
   const loadBrands = useCallback(async () => {

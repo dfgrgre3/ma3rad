@@ -35,9 +35,9 @@ async function createHandlers(fsImpl = fs) {
   };
   const app = { getVersion: () => 'test', isPackaged: false };
   const safeStorage = {
-    isEncryptionAvailable: () => true,
-    encryptString: (value) => Buffer.from(value),
-    decryptString: (value) => value.toString(),
+    isAsyncEncryptionAvailable: async () => true,
+    encryptStringAsync: async (value) => Buffer.from(value),
+    decryptStringAsync: async (value) => ({ result: value.toString(), shouldReEncrypt: false }),
   };
 
   registerDatabaseHandlers({

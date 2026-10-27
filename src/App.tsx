@@ -11,7 +11,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { SetupWizard } from './components/SetupWizard';
 import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { ToastProvider } from './components/ui/Toast';
+import { ToastProvider, useToast } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { toAppError } from './errors/appError';
 
@@ -332,29 +332,62 @@ export const App: React.FC = () => {
 };
 
 const DatabasePersistenceStatus: React.FC = () => {
-  const [state, setState] = useState(DatabaseManager.getInstance().getPersistenceStatus());
+  const database = DatabaseManager.getInstance();
+  const toast = useToast();
+  const [state, setState] = useState(database.getPersistenceStatus());
+  const [showSaved, setShowSaved] = useState(false);
+  const [showUnencryptedWarning, setShowUnencryptedWarning] = useState(true);
+  const previousStatus = useRef(state.status);
+  const hasCompletedInitialPersistence = useRef(state.status === 'saved');
+  const lastShownPersistenceError = useRef<string | null>(null);
+  const savedTimeout = useRef<number | null>(null);
 
   useEffect(() => {
-    const refresh = () => setState(DatabaseManager.getInstance().getPersistenceStatus());
+    const warningTimeout = window.setTimeout(() => setShowUnencryptedWarning(false), 3000);
+    const refresh = () => {
+      const next = database.getPersistenceStatus();
+      if (next.status === 'saved') {
+        if (previousStatus.current === 'saving' && hasCompletedInitialPersistence.current) {
+          setShowSaved(true);
+          if (savedTimeout.current !== null) window.clearTimeout(savedTimeout.current);
+          savedTimeout.current = window.setTimeout(() => setShowSaved(false), 3000);
+        }
+        hasCompletedInitialPersistence.current = true;
+      }
+      if (next.status === 'error' || next.status === 'unavailable') {
+        const failureKey = `${next.status}:${next.code || ''}:${next.error || ''}`;
+        if (lastShownPersistenceError.current !== failureKey) {
+          lastShownPersistenceError.current = failureKey;
+          toast.error(
+            next.status === 'unavailable' ? 'تعذر تحديد وسيط حفظ قاعدة البيانات' : `فشل حفظ قاعدة البيانات [${next.code || 'DATABASE_PERSIST_FAILED'}]`,
+            next.error || 'تعذر تحديد سبب الخطأ. تحقق من مساحة القرص وصلاحية مجلد بيانات التطبيق.'
+          );
+        }
+      } else if (next.status === 'saved') {
+        lastShownPersistenceError.current = null;
+      }
+      previousStatus.current = next.status;
+      setState(next);
+    };
     refresh();
-    const timer = window.setInterval(refresh, 500);
-    return () => window.clearInterval(timer);
-  }, []);
+    const timer = window.setInterval(refresh, 100);
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(warningTimeout);
+      if (savedTimeout.current !== null) window.clearTimeout(savedTimeout.current);
+    };
+  }, [database, toast]);
 
-  if (state.status === 'saved') {
-    return <div role="status" aria-live="polite" className="fixed bottom-3 left-3 z-[100] rounded-full border border-emerald-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-emerald-700 shadow-lg">تم حفظ البيانات</div>;
+  if (state.status === 'saved' && showSaved) {
+    return <div role="status" aria-live="polite" className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-full border border-emerald-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-emerald-700 shadow-lg">تم حفظ البيانات</div>;
   }
   if (state.status === 'saving') {
-    return <div role="status" aria-live="polite" className="fixed bottom-3 left-3 z-[100] rounded-full border border-amber-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-amber-700 shadow-lg">جارٍ حفظ التغييرات…</div>;
+    return <div role="status" aria-live="polite" className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-full border border-amber-200 bg-white/95 px-3 py-1.5 text-[11px] font-bold text-amber-700 shadow-lg">جارٍ حفظ التغييرات…</div>;
   }
-  if (state.status === 'unencrypted') {
-    return <div role="alert" aria-live="polite" className="fixed bottom-3 left-3 z-[100] rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800 shadow-xl">تُحفظ البيانات في تخزين المتصفح غير المشفر. استخدم تطبيق سطح المكتب لحماية قاعدة البيانات المحلية.</div>;
+  if (state.status === 'unencrypted' && showUnencryptedWarning) {
+    return <div role="alert" aria-live="polite" className="fixed left-1/2 top-4 z-[100] -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800 shadow-xl">تُحفظ البيانات في تخزين المتصفح غير المشفر. استخدم تطبيق سطح المكتب لحماية قاعدة البيانات المحلية.</div>;
   }
-  return (
-    <div role="alert" aria-live="assertive" className="fixed bottom-3 left-3 z-[100] max-w-[min(92vw,36rem)] rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-800 shadow-xl">
-      {state.status === 'unavailable' ? 'تعذر تحديد وسيط حفظ قاعدة البيانات.' : `فشل حفظ قاعدة البيانات: ${state.error || 'خطأ غير معروف'}`}
-    </div>
-  );
+  return null;
 };
 
 // ─── Inner component that has access to router context ────────────────────────

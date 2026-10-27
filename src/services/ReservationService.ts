@@ -56,7 +56,7 @@ export class ReservationService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
     const quantity = round2(input.quantityM2);
-    if (!(quantity > 0)) throw new Error('ÙƒÙ…ÙŠØ© Ø§Ù„Ø­Ø¬Ø² ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±.');
+    if (!(quantity > 0)) throw new Error('كمية الحجز يجب أن تكون أكبر من صفر.');
 
     const id = `res_${uuidv4().substring(0, 8)}`;
     this.db.executeTransaction((db) => {
@@ -67,11 +67,11 @@ export class ReservationService {
          WHERE ws.product_id = ? AND ws.warehouse_id = ?`,
         [input.productId, input.warehouseId]
       )[0];
-      if (!stock) throw new Error('Ø§Ù„ØµÙ†Ù ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ù‡Ø°Ø§ Ø§Ù„Ù…Ø®Ø²Ù†.');
+      if (!stock) throw new Error('الصنف غير موجود في هذا المخزن.');
       const available = round2(Number(stock.quantity) - Number(stock.reserved));
       if (quantity > available) {
         const unit = getProductUnitLabel(stock);
-        throw new Error(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ§Ø­Ø© ${available} ${unit} ÙÙ‚Ø·ØŒ ÙˆØ§Ù„Ù…Ø·Ù„ÙˆØ¨ Ø­Ø¬Ø²Ù‡ ${quantity} ${unit}.`);
+        throw new Error(`الكمية المتاحة ${available} ${unit} فقط، والمطلوب حجزه ${quantity} ${unit}.`);
       }
 
       db.run(
@@ -102,8 +102,8 @@ export class ReservationService {
        FROM stock_reservations WHERE id = ?`,
       [id]
     )[0];
-    if (!row) throw new Error('Ø§Ù„Ø­Ø¬Ø² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
-    if (row.status !== 'ACTIVE') throw new Error('Ø§Ù„Ø­Ø¬Ø² ØºÙŠØ± Ù†Ø´Ø· Ø¨Ø§Ù„ÙØ¹Ù„.');
+    if (!row) throw new Error('الحجز غير موجود.');
+    if (row.status !== 'ACTIVE') throw new Error('الحجز غير نشط بالفعل.');
 
     this.db.executeTransaction((db) => {
       db.run(
@@ -128,8 +128,8 @@ export class ReservationService {
        FROM stock_reservations WHERE id = ?`,
       [id]
     )[0];
-    if (!row) throw new Error('Ø§Ù„Ø­Ø¬Ø² ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯.');
-    if (row.status !== 'ACTIVE') throw new Error('Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªÙ†ÙÙŠØ° Ø­Ø¬Ø² ØºÙŠØ± Ù†Ø´Ø·.');
+    if (!row) throw new Error('الحجز غير موجود.');
+    if (row.status !== 'ACTIVE') throw new Error('لا يمكن تنفيذ حجز غير نشط.');
 
     this.db.executeTransaction((db) => {
       const stock = db.query<any>(
@@ -137,7 +137,7 @@ export class ReservationService {
         [row.productId, row.warehouseId]
       )[0];
       if (!stock || Number(stock.quantity) < Number(row.quantity)) {
-        throw new Error('Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø§Ù„ÙØ¹Ù„ÙŠ ØºÙŠØ± ÙƒØ§ÙÙ Ù„ØªÙ†ÙÙŠØ° Ø§Ù„Ø­Ø¬Ø².');
+        throw new Error('المخزون الفعلي غير كافٍ لتنفيذ الحجز.');
       }
       const product = db.query<any>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [row.productId])[0];
       const fifoPlan = InventoryCostingService.costingMethod(db) === 'FIFO'
@@ -157,7 +157,7 @@ export class ReservationService {
         [
           transactionId, db.nextNumber('ITX'), row.productId, row.warehouseId,
           Number(row.quantity), unitCost, round2(Number(row.quantity) * unitCost),
-          row.id, `ØªÙ†ÙÙŠØ° Ø­Ø¬Ø² ${row.referenceType} ${row.referenceId || ''}`.trim(), actor.id,
+          row.id, `تنفيذ حجز ${row.referenceType} ${row.referenceId || ''}`.trim(), actor.id,
         ]
       );
       if (fifoPlan) InventoryCostingService.consumeFifo(db, transactionId, fifoPlan);

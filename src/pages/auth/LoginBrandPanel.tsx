@@ -12,20 +12,20 @@ export const LoginBrandPanel: React.FC = () => (
           </div>
           <div>
             <h1 className="text-xl font-black tracking-wide">CeramiSys ERP</h1>
-            <p className="text-xs text-sky-100">Ù†Ø¸Ø§Ù… Ø¥Ø¯Ø§Ø±Ø© Ù…Ø¹Ø§Ø±Ø¶ Ø§Ù„Ø³ÙŠØ±Ø§Ù…ÙŠÙƒ ÙˆÙ…ÙˆØ§Ø¯ Ø§Ù„ØªØ´Ø·ÙŠØ¨</p>
+            <p className="text-xs text-sky-100">نظام إدارة معارض السيراميك ومواد التشطيب</p>
           </div>
         </div>
 
         <div className="relative space-y-4">
           <h2 className="text-3xl font-black leading-snug">
-            ÙƒÙ„ Ù…Ø¹Ø±Ø¶Ùƒ ÙÙŠ Ù…ÙƒØ§Ù† ÙˆØ§Ø­Ø¯
+            كل معرضك في مكان واحد
             <br />
-            <span className="text-sky-200">Ù…Ø¨ÙŠØ¹Ø§ØªØŒ Ù…Ø®Ø²ÙˆÙ†ØŒ Ø­Ø³Ø§Ø¨Ø§Øª ÙˆØªÙ‚Ø§Ø±ÙŠØ±</span>
+            <span className="text-sky-200">مبيعات، مخزون، حسابات وتقارير</span>
           </h2>
           <ul className="space-y-3 text-sm text-sky-50">
-            <li className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-sky-300" /> ØµÙ„Ø§Ø­ÙŠØ§Øª Ø¯Ù‚ÙŠÙ‚Ø© Ù„ÙƒÙ„ Ù…ÙˆØ¸Ù ÙˆÙƒÙ„ ÙˆØ­Ø¯Ø©</li>
-            <li className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-sky-300" /> ÙŠØ¹Ù…Ù„ Ø¨Ø§Ù„ÙƒØ§Ù…Ù„ Ø¨Ø¯ÙˆÙ† Ø§ØªØµØ§Ù„ Ø¨Ø§Ù„Ø¥Ù†ØªØ±Ù†Øª</li>
-            <li className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-sky-300" /> Ù‚Ø§Ø¹Ø¯Ø© Ø¨ÙŠØ§Ù†Ø§Øª Ù…Ø­Ù„ÙŠØ© Ø¨Ù…Ø¹Ø§Ù…Ù„Ø§Øª Ø¢Ù…Ù†Ø© ÙˆØ³Ø¬Ù„ ØªØ¯Ù‚ÙŠÙ‚</li>
+            <li className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-sky-300" /> صلاحيات دقيقة لكل موظف وكل وحدة</li>
+            <li className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-sky-300" /> يعمل بالكامل دون اتصال بالإنترنت</li>
+            <li className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-sky-300" /> قاعدة بيانات محلية بمعاملات آمنة وسجل تدقيق</li>
           </ul>
         </div>
 

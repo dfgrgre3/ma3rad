@@ -46,7 +46,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (kind: ToastKind, title: string, message?: string) => {
       const id = ++counter.current;
       setItems((prev) => [...prev.slice(-4), { id, kind, title, message }]);
-      window.setTimeout(() => remove(id), kind === 'error' ? 7000 : 4500);
+      window.setTimeout(() => remove(id), 3000);
     },
     [remove]
   );

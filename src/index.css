@@ -86,7 +86,8 @@ input[type=number] {
 * { box-sizing: border-box; }
 /* Touch-friendly: no tap flash, no double-tap zoom on controls */
 html { -webkit-tap-highlight-color: transparent; }
-body { background: var(--cerami-canvas); color: var(--cerami-text); }
+html, body, #root { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
+body { background: var(--cerami-canvas); color: var(--cerami-text); overflow-x: hidden; }
 button, a, [role='button'], input, select, textarea, label { touch-action: manipulation; }
 button, a, input, select, textarea { outline: none; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
@@ -232,4 +233,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dashboard-embedded-scope .rounded-3xl,
 .dashboard-embedded-scope .rounded-2xl {
   border-radius: 0.75rem !important;
+}
+
+/* Responsive application frame and shared content safeguards. */
+.app-shell { height: 100vh; height: 100dvh; }
+.app-main, .app-main > * { min-width: 0; }
+img, video, canvas, svg { max-width: 100%; }
+pre, code { overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  .app-header { min-height: 3.5rem; }
+  .app-header > nav { display: none; }
+  /* Dialogs and controls stay within the available viewport on touch screens. */
+  .app-main [role='dialog'] { max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); overflow: auto; }
+  .app-main input, .app-main select, .app-main textarea { max-width: 100%; }
+  .app-main .fixed.inset-0 > * { max-width: calc(100vw - 1rem); }
+}
+
+@media (max-width: 380px) {
+  .app-header { gap: 0.25rem; padding-inline: 0.5rem; }
+  .app-header > div:last-of-type { gap: 0.25rem; }
 }

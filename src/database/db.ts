@@ -6,6 +6,25 @@ import { AppError, toAppError } from '../errors/appError';
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 type DatabaseFileApi = NonNullable<NonNullable<Window['ceramisys']>['db']>;
 
+function persistenceErrorMessage(error: unknown, fallbackCode: string): string {
+  const seen = new Set<unknown>();
+  let current: any = error;
+  while (current && !seen.has(current)) {
+    if (typeof current === 'string' && current.trim()) return current.trim();
+    if (typeof current !== 'object') break;
+    seen.add(current);
+    const message = typeof current.message === 'string' ? current.message.trim() : '';
+    const code = typeof current.code === 'string' ? current.code.trim() : '';
+    const errno = typeof current.errno === 'string' || typeof current.errno === 'number' ? String(current.errno) : '';
+    const syscall = typeof current.syscall === 'string' ? current.syscall.trim() : '';
+    const path = typeof current.path === 'string' ? current.path.trim() : '';
+    const details = [code && `[${code}]`, errno && `errno ${errno}`, syscall, path].filter(Boolean).join(' ');
+    if (message || details) return [message, details].filter(Boolean).join(' — ');
+    current = current.cause;
+  }
+  return `تعذر حفظ قاعدة البيانات (الرمز: ${fallbackCode}). راجع سجل التطبيق لمعرفة تفاصيل الخطأ.`;
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   const chunk = 0x8000;
@@ -498,7 +517,7 @@ export class DatabaseManager {
       snapshot = this.exportSnapshot();
     } catch (e) {
       const failure = toAppError(e, 'DATABASE_SNAPSHOT_FAILED', 'تعذر إنشاء لقطة لقاعدة البيانات.');
-      this.lastPersistError = failure.message;
+      this.lastPersistError = persistenceErrorMessage(e, failure.code);
       this.lastPersistErrorCode = failure.code;
       console.error('Failed to export SQLite database snapshot', e);
       return;
@@ -541,7 +560,7 @@ export class DatabaseManager {
       }
     } catch (error) {
       const failure = toAppError(error, 'DATABASE_PERSIST_FAILED', 'تعذر حفظ قاعدة البيانات.');
-      this.lastPersistError = failure.message;
+      this.lastPersistError = persistenceErrorMessage(error, failure.code);
       this.lastPersistErrorCode = failure.code;
       console.error('Failed to persist SQLite database', error);
     }
