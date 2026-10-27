@@ -214,6 +214,7 @@ export const PosView: React.FC = () => {
   const [notes, setNotes] = useState('');
 
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
+  const heldOrdersRef = useRef<HeldOrder[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [successInvoice, setSuccessInvoice] = useState<any | null>(null);
   const [invoicePreview, setInvoicePreview] = useState<{
@@ -344,8 +345,14 @@ export const PosView: React.FC = () => {
     loadInitialData();
     try {
       const raw = localStorage.getItem(HELD_STORAGE_KEY);
-      if (raw) setHeldOrders(JSON.parse(raw));
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        const restored = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
+        heldOrdersRef.current = restored;
+        setHeldOrders(restored);
+      }
     } catch {
+      heldOrdersRef.current = [];
       setHeldOrders([]);
     }
   }, [loadInitialData]);
@@ -385,10 +392,15 @@ export const PosView: React.FC = () => {
     return list;
   }, [products, searchQuery, selectedCategory, selectedBrand, selectedGrade, selectedSize, selectedColor, inStockOnly, sortMode, stockOf]);
 
-  const visibleCategories = useMemo(
-    () => categories.filter((c) => c.productCount > 0),
-    [categories]
-  );
+  const visibleCategories = useMemo(() => {
+    const counts = new Map<string, number>();
+    products.forEach((product) => {
+      if (product.categoryId) counts.set(product.categoryId, (counts.get(product.categoryId) || 0) + 1);
+    });
+    return categories
+      .filter((category) => counts.has(category.id))
+      .map((category) => ({ ...category, productCount: counts.get(category.id) || 0 }));
+  }, [categories, products]);
   const visibleBrands = useMemo(() => [...new Map(products.filter((p) => p.brandId).map((p) => [p.brandId, p.brandName || ''])).entries()], [products]);
   const visibleSizes = useMemo(
     () => [...new Set(products.map((p) => p.size).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar', { numeric: true })),
@@ -461,12 +473,17 @@ export const PosView: React.FC = () => {
           current.boxesCount = CeramicMath.calculateBoxes(newM2, current.product.metersPerBox || 1.44, true);
           current.piecesCount = CeramicMath.calculatePiecesFromBoxes(current.boxesCount, current.product.piecesPerBox || 4);
         }
+        try {
+          current.unitPrice = pricingService.getEffectivePrice(current.product.id, selectedCustomer?.id, newM2).priceM2;
+        } catch {
+          // Keep the current price if a pricing rule cannot be resolved.
+        }
         updated[existingIndex] = current;
         return updated;
       }
       return [...prev, makeCartItem(product, stepM2)];
     });
-  }, [stockOf, selectedCustomer]);
+  }, [stockOf, selectedCustomer, pricingService]);
 
   const addCalculatedToCart = (product: Product, quantityM2: number) => {
     addToCart(product, quantityM2);
@@ -538,6 +555,7 @@ export const PosView: React.FC = () => {
   };
 
   const updateCartPrice = (index: number, value: number) => {
+    if (!Number.isFinite(value) || value < 0) return;
     if (!can('sales.approve')) {
       notify('لا تملك صلاحية تعديل سعر الصنف', 'error');
       return;
@@ -620,8 +638,10 @@ export const PosView: React.FC = () => {
     e.preventDefault();
     const term = searchQuery.trim();
     if (!term) return;
+    const normalizedTerm = term.toLocaleLowerCase('ar-EG');
     const exact = products.find(
-      (p) => p.barcode === term || p.sku.toLowerCase() === term.toLowerCase()
+      (p) => (p.barcode || '').trim().toLocaleLowerCase('ar-EG') === normalizedTerm
+        || (p.sku || '').trim().toLocaleLowerCase('ar-EG') === normalizedTerm
     );
     if (exact) {
       addToCart(exact);
@@ -630,11 +650,15 @@ export const PosView: React.FC = () => {
       notify(`تمت إضافة ${exact.name}`, 'success');
       return;
     }
-    if (filteredProducts.length >= 1) {
+    if (filteredProducts.length === 1) {
       addToCart(filteredProducts[0]);
       setSearchQuery('');
       barcodeInputRef.current?.focus();
       notify(`تمت إضافة ${filteredProducts[0].name}`, 'success');
+      return;
+    }
+    if (filteredProducts.length > 1) {
+      notify('توجد عدة نتائج؛ اختر الصنف المطلوب من القائمة.', 'warning');
       return;
     }
     notify(`لا يوجد صنف مطابق للباركود: ${term}`, 'error');
@@ -683,7 +707,8 @@ export const PosView: React.FC = () => {
 
   // ── Held orders ─────────────────────────────────────────────────────────────
   const persistHeld = (orders: HeldOrder[] | ((current: HeldOrder[]) => HeldOrder[])) => {
-    const next = typeof orders === 'function' ? orders(heldOrders) : orders;
+    const next = typeof orders === 'function' ? orders(heldOrdersRef.current) : orders;
+    heldOrdersRef.current = next;
     setHeldOrders(next);
     try {
       localStorage.setItem(HELD_STORAGE_KEY, JSON.stringify(next));
@@ -706,6 +731,7 @@ export const PosView: React.FC = () => {
       warehouseId: selectedWarehouseId,
       items: cart,
       discountAmount,
+      taxPercentage,
       shippingCost,
       notes,
       paidAmount,
@@ -714,8 +740,10 @@ export const PosView: React.FC = () => {
     persistHeld((prev) => [hold, ...prev]);
     setCart([]);
     setDiscountAmount(0);
+    setTaxPercentage(settings?.defaultTaxPercentage || 0);
     setShippingCost(0);
     setNotes('');
+    setPaidAmount(0);
     notify('تم تعليق الطلب وإمكانية استرجاعه لاحقاً', 'success');
   };
 
@@ -725,6 +753,7 @@ export const PosView: React.FC = () => {
     if (order.warehouseId) setSelectedWarehouseId(order.warehouseId);
     setCart(order.items);
     setDiscountAmount(order.discountAmount || 0);
+    setTaxPercentage(order.taxPercentage ?? settings?.defaultTaxPercentage ?? 0);
     setShippingCost(order.shippingCost || 0);
     setNotes(order.notes || '');
     setPaidAmount(order.paidAmount || 0);
@@ -785,6 +814,21 @@ export const PosView: React.FC = () => {
 
   // ── Checkout ────────────────────────────────────────────────────────────────
   const validateCartAndPermissions = useCallback(() => {
+    if (!Number.isFinite(discountAmount) || discountAmount < 0
+      || !Number.isFinite(shippingCost) || shippingCost < 0
+      || !Number.isFinite(taxPercentage) || taxPercentage < 0
+      || !Number.isFinite(paidAmount) || paidAmount < 0) {
+      notify('تحقق من أن الخصم والضريبة والشحن والمدفوع أرقام صحيحة غير سالبة', 'error');
+      return false;
+    }
+    const invalidItem = cart.find((item) => !Number.isFinite(item.quantityM2) || item.quantityM2 <= 0
+      || !Number.isFinite(item.unitPrice) || item.unitPrice < 0
+      || !Number.isFinite(item.discountAmount) || item.discountAmount < 0
+      || item.discountAmount > item.quantityM2 * item.unitPrice);
+    if (invalidItem) {
+      notify(`تحقق من الكمية والسعر والخصم للصنف «${invalidItem.product.name}»`, 'error');
+      return false;
+    }
     if (cart.length === 0) {
       notify('السلة فارغة، أضف أصنافاً أولاً', 'error');
       return false;
@@ -807,7 +851,7 @@ export const PosView: React.FC = () => {
     }
 
     return true;
-  }, [cart.length, selectedCustomer, selectedWarehouseId, can, remainingAmount, notify]);
+  }, [cart, discountAmount, shippingCost, taxPercentage, paidAmount, selectedCustomer, selectedWarehouseId, can, remainingAmount, notify]);
 
   const validateStockAvailability = useCallback(() => {
     if (settings?.enableNegativeStock ?? false) return true;
@@ -837,6 +881,10 @@ export const PosView: React.FC = () => {
 
   const validateDiscount = useCallback(() => {
     const totalDiscount = round2(discountAmount + lineDiscountTotal);
+    if (totalDiscount > lineSubtotal) {
+      notify('إجمالي الخصومات لا يمكن أن يتجاوز قيمة الأصناف', 'error');
+      return false;
+    }
     if (totalDiscount > 0 && !can('sales.discount')) {
       notify('غير مصرح لك بمنح خصم على الفاتورة', 'error');
       return false;
@@ -1031,13 +1079,14 @@ export const PosView: React.FC = () => {
   };
 
   const latest = useRef<any>({});
-  latest.current = { handleCheckout, cart, isCalculatorOpen, isCustomerModalOpen, isHeldModalOpen, isShortcutsOpen, isShiftModalOpen, successInvoice };
+  latest.current = { handleCheckout, cart, isCalculatorOpen, isCustomerModalOpen, isHeldModalOpen, isShortcutsOpen, isShiftModalOpen, isCloseShiftModalOpen, isToneWarningOpen, invoicePreview, successInvoice };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const s = latest.current;
       const target = e.target as HTMLElement | null;
       const isTyping = !!target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+      if (e.key === 'F9' && (s.isCalculatorOpen || s.isCustomerModalOpen || s.isHeldModalOpen || s.isShortcutsOpen || s.isShiftModalOpen || s.isCloseShiftModalOpen || s.isToneWarningOpen || s.invoicePreview || s.successInvoice)) return;
       if (isTyping && !['F1', 'F8', 'Escape'].includes(e.key)) return;
       if (e.key === 'F2') {
         e.preventDefault();
@@ -1254,6 +1303,20 @@ export const PosView: React.FC = () => {
             >
               <Calculator className="w-4 h-4" /> حاسبة المقايسة (F8)
             </button>
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <span>النتائج: <strong className="text-slate-700">{filteredProducts.length}</strong> صنف</span>
+            {(searchQuery || selectedCategory !== 'ALL' || selectedBrand !== 'ALL' || selectedGrade !== 'ALL' || selectedSize !== 'ALL' || selectedColor !== 'ALL' || inStockOnly) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery(''); setSelectedCategory('ALL'); setSelectedBrand('ALL');
+                  setSelectedGrade('ALL'); setSelectedSize('ALL'); setSelectedColor('ALL'); setInStockOnly(false);
+                }}
+                className="font-bold text-sky-700 hover:text-sky-900"
+              >مسح البحث والفلاتر</button>
+            )}
           </div>
 
           {/* Category chips */}

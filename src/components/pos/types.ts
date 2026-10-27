@@ -23,6 +23,7 @@ export interface HeldOrder {
   warehouseId: string;
   items: CartItem[];
   discountAmount: number;
+  taxPercentage?: number;
   shippingCost: number;
   notes: string;
   paidAmount?: number;
