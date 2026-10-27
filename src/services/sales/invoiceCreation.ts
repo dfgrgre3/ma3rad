@@ -11,15 +11,42 @@ import type { SalesInvoice } from '../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from './types';
 
-export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): SalesInvoice {
+type PreparedSaleItem = {
+  id: string;
+  invoiceId: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  productGrade: string;
+  size: string;
+  soldBy: CreateSaleDTO['items'][number]['soldBy'];
+  quantityM2: number;
+  boxesCount: number;
+  piecesCount: number;
+  unitPrice: number;
+  originalUnitPrice: number;
+  unitCost: number;
+  discountAmount: number;
+  totalPrice: number;
+  totalCost: number;
+  profit: number;
+  fifoPlan: ReturnType<typeof InventoryCostingService.planFifo> | null;
+  metersPerBox: number;
+  piecesPerBox: number;
+  productType: string;
+};
+
+function assertSaleHasItems(dto: CreateSaleDTO): void {
   if (!dto.items || dto.items.length === 0) {
     throw new Error('لا يمكن إنشاء فاتورة مبيعات بدون أصناف.');
   }
-  const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'sales.create');
+}
+
+function resolveCashRegister(ctx: SalesContext, dto: CreateSaleDTO, actor: any): { branchId: string; cashRegisterId: string } {
   const branchId = ctx.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
   const branchRegisterId = ctx.branchAccess.getDefaultRegisterId(branchId, actor);
   let cashRegisterId = branchRegisterId;
+
   if (dto.shiftId) {
     const shift = ctx.branchAccess.requireShiftAccess(dto.shiftId, actor);
     if (shift.status !== 'OPEN') throw new Error('الوردية المحددة مغلقة.');
@@ -27,104 +54,339 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     cashRegisterId = shift.registerId;
   }
 
+  return { branchId, cashRegisterId };
+}
+
+function validateItemQuantity(quantityM2: number): void {
+  if (quantityM2 <= 0) throw new Error('كمية أحد الأصناف في الفاتورة غير صحيحة.');
+}
+
+function getUnitLabel(product: any, isGeneralProduct: boolean): string {
+  if (!isGeneralProduct) return 'م²';
+  return product.custom_unit || ({
+    M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة',
+    KG: 'كجم', TON: 'طن', SET: 'طقم',
+  } as Record<string, string>)[product.base_unit] || 'وحدة';
+}
+
+function validateProductPricing(item: CreateSaleDTO['items'][number], product: any, actor: any): void {
+  if (item.unitPrice !== Number(product.sellingPriceM2) && !PermissionService.can(actor, 'sales.approve')) {
+    throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${product.name}».`);
+  }
+  if (item.unitPrice < (product.minSellingPriceM2 || 0)) {
+    PermissionService.require(actor, 'sales.approve');
+  }
+}
+
+function getAvailableStockM2(sqliteDb: any, productId: string, warehouseId: string): number {
+  const stockRow = sqliteDb.query(
+    `SELECT quantity_m2, reserved_m2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+    [productId, warehouseId]
+  )[0] as any;
+
+  return (stockRow ? Number(stockRow.quantityM2) : 0) - Number(stockRow?.reservedM2 || 0);
+}
+
+function assertAvailableStock(product: any, unitLabel: string, availableM2: number, plannedSoFar: number, quantityM2: number): void {
+  if (availableM2 - plannedSoFar < quantityM2) {
+    throw new Error(
+      `الرصيد المتاح من الصنف (${product.name}) غير كافٍ. المتاح: ${round2(availableM2 - plannedSoFar)} ${unitLabel}، المطلوب: ${quantityM2} ${unitLabel}`
+    );
+  }
+}
+
+function getFifoPlan(sqliteDb: any, item: CreateSaleDTO['items'][number], dto: CreateSaleDTO, quantityM2: number, plannedFifoByLayer: Map<string, number>, costingMethod: string): ReturnType<typeof InventoryCostingService.planFifo> | null {
+  if (costingMethod !== 'FIFO') return null;
+  const fifoPlan = InventoryCostingService.planFifo(sqliteDb, item.productId, dto.warehouseId, quantityM2, plannedFifoByLayer);
+  for (const allocation of fifoPlan?.allocations || []) {
+    plannedFifoByLayer.set(allocation.layerId, round2((plannedFifoByLayer.get(allocation.layerId) || 0) + allocation.quantity));
+  }
+  return fifoPlan;
+}
+
+function getBoxesCount(product: any, item: CreateSaleDTO['items'][number], quantityM2: number): number {
+  const isGeneralProduct = product.product_type === 'GENERAL';
+  const metersPerBox = Number(product.metersPerBox) || 1.44;
+
+  if (isGeneralProduct) {
+    return product.base_unit === 'BOX' ? quantityM2 : 0;
+  }
+
+  if (item.boxesCount !== undefined && item.boxesCount !== null) {
+    return round2(Math.max(0, item.boxesCount));
+  }
+
+  return round2(quantityM2 / metersPerBox);
+}
+
+function buildPreparedItem(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  item: CreateSaleDTO['items'][number],
+  actor: any,
+  plannedByProduct: Map<string, number>,
+  plannedFifoByLayer: Map<string, number>,
+  costingMethod: string
+): PreparedSaleItem {
+  const quantityM2 = round2(Math.max(0, item.quantityM2 || 0));
+  validateItemQuantity(quantityM2);
+
+  const product = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
+  if (!product) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
+
+  const isGeneralProduct = product.product_type === 'GENERAL';
+  const unitLabel = getUnitLabel(product, isGeneralProduct);
+  validateProductPricing(item, product, actor);
+
+  const availableM2 = getAvailableStockM2(sqliteDb, item.productId, dto.warehouseId);
+  const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
+  assertAvailableStock(product, unitLabel, availableM2, alreadyPlanned, quantityM2);
+  plannedByProduct.set(item.productId, alreadyPlanned + quantityM2);
+
+  const fifoPlan = getFifoPlan(sqliteDb, item, dto, quantityM2, plannedFifoByLayer, costingMethod);
+  const line = computeSaleLine({
+    quantity: quantityM2,
+    unitPrice: item.unitPrice,
+    unitCost: fifoPlan ? fifoPlan.totalCost / quantityM2 : (item.unitCost ?? product.costPrice ?? 0),
+    discountAmount: item.discountAmount || 0,
+  });
+
+  const metersPerBox = Number(product.metersPerBox) || 1.44;
+  const piecesPerBox = Number(product.piecesPerBox) || 4;
+  const boxesCount = getBoxesCount(product, item, quantityM2);
+  return {
+    id: `item_${uuidv4().substring(0, 8)}`,
+    invoiceId: '',
+    productId: product.id,
+    productName: product.name,
+    productSku: product.sku,
+    productGrade: product.grade,
+    size: product.size,
+    soldBy: item.soldBy,
+    quantityM2,
+    boxesCount,
+    piecesCount: isGeneralProduct
+      ? product.base_unit === 'PIECE' ? quantityM2 : 0
+      : item.piecesCount || Math.round(boxesCount * piecesPerBox),
+    unitPrice: item.unitPrice,
+    originalUnitPrice: product.sellingPriceM2,
+    unitCost: line.lineCost / (quantityM2 || 1),
+    discountAmount: line.lineDiscount,
+    totalPrice: line.lineTotal,
+    totalCost: line.lineCost,
+    profit: line.lineProfit,
+    fifoPlan,
+    metersPerBox,
+    piecesPerBox,
+    productType: product.product_type,
+  };
+}
+
+function prepareSaleItems(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  actor: any,
+  costingMethod: string
+): { preparedItems: PreparedSaleItem[]; totalLineDiscount: number } {
+  let totalLineDiscount = 0;
+  const preparedItems: PreparedSaleItem[] = [];
+  const plannedByProduct = new Map<string, number>();
+  const plannedFifoByLayer = new Map<string, number>();
+
+  for (const item of dto.items) {
+    const preparedItem = buildPreparedItem(sqliteDb, dto, item, actor, plannedByProduct, plannedFifoByLayer, costingMethod);
+    totalLineDiscount += preparedItem.discountAmount;
+    preparedItems.push(preparedItem);
+  }
+
+  return { preparedItems, totalLineDiscount };
+}
+
+function validateDiscountAndCredit(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  actor: any,
+  totals: ReturnType<typeof computeSaleTotals>,
+  totalLineDiscount: number
+): void {
+  const headerDiscount = dto.discountAmount || 0;
+  if (totalLineDiscount + headerDiscount > 0) {
+    PermissionService.require(actor, 'sales.discount');
+  }
+
+  if (totals.remainingAmount > 0 && !PermissionService.can(actor, 'sales.credit')) {
+    throw new Error('لا تملك صلاحية البيع الآجل أو تسجيل مبلغ متبقٍ على العميل.');
+  }
+
+  if (totals.remainingAmount <= 0) return;
+
+  const customer = sqliteDb.query(
+    `SELECT name, credit_limit, current_balance FROM customers WHERE id = ?`,
+    [dto.customerId]
+  )[0] as { name: string; creditLimit?: number; currentBalance?: number } | undefined;
+  if (!customer) throw new Error('العميل المحدد غير موجود.');
+  const limit = Number(customer.creditLimit || 0);
+  const projected = round2(Number(customer.currentBalance || 0) + totals.remainingAmount);
+  if (limit > 0 && projected > limit && !PermissionService.can(actor, 'sales.approve')) {
+    throw new Error(
+      `تجاوز حد الائتمان للعميل "${customer.name}". الرصيد الحالي ${customer.currentBalance} + الآجل ${totals.remainingAmount} يتجاوز الحد ${limit}.`
+    );
+  }
+}
+
+function getDueDate(today: string, customerId: string, sqliteDb: any, remainingAmount: number): string | null {
+  if (remainingAmount <= 0) return null;
+  const termsDays = Number((sqliteDb.query(
+    'SELECT payment_terms_days AS paymentTermsDays FROM customers WHERE id=?',
+    [customerId]
+  )[0] as { paymentTermsDays?: number } | undefined)?.paymentTermsDays || 0);
+  if (termsDays <= 0) return null;
+
+  const due = new Date(`${today}T00:00:00`);
+  due.setDate(due.getDate() + termsDays);
+  return localDateString(due);
+}
+
+function insertInvoiceItems(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  preparedItems: PreparedSaleItem[],
+  invoiceId: string,
+  invoiceNumber: string | number,
+  actor: any,
+  costingMethod: string
+): void {
+  for (const item of preparedItems) {
+    item.invoiceId = invoiceId;
+    sqliteDb.run(`
+      INSERT INTO sales_invoice_items (
+        id, invoice_id, product_id, product_name, product_sku, product_grade, size,
+        sold_by, quantity_m2, boxes_count, pieces_count, unit_price, original_unit_price,
+        unit_cost, discount_amount, total_price, total_cost, profit, meters_per_box, pieces_per_box
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      item.id, item.invoiceId, item.productId, item.productName, item.productSku, item.productGrade,
+      item.size, item.soldBy, item.quantityM2, item.boxesCount, item.piecesCount,
+      item.unitPrice, item.originalUnitPrice, round2(item.unitCost), item.discountAmount,
+      item.totalPrice, item.totalCost, item.profit, item.metersPerBox, item.piecesPerBox
+    ]);
+
+    const stockUpdate = sqliteDb.query(
+      `SELECT id FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+      [item.productId, dto.warehouseId]
+    )[0] as { id: string } | undefined;
+    if (!stockUpdate) {
+      throw new Error(`لا يوجد رصيد مخزني مسجل للصنف "${item.productName}" في المخزن المحدد.`);
+    }
+
+    sqliteDb.run(`
+      UPDATE warehouse_stock
+      SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
+      WHERE product_id = ? AND warehouse_id = ?
+    `, [item.quantityM2, item.productId, dto.warehouseId]);
+
+    const txId = `tx_${uuidv4().substring(0, 8)}`;
+    sqliteDb.run(`
+      INSERT INTO inventory_transactions (
+        id, transaction_number, type, product_id, warehouse_id,
+        quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+        reference_id, notes, performed_by
+      ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
+    `, [
+      txId, sqliteDb.nextNumber('TX-SALE'), item.productId, dto.warehouseId,
+      -item.quantityM2, -item.boxesCount, round2(item.unitCost), item.totalCost,
+      invoiceId, `بيع بموجب فاتورة ${invoiceNumber}`, actor.id
+    ]);
+    if (costingMethod === 'FIFO' && item.fifoPlan) InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan);
+
+    if (item.productType !== 'GENERAL') {
+      const batchResult = new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2);
+      for (const allocation of batchResult.allocations) {
+        sqliteDb.run(`
+          INSERT INTO sales_invoice_batch_allocations (id, invoice_item_id, batch_id, quantity_m2)
+          VALUES (?, ?, ?, ?)
+        `, [`sba_${uuidv4().substring(0, 8)}`, item.id, allocation.batchId, allocation.quantityM2]);
+      }
+    }
+  }
+}
+
+function updateCustomerAndCash(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  totals: ReturnType<typeof computeSaleTotals>,
+  cashRegisterId: string
+): void {
+  sqliteDb.run(`
+    UPDATE customers SET
+      total_purchases = total_purchases + ?,
+      current_balance = current_balance + ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `, [totals.totalAmount, totals.remainingAmount, dto.customerId]);
+
+  if (totals.paidAmount <= 0) return;
+  if (dto.paymentType === 'CASH') {
+    sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [totals.paidAmount, cashRegisterId]);
+  }
+  if (!dto.shiftId) return;
+
+  const col = dto.paymentType === 'CASH' ? 'total_sales_cash'
+    : dto.paymentType === 'CARD' ? 'total_sales_card' : 'total_sales_transfer';
+  sqliteDb.run(`UPDATE cash_shifts SET ${col} = ${col} + ? WHERE id = ?`, [totals.paidAmount, dto.shiftId]);
+}
+
+function buildLedgerEntries(dto: CreateSaleDTO, totals: ReturnType<typeof computeSaleTotals>): any[] {
+  return [
+    ...(totals.paidAmount > 0 ? [{
+      accountCode: paymentAccountCode(dto.paymentType),
+      debit: totals.paidAmount,
+      credit: 0,
+    }] : []),
+    ...(totals.remainingAmount > 0 ? [{
+      accountCode: '1103',
+      debit: totals.remainingAmount,
+      credit: 0,
+    }] : []),
+    {
+      accountCode: '4101',
+      debit: 0,
+      credit: round2(totals.subtotal - totals.discountAmount),
+    },
+    ...(totals.shippingCost > 0 ? [{
+      accountCode: '4102',
+      debit: 0,
+      credit: totals.shippingCost,
+    }] : []),
+    ...(totals.taxAmount > 0 ? [{
+      accountCode: '2102',
+      debit: 0,
+      credit: totals.taxAmount,
+    }] : []),
+    ...(totals.totalCost > 0 ? [
+      { accountCode: '5101', debit: totals.totalCost, credit: 0 },
+      { accountCode: '1104', debit: 0, credit: totals.totalCost },
+    ] : []),
+  ];
+}
+
+function insertAuditLog(sqliteDb: any, actor: any, invoiceId: string, invoiceNumber: string | number, totals: ReturnType<typeof computeSaleTotals>): void {
+  sqliteDb.run(`
+    INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+    VALUES (?, ?, ?, 'إصدار فاتورة مبيعات', 'SALES', ?, ?)
+  `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoiceId, JSON.stringify({ invoiceNumber, totalAmount: totals.totalAmount, paidAmount: totals.paidAmount })]);
+}
+
+export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): SalesInvoice {
+  assertSaleHasItems(dto);
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'sales.create');
+  const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor);
+
   return ctx.db.executeTransaction((sqliteDb) => {
-    let totalLineDiscount = 0;
-    const preparedItems: any[] = [];
-    const plannedByProduct = new Map<string, number>();
-    const plannedFifoByLayer = new Map<string, number>();
     const costingMethod = SettingsService.getSettings().costingMethod;
-
-    for (const item of dto.items) {
-      const quantityM2 = round2(Math.max(0, item.quantityM2 || 0));
-      if (quantityM2 <= 0) throw new Error('كمية أحد الأصناف في الفاتورة غير صحيحة.');
-      const prod = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
-      if (!prod) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
-      const isGeneralProduct = prod.product_type === 'GENERAL';
-      const unitLabel = isGeneralProduct
-        ? (prod.custom_unit || ({
-            M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة',
-            KG: 'كجم', TON: 'طن', SET: 'طقم',
-          } as Record<string, string>)[prod.base_unit] || 'وحدة')
-        : 'م²';
-
-      if (item.unitPrice !== Number(prod.sellingPriceM2) && !PermissionService.can(actor, 'sales.approve')) {
-        throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${prod.name}».`);
-      }
-
-      // Margin / price protection (brief §132): selling below the minimum allowed price needs approval.
-      if (item.unitPrice < (prod.minSellingPriceM2 || 0)) {
-        PermissionService.require(actor, 'sales.approve');
-      }
-
-      const stockRow = sqliteDb.query(
-        `SELECT quantity_m2, reserved_m2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
-        [item.productId, dto.warehouseId]
-      )[0] as any;
-      const availableM2 = (stockRow ? Number(stockRow.quantityM2) : 0) - Number(stockRow?.reservedM2 || 0);
-      const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
-      if (availableM2 - alreadyPlanned < quantityM2) {
-        throw new Error(
-          `الرصيد المتاح من الصنف (${prod.name}) غير كافٍ. المتاح: ${round2(availableM2 - alreadyPlanned)} ${unitLabel}، المطلوب: ${quantityM2} ${unitLabel}`
-        );
-      }
-      plannedByProduct.set(item.productId, alreadyPlanned + quantityM2);
-
-      const fifoPlan = costingMethod === 'FIFO'
-        ? InventoryCostingService.planFifo(sqliteDb, item.productId, dto.warehouseId, quantityM2, plannedFifoByLayer)
-        : null;
-      for (const allocation of fifoPlan?.allocations || []) {
-        plannedFifoByLayer.set(allocation.layerId, round2((plannedFifoByLayer.get(allocation.layerId) || 0) + allocation.quantity));
-      }
-      const line = computeSaleLine({
-        quantity: quantityM2,
-        unitPrice: item.unitPrice,
-        unitCost: fifoPlan ? fifoPlan.totalCost / quantityM2 : (item.unitCost ?? prod.costPrice ?? 0),
-        discountAmount: item.discountAmount || 0,
-      });
-      totalLineDiscount += line.lineDiscount;
-
-      const metersPerBox = Number(prod.metersPerBox) || 1.44;
-      const piecesPerBox = Number(prod.piecesPerBox) || 4;
-      const boxesCount = isGeneralProduct
-        ? prod.base_unit === 'BOX' ? quantityM2 : 0
-        : item.boxesCount !== undefined && item.boxesCount !== null
-          ? round2(Math.max(0, item.boxesCount))
-          : round2(quantityM2 / metersPerBox);
-
-      preparedItems.push({
-        id: `item_${uuidv4().substring(0, 8)}`,
-        invoiceId: '',
-        productId: prod.id,
-        productName: prod.name,
-        productSku: prod.sku,
-        productGrade: prod.grade,
-        size: prod.size,
-        soldBy: item.soldBy,
-        quantityM2,
-        boxesCount,
-        piecesCount: isGeneralProduct
-          ? prod.base_unit === 'PIECE' ? quantityM2 : 0
-          : item.piecesCount || Math.round(boxesCount * piecesPerBox),
-        unitPrice: item.unitPrice,
-        originalUnitPrice: prod.sellingPriceM2,
-        unitCost: line.lineCost / (quantityM2 || 1),
-        discountAmount: line.lineDiscount,
-        totalPrice: line.lineTotal,
-        totalCost: line.lineCost,
-        profit: line.lineProfit,
-        fifoPlan,
-        metersPerBox,
-        piecesPerBox,
-        productType: prod.product_type,
-      });
-    }
-
-    // Any discount requires explicit permission (brief §68/§131).
+    const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod);
     const headerDiscount = dto.discountAmount || 0;
-    if (totalLineDiscount + headerDiscount > 0) {
-      PermissionService.require(actor, 'sales.discount');
-    }
-
     const totals = computeSaleTotals({
       lines: preparedItems.map((p) => ({
         lineTotal: p.totalPrice,
@@ -136,32 +398,12 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       paidAmount: dto.paidAmount,
     });
 
-    if (totals.remainingAmount > 0 && !PermissionService.can(actor, 'sales.credit')) {
-      throw new Error('لا تملك صلاحية البيع الآجل أو تسجيل مبلغ متبقٍ على العميل.');
-    }
-
-    // Credit-limit guard: extensions beyond the customer's limit need approval.
-    if (totals.remainingAmount > 0) {
-      const customer = sqliteDb.query<any>(
-        `SELECT name, credit_limit, current_balance FROM customers WHERE id = ?`,
-        [dto.customerId]
-      )[0];
-      if (!customer) throw new Error('العميل المحدد غير موجود.');
-      const limit = Number(customer.creditLimit || 0);
-      const projected = round2(Number(customer.currentBalance || 0) + totals.remainingAmount);
-      if (limit > 0 && projected > limit && !PermissionService.can(actor, 'sales.approve')) {
-        throw new Error(
-          `تجاوز حد الائتمان للعميل "${customer.name}". الرصيد الحالي ${customer.currentBalance} + الآجل ${totals.remainingAmount} يتجاوز الحد ${limit}.`
-        );
-      }
-    }
+    validateDiscountAndCredit(sqliteDb, dto, actor, totals, totalLineDiscount);
 
     const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
     const invoiceNumber = sqliteDb.nextNumber('INV');
     const today = localDateString();
-    const termsDays = Number(sqliteDb.query<{ paymentTermsDays: number }>('SELECT payment_terms_days AS paymentTermsDays FROM customers WHERE id=?',[dto.customerId])[0]?.paymentTermsDays || 0);
-    let dueDate: string | null = null;
-    if (totals.remainingAmount > 0 && termsDays > 0) { const due = new Date(`${today}T00:00:00`); due.setDate(due.getDate()+termsDays); dueDate=localDateString(due); }
+    const dueDate = getDueDate(today, dto.customerId, sqliteDb, totals.remainingAmount);
 
     sqliteDb.run(`
       INSERT INTO sales_invoices (
@@ -178,110 +420,10 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       totals.paymentStatus, totals.totalCost, totals.grossProfit, dto.notes || null, actor.id
     ]);
 
-    for (const item of preparedItems) {
-      item.invoiceId = invoiceId;
-      sqliteDb.run(`
-        INSERT INTO sales_invoice_items (
-          id, invoice_id, product_id, product_name, product_sku, product_grade, size,
-          sold_by, quantity_m2, boxes_count, pieces_count, unit_price, original_unit_price,
-          unit_cost, discount_amount, total_price, total_cost, profit, meters_per_box, pieces_per_box
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        item.id, item.invoiceId, item.productId, item.productName, item.productSku, item.productGrade,
-        item.size, item.soldBy, item.quantityM2, item.boxesCount, item.piecesCount,
-        item.unitPrice, item.originalUnitPrice, round2(item.unitCost), item.discountAmount,
-        item.totalPrice, item.totalCost, item.profit, item.metersPerBox, item.piecesPerBox
-      ]);
+    insertInvoiceItems(sqliteDb, dto, preparedItems, invoiceId, invoiceNumber, actor, costingMethod);
+    updateCustomerAndCash(sqliteDb, dto, totals, cashRegisterId);
 
-      const stockUpdate = sqliteDb.query<{ id: string }>(
-        `SELECT id FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
-        [item.productId, dto.warehouseId]
-      )[0];
-      if (!stockUpdate) {
-        throw new Error(`لا يوجد رصيد مخزني مسجل للصنف "${item.productName}" في المخزن المحدد.`);
-      }
-      sqliteDb.run(`
-        UPDATE warehouse_stock
-        SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
-        WHERE product_id = ? AND warehouse_id = ?
-      `, [item.quantityM2, item.productId, dto.warehouseId]);
-
-      const txId = `tx_${uuidv4().substring(0, 8)}`;
-      sqliteDb.run(`
-        INSERT INTO inventory_transactions (
-          id, transaction_number, type, product_id, warehouse_id,
-          quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
-          reference_id, notes, performed_by
-        ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
-      `, [
-        txId, sqliteDb.nextNumber('TX-SALE'), item.productId, dto.warehouseId,
-        -item.quantityM2, -item.boxesCount, round2(item.unitCost), item.totalCost,
-        invoiceId, `بيع بموجب فاتورة ${invoiceNumber}`, actor.id
-      ]);
-      if (costingMethod === 'FIFO') InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan);
-
-      // ── Batch FIFO deduction (runs only if batches are tracked for this product) ──
-      if (item.productType !== 'GENERAL') {
-        const batchResult = new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2);
-        for (const allocation of batchResult.allocations) {
-          sqliteDb.run(`
-            INSERT INTO sales_invoice_batch_allocations (id, invoice_item_id, batch_id, quantity_m2)
-            VALUES (?, ?, ?, ?)
-          `, [`sba_${uuidv4().substring(0, 8)}`, item.id, allocation.batchId, allocation.quantityM2]);
-        }
-      }
-    }
-
-    sqliteDb.run(`
-      UPDATE customers SET
-        total_purchases = total_purchases + ?,
-        current_balance = current_balance + ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [totals.totalAmount, totals.remainingAmount, dto.customerId]);
-
-    if (totals.paidAmount > 0) {
-      if (dto.paymentType === 'CASH') {
-        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [totals.paidAmount, cashRegisterId]);
-      }
-      if (dto.shiftId) {
-        const col = dto.paymentType === 'CASH' ? 'total_sales_cash'
-          : dto.paymentType === 'CARD' ? 'total_sales_card' : 'total_sales_transfer';
-        sqliteDb.run(`UPDATE cash_shifts SET ${col} = ${col} + ? WHERE id = ?`, [totals.paidAmount, dto.shiftId]);
-      }
-    }
-
-    const ledgerLines = [
-      ...(totals.paidAmount > 0 ? [{
-        accountCode: paymentAccountCode(dto.paymentType),
-        debit: totals.paidAmount,
-        credit: 0,
-      }] : []),
-      ...(totals.remainingAmount > 0 ? [{
-        accountCode: '1103',
-        debit: totals.remainingAmount,
-        credit: 0,
-      }] : []),
-      {
-        accountCode: '4101',
-        debit: 0,
-        credit: round2(totals.subtotal - totals.discountAmount),
-      },
-      ...(totals.shippingCost > 0 ? [{
-        accountCode: '4102',
-        debit: 0,
-        credit: totals.shippingCost,
-      }] : []),
-      ...(totals.taxAmount > 0 ? [{
-        accountCode: '2102',
-        debit: 0,
-        credit: totals.taxAmount,
-      }] : []),
-      ...(totals.totalCost > 0 ? [
-        { accountCode: '5101', debit: totals.totalCost, credit: 0 },
-        { accountCode: '1104', debit: 0, credit: totals.totalCost },
-      ] : []),
-    ];
+    const ledgerLines = buildLedgerEntries(dto, totals);
     postLedgerEntry(sqliteDb.getDatabase(), {
       date: today,
       description: `Sale ${invoiceNumber}`,
@@ -291,11 +433,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       lines: ledgerLines,
     });
 
-    sqliteDb.run(`
-      INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-      VALUES (?, ?, ?, 'إصدار فاتورة مبيعات', 'SALES', ?, ?)
-    `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoiceId, JSON.stringify({ invoiceNumber, totalAmount: totals.totalAmount, paidAmount: totals.paidAmount })]);
-
+    insertAuditLog(sqliteDb, actor, invoiceId, invoiceNumber, totals);
     return ctx.getInvoiceById(invoiceId)!;
   });
 }

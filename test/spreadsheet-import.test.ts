@@ -7,6 +7,7 @@ import {
   validateSpreadsheetFileHeader,
   validateSpreadsheetFileMetadata,
 } from '../src/services/SpreadsheetImportService.ts';
+import { DataImportService, type ParsedImport } from '../src/services/DataImportService.ts';
 
 const toArrayBuffer = (bytes: Uint8Array | ArrayBuffer): ArrayBuffer => {
   if (bytes instanceof ArrayBuffer) return bytes;
@@ -46,4 +47,62 @@ test('spreadsheet import rejects worksheet row and column ranges beyond configur
 test('spreadsheet import rejects excessive cell data even when the compressed file is small', () => {
   const sheet = XLSX.utils.aoa_to_sheet(Array.from({ length: 130 }, () => ['x'.repeat(32_767)]));
   assert.throws(() => parseSpreadsheetBuffer(workbookBuffer(sheet), 'large-data.xlsx'), /حجم محتوى الخلايا/);
+});
+
+test('data import validation reports duplicate customer codes and invalid opening balances', () => {
+  const data: ParsedImport = {
+    entity: 'customers',
+    headers: [],
+    mapping: { name: 'name', code: 'code', phone: 'phone', initialBalance: 'initialBalance' },
+    rows: [
+      { name: 'First', code: 'C-1', phone: '0100', initialBalance: 'invalid' },
+      { name: 'Second', code: 'C-1', phone: '0200', initialBalance: '25' },
+    ],
+    confidence: 1,
+  };
+
+  assert.deepEqual(new DataImportService().validate(data), [
+    { row: 2, messages: ['الرصيد الافتتاحي غير صالح'] },
+    { row: 3, messages: ['سجل مكرر داخل الملف'] },
+  ]);
+});
+
+test('data import validation checks positive product measurements and duplicate SKUs', () => {
+  const data: ParsedImport = {
+    entity: 'products',
+    headers: [],
+    mapping: {
+      sku: 'sku',
+      name: 'name',
+      category: 'category',
+      brand: 'brand',
+      size: 'size',
+      piecesPerBox: 'piecesPerBox',
+      metersPerBox: 'metersPerBox',
+      costPrice: 'costPrice',
+      sellingPriceM2: 'sellingPriceM2',
+    },
+    rows: [
+      {
+        sku: 'SKU-1', name: 'Product 1', category: 'Category', brand: 'Brand', size: '60x60',
+        piecesPerBox: '0', metersPerBox: '2', costPrice: '100', sellingPriceM2: 'invalid',
+      },
+      {
+        sku: 'SKU-1', name: 'Product 2', category: 'Category', brand: 'Brand', size: '60x60',
+        piecesPerBox: '4', metersPerBox: '2', costPrice: '100', sellingPriceM2: '150',
+      },
+    ],
+    confidence: 1,
+  };
+
+  assert.deepEqual(new DataImportService().validate(data), [
+    {
+      row: 2,
+      messages: [
+        'قطع بالكرتونة يجب أن يكون أكبر من صفر',
+        'سعر البيع للمتر يجب أن يكون أكبر من صفر',
+      ],
+    },
+    { row: 3, messages: ['كود مكرر داخل الملف'] },
+  ]);
 });

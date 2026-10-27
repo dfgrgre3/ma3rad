@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { AppError, toAppError } from '../errors/appError';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
+type DatabaseFileApi = NonNullable<NonNullable<Window['ceramisys']>['db']>;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -80,58 +81,26 @@ export class DatabaseManager {
       this.db = null;
     }
 
-    // Resolve the sql.js engine + wasm URL in a runtime-agnostic way:
-    //  - Browser / Vite bundler: load the browser distribution. sql.js is a
-    //    CommonJS build whose `module.exports` is the init function, with
-    //    `module.exports.default` set to itself for interop. The bundler's
-    //    CommonJS interop can expose the callable through EITHER the module
-    //    or a nested `.default` chain — walk down until we have a function.
-    //  - Node (`node --test`): the test harness injects a global `initSqlJs`
-    //    that points at the CommonJS build and a real wasm file path.
-    let initSqlJsFn: any;
-    let wasmUrl: string | undefined;
+    await this.initializeSqlEngine();
 
-    const injected = (globalThis as any)?.initSqlJs;
-    if (typeof injected === 'function') {
-      // Harness-injected initializer (also lets hosts override sql.js).
-      initSqlJsFn = injected;
-      wasmUrl = undefined;
-    } else {
-      let candidate: any;
-      try {
-        // @ts-ignore - sql.js does not declare its distributable entry points.
-        candidate = await import('sql.js/dist/sql-wasm-browser.js');
-      } catch {
-        // Fallback for runtimes whose ESM bundler cannot import the browser
-        // distribution (e.g. plain `node --test`). Load it via require.
-        try {
-          const { createRequire } = await import('node:module');
-          const __require = createRequire(import.meta.url);
-          candidate = __require('sql.js');
-        } catch {
-          candidate = undefined;
-        }
-      }
+    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    const { savedBytes, loadedFromFile } = await this.loadSavedBytes(fileApi);
+    const isFreshDatabase = await this.openDatabase(savedBytes);
+    this.selectStorageBackend(fileApi);
+    await this.backupBeforeGrossProfitMigration(savedBytes, loadedFromFile, isFreshDatabase, fileApi);
 
-      // Recursively unwrap `.default` interop wrappers until a callable
-      // function is found (or the chain bottoms out) instead of the fragile
-      // single-step `mod.default ?? mod`.
-      for (let depth = 0; depth < 8; depth++) {
-        if (typeof candidate === 'function') break;
-        const next = candidate && (candidate as any).default;
-        if (next === undefined || next === null || next === candidate) break;
-        candidate = next;
-      }
-      initSqlJsFn = candidate;
+    const report = runMigrations(this.getDatabase());
+    this.ensureLegacySalesInvoiceStatusColumns();
+    await this.handleMigrationFailures(report, isFreshDatabase, fileApi);
 
-      try {
-        // @ts-ignore - Vite resolves this wasm asset URL at build time.
-        wasmUrl = (await import('sql.js/dist/sql-wasm-browser.wasm?url')).default;
-      } catch {
-        wasmUrl = undefined;
-      }
-    }
+    await this.persistInitializedDatabase(isFreshDatabase);
+    this.forceFreshAfterRecovery = false;
+    this.initializedSuccessfully = true;
+    return this.getDatabase();
+  }
 
+  private async initializeSqlEngine(): Promise<void> {
+    const { initSqlJsFn, wasmUrl } = await this.resolveSqlJs();
     if (typeof initSqlJsFn !== 'function') {
       throw new TypeError(
         'sql.js could not be resolved to a callable init function ' +
@@ -150,14 +119,69 @@ export class DatabaseManager {
       console.error('❌ SQL.js failed to load:', err);
       throw err;
     }
+  }
 
-    // Prefer the real SQLite file managed by the Electron main process. The
-    // previous localStorage snapshot is only used to migrate existing installs.
-    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+  private async resolveSqlJs(): Promise<{ initSqlJsFn: any; wasmUrl?: string }> {
+    // Resolve the sql.js engine + wasm URL in a runtime-agnostic way:
+    //  - Browser / Vite bundler: load the browser distribution. sql.js is a
+    //    CommonJS build whose `module.exports` is the init function, with
+    //    `module.exports.default` set to itself for interop. The bundler's
+    //    CommonJS interop can expose the callable through EITHER the module
+    //    or a nested `.default` chain — walk down until we have a function.
+    //  - Node (`node --test`): the test harness injects a global `initSqlJs`
+    //    that points at the CommonJS build and a real wasm file path.
+    let initSqlJsFn: any;
+    let wasmUrl: string | undefined;
+
+    const injected = (globalThis as any)?.initSqlJs;
+    if (typeof injected === 'function') {
+      // Harness-injected initializer (also lets hosts override sql.js).
+      return { initSqlJsFn: injected, wasmUrl };
+    }
+
+    const candidate = this.unwrapSqlJsInitializer(await this.loadSqlJsModule());
+    try {
+      // @ts-ignore - Vite resolves this wasm asset URL at build time.
+      wasmUrl = (await import('sql.js/dist/sql-wasm-browser.wasm?url')).default;
+    } catch {
+      wasmUrl = undefined;
+    }
+
+    return { initSqlJsFn: candidate, wasmUrl };
+  }
+
+  private async loadSqlJsModule(): Promise<any> {
+    try {
+      // @ts-ignore - sql.js does not declare its distributable entry points.
+      return await import('sql.js/dist/sql-wasm-browser.js');
+    } catch {
+      // Fallback for runtimes whose ESM bundler cannot import the browser distribution.
+      try {
+        const { createRequire } = await import('node:module');
+        const __require = createRequire(import.meta.url);
+        return __require('sql.js');
+      } catch {
+        return undefined;
+      }
+    }
+  }
+
+  private unwrapSqlJsInitializer(candidate: any): any {
+    // Interop can expose the initializer through nested `.default` wrappers.
+    for (let depth = 0; depth < 8; depth++) {
+      if (typeof candidate === 'function') break;
+      const next = candidate && candidate.default;
+      if (next === undefined || next === null || next === candidate) break;
+      candidate = next;
+    }
+    return candidate;
+  }
+
+  private async loadSavedBytes(
+    fileApi: DatabaseFileApi | undefined
+  ): Promise<{ savedBytes: Uint8Array | null; loadedFromFile: boolean }> {
     let savedBytes: Uint8Array | null = null;
     let loadedFromFile = false;
-    let isFreshDatabase = true;
-
     if (fileApi?.load) {
       let loaded: Uint8Array | null;
       try {
@@ -186,6 +210,10 @@ export class DatabaseManager {
       }
     }
 
+    return { savedBytes, loadedFromFile };
+  }
+
+  private async openDatabase(savedBytes: Uint8Array | null): Promise<boolean> {
     if (savedBytes !== null) {
       if (savedBytes.length === 0) {
         throw await this.databaseRecoveryError(new Error('ملف قاعدة البيانات فارغ.'));
@@ -195,20 +223,30 @@ export class DatabaseManager {
         // Verify file is a valid readable SQLite database immediately
         loadedDb.exec("SELECT 1 FROM sqlite_master LIMIT 1");
         this.db = loadedDb;
-        isFreshDatabase = false;
         console.log(`✅ Loaded existing SQLite database (${this.storageBackend === 'file' ? 'file' : 'legacy storage'}).`);
       } catch (e) {
         throw await this.databaseRecoveryError(e);
       }
+      return false;
     } else {
       console.log('Creating fresh SQLite database and running migrations...');
       this.db = new this.SQL.Database();
+      return true;
     }
+  }
 
+  private selectStorageBackend(fileApi: DatabaseFileApi | undefined): void {
     if (!this.storageBackend || this.storageBackend === 'none') {
       this.storageBackend = fileApi?.save ? 'file' : (typeof localStorage !== 'undefined' ? 'localStorage' : 'none');
     }
+  }
 
+  private async backupBeforeGrossProfitMigration(
+    savedBytes: Uint8Array | null,
+    loadedFromFile: boolean,
+    isFreshDatabase: boolean,
+    fileApi: DatabaseFileApi | undefined
+  ): Promise<void> {
     // Bring the database up to the current schema. This runs on BOTH paths:
     // a saved database is loaded as an opaque blob, so tables and columns added
     // since it was created only ever arrive through here.
@@ -232,8 +270,13 @@ export class DatabaseManager {
         throw new Error(`توقف الترحيل المالي قبل تعديل البيانات لعدم إنشاء نسخة احتياطية: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-    const report = runMigrations(this.getDatabase());
-    this.ensureLegacySalesInvoiceStatusColumns();
+  }
+
+  private async handleMigrationFailures(
+    report: ReturnType<typeof runMigrations>,
+    isFreshDatabase: boolean,
+    fileApi: DatabaseFileApi | undefined
+  ): Promise<void> {
     if (report.failed.length > 0) {
       console.error('⚠️ Some migrations did not apply; they will be retried on next launch.', report.failed);
       let backupMessage = '';
@@ -249,7 +292,9 @@ export class DatabaseManager {
       this.db = null;
       throw new Error(`Database migration failed (${report.failed[0].id}): ${report.failed[0].error}.${backupMessage}`);
     }
+  }
 
+  private async persistInitializedDatabase(isFreshDatabase: boolean): Promise<void> {
     // Seed reference data only for a genuinely new database — migrations already
     // hold everything an existing database needs.
     if (isFreshDatabase) {
@@ -263,9 +308,6 @@ export class DatabaseManager {
       this.db = null;
       throw new Error(`تعذر حفظ قاعدة البيانات على وسيط التخزين. لم يبدأ النظام لتجنب العمل على بيانات غير محفوظة. ${this.lastPersistError}`);
     }
-    this.forceFreshAfterRecovery = false;
-    this.initializedSuccessfully = true;
-    return this.getDatabase();
   }
 
   private async databaseRecoveryError(cause: unknown): Promise<Error & { code: string }> {
@@ -463,41 +505,51 @@ export class DatabaseManager {
         while (this.pendingSnapshot) {
           const nextSnapshot = this.pendingSnapshot;
           this.pendingSnapshot = null;
-          try {
-            const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
-            if (fileApi?.save) {
-              const result = await fileApi.save(nextSnapshot);
-              if (!result?.ok) {
-                throw new AppError(result?.error || 'تعذر حفظ قاعدة البيانات على القرص.',
-                  result?.code || 'DATABASE_SAVE_FAILED', result?.retryable !== false);
-              }
-              this.storageBackend = 'file';
-              this.lastPersistError = null;
-              this.lastPersistErrorCode = null;
-              if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
-                try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
-                this.migratedLegacyStorage = false;
-              }
-            } else if (typeof localStorage !== 'undefined') {
-              localStorage.setItem(DB_STORAGE_KEY, bytesToBase64(nextSnapshot));
-              this.storageBackend = 'localStorage';
-              this.lastPersistError = null;
-              this.lastPersistErrorCode = null;
-            } else {
-              this.storageBackend = 'none';
-            }
-          } catch (error) {
-            const failure = toAppError(error, 'DATABASE_PERSIST_FAILED', 'تعذر حفظ قاعدة البيانات.');
-            this.lastPersistError = failure.message;
-            this.lastPersistErrorCode = failure.code;
-            console.error('Failed to persist SQLite database', error);
-          }
+          await this.persistSnapshot(nextSnapshot);
         }
       })
       .finally(() => {
         this.isPersisting = false;
         if (this.pendingSnapshot) this.persist(this.pendingSnapshot);
       });
+  }
+
+  private async persistSnapshot(snapshot: Uint8Array): Promise<void> {
+    try {
+      if (await this.persistToFile(snapshot)) return;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(DB_STORAGE_KEY, bytesToBase64(snapshot));
+        this.storageBackend = 'localStorage';
+        this.lastPersistError = null;
+        this.lastPersistErrorCode = null;
+      } else {
+        this.storageBackend = 'none';
+      }
+    } catch (error) {
+      const failure = toAppError(error, 'DATABASE_PERSIST_FAILED', 'تعذر حفظ قاعدة البيانات.');
+      this.lastPersistError = failure.message;
+      this.lastPersistErrorCode = failure.code;
+      console.error('Failed to persist SQLite database', error);
+    }
+  }
+
+  private async persistToFile(snapshot: Uint8Array): Promise<boolean> {
+    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    if (!fileApi?.save) return false;
+
+    const result = await fileApi.save(snapshot);
+    if (!result?.ok) {
+      throw new AppError(result?.error || 'تعذر حفظ قاعدة البيانات على القرص.',
+        result?.code || 'DATABASE_SAVE_FAILED', result?.retryable !== false);
+    }
+    this.storageBackend = 'file';
+    this.lastPersistError = null;
+    this.lastPersistErrorCode = null;
+    if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* ignore */ }
+      this.migratedLegacyStorage = false;
+    }
+    return true;
   }
 
   /** Wait for all pending disk writes (used before shutdown/backup/restore). */
@@ -581,17 +633,22 @@ export class DatabaseManager {
       return result;
     } catch (error) {
       if (!depthReleased) this.transactionDepth--;
-      if (isOuterTransaction) {
-        try { db.exec('ROLLBACK;'); } catch { /* transaction may already be closed */ }
-      } else {
-        try {
-          db.exec(`ROLLBACK TO SAVEPOINT ${savepoint};`);
-          db.exec(`RELEASE SAVEPOINT ${savepoint};`);
-        } catch { /* savepoint may already have been released */ }
-      }
+      this.rollbackTransaction(db, isOuterTransaction, savepoint);
       console.error('Transaction rolled back due to error:', error);
       throw toAppError(error, 'DATABASE_TRANSACTION_FAILED');
     }
+  }
+
+  private rollbackTransaction(db: Database, isOuterTransaction: boolean, savepoint: string): void {
+    if (isOuterTransaction) {
+      try { db.exec('ROLLBACK;'); } catch { /* transaction may already be closed */ }
+      return;
+    }
+
+    try {
+      db.exec(`ROLLBACK TO SAVEPOINT ${savepoint};`);
+      db.exec(`RELEASE SAVEPOINT ${savepoint};`);
+    } catch { /* savepoint may already have been released */ }
   }
 
   public query<T = any>(sql: string, params: any[] = []): T[] {

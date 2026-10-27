@@ -63,6 +63,15 @@ export interface CreatePurchaseReturnDTO {
   items: { productId: string; quantityM2: number; boxesCount?: number }[];
 }
 
+type PreparedPurchaseReturnItem = Pick<
+  ReturnablePurchaseItem,
+  'productId' | 'productName' | 'grade' | 'unitCost'
+> & {
+  quantityM2: number;
+  boxesCount: number;
+  totalRefund: number;
+};
+
 export class PurchaseReturnService {
   private db = DatabaseManager.getInstance();
 
@@ -152,24 +161,16 @@ export class PurchaseReturnService {
     });
   }
 
-  public createReturn(dto: CreatePurchaseReturnDTO): PurchaseReturnRow {
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.return');
-    if (!dto.items || dto.items.length === 0) throw new Error('يجب تحديد أصناف للمرتجع.');
-    if (!dto.reason.trim()) throw new Error('يجب إدخال سبب المرتجع.');
-
-    const purchase = this.db.query<any>(`
-      SELECT id, invoice_number AS invoiceNumber, supplier_id AS supplierId, warehouse_id AS warehouseId
-      FROM purchase_invoices WHERE id = ?
-    `, [dto.purchaseId])[0];
-    if (!purchase) throw new Error('فاتورة الشراء غير موجودة.');
-
-    const returnable = this.getReturnableItems(dto.purchaseId);
-    const prepared: any[] = [];
+  private prepareReturnItems(
+    items: CreatePurchaseReturnDTO['items'],
+    returnable: ReturnablePurchaseItem[],
+    warehouseId: string,
+  ): { items: PreparedPurchaseReturnItem[]; total: number } {
+    const prepared: PreparedPurchaseReturnItem[] = [];
     let total = 0;
 
-    for (const line of dto.items) {
-      const source = returnable.find((r) => r.productId === line.productId);
+    for (const line of items) {
+      const source = returnable.find((item) => item.productId === line.productId);
       if (!source) throw new Error('صنف غير موجود في فاتورة الشراء.');
       const qty = Number(line.quantityM2) || 0;
       if (qty <= 0) continue;
@@ -177,13 +178,15 @@ export class PurchaseReturnService {
         const unitLabel = getProductUnitLabel(source);
         throw new Error(`الكمية المرتجعة من "${source.productName}" تتجاوز المتاح (${source.returnableM2} ${unitLabel}).`);
       }
+
       const stock = this.db.query<any>(
         `SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
-        [line.productId, purchase.warehouseId]
+        [line.productId, warehouseId]
       )[0];
       if (!stock || Number(stock.quantityM2) + 0.009 < qty) {
         throw new Error(`رصيد المخزن غير كافٍ لارتجاع "${source.productName}".`);
       }
+
       const amount = round2(qty * Number(source.unitCost));
       total = round2(total + amount);
       prepared.push({
@@ -198,6 +201,27 @@ export class PurchaseReturnService {
         totalRefund: amount,
       });
     }
+
+    return { items: prepared, total };
+  }
+
+  public createReturn(dto: CreatePurchaseReturnDTO): PurchaseReturnRow {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.return');
+    if (!dto.items || dto.items.length === 0) throw new Error('يجب تحديد أصناف للمرتجع.');
+    if (!dto.reason.trim()) throw new Error('يجب إدخال سبب المرتجع.');
+
+    const purchase = this.db.query<any>(`
+      SELECT id, invoice_number AS invoiceNumber, supplier_id AS supplierId, warehouse_id AS warehouseId
+      FROM purchase_invoices WHERE id = ?
+    `, [dto.purchaseId])[0];
+    if (!purchase) throw new Error('فاتورة الشراء غير موجودة.');
+
+    const { items: prepared, total } = this.prepareReturnItems(
+      dto.items,
+      this.getReturnableItems(dto.purchaseId),
+      purchase.warehouseId
+    );
 
     if (prepared.length === 0 || total <= 0) throw new Error('لم يتم تحديد كميات صحيحة للمرتجع.');
 

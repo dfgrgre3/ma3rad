@@ -167,7 +167,8 @@ export const SalesView: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [filters]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [filters]);
 
   useEffect(() => { setPage(1); }, [filters]);
 

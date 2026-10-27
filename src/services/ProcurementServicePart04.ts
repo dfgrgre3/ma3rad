@@ -111,72 +111,103 @@ public perform3WayMatching(params: {
     grnId?: string;
     invoiceItems: { productId: string; quantityM2: number; unitCost: number }[];
   }): ThreeWayMatchingResult {
-    let poItemsMap = new Map<string, { unitCost: number; quantityM2: number }>();
-    if (params.purchaseOrderId) {
-      const poItems = this.db.query<any>(`SELECT product_id, unit_cost, quantity_m2 FROM purchase_order_items WHERE purchase_order_id = ?`, [params.purchaseOrderId]);
-      for (const pi of poItems) {
-        poItemsMap.set(pi.productId, { unitCost: Number(pi.unitCost), quantityM2: Number(pi.quantityM2) });
-      }
-    }
-
-    let grnItemsMap = new Map<string, { acceptedQty: number }>();
-    if (params.grnId) {
-      const grnItems = this.db.query<any>(`SELECT product_id, accepted_quantity_m2 FROM goods_receipt_note_items WHERE grn_id = ?`, [params.grnId]);
-      for (const gi of grnItems) {
-        grnItemsMap.set(gi.productId, { acceptedQty: Number(gi.acceptedQuantityM2) });
-      }
-    }
+    const poItemsMap = this.getPurchaseOrderMatchingItems(params.purchaseOrderId);
+    const grnItemsMap = this.getGoodsReceiptMatchingItems(params.grnId);
 
     let priceVarianceTotal = 0;
     let qtyVarianceTotal = 0;
     const itemsResult: ThreeWayMatchingResult['items'] = [];
 
     for (const invItem of params.invoiceItems) {
-      const prod = this.db.query<any>(`SELECT name FROM products WHERE id = ?`, [invItem.productId])[0];
-      const prodName = prod?.name || 'صنف';
-      const poData = poItemsMap.get(invItem.productId);
-      const grnData = grnItemsMap.get(invItem.productId);
-
-      const poPrice = poData ? poData.unitCost : invItem.unitCost;
-      const grnAccepted = grnData ? grnData.acceptedQty : invItem.quantityM2;
-
-      const priceDiff = round2(invItem.unitCost - poPrice);
-      const qtyDiff = round2(invItem.quantityM2 - grnAccepted);
-
-      const linePriceVariance = round2(priceDiff * invItem.quantityM2);
-      const lineQtyVariance = round2(qtyDiff * invItem.unitCost);
-
-      priceVarianceTotal = round2(priceVarianceTotal + linePriceVariance);
-      qtyVarianceTotal = round2(qtyVarianceTotal + lineQtyVariance);
-
-      let status: 'MATCHED' | 'PRICE_DIFF' | 'QTY_DIFF' | 'BOTH_DIFF' = 'MATCHED';
-      if (Math.abs(priceDiff) > 0.01 && Math.abs(qtyDiff) > 0.01) status = 'BOTH_DIFF';
-      else if (Math.abs(priceDiff) > 0.01) status = 'PRICE_DIFF';
-      else if (Math.abs(qtyDiff) > 0.01) status = 'QTY_DIFF';
-
-      itemsResult.push({
-        productId: invItem.productId,
-        productName: prodName,
-        invoiceQty: invItem.quantityM2,
-        invoicePrice: invItem.unitCost,
-        poPrice,
-        grnAcceptedQty: grnAccepted,
-        priceVariance: linePriceVariance,
-        qtyVariance: lineQtyVariance,
-        status,
-      });
+      const itemResult = this.createThreeWayMatchingItem(invItem, poItemsMap, grnItemsMap);
+      priceVarianceTotal = round2(priceVarianceTotal + itemResult.priceVariance);
+      qtyVarianceTotal = round2(qtyVarianceTotal + itemResult.qtyVariance);
+      itemsResult.push(itemResult);
     }
 
-    let overallStatus: ThreeWayMatchingResult['matchingStatus'] = 'MATCHED';
-    if (Math.abs(priceVarianceTotal) > 0.01 && Math.abs(qtyVarianceTotal) > 0.01) overallStatus = 'BOTH_VARIANCE';
-    else if (Math.abs(priceVarianceTotal) > 0.01) overallStatus = 'PRICE_VARIANCE';
-    else if (Math.abs(qtyVarianceTotal) > 0.01) overallStatus = 'QTY_VARIANCE';
-
     return {
-      matchingStatus: overallStatus,
+      matchingStatus: this.getOverallMatchingStatus(priceVarianceTotal, qtyVarianceTotal),
       priceVarianceTotal,
       qtyVarianceTotal,
       items: itemsResult,
     };
+  }
+
+  private getPurchaseOrderMatchingItems(purchaseOrderId?: string): Map<string, { unitCost: number; quantityM2: number }> {
+    const items = new Map<string, { unitCost: number; quantityM2: number }>();
+    if (!purchaseOrderId) return items;
+
+    const poItems = this.db.query<any>(
+      `SELECT product_id, unit_cost, quantity_m2 FROM purchase_order_items WHERE purchase_order_id = ?`,
+      [purchaseOrderId],
+    );
+    for (const item of poItems) {
+      items.set(item.productId, { unitCost: Number(item.unitCost), quantityM2: Number(item.quantityM2) });
+    }
+    return items;
+  }
+
+  private getGoodsReceiptMatchingItems(grnId?: string): Map<string, { acceptedQty: number }> {
+    const items = new Map<string, { acceptedQty: number }>();
+    if (!grnId) return items;
+
+    const grnItems = this.db.query<any>(
+      `SELECT product_id, accepted_quantity_m2 FROM goods_receipt_note_items WHERE grn_id = ?`,
+      [grnId],
+    );
+    for (const item of grnItems) {
+      items.set(item.productId, { acceptedQty: Number(item.acceptedQuantityM2) });
+    }
+    return items;
+  }
+
+  private createThreeWayMatchingItem(
+    invoiceItem: { productId: string; quantityM2: number; unitCost: number },
+    poItems: Map<string, { unitCost: number; quantityM2: number }>,
+    grnItems: Map<string, { acceptedQty: number }>,
+  ): ThreeWayMatchingResult['items'][number] {
+    const product = this.db.query<any>(`SELECT name FROM products WHERE id = ?`, [invoiceItem.productId])[0];
+    const poData = poItems.get(invoiceItem.productId);
+    const grnData = grnItems.get(invoiceItem.productId);
+    const poPrice = poData ? poData.unitCost : invoiceItem.unitCost;
+    const grnAccepted = grnData ? grnData.acceptedQty : invoiceItem.quantityM2;
+    const priceDiff = round2(invoiceItem.unitCost - poPrice);
+    const qtyDiff = round2(invoiceItem.quantityM2 - grnAccepted);
+
+    return {
+      productId: invoiceItem.productId,
+      productName: product?.name || 'صنف',
+      invoiceQty: invoiceItem.quantityM2,
+      invoicePrice: invoiceItem.unitCost,
+      poPrice,
+      grnAcceptedQty: grnAccepted,
+      priceVariance: round2(priceDiff * invoiceItem.quantityM2),
+      qtyVariance: round2(qtyDiff * invoiceItem.unitCost),
+      status: this.getItemMatchingStatus(priceDiff, qtyDiff),
+    };
+  }
+
+  private getItemMatchingStatus(
+    priceDiff: number,
+    qtyDiff: number,
+  ): ThreeWayMatchingResult['items'][number]['status'] {
+    const hasPriceDifference = Math.abs(priceDiff) > 0.01;
+    const hasQuantityDifference = Math.abs(qtyDiff) > 0.01;
+    if (hasPriceDifference && hasQuantityDifference) return 'BOTH_DIFF';
+    if (hasPriceDifference) return 'PRICE_DIFF';
+    if (hasQuantityDifference) return 'QTY_DIFF';
+    return 'MATCHED';
+  }
+
+  private getOverallMatchingStatus(
+    priceVarianceTotal: number,
+    qtyVarianceTotal: number,
+  ): ThreeWayMatchingResult['matchingStatus'] {
+    const hasPriceVariance = Math.abs(priceVarianceTotal) > 0.01;
+    const hasQuantityVariance = Math.abs(qtyVarianceTotal) > 0.01;
+    if (hasPriceVariance && hasQuantityVariance) return 'BOTH_VARIANCE';
+    if (hasPriceVariance) return 'PRICE_VARIANCE';
+    if (hasQuantityVariance) return 'QTY_VARIANCE';
+    return 'MATCHED';
   }
 }

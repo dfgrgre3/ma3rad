@@ -306,31 +306,59 @@ export class PricingService {
     );
 
     for (const promo of rows) {
-      if (promo.applies_to !== 'ALL') {
-        const type = promo.applies_to === 'PRODUCTS' ? 'PRODUCT' : promo.applies_to === 'CATEGORIES' ? 'CATEGORY' : 'BRAND';
-        const targetId = type === 'PRODUCT' ? product.productId : type === 'CATEGORY' ? product.categoryId : product.brandId;
-        const hit = this.db.query<any>(
-          `SELECT 1 FROM promotion_targets WHERE promotion_id = ? AND target_type = ? AND target_id = ?`,
-          [promo.id, type, targetId || '']
-        )[0];
-        if (!hit) continue;
-      }
-
-      if (promo.promotion_type === 'BUY_X_GET_Y') {
-        if (quantity > 0 && promo.buy_quantity > 0 && promo.get_quantity > 0) {
-          const free = Math.floor(quantity / promo.buy_quantity) * promo.get_quantity;
-          if (free > 0) return { name: `${promo.name} (${free} مجانًا)`, discount: 0, code: promo.code };
-        }
-        continue;
-      }
-      if (promo.promotion_type === 'BUNDLE_PRICE') continue;
-
-      const base = subtotal > 0 ? subtotal : 0;
-      const discount = promo.promotion_type === 'PERCENTAGE'
-        ? (base * Number(promo.discount_percentage)) / 100
-        : Number(promo.discount_amount);
-      if (discount > 0) return { name: promo.name, discount: Math.round(discount * 100) / 100, code: promo.code };
+      if (!this.promotionAppliesToProduct(promo, product)) continue;
+      const result = this.getPromotionResult(promo, subtotal, quantity);
+      if (result) return result;
     }
     return null;
+  }
+
+  private promotionAppliesToProduct(
+    promo: any,
+    product: { productId: string; categoryId?: string | null; brandId?: string | null }
+  ): boolean {
+    if (promo.applies_to === 'ALL') return true;
+
+    const targetTypes: Record<string, 'PRODUCT' | 'CATEGORY' | 'BRAND'> = {
+      PRODUCTS: 'PRODUCT',
+      CATEGORIES: 'CATEGORY',
+    };
+    const type = targetTypes[promo.applies_to] || 'BRAND';
+    const targetIds = {
+      PRODUCT: product.productId,
+      CATEGORY: product.categoryId,
+      BRAND: product.brandId,
+    };
+    const hit = this.db.query<any>(
+      `SELECT 1 FROM promotion_targets WHERE promotion_id = ? AND target_type = ? AND target_id = ?`,
+      [promo.id, type, targetIds[type] || '']
+    )[0];
+    return Boolean(hit);
+  }
+
+  private getPromotionResult(
+    promo: any,
+    subtotal: number,
+    quantity: number
+  ): { name: string; discount: number; code: string } | null {
+    if (promo.promotion_type === 'BUY_X_GET_Y') {
+      return this.getBuyXGetYResult(promo, quantity);
+    }
+    if (promo.promotion_type === 'BUNDLE_PRICE') return null;
+
+    const base = subtotal > 0 ? subtotal : 0;
+    const discount = promo.promotion_type === 'PERCENTAGE'
+      ? (base * Number(promo.discount_percentage)) / 100
+      : Number(promo.discount_amount);
+    if (discount <= 0) return null;
+    return { name: promo.name, discount: Math.round(discount * 100) / 100, code: promo.code };
+  }
+
+  private getBuyXGetYResult(promo: any, quantity: number): { name: string; discount: number; code: string } | null {
+    if (quantity <= 0 || promo.buy_quantity <= 0 || promo.get_quantity <= 0) return null;
+
+    const free = Math.floor(quantity / promo.buy_quantity) * promo.get_quantity;
+    if (free <= 0) return null;
+    return { name: `${promo.name} (${free} مجانًا)`, discount: 0, code: promo.code };
   }
 }

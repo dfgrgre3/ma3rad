@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   RotateCcw, Plus, Search, Calendar, Printer, Loader2, X, AlertTriangle, Eye,
@@ -82,7 +82,7 @@ export const ReturnsPage: React.FC = () => {
 
   const [detail, setDetail] = useState<ReturnDetail | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setReturns(service.getReturns(search, dateFrom || undefined, dateTo || undefined));
@@ -94,15 +94,15 @@ export const ReturnsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateFrom, dateTo, search, service]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [search, dateFrom, dateTo]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(returns.length / PAGE_SIZE));
   const pageItems = returns.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const pickInvoice = (id: string) => {
+  const pickInvoice = useCallback((id: string) => {
     setInvoiceId(id);
     if (!id) { setLines([]); setInvoiceInfo(null); return; }
     const inv = service.getInvoiceById(id);
@@ -110,9 +110,9 @@ export const ReturnsPage: React.FC = () => {
     if (!inv) { setLines([]); return; }
     const returnable = service.getReturnableItems(id);
     setLines(returnable.map((r) => ({ ...r, quantityM2: 0, reason: '' })));
-  };
+  }, [service]);
 
-  const openModal = (presetInvoiceId?: string) => {
+  const openModal = useCallback((presetInvoiceId?: string) => {
     try {
       const list = service.getInvoicesFiltered({}, false);
       setInvoices(list);
@@ -127,15 +127,14 @@ export const ReturnsPage: React.FC = () => {
         if (exists) pickInvoice(presetInvoiceId);
       }
     } catch (e: any) { alert(e?.message); }
-  };
+  }, [pickInvoice, service]);
 
   useEffect(() => {
     if (location.state?.invoiceId) {
       openModal(location.state.invoiceId);
       window.history.replaceState({}, document.title);
     }
-    /* eslint-disable-next-line */
-  }, [location.state]);
+  }, [location.state, openModal]);
 
   const setLine = (idx: number, patch: Partial<ReturnLine>) =>
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));

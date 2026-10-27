@@ -310,6 +310,13 @@ export class PermissionService {
   /** Idempotently populate the permissions catalog and seed built-in roles. */
   public static seed(): void {
     const db = DatabaseManager.getInstance();
+    PermissionService.seedPermissionCatalog(db);
+    PermissionService.seedBuiltInRoles(db);
+    PermissionService.seedRoleDefaults(db);
+    PermissionService.cache = null;
+  }
+
+  private static seedPermissionCatalog(db: DatabaseManager): void {
     const existing = new Set(db.query<{ code: string }>('SELECT code FROM permissions').map((r) => r.code));
     for (const p of PERMISSIONS) {
       if (!existing.has(p.code)) {
@@ -319,9 +326,9 @@ export class PermissionService {
         );
       }
     }
+  }
 
-    // Ensure built-in roles exist even on databases created before the roles
-    // table was introduced.
+  private static seedBuiltInRoles(db: DatabaseManager): void {
     for (const [code, name] of Object.entries(ROLE_NAMES)) {
       db.run(
         `INSERT OR IGNORE INTO roles (id, code, name, description, is_system)
@@ -329,7 +336,9 @@ export class PermissionService {
         [`role_${code.toLowerCase()}`, code, name, '']
       );
     }
+  }
 
+  private static seedRoleDefaults(db: DatabaseManager): void {
     // Seed built-in role defaults exactly once. A persistent marker (not the
     // row count) is used so an admin can intentionally clear every permission
     // from a role without the defaults coming back on the next boot.
@@ -337,42 +346,7 @@ export class PermissionService {
       const markerKey = `rbac.seeded.${roleCode}`;
       const seeded = db.query('SELECT value FROM system_settings WHERE key = ?', [markerKey]);
       if (seeded.length > 0) {
-        if (roleCode === 'ADMIN') {
-          for (const permission of ['admin.data.export', 'admin.data.delete']) {
-            db.run(
-              'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
-              [roleCode, permission]
-            );
-          }
-        }
-        if (roleCode === 'MANAGER') {
-          const current = db.query<{ permissionCode: string }>(
-            'SELECT permission_code AS permissionCode FROM role_permissions WHERE role_code = ?',
-            [roleCode]
-          ).map((row) => row.permissionCode);
-          const legacyPermissions = ALL.filter((permission) =>
-            permission !== 'admin.data.export' && permission !== 'admin.data.delete'
-          );
-          const retainsOriginalFullGrant =
-            (current.length === ALL.length && ALL.every((permission) => current.includes(permission))) ||
-            (current.length === legacyPermissions.length && legacyPermissions.every((permission) => current.includes(permission)));
-          db.executeTransaction(() => {
-            if (retainsOriginalFullGrant) {
-              db.run('DELETE FROM role_permissions WHERE role_code = ?', [roleCode]);
-              for (const permission of defaults) {
-                db.run(
-                  'INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
-                  [roleCode, permission]
-                );
-              }
-            } else {
-              // Keep view/export grants for customized managers, but strip deletion.
-              db.run('DELETE FROM role_permissions WHERE role_code = ? AND permission_code = ?', [roleCode, 'admin.data.delete']);
-              db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, 'admin.data']);
-              db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, 'admin.data.export']);
-            }
-          });
-        }
+        PermissionService.reconcileSeededRole(db, roleCode, defaults);
         continue;
       }
       for (const perm of defaults) {
@@ -386,8 +360,54 @@ export class PermissionService {
         [markerKey]
       );
     }
+  }
 
-    PermissionService.cache = null;
+  private static reconcileSeededRole(db: DatabaseManager, roleCode: string, defaults: string[]): void {
+    if (roleCode === 'ADMIN') {
+      PermissionService.ensureAdminDataPermissions(db);
+    }
+    if (roleCode === 'MANAGER') {
+      PermissionService.reconcileManagerPermissions(db, defaults);
+    }
+  }
+
+  private static ensureAdminDataPermissions(db: DatabaseManager): void {
+    for (const permission of ['admin.data.export', 'admin.data.delete']) {
+      db.run(
+        'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+        ['ADMIN', permission]
+      );
+    }
+  }
+
+  private static reconcileManagerPermissions(db: DatabaseManager, defaults: string[]): void {
+    const roleCode = 'MANAGER';
+    const current = db.query<{ permissionCode: string }>(
+      'SELECT permission_code AS permissionCode FROM role_permissions WHERE role_code = ?',
+      [roleCode]
+    ).map((row) => row.permissionCode);
+    const legacyPermissions = ALL.filter((permission) =>
+      permission !== 'admin.data.export' && permission !== 'admin.data.delete'
+    );
+    const retainsOriginalFullGrant =
+      (current.length === ALL.length && ALL.every((permission) => current.includes(permission))) ||
+      (current.length === legacyPermissions.length && legacyPermissions.every((permission) => current.includes(permission)));
+    db.executeTransaction(() => {
+      if (retainsOriginalFullGrant) {
+        db.run('DELETE FROM role_permissions WHERE role_code = ?', [roleCode]);
+        for (const permission of defaults) {
+          db.run(
+            'INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+            [roleCode, permission]
+          );
+        }
+      } else {
+        // Keep view/export grants for customized managers, but strip deletion.
+        db.run('DELETE FROM role_permissions WHERE role_code = ? AND permission_code = ?', [roleCode, 'admin.data.delete']);
+        db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, 'admin.data']);
+        db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, 'admin.data.export']);
+      }
+    });
   }
 
   // ─── Catalog & roles ────────────────────────────────────────────────────────

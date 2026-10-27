@@ -6,6 +6,8 @@ import { localDateString } from '../../utils/date';
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
 const today = () => localDateString();
+const percentageOfRevenue = (amount: number, revenue: number) =>
+  revenue > 0 ? ((amount / revenue) * 100).toFixed(1) : '0';
 
 type PnL = {
   revenue: number;
@@ -143,11 +145,11 @@ export const ProfitLossPage: React.FC = () => {
                 </div>
                 <div className="bg-white px-4 py-3 text-center">
                   <div className="text-[10px] text-slate-400 font-bold">نسبة تكلفة البضاعة</div>
-                  <div className="text-lg font-black mt-1 text-slate-800">{pnl.revenue > 0 ? ((pnl.costOfGoodsSold / pnl.revenue) * 100).toFixed(1) : 0}%</div>
+                  <div className="text-lg font-black mt-1 text-slate-800">{percentageOfRevenue(pnl.costOfGoodsSold, pnl.revenue)}%</div>
                 </div>
                 <div className="bg-white px-4 py-3 text-center">
                   <div className="text-[10px] text-slate-400 font-bold">نسبة المصروفات</div>
-                  <div className="text-lg font-black mt-1 text-slate-800">{pnl.revenue > 0 ? ((pnl.expenses / pnl.revenue) * 100).toFixed(1) : 0}%</div>
+                  <div className="text-lg font-black mt-1 text-slate-800">{percentageOfRevenue(pnl.expenses, pnl.revenue)}%</div>
                 </div>
               </div>
             </div>

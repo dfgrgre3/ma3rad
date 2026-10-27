@@ -32,7 +32,8 @@ export const ExpensesPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const filtered = expenses.filter((e) =>
     !search.trim() || e.category.includes(search) || (e.description || '').includes(search)

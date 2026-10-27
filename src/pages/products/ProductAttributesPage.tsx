@@ -34,7 +34,8 @@ export const ProductAttributesPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const activeCategory = categories.find((c) => c.id === selectedCatId) || categories[0];
 

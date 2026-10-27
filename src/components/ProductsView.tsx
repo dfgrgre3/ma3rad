@@ -461,44 +461,90 @@ export const ProductsView: React.FC = () => {
     removedVariantIds.forEach((id) => extraService.deleteVariant(id));
   };
 
+  const isProductFormValid = () => {
+    if (!formData.name.trim()) { alert('أدخل اسم الصنف.'); return false; }
+    if (!formData.categoryId) { alert('اختر نوع المنتج أو أضف نوعًا جديدًا.'); return false; }
+    if (formData.productType === 'CERAMIC' && !formData.brandId) { alert('اختر الماركة أو أضف ماركة جديدة.'); return false; }
+    if (!formData.barcode.trim() || !formData.sku.trim()) { alert('الباركود وكود الصنف مطلوبان.'); return false; }
+    return true;
+  };
+
+  const buildProductPayload = () => ({
+    productType: formData.productType,
+    name: formData.name.trim(),
+    sku: formData.sku.trim(),
+    barcode: formData.barcode.trim(),
+    categoryId: formData.categoryId,
+    brandId: formData.brandId,
+    grade: formData.productType === 'CERAMIC' ? formData.grade : 'GRADE_1',
+    size: formData.productType === 'CERAMIC' ? formData.size : '',
+    thickness: formData.thickness,
+    color: formData.color,
+    tone: formData.tone,
+    finish: formData.finish,
+    surfaceLocation: formData.surfaceLocation,
+    baseUnit: formData.baseUnit,
+    sellUnit: formData.sellUnit,
+    customUnit: formData.customUnit,
+    piecesPerBox: formData.productType === 'CERAMIC' ? formData.piecesPerBox : 1,
+    metersPerBox: formData.productType === 'CERAMIC' ? formData.metersPerBox : 1,
+    weightPerBox: formData.weightPerBox,
+    costPrice: formData.costPrice,
+    sellingPriceM2: formData.sellingPriceM2,
+    sellingPriceBox: formData.sellingPriceBox,
+    wholesalePriceM2: formData.wholesalePriceM2,
+    minSellingPriceM2: formData.minSellingPriceM2,
+    minStockLevel: formData.minStockLevel,
+    maxStockLevel: formData.maxStockLevel,
+    notes: formData.notes,
+    imagePath: existingImages.find((i) => i.isPrimary)?.filePath || '',
+  });
+
+  const saveNewProductImages = (productId: string) => {
+    pendingImages.forEach((dataUrl, index) => {
+      try {
+        extraService.addImage(productId, dataUrl, `صورة ${index + 1}`);
+      } catch (err) {
+        console.error(err);
+      }
+    });
+    if (pendingImages.length > 0) {
+      try {
+        productService.updateProduct(productId, { imagePath: pendingImages[0] });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const saveOpeningStock = (productId: string) => {
+    openingRows
+      .filter((row) => row.warehouseId && row.meters > 0)
+      .forEach((row) => {
+        try {
+          inventoryService.adjustStock(
+            productId,
+            row.warehouseId,
+            round(row.meters, 3),
+            'رصيد افتتاحي عند تعريف الصنف',
+          );
+        } catch (err) {
+          console.error(err);
+        }
+      });
+  };
+
+  const saveNewProductDetails = (productId: string) => {
+    saveNewProductImages(productId);
+    saveOpeningStock(productId);
+  };
+
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) { alert('أدخل اسم الصنف.'); return; }
-    if (!formData.categoryId) { alert('اختر نوع المنتج أو أضف نوعًا جديدًا.'); return; }
-    if (formData.productType === 'CERAMIC' && !formData.brandId) { alert('اختر الماركة أو أضف ماركة جديدة.'); return; }
-    if (!formData.barcode.trim() || !formData.sku.trim()) { alert('الباركود وكود الصنف مطلوبان.'); return; }
+    if (!isProductFormValid()) return;
     setIsSaving(true);
     try {
-      const payload = {
-        productType: formData.productType,
-        name: formData.name.trim(),
-        sku: formData.sku.trim(),
-        barcode: formData.barcode.trim(),
-        categoryId: formData.categoryId,
-        brandId: formData.brandId,
-        grade: formData.productType === 'CERAMIC' ? formData.grade : 'GRADE_1',
-        size: formData.productType === 'CERAMIC' ? formData.size : '',
-        thickness: formData.thickness,
-        color: formData.color,
-        tone: formData.tone,
-        finish: formData.finish,
-        surfaceLocation: formData.surfaceLocation,
-        baseUnit: formData.baseUnit,
-        sellUnit: formData.sellUnit,
-        customUnit: formData.customUnit,
-        piecesPerBox: formData.productType === 'CERAMIC' ? formData.piecesPerBox : 1,
-        metersPerBox: formData.productType === 'CERAMIC' ? formData.metersPerBox : 1,
-        weightPerBox: formData.weightPerBox,
-        costPrice: formData.costPrice,
-        sellingPriceM2: formData.sellingPriceM2,
-        sellingPriceBox: formData.sellingPriceBox,
-        wholesalePriceM2: formData.wholesalePriceM2,
-        minSellingPriceM2: formData.minSellingPriceM2,
-        minStockLevel: formData.minStockLevel,
-        maxStockLevel: formData.maxStockLevel,
-        notes: formData.notes,
-        imagePath: existingImages.find((i) => i.isPrimary)?.filePath || '',
-      };
+      const payload = buildProductPayload();
 
       let productId = editingProduct?.id || '';
       if (editingProduct) {
@@ -515,36 +561,7 @@ export const ProductsView: React.FC = () => {
         removedImageIds.forEach((id) => {
           try { extraService.deleteImage(id); } catch (err) { console.error(err); }
         });
-        if (!editingProduct) {
-          pendingImages.forEach((dataUrl, index) => {
-            try {
-              extraService.addImage(productId, dataUrl, `صورة ${index + 1}`);
-            } catch (err) {
-              console.error(err);
-            }
-          });
-          if (pendingImages.length > 0) {
-            try {
-              productService.updateProduct(productId, { imagePath: pendingImages[0] });
-            } catch (err) {
-              console.error(err);
-            }
-          }
-          openingRows
-            .filter((row) => row.warehouseId && row.meters > 0)
-            .forEach((row) => {
-              try {
-                inventoryService.adjustStock(
-                  productId,
-                  row.warehouseId,
-                  round(row.meters, 3),
-                  'رصيد افتتاحي عند تعريف الصنف',
-                );
-              } catch (err) {
-                console.error(err);
-              }
-            });
-        }
+        if (!editingProduct) saveNewProductDetails(productId);
       }
 
       setIsModalOpen(false);

@@ -5,6 +5,15 @@ const { execFile } = require('child_process');
 const net = require('net');
 
 const NETWORK_PRINTER_PORT = 9100;
+const WINDOWS_POWERSHELL = path.win32.join(
+  process.env.SystemRoot || 'C:\\Windows',
+  'System32',
+  'WindowsPowerShell',
+  'v1.0',
+  'powershell.exe'
+);
+const CUPS_LPSTAT = '/usr/bin/lpstat';
+const CUPS_LP = '/usr/bin/lp';
 
 function isAllowedNetworkPrinterAddress(host) {
   if (typeof host !== 'string' || net.isIP(host) !== 4) return false;
@@ -29,7 +38,7 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_
   function runPowerShell(script) {
     return new Promise((resolve, reject) => {
       execFile(
-        'powershell.exe',
+        WINDOWS_POWERSHELL,
         ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
         { windowsHide: true, timeout: 15000, maxBuffer: 4 * 1024 * 1024 },
         (error, stdout, stderr) => {
@@ -50,7 +59,7 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_
       }
       // macOS / Linux: CUPS lists printers via lpstat.
       const out = await new Promise((resolve, reject) => {
-        execFile('lpstat', ['-e'], { timeout: 10000 }, (err, stdout) => {
+        execFile(CUPS_LPSTAT, ['-e'], { timeout: 10000 }, (err, stdout) => {
           if (err) reject(err); else resolve(String(stdout));
         });
       });
@@ -181,7 +190,7 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_
       await fs.writeFile(tempFile, Buffer.from(bytes));
       await new Promise((resolve, reject) => {
         // -o raw sends the bytes untouched (ESC/POS passthrough).
-        execFile('lp', ['-d', printerName, '-o', 'raw', tempFile], { timeout: 15000 }, (err) => {
+        execFile(CUPS_LP, ['-d', printerName, '-o', 'raw', tempFile], { timeout: 15000 }, (err) => {
           err ? reject(err) : resolve();
         });
       });

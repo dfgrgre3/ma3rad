@@ -8,6 +8,48 @@ import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 
+function getExistingCustomerPayment(
+  prior: CustomerPayment[],
+  customerId: string,
+  amount: number,
+  paymentType: PaymentType,
+  register: string,
+  shiftId: string | undefined,
+  notes: string,
+  branchId: string,
+): CustomerPayment | undefined {
+  if (prior.some((row) => row.branchId !== branchId)) {
+    throw new Error('The customer payment idempotency key was already used in another branch.');
+  }
+  if (!prior.length) return undefined;
+
+  const existingPayment = prior[0];
+  if (
+    existingPayment.customerId !== customerId ||
+    Number(existingPayment.amount) !== amount ||
+    existingPayment.paymentType !== paymentType ||
+    (existingPayment.registerId || 'cr_main') !== register ||
+    (existingPayment.shiftId || null) !== (shiftId || null) ||
+    (existingPayment.notes || '') !== notes
+  ) {
+    throw new Error('The customer payment idempotency key was already used for a different request.');
+  }
+  return {
+    id: existingPayment.id,
+    receiptNumber: existingPayment.receiptNumber,
+    customerId: existingPayment.customerId,
+    branchId: existingPayment.branchId,
+    amount: existingPayment.amount,
+    paymentType: existingPayment.paymentType,
+    date: existingPayment.date,
+    registerId: existingPayment.registerId,
+    shiftId: existingPayment.shiftId,
+    notes: existingPayment.notes,
+    performedBy: existingPayment.performedBy,
+    createdAt: existingPayment.createdAt,
+  };
+}
+
 export class CustomerService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
@@ -138,18 +180,12 @@ export class CustomerService {
     const today = paymentDate || localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
-      const prior = idempotencyKey ? sqliteDb.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [idempotencyKey]) : [];
-      if (prior.some((row: any) => row.branchId !== branchId)) {
-        throw new Error('The customer payment idempotency key was already used in another branch.');
-      }
-      if (prior.length) {
-        const existingPayment = prior[0];
-        if (existingPayment.customerId !== customerId || Number(existingPayment.amount) !== amount || existingPayment.paymentType !== paymentType ||
-          (existingPayment.registerId || 'cr_main') !== register || (existingPayment.shiftId || null) !== (shiftId || null) || (existingPayment.notes || '') !== notes) {
-          throw new Error('The customer payment idempotency key was already used for a different request.');
-        }
-        return { id:existingPayment.id, receiptNumber:existingPayment.receiptNumber, customerId:existingPayment.customerId, branchId:existingPayment.branchId, amount:existingPayment.amount, paymentType:existingPayment.paymentType, date:existingPayment.date, registerId:existingPayment.registerId, shiftId:existingPayment.shiftId, notes:existingPayment.notes, performedBy:existingPayment.performedBy, createdAt:existingPayment.createdAt };
-      }
+      const prior = idempotencyKey
+        ? sqliteDb.query<CustomerPayment>(`SELECT * FROM customer_payments WHERE payment_group_id=?`, [idempotencyKey])
+        : [];
+      const existingPayment = getExistingCustomerPayment(prior, customerId, amount, paymentType, register, shiftId, notes, branchId);
+      if (existingPayment) return existingPayment;
+
       const receiptNumber = sqliteDb.nextNumber('REC');
       // 1. Record customer payment receipt
       sqliteDb.run(`

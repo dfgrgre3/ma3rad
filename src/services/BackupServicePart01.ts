@@ -55,6 +55,50 @@ public verifyBackupFile(bytes: Uint8Array) {
     return this.db.inspectDatabaseBinary(bytes);
   }
 
+private async readBackupBytes(file: File): Promise<Uint8Array> {
+    const fileBytes = new Uint8Array(await file.arrayBuffer());
+    if (isEncryptedBackup(fileBytes)) {
+      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
+      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
+      return decryptExternalBackup(fileBytes, password);
+    }
+
+    if (isEncryptedLocalDatabase(fileBytes)) {
+      const decryptLocal = typeof window !== 'undefined' ? window.ceramisys?.db?.decryptLocalBackup : undefined;
+      if (!decryptLocal) throw new Error('هذه نسخة محلية مرتبطة بمفتاح هذا الجهاز؛ استعدها من تطبيق سطح المكتب الذي أنشأها.');
+      return decryptLocal(fileBytes);
+    }
+
+    if (!window.confirm('هذا ملف SQLite قديم غير مشفر. استيراده قد يعرّض بياناته للقراءة خارج التطبيق. هل تريد المتابعة؟')) {
+      throw new Error('أُلغي استيراد الملف غير المشفر.');
+    }
+    return fileBytes;
+  }
+
+private async importBackupWithRollback(bytes: Uint8Array, currentSnapshot: Uint8Array, snapshotPath?: string): Promise<void> {
+    try {
+      this.db.importDatabaseBinary(bytes);
+      await this.db.flush();
+    } catch (restoreError) {
+      try {
+        this.db.importDatabaseBinary(currentSnapshot);
+        await this.db.flush();
+      } catch (rollbackError) {
+        throw new Error(`Restore failed (${restoreError instanceof Error ? restoreError.message : String(restoreError)}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}). The pre-restore snapshot remains at ${snapshotPath || 'the configured backup location'}.`);
+      }
+      throw restoreError;
+    }
+  }
+
+private async verifyRestoredDatabase(currentSnapshot: Uint8Array): Promise<void> {
+    const restored = this.verifyBackupFile(this.db.exportDatabaseBinary());
+    if (!restored.valid) {
+      this.db.importDatabaseBinary(currentSnapshot);
+      await this.db.flush();
+      throw new Error(`فشل التحقق بعد الاستعادة، وتمت إعادة قاعدة البيانات السابقة: ${restored.error || restored.integrity}`);
+    }
+  }
+
 public async restoreBackupFromFile(file: File): Promise<{
     productsCount: number;
     invoicesCount: number;
@@ -62,23 +106,7 @@ public async restoreBackupFromFile(file: File): Promise<{
     journalEntriesCount: number;
   }> {
     const user = this.require();
-    const arrayBuffer = await file.arrayBuffer();
-    const fileBytes = new Uint8Array(arrayBuffer);
-    let bytes: Uint8Array;
-    if (isEncryptedBackup(fileBytes)) {
-      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
-      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
-      bytes = await decryptExternalBackup(fileBytes, password);
-    } else if (isEncryptedLocalDatabase(fileBytes)) {
-      const decryptLocal = typeof window !== 'undefined' ? window.ceramisys?.db?.decryptLocalBackup : undefined;
-      if (!decryptLocal) throw new Error('هذه نسخة محلية مرتبطة بمفتاح هذا الجهاز؛ استعدها من تطبيق سطح المكتب الذي أنشأها.');
-      bytes = await decryptLocal(fileBytes);
-    } else {
-      if (!window.confirm('هذا ملف SQLite قديم غير مشفر. استيراده قد يعرّض بياناته للقراءة خارج التطبيق. هل تريد المتابعة؟')) {
-        throw new Error('أُلغي استيراد الملف غير المشفر.');
-      }
-      bytes = fileBytes;
-    }
+    const bytes = await this.readBackupBytes(file);
 
     // Validate integrity and inspect contents before replacing live database
     const inspection = this.verifyBackupFile(bytes);
@@ -94,25 +122,8 @@ public async restoreBackupFromFile(file: File): Promise<{
       throw new Error(`لم يتم الاستعادة لأن إنشاء نسخة ما قبل الاستعادة فشل: ${preRestore.error || 'unknown error'}`);
     }
 
-    // Import and replace active database
-    try {
-      this.db.importDatabaseBinary(bytes);
-      await this.db.flush();
-    } catch (restoreError) {
-      try {
-        this.db.importDatabaseBinary(currentSnapshot);
-        await this.db.flush();
-      } catch (rollbackError) {
-        throw new Error(`Restore failed (${restoreError instanceof Error ? restoreError.message : String(restoreError)}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}). The pre-restore snapshot remains at ${preRestore.path || 'the configured backup location'}.`);
-      }
-      throw restoreError;
-    }
-    const restored = this.verifyBackupFile(this.db.exportDatabaseBinary());
-    if (!restored.valid) {
-      this.db.importDatabaseBinary(currentSnapshot);
-      await this.db.flush();
-      throw new Error(`فشل التحقق بعد الاستعادة، وتمت إعادة قاعدة البيانات السابقة: ${restored.error || restored.integrity}`);
-    }
+    await this.importBackupWithRollback(bytes, currentSnapshot, preRestore.path);
+    await this.verifyRestoredDatabase(currentSnapshot);
 
     new AuditService().log({
       userId: user.id,

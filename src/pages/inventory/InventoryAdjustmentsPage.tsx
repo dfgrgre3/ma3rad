@@ -71,6 +71,223 @@ export function loadBranchAdjustments(): Adjustment[] {
   `, scope.params);
 }
 
+type AdjustmentType = 'ADD' | 'SUBTRACT' | 'DAMAGE';
+
+interface AdjustmentProduct {
+  id: string;
+  name: string;
+  costPrice: number;
+  metersPerBox: number;
+  productType: 'CERAMIC' | 'GENERAL';
+  baseUnit: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM';
+}
+
+interface AdjustmentTransactionInput {
+  actorId: string;
+  product: AdjustmentProduct;
+  productId: string;
+  warehouseId: string;
+  type: AdjustmentType;
+  quantity: number;
+  reason: string;
+  notes: string;
+}
+
+interface AdjustmentValues {
+  fifoEnabled: boolean;
+  fifoPlan: ReturnType<typeof InventoryCostingService.planFifo> | null;
+  unitCost: number;
+  totalValue: number;
+  boxesCount: number;
+}
+
+function calculateAdjustmentValues(
+  txDb: DatabaseManager,
+  input: AdjustmentTransactionInput
+): AdjustmentValues {
+  const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
+  const fifoPlan = fifoEnabled && input.type !== 'ADD'
+    ? InventoryCostingService.planFifo(txDb, input.productId, input.warehouseId, input.quantity)
+    : null;
+  const unitCost = fifoPlan?.unitCost ?? (input.product.costPrice || 0);
+  const totalValue = input.quantity * unitCost;
+
+  if (!(totalValue > 0)) {
+    throw new Error('Set a positive product cost before posting an inventory adjustment.');
+  }
+
+  const boxesCount = input.product.productType === 'GENERAL'
+    ? input.product.baseUnit === 'BOX' ? input.quantity : 0
+    : Number((input.quantity / (input.product.metersPerBox || 1.44)).toFixed(2));
+
+  return { fifoEnabled, fifoPlan, unitCost, totalValue, boxesCount };
+}
+
+function validateAvailableStock(txDb: DatabaseManager, input: AdjustmentTransactionInput): void {
+  const stockBefore = txDb.query<{ quantityM2: number; reservedM2: number }>(
+    'SELECT quantity_m2 AS quantityM2,reserved_m2 AS reservedM2 FROM warehouse_stock WHERE warehouse_id=? AND product_id=?',
+    [input.warehouseId, input.productId]
+  )[0];
+
+  if (
+    input.type !== 'ADD' &&
+    Number(stockBefore?.quantityM2 || 0) - Number(stockBefore?.reservedM2 || 0) < input.quantity
+  ) {
+    throw new Error(
+      `The adjustment cannot reduce available stock below the reserved quantity (${getStockQuantityLabel(input.product)}).`
+    );
+  }
+}
+
+function insertAdjustmentRecords(
+  txDb: DatabaseManager,
+  input: AdjustmentTransactionInput,
+  values: AdjustmentValues,
+  adjustmentId: string,
+  adjustmentNumber: string,
+  date: string
+): void {
+  txDb.run(`
+    INSERT INTO stock_adjustments (
+      id, adjustment_number, warehouse_id, date, adjustment_type,
+      reason, status, total_quantity_m2, total_value, notes, created_by, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `, [
+    adjustmentId, adjustmentNumber, input.warehouseId, date, input.type,
+    input.reason, input.quantity, values.totalValue, input.notes, input.actorId
+  ]);
+
+  txDb.run(`
+    INSERT INTO stock_adjustment_items (
+      id, adjustment_id, product_id, product_name, quantity_m2,
+      boxes_count, unit_cost, total_value, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    `adji_${uuidv4().substring(0, 8)}`, adjustmentId, input.productId, input.product.name,
+    input.quantity, values.boxesCount, values.unitCost, values.totalValue, input.notes
+  ]);
+}
+
+function updateWarehouseStock(txDb: DatabaseManager, input: AdjustmentTransactionInput): void {
+  const stock = txDb.query<{ quantityM2: number }>(
+    'SELECT id, quantity_m2 AS quantityM2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [input.warehouseId, input.productId]
+  )[0];
+  const adjustmentQuantity = input.type === 'ADD' ? input.quantity : -input.quantity;
+
+  if (stock) {
+    txDb.run(`
+      UPDATE warehouse_stock
+      SET quantity_m2 = ?, last_updated = CURRENT_TIMESTAMP
+      WHERE warehouse_id = ? AND product_id = ?
+    `, [stock.quantityM2 + adjustmentQuantity, input.warehouseId, input.productId]);
+    return;
+  }
+
+  txDb.run(`
+    INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+    VALUES (?, ?, ?, ?, 0)
+  `, [
+    `stk_${uuidv4().substring(0, 8)}`, input.warehouseId, input.productId, adjustmentQuantity
+  ]);
+}
+
+function recordInventoryTransaction(
+  txDb: DatabaseManager,
+  input: AdjustmentTransactionInput,
+  values: AdjustmentValues,
+  adjustmentId: string,
+  adjustmentNumber: string
+): string {
+  const transactionId = `tx_${uuidv4().substring(0, 8)}`;
+  const isAddition = input.type === 'ADD';
+  const transactionType = isAddition
+    ? 'ADJUSTMENT_ADD'
+    : input.type === 'DAMAGE' ? 'DAMAGE' : 'ADJUSTMENT_SUB';
+  const sign = isAddition ? 1 : -1;
+
+  txDb.run(`
+    INSERT INTO inventory_transactions (
+      id, transaction_number, type, product_id, warehouse_id,
+      quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
+      notes, performed_by, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?, '${input.actorId}', CURRENT_TIMESTAMP)
+  `, [
+    transactionId, adjustmentNumber, transactionType, input.productId, input.warehouseId,
+    input.quantity * sign, values.boxesCount * sign, values.unitCost, values.totalValue, adjustmentId,
+    `تسوية مخزنية (${input.reason})`
+  ]);
+
+  return transactionId;
+}
+
+function updateCostLayers(
+  txDb: DatabaseManager,
+  input: AdjustmentTransactionInput,
+  values: AdjustmentValues,
+  transactionId: string,
+  adjustmentId: string,
+  date: string
+): void {
+  if (values.fifoPlan) {
+    InventoryCostingService.consumeFifo(txDb, transactionId, values.fifoPlan);
+  } else if (values.fifoEnabled && input.type === 'ADD') {
+    InventoryCostingService.addLayer(txDb, {
+      productId: input.productId,
+      warehouseId: input.warehouseId,
+      sourceTransactionId: transactionId,
+      sourceType: 'INVENTORY_ADJUSTMENT',
+      sourceId: adjustmentId,
+      date,
+      quantity: input.quantity,
+      unitCost: values.unitCost,
+    });
+  }
+}
+
+function postAdjustmentLedgerEntry(
+  txDb: DatabaseManager,
+  input: AdjustmentTransactionInput,
+  adjustmentId: string,
+  adjustmentNumber: string,
+  date: string,
+  totalValue: number
+): void {
+  const lines = input.type === 'ADD'
+    ? [{ accountCode: '1104', debit: totalValue, credit: 0 }, { accountCode: '5201', debit: 0, credit: totalValue }]
+    : [{ accountCode: '5201', debit: totalValue, credit: 0 }, { accountCode: '1104', debit: 0, credit: totalValue }];
+
+  postLedgerEntry(txDb.getDatabase(), {
+    date,
+    description: `Inventory adjustment ${adjustmentNumber}: ${input.reason}`,
+    referenceType: 'INVENTORY_ADJUSTMENT',
+    referenceId: adjustmentId,
+    createdBy: input.actorId,
+    lines,
+  });
+}
+
+function saveAdjustmentTransaction(txDb: DatabaseManager, input: AdjustmentTransactionInput): void {
+  const values = calculateAdjustmentValues(txDb, input);
+  validateAvailableStock(txDb, input);
+
+  const adjustmentId = `adj_${uuidv4().substring(0, 8)}`;
+  const adjustmentNumber = txDb.nextNumber('ADJ');
+  const date = localDateString();
+  insertAdjustmentRecords(txDb, input, values, adjustmentId, adjustmentNumber, date);
+  updateWarehouseStock(txDb, input);
+
+  const transactionId = recordInventoryTransaction(
+    txDb, input, values, adjustmentId, adjustmentNumber
+  );
+  updateCostLayers(txDb, input, values, transactionId, adjustmentId, date);
+  if (values.totalValue > 0) {
+    postAdjustmentLedgerEntry(
+      txDb, input, adjustmentId, adjustmentNumber, date, values.totalValue
+    );
+  }
+}
+
 export const InventoryAdjustmentsPage: React.FC = () => {
   const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [search, setSearch] = useState('');
@@ -178,101 +395,16 @@ export const InventoryAdjustmentsPage: React.FC = () => {
       const actor = AuthService.requireAuth();
       PermissionService.require(actor, 'inventory.adjust');
       branchAccess.requireWarehouseAccess(selectedWarehouseId, actor);
-      db.executeTransaction((txDb) => {
-        // 1. Calculate values
-        const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
-        const fifoPlan = fifoEnabled && adjType !== 'ADD'
-          ? InventoryCostingService.planFifo(txDb, selectedProductId, selectedWarehouseId, qtyM2)
-          : null;
-        const unitCost = fifoPlan?.unitCost ?? (prod.costPrice || 0);
-        const totalVal = qtyM2 * unitCost;
-        if (!(totalVal > 0)) throw new Error('Set a positive product cost before posting an inventory adjustment.');
-        const boxesCount = prod.productType === 'GENERAL'
-          ? prod.baseUnit === 'BOX' ? qtyM2 : 0
-          : Number((qtyM2 / (prod.metersPerBox || 1.44)).toFixed(2));
-        const adjId = `adj_${uuidv4().substring(0, 8)}`;
-        const adjNum = txDb.nextNumber('ADJ');
-        const today = localDateString();
-        const stockBefore = txDb.query<any>('SELECT quantity_m2 AS quantityM2,reserved_m2 AS reservedM2 FROM warehouse_stock WHERE warehouse_id=? AND product_id=?', [selectedWarehouseId, selectedProductId])[0];
-        if (adjType !== 'ADD' && Number(stockBefore?.quantityM2 || 0) - Number(stockBefore?.reservedM2 || 0) < qtyM2) {
-          throw new Error(`The adjustment cannot reduce available stock below the reserved quantity (${getStockQuantityLabel(prod)}).`);
-        }
-
-        // 2. Insert into stock_adjustments
-        txDb.run(`
-          INSERT INTO stock_adjustments (
-            id, adjustment_number, warehouse_id, date, adjustment_type,
-            reason, status, total_quantity_m2, total_value, notes, created_by, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'POSTED', ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        `, [
-          adjId, adjNum, selectedWarehouseId, today, adjType,
-          reason, qtyM2, totalVal, notes, actor.id
-        ]);
-
-        // 3. Insert into stock_adjustment_items
-        const itemId = `adji_${uuidv4().substring(0, 8)}`;
-        txDb.run(`
-          INSERT INTO stock_adjustment_items (
-            id, adjustment_id, product_id, product_name, quantity_m2,
-            boxes_count, unit_cost, total_value, notes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          itemId, adjId, selectedProductId, prod.name, qtyM2,
-          boxesCount, unitCost, totalVal, notes
-        ]);
-
-        // 4. Update warehouse_stock
-        // Check if stock record exists
-        const stockExists = txDb.query('SELECT id, quantity_m2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?', [selectedWarehouseId, selectedProductId]);
-        if (stockExists.length > 0) {
-          const currentM2 = stockExists[0].quantityM2;
-          const newM2 = adjType === 'ADD' ? (currentM2 + qtyM2) : (currentM2 - qtyM2);
-          txDb.run(`
-            UPDATE warehouse_stock 
-            SET quantity_m2 = ?, last_updated = CURRENT_TIMESTAMP
-            WHERE warehouse_id = ? AND product_id = ?
-          `, [newM2, selectedWarehouseId, selectedProductId]);
-        } else {
-          const stockId = `stk_${uuidv4().substring(0, 8)}`;
-          const initialM2 = adjType === 'ADD' ? qtyM2 : -qtyM2;
-          txDb.run(`
-            INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
-            VALUES (?, ?, ?, ?, 0)
-          `, [stockId, selectedWarehouseId, selectedProductId, initialM2]);
-        }
-
-        // 5. Record Inventory Transaction
-        const txId = `tx_${uuidv4().substring(0, 8)}`;
-        const txType = adjType === 'ADD' ? 'ADJUSTMENT_ADD' : (adjType === 'DAMAGE' ? 'DAMAGE' : 'ADJUSTMENT_SUB');
-        const txQty = adjType === 'ADD' ? qtyM2 : -qtyM2;
-        const txBoxes = adjType === 'ADD' ? boxesCount : -boxesCount;
-
-        txDb.run(`
-          INSERT INTO inventory_transactions (
-            id, transaction_number, type, product_id, warehouse_id,
-            quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
-            notes, performed_by, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?, '${actor.id}', CURRENT_TIMESTAMP)
-        `, [
-          txId, adjNum, txType, selectedProductId, selectedWarehouseId,
-          txQty, txBoxes, unitCost, totalVal, adjId,
-          `تسوية مخزنية (${reason})`
-        ]);
-        if (fifoPlan) InventoryCostingService.consumeFifo(txDb, txId, fifoPlan);
-        else if (fifoEnabled && adjType === 'ADD') InventoryCostingService.addLayer(txDb, {
-          productId: selectedProductId, warehouseId: selectedWarehouseId, sourceTransactionId: txId,
-          sourceType: 'INVENTORY_ADJUSTMENT', sourceId: adjId, date: today, quantity: qtyM2, unitCost,
-        });
-        if (totalVal > 0) {
-          const lines = adjType === 'ADD'
-            ? [{ accountCode: '1104', debit: totalVal, credit: 0 }, { accountCode: '5201', debit: 0, credit: totalVal }]
-            : [{ accountCode: '5201', debit: totalVal, credit: 0 }, { accountCode: '1104', debit: 0, credit: totalVal }];
-          postLedgerEntry(txDb.getDatabase(), {
-            date: today, description: `Inventory adjustment ${adjNum}: ${reason}`,
-            referenceType: 'INVENTORY_ADJUSTMENT', referenceId: adjId, createdBy: actor.id, lines,
-          });
-        }
-      });
+      db.executeTransaction(txDb => saveAdjustmentTransaction(txDb, {
+        actorId: actor.id,
+        product: prod,
+        productId: selectedProductId,
+        warehouseId: selectedWarehouseId,
+        type: adjType,
+        quantity: qtyM2,
+        reason,
+        notes,
+      }));
 
       // Reset form & Close
       setShowCreateModal(false);

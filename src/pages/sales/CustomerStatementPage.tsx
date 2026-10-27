@@ -53,6 +53,82 @@ interface StatementModalProps {
   onClose: () => void;
 }
 
+interface StatementTableProps {
+  loading: boolean;
+  rows: CustomerStatementRow[];
+  totalDebit: number;
+  totalCredit: number;
+  netBalance: number;
+}
+
+const StatementTable: React.FC<StatementTableProps> = ({
+  loading,
+  rows,
+  totalDebit,
+  totalCredit,
+  netBalance,
+}) => (
+  <>
+    {loading ? (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
+      </div>
+    ) : rows.length === 0 ? (
+      <div className="py-12 text-center text-slate-400 dark:text-slate-500">
+        <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
+        <p className="text-sm font-semibold">لا توجد حركات في هذه الفترة</p>
+      </div>
+    ) : (
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
+              <tr>
+                {['التاريخ', 'المرجع', 'البيان', 'مدين', 'دائن', 'الرصيد'].map(h => (
+                  <th key={h} className="text-right font-bold text-slate-500 dark:text-slate-400 px-3 py-2.5 whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {rows.map((row, i) => (
+                <tr key={i} className={`transition-colors ${
+                  row.type === 'invoice' ? 'hover:bg-rose-50/30 dark:hover:bg-rose-900/10' :
+                  row.type === 'return' ? 'hover:bg-amber-50/30 dark:hover:bg-amber-900/10' :
+                  'hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10'
+                }`}>
+                  <td className="px-3 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.date}</td>
+                  <td className="px-3 py-2.5 font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">{row.reference}</td>
+                  <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300">{row.description}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                    {row.debit > 0 ? fmt(row.debit) : '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                    {row.credit > 0 ? fmt(row.credit) : '—'}
+                  </td>
+                  <td className={`px-3 py-2.5 text-right font-bold whitespace-nowrap ${row.balance > 0 ? 'text-rose-700 dark:text-rose-400' : row.balance < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}`}>
+                    {fmt(Math.abs(row.balance))}
+                    {row.balance !== 0 && <span className="text-[10px] mr-1">{row.balance > 0 ? 'م' : 'د'}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-slate-100 dark:bg-slate-800">
+              <tr>
+                <td colSpan={3} className="px-3 py-3 font-bold text-slate-700 dark:text-slate-300 text-xs">الإجمالي</td>
+                <td className="px-3 py-3 font-bold text-rose-700 dark:text-rose-400 text-xs whitespace-nowrap">{fmt(totalDebit)}</td>
+                <td className="px-3 py-3 font-bold text-emerald-700 dark:text-emerald-400 text-xs whitespace-nowrap">{fmt(totalCredit)}</td>
+                <td className={`px-3 py-3 font-black text-xs whitespace-nowrap ${netBalance > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                  {fmt(Math.abs(netBalance))} {netBalance > 0 ? '(مدين)' : netBalance < 0 ? '(دائن)' : '(مصفّى)'}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    )}
+  </>
+);
+
 const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) => {
   const salesService = useMemo(() => new SalesService(), []);
   const printService = useMemo(() => new PrintService(), []);
@@ -271,63 +347,13 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
             )}
 
             {/* Statement Table */}
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
-              </div>
-            ) : rows.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 dark:text-slate-500">
-                <FileText className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                <p className="text-sm font-semibold">لا توجد حركات في هذه الفترة</p>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0 z-10">
-                      <tr>
-                        {['التاريخ', 'المرجع', 'البيان', 'مدين', 'دائن', 'الرصيد'].map(h => (
-                          <th key={h} className="text-right font-bold text-slate-500 dark:text-slate-400 px-3 py-2.5 whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {rows.map((row, i) => (
-                        <tr key={i} className={`transition-colors ${
-                          row.type === 'invoice' ? 'hover:bg-rose-50/30 dark:hover:bg-rose-900/10' :
-                          row.type === 'return' ? 'hover:bg-amber-50/30 dark:hover:bg-amber-900/10' :
-                          'hover:bg-emerald-50/30 dark:hover:bg-emerald-900/10'
-                        }`}>
-                          <td className="px-3 py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{row.date}</td>
-                          <td className="px-3 py-2.5 font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">{row.reference}</td>
-                          <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300">{row.description}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold text-rose-600 dark:text-rose-400 whitespace-nowrap">
-                            {row.debit > 0 ? fmt(row.debit) : '—'}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                            {row.credit > 0 ? fmt(row.credit) : '—'}
-                          </td>
-                          <td className={`px-3 py-2.5 text-right font-bold whitespace-nowrap ${row.balance > 0 ? 'text-rose-700 dark:text-rose-400' : row.balance < 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}`}>
-                            {fmt(Math.abs(row.balance))}
-                            {row.balance !== 0 && <span className="text-[10px] mr-1">{row.balance > 0 ? 'م' : 'د'}</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-slate-100 dark:bg-slate-800">
-                      <tr>
-                        <td colSpan={3} className="px-3 py-3 font-bold text-slate-700 dark:text-slate-300 text-xs">الإجمالي</td>
-                        <td className="px-3 py-3 font-bold text-rose-700 dark:text-rose-400 text-xs whitespace-nowrap">{fmt(totalDebit)}</td>
-                        <td className="px-3 py-3 font-bold text-emerald-700 dark:text-emerald-400 text-xs whitespace-nowrap">{fmt(totalCredit)}</td>
-                        <td className={`px-3 py-3 font-black text-xs whitespace-nowrap ${netBalance > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                          {fmt(Math.abs(netBalance))} {netBalance > 0 ? '(مدين)' : netBalance < 0 ? '(دائن)' : '(مصفّى)'}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            )}
+            <StatementTable
+              loading={loading}
+              rows={rows}
+              totalDebit={totalDebit}
+              totalCredit={totalCredit}
+              netBalance={netBalance}
+            />
           </div>
 
           <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-end">

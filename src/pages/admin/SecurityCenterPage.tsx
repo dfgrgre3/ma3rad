@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ShieldCheck, Users, MonitorSmartphone, AlertTriangle, Lock, RefreshCw,
   LogOut, Search, Loader2, Clock, KeyRound, FileWarning,
@@ -23,7 +23,7 @@ export const SecurityCenterPage: React.FC = () => {
   const [onlyFailed, setOnlyFailed] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setOverview(service.getOverview());
@@ -34,9 +34,11 @@ export const SecurityCenterPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [onlyFailed, search, service, toast]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const revoke = (session: ActiveSession) => {
     if (!confirm(`إنهاء جلسة ${session.userName}؟`)) return;

@@ -66,6 +66,16 @@ export interface EmployeePayrollPayable {
   balance: number;
 }
 
+type PayrollTransactionInput = {
+  employeeId: string;
+  type: PayrollTxType;
+  amount: number;
+  date: string;
+  notes: string;
+  createdBy?: string;
+  registerId?: string;
+};
+
 export class EmployeeService {
   private static db = DatabaseManager.getInstance();
   private static branchAccess = new BranchAccessService();
@@ -227,15 +237,149 @@ export class EmployeeService {
     );
   }
 
-  static addTransaction(data: {
-    employeeId: string;
-    type: PayrollTxType;
-    amount: number;
-    date: string;
-    notes: string;
-    createdBy?: string;
-    registerId?: string;
-  }): PayrollTransaction {
+  private static ensureSalaryAccrual(
+    db: DatabaseManager,
+    employeeId: string,
+    date: string,
+    createdBy: string
+  ): void {
+    const period = date.slice(0, 7);
+    const referenceId = `${employeeId}:${period}`;
+    const accrued = db.query(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_SALARY_ACCRUAL' AND reference_id=?`, [referenceId])[0];
+    if (accrued) return;
+
+    const employee = db.query<{ name: string; baseSalary: number; salaryType: SalaryType }>(
+      'SELECT name,base_salary AS baseSalary,salary_type AS salaryType FROM employees WHERE id=?',
+      [employeeId]
+    )[0];
+    const salary = Math.round((Number(employee?.baseSalary || 0) * (employee?.salaryType === 'DAILY' ? 26 : 1)) * 100) / 100;
+    if (salary <= 0) return;
+
+    postLedgerEntry(db.getDatabase(), {
+      date: `${period}-01`,
+      description: `Salary accrual for ${employee?.name || employeeId} (${period})`,
+      referenceType: 'PAYROLL_SALARY_ACCRUAL',
+      referenceId,
+      createdBy,
+      lines: [{ accountCode: '5202', debit: salary, credit: 0 }, { accountCode: '2104', debit: 0, credit: salary }],
+    });
+  }
+
+  private static applyAdvancesToSalary(
+    db: DatabaseManager,
+    employeeId: string,
+    date: string,
+    createdBy: string
+  ): void {
+    const period = date.slice(0, 7);
+    const referenceId = `${employeeId}:${period}`;
+    const applied = db.query(
+      `SELECT id FROM journal_entries WHERE reference_type='PAYROLL_ADVANCE_APPLICATION' AND reference_id=?`,
+      [referenceId]
+    )[0];
+    if (applied) return;
+
+    const advances = Number(db.query<{ amount: number }>(
+      `SELECT COALESCE(SUM(amount),0) AS amount FROM payroll_transactions WHERE employee_id=? AND type='ADVANCE' AND substr(date,1,7)=?`,
+      [employeeId, period]
+    )[0]?.amount || 0);
+    if (advances <= 0) return;
+
+    postLedgerEntry(db.getDatabase(), {
+      date,
+      description: `Apply employee advances to salary (${period})`,
+      referenceType: 'PAYROLL_ADVANCE_APPLICATION',
+      referenceId,
+      createdBy,
+      lines: [{ accountCode: '2104', debit: advances, credit: 0 }, { accountCode: '1202', debit: 0, credit: advances }],
+    });
+  }
+
+  private static getPayrollPayable(db: DatabaseManager, employeeId: string, date: string): number {
+    const period = date.slice(0, 7);
+    return Number(db.query<{ amount: number }>(`
+      SELECT COALESCE(SUM(l.credit-l.debit),0) AS amount
+      FROM journal_entry_lines l
+      JOIN journal_entries e ON e.id=l.entry_id AND e.is_posted=1
+      JOIN chart_of_accounts a ON a.id=l.account_id
+      WHERE a.code='2104' AND (
+        (e.reference_type IN ('PAYROLL_SALARY_ACCRUAL','PAYROLL_ADVANCE_APPLICATION') AND e.reference_id=?)
+        OR (e.reference_type='PAYROLL_TRANSACTION' AND e.reference_id IN (
+          SELECT id FROM payroll_transactions
+          WHERE employee_id=? AND substr(date,1,7)=? AND type IN ('BONUS','DEDUCTION','SALARY_PAYOUT')
+        ))
+      )
+    `, [`${employeeId}:${period}`, employeeId, period])[0]?.amount || 0);
+  }
+
+  private static getPayrollPostingLines(type: PayrollTxType, amount: number, payable: number) {
+    switch (type) {
+      case 'ADVANCE':
+        return [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
+      case 'BONUS':
+        return [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2104', debit: 0, credit: amount }];
+      case 'DEDUCTION':
+        return [{ accountCode: '2104', debit: amount, credit: 0 }, { accountCode: '5202', debit: 0, credit: amount }];
+      case 'SALARY_PAYOUT':
+        return [
+          { accountCode: '2104', debit: Math.min(amount, Math.max(0, payable)), credit: 0 },
+          { accountCode: '1101', debit: 0, credit: amount },
+        ];
+    }
+  }
+
+  private static persistPayrollTransaction(
+    db: DatabaseManager,
+    data: PayrollTransactionInput,
+    amount: number,
+    id: string,
+    registerId: string | null,
+    branchId: string,
+    actor: ReturnType<typeof AuthService.requireAuth>
+  ): void {
+    if (registerId) this.branchAccess.requireRegisterAccess(registerId, actor, branchId);
+    if ((data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') && !registerId) {
+      throw new Error('يجب تحديد خزينة فرع الموظف لهذه الحركة النقدية.');
+    }
+    db.run(
+      `INSERT INTO payroll_transactions (id,employee_id,type,amount,date,notes,created_by,register_id,branch_id) VALUES (?,?,?,?,?,?,?,?,?)`,
+      [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, registerId, branchId]
+    );
+
+    if (data.type === 'DEDUCTION' || data.type === 'SALARY_PAYOUT') {
+      this.ensureSalaryAccrual(db, data.employeeId, data.date, actor.id);
+    }
+    if (data.type === 'SALARY_PAYOUT') {
+      this.applyAdvancesToSalary(db, data.employeeId, data.date, actor.id);
+    }
+
+    const payable = data.type === 'SALARY_PAYOUT'
+      ? this.getPayrollPayable(db, data.employeeId, data.date)
+      : 0;
+    if (data.type === 'SALARY_PAYOUT' && amount > payable + 0.009) {
+      throw new Error(`Salary payout exceeds accrued payroll payable (${payable}).`);
+    }
+    const lines = this.getPayrollPostingLines(data.type, amount, payable);
+    postLedgerEntry(db.getDatabase(), {
+      date: data.date,
+      description: `Payroll ${data.type} for ${this.getById(data.employeeId)?.name || data.employeeId}`,
+      referenceType: 'PAYROLL_TRANSACTION',
+      referenceId: id,
+      createdBy: actor.id,
+      lines,
+    });
+
+    if (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') {
+      db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, registerId]);
+    }
+    db.run(
+      `INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
+      [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, `Payroll ${data.type}`, 'HR', id,
+        JSON.stringify({ employeeId: data.employeeId, amount, date: data.date })]
+    );
+  }
+
+  static addTransaction(data: PayrollTransactionInput): PayrollTransaction {
     const actor = this.requireManage();
     const branchId = this.requireEmployeeBranch(data.employeeId, actor);
     const id = `ptx_${uuidv4().substring(0, 8)}`;
@@ -249,70 +393,7 @@ export class EmployeeService {
         ? this.branchAccess.getDefaultRegisterId(branchId, actor)
         : null;
     this.db.executeTransaction((db) => {
-      if (registerId) this.branchAccess.requireRegisterAccess(registerId, actor, branchId);
-      if (hasCashMovement && !registerId) throw new Error('يجب تحديد خزينة فرع الموظف لهذه الحركة النقدية.');
-      db.run(`INSERT INTO payroll_transactions (id,employee_id,type,amount,date,notes,created_by,register_id,branch_id) VALUES (?,?,?,?,?,?,?,?,?)`,
-        [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, registerId, branchId]);
-      if (data.type === 'DEDUCTION' || data.type === 'SALARY_PAYOUT') {
-        const period = data.date.slice(0, 7);
-        const accrualRef = `${data.employeeId}:${period}`;
-        const accrued = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_SALARY_ACCRUAL' AND reference_id=?`, [accrualRef])[0];
-        if (!accrued) {
-          const employee = db.query<any>('SELECT name,base_salary,salary_type FROM employees WHERE id=?', [data.employeeId])[0];
-          const salary = Math.round((Number(employee?.baseSalary || 0) * (employee?.salaryType === 'DAILY' ? 26 : 1)) * 100) / 100;
-          if (salary > 0) postLedgerEntry(db.getDatabase(), {
-            date: `${period}-01`, description: `Salary accrual for ${employee?.name || data.employeeId} (${period})`,
-            referenceType: 'PAYROLL_SALARY_ACCRUAL', referenceId: accrualRef, createdBy: actor.id,
-            lines: [{ accountCode: '5202', debit: salary, credit: 0 }, { accountCode: '2104', debit: 0, credit: salary }],
-          });
-        }
-      }
-      if (data.type === 'SALARY_PAYOUT') {
-        const period = data.date.slice(0, 7);
-        const advanceRef = `${data.employeeId}:${period}`;
-        if (!db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='PAYROLL_ADVANCE_APPLICATION' AND reference_id=?`, [advanceRef])[0]) {
-          const advances = Number(db.query<any>(`SELECT COALESCE(SUM(amount),0) AS amount FROM payroll_transactions WHERE employee_id=? AND type='ADVANCE' AND substr(date,1,7)=?`, [data.employeeId, period])[0]?.amount || 0);
-          if (advances > 0) postLedgerEntry(db.getDatabase(), {
-            date: data.date, description: `Apply employee advances to salary (${period})`,
-            referenceType: 'PAYROLL_ADVANCE_APPLICATION', referenceId: advanceRef, createdBy: actor.id,
-            lines: [{ accountCode: '2104', debit: advances, credit: 0 }, { accountCode: '1202', debit: 0, credit: advances }],
-          });
-        }
-      }
-      const payable = data.type === 'SALARY_PAYOUT'
-        ? Number(db.query<any>(`
-            SELECT COALESCE(SUM(l.credit-l.debit),0) AS amount
-            FROM journal_entry_lines l
-            JOIN journal_entries e ON e.id=l.entry_id AND e.is_posted=1
-            JOIN chart_of_accounts a ON a.id=l.account_id
-            WHERE a.code='2104' AND (
-              (e.reference_type IN ('PAYROLL_SALARY_ACCRUAL','PAYROLL_ADVANCE_APPLICATION') AND e.reference_id=?)
-              OR (e.reference_type='PAYROLL_TRANSACTION' AND e.reference_id IN (
-                SELECT id FROM payroll_transactions
-                WHERE employee_id=? AND substr(date,1,7)=? AND type IN ('BONUS','DEDUCTION','SALARY_PAYOUT')
-              ))
-            )
-          `, [`${data.employeeId}:${data.date.slice(0, 7)}`, data.employeeId, data.date.slice(0, 7)])[0]?.amount || 0)
-        : 0;
-      if (data.type === 'SALARY_PAYOUT' && amount > payable + 0.009) throw new Error(`Salary payout exceeds accrued payroll payable (${payable}).`);
-      const payablePortion = Math.min(amount, Math.max(0, payable));
-      const lines = data.type === 'ADVANCE'
-        ? [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }]
-        : data.type === 'BONUS'
-          ? [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2104', debit: 0, credit: amount }]
-          : data.type === 'DEDUCTION'
-            ? [{ accountCode: '2104', debit: amount, credit: 0 }, { accountCode: '5202', debit: 0, credit: amount }]
-            : [{ accountCode: '2104', debit: payablePortion, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
-      postLedgerEntry(db.getDatabase(), {
-        date: data.date, description: `Payroll ${data.type} for ${this.getById(data.employeeId)?.name || data.employeeId}`,
-        referenceType: 'PAYROLL_TRANSACTION', referenceId: id, createdBy: actor.id, lines,
-      });
-      if (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') {
-        db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, registerId]);
-      }
-      db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
-        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, `Payroll ${data.type}`, 'HR', id,
-          JSON.stringify({ employeeId: data.employeeId, amount, date: data.date })]);
+      this.persistPayrollTransaction(db, data, amount, id, registerId, branchId, actor);
     });
     return this.getTransactions(data.employeeId).find(t => t.id === id)!;
   }

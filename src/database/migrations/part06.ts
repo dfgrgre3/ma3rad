@@ -9,6 +9,76 @@ import {
   type Migration,
 } from '../migrationSupport';
 
+type SupplierPaymentAllocationPayment = {
+  id: string;
+  supplier_id: string;
+  amount: number;
+  date: string;
+  notes: string | null;
+};
+
+type SupplierPaymentAllocationInvoice = {
+  id: string;
+  invoice_number: string;
+  total_amount: number;
+  paid_amount: number;
+  remaining_amount: number;
+};
+
+function getSupplierPaymentInvoices(db: Database, payment: SupplierPaymentAllocationPayment) {
+  return queryLedgerRows<SupplierPaymentAllocationInvoice>(db, `
+    SELECT id,invoice_number,total_amount,paid_amount,remaining_amount FROM purchase_invoices
+    WHERE supplier_id=? AND date<=? ORDER BY date,created_at,id
+  `, [payment.supplier_id, payment.date]);
+}
+
+function allocateSupplierPaymentToInvoice(
+  db: Database,
+  payment: SupplierPaymentAllocationPayment,
+  invoice: SupplierPaymentAllocationInvoice,
+  unapplied: number,
+  hasNoteInvoice: boolean,
+) {
+  const allocated = Number(queryLedgerRows<{ amount: number }>(db,
+    `SELECT COALESCE(SUM(amount),0) AS amount FROM supplier_payment_allocations WHERE purchase_invoice_id=?`,
+    [invoice.id])[0]?.amount || 0);
+  const returns = Number(queryLedgerRows<{ amount: number }>(db,
+    `SELECT COALESCE(SUM(remaining_to_balance),0) AS amount FROM purchase_returns WHERE original_purchase_id=? AND date<=?`,
+    [invoice.id, payment.date])[0]?.amount || 0);
+  const open = Math.max(0, Number(invoice.total_amount) - allocated - returns);
+  const value = Math.round(Math.min(unapplied, open) * 100) / 100;
+  if (value <= 0) return unapplied;
+
+  db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
+    [`spa_${uuidv4().substring(0, 8)}`, payment.id, invoice.id, value]);
+  if (!hasNoteInvoice) {
+    const paid = Math.round((Number(invoice.paid_amount) + value) * 100) / 100;
+    const remaining = Math.max(0, Math.round((Number(invoice.remaining_amount) - value) * 100) / 100);
+    db.run(`UPDATE purchase_invoices SET paid_amount=?,remaining_amount=?,payment_status=? WHERE id=?`,
+      [paid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', invoice.id]);
+    invoice.paid_amount = paid;
+    invoice.remaining_amount = remaining;
+  }
+  return Math.round((unapplied - value) * 100) / 100;
+}
+
+function allocateSupplierPayment(db: Database, payment: SupplierPaymentAllocationPayment) {
+  if (queryLedgerRows(db, `SELECT id FROM supplier_payment_allocations WHERE payment_id=?`, [payment.id]).length) return;
+
+  const invoices = getSupplierPaymentInvoices(db, payment);
+  const noteInvoice = payment.notes
+    ? invoices.find((invoice) => payment.notes!.includes(invoice.invoice_number))
+    : undefined;
+  const ordered = noteInvoice
+    ? [noteInvoice, ...invoices.filter((invoice) => invoice.id !== noteInvoice.id)]
+    : invoices;
+  let unapplied = Math.round((Number(payment.amount) || 0) * 100) / 100;
+  for (const invoice of ordered) {
+    if (unapplied <= 0.009) break;
+    unapplied = allocateSupplierPaymentToInvoice(db, payment, invoice, unapplied, Boolean(noteInvoice));
+  }
+}
+
 export const MIGRATION_PART_06: Migration[] = [
 {
     id: '025_backfill_return_ledger_entries',
@@ -84,40 +154,10 @@ export const MIGRATION_PART_06: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_supplier_payment_allocations_invoice
           ON supplier_payment_allocations(purchase_invoice_id);
       `);
-      const payments = queryLedgerRows<{ id: string; supplier_id: string; amount: number; date: string; notes: string | null }>(
+      const payments = queryLedgerRows<SupplierPaymentAllocationPayment>(
         db, `SELECT id,supplier_id,amount,date,notes FROM supplier_payments ORDER BY date,created_at,id`);
       for (const payment of payments) {
-        if (queryLedgerRows(db, `SELECT id FROM supplier_payment_allocations WHERE payment_id=?`, [payment.id]).length) continue;
-        const invoices = queryLedgerRows<{ id: string; invoice_number: string; total_amount: number; paid_amount: number; remaining_amount: number }>(db, `
-          SELECT id,invoice_number,total_amount,paid_amount,remaining_amount FROM purchase_invoices
-          WHERE supplier_id=? AND date<=? ORDER BY date,created_at,id
-        `, [payment.supplier_id, payment.date]);
-        const noteInvoice = payment.notes
-          ? invoices.find((invoice) => payment.notes!.includes(invoice.invoice_number))
-          : undefined;
-        const ordered = noteInvoice ? [noteInvoice, ...invoices.filter((invoice) => invoice.id !== noteInvoice.id)] : invoices;
-        let unapplied = Math.round((Number(payment.amount) || 0) * 100) / 100;
-        for (const invoice of ordered) {
-          if (unapplied <= 0.009) break;
-          const allocated = Number(queryLedgerRows<{ amount: number }>(db,
-            `SELECT COALESCE(SUM(amount),0) AS amount FROM supplier_payment_allocations WHERE purchase_invoice_id=?`, [invoice.id])[0]?.amount || 0);
-          const returns = Number(queryLedgerRows<{ amount: number }>(db,
-            `SELECT COALESCE(SUM(remaining_to_balance),0) AS amount FROM purchase_returns WHERE original_purchase_id=? AND date<=?`, [invoice.id, payment.date])[0]?.amount || 0);
-          const open = Math.max(0, Number(invoice.total_amount) - allocated - returns);
-          const value = Math.round(Math.min(unapplied, open) * 100) / 100;
-          if (value <= 0) continue;
-          db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
-            [`spa_${uuidv4().substring(0, 8)}`, payment.id, invoice.id, value]);
-          if (!noteInvoice) {
-            const paid = Math.round((Number(invoice.paid_amount) + value) * 100) / 100;
-            const remaining = Math.max(0, Math.round((Number(invoice.remaining_amount) - value) * 100) / 100);
-            db.run(`UPDATE purchase_invoices SET paid_amount=?,remaining_amount=?,payment_status=? WHERE id=?`,
-              [paid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', invoice.id]);
-            invoice.paid_amount = paid;
-            invoice.remaining_amount = remaining;
-          }
-          unapplied = Math.round((unapplied - value) * 100) / 100;
-        }
+        allocateSupplierPayment(db, payment);
       }
     },
   },

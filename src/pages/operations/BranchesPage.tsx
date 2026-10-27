@@ -22,7 +22,7 @@ export const BranchesPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();

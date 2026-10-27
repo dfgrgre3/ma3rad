@@ -39,7 +39,7 @@ export class BackupServicePart02 extends BackupServicePart01 {
     let deleted = 0;
     const errors: string[] = [];
     for (const [index, backup] of backups.entries()) {
-      if (backup.createdAt >= cutoffDateStr && index < maxCount) continue;
+      if (this.shouldRetainBackup(backup.createdAt, index, cutoffDateStr, maxCount)) continue;
       try {
         const result = await api.removeBackup(backup.fileName);
         if (!result.ok) {
@@ -56,6 +56,15 @@ export class BackupServicePart02 extends BackupServicePart01 {
       }
     }
     return { deleted, errors };
+  }
+
+  private shouldRetainBackup(
+    createdAt: string,
+    index: number,
+    cutoffDate: string,
+    maxCount: number
+  ): boolean {
+    return createdAt >= cutoffDate && index < maxCount;
   }
 
 public getRetentionSettings(): { retentionDays: number; maxBackups: number } {

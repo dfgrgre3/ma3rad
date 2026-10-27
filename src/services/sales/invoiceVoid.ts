@@ -8,7 +8,55 @@ import { localDateString } from '../../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
 import { round2 } from '../financials';
 import type { SalesInvoice } from '../../types';
-import type { SalesContext } from './context';
+import type { DatabaseManager } from '../../database/db';
+import type { InvoiceWithItems, SalesContext } from './context';
+
+function restoreInvoiceItem(
+  sqliteDb: DatabaseManager,
+  inv: InvoiceWithItems,
+  invoiceId: string,
+  reason: string,
+  performedBy: string,
+  item: InvoiceWithItems['items'][number]
+): void {
+  if (SettingsService.getSettings().costingMethod === 'FIFO') {
+    const issue = sqliteDb.query<any>(`SELECT id FROM inventory_transactions
+      WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE'
+      ORDER BY created_at,id LIMIT 1`, [invoiceId, item.productId])[0];
+    if (!issue) throw new Error('The original FIFO sale issue is missing; reconcile the invoice before voiding it.');
+    InventoryCostingService.restoreIssue(sqliteDb, issue.id);
+  }
+  sqliteDb.run(`
+    UPDATE warehouse_stock
+    SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
+    WHERE product_id = ? AND warehouse_id = ?
+  `, [item.quantityM2, item.productId, inv.warehouseId]);
+
+  if (item.productType !== 'GENERAL') {
+    new BatchService().restoreForInvoiceVoid({
+      invoiceId,
+      productId: item.productId,
+      warehouseId: inv.warehouseId,
+      quantityM2: item.quantityM2,
+      costPrice: item.unitCost,
+      performedBy,
+      reason,
+    });
+  }
+
+  sqliteDb.run(`
+    INSERT INTO inventory_transactions (
+      id, transaction_number, type, product_id, warehouse_id,
+      quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+      reference_id, notes, performed_by
+    ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
+  `, [
+    `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-VOID'),
+    item.productId, inv.warehouseId, item.quantityM2, item.boxesCount,
+    item.unitCost, round2(item.quantityM2 * item.unitCost), invoiceId,
+    `إلغاء فاتورة ${inv.invoiceNumber}`, performedBy
+  ]);
+}
 
 /** Void a completed sales invoice with full reversal (brief §67/§220). */
 export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: string): SalesInvoice {
@@ -38,43 +86,7 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     }
 
     for (const item of inv.items) {
-      if (SettingsService.getSettings().costingMethod === 'FIFO') {
-        const issue = sqliteDb.query<any>(`SELECT id FROM inventory_transactions
-          WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE'
-          ORDER BY created_at,id LIMIT 1`, [invoiceId, item.productId])[0];
-        if (!issue) throw new Error('The original FIFO sale issue is missing; reconcile the invoice before voiding it.');
-        InventoryCostingService.restoreIssue(sqliteDb, issue.id);
-      }
-      sqliteDb.run(`
-        UPDATE warehouse_stock
-        SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
-        WHERE product_id = ? AND warehouse_id = ?
-      `, [item.quantityM2, item.productId, inv.warehouseId]);
-
-      if (item.productType !== 'GENERAL') {
-        new BatchService().restoreForInvoiceVoid({
-          invoiceId,
-          productId: item.productId,
-          warehouseId: inv.warehouseId,
-          quantityM2: item.quantityM2,
-          costPrice: item.unitCost,
-          performedBy: actor.id,
-          reason,
-        });
-      }
-
-      sqliteDb.run(`
-        INSERT INTO inventory_transactions (
-          id, transaction_number, type, product_id, warehouse_id,
-          quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
-          reference_id, notes, performed_by
-        ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
-      `, [
-        `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-VOID'),
-        item.productId, inv.warehouseId, item.quantityM2, item.boxesCount,
-        item.unitCost, round2(item.quantityM2 * item.unitCost), invoiceId,
-        `إلغاء فاتورة ${inv.invoiceNumber}`, actor.id
-      ]);
+      restoreInvoiceItem(sqliteDb, inv, invoiceId, reason, actor.id, item);
     }
 
     // Reverse the credit extended to the customer and the cash received.

@@ -119,7 +119,7 @@ export const QuotationsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
 
   const totalPages = Math.max(1, Math.ceil(quotations.length / PAGE_SIZE));

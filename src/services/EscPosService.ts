@@ -65,6 +65,22 @@ export class EscPosService {
     return settings.thermalPaperWidth === '58' ? 32 : 48;
   }
 
+  private static writeInvoiceItems(
+    items: any[],
+    width: number,
+    line: (value: string) => void,
+    centered: (value: string) => void
+  ): void {
+    for (const item of items) {
+      centered(item.productName);
+      const meta = `${item.productSku} ${item.size} ${item.quantityM2}م² (${item.boxesCount}ك)`;
+      line(EscPosService.row(meta, `${CeramicMath.formatCurrency(item.totalPrice)}`, width));
+      if (item.discountAmount > 0) {
+        line(EscPosService.row('خصم الصنف', `-${CeramicMath.formatCurrency(item.discountAmount)}`, width));
+      }
+    }
+  }
+
   /**
    * Builds the complete receipt for a sales invoice, ending with a partial
    * paper cut. `width` is the printer line width in characters (32 for the
@@ -100,14 +116,7 @@ export class EscPosService {
     if (invoice.warehouseName) line(EscPosService.row('المخزن', invoice.warehouseName, width));
     line(dashes);
 
-    for (const item of invoice.items) {
-      centered(item.productName);
-      const meta = `${item.productSku} ${item.size} ${item.quantityM2}م² (${item.boxesCount}ك)`;
-      line(EscPosService.row(meta, `${CeramicMath.formatCurrency(item.totalPrice)}`, width));
-      if (item.discountAmount > 0) {
-        line(EscPosService.row('خصم الصنف', `-${CeramicMath.formatCurrency(item.discountAmount)}`, width));
-      }
-    }
+    EscPosService.writeInvoiceItems(invoice.items, width, line, centered);
     line(dashes);
 
     line(EscPosService.row('المجموع الفرعي', CeramicMath.formatCurrency(invoice.subtotal), width));

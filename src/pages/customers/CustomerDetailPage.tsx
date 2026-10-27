@@ -340,8 +340,9 @@ export const CustomerDetailPage: React.FC = () => {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">المنتج</label>
+                  <label htmlFor="customer-override-product" className="block text-[11px] font-semibold text-slate-600 mb-1">المنتج</label>
                   <select
+                    id="customer-override-product"
                     value={overrideForm.productId}
                     onChange={(e) => setOverrideForm((f) => ({ ...f, productId: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500"
@@ -353,8 +354,9 @@ export const CustomerDetailPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">السعر / م²</label>
+                  <label htmlFor="customer-override-price" className="block text-[11px] font-semibold text-slate-600 mb-1">السعر / م²</label>
                   <input
+                    id="customer-override-price"
                     type="number" min="0" step="0.01"
                     value={overrideForm.priceM2}
                     onChange={(e) => setOverrideForm((f) => ({ ...f, priceM2: e.target.value }))}
@@ -362,8 +364,9 @@ export const CustomerDetailPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">ساري من</label>
+                  <label htmlFor="customer-override-valid-from" className="block text-[11px] font-semibold text-slate-600 mb-1">ساري من</label>
                   <input
+                    id="customer-override-valid-from"
                     type="date"
                     value={overrideForm.validFrom}
                     onChange={(e) => setOverrideForm((f) => ({ ...f, validFrom: e.target.value }))}
@@ -371,8 +374,9 @@ export const CustomerDetailPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">ساري حتى</label>
+                  <label htmlFor="customer-override-valid-to" className="block text-[11px] font-semibold text-slate-600 mb-1">ساري حتى</label>
                   <input
+                    id="customer-override-valid-to"
                     type="date"
                     value={overrideForm.validTo}
                     onChange={(e) => setOverrideForm((f) => ({ ...f, validTo: e.target.value }))}

@@ -107,7 +107,7 @@ export const DebtsDashboardPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const openPayment = (d: DebtRow) => {
     setTarget(d); setAmount(String(d.amount)); setAllocationAmounts({}); setPaymentDate(localDateString()); setPaymentReference(''); setPaymentGroupKey(`ui-${uuidv4()}`);

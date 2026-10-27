@@ -17,6 +17,11 @@ import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnit
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
+const getBoxesCount = (product: Product | undefined, quantity: number): number => {
+  if (product?.productType === 'GENERAL') return product.baseUnit === 'BOX' ? quantity : 0;
+  return Number((quantity / (product?.metersPerBox || 1.44)).toFixed(2));
+};
+
 export const PurchasesView: React.FC = () => {
   const purchaseService = useMemo(() => new PurchaseService(), []);
   const supplierService = useMemo(() => new SupplierService(), []);
@@ -135,12 +140,10 @@ export const PurchasesView: React.FC = () => {
       items: fullGrn.items.map(it => ({
         productId: it.productId,
         quantityM2: it.acceptedQuantityM2 || it.receivedQuantityM2,
-        boxesCount: (() => {
-          const product = products.find((candidate) => candidate.id === it.productId);
-          const quantity = it.acceptedQuantityM2 || it.receivedQuantityM2;
-          if (product?.productType === 'GENERAL') return product.baseUnit === 'BOX' ? quantity : 0;
-          return Number((quantity / (product?.metersPerBox || 1.44)).toFixed(2));
-        })(),
+        boxesCount: getBoxesCount(
+          products.find((candidate) => candidate.id === it.productId),
+          it.acceptedQuantityM2 || it.receivedQuantityM2
+        ),
         unitCost: it.unitCost || 120,
         grnAcceptedQty: it.acceptedQuantityM2,
       })),

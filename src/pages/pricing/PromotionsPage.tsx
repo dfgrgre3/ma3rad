@@ -46,7 +46,9 @@ export const PromotionsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // Initial data load only; subsequent loads are triggered by user actions.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();

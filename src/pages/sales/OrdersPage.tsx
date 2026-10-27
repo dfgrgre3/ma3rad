@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { OrderService, Order, OrderStatus, OrderStats, OrderStatusEntry } from '../../services/OrderService';
 import { CustomerService } from '../../services/CustomerService';
@@ -68,7 +68,7 @@ export const OrdersPage: React.FC = () => {
   const [convertPaid, setConvertPaid] = useState('');
   const [convertNotes, setConvertNotes] = useState('');
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setOrders(service.getOrders(search.trim(), statusFilter, dateFrom || undefined, dateTo || undefined));
@@ -79,9 +79,9 @@ export const OrdersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, search, statusFilter, dateFrom, dateTo]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [search, statusFilter, dateFrom, dateTo]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));

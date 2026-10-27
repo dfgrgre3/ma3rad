@@ -143,22 +143,7 @@ export class PrintService {
   public async printThermalReceipt(invoice: SalesInvoice & { items: any[] }): Promise<void> {
     const settings = this.getSettings();
 
-    // Direct ESC/POS route: raw bytes to the OS spooler (winspool/CUPS) or
-    // straight over TCP 9100 for network printers — silent, no dialog.
-    if (settings.thermalPrinterName && window.ceramisys?.printing?.raw) {
-      try {
-        const width = EscPosService.lineWidthFor(settings);
-        const bytes = EscPosService.buildReceiptBytes(invoice, settings, width);
-        const isNetwork = settings.thermalTransport === 'network';
-        const res = await window.ceramisys.printing.raw(bytes, settings.thermalPrinterName, isNetwork
-          ? { transport: 'network', host: settings.thermalHost, port: 9100 }
-          : { transport: 'system' });
-        if (res?.ok) return;
-        console.warn('Direct ESC/POS printing failed, falling back to dialog:', res?.error);
-      } catch (error) {
-        console.warn('Direct ESC/POS printing failed, falling back to dialog:', error);
-      }
-    }
+    if (await this.printThermalReceiptDirect(invoice, settings)) return;
 
     const printWindow = window.open('', '_blank', 'width=380,height=640');
     if (!printWindow) {
@@ -236,6 +221,30 @@ export class PrintService {
 
     printWindow.document.write(html);
     printWindow.document.close();
+  }
+
+  private async printThermalReceiptDirect(
+    invoice: SalesInvoice & { items: any[] },
+    settings: SystemSettings,
+  ): Promise<boolean> {
+    // Direct ESC/POS route: raw bytes to the OS spooler (winspool/CUPS) or
+    // straight over TCP 9100 for network printers — silent, no dialog.
+    if (!settings.thermalPrinterName || !window.ceramisys?.printing?.raw) return false;
+
+    try {
+      const width = EscPosService.lineWidthFor(settings);
+      const bytes = EscPosService.buildReceiptBytes(invoice, settings, width);
+      const isNetwork = settings.thermalTransport === 'network';
+      const res = await window.ceramisys.printing.raw(bytes, settings.thermalPrinterName, isNetwork
+        ? { transport: 'network', host: settings.thermalHost, port: 9100 }
+        : { transport: 'system' });
+      if (res?.ok) return true;
+      console.warn('Direct ESC/POS printing failed, falling back to dialog:', res?.error);
+    } catch (error) {
+      console.warn('Direct ESC/POS printing failed, falling back to dialog:', error);
+    }
+
+    return false;
   }
 
   // ─── Quotations / Orders / Returns ──────────────────────────────────────────

@@ -104,6 +104,170 @@ export class PurchaseService {
     };
   }
 
+  private preparePurchaseItems(sqliteDb: any, purchaseId: string, items: CreatePurchaseDTO['items']): { subtotal: number; preparedItems: any[] } {
+    let subtotal = 0;
+    const preparedItems: any[] = [];
+
+    for (const item of items) {
+      const prod = sqliteDb.query(`SELECT name, grade, product_type, base_unit, meters_per_box, pieces_per_box, cost_price FROM products WHERE id = ?`, [item.productId])[0] as any;
+      if (!prod) throw new Error(`المنتج ${item.productId} غير موجود.`);
+
+      const lineTotalCost = round2(item.quantityM2 * item.unitCost);
+      subtotal = round2(subtotal + lineTotalCost);
+
+      preparedItems.push({
+        id: `pitem_${uuidv4().substring(0, 8)}`,
+        purchaseId,
+        productId: item.productId,
+        productName: prod.name,
+        grade: prod.grade,
+        quantityM2: item.quantityM2,
+        boxesCount: prod.product_type === 'GENERAL'
+          ? prod.base_unit === 'BOX' ? item.quantityM2 : 0
+          : item.boxesCount,
+        productType: prod.product_type,
+        unitCost: item.unitCost,
+        totalCost: lineTotalCost,
+        metersPerBox: prod.meters_per_box || 1.44,
+        piecesPerBox: prod.pieces_per_box || 4,
+        orderedUnitCost: item.orderedUnitCost || item.unitCost,
+        grnAcceptedQty: item.grnAcceptedQty || item.quantityM2,
+        landedCostShare: 0,
+        effectiveUnitCost: item.unitCost,
+      });
+    }
+
+    return { subtotal, preparedItems };
+  }
+
+  private distributeLandedCosts(preparedItems: any[], dto: CreatePurchaseDTO) {
+    const landedFreight = Number(dto.landedFreight ?? dto.shippingCost ?? 0);
+    const landedLoading = Number(dto.landedLoading || 0);
+    const landedCustoms = Number(dto.landedCustomsTaxes || 0);
+    const landedInsurance = Number(dto.landedInsurance || 0);
+    const landedOther = Number(dto.landedOther || 0);
+    const totalLanded = round2(landedFreight + landedLoading + landedCustoms + landedInsurance + landedOther);
+    const allocMethod = dto.landedAllocationMethod || 'VALUE';
+
+    let denominator = 0;
+    for (const item of preparedItems) {
+      denominator += allocMethod === 'QUANTITY' ? item.quantityM2 : item.totalCost;
+    }
+    if (denominator <= 0) denominator = 1;
+
+    let allocatedShareSum = 0;
+    preparedItems.forEach((item, index) => {
+      const value = allocMethod === 'QUANTITY' ? item.quantityM2 : item.totalCost;
+      const share = index === preparedItems.length - 1
+        ? round2(totalLanded - allocatedShareSum)
+        : round2(totalLanded * (value / denominator));
+      allocatedShareSum = round2(allocatedShareSum + share);
+      item.landedCostShare = share;
+      item.effectiveUnitCost = item.quantityM2 > 0 ? round2((item.totalCost + share) / item.quantityM2) : item.unitCost;
+    });
+
+    return { landedFreight, landedLoading, landedCustoms, landedInsurance, landedOther, totalLanded, allocMethod };
+  }
+
+  private calculateMatchingVariance(preparedItems: any[]) {
+    let priceVarianceAmount = 0;
+    let qtyVarianceAmount = 0;
+
+    for (const item of preparedItems) {
+      const priceDiff = round2(item.unitCost - item.orderedUnitCost);
+      const qtyDiff = round2(item.quantityM2 - item.grnAcceptedQty);
+      priceVarianceAmount = round2(priceVarianceAmount + priceDiff * item.quantityM2);
+      qtyVarianceAmount = round2(qtyVarianceAmount + qtyDiff * item.unitCost);
+    }
+
+    let matchingStatus = 'MATCHED';
+    if (Math.abs(priceVarianceAmount) > 0.01 && Math.abs(qtyVarianceAmount) > 0.01) {
+      matchingStatus = 'BOTH_VARIANCE';
+    } else if (Math.abs(priceVarianceAmount) > 0.01) {
+      matchingStatus = 'PRICE_VARIANCE';
+    } else if (Math.abs(qtyVarianceAmount) > 0.01) {
+      matchingStatus = 'QTY_VARIANCE';
+    }
+
+    return { matchingStatus, priceVarianceAmount, qtyVarianceAmount };
+  }
+
+  private persistPurchaseItems(
+    sqliteDb: any,
+    dto: CreatePurchaseDTO,
+    purchaseId: string,
+    invoiceNumber: string,
+    preparedItems: any[],
+    performedBy: string,
+    today: string,
+    alreadyReceivedInGrn: boolean,
+    method: string
+  ) {
+    for (const item of preparedItems) {
+      sqliteDb.run(`
+        INSERT INTO purchase_invoice_items (
+          id, purchase_id, product_id, product_name, grade, quantity_m2, boxes_count,
+          unit_cost, total_cost, meters_per_box, pieces_per_box,
+          landed_cost_share, effective_unit_cost, ordered_unit_cost, grn_accepted_qty
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        item.id, item.purchaseId, item.productId, item.productName, item.grade,
+        item.quantityM2, item.boxesCount, item.unitCost, item.totalCost,
+        item.metersPerBox, item.piecesPerBox,
+        item.landedCostShare, item.effectiveUnitCost, item.orderedUnitCost, item.grnAcceptedQty,
+      ]);
+
+      const stockRow = sqliteDb.query(`SELECT quantity_m2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`, [item.productId, dto.warehouseId])[0] as any;
+      if (!alreadyReceivedInGrn) {
+        if (stockRow) {
+          sqliteDb.run(`
+            UPDATE warehouse_stock
+            SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
+            WHERE product_id = ? AND warehouse_id = ?
+          `, [item.quantityM2, item.productId, dto.warehouseId]);
+        } else {
+          sqliteDb.run(`
+            INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+            VALUES (?, ?, ?, ?, 0)
+          `, [`stk_${uuidv4().substring(0, 8)}`, dto.warehouseId, item.productId, item.quantityM2]);
+        }
+      }
+
+      const prevQty = stockRow ? Number(stockRow.quantityM2) : 0;
+      const prevCost = Number(sqliteDb.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0]?.costPrice || 0);
+      const grnQuantityAlreadyInStock = alreadyReceivedInGrn ? Math.min(prevQty, item.grnAcceptedQty) : 0;
+      const newCost = method === 'FIFO'
+        ? round2(item.effectiveUnitCost)
+        : computeWeightedAverageCost(
+          prevQty - grnQuantityAlreadyInStock,
+          prevCost,
+          alreadyReceivedInGrn ? item.grnAcceptedQty : item.quantityM2,
+          item.effectiveUnitCost
+        );
+      sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
+
+      if (!alreadyReceivedInGrn) {
+        const inventoryTransactionId = `tx_${uuidv4().substring(0, 8)}`;
+        sqliteDb.run(`
+          INSERT INTO inventory_transactions (
+            id, transaction_number, type, product_id, warehouse_id,
+            quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+            reference_id, notes, performed_by
+          ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, ?)
+        `, [
+          inventoryTransactionId, sqliteDb.nextNumber('TX-PUR'),
+          item.productId, dto.warehouseId, item.quantityM2, item.boxesCount, item.effectiveUnitCost,
+          round2(item.quantityM2 * item.effectiveUnitCost), purchaseId, `شراء توريد سيراميك بموجب فاتورة ${invoiceNumber}`, performedBy,
+        ]);
+        InventoryCostingService.addLayer(sqliteDb, {
+          productId: item.productId, warehouseId: dto.warehouseId,
+          sourceTransactionId: inventoryTransactionId, sourceType: 'PURCHASE', sourceId: purchaseId,
+          date: today, quantity: item.quantityM2, unitCost: item.effectiveUnitCost,
+        });
+      }
+    }
+  }
+
   public createPurchase(dto: CreatePurchaseDTO): PurchaseInvoice {
     if (!dto.items || dto.items.length === 0) {
       throw new Error('لا يمكن إنشاء فاتورة توريد بدون أصناف.');
@@ -113,7 +277,6 @@ export class PurchaseService {
     const branchId = this.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
     const branchRegisterId = this.branchAccess.getDefaultRegisterId(branchId, actor);
 
-    // Duplicate supplier invoice check (unless explicit override for suppliers without numbers)
     if (!dto.isNoNumberSupplier && dto.supplierInvoiceNumber && dto.supplierInvoiceNumber.trim()) {
       const existing = this.db.query<any>(
         `SELECT invoice_number, date FROM purchase_invoices WHERE supplier_id = ? AND supplier_invoice_number = ? AND is_no_number_supplier = 0`,
@@ -142,88 +305,16 @@ export class PurchaseService {
 
     const invoice = this.db.executeTransaction((sqliteDb) => {
       const invoiceNumber = sqliteDb.nextNumber('PUR');
-      let subtotal = 0;
-      const preparedItems: any[] = [];
-
-      for (let idx = 0; idx < dto.items.length; idx++) {
-        const item = dto.items[idx];
-        const prod = sqliteDb.query(`SELECT name, grade, product_type, base_unit, meters_per_box, pieces_per_box, cost_price FROM products WHERE id = ?`, [item.productId])[0] as any;
-        if (!prod) throw new Error(`المنتج ${item.productId} غير موجود.`);
-
-        const lineTotalCost = round2(item.quantityM2 * item.unitCost);
-        subtotal = round2(subtotal + lineTotalCost);
-
-        preparedItems.push({
-          id: `pitem_${uuidv4().substring(0, 8)}`,
-          purchaseId,
-          productId: item.productId,
-          productName: prod.name,
-          grade: prod.grade,
-          quantityM2: item.quantityM2,
-          boxesCount: prod.product_type === 'GENERAL'
-            ? prod.base_unit === 'BOX' ? item.quantityM2 : 0
-            : item.boxesCount,
-          productType: prod.product_type,
-          unitCost: item.unitCost,
-          totalCost: lineTotalCost,
-          metersPerBox: prod.metersPerBox || 1.44,
-          piecesPerBox: prod.piecesPerBox || 4,
-          orderedUnitCost: item.orderedUnitCost || item.unitCost,
-          grnAcceptedQty: item.grnAcceptedQty || item.quantityM2,
-          landedCostShare: 0,
-          effectiveUnitCost: item.unitCost,
-        });
-      }
-
+      const { subtotal, preparedItems } = this.preparePurchaseItems(sqliteDb, purchaseId, dto.items);
       const discountAmount = round2(dto.discountAmount || 0);
       const taxAmount = round2(dto.taxAmount || 0);
-
-      // Landed Costs Distribution
-      const landedFreight = Number(dto.landedFreight ?? dto.shippingCost ?? 0);
-      const landedLoading = Number(dto.landedLoading || 0);
-      const landedCustoms = Number(dto.landedCustomsTaxes || 0);
-      const landedInsurance = Number(dto.landedInsurance || 0);
-      const landedOther = Number(dto.landedOther || 0);
-      const totalLanded = round2(landedFreight + landedLoading + landedCustoms + landedInsurance + landedOther);
-      const allocMethod = dto.landedAllocationMethod || 'VALUE';
-
-      let denominator = 0;
-      for (const it of preparedItems) {
-        denominator += allocMethod === 'QUANTITY' ? it.quantityM2 : it.totalCost;
-      }
-      if (denominator <= 0) denominator = 1;
-
-      let allocatedShareSum = 0;
-      preparedItems.forEach((it, idx) => {
-        const val = allocMethod === 'QUANTITY' ? it.quantityM2 : it.totalCost;
-        const share = idx === preparedItems.length - 1
-          ? round2(totalLanded - allocatedShareSum)
-          : round2(totalLanded * (val / denominator));
-        allocatedShareSum = round2(allocatedShareSum + share);
-        it.landedCostShare = share;
-        it.effectiveUnitCost = it.quantityM2 > 0 ? round2((it.totalCost + share) / it.quantityM2) : it.unitCost;
-      });
-
-      // 3-Way Matching Variance
-      let priceVarianceAmount = 0;
-      let qtyVarianceAmount = 0;
-      for (const it of preparedItems) {
-        const priceDiff = round2(it.unitCost - it.orderedUnitCost);
-        const qtyDiff = round2(it.quantityM2 - it.grnAcceptedQty);
-        priceVarianceAmount = round2(priceVarianceAmount + priceDiff * it.quantityM2);
-        qtyVarianceAmount = round2(qtyVarianceAmount + qtyDiff * it.unitCost);
-      }
-      let matchingStatus = 'MATCHED';
-      if (Math.abs(priceVarianceAmount) > 0.01 && Math.abs(qtyVarianceAmount) > 0.01) matchingStatus = 'BOTH_VARIANCE';
-      else if (Math.abs(priceVarianceAmount) > 0.01) matchingStatus = 'PRICE_VARIANCE';
-      else if (Math.abs(qtyVarianceAmount) > 0.01) matchingStatus = 'QTY_VARIANCE';
-
+      const { landedFreight, landedLoading, landedCustoms, landedInsurance, landedOther, totalLanded, allocMethod } = this.distributeLandedCosts(preparedItems, dto);
+      const { matchingStatus, priceVarianceAmount, qtyVarianceAmount } = this.calculateMatchingVariance(preparedItems);
       const shippingCost = round2(landedFreight);
       const totalAmount = round2(subtotal - discountAmount + taxAmount + totalLanded);
       const remainingAmount = round2(Math.max(0, totalAmount - dto.paidAmount));
       const paymentStatus: PaymentStatus = remainingAmount <= 0 ? 'PAID' : (dto.paidAmount > 0 ? 'PARTIAL' : 'UNPAID');
 
-      // 1. Insert Purchase Invoice
       sqliteDb.run(`
         INSERT INTO purchase_invoices (
           id, invoice_number, supplier_invoice_number, date, due_date, supplier_id, warehouse_id, branch_id,
@@ -244,77 +335,8 @@ export class PurchaseService {
 
       const method = this.costingMethod();
       const alreadyReceivedInGrn = Boolean(dto.grnId);
+      this.persistPurchaseItems(sqliteDb, dto, purchaseId, invoiceNumber, preparedItems, performedBy, today, alreadyReceivedInGrn, method);
 
-      // 2. Insert Items, Increase Stock (if not already received via GRN) & Update Cost Price
-      for (const item of preparedItems) {
-        sqliteDb.run(`
-          INSERT INTO purchase_invoice_items (
-            id, purchase_id, product_id, product_name, grade, quantity_m2, boxes_count,
-            unit_cost, total_cost, meters_per_box, pieces_per_box,
-            landed_cost_share, effective_unit_cost, ordered_unit_cost, grn_accepted_qty
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-          item.id, item.purchaseId, item.productId, item.productName, item.grade,
-          item.quantityM2, item.boxesCount, item.unitCost, item.totalCost,
-          item.metersPerBox, item.piecesPerBox,
-          item.landedCostShare, item.effectiveUnitCost, item.orderedUnitCost, item.grnAcceptedQty,
-        ]);
-
-        // Stock Increase only if not already received and stocked through Goods Receipt Note (GRN)
-        const stockRow = sqliteDb.query(`SELECT quantity_m2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`, [item.productId, dto.warehouseId])[0] as any;
-        if (!alreadyReceivedInGrn) {
-          if (stockRow) {
-            sqliteDb.run(`
-              UPDATE warehouse_stock
-              SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
-              WHERE product_id = ? AND warehouse_id = ?
-            `, [item.quantityM2, item.productId, dto.warehouseId]);
-          } else {
-            sqliteDb.run(`
-              INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
-              VALUES (?, ?, ?, ?, 0)
-            `, [`stk_${uuidv4().substring(0, 8)}`, dto.warehouseId, item.productId, item.quantityM2]);
-          }
-        }
-
-        // Costing strategy uses effective landed unit cost
-        const prevQty = stockRow ? Number(stockRow.quantityM2) : 0;
-        const prevCost = Number(sqliteDb.query(`SELECT cost_price FROM products WHERE id = ?`, [item.productId])[0]?.costPrice || 0);
-        const grnQuantityAlreadyInStock = alreadyReceivedInGrn
-          ? Math.min(prevQty, item.grnAcceptedQty)
-          : 0;
-        const newCost = method === 'FIFO'
-          ? round2(item.effectiveUnitCost)
-          : computeWeightedAverageCost(
-            prevQty - grnQuantityAlreadyInStock,
-            prevCost,
-            alreadyReceivedInGrn ? item.grnAcceptedQty : item.quantityM2,
-            item.effectiveUnitCost
-          );
-        sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newCost, item.productId]);
-
-        if (!alreadyReceivedInGrn) {
-          const inventoryTransactionId = `tx_${uuidv4().substring(0, 8)}`;
-          sqliteDb.run(`
-            INSERT INTO inventory_transactions (
-              id, transaction_number, type, product_id, warehouse_id,
-              quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
-              reference_id, notes, performed_by
-            ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, ?)
-          `, [
-            inventoryTransactionId, sqliteDb.nextNumber('TX-PUR'),
-            item.productId, dto.warehouseId, item.quantityM2, item.boxesCount, item.effectiveUnitCost,
-            round2(item.quantityM2 * item.effectiveUnitCost), purchaseId, `شراء توريد سيراميك بموجب فاتورة ${invoiceNumber}`, performedBy,
-          ]);
-          InventoryCostingService.addLayer(sqliteDb, {
-            productId: item.productId, warehouseId: dto.warehouseId,
-            sourceTransactionId: inventoryTransactionId, sourceType: 'PURCHASE', sourceId: purchaseId,
-            date: today, quantity: item.quantityM2, unitCost: item.effectiveUnitCost,
-          });
-        }
-      }
-
-      // 3. Update Supplier Balance & Total Purchases
       sqliteDb.run(`
         UPDATE suppliers SET
           total_purchases = total_purchases + ?,
@@ -323,7 +345,6 @@ export class PurchaseService {
         WHERE id = ?
       `, [totalAmount, remainingAmount, dto.supplierId]);
 
-      // 4. If Cash Paid, Deduct from Cash Register
       if (dto.paidAmount > 0 && dto.paymentType === 'CASH') {
         sqliteDb.run(`
           UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?
@@ -383,7 +404,6 @@ export class PurchaseService {
         ],
       });
 
-      // 5. Audit Log
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
         VALUES (?, ?, ?, 'إدخال فاتورة مشتريات وتوريد', 'PURCHASES', ?, ?)
@@ -495,61 +515,11 @@ export class PurchaseService {
     const invoiceBranchId = invoice.branchId || this.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
     if (!reason || !reason.trim()) throw new Error('سبب الحذف مطلوب.');
 
-    const returnsCount = this.db.query<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM purchase_returns WHERE original_invoice_id = ?',
-      [purchaseId]
-    )[0]?.count ?? 0;
-    if (returnsCount > 0) throw new Error('لا يمكن حذف فاتورة لها مرتجعات مسجلة. احذف المرتجعات أولًا.');
+    this.ensurePurchaseHasNoReturns(purchaseId);
 
     this.db.executeTransaction((db) => {
-      const costingMethod = InventoryCostingService.costingMethod(db);
-
-      // For FIFO: check if any quantity has been consumed
-      if (costingMethod === 'FIFO') {
-        if (!db.query<any>(`SELECT id FROM inventory_cost_layers WHERE source_type='PURCHASE' AND source_id=? LIMIT 1`, [purchaseId]).length) {
-          throw new Error('This legacy purchase has no traceable FIFO lot. Do not delete it while FIFO is active; reconcile the stock through a documented inventory adjustment.');
-        }
-        InventoryCostingService.removeUnusedSource(db, 'PURCHASE', purchaseId);
-      } else {
-        // For AVERAGE_COST: verify current stock is sufficient before deletion
-        for (const item of invoice.items) {
-          const stockRow = db.query<{ quantityM2: number }>(
-            `SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
-            [item.productId, invoice.warehouseId]
-          )[0];
-          const currentQuantity = stockRow ? Number(stockRow.quantityM2) : 0;
-          if (currentQuantity < item.quantityM2) {
-            const product = db.query<any>(`SELECT product_type, base_unit, custom_unit FROM products WHERE id = ?`, [item.productId])[0];
-            const unit = product?.product_type === 'GENERAL'
-              ? product.custom_unit || ({ M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة', KG: 'كجم', TON: 'طن', SET: 'طقم' } as Record<string, string>)[product.base_unit] || 'وحدة'
-              : 'م²';
-            throw new Error(`لا يمكن حذف فاتورة التوريد. الرصيد الحالي للصنف (${currentQuantity} ${unit}) أقل من كمية الفاتورة (${item.quantityM2} ${unit}). تم استخدام جزء من الكمية في مبيعات. استخدم مرتجع بدلاً من الحذف.`);
-          }
-        }
-      }
-
-      for (const item of invoice.items) {
-        db.run(
-          `UPDATE warehouse_stock
-           SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
-           WHERE product_id = ? AND warehouse_id = ?`,
-          [item.quantityM2, item.productId, invoice.warehouseId]
-        );
-        db.run(
-          `INSERT INTO inventory_transactions (
-             id, transaction_number, type, product_id, warehouse_id,
-             quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
-             reference_id, notes, performed_by
-           ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ?, ?, 'PURCHASE_DELETE', ?, ?, ?)`,
-          [
-            `tx_${uuidv4().substring(0, 8)}`, db.nextNumber('TX-VOID'),
-            item.productId, invoice.warehouseId, -item.quantityM2, item.boxesCount,
-            item.unitCost, round2(-item.quantityM2 * item.unitCost), purchaseId,
-            `حذف فاتورة توريد ${invoice.invoiceNumber}: ${reason.trim()}`, actor.id,
-          ]
-        );
-      }
-
+      this.validatePurchaseInventoryDeletion(db, purchaseId, invoice);
+      this.reversePurchaseInventory(db, purchaseId, invoice, reason, actor.id);
       db.run(
         `UPDATE suppliers SET
            current_balance = current_balance - ?,
@@ -559,65 +529,171 @@ export class PurchaseService {
         [invoice.remainingAmount, invoice.totalAmount, invoice.supplierId]
       );
 
-      const relatedPayments = db.query<any>(
-        `SELECT id, amount, payment_type, register_id FROM supplier_payments
-         WHERE supplier_id = ? AND branch_id = ? AND notes LIKE ?`,
-        [invoice.supplierId, invoiceBranchId, `%${invoice.invoiceNumber}%`]
-      );
-      for (const payment of relatedPayments) {
-        postLedgerEntry(db.getDatabase(), {
-          date: localDateString(),
-          description: `Reverse supplier payment ${payment.id}`,
-          referenceType: 'SUPPLIER_PAYMENT_VOID',
-          referenceId: payment.id,
-          createdBy: actor.id,
-          lines: [
-            { accountCode: paymentAccountCode(payment.payment_type), debit: Number(payment.amount), credit: 0 },
-            { accountCode: '2101', debit: 0, credit: Number(payment.amount) },
-          ],
-        });
-        if (payment.payment_type === 'CASH' && payment.register_id) {
-          db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [payment.amount, payment.register_id]);
-        }
-        db.run('DELETE FROM supplier_payments WHERE id = ?', [payment.id]);
-      }
-      if (relatedPayments.length === 0 && invoice.paidAmount > 0 && invoice.paymentType === 'CASH') {
-        const registerId = this.branchAccess.getDefaultRegisterId(invoiceBranchId, actor);
-        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [invoice.paidAmount, registerId]);
-      }
-
-      const inventoryCost = round2(invoice.items.reduce((sum, item) => sum + Number(item.totalCost), 0));
-      const purchaseAdjustment = round2(invoice.totalAmount - inventoryCost - invoice.taxAmount);
-      postLedgerEntry(db.getDatabase(), {
-        date: localDateString(),
-        description: `Void purchase ${invoice.invoiceNumber}`,
-        referenceType: 'PURCHASE_VOID',
-        referenceId: purchaseId,
-        createdBy: actor.id,
-        lines: [
-          { accountCode: '2101', debit: invoice.totalAmount, credit: 0 },
-          ...(inventoryCost > 0 ? [{ accountCode: '1104', debit: 0, credit: inventoryCost }] : []),
-          ...(invoice.taxAmount > 0 ? [{ accountCode: '1201', debit: 0, credit: invoice.taxAmount }] : []),
-          ...(purchaseAdjustment > 0.009
-            ? [{ accountCode: '5201', debit: 0, credit: purchaseAdjustment }]
-            : purchaseAdjustment < -0.009
-              ? [{ accountCode: '5201', debit: -purchaseAdjustment, credit: 0 }]
-              : []),
-        ],
-      });
-
+      this.reversePurchasePayments(db, invoice, invoiceBranchId, actor);
+      this.postPurchaseVoidLedger(db, purchaseId, invoice, actor.id);
       db.run('DELETE FROM purchase_invoice_items WHERE purchase_id = ?', [purchaseId]);
       db.run('DELETE FROM purchase_invoices WHERE id = ?', [purchaseId]);
+      this.logPurchaseDeletion(db, purchaseId, invoice, reason, actor.id, actor.fullName);
+    });
+  }
 
+  private ensurePurchaseHasNoReturns(purchaseId: string): void {
+    const returnsCount = this.db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM purchase_returns WHERE original_invoice_id = ?',
+      [purchaseId]
+    )[0]?.count ?? 0;
+    if (returnsCount > 0) throw new Error('لا يمكن حذف فاتورة لها مرتجعات مسجلة. احذف المرتجعات أولًا.');
+  }
+
+  private validatePurchaseInventoryDeletion(
+    db: DatabaseManager,
+    purchaseId: string,
+    invoice: PurchaseInvoice & { items: PurchaseInvoiceItem[] }
+  ): void {
+    if (InventoryCostingService.costingMethod(db) === 'FIFO') {
+      const hasCostLayer = db.query<{ id: string }>(
+        `SELECT id FROM inventory_cost_layers WHERE source_type='PURCHASE' AND source_id=? LIMIT 1`,
+        [purchaseId]
+      ).length > 0;
+      if (!hasCostLayer) {
+        throw new Error('This legacy purchase has no traceable FIFO lot. Do not delete it while FIFO is active; reconcile the stock through a documented inventory adjustment.');
+      }
+      InventoryCostingService.removeUnusedSource(db, 'PURCHASE', purchaseId);
+      return;
+    }
+
+    invoice.items.forEach((item) => this.ensurePurchaseItemStockIsAvailable(db, item, invoice.warehouseId));
+  }
+
+  private ensurePurchaseItemStockIsAvailable(
+    db: DatabaseManager,
+    item: PurchaseInvoiceItem,
+    warehouseId: string
+  ): void {
+    const stockRow = db.query<{ quantityM2: number }>(
+      `SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+      [item.productId, warehouseId]
+    )[0];
+    const currentQuantity = stockRow ? Number(stockRow.quantityM2) : 0;
+    if (currentQuantity >= item.quantityM2) return;
+
+    const product = db.query<{ product_type: string; base_unit: string; custom_unit?: string }>(
+      `SELECT product_type, base_unit, custom_unit FROM products WHERE id = ?`,
+      [item.productId]
+    )[0];
+    const unit = product?.product_type === 'GENERAL'
+      ? product.custom_unit || ({ M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة', KG: 'كجم', TON: 'طن', SET: 'طقم' } as Record<string, string>)[product.base_unit] || 'وحدة'
+      : 'م²';
+    throw new Error(`لا يمكن حذف فاتورة التوريد. الرصيد الحالي للصنف (${currentQuantity} ${unit}) أقل من كمية الفاتورة (${item.quantityM2} ${unit}). تم استخدام جزء من الكمية في مبيعات. استخدم مرتجع بدلاً من الحذف.`);
+  }
+
+  private reversePurchaseInventory(
+    db: DatabaseManager,
+    purchaseId: string,
+    invoice: PurchaseInvoice & { items: PurchaseInvoiceItem[] },
+    reason: string,
+    actorId: string
+  ): void {
+    for (const item of invoice.items) {
       db.run(
-        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
-         VALUES (?, ?, ?, 'حذف فاتورة توريد', 'PURCHASES', ?, ?, ?)`,
+        `UPDATE warehouse_stock
+         SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
+         WHERE product_id = ? AND warehouse_id = ?`,
+        [item.quantityM2, item.productId, invoice.warehouseId]
+      );
+      db.run(
+        `INSERT INTO inventory_transactions (
+           id, transaction_number, type, product_id, warehouse_id,
+           quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+           reference_id, notes, performed_by
+         ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ?, ?, 'PURCHASE_DELETE', ?, ?, ?)`,
         [
-          `aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, purchaseId,
-          JSON.stringify({ invoiceNumber: invoice.invoiceNumber, total: invoice.totalAmount, paid: invoice.paidAmount }),
-          JSON.stringify({ reason: reason.trim() }),
+          `tx_${uuidv4().substring(0, 8)}`, db.nextNumber('TX-VOID'),
+          item.productId, invoice.warehouseId, -item.quantityM2, item.boxesCount,
+          item.unitCost, round2(-item.quantityM2 * item.unitCost), purchaseId,
+          `حذف فاتورة توريد ${invoice.invoiceNumber}: ${reason.trim()}`, actorId,
         ]
       );
+    }
+  }
+
+  private reversePurchasePayments(
+    db: DatabaseManager,
+    invoice: PurchaseInvoice,
+    invoiceBranchId: string,
+    actor: ReturnType<typeof AuthService.requireAuth>
+  ): void {
+    const relatedPayments = db.query<any>(
+      `SELECT id, amount, payment_type, register_id FROM supplier_payments
+       WHERE supplier_id = ? AND branch_id = ? AND notes LIKE ?`,
+      [invoice.supplierId, invoiceBranchId, `%${invoice.invoiceNumber}%`]
+    );
+    for (const payment of relatedPayments) {
+      postLedgerEntry(db.getDatabase(), {
+        date: localDateString(),
+        description: `Reverse supplier payment ${payment.id}`,
+        referenceType: 'SUPPLIER_PAYMENT_VOID',
+        referenceId: payment.id,
+        createdBy: actor.id,
+        lines: [
+          { accountCode: paymentAccountCode(payment.payment_type), debit: Number(payment.amount), credit: 0 },
+          { accountCode: '2101', debit: 0, credit: Number(payment.amount) },
+        ],
+      });
+      if (payment.payment_type === 'CASH' && payment.register_id) {
+        db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [payment.amount, payment.register_id]);
+      }
+      db.run('DELETE FROM supplier_payments WHERE id = ?', [payment.id]);
+    }
+    if (relatedPayments.length === 0 && invoice.paidAmount > 0 && invoice.paymentType === 'CASH') {
+      const registerId = this.branchAccess.getDefaultRegisterId(invoiceBranchId, actor);
+      db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [invoice.paidAmount, registerId]);
+    }
+  }
+
+  private postPurchaseVoidLedger(
+    db: DatabaseManager,
+    purchaseId: string,
+    invoice: PurchaseInvoice & { items: PurchaseInvoiceItem[] },
+    actorId: string
+  ): void {
+    const inventoryCost = round2(invoice.items.reduce((sum, item) => sum + Number(item.totalCost), 0));
+    const purchaseAdjustment = round2(invoice.totalAmount - inventoryCost - invoice.taxAmount);
+    postLedgerEntry(db.getDatabase(), {
+      date: localDateString(),
+      description: `Void purchase ${invoice.invoiceNumber}`,
+      referenceType: 'PURCHASE_VOID',
+      referenceId: purchaseId,
+      createdBy: actorId,
+      lines: [
+        { accountCode: '2101', debit: invoice.totalAmount, credit: 0 },
+        ...(inventoryCost > 0 ? [{ accountCode: '1104', debit: 0, credit: inventoryCost }] : []),
+        ...(invoice.taxAmount > 0 ? [{ accountCode: '1201', debit: 0, credit: invoice.taxAmount }] : []),
+        ...(purchaseAdjustment > 0.009
+          ? [{ accountCode: '5201', debit: 0, credit: purchaseAdjustment }]
+          : purchaseAdjustment < -0.009
+            ? [{ accountCode: '5201', debit: -purchaseAdjustment, credit: 0 }]
+            : []),
+      ],
     });
+  }
+
+  private logPurchaseDeletion(
+    db: DatabaseManager,
+    purchaseId: string,
+    invoice: PurchaseInvoice,
+    reason: string,
+    actorId: string,
+    actorName: string
+  ): void {
+    db.run(
+      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+       VALUES (?, ?, ?, 'حذف فاتورة توريد', 'PURCHASES', ?, ?, ?)`,
+      [
+        `aud_${uuidv4().substring(0, 8)}`, actorId, actorName, purchaseId,
+        JSON.stringify({ invoiceNumber: invoice.invoiceNumber, total: invoice.totalAmount, paid: invoice.paidAmount }),
+        JSON.stringify({ reason: reason.trim() }),
+      ]
+    );
   }
 }

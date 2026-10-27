@@ -87,7 +87,7 @@ export const PurchaseReturnsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [search, dateFrom, dateTo]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [search, dateFrom, dateTo]);
   useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));

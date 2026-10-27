@@ -632,28 +632,15 @@ function appliedIds(db: Database): Set<string> {
   return new Set((res[0]?.values ?? []).map((row) => String(row[0])));
 }
 
-/**
- * Brings any database — brand new or years old — up to the current schema.
- * Call on every startup, before any service issues a query.
- *
- * A migration that throws is left unrecorded. Later migrations depend on earlier
- * schema and data invariants, so stop immediately and retry on the next launch.
- */
-export function runMigrations(db: Database): MigrationReport {
-  const report: MigrationReport = { applied: [], skipped: [], failed: [] };
-
-  // PRAGMA foreign_keys is connection-scoped and SQLite ignores changes made
-  // inside a transaction, so configure it before executing schema/migrations.
+function setForeignKeysEnabled(db: Database, errorMessage: string): void {
   db.run('PRAGMA foreign_keys = ON');
-  const foreignKeysEnabled = Number(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0]) === 1;
-  if (!foreignKeysEnabled) {
-    throw new Error('SQLite foreign key enforcement could not be enabled.');
+  const enabled = Number(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0]) === 1;
+  if (!enabled) {
+    throw new Error(errorMessage);
   }
+}
 
-  // 1. Create missing tables before migrations. Indexes are deferred because a
-  //    legacy table may not have the columns referenced by a newer index yet.
-  //    Executing the whole schema at once would roll back table creation too,
-  //    leaving migrations unable to add those columns on the next launch.
+function createSchemaTables(db: Database): void {
   const schemaWithoutIndexes = SCHEMA_SQL.replace(
     /CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS[\s\S]*?;\s*/gi,
     ''
@@ -666,53 +653,89 @@ export function runMigrations(db: Database): MigrationReport {
     db.run('ROLLBACK');
     throw error;
   }
+}
 
-  // 2. Apply the ordered migration list.
+function applyMigration(db: Database, migration: Migration, report: MigrationReport): boolean {
+  if (migration.disableForeignKeys) {
+    db.run('PRAGMA foreign_keys = OFF');
+  }
+
+  let applied = false;
+  try {
+    db.run('BEGIN TRANSACTION');
+    migration.up(db);
+    db.run('INSERT OR REPLACE INTO schema_migrations (id, description) VALUES (?, ?)', [
+      migration.id,
+      migration.description,
+    ]);
+    db.run('COMMIT');
+    report.applied.push(migration.id);
+    applied = true;
+  } catch (error) {
+    try { db.run('ROLLBACK'); } catch { /* transaction may already be closed */ }
+    const message = error instanceof Error ? error.message : String(error);
+    report.failed.push({ id: migration.id, error: message });
+    console.error(`❌ Migration ${migration.id} failed:`, message);
+  } finally {
+    setForeignKeysEnabled(
+      db,
+      `SQLite foreign key enforcement was not restored after migration ${migration.id}.`
+    );
+  }
+  return applied;
+}
+
+function applyPendingMigrations(db: Database, report: MigrationReport): void {
   const done = appliedIds(db);
-
   for (const migration of MIGRATIONS) {
     if (done.has(migration.id)) {
       report.skipped.push(migration.id);
       continue;
     }
-    if (migration.disableForeignKeys) {
-      db.run('PRAGMA foreign_keys = OFF');
-    }
-    try {
-      db.run('BEGIN TRANSACTION');
-      migration.up(db);
-      db.run('INSERT OR REPLACE INTO schema_migrations (id, description) VALUES (?, ?)', [
-        migration.id,
-        migration.description,
-      ]);
-      db.run('COMMIT');
-      report.applied.push(migration.id);
-    } catch (error) {
-      try { db.run('ROLLBACK'); } catch { /* transaction may already be closed */ }
-      const message = error instanceof Error ? error.message : String(error);
-      report.failed.push({ id: migration.id, error: message });
-      console.error(`❌ Migration ${migration.id} failed:`, message);
+    if (!applyMigration(db, migration, report)) {
       break;
-    } finally {
-      db.run('PRAGMA foreign_keys = ON');
-      const enabled = Number(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0]) === 1;
-      if (!enabled) {
-        throw new Error(`SQLite foreign key enforcement was not restored after migration ${migration.id}.`);
-      }
     }
   }
+}
+
+function createSchemaIndexes(db: Database): void {
+  db.run('BEGIN TRANSACTION');
+  try {
+    db.exec(SCHEMA_SQL);
+    db.run('COMMIT');
+  } catch (error) {
+    try { db.run('ROLLBACK'); } catch { /* transaction may already be closed */ }
+    throw error;
+  }
+}
+
+/**
+ * Brings any database — brand new or years old — up to the current schema.
+ * Call on every startup, before any service issues a query.
+ *
+ * A migration that throws is left unrecorded. Later migrations depend on earlier
+ * schema and data invariants, so stop immediately and retry on the next launch.
+ */
+export function runMigrations(db: Database): MigrationReport {
+  const report: MigrationReport = { applied: [], skipped: [], failed: [] };
+
+  // PRAGMA foreign_keys is connection-scoped and SQLite ignores changes made
+  // inside a transaction, so configure it before executing schema/migrations.
+  setForeignKeysEnabled(db, 'SQLite foreign key enforcement could not be enabled.');
+
+  // 1. Create missing tables before migrations. Indexes are deferred because a
+  //    legacy table may not have the columns referenced by a newer index yet.
+  //    Executing the whole schema at once would roll back table creation too,
+  //    leaving migrations unable to add those columns on the next launch.
+  createSchemaTables(db);
+
+  // 2. Apply the ordered migration list.
+  applyPendingMigrations(db, report);
 
   // 3. Re-run the idempotent schema after column migrations so all indexes
   //    exist on both fresh and upgraded databases.
   if (report.failed.length === 0) {
-    db.run('BEGIN TRANSACTION');
-    try {
-      db.exec(SCHEMA_SQL);
-      db.run('COMMIT');
-    } catch (error) {
-      try { db.run('ROLLBACK'); } catch { /* transaction may already be closed */ }
-      throw error;
-    }
+    createSchemaIndexes(db);
   }
 
   if (report.applied.length > 0) {

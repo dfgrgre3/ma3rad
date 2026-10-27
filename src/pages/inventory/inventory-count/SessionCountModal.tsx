@@ -20,6 +20,123 @@ interface SessionCountModalProps {
   onClose: () => void;
 }
 
+interface CountItemRowProps {
+  item: CountItem;
+  index: number;
+  session: CountSession;
+  onCountChange: (index: number, value: string) => void;
+  onDiscrepancyReasonChange: (index: number, value: string) => void;
+  onNoteChange: (index: number, value: string) => void;
+}
+
+const isBlindCounting = (session: CountSession) =>
+  session.isBlind && session.status === 'COUNTING';
+
+const QuantityVariance: React.FC<{ value: number; item: CountItem }> = ({ value, item }) => {
+  if (value > 0) return <span className="text-emerald-600">+{formatProductQuantity(value, item)}</span>;
+  if (value < 0) return <span className="text-rose-600">{formatProductQuantity(value, item)}</span>;
+  return <span className="text-slate-500">مطابق</span>;
+};
+
+const FinancialVariance: React.FC<{ value: number }> = ({ value }) => {
+  if (value > 0) return <span className="text-emerald-600">+{fmtCountCurrency(value)}</span>;
+  if (value < 0) return <span className="text-rose-600">{fmtCountCurrency(value)}</span>;
+  return <span className="text-slate-500">0 ج</span>;
+};
+
+const CountItemRow: React.FC<CountItemRowProps> = ({
+  item,
+  index,
+  session,
+  onCountChange,
+  onDiscrepancyReasonChange,
+  onNoteChange,
+}) => {
+  const blindCounting = isBlindCounting(session);
+  const isPosted = session.status === 'POSTED';
+  const isCounted = item.countedQuantityM2 !== null;
+  const hasVariance = item.varianceM2 !== 0 && isCounted;
+
+  return (
+    <tr className="hover:bg-slate-100 transition">
+      <td className="px-4 py-3 text-slate-900 font-semibold">{item.productName}</td>
+      <td className="px-4 py-3 font-mono text-slate-500 font-bold">
+        {blindCounting ? (
+          <span className="text-violet-600 bg-violet-50 px-2 py-0.5 rounded text-[10px] border border-violet-200">🔒 مخفي (عدّ أعمى)</span>
+        ) : (
+          formatProductQuantity(item.systemQuantityM2, item)
+        )}
+      </td>
+      <td className="px-4 py-2">
+        {isPosted ? (
+          <span className="font-mono text-slate-900 font-bold">{formatProductQuantity(Number(item.countedQuantityM2), item)}</span>
+        ) : (
+          <input
+            type="number"
+            step="0.01"
+            value={item.countedQuantityM2 ?? ''}
+            onChange={(e) => onCountChange(index, e.target.value)}
+            placeholder="أدخل الجرد الفعلي"
+            className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-mono w-28 focus:outline-none focus:border-violet-500 text-slate-900"
+          />
+        )}
+      </td>
+      <td className="px-4 py-3 font-mono font-bold">
+        {blindCounting ? (
+          <span className="text-slate-400 text-[11px]">يحتسب بعد الإدخال</span>
+        ) : isCounted ? (
+          <QuantityVariance value={item.varianceM2} item={item} />
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
+      <td className="px-2 py-2">
+        {hasVariance ? (
+          isPosted ? (
+            <span className="text-xs font-bold text-slate-700">{item.discrepancyReason || 'غير محدد'}</span>
+          ) : (
+            <select
+              value={item.discrepancyReason || ''}
+              onChange={(e) => onDiscrepancyReasonChange(index, e.target.value)}
+              className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 focus:outline-none focus:border-violet-500"
+            >
+              <option value="">-- سبب الفارق --</option>
+              <option value="BREAKAGE">كسر وتلف</option>
+              <option value="THEFT">عجز / فقد</option>
+              <option value="MISCOUNT">خطأ في العد</option>
+              <option value="INPUT_ERROR">خطأ إدخال سابق</option>
+              <option value="SUPPLIER_SHORTAGE">عجز توريد</option>
+              <option value="OTHER">أخرى</option>
+            </select>
+          )
+        ) : (
+          <span className="text-slate-300 text-xs">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3 font-mono text-slate-500">{fmtCountCurrency(item.unitCost)}</td>
+      <td className="px-4 py-3 font-mono font-bold">
+        {blindCounting ? (
+          <span className="text-slate-400">—</span>
+        ) : isCounted ? (
+          <FinancialVariance value={item.varianceValue} />
+        ) : (
+          <span className="text-slate-500">—</span>
+        )}
+      </td>
+      <td className="px-2 py-2">
+        <input
+          value={item.notes}
+          disabled={isPosted}
+          onChange={(e) => onNoteChange(index, e.target.value)}
+          maxLength={250}
+          placeholder="ملاحظة"
+          className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs disabled:border-transparent"
+        />
+      </td>
+    </tr>
+  );
+};
+
 export const SessionCountModal: React.FC<SessionCountModalProps> = ({
   session,
   items,
@@ -73,95 +190,16 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {visibleItems.map(({ item, index: idx }) => (
-                  <tr key={item.id} className="hover:bg-slate-100 transition">
-                    <td className="px-4 py-3 text-slate-900 font-semibold">{item.productName}</td>
-                    <td className="px-4 py-3 font-mono text-slate-500 font-bold">
-                      {session.isBlind && session.status === 'COUNTING' ? (
-                        <span className="text-violet-600 bg-violet-50 px-2 py-0.5 rounded text-[10px] border border-violet-200">🔒 مخفي (عدّ أعمى)</span>
-                      ) : (
-                        formatProductQuantity(item.systemQuantityM2, item)
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      {session.status === 'POSTED' ? (
-                        <span className="font-mono text-slate-900 font-bold">{formatProductQuantity(Number(item.countedQuantityM2), item)}</span>
-                      ) : (
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.countedQuantityM2 ?? ''}
-                          onChange={(e) => onCountChange(idx, e.target.value)}
-                          placeholder="أدخل الجرد الفعلي"
-                          className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-mono w-28 focus:outline-none focus:border-violet-500 text-slate-900"
-                        />
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono font-bold">
-                      {session.isBlind && session.status === 'COUNTING' ? (
-                        <span className="text-slate-400 text-[11px]">يحتسب بعد الإدخال</span>
-                      ) : item.countedQuantityM2 !== null ? (
-                        item.varianceM2 > 0 ? (
-                          <span className="text-emerald-600">+{formatProductQuantity(item.varianceM2, item)}</span>
-                        ) : item.varianceM2 < 0 ? (
-                          <span className="text-rose-600">{formatProductQuantity(item.varianceM2, item)}</span>
-                        ) : (
-                          <span className="text-slate-500">مطابق</span>
-                        )
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2">
-                      {item.varianceM2 !== 0 && item.countedQuantityM2 !== null ? (
-                        session.status === 'POSTED' ? (
-                          <span className="text-xs font-bold text-slate-700">{item.discrepancyReason || 'غير محدد'}</span>
-                        ) : (
-                          <select
-                            value={item.discrepancyReason || ''}
-                            onChange={(e) => onDiscrepancyReasonChange(idx, e.target.value)}
-                            className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 focus:outline-none focus:border-violet-500"
-                          >
-                            <option value="">-- سبب الفارق --</option>
-                            <option value="BREAKAGE">كسر وتلف</option>
-                            <option value="THEFT">عجز / فقد</option>
-                            <option value="MISCOUNT">خطأ في العد</option>
-                            <option value="INPUT_ERROR">خطأ إدخال سابق</option>
-                            <option value="SUPPLIER_SHORTAGE">عجز توريد</option>
-                            <option value="OTHER">أخرى</option>
-                          </select>
-                        )
-                      ) : (
-                        <span className="text-slate-300 text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-slate-500">{fmtCountCurrency(item.unitCost)}</td>
-                    <td className="px-4 py-3 font-mono font-bold">
-                      {session.isBlind && session.status === 'COUNTING' ? (
-                        <span className="text-slate-400">—</span>
-                      ) : item.countedQuantityM2 !== null ? (
-                        item.varianceValue > 0 ? (
-                          <span className="text-emerald-600">+{fmtCountCurrency(item.varianceValue)}</span>
-                        ) : item.varianceValue < 0 ? (
-                          <span className="text-rose-600">{fmtCountCurrency(item.varianceValue)}</span>
-                        ) : (
-                          <span className="text-slate-500">0 ج</span>
-                        )
-                      ) : (
-                        <span className="text-slate-500">—</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        value={item.notes}
-                        disabled={session.status === 'POSTED'}
-                        onChange={(e) => onNoteChange(idx, e.target.value)}
-                        maxLength={250}
-                        placeholder="ملاحظة"
-                        className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs disabled:border-transparent"
-                      />
-                    </td>
-                  </tr>
+                {visibleItems.map(({ item, index }) => (
+                  <CountItemRow
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    session={session}
+                    onCountChange={onCountChange}
+                    onDiscrepancyReasonChange={onDiscrepancyReasonChange}
+                    onNoteChange={onNoteChange}
+                  />
                 ))}
                 {visibleItems.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-500">لا توجد أصناف تطابق البحث</td></tr>}
               </tbody>

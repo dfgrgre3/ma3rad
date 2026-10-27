@@ -66,7 +66,8 @@ export const LeadsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const filtered = leads.filter((l) => statusFilter === 'ALL' || l.stage === statusFilter);
 

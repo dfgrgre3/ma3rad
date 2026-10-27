@@ -4,6 +4,7 @@ import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
 import { PermissionService } from './services/PermissionService';
 import { SettingsService } from './services/SettingsService';
+import type { BackupService } from './services/BackupService';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from './config/businessProfiles';
 import { User } from './types';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -30,6 +31,39 @@ function markRuntimeSession(): void {
   } catch {
     // Session storage may be unavailable in restricted browser contexts.
   }
+}
+
+async function maintainAutomaticBackups(backupService: BackupService, interval: number): Promise<void> {
+  try {
+    const result = await backupService.runAutoBackupIfDue(interval);
+    if (result.error) console.warn('Auto backup failed:', result.error);
+    const retention = backupService.getRetentionSettings();
+    const cleanup = await backupService.cleanupOldBackups(retention.retentionDays, retention.maxBackups);
+    if (cleanup.errors.length > 0) {
+      console.warn('Automatic backup retention cleanup failed:', cleanup.errors.join('; '));
+    }
+  } catch (error) {
+    console.warn('Automatic backup maintenance failed:', error);
+  }
+}
+
+function runAutomaticBackupCheck(BackupServiceClass: typeof BackupService): void {
+  try {
+    const interval = SettingsService.getSettings().autoBackupIntervalHours || 24;
+    void maintainAutomaticBackups(new BackupServiceClass(), interval);
+  } catch (error) {
+    console.warn('Auto backup skipped:', error);
+  }
+}
+
+function scheduleAutomaticBackupChecks(
+  backupTimer: React.MutableRefObject<ReturnType<typeof setInterval> | null>
+): void {
+  void import('./services/BackupService').then(({ BackupService: BackupServiceClass }) => {
+    if (backupTimer.current) clearInterval(backupTimer.current);
+    runAutomaticBackupCheck(BackupServiceClass);
+    backupTimer.current = setInterval(() => runAutomaticBackupCheck(BackupServiceClass), 15 * 60 * 1000);
+  });
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
@@ -70,29 +104,7 @@ export const App: React.FC = () => {
         setCurrentUser(restoreCurrentRuntimeSession ? AuthService.restoreSession() : null);
         setDbReady(true);
         // Check the configured interval throughout the desktop session.
-        void import('./services/BackupService').then(({ BackupService }) => {
-          const runBackupCheck = () => {
-            try {
-              const interval = SettingsService.getSettings().autoBackupIntervalHours || 24;
-              const backupService = new BackupService();
-              void backupService.runAutoBackupIfDue(interval).then(async (result) => {
-                if (result.error) console.warn('Auto backup failed:', result.error);
-                const retention = backupService.getRetentionSettings();
-                const cleanup = await backupService.cleanupOldBackups(retention.retentionDays, retention.maxBackups);
-                if (cleanup.errors.length > 0) {
-                  console.warn('Automatic backup retention cleanup failed:', cleanup.errors.join('; '));
-                }
-              }).catch((error) => {
-                console.warn('Automatic backup maintenance failed:', error);
-              });
-            } catch (e) {
-              console.warn('Auto backup skipped:', e);
-            }
-          };
-          if (backupTimer.current) clearInterval(backupTimer.current);
-          runBackupCheck();
-          backupTimer.current = setInterval(runBackupCheck, 15 * 60 * 1000);
-        });
+        scheduleAutomaticBackupChecks(backupTimer);
         // Scheduled business alerts (low stock, dues, pending approvals).
         void import('./services/NotificationService').then(({ NotificationService }) => {
           try {

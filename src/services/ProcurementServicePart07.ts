@@ -9,6 +9,34 @@ import type { ReorderSuggestion, SupplierRfqRow, SupplierRfqItem, SupplierQuotat
 import { ProcurementServicePart06 } from './ProcurementServicePart06';
 import { BranchAccessService } from './BranchAccessService';
 
+function getDeliveryMetrics(orders: Array<{
+  status: string;
+  receiptDate: string | null;
+  expectedDate: string | null;
+}>): { receivedOrders: number; onTimeDeliveries: number } {
+  let receivedOrders = 0;
+  let onTimeDeliveries = 0;
+
+  for (const order of orders) {
+    if (!['PARTIAL', 'RECEIVED'].includes(order.status) && !order.receiptDate) continue;
+
+    receivedOrders++;
+    if (!order.expectedDate || !order.receiptDate || order.receiptDate <= order.expectedDate) {
+      onTimeDeliveries++;
+    }
+  }
+
+  return { receivedOrders, onTimeDeliveries };
+}
+
+function getSupplierRatingLabel(score: number): SupplierScorecard['ratingLabel'] {
+  if (score >= 90) return 'ممتاز';
+  if (score >= 80) return 'جيد جداً';
+  if (score >= 70) return 'جيد';
+  if (score >= 55) return 'يحتاج تحسين';
+  return 'ضعيف';
+}
+
 export abstract class ProcurementServicePart07 extends ProcurementServicePart06 {
 public getSupplierScorecard(supplierId: string): SupplierScorecard {
     const sup = this.db.query<any>(`SELECT * FROM suppliers WHERE id = ?`, [supplierId])[0];
@@ -34,19 +62,7 @@ public getSupplierScorecard(supplierId: string): SupplierScorecard {
     `, [supplierId, ...orderScope.params]);
 
     const totalOrders = orders.length;
-    let receivedOrders = 0;
-    let onTimeDeliveries = 0;
-
-    for (const o of orders) {
-      if (['PARTIAL', 'RECEIVED'].includes(o.status) || o.receiptDate) {
-        receivedOrders++;
-        if (o.expectedDate && o.receiptDate) {
-          if (o.receiptDate <= o.expectedDate) onTimeDeliveries++;
-        } else {
-          onTimeDeliveries++;
-        }
-      }
-    }
+    const { receivedOrders, onTimeDeliveries } = getDeliveryMetrics(orders);
     const onTimeRate = receivedOrders > 0 ? round2((onTimeDeliveries / receivedOrders) * 100) : 100;
 
     // 2. Goods receipt quality
@@ -87,12 +103,7 @@ public getSupplierScorecard(supplierId: string): SupplierScorecard {
     const claimsPenalty = Math.min(20, totalClaimsCount * 4);
     const overallScore = Math.max(0, Math.min(100, round2((onTimeRate * 0.4) + (acceptanceRate * 0.4) + (20 - claimsPenalty))));
 
-    let ratingLabel: SupplierScorecard['ratingLabel'] = 'ممتاز';
-    if (overallScore >= 90) ratingLabel = 'ممتاز';
-    else if (overallScore >= 80) ratingLabel = 'جيد جداً';
-    else if (overallScore >= 70) ratingLabel = 'جيد';
-    else if (overallScore >= 55) ratingLabel = 'يحتاج تحسين';
-    else ratingLabel = 'ضعيف';
+    const ratingLabel = getSupplierRatingLabel(overallScore);
 
     return {
       supplierId: sup.id,

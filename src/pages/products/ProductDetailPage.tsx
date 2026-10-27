@@ -84,7 +84,8 @@ export const ProductDetailPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [id]);
 
   const openEdit = () => {
     if (!product) return;

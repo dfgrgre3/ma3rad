@@ -34,6 +34,152 @@ import {
   PosToast, ShortcutsModal, SuccessInvoiceModal, ToneWarningModal,
 } from './pos/PosModals';
 
+const CUSTOMER_TYPE_LABELS: Record<Customer['customerType'], string> = {
+  RETAIL: 'قطاعي',
+  CONTRACTOR: 'مقاول',
+  WHOLESALE: 'جملة',
+  ENGINEER: 'مهندس',
+};
+
+interface CartLineProps {
+  item: CartItem;
+  index: number;
+  enableNegativeStock: boolean;
+  gradeLabel: (grade: Product['grade']) => string;
+  onRemove: (index: number) => void;
+  onUpdateUnit: (index: number, unit: PosUnit) => void;
+  onStepQuantity: (index: number, direction: 1 | -1) => void;
+  onUpdateQuantity: (index: number, value: number) => void;
+  onUpdatePrice: (index: number, value: number) => void;
+  onUpdateLineDiscount: (index: number, value: number) => void;
+}
+
+const getCartQuantityStep = (item: CartItem) => {
+  const isWholeUnit = item.product.baseUnit === 'BOX'
+    || item.product.baseUnit === 'PIECE'
+    || item.product.baseUnit === 'SET';
+  return item.product.productType === 'GENERAL'
+    ? isWholeUnit ? 1 : 0.01
+    : item.soldBy === 'BOX' ? 1 : 0.01;
+};
+
+const getCartPriceUnitLabel = (item: CartItem, isGeneral: boolean) =>
+  isGeneral ? getProductUnitLabel(item.product) : item.soldBy === 'BOX' ? 'كرتونة' : 'م²';
+
+const CartLine: React.FC<CartLineProps> = ({
+  item,
+  index,
+  enableNegativeStock,
+  gradeLabel,
+  onRemove,
+  onUpdateUnit,
+  onStepQuantity,
+  onUpdateQuantity,
+  onUpdatePrice,
+  onUpdateLineDiscount,
+}) => {
+  const metersPerBox = item.product.metersPerBox || 1.44;
+  const lineTotal = round2(item.quantityM2 * item.unitPrice - item.discountAmount);
+  const isGeneral = item.product.productType === 'GENERAL';
+  const displayQty = !isGeneral && item.soldBy === 'BOX' ? item.boxesCount : item.quantityM2;
+  const displayPrice = !isGeneral && item.soldBy === 'BOX' ? round2(item.unitPrice * metersPerBox) : item.unitPrice;
+  const overStock = item.quantityM2 > item.availableStockM2 && !enableNegativeStock;
+
+  return (
+    <div
+      className={`bg-white p-2.5 rounded-xl border text-xs space-y-2 ${overStock ? 'border-rose-500/50' : 'border-slate-200/80'}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-bold text-slate-900 line-clamp-1">{item.product.name}</div>
+          <div className="text-[10px] text-slate-500">
+            {isGeneral ? `الوحدة: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
+          </div>
+        </div>
+        <button
+          onClick={() => onRemove(index)}
+          className="text-slate-500 hover:text-rose-600 transition shrink-0"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {overStock && (
+        <div className="text-[10px] text-rose-600 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" /> الكمية تتجاوز الرصيد المتاح
+        </div>
+      )}
+
+      {!isGeneral && <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onUpdateUnit(index, 'M2')}
+          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'M2' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
+        >م²</button>
+        <button
+          type="button"
+          onClick={() => onUpdateUnit(index, 'BOX')}
+          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'BOX' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
+        >كرتونة</button>
+        <span className="text-[10px] text-slate-500 mr-auto">
+          {item.piecesCount} قطعة • {item.boxesCount} كرتونة
+        </span>
+      </div>}
+
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+          <button
+            onClick={() => onStepQuantity(index, -1)}
+            className="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
+          >
+            <Minus className="w-3 h-3" />
+          </button>
+          <input
+            type="number"
+            step={getCartQuantityStep(item)}
+            value={displayQty}
+            onChange={(e) => { if (e.target.value !== '') onUpdateQuantity(index, Number.parseFloat(e.target.value)); }}
+            aria-label={`تغيير الكمية للمنتج ${item.product.name}`}
+            className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-slate-900"
+          />
+          <button
+            onClick={() => onStepQuantity(index, 1)}
+            className="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            value={displayPrice}
+            onChange={(e) => { if (e.target.value !== '') onUpdatePrice(index, Number.parseFloat(e.target.value)); }}
+            aria-label={`تغيير السعر للمنتج ${item.product.name}`}
+            className="w-16 text-center font-bold bg-white border border-slate-200 rounded-lg p-1 text-xs text-slate-900"
+          />
+          <span className="text-[10px] text-slate-500">ج.م</span>
+          <span className="text-[10px] text-slate-500">/{getCartPriceUnitLabel(item, isGeneral)}</span>
+        </div>
+
+        <div className="font-black text-sky-600 w-20 text-left">{CeramicMath.formatCurrency(lineTotal)}</div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-slate-500">خصم الصنف</span>
+        <input
+          type="number"
+          value={item.discountAmount || ''}
+          placeholder="0"
+          onChange={(e) => onUpdateLineDiscount(index, e.target.value === '' ? 0 : Number.parseFloat(e.target.value))}
+          aria-label={`خصم الصنف ${item.product.name}`}
+          className="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900"
+        />
+      </div>
+    </div>
+  );
+};
+
 export const PosView: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useContext(LayoutContext);
@@ -305,7 +451,7 @@ export const PosView: React.FC = () => {
       const stepM2 = requestedM2 ?? (product.productType === 'GENERAL' ? 1 : (product.metersPerBox || 1.44));
       if (existingIndex > -1) {
         const updated = [...prev];
-        const current = updated[existingIndex];
+        const current = { ...updated[existingIndex] };
         const newM2 = round2(current.quantityM2 + stepM2);
         current.quantityM2 = newM2;
         if (current.product.productType === 'GENERAL') {
@@ -315,6 +461,7 @@ export const PosView: React.FC = () => {
           current.boxesCount = CeramicMath.calculateBoxes(newM2, current.product.metersPerBox || 1.44, true);
           current.piecesCount = CeramicMath.calculatePiecesFromBoxes(current.boxesCount, current.product.piecesPerBox || 4);
         }
+        updated[existingIndex] = current;
         return updated;
       }
       return [...prev, makeCartItem(product, stepM2)];
@@ -334,11 +481,12 @@ export const PosView: React.FC = () => {
     }
     setCart((prev) => {
       const updated = [...prev];
-      const item = updated[index];
+      const item = { ...updated[index] };
       if (item.product.productType === 'GENERAL') {
         item.quantityM2 = round2(value);
         item.boxesCount = item.product.baseUnit === 'BOX' ? value : 0;
         item.piecesCount = item.product.baseUnit === 'PIECE' ? value : 0;
+        updated[index] = item;
         return updated;
       }
       const metersPerBox = item.product.metersPerBox || 1.44;
@@ -351,6 +499,7 @@ export const PosView: React.FC = () => {
         item.boxesCount = CeramicMath.calculateBoxes(value, metersPerBox, true);
         item.piecesCount = CeramicMath.calculatePiecesFromBoxes(item.boxesCount, item.product.piecesPerBox || 4);
       }
+      updated[index] = item;
       return updated;
     });
   };
@@ -395,15 +544,16 @@ export const PosView: React.FC = () => {
     }
     setCart((prev) => {
       const updated = [...prev];
-      const item = updated[index];
+      const item = { ...updated[index] };
       if (item.product.productType === 'GENERAL') {
         item.unitPrice = round2(value);
-        return updated;
+      } else {
+        const metersPerBox = item.product.metersPerBox || 1.44;
+        item.unitPrice = item.soldBy === 'BOX'
+          ? round2(value / metersPerBox)
+          : round2(value);
       }
-      const metersPerBox = item.product.metersPerBox || 1.44;
-      item.unitPrice = item.soldBy === 'BOX'
-        ? round2(value / metersPerBox)
-        : round2(value);
+      updated[index] = item;
       return updated;
     });
   };
@@ -457,9 +607,12 @@ export const PosView: React.FC = () => {
 
   // Cash sales auto-fill the paid amount with the grand total.
   useEffect(() => {
-    if (paymentType === 'CASH') setPaidAmount(totalAmount);
-    if (paymentType === 'CREDIT') setPaidAmount(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (paymentType === 'CASH') {
+      setPaidAmount(totalAmount);
+    }
+    if (paymentType === 'CREDIT') {
+      setPaidAmount(0);
+    }
   }, [totalAmount, paymentType]);
 
   // ── Barcode / search submit ─────────────────────────────────────────────────
@@ -529,10 +682,11 @@ export const PosView: React.FC = () => {
   };
 
   // ── Held orders ─────────────────────────────────────────────────────────────
-  const persistHeld = (orders: HeldOrder[]) => {
-    setHeldOrders(orders);
+  const persistHeld = (orders: HeldOrder[] | ((current: HeldOrder[]) => HeldOrder[])) => {
+    const next = typeof orders === 'function' ? orders(heldOrders) : orders;
+    setHeldOrders(next);
     try {
-      localStorage.setItem(HELD_STORAGE_KEY, JSON.stringify(orders));
+      localStorage.setItem(HELD_STORAGE_KEY, JSON.stringify(next));
     } catch {
       /* storage full — ignore */
     }
@@ -557,7 +711,7 @@ export const PosView: React.FC = () => {
       paidAmount,
       paymentType
     };
-    persistHeld([hold, ...heldOrders]);
+    persistHeld((prev) => [hold, ...prev]);
     setCart([]);
     setDiscountAmount(0);
     setShippingCost(0);
@@ -575,13 +729,13 @@ export const PosView: React.FC = () => {
     setNotes(order.notes || '');
     setPaidAmount(order.paidAmount || 0);
     setPaymentType(order.paymentType || 'CASH');
-    persistHeld(heldOrders.filter((h) => h.id !== order.id));
+    persistHeld((prev) => prev.filter((h) => h.id !== order.id));
     setIsHeldModalOpen(false);
     notify(`تم استرجاع الطلب: ${order.customerName}`, 'success');
   };
 
   const deleteHeldOrder = (id: string) => {
-    persistHeld(heldOrders.filter((h) => h.id !== id));
+    persistHeld((prev) => prev.filter((h) => h.id !== id));
   };
 
   useEffect(() => {
@@ -630,58 +784,62 @@ export const PosView: React.FC = () => {
   };
 
   // ── Checkout ────────────────────────────────────────────────────────────────
-  const handleCheckout = useCallback((skipToneCheck = false) => {
-    if (isProcessing) return;
+  const validateCartAndPermissions = useCallback(() => {
     if (cart.length === 0) {
       notify('السلة فارغة، أضف أصنافاً أولاً', 'error');
-      return;
+      return false;
     }
     if (!selectedCustomer) {
       notify('يرجى اختيار العميل', 'error');
-      return;
+      return false;
     }
     if (!selectedWarehouseId) {
       notify('يرجى اختيار المخزن', 'error');
-      return;
+      return false;
     }
     if (!can('sales.create')) {
       notify('لا تملك صلاحية إنشاء فاتورة بيع', 'error');
-      return;
+      return false;
     }
     if (remainingAmount > 0 && !can('sales.credit')) {
       notify('لا تملك صلاحية البيع الآجل أو ترك مبلغ متبقٍ', 'error');
-      return;
+      return false;
     }
 
-    // Stock guard (respects the negative-stock setting)
-    const allowNegative = settings?.enableNegativeStock ?? false;
-    if (!allowNegative) {
-      for (const item of cart) {
-        const available = stockOf(item.product.id);
-        if (item.quantityM2 > available) {
-          notify(
-            `الرصيد المتاح من «${item.product.name}» ${formatProductQuantity(available, item.product)} فقط، والمطلوب ${formatProductQuantity(item.quantityM2, item.product)}`,
-            'error'
-          );
-          return;
-        }
+    return true;
+  }, [cart.length, selectedCustomer, selectedWarehouseId, can, remainingAmount, notify]);
+
+  const validateStockAvailability = useCallback(() => {
+    if (settings?.enableNegativeStock ?? false) return true;
+    for (const item of cart) {
+      const available = stockOf(item.product.id);
+      if (item.quantityM2 > available) {
+        notify(
+          `الرصيد المتاح من «${item.product.name}» ${formatProductQuantity(available, item.product)} فقط، والمطلوب ${formatProductQuantity(item.quantityM2, item.product)}`,
+          'error'
+        );
+        return false;
       }
     }
+    return true;
+  }, [cart, settings, stockOf, notify]);
 
-    // Minimum price guard (requires sales.approve)
+  const validateMinimumPrices = useCallback(() => {
     for (const item of cart) {
       const min = item.product.minSellingPriceM2 || 0;
       if (min > 0 && item.unitPrice < min && !can('sales.approve')) {
         notify(`سعر «${item.product.name}» أقل من الحد الأدنى المسموح (${min}). يلزم اعتماد المسؤول`, 'error');
-        return;
+        return false;
       }
     }
+    return true;
+  }, [cart, can, notify]);
 
-    // Discount guard + approval threshold
+  const validateDiscount = useCallback(() => {
     const totalDiscount = round2(discountAmount + lineDiscountTotal);
     if (totalDiscount > 0 && !can('sales.discount')) {
       notify('غير مصرح لك بمنح خصم على الفاتورة', 'error');
-      return;
+      return false;
     }
     if (totalDiscount > 0) {
       const discountPercent = lineSubtotal > 0 ? (totalDiscount / lineSubtotal) * 100 : 0;
@@ -691,7 +849,7 @@ export const PosView: React.FC = () => {
           const request = new ApprovalService().createRequest({
             requestType: 'DISCOUNT',
             title: `اعتماد خصم ${discountPercent.toFixed(1)}% على فاتورة بيع`,
-            description: `العميل: ${selectedCustomer.name} — قيمة الخصم ${totalDiscount} ج.م من إجمالي ${lineSubtotal} ج.م (الحد المسموح ${threshold}%).`,
+            description: `العميل: ${selectedCustomer?.name ?? ''} — قيمة الخصم ${totalDiscount} ج.م من إجمالي ${lineSubtotal} ج.م (الحد المسموح ${threshold}%).`,
             requestedValue: totalDiscount,
             currentValue: lineSubtotal,
             priority: 'HIGH',
@@ -701,52 +859,80 @@ export const PosView: React.FC = () => {
         } catch (error: any) {
           notify(error?.message || 'الخصم يتجاوز الحد المسموح ويلزم اعتماد المسؤول', 'error');
         }
-        return;
+        return false;
       }
     }
+    return true;
+  }, [
+    discountAmount, lineDiscountTotal, can, lineSubtotal, settings,
+    selectedCustomer, notify,
+  ]);
 
-    // Credit limit guard
-    if (remainingAmount > 0 && selectedCustomer.creditLimit > 0) {
+  const validateCreditLimit = useCallback(() => {
+    if (selectedCustomer && remainingAmount > 0 && selectedCustomer.creditLimit > 0) {
       const projected = round2((selectedCustomer.currentBalance || 0) + remainingAmount);
       if (projected > selectedCustomer.creditLimit) {
         notify(
           `تجاوز حد الائتمان للعميل. الرصيد الحالي ${selectedCustomer.currentBalance} + الآجل ${remainingAmount} > الحد ${selectedCustomer.creditLimit}`,
           'error'
         );
-        return;
+        return false;
       }
     }
+    return true;
+  }, [remainingAmount, selectedCustomer, notify]);
 
+  const confirmActiveShift = useCallback(() => {
     if (!activeShift) {
       const proceed = window.confirm(
         'لا توجد وردية كاشير مفتوحة. سيتم تسجيل الفاتورة بدون ربطها بوردية. هل تريد المتابعة؟'
       );
-      if (!proceed) return;
+      if (!proceed) return false;
     }
+    return true;
+  }, [activeShift]);
+
+  const validateCheckoutDetails = useCallback(() => (
+    validateCartAndPermissions()
+      && validateStockAvailability()
+      && validateMinimumPrices()
+      && validateDiscount()
+      && validateCreditLimit()
+      && confirmActiveShift()
+  ), [
+    validateCartAndPermissions, validateStockAvailability, validateMinimumPrices,
+    validateDiscount, validateCreditLimit, confirmActiveShift,
+  ]);
+
+  const showToneMixingWarning = useCallback(() => {
+    const checkItems = cart
+      .filter((ci) => ci.product.productType !== 'GENERAL')
+      .map((ci) => ({
+        productId:   ci.product.id,
+        productName: ci.product.name,
+        warehouseId: selectedWarehouseId,
+        quantityM2:  ci.quantityM2,
+      }));
+    if (checkItems.length === 0) return false;
+
+    const conflicts = batchService.checkToneMixing(checkItems);
+    if (conflicts.length === 0) return false;
+    setToneConflicts(conflicts);
+    setIsToneWarningOpen(true);
+    return true;
+  }, [cart, selectedWarehouseId, batchService]);
+
+  const handleCheckout = useCallback((skipToneCheck = false) => {
+    if (isProcessing || !validateCheckoutDetails() || !selectedCustomer) return;
 
     try {
       setIsProcessing(true);
 
       // ── Tone/Shade mixing guard ─────────────────────────────────────────────
       // Only run when not already bypassed via the warning modal
-      if (!skipToneCheck) {
-        const checkItems = cart
-          .filter((ci) => ci.product.productType !== 'GENERAL')
-          .map((ci) => ({
-            productId:   ci.product.id,
-            productName: ci.product.name,
-            warehouseId: selectedWarehouseId,
-            quantityM2:  ci.quantityM2,
-          }));
-        if (checkItems.length > 0) {
-          const conflicts = batchService.checkToneMixing(checkItems);
-          if (conflicts.length > 0) {
-            setToneConflicts(conflicts);
-            setIsToneWarningOpen(true);
-            setIsProcessing(false);
-            return; // wait for user to confirm or cancel
-          }
-        }
+      if (!skipToneCheck && showToneMixingWarning()) {
+        setIsProcessing(false);
+        return; // wait for user to confirm or cancel
       }
       // ── End tone guard ──────────────────────────────────────────────────────
 
@@ -790,10 +976,11 @@ export const PosView: React.FC = () => {
       setIsProcessing(false);
     }
   }, [
-    cart, selectedCustomer, selectedWarehouseId, settings, stockOf, can, isProcessing,
-    discountAmount, lineDiscountTotal, remainingAmount, activeShift, taxPercentage,
+    cart, selectedCustomer, selectedWarehouseId, isProcessing,
+    discountAmount, activeShift, taxPercentage,
     taxAmount, shippingCost, paidAmount, paymentType, notes, currentUser,
-    salesService, batchService, productService, cashierService, loadStock, notify,
+    salesService, productService, cashierService, loadStock, notify,
+    validateCheckoutDetails, showToneMixingWarning,
   ]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
@@ -1207,7 +1394,7 @@ export const PosView: React.FC = () => {
           </div>
           {selectedCustomer && (
             <div className="flex items-center justify-between text-[11px] bg-white rounded-lg px-2.5 py-1.5 border border-slate-200">
-              <span className="text-slate-500">{selectedCustomer.customerType === 'WHOLESALE' ? 'جملة' : selectedCustomer.customerType === 'CONTRACTOR' ? 'مقاول' : selectedCustomer.customerType === 'ENGINEER' ? 'مهندس' : 'قطاعي'}</span>
+              <span className="text-slate-500">{CUSTOMER_TYPE_LABELS[selectedCustomer.customerType]}</span>
               <span className={selectedCustomer.currentBalance > 0 ? 'text-amber-600 font-bold' : 'text-slate-500'}>
                 الرصيد: {CeramicMath.formatCurrency(selectedCustomer.currentBalance)}
               </span>
@@ -1228,113 +1415,21 @@ export const PosView: React.FC = () => {
               <p className="text-[11px]">انقر على أي صنف لإضافته، أو امسح الباركود</p>
             </div>
           ) : (
-            cart.map((item, idx) => {
-              const metersPerBox = item.product.metersPerBox || 1.44;
-              const lineTotal = round2(item.quantityM2 * item.unitPrice - item.discountAmount);
-              const isGeneral = item.product.productType === 'GENERAL';
-              const displayQty = !isGeneral && item.soldBy === 'BOX' ? item.boxesCount : item.quantityM2;
-              const displayPrice = !isGeneral && item.soldBy === 'BOX' ? round2(item.unitPrice * metersPerBox) : item.unitPrice;
-              const overStock = item.quantityM2 > item.availableStockM2 && !(settings?.enableNegativeStock);
-              return (
-                <div
-                  key={item.product.id}
-                  className={`bg-white p-2.5 rounded-xl border text-xs space-y-2 ${overStock ? 'border-rose-500/50' : 'border-slate-200/80'}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-bold text-slate-900 line-clamp-1">{item.product.name}</div>
-                      <div className="text-[10px] text-slate-500">
-                        {isGeneral ? `الوحدة: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeFromCart(idx)}
-                      className="text-slate-500 hover:text-rose-600 transition shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {overStock && (
-                    <div className="text-[10px] text-rose-600 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> الكمية تتجاوز الرصيد المتاح
-                    </div>
-                  )}
-
-                  {/* Unit toggle */}
-                  {!isGeneral && <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => updateCartUnit(idx, 'M2')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'M2' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
-                    >م²</button>
-                    <button
-                      type="button"
-                      onClick={() => updateCartUnit(idx, 'BOX')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'BOX' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
-                    >كرتونة</button>
-                    <span className="text-[10px] text-slate-500 mr-auto">
-                      {item.piecesCount} قطعة • {item.boxesCount} كرتونة
-                    </span>
-                  </div>}
-
-                  {/* Quantity + price */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
-                      <button
-                        onClick={() => stepCartQuantity(idx, -1)}
-                        className="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <input
-                        type="number"
-                        step={isGeneral
-                          ? item.product.baseUnit === 'BOX' || item.product.baseUnit === 'PIECE' || item.product.baseUnit === 'SET' ? 1 : 0.01
-                          : item.soldBy === 'BOX' ? 1 : 0.01}
-                        value={displayQty}
-                        onChange={(e) => { if (e.target.value !== '') updateCartQuantity(idx, Number.parseFloat(e.target.value)); }}
-                        aria-label={`تغيير الكمية للمنتج ${item.product.name}`}
-                        className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-slate-900"
-                      />
-                      <button
-                        onClick={() => stepCartQuantity(idx, 1)}
-                        className="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-slate-100 rounded"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={displayPrice}
-                        onChange={(e) => { if (e.target.value !== '') updateCartPrice(idx, Number.parseFloat(e.target.value)); }}
-                        aria-label={`تغيير السعر للمنتج ${item.product.name}`}
-                        className="w-16 text-center font-bold bg-white border border-slate-200 rounded-lg p-1 text-xs text-slate-900"
-                      />
-                      <span className="text-[10px] text-slate-500">ج.م</span>
-                      <span className="text-[10px] text-slate-500">/{isGeneral ? getProductUnitLabel(item.product) : item.soldBy === 'BOX' ? 'كرتونة' : 'م²'}</span>
-                    </div>
-
-                    <div className="font-black text-sky-600 w-20 text-left">{CeramicMath.formatCurrency(lineTotal)}</div>
-                  </div>
-
-                  {/* Line discount */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-500">خصم الصنف</span>
-                    <input
-                      type="number"
-                      value={item.discountAmount || ''}
-                      placeholder="0"
-                      onChange={(e) => updateCartLineDiscount(idx, e.target.value === '' ? 0 : Number.parseFloat(e.target.value))}
-                      aria-label={`خصم الصنف ${item.product.name}`}
-                      className="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-900"
-                    />
-                  </div>
-                </div>
-              );
-            })
+            cart.map((item, index) => (
+              <CartLine
+                key={item.product.id}
+                item={item}
+                index={index}
+                enableNegativeStock={settings?.enableNegativeStock ?? false}
+                gradeLabel={gradeLabel}
+                onRemove={removeFromCart}
+                onUpdateUnit={updateCartUnit}
+                onStepQuantity={stepCartQuantity}
+                onUpdateQuantity={updateCartQuantity}
+                onUpdatePrice={updateCartPrice}
+                onUpdateLineDiscount={updateCartLineDiscount}
+              />
+            ))
           )}
         </div>
 

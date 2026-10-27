@@ -79,15 +79,12 @@ export class ElectronicInvoiceService {
   public submitElectronicInvoice(id: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'electronic_invoices.submit');
-    void id;
     throw new Error('لم يتم إعداد موفر فوترة إلكترونية معتمد؛ لا يمكن تسجيل الفاتورة كمرسلة ضريبيًا.');
   }
 
   public acceptElectronicInvoice(id: string, taxAuthorityReference: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'electronic_invoices.accept');
-    void id;
-    void taxAuthorityReference;
     throw new Error('لا يمكن تسجيل قبول ضريبي دون رد موثق من موفر التكامل المعتمد.');
   }
 

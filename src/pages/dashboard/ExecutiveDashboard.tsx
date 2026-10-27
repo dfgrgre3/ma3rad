@@ -66,7 +66,7 @@ export const ExecutiveDashboard: React.FC = () => {
     }
   };
 
-  const loadData = async () => {
+  const loadData = () => {
     setLoading(true);
     setLoadError(null);
     try {

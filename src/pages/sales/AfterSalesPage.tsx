@@ -38,6 +38,13 @@ const COMMON_REASONS = [
   'خطأ في تسجيل كود الصنف بالمعرض',
 ];
 
+const getTabButtonClass = (isActive: boolean, activeClass: string) =>
+  `flex-1 md:flex-initial px-5 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
+    isActive
+      ? activeClass
+      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+  }`;
+
 export const AfterSalesPage: React.FC = () => {
   const toast = useToast();
   const salesService = useMemo(() => new SalesService(), []);
@@ -200,33 +207,30 @@ export const AfterSalesPage: React.FC = () => {
         <div className="flex bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl w-full md:w-auto">
           <button
             onClick={() => setActiveTab('returns')}
-            className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
-              activeTab === 'returns'
-                ? 'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-            }`}
+            className={getTabButtonClass(
+              activeTab === 'returns',
+              'bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm'
+            )}
           >
             <RotateCcw className="w-4 h-4" />
             سجل المرتجعات والإشعارات الدائنة ({returnsList.length})
           </button>
           <button
             onClick={() => setActiveTab('warranty')}
-            className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
-              activeTab === 'warranty'
-                ? 'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-            }`}
+            className={getTabButtonClass(
+              activeTab === 'warranty',
+              'bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-sm'
+            )}
           >
             <ShieldCheck className="w-4 h-4" />
             سجل الفواتير الحديثة ({recentInvoices.length})
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
-              activeTab === 'analytics'
-                ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-            }`}
+            className={getTabButtonClass(
+              activeTab === 'analytics',
+              'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+            )}
           >
             <PieIcon className="w-4 h-4" />
             تحليل أسباب المرتجعات

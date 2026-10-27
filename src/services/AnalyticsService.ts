@@ -7,6 +7,18 @@ import { BranchAccessService } from './BranchAccessService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 
+type ProductRevenue = { productId: string; productName: string; quantity: number; revenue: number };
+type CustomerSpent = { customerId: string; customerName: string; totalSpent: number; orderCount: number };
+type DailySales = { date: string; amount: number; count: number };
+
+type SalesAnalyticsTotals = {
+  totalSales: number;
+  totalProfit: number;
+  productRevenue: Record<string, ProductRevenue>;
+  customerSpent: Record<string, CustomerSpent>;
+  salesByDay: Record<string, DailySales>;
+};
+
 export class AnalyticsService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
@@ -30,7 +42,6 @@ export class AnalyticsService {
       ORDER BY si.date ASC
     `, [dateFrom, dateTo, ...scope.params]);
 
-    const saleItemsByInvoice = new Map<string, any[]>();
     const saleItems = this.db.query<any>(`
       SELECT sii.*, p.name AS productName
       FROM sales_invoice_items sii
@@ -40,55 +51,18 @@ export class AnalyticsService {
         AND ${scope.clause}
       ORDER BY si.date ASC, sii.id ASC
     `, [dateFrom, dateTo, ...scope.params]);
-    for (const item of saleItems) {
-      const list = saleItemsByInvoice.get(item.invoiceId) || [];
-      list.push(item);
-      saleItemsByInvoice.set(item.invoiceId, list);
-    }
+    const saleItemsByInvoice = this.groupItemsByParent(saleItems, item => item.invoiceId);
 
-    let totalSales = invoices.reduce((sum: number, inv: any) =>
-      sum + Number(inv.subtotal || 0) - Number(inv.discountAmount || 0), 0);
+    const totals: SalesAnalyticsTotals = {
+      totalSales: invoices.reduce((sum: number, inv: any) =>
+        sum + Number(inv.subtotal || 0) - Number(inv.discountAmount || 0), 0),
+      totalProfit: 0,
+      productRevenue: {},
+      customerSpent: {},
+      salesByDay: {},
+    };
     const totalOrders = invoices.length;
-    let totalProfit = 0;
-
-    const productRevenue: Record<string, { productId: string; productName: string; quantity: number; revenue: number }> = {};
-    const customerSpent: Record<string, { customerId: string; customerName: string; totalSpent: number; orderCount: number }> = {};
-    const salesByDay: Record<string, { date: string; amount: number; count: number }> = {};
-
-    for (const inv of invoices) {
-      const date = inv.date;
-      if (!salesByDay[date]) salesByDay[date] = { date, amount: 0, count: 0 };
-      const invoiceRevenue = Number(inv.subtotal || 0) - Number(inv.discountAmount || 0);
-      salesByDay[date].amount += invoiceRevenue;
-      salesByDay[date].count += 1;
-
-      const custId = inv.customerId;
-      if (!customerSpent[custId]) {
-        customerSpent[custId] = { customerId: custId, customerName: inv.customerName, totalSpent: 0, orderCount: 0 };
-      }
-      customerSpent[custId].totalSpent += invoiceRevenue;
-      customerSpent[custId].orderCount += 1;
-
-      const items = saleItemsByInvoice.get(inv.id) || [];
-
-      for (const item of items) {
-        const qty = Number(item.quantityM2 || 0);
-        const lineRevenue = Number(item.totalPrice || 0);
-        const headerDiscountShare = Number(inv.subtotal || 0) > 0
-          ? Number(inv.discountAmount || 0) * lineRevenue / Number(inv.subtotal)
-          : 0;
-        const revenue = lineRevenue - headerDiscountShare;
-        const cost = Number(item.unitCost || 0) * qty;
-        totalProfit += revenue - cost;
-
-        const pid = item.productId;
-        if (!productRevenue[pid]) {
-          productRevenue[pid] = { productId: pid, productName: item.productName, quantity: 0, revenue: 0 };
-        }
-        productRevenue[pid].quantity += qty;
-        productRevenue[pid].revenue += revenue;
-      }
-    }
+    this.aggregateInvoices(invoices, saleItemsByInvoice, totals);
 
     const returns = this.db.query<any>(`
       SELECT sr.*, si.total_amount AS invoiceTotal, si.tax_amount AS invoiceTax,
@@ -101,7 +75,6 @@ export class AnalyticsService {
       ORDER BY sr.date ASC
     `, [dateFrom, dateTo, ...scope.params]);
 
-    const returnItemsByReturn = new Map<string, any[]>();
     const returnItems = this.db.query<any>(`
       SELECT sri.*, p.name AS productName
       FROM sales_return_items sri
@@ -112,12 +85,70 @@ export class AnalyticsService {
         AND ${scope.clause}
       ORDER BY sr.date ASC, sri.id ASC
     `, [dateFrom, dateTo, ...scope.params]);
-    for (const item of returnItems) {
-      const list = returnItemsByReturn.get(item.returnId) || [];
-      list.push(item);
-      returnItemsByReturn.set(item.returnId, list);
-    }
+    const returnItemsByReturn = this.groupItemsByParent(returnItems, item => item.returnId);
+    this.aggregateReturns(returns, returnItemsByReturn, totals);
 
+    totals.totalSales = round2(totals.totalSales);
+    const averageOrderValue = totalOrders > 0 ? round2(totals.totalSales / totalOrders) : 0;
+
+    const topProducts = Object.values(totals.productRevenue)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    const topCustomers = Object.values(totals.customerSpent)
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 10);
+
+    const periodLabel = `${dateFrom} إلى ${dateTo}`;
+
+    return {
+      period: periodLabel,
+      totalSales: totals.totalSales,
+      totalOrders,
+      averageOrderValue,
+      totalProfit: round2(totals.totalProfit),
+      topProducts,
+      topCustomers,
+      salesByDay: Object.values(totals.salesByDay).sort((a, b) => a.date.localeCompare(b.date)),
+    };
+  }
+
+  private groupItemsByParent<T>(items: T[], getParentId: (item: T) => string): Map<string, T[]> {
+    const grouped = new Map<string, T[]>();
+    for (const item of items) {
+      const parentId = getParentId(item);
+      const group = grouped.get(parentId) || [];
+      group.push(item);
+      grouped.set(parentId, group);
+    }
+    return grouped;
+  }
+
+  private aggregateInvoices(invoices: any[], itemsByInvoice: Map<string, any[]>, totals: SalesAnalyticsTotals): void {
+    for (const invoice of invoices) {
+      const invoiceRevenue = Number(invoice.subtotal || 0) - Number(invoice.discountAmount || 0);
+      this.addDailySales(totals, invoice.date, invoiceRevenue, 1);
+      this.addCustomerSpend(totals, invoice.customerId, invoice.customerName, invoiceRevenue, 1);
+
+      for (const item of itemsByInvoice.get(invoice.id) || []) {
+        this.aggregateInvoiceItem(invoice, item, totals);
+      }
+    }
+  }
+
+  private aggregateInvoiceItem(invoice: any, item: any, totals: SalesAnalyticsTotals): void {
+    const quantity = Number(item.quantityM2 || 0);
+    const lineRevenue = Number(item.totalPrice || 0);
+    const subtotal = Number(invoice.subtotal || 0);
+    const discountShare = subtotal > 0
+      ? Number(invoice.discountAmount || 0) * lineRevenue / subtotal
+      : 0;
+    const revenue = lineRevenue - discountShare;
+    totals.totalProfit += revenue - Number(item.unitCost || 0) * quantity;
+    this.addProductRevenue(totals, item.productId, item.productName, quantity, revenue);
+  }
+
+  private aggregateReturns(returns: any[], itemsByReturn: Map<string, any[]>, totals: SalesAnalyticsTotals): void {
     for (const salesReturn of returns) {
       const returnedAmount = Number(salesReturn.totalAmount || 0);
       const invoiceTotal = Number(salesReturn.invoiceTotal || 0);
@@ -125,72 +156,66 @@ export class AnalyticsService {
         ? round2(returnedAmount * Number(salesReturn.invoiceTax || 0) / invoiceTotal)
         : 0;
       const netReturnedRevenue = returnedAmount - taxReduction;
-      totalSales -= netReturnedRevenue;
 
-      const date = salesReturn.date;
-      if (!salesByDay[date]) salesByDay[date] = { date, amount: 0, count: 0 };
-      salesByDay[date].amount -= netReturnedRevenue;
+      totals.totalSales -= netReturnedRevenue;
+      this.addDailySales(totals, salesReturn.date, -netReturnedRevenue, 0);
+      this.addCustomerSpend(
+        totals,
+        salesReturn.customerId,
+        salesReturn.customerName || 'غير معروف',
+        -netReturnedRevenue,
+        0,
+      );
 
-      const customerId = salesReturn.customerId;
-      if (!customerSpent[customerId]) {
-        customerSpent[customerId] = {
-          customerId,
-          customerName: salesReturn.customerName || 'غير معروف',
-          totalSpent: 0,
-          orderCount: 0,
-        };
-      }
-      customerSpent[customerId].totalSpent -= netReturnedRevenue;
-
-      const items = returnItemsByReturn.get(salesReturn.id) || [];
-
-      for (const item of items) {
-        const itemRefund = Number(item.totalRefund || 0);
-        const itemTaxReduction = returnedAmount > 0
-          ? round2(taxReduction * itemRefund / returnedAmount)
-          : 0;
-        const netRevenue = itemRefund - itemTaxReduction;
-        const quantity = Number(item.quantityM2 || 0);
-        const returnedCost = Number(item.unitCost || 0) * quantity;
-        totalProfit += returnedCost - netRevenue;
-
-        const productId = item.productId;
-        if (!productRevenue[productId]) {
-          productRevenue[productId] = {
-            productId,
-            productName: item.productName,
-            quantity: 0,
-            revenue: 0,
-          };
-        }
-        productRevenue[productId].quantity -= quantity;
-        productRevenue[productId].revenue -= netRevenue;
+      for (const item of itemsByReturn.get(salesReturn.id) || []) {
+        this.aggregateReturnItem(item, returnedAmount, taxReduction, totals);
       }
     }
+  }
 
-    totalSales = round2(totalSales);
-    const averageOrderValue = totalOrders > 0 ? round2(totalSales / totalOrders) : 0;
+  private aggregateReturnItem(item: any, returnedAmount: number, taxReduction: number, totals: SalesAnalyticsTotals): void {
+    const itemRefund = Number(item.totalRefund || 0);
+    const itemTaxReduction = returnedAmount > 0
+      ? round2(taxReduction * itemRefund / returnedAmount)
+      : 0;
+    const netRevenue = itemRefund - itemTaxReduction;
+    const quantity = Number(item.quantityM2 || 0);
+    totals.totalProfit += Number(item.unitCost || 0) * quantity - netRevenue;
+    this.addProductRevenue(totals, item.productId, item.productName, -quantity, -netRevenue);
+  }
 
-    const topProducts = Object.values(productRevenue)
-      .sort((a: any, b: any) => b.revenue - a.revenue)
-      .slice(0, 10);
+  private addDailySales(totals: SalesAnalyticsTotals, date: string, amount: number, count: number): void {
+    if (!totals.salesByDay[date]) totals.salesByDay[date] = { date, amount: 0, count: 0 };
+    totals.salesByDay[date].amount += amount;
+    totals.salesByDay[date].count += count;
+  }
 
-    const topCustomers = Object.values(customerSpent)
-      .sort((a: any, b: any) => b.totalSpent - a.totalSpent)
-      .slice(0, 10);
+  private addCustomerSpend(
+    totals: SalesAnalyticsTotals,
+    customerId: string,
+    customerName: string,
+    amount: number,
+    orderCount: number,
+  ): void {
+    if (!totals.customerSpent[customerId]) {
+      totals.customerSpent[customerId] = { customerId, customerName, totalSpent: 0, orderCount: 0 };
+    }
+    totals.customerSpent[customerId].totalSpent += amount;
+    totals.customerSpent[customerId].orderCount += orderCount;
+  }
 
-    const periodLabel = `${dateFrom} إلى ${dateTo}`;
-
-    return {
-      period: periodLabel,
-      totalSales,
-      totalOrders,
-      averageOrderValue,
-      totalProfit: round2(totalProfit),
-      topProducts,
-      topCustomers,
-      salesByDay: Object.values(salesByDay).sort((a: any, b: any) => a.date.localeCompare(b.date)),
-    };
+  private addProductRevenue(
+    totals: SalesAnalyticsTotals,
+    productId: string,
+    productName: string,
+    quantity: number,
+    revenue: number,
+  ): void {
+    if (!totals.productRevenue[productId]) {
+      totals.productRevenue[productId] = { productId, productName, quantity: 0, revenue: 0 };
+    }
+    totals.productRevenue[productId].quantity += quantity;
+    totals.productRevenue[productId].revenue += revenue;
   }
 
   public recordSnapshot(metricName: string, metricValue: number, periodStart: string, periodEnd: string, dimension?: string): void {

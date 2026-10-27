@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Truck, Plus, Search, Loader2, MapPin, User, Phone, Calendar } from 'lucide-react';
 import { OperationsService, Delivery, Driver, Vehicle } from '../../services/OperationsService';
 import { AuthService } from '../../services/AuthService';
@@ -7,7 +7,7 @@ import { STATUS_LABEL, STATUS_STYLE } from './deliveryStatus';
 import { DeliveryCreateModal } from './DeliveryCreateModal';
 type Customer = { id: string; name: string; phone?: string | null; address?: string | null; city?: string | null };
 export const DeliveriesPage: React.FC = () => {
-  const service = new OperationsService();
+  const service = useMemo(() => new OperationsService(), []);
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'deliveries.manage');
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -24,16 +24,16 @@ export const DeliveriesPage: React.FC = () => {
     scheduledAt: '', deliveryFee: '', notes: '',
   });
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setDeliveries(service.getDeliveries(search, statusFilter));
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل أوامر التسليم.'); }
     finally { setLoading(false); }
-  };
+  }, [search, service, statusFilter]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [statusFilter]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     try {

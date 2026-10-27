@@ -60,7 +60,8 @@ export const ProjectDetailPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [id]);
 
   const changeStatus = (status: ProjectStatus) => {
     try { service.updateProject(id, { status }); load(); } catch (e: any) { alert(e?.message); }

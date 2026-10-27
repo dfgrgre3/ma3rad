@@ -9,6 +9,19 @@ import {
   type Migration,
 } from '../migrationSupport';
 
+function payrollEntryLines(type: string, amount: number) {
+  switch (type) {
+    case 'ADVANCE':
+      return [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
+    case 'BONUS':
+      return [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2104', debit: 0, credit: amount }];
+    case 'DEDUCTION':
+      return [{ accountCode: '2104', debit: amount, credit: 0 }, { accountCode: '5202', debit: 0, credit: amount }];
+    default:
+      return [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
+  }
+}
+
 export const MIGRATION_PART_07: Migration[] = [
 {
     id: '030_payroll_and_inventory_accounts',
@@ -95,13 +108,7 @@ export const MIGRATION_PART_07: Migration[] = [
         if (amount <= 0) continue;
         const date = row.date || localDateString();
         const registerId = row.register_id || 'cr_main';
-        const lines = row.type === 'ADVANCE'
-          ? [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }]
-          : row.type === 'BONUS'
-            ? [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2104', debit: 0, credit: amount }]
-            : row.type === 'DEDUCTION'
-              ? [{ accountCode: '2104', debit: amount, credit: 0 }, { accountCode: '5202', debit: 0, credit: amount }]
-              : [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
+        const lines = payrollEntryLines(row.type, amount);
         postLedgerEntry(db, {
           date, description: `Payroll ${row.type} for employee ${row.employee_id}`,
           referenceType: 'PAYROLL_TRANSACTION', referenceId: row.id, createdBy, lines,

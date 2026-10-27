@@ -46,11 +46,7 @@ export class DynamicDataService {
     return rows.map(r => ({ id:r.id,name:r.name,nameKey:r.nameKey,description:r.description||'',fields:asJSON(r.fieldsJson,[]),relations:asJSON(r.relationsJson,[]),createdAt:r.createdAt,updatedAt:r.updatedAt,recordCount:r.recordCount }));
   }
 
-  private saveEntity(name: string, headers: string[], rows: Record<string, unknown>[], actorId: string): DynamicEntity {
-    const displayName = name.trim() || 'بيانات مستوردة'; const nameKey = clean(displayName);
-    const found = this.db.query<any>('SELECT * FROM dynamic_entity_types WHERE name_key=?',[nameKey])[0];
-    const oldFields: DynamicField[] = found ? asJSON(found.fieldsJson,[]) : [];
-    const fields: DynamicField[] = [...oldFields];
+  private mergeImportedFields(fields: DynamicField[], headers: string[], rows: Record<string, unknown>[]): void {
     for (const header of headers) {
       const existing = fields.find(f => clean(f.originalHeader || f.label) === clean(header) || clean(f.label) === clean(header));
       const samples = rows.slice(0, 50).map(r => r[header]);
@@ -61,6 +57,14 @@ export class DynamicDataService {
         if (existing.type === 'text' && inferred !== 'text') existing.type = inferred;
       } else { const base=fieldKey(header);let key=base;let suffix=2;while(fields.some(f=>f.key===key))key=`${base}_${suffix++}`;fields.push({ key, label: header.trim(), type: inferred, required: false, originalHeader: header, relationCandidate }); }
     }
+  }
+
+  private saveEntity(name: string, headers: string[], rows: Record<string, unknown>[], actorId: string): DynamicEntity {
+    const displayName = name.trim() || 'بيانات مستوردة'; const nameKey = clean(displayName);
+    const found = this.db.query<any>('SELECT * FROM dynamic_entity_types WHERE name_key=?',[nameKey])[0];
+    const oldFields: DynamicField[] = found ? asJSON(found.fieldsJson,[]) : [];
+    const fields: DynamicField[] = [...oldFields];
+    this.mergeImportedFields(fields, headers, rows);
     const relations = found ? asJSON<Array<Record<string, unknown>>>(found.relationsJson,[]) : [];
     if (found) this.db.run('UPDATE dynamic_entity_types SET fields_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?',[JSON.stringify(fields),found.id]);
     else this.db.run('INSERT INTO dynamic_entity_types (id,name,name_key,description,fields_json,relations_json,created_by) VALUES (?,?,?,?,?,?,?)',[id('det'),displayName,nameKey,'',JSON.stringify(fields),JSON.stringify(relations),actorId]);

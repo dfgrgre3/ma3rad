@@ -197,6 +197,7 @@ export const AdminRolesTab: React.FC = () => {
               <Search className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
               <input
                 aria-label="بحث في الصلاحيات"
+                name="role-search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="بحث في الصلاحيات..."
@@ -299,16 +300,41 @@ export const AdminRolesTab: React.FC = () => {
             {modal === 'create' && (
               <div>
                 <label htmlFor="role-code" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">كود الدور (إنجليزي) *</label>
-                <input id="role-code" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="SALES_MANAGER" className={`${inputCls} font-mono`} />
+                <input
+                  id="role-code"
+                  name="roleCode"
+                  aria-label="كود الدور"
+                  required
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                  placeholder="SALES_MANAGER"
+                  className={`${inputCls} font-mono`}
+                />
               </div>
             )}
             <div>
               <label htmlFor="role-name" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">اسم الدور *</label>
-              <input id="role-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
+              <input
+                id="role-name"
+                name="roleName"
+                aria-label="اسم الدور"
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className={inputCls}
+              />
             </div>
             <div>
               <label htmlFor="role-description" className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300">الوصف</label>
-              <textarea id="role-description" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputCls} />
+              <textarea
+                id="role-description"
+                name="roleDescription"
+                aria-label="وصف الدور"
+                rows={2}
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                className={inputCls}
+              />
             </div>
             <div className="flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
               <button type="button" onClick={() => setModal(null)} className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">إلغاء</button>

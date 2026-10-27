@@ -195,6 +195,88 @@ const PAY_DARK_STYLE: Record<string, string> = {
   UNPAID: 'dark:bg-rose-950 dark:text-rose-300',
 };
 
+const getDailyData = (service: DailyOperationsService, kind: DailyKind, date: string) => {
+  const loaders: Record<DailyKind, (value: string) => any> = {
+    sales: service.getSales.bind(service),
+    purchases: service.getPurchases.bind(service),
+    expenses: service.getExpenses.bind(service),
+    debts: service.getDebts.bind(service),
+  };
+  return loaders[kind](date);
+};
+
+const getDailyRowSearchText = (kind: DailyKind, row: any) => {
+  const fields: Record<DailyKind, string> = {
+    sales: `${row.invoiceNumber} ${row.customerName || ''} ${row.customerPhone || ''} ${row.createdByName || ''}`,
+    purchases: `${row.invoiceNumber} ${row.supplierName || ''} ${row.supplierPhone || ''}`,
+    expenses: `${row.category} ${row.description} ${row.recipient || ''} ${row.registerName || ''}`,
+    debts: `${row.invoiceNumber} ${row.customerName || ''} ${row.customerPhone || ''}`,
+  };
+  return fields[kind].toLowerCase();
+};
+
+const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
+  const invoiceColumns = [
+    { key: 'invoiceNumber', label: 'الفاتورة' }, { key: 'time', label: 'الوقت' },
+    { key: 'customerName', label: 'العميل' }, { key: 'itemsCount', label: 'الأصناف' },
+    { key: 'total', label: 'الإجمالي' }, { key: 'paid', label: 'المدفوع' },
+    { key: 'remaining', label: 'المتبقي' }, { key: 'paymentStatus', label: 'الحالة' },
+  ];
+  const exportOptions: Record<DailyKind, Parameters<typeof exportToExcel>[0]> = {
+    sales: {
+      title: 'مبيعات اليوم',
+      subtitle: date,
+      columns: invoiceColumns,
+      rows: data.rows.map((row: any) => ({
+        ...row,
+        time: time(row.createdAt),
+        paymentStatus: PAY_LABEL[row.paymentStatus] || row.paymentStatus,
+      })),
+      fileName: `sales-${date}`,
+    },
+    purchases: {
+      title: 'مشتريات اليوم',
+      subtitle: date,
+      columns: invoiceColumns.map((column) => column.key === 'customerName'
+        ? { ...column, key: 'supplierName', label: 'المورد' }
+        : column),
+      rows: data.rows.map((row: any) => ({
+        ...row,
+        time: time(row.createdAt),
+        paymentStatus: PAY_LABEL[row.paymentStatus] || row.paymentStatus,
+      })),
+      fileName: `purchases-${date}`,
+    },
+    expenses: {
+      title: 'منصرف اليوم',
+      subtitle: date,
+      columns: [
+        { key: 'category', label: 'البند' }, { key: 'description', label: 'البيان' },
+        { key: 'recipient', label: 'المستفيد' }, { key: 'paymentType', label: 'طريقة الدفع' },
+        { key: 'amount', label: 'المبلغ' }, { key: 'time', label: 'الوقت' },
+      ],
+      rows: data.rows.map((row: any) => ({
+        ...row,
+        time: time(row.createdAt),
+        paymentType: PAY_LABEL[row.paymentType] || row.paymentType,
+      })),
+      fileName: `expenses-${date}`,
+    },
+    debts: {
+      title: 'ديون اليوم',
+      subtitle: date,
+      columns: [
+        { key: 'invoiceNumber', label: 'الفاتورة' }, { key: 'customerName', label: 'العميل' },
+        { key: 'total', label: 'الإجمالي' }, { key: 'paid', label: 'المدفوع' },
+        { key: 'remaining', label: 'المتبقي' }, { key: 'paymentStatus', label: 'الحالة' },
+      ],
+      rows: data.rows,
+      fileName: `debts-${date}`,
+    },
+  };
+  return exportOptions[kind];
+};
+
 const payBadge = (status?: string | null, darkTheme = false) => {
   const key = status || '';
   return (
@@ -244,10 +326,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const load = () => {
     setLoading(true);
     try {
-      if (kind === 'sales') setData(service.getSales(date));
-      else if (kind === 'purchases') setData(service.getPurchases(date));
-      else if (kind === 'expenses') setData(service.getExpenses(date));
-      else setData(service.getDebts(date));
+      setData(getDailyData(service, kind, date));
       setError(null);
     } catch (e: any) {
       setError(e?.message || 'تعذر تحميل بيانات اليوم');
@@ -257,22 +336,17 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [kind, date]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [kind, date]);
 
   const filteredRows = useMemo(() => {
     const rows: any[] = data?.rows || [];
     const term = search.trim().toLowerCase();
     return rows.filter((row) => {
-      if (status !== 'ALL' && (kind === 'sales' || kind === 'purchases') && row.paymentStatus !== status) return false;
+      const supportsPaymentFilter = kind === 'sales' || kind === 'purchases';
+      if (supportsPaymentFilter && status !== 'ALL' && row.paymentStatus !== status) return false;
       if (!term) return true;
-      const haystack = kind === 'sales'
-        ? `${row.invoiceNumber} ${row.customerName || ''} ${row.customerPhone || ''} ${row.createdByName || ''}`
-        : kind === 'purchases'
-          ? `${row.invoiceNumber} ${row.supplierName || ''} ${row.supplierPhone || ''}`
-          : kind === 'expenses'
-            ? `${row.category} ${row.description} ${row.recipient || ''} ${row.registerName || ''}`
-            : `${row.invoiceNumber} ${row.customerName || ''} ${row.customerPhone || ''}`;
-      return haystack.toLowerCase().includes(term);
+      return getDailyRowSearchText(kind, row).includes(term);
     });
   }, [data, search, status, kind]);
 
@@ -327,53 +401,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const handleExport = () => {
     if (!data) return;
     try {
-      if (kind === 'sales') {
-        exportToExcel({
-          title: 'مبيعات اليوم', subtitle: date,
-          columns: [
-            { key: 'invoiceNumber', label: 'الفاتورة' }, { key: 'time', label: 'الوقت' },
-            { key: 'customerName', label: 'العميل' }, { key: 'itemsCount', label: 'الأصناف' },
-            { key: 'total', label: 'الإجمالي' }, { key: 'paid', label: 'المدفوع' },
-            { key: 'remaining', label: 'المتبقي' }, { key: 'paymentStatus', label: 'الحالة' },
-          ],
-          rows: data.rows.map((r: any) => ({ ...r, time: time(r.createdAt), paymentStatus: PAY_LABEL[r.paymentStatus] || r.paymentStatus })),
-          fileName: `sales-${date}`,
-        });
-      } else if (kind === 'purchases') {
-        exportToExcel({
-          title: 'مشتريات اليوم', subtitle: date,
-          columns: [
-            { key: 'invoiceNumber', label: 'الفاتورة' }, { key: 'time', label: 'الوقت' },
-            { key: 'supplierName', label: 'المورد' }, { key: 'itemsCount', label: 'الأصناف' },
-            { key: 'total', label: 'الإجمالي' }, { key: 'paid', label: 'المدفوع' },
-            { key: 'remaining', label: 'المتبقي' }, { key: 'paymentStatus', label: 'الحالة' },
-          ],
-          rows: data.rows.map((r: any) => ({ ...r, time: time(r.createdAt), paymentStatus: PAY_LABEL[r.paymentStatus] || r.paymentStatus })),
-          fileName: `purchases-${date}`,
-        });
-      } else if (kind === 'expenses') {
-        exportToExcel({
-          title: 'منصرف اليوم', subtitle: date,
-          columns: [
-            { key: 'category', label: 'البند' }, { key: 'description', label: 'البيان' },
-            { key: 'recipient', label: 'المستفيد' }, { key: 'paymentType', label: 'طريقة الدفع' },
-            { key: 'amount', label: 'المبلغ' }, { key: 'time', label: 'الوقت' },
-          ],
-          rows: data.rows.map((r: any) => ({ ...r, time: time(r.createdAt), paymentType: PAY_LABEL[r.paymentType] || r.paymentType })),
-          fileName: `expenses-${date}`,
-        });
-      } else {
-        exportToExcel({
-          title: 'ديون اليوم', subtitle: date,
-          columns: [
-            { key: 'invoiceNumber', label: 'الفاتورة' }, { key: 'customerName', label: 'العميل' },
-            { key: 'total', label: 'الإجمالي' }, { key: 'paid', label: 'المدفوع' },
-            { key: 'remaining', label: 'المتبقي' }, { key: 'paymentStatus', label: 'الحالة' },
-          ],
-          rows: data.rows,
-          fileName: `debts-${date}`,
-        });
-      }
+      exportToExcel(getDailyExportOptions(kind, date, data));
       toast.success('تم تصدير التقرير');
     } catch (e: any) {
       toast.error(e?.message || 'تعذر تصدير التقرير');

@@ -41,6 +41,52 @@ const num = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+type ProductImportValidationRow = Pick<
+  ProductImportRow,
+  'sku' | 'barcode' | 'name' | 'category' | 'brand' | 'size' |
+  'piecesPerBox' | 'metersPerBox' | 'costPrice' | 'sellingPriceM2'
+>;
+
+const validateRequiredFields = (
+  row: ProductImportValidationRow,
+  categoryNames: Set<string>,
+  brandNames: Set<string>,
+): string[] => {
+  const errors: string[] = [];
+  if (!row.sku) errors.push('الكود مطلوب');
+  if (!row.name) errors.push('اسم المنتج مطلوب');
+  if (!row.category) errors.push('التصنيف مطلوب');
+  else if (!categoryNames.has(row.category)) errors.push(`التصنيف غير موجود: ${row.category}`);
+  if (!row.brand) errors.push('الماركة مطلوبة');
+  else if (!brandNames.has(row.brand)) errors.push(`الماركة غير موجودة: ${row.brand}`);
+  if (!row.size) errors.push('المقاس مطلوب');
+  return errors;
+};
+
+const validatePricing = (row: ProductImportValidationRow): string[] => {
+  const errors: string[] = [];
+  if (!(row.piecesPerBox > 0)) errors.push('عدد القطع بالكرتونة يجب أن يكون أكبر من صفر');
+  if (!(row.metersPerBox > 0)) errors.push('مترات الكرتونة يجب أن تكون أكبر من صفر');
+  if (!(row.sellingPriceM2 > 0)) errors.push('سعر المتر مطلوب');
+  if (row.sellingPriceM2 > 0 && row.costPrice > row.sellingPriceM2) {
+    errors.push('سعر التكلفة أكبر من سعر البيع');
+  }
+  return errors;
+};
+
+const validateDuplicateIdentifiers = (
+  row: ProductImportValidationRow,
+  seenSku: Set<string>,
+  seenBarcode: Set<string>,
+): string[] => {
+  const errors: string[] = [];
+  if (row.sku && seenSku.has(row.sku)) errors.push('الكود مكرر داخل الملف');
+  if (row.barcode && seenBarcode.has(row.barcode)) errors.push('الباركود مكرر داخل الملف');
+  if (row.sku) seenSku.add(row.sku);
+  if (row.barcode) seenBarcode.add(row.barcode);
+  return errors;
+};
+
 const HEADER_ALIASES: Record<string, string[]> = {
   sku: ['sku', 'الكود', 'كود', 'كود الصنف'],
   barcode: ['barcode', 'الباركود', 'باركود'],
@@ -118,23 +164,15 @@ export class ProductImportService {
       const minSellingPriceM2 = num(value('minSellingPriceM2')) || costPrice;
       const initialStockM2 = num(value('initialStockM2'));
 
-      const errors: string[] = [];
-      if (!sku) errors.push('الكود مطلوب');
-      if (!name) errors.push('اسم المنتج مطلوب');
-      if (!category) errors.push('التصنيف مطلوب');
-      else if (!categoryNames.has(category)) errors.push(`التصنيف غير موجود: ${category}`);
-      if (!brand) errors.push('الماركة مطلوبة');
-      else if (!brandNames.has(brand)) errors.push(`الماركة غير موجودة: ${brand}`);
-      if (!size) errors.push('المقاس مطلوب');
-      if (!(piecesPerBox > 0)) errors.push('عدد القطع بالكرتونة يجب أن يكون أكبر من صفر');
-      if (!(metersPerBox > 0)) errors.push('مترات الكرتونة يجب أن تكون أكبر من صفر');
-      if (!(sellingPriceM2 > 0)) errors.push('سعر المتر مطلوب');
-      if (sellingPriceM2 > 0 && costPrice > sellingPriceM2) errors.push('سعر التكلفة أكبر من سعر البيع');
-      if (sku && seenSku.has(sku)) errors.push('الكود مكرر داخل الملف');
-      if (barcode && seenBarcode.has(barcode)) errors.push('الباركود مكرر داخل الملف');
-
-      if (sku) seenSku.add(sku);
-      if (barcode) seenBarcode.add(barcode);
+      const row = {
+        sku, barcode, name, category, brand, size,
+        piecesPerBox, metersPerBox, costPrice, sellingPriceM2,
+      };
+      const errors = [
+        ...validateRequiredFields(row, categoryNames, brandNames),
+        ...validatePricing(row),
+        ...validateDuplicateIdentifiers(row, seenSku, seenBarcode),
+      ];
 
       return {
         rowNumber: index + 2, sku, barcode, name, category, brand, grade, size,

@@ -49,7 +49,8 @@ export const ProjectsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
 
   const filtered = projects.filter((p) => statusFilter === 'ALL' || p.status === statusFilter);
   const active = projects.filter((p) => p.status === 'ACTIVE').length;

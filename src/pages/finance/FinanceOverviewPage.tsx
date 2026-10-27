@@ -20,6 +20,14 @@ interface AccountRecord {
   balance: number;
 }
 
+const ACCOUNT_TYPE_PRESENTATION: Record<AccountRecord['type'], { label: string; className: string }> = {
+  ASSET: { label: 'أصول', className: 'bg-emerald-500/10 text-emerald-600' },
+  LIABILITY: { label: 'خصوم والتزامات', className: 'bg-amber-500/10 text-amber-600' },
+  EQUITY: { label: 'حقوق ملكية', className: 'bg-indigo-500/10 text-indigo-600' },
+  REVENUE: { label: 'إيرادات', className: 'bg-teal-500/10 text-teal-600' },
+  EXPENSE: { label: 'مصروفات', className: 'bg-rose-500/10 text-rose-600' },
+};
+
 interface JournalEntryRecord {
   id: string;
   entryNumber: string;
@@ -344,17 +352,8 @@ export const FinanceOverviewPage: React.FC = () => {
                     <td className="p-3 font-mono font-bold text-sky-600">{acc.code}</td>
                     <td className="p-3 font-bold text-slate-900">{acc.name}</td>
                     <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
- acc.type === 'ASSET' ? 'bg-emerald-500/10 text-emerald-600' :
- acc.type === 'LIABILITY' ? 'bg-amber-500/10 text-amber-600' :
- acc.type === 'EQUITY' ? 'bg-indigo-500/10 text-indigo-600' :
- acc.type === 'REVENUE' ? 'bg-teal-500/10 text-teal-600' :
- 'bg-rose-500/10 text-rose-600'
- }`}>
-                        {acc.type === 'ASSET' ? 'أصول' :
-                         acc.type === 'LIABILITY' ? 'خصوم والتزامات' :
-                         acc.type === 'EQUITY' ? 'حقوق ملكية' :
-                         acc.type === 'REVENUE' ? 'إيرادات' : 'مصروفات'}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ACCOUNT_TYPE_PRESENTATION[acc.type].className}`}>
+                        {ACCOUNT_TYPE_PRESENTATION[acc.type].label}
                       </span>
                     </td>
                     <td className="p-3 font-mono font-black text-slate-800">{fmt(acc.balance)}</td>

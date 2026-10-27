@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Truck, Plus, Search, Loader2, X, Calendar, Fuel } from 'lucide-react';
 import { OperationsService, Vehicle, Driver } from '../../services/OperationsService';
 import { AuthService } from '../../services/AuthService';
@@ -15,7 +15,7 @@ const STATUS_STYLE: Record<Vehicle['status'], string> = {
 };
 
 export const VehiclesPage: React.FC = () => {
-  const service = new OperationsService();
+  const service = useMemo(() => new OperationsService(), []);
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'vehicles.manage');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -29,17 +29,17 @@ export const VehiclesPage: React.FC = () => {
     licenseExpiresAt: '', insuranceExpiresAt: '',
   });
 
-  const load = () => {
+  const load = useCallback((query: string) => {
     setLoading(true);
     try {
-      setVehicles(service.getVehicles(search));
+      setVehicles(service.getVehicles(query));
       setDrivers(service.getDrivers());
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل المركبات.'); }
     finally { setLoading(false); }
-  };
+  }, [service]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { load(''); }, [load]);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,13 +57,13 @@ export const VehiclesPage: React.FC = () => {
       });
       setModalOpen(false);
       setForm({ plateNumber: '', make: '', model: '', year: '', capacityKg: '', assignedDriverId: '', licenseExpiresAt: '', insuranceExpiresAt: '' });
-      load();
+      load(search);
     } catch (err: any) { alert(err?.message || 'تعذر إضافة المركبة.'); }
     finally { setSaving(false); }
   };
 
   const changeStatus = (v: Vehicle, status: Vehicle['status']) => {
-    try { service.updateVehicleStatus(v.id, status); load(); } catch (e: any) { alert(e?.message); }
+    try { service.updateVehicleStatus(v.id, status); load(search); } catch (e: any) { alert(e?.message); }
   };
 
   return (
@@ -84,7 +84,7 @@ export const VehiclesPage: React.FC = () => {
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200">
-        <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative">
+        <form onSubmit={(e) => { e.preventDefault(); load(search); }} className="relative">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم اللوحة أو الماركة ثم Enter..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400" />
         </form>

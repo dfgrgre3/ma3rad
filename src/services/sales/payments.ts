@@ -196,72 +196,96 @@ export function recordCustomerPaymentAllocationsEntry(
   });
 }
 
-export function deleteInvoicePaymentEntry(ctx: SalesContext, paymentId: string): void {
-  const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'customers.payment.reverse');
-  const payment = ctx.db.query<any>(
-    `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id, branch_id
-     FROM customer_payments WHERE id = ?`,
+function assertPaymentIsNotInstallmentLinked(ctx: SalesContext, paymentId: string, invoiceId: string): void {
+  const protectedPayment = ctx.db.query<any>(
+    'SELECT COUNT(*) AS count FROM installments WHERE payment_id=?',
     [paymentId]
-  )[0];
-  if (!payment) throw new Error('سند القبض غير موجود.');
-  ctx.branchAccess.requireBranchAccess(payment.branchId, actor);
-  if (payment.registerId) ctx.branchAccess.requireRegisterAccess(payment.registerId, actor, payment.branchId);
-  if (payment.invoiceId) {
-    const invoice = ctx.getInvoiceById(payment.invoiceId);
-    if (!invoice) throw new Error('الفاتورة غير موجودة أو خارج نطاق الفروع المصرح به.');
+  )[0]?.count || 0;
+  const linkedPlan = ctx.db.query<any>(
+    `SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`,
+    [invoiceId]
+  )[0]?.count || 0;
+  if (protectedPayment || linkedPlan) {
+    throw new Error('This receipt belongs to an installment plan. Reverse the plan payment from the installments screen.');
   }
-  if (payment.paymentGroupId) {
-    const group = ctx.db.query<any>(`SELECT * FROM customer_payments WHERE payment_group_id=? AND branch_id=?`, [payment.paymentGroupId, payment.branchId]);
-    for (const row of group) {
-      if (row.invoiceId && !ctx.getInvoiceById(row.invoiceId)) {
-        throw new Error('تتضمن الدفعة فاتورة خارج نطاق الفروع المصرح به.');
-      }
-      const protectedPayment = ctx.db.query<any>('SELECT COUNT(*) AS count FROM installments WHERE payment_id=?', [row.id])[0]?.count || 0;
-      const linkedPlan = ctx.db.query<any>(`SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`, [row.invoiceId])[0]?.count || 0;
-      if (protectedPayment || linkedPlan) throw new Error('This receipt belongs to an installment plan. Reverse the plan payment from the installments screen.');
-    }
-    ctx.db.executeTransaction((db) => {
-      const groupEntry = db.getDatabase().exec(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT_GROUP' AND reference_id=?`, [payment.paymentGroupId])[0]?.values[0]?.[0];
-      if (groupEntry) reverseLedgerEntry(db.getDatabase(), String(groupEntry), {
-        date: localDateString(), description: `Reverse customer receipt group ${payment.paymentGroupId}`,
-        referenceType: 'CUSTOMER_PAYMENT_GROUP_VOID', referenceId: `${payment.paymentGroupId}:${uuidv4()}`, createdBy: actor.id,
-      });
-      for (const row of group) {
-        const paymentEntry = db.getDatabase().exec(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`, [row.id])[0]?.values[0]?.[0];
-        if (paymentEntry) reverseLedgerEntry(db.getDatabase(), String(paymentEntry), {
-          date: localDateString(), description: `Reverse customer receipt ${row.receiptNumber}`,
-          referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${row.id}:${uuidv4()}`, createdBy: actor.id,
-        });
-        const invoice = db.query<any>(`SELECT id,customer_id,paid_amount,total_amount,remaining_amount,invoice_status FROM sales_invoices WHERE id=?`, [row.invoiceId])[0];
-        if (!invoice || invoice.invoiceStatus === 'VOID') throw new Error('تعذر عكس الدفعة المرتبطة بفاتورة غير متاحة.');
-        const value = round2(row.amount); const paid = round2(Math.max(0, invoice.paidAmount - value)); const remaining = round2(Math.min(invoice.totalAmount, invoice.remainingAmount + value));
-        db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [paid, remaining, remaining <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]);
-        db.run(`UPDATE customers SET current_balance=current_balance+?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [value, invoice.customerId]);
-        if (row.paymentType === 'CASH') db.run(`UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?`, [value, row.registerId || 'cr_main']);
-        if (row.shiftId) db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?`, [value, row.shiftId]);
-      }
-      db.run(`DELETE FROM customer_payments WHERE payment_group_id=?`, [payment.paymentGroupId]);
-      db.run(`INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,old_values) VALUES (?,?,?,?,?,?,?)`,
-        [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'عكس دفعة موزعة على فواتير', 'SALES', payment.paymentGroupId, JSON.stringify(group.map(row => ({ receiptNumber: row.receiptNumber, invoiceId: row.invoiceId, amount: row.amount })))]);
-    });
-    return;
-  }
-  if (!payment.invoiceId) throw new Error('هذا السند غير مرتبط بفاتورة بيع. احذفه من كشف حساب العميل.');
-  const protectedPayment = ctx.db.query<any>('SELECT COUNT(*) AS count FROM installments WHERE payment_id=?', [paymentId])[0]?.count || 0;
-  const linkedPlan = ctx.db.query<any>(`SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`, [payment.invoiceId])[0]?.count || 0;
-  if (protectedPayment || linkedPlan) throw new Error('This receipt belongs to an installment plan. Reverse the plan payment from the installments screen.');
-  const invoice = ctx.getInvoiceById(payment.invoiceId);
-  if (!invoice) throw new Error('فاتورة البيع غير موجودة.');
-  if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن حذف دفعة من فاتورة ملغاة.');
+}
 
+function validatePaymentGroup(ctx: SalesContext, group: any[]): void {
+  for (const row of group) {
+    if (row.invoiceId && !ctx.getInvoiceById(row.invoiceId)) {
+      throw new Error('تتضمن الدفعة فاتورة خارج نطاق الفروع المصرح به.');
+    }
+    assertPaymentIsNotInstallmentLinked(ctx, row.id, row.invoiceId);
+  }
+}
+
+function reversePaymentGroup(ctx: SalesContext, payment: any, group: any[], actor: ReturnType<typeof AuthService.requireAuth>): void {
+  ctx.db.executeTransaction((db) => {
+    const groupEntry = db.getDatabase().exec(
+      `SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT_GROUP' AND reference_id=?`,
+      [payment.paymentGroupId]
+    )[0]?.values[0]?.[0];
+    if (groupEntry) reverseLedgerEntry(db.getDatabase(), String(groupEntry), {
+      date: localDateString(), description: `Reverse customer receipt group ${payment.paymentGroupId}`,
+      referenceType: 'CUSTOMER_PAYMENT_GROUP_VOID', referenceId: `${payment.paymentGroupId}:${uuidv4()}`, createdBy: actor.id,
+    });
+    for (const row of group) {
+      const paymentEntry = db.getDatabase().exec(
+        `SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`,
+        [row.id]
+      )[0]?.values[0]?.[0];
+      if (paymentEntry) reverseLedgerEntry(db.getDatabase(), String(paymentEntry), {
+        date: localDateString(), description: `Reverse customer receipt ${row.receiptNumber}`,
+        referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${row.id}:${uuidv4()}`, createdBy: actor.id,
+      });
+      const invoice = db.query<any>(
+        `SELECT id,customer_id,paid_amount,total_amount,remaining_amount,invoice_status FROM sales_invoices WHERE id=?`,
+        [row.invoiceId]
+      )[0];
+      if (!invoice || invoice.invoiceStatus === 'VOID') throw new Error('تعذر عكس الدفعة المرتبطة بفاتورة غير متاحة.');
+      const value = round2(row.amount);
+      const paid = round2(Math.max(0, invoice.paidAmount - value));
+      const remaining = round2(Math.min(invoice.totalAmount, invoice.remainingAmount + value));
+      db.run(
+        `UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        [paid, remaining, remaining <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID', invoice.id]
+      );
+      db.run(`UPDATE customers SET current_balance=current_balance+?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [value, invoice.customerId]);
+      if (row.paymentType === 'CASH') {
+        db.run(`UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?`, [value, row.registerId || 'cr_main']);
+      }
+      if (row.shiftId) {
+        db.run(`UPDATE cash_shifts SET total_customer_payments=total_customer_payments-? WHERE id=?`, [value, row.shiftId]);
+      }
+    }
+    db.run(`DELETE FROM customer_payments WHERE payment_group_id=?`, [payment.paymentGroupId]);
+    db.run(
+      `INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,old_values) VALUES (?,?,?,?,?,?,?)`,
+      [`aud_${uuidv4().slice(0, 8)}`, actor.id, actor.fullName, 'عكس دفعة موزعة على فواتير', 'SALES',
+        payment.paymentGroupId, JSON.stringify(group.map(row => ({
+          receiptNumber: row.receiptNumber, invoiceId: row.invoiceId, amount: row.amount,
+        })))]
+    );
+  });
+}
+
+function reverseSingleInvoicePayment(
+  ctx: SalesContext,
+  payment: any,
+  paymentId: string,
+  invoice: NonNullable<ReturnType<SalesContext['getInvoiceById']>>,
+  actor: ReturnType<typeof AuthService.requireAuth>
+): void {
   const amount = round2(payment.amount);
   const newPaid = round2(Math.max(0, invoice.paidAmount - amount));
   const newRemaining = round2(Math.min(invoice.totalAmount, invoice.remainingAmount + amount));
   const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
 
   ctx.db.executeTransaction((db) => {
-    const paymentEntry = db.getDatabase().exec(`SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`, [paymentId])[0]?.values[0]?.[0];
+    const paymentEntry = db.getDatabase().exec(
+      `SELECT id FROM journal_entries WHERE reference_type='CUSTOMER_PAYMENT' AND reference_id=?`,
+      [paymentId]
+    )[0]?.values[0]?.[0];
     if (paymentEntry) reverseLedgerEntry(db.getDatabase(), String(paymentEntry), {
       date: localDateString(), description: `Reverse customer receipt ${payment.receiptNumber}`,
       referenceType: 'CUSTOMER_PAYMENT_VOID', referenceId: `${paymentId}:${uuidv4()}`, createdBy: actor.id,
@@ -292,4 +316,35 @@ export function deleteInvoicePaymentEntry(ctx: SalesContext, paymentId: string):
       ]
     );
   });
+}
+
+export function deleteInvoicePaymentEntry(ctx: SalesContext, paymentId: string): void {
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'customers.payment.reverse');
+  const payment = ctx.db.query<any>(
+    `SELECT id, receipt_number, invoice_id, customer_id, amount, payment_type, register_id, shift_id, payment_group_id, branch_id
+     FROM customer_payments WHERE id = ?`,
+    [paymentId]
+  )[0];
+  if (!payment) throw new Error('سند القبض غير موجود.');
+  ctx.branchAccess.requireBranchAccess(payment.branchId, actor);
+  if (payment.registerId) ctx.branchAccess.requireRegisterAccess(payment.registerId, actor, payment.branchId);
+  if (payment.invoiceId && !ctx.getInvoiceById(payment.invoiceId)) {
+    throw new Error('الفاتورة غير موجودة أو خارج نطاق الفروع المصرح به.');
+  }
+  if (payment.paymentGroupId) {
+    const group = ctx.db.query<any>(
+      `SELECT * FROM customer_payments WHERE payment_group_id=? AND branch_id=?`,
+      [payment.paymentGroupId, payment.branchId]
+    );
+    validatePaymentGroup(ctx, group);
+    reversePaymentGroup(ctx, payment, group, actor);
+    return;
+  }
+  if (!payment.invoiceId) throw new Error('هذا السند غير مرتبط بفاتورة بيع. احذفه من كشف حساب العميل.');
+  assertPaymentIsNotInstallmentLinked(ctx, paymentId, payment.invoiceId);
+  const invoice = ctx.getInvoiceById(payment.invoiceId);
+  if (!invoice) throw new Error('فاتورة البيع غير موجودة.');
+  if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن حذف دفعة من فاتورة ملغاة.');
+  reverseSingleInvoicePayment(ctx, payment, paymentId, invoice, actor);
 }
