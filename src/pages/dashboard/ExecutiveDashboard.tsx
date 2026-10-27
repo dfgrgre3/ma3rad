@@ -133,14 +133,14 @@ export const ExecutiveDashboard: React.FC = () => {
         [fromStr, toStr]
       );
       const totalPurchasesRow = db.exec(
-        `SELECT COALESCE(SUM(total_amount),0) FROM purchase_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
+        `SELECT COALESCE(SUM(total_amount),0) FROM purchase_invoices WHERE date BETWEEN ? AND ?`,
         [fromStr, toStr]
       );
       const totalPurchases = totalPurchasesRow[0]?.values[0]?.[0] as number ?? 0;
 
       const purchaseRows = db.exec(
-        `SELECT id, date, supplier_id, total_amount, payment_status, created_at, currency_rate
-         FROM purchase_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'
+        `SELECT id, date, supplier_id, total_amount, payment_status, created_at
+         FROM purchase_invoices WHERE date BETWEEN ? AND ?
          ORDER BY created_at ASC`,
         [fromStr, toStr]
       );
@@ -149,7 +149,7 @@ export const ExecutiveDashboard: React.FC = () => {
       let purchasesTotal = 0;
       let purchasesCount = 0;
       for (const row of purchaseRows[0]?.values ?? []) {
-        const [pid, pdate, psupplierId, ptotalAmount, ppaymentStatus, pcreatedAt, pcurrencyRate] = row;
+        const [pid, pdate, psupplierId, ptotalAmount] = row;
         supplierById.set(String(psupplierId), String(psupplierId));
         purchasesTotal += Number(ptotalAmount) || 0;
         purchasesCount += 1;
@@ -447,7 +447,7 @@ export const ExecutiveDashboard: React.FC = () => {
               onClick={() => setRange(r.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
  range === r.id
- ? 'bg-sky-600 text-slate-900 shadow-md shadow-sky-600/25'
+ ? 'bg-sky-600 text-white shadow-md shadow-sky-600/25'
  : 'bg-slate-100 hover:bg-slate-200 hover:text-slate-900'
  }`}
             >
@@ -522,15 +522,15 @@ export const ExecutiveDashboard: React.FC = () => {
               <h3 className="text-sm font-bold text-slate-900 mb-4">المبيعات والأرباح — آخر 30 يوم</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={dailySales} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#64748b' }} interval={4} />
-                  <YAxis tick={{ fontSize: 10, fill: '#64748b' }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--cerami-chart-grid)" />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--cerami-muted)' }} interval={4} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--cerami-muted)' }} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: 8 }}
-                    labelStyle={{ color: '#94a3b8' }}
+                    contentStyle={{ backgroundColor: 'var(--cerami-tooltip-surface)', border: '1px solid var(--cerami-tooltip-border)', borderRadius: 8, color: 'var(--cerami-text)' }}
+                    labelStyle={{ color: 'var(--cerami-muted)' }}
                     formatter={(val: number) => [formatCurrency(val)]}
                   />
-                  <Legend wrapperStyle={{ fontSize: 11, color: '#64748b' }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: 'var(--cerami-muted)' }} />
                   <Line type="monotone" dataKey="sales" name="مبيعات" stroke="#38bdf8" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="profit" name="ربح" stroke="#34d399" strokeWidth={2} dot={false} />
                 </LineChart>
@@ -554,7 +554,7 @@ export const ExecutiveDashboard: React.FC = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: 8 }}
+                    contentStyle={{ backgroundColor: 'var(--cerami-tooltip-surface)', border: '1px solid var(--cerami-tooltip-border)', borderRadius: 8, color: 'var(--cerami-text)' }}
                     formatter={(val: number) => [formatCurrency(val)]}
                   />
                 </PieChart>

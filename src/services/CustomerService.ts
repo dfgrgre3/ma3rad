@@ -116,7 +116,9 @@ export class CustomerService {
     });
   }
 
-  public updateCustomer(id: string, updates: Partial<Customer>, performedBy = 'usr_admin'): Customer {
+  public updateCustomer(id: string, updates: Partial<Customer>): Customer {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'customers.update');
     const existing = this.getCustomerById(id);
     if (!existing) throw new Error('العميل غير موجود.');
 
@@ -145,8 +147,8 @@ export class CustomerService {
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
-        VALUES (?, ?, 'المدير', 'تعديل بيانات عميل', 'CUSTOMERS', ?, ?, ?)
-      `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id, JSON.stringify(existing), JSON.stringify(updates)]);
+        VALUES (?, ?, ?, 'تعديل بيانات عميل', 'CUSTOMERS', ?, ?, ?)
+      `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(existing), JSON.stringify(updates)]);
 
       return this.getCustomerById(id)!;
     });

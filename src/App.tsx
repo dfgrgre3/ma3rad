@@ -69,6 +69,7 @@ function scheduleAutomaticBackupChecks(
 // ─── App ──────────────────────────────────────────────────────────────────────
 export const App: React.FC = () => {
   const backupTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startupCompleted = useRef(false);
   const [dbReady, setDbReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [recoveryRequired, setRecoveryRequired] = useState(false);
@@ -96,6 +97,8 @@ export const App: React.FC = () => {
     DatabaseManager.getInstance()
       .initialize()
       .then(() => {
+        if (startupCompleted.current) return;
+        startupCompleted.current = true;
         const restoreCurrentRuntimeSession = hasRuntimeSession();
         if (!restoreCurrentRuntimeSession) AuthService.clearPersistedSession();
         markRuntimeSession();
@@ -375,6 +378,7 @@ const DashboardView = lazy(() => import('./components/DashboardView').then(m => 
 const DataImportPage = lazy(() => import('./pages/settings/DataImportPage').then(m => ({ default: m.DataImportPage })));
 const DynamicDataPage = lazy(() => import('./pages/settings/DynamicDataPage').then(m => ({ default: m.DynamicDataPage })));
 const ExecutiveDashboard     = lazy(() => import('./pages/dashboard/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
+const QuickToolsPage         = lazy(() => import('./pages/tools/QuickToolsPage').then(m => ({ default: m.QuickToolsPage })));
 const PosView                = lazy(() => import('./components/PosView').then(m => ({ default: m.PosView })));
 const SalesView              = lazy(() => import('./components/SalesView').then(m => ({ default: m.SalesView })));
 const TodaySalesPage         = lazy(() => import('./pages/daily/DailyPage').then(m => ({ default: m.TodaySalesPage })));
@@ -506,6 +510,7 @@ const AppRouterWithProps: React.FC<{
       {/* Dashboard */}
       <Route path="dashboard" element={<S><DashboardView /></S>} />
       <Route path="dashboard/executive" element={<S><ExecutiveDashboard /></S>} />
+      <Route path="tools" element={<S><QuickToolsPage /></S>} />
 
       {/* Sales / POS */}
       <Route path="sales/analytics" element={<S><SalesAnalyticsPage /></S>} />

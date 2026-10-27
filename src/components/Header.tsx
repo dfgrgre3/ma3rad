@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown, ChevronUp, Bell, Menu, X,
-  Sun, Moon, SlidersHorizontal, Search,
+  SlidersHorizontal, Search,
 } from 'lucide-react';
 import type { User } from '../types';
 import { PermissionService } from '../services/PermissionService';
@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const { settings, resolvedMode, toggleMode } = useTheme();
+  const { settings } = useTheme();
 
   const visibleGroups = useMemo(() => {
     return NavigationService.getGroups()
@@ -189,15 +189,6 @@ export const Header: React.FC<HeaderProps> = ({
           aria-controls="mobile-navigation-menu"
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-
-        <button
-          onClick={toggleMode}
-          className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition"
-          title={resolvedMode === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
-          aria-label="تبديل الوضع"
-        >
-          {resolvedMode === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
         {PermissionService.can(currentUser, 'admin.view') && (

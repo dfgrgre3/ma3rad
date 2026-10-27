@@ -60,6 +60,7 @@ export class DatabaseManager {
   private lastPersistError: string | null = null;
   private lastPersistErrorCode: string | null = null;
   private initializedSuccessfully = false;
+  private initializationPromise: Promise<Database> | null = null;
   private storageBackend: 'file' | 'localStorage' | 'none' = 'none';
   private migratedLegacyStorage = false;
   private forceFreshAfterRecovery = false;
@@ -74,8 +75,21 @@ export class DatabaseManager {
     return DatabaseManager.instance;
   }
 
-  public async initialize(): Promise<Database> {
+  public initialize(): Promise<Database> {
     if (this.db && this.initializedSuccessfully) return this.db;
+    if (this.initializationPromise) return this.initializationPromise;
+
+    const initialization = this.initializeDatabase();
+    this.initializationPromise = initialization;
+    void initialization.finally(() => {
+      if (this.initializationPromise === initialization) this.initializationPromise = null;
+    }).catch(() => {
+      // The original promise carries the initialization failure to its callers.
+    });
+    return initialization;
+  }
+
+  private async initializeDatabase(): Promise<Database> {
     if (this.db) {
       this.db?.close();
       this.db = null;
@@ -89,8 +103,8 @@ export class DatabaseManager {
     this.selectStorageBackend(fileApi);
     await this.backupBeforeGrossProfitMigration(savedBytes, loadedFromFile, isFreshDatabase, fileApi);
 
-    const report = runMigrations(this.getDatabase());
     this.ensureLegacySalesInvoiceStatusColumns();
+    const report = runMigrations(this.getDatabase());
     await this.handleMigrationFailures(report, isFreshDatabase, fileApi);
 
     await this.persistInitializedDatabase(isFreshDatabase);

@@ -18,12 +18,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.25);
+  background: var(--cerami-scrollbar-thumb, rgba(100, 116, 139, 0.25));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.45);
+  background: var(--cerami-scrollbar-thumb-hover, rgba(100, 116, 139, 0.45));
 }
 
 /* Number inputs styling */
@@ -56,13 +56,37 @@ input[type=number] {
 :root {
   --cerami-primary: #0284c7;
   --cerami-surface: #ffffff;
+  --cerami-surface-muted: #f1f5f9;
+  --cerami-canvas: #f3f6fb;
   --cerami-border: #e2e8f0;
+  --cerami-text: #0f172a;
   --cerami-muted: #64748b;
+  --cerami-chart-grid: #dbe4ef;
+  --cerami-tooltip-surface: #ffffff;
+  --cerami-tooltip-border: #e2e8f0;
+  --cerami-scrollbar-thumb: rgba(100, 116, 139, 0.25);
+  --cerami-scrollbar-thumb-hover: rgba(100, 116, 139, 0.45);
+}
+
+:root { color-scheme: light; }
+.dark {
+  --cerami-surface: #111c2f;
+  --cerami-surface-muted: #1b293e;
+  --cerami-canvas: #0b1220;
+  --cerami-border: #29384d;
+  --cerami-text: #e2e8f0;
+  --cerami-muted: #94a3b8;
+  --cerami-chart-grid: #334155;
+  --cerami-tooltip-surface: #111c2f;
+  --cerami-tooltip-border: #334155;
+  --cerami-scrollbar-thumb: rgba(148, 163, 184, 0.3);
+  --cerami-scrollbar-thumb-hover: rgba(148, 163, 184, 0.55);
 }
 
 * { box-sizing: border-box; }
 /* Touch-friendly: no tap flash, no double-tap zoom on controls */
 html { -webkit-tap-highlight-color: transparent; }
+body { background: var(--cerami-canvas); color: var(--cerami-text); }
 button, a, [role='button'], input, select, textarea, label { touch-action: manipulation; }
 button, a, input, select, textarea { outline: none; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
@@ -97,9 +121,72 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
 }
 
-.dark .ui-card { --cerami-surface: #0f172a; --cerami-border: #334155; }
-.dark .ui-input { --cerami-surface: #0f172a; --cerami-border: #334155; color: #f8fafc; }
+.dark .ui-input { color: var(--cerami-text); }
 @media print { .ui-card { box-shadow: none; } }
+
+/* Keep shared Tailwind neutral surfaces legible when individual pages omit dark variants. */
+.dark .bg-white,
+.dark .bg-slate-50,
+.dark .bg-gray-50,
+.dark .bg-zinc-50,
+.dark .bg-neutral-50 { background-color: var(--cerami-surface); }
+.dark .bg-slate-100,
+.dark .bg-slate-200,
+.dark .bg-slate-300,
+.dark .bg-gray-100,
+.dark .bg-gray-200,
+.dark .bg-gray-300,
+.dark .bg-zinc-100,
+.dark .bg-zinc-200,
+.dark .bg-zinc-300,
+.dark .bg-neutral-100,
+.dark .bg-neutral-200,
+.dark .bg-neutral-300 { background-color: var(--cerami-surface-muted); }
+.dark #root > .dark\:bg-slate-950 { background-color: var(--cerami-canvas); }
+
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-zinc-900,
+.dark .text-zinc-800,
+.dark .text-neutral-900,
+.dark .text-neutral-800 { color: var(--cerami-text); }
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark .text-zinc-700,
+.dark .text-zinc-600,
+.dark .text-neutral-700,
+.dark .text-neutral-600 { color: #cbd5e1; }
+.dark .text-slate-500,
+.dark .text-slate-400,
+.dark .text-gray-500,
+.dark .text-gray-400,
+.dark .text-zinc-500,
+.dark .text-zinc-400,
+.dark .text-neutral-500,
+.dark .text-neutral-400 { color: var(--cerami-muted); }
+
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-300,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-zinc-100,
+.dark .border-zinc-200,
+.dark .border-zinc-300,
+.dark .border-neutral-100,
+.dark .border-neutral-200,
+.dark .border-neutral-300,
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--cerami-border); }
+
+.dark ::placeholder { color: #94a3b8; opacity: 1; }
 
 /* Print Styles */
 @media print {

@@ -1,6 +1,7 @@
 import { NAV_GROUPS, NAV_STORAGE_KEYS, type NavGroupDef } from '../config/navigation';
 import { SettingsService } from './SettingsService';
 import { PermissionService } from './PermissionService';
+import { AuthService } from './AuthService';
 import type { User } from '../types';
 
 export interface NavOverrides {
@@ -103,7 +104,8 @@ export class NavigationService {
   }
 
   public static reset(): void {
-    NavigationService.saveOverrides({ hidden: [], labels: {}, groupsOrder: [], itemsOrder: {} });
+    const actor = AuthService.requireAuth();
+    NavigationService.saveOverrides({ hidden: [], labels: {}, groupsOrder: [], itemsOrder: {} }, actor);
   }
 
   public static getFlatItems(): { groupId: string; label: string; to: string; perm?: string }[] {

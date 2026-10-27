@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Lock, ShieldAlert, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { AuthService } from '../services/AuthService';
 import { useToast } from './ui/Toast';
@@ -10,6 +10,8 @@ interface ForcePasswordChangeModalProps {
 }
 
 export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> = ({ user, onSuccess }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -18,6 +20,34 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
   const [showNew, setShowNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    currentPasswordRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
 
   const hasMinLength = newPassword.length >= 8;
   const hasLetters = /[a-zA-Z\u0600-\u06FF]/.test(newPassword);
@@ -52,24 +82,24 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
 
   return (
     <div className="fixed inset-0 z-[9999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700/60 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="force-password-title" aria-describedby="force-password-description" className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700/60 rounded-2xl shadow-2xl max-w-md w-full max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
         <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-5 text-white flex items-center gap-3">
           <div className="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm">
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-bold">تغيير كلمة المرور الافتراضية</h2>
-            <p className="text-xs text-amber-100">إجراء أمني إلزامي لتأمين النظام وقاعدة البيانات</p>
+            <h2 id="force-password-title" className="text-lg font-bold">تغيير كلمة المرور الافتراضية</h2>
+            <p id="force-password-description" className="text-xs text-amber-100">إجراء أمني إلزامي لتأمين النظام وقاعدة البيانات</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" aria-busy={loading}>
           <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
             تم رصد استخدام كلمة المرور الافتراضية (<strong>admin123</strong>) لحساب المدير. يرجى تعيين كلمة مرور قوية لمتابعة العمل على البرنامج.
           </div>
 
           {error && (
-            <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+            <div role="alert" aria-live="assertive" className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -81,6 +111,7 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
             </label>
             <div className="relative">
               <input
+                ref={currentPasswordRef}
                 id="current-password"
                 type={showCurrent ? 'text' : 'password'}
                 required
@@ -92,7 +123,9 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
               <button
                 type="button"
                 onClick={() => setShowCurrent(!showCurrent)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                aria-label={showCurrent ? 'إخفاء كلمة المرور الحالية' : 'إظهار كلمة المرور الحالية'}
+                aria-pressed={showCurrent}
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-slate-300 dark:hover:text-white"
               >
                 {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -116,7 +149,9 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
               <button
                 type="button"
                 onClick={() => setShowNew(!showNew)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                aria-label={showNew ? 'إخفاء كلمة المرور الجديدة' : 'إظهار كلمة المرور الجديدة'}
+                aria-pressed={showNew}
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-slate-300 dark:hover:text-white"
               >
                 {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -161,10 +196,10 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
             <button
               type="submit"
               disabled={!isValid || loading}
-              className="w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+              className="w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
             >
               <Lock className="w-4 h-4" />
-              <span>{loading ? 'جاري الحفظ...' : 'حفظ كلمة المرور وتأمين النظام'}</span>
+              <span aria-live="polite">{loading ? 'جاري الحفظ...' : 'حفظ كلمة المرور وتأمين النظام'}</span>
             </button>
           </div>
         </form>

@@ -191,6 +191,8 @@ export class OperationsService {
 
   // ── Drivers ────────────────────────────────────────────────────────────────
   public getDrivers(search = ''): Driver[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'drivers.view');
     let sql = `
       SELECT d.*, (SELECT COUNT(*) FROM deliveries dl WHERE dl.driver_id = d.id) AS trips_count
       FROM drivers d WHERE 1 = 1`;
@@ -228,6 +230,8 @@ export class OperationsService {
 
   // ── Vehicles ───────────────────────────────────────────────────────────────
   public getVehicles(search = ''): Vehicle[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'vehicles.view');
     let sql = `
       SELECT v.*, d.full_name AS assigned_driver_name
       FROM vehicles v LEFT JOIN drivers d ON d.id = v.assigned_driver_id WHERE 1 = 1`;
@@ -273,6 +277,8 @@ export class OperationsService {
   }
 
   public getCustomersForSelect(): Array<{ id: string; name: string; phone?: string | null; address?: string | null; city?: string | null }> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'customers.view');
     return this.db.query(
       `SELECT id, name, phone, address, city FROM customers WHERE is_active = 1 ORDER BY name`
     );
@@ -280,6 +286,8 @@ export class OperationsService {
 
   // ── Deliveries ─────────────────────────────────────────────────────────────
   public getDeliveries(search = '', status = 'ALL'): Delivery[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'deliveries.view');
     let sql = `
       SELECT dl.*, c.name AS customer_name, c.phone AS customer_phone,
         d.full_name AS driver_name, v.plate_number

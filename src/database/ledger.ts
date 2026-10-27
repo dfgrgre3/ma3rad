@@ -158,17 +158,13 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   }
 
   // Enforce period lock from fiscal_periods table if present
-  try {
-    const closedFiscalPeriod = queryLedgerRows<{ name: string; status: string }>(
-      db,
-      "SELECT name, status FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date AND status IN ('CLOSED', 'LOCKED') LIMIT 1",
-      [posting.date, posting.date]
-    )[0];
-    if (closedFiscalPeriod) {
-      throw new Error(`لا يمكن الترحيل في فترة محاسبية مقفلة: ${closedFiscalPeriod.name} (${closedFiscalPeriod.status}).`);
-    }
-  } catch (err: any) {
-    if (err.message?.includes('لا يمكن الترحيل في فترة محاسبية')) throw err;
+  const closedFiscalPeriod = queryLedgerRows<{ name: string; status: string }>(
+    db,
+    "SELECT name, status FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date AND status IN ('CLOSED', 'LOCKED') LIMIT 1",
+    [posting.date, posting.date]
+  )[0];
+  if (closedFiscalPeriod) {
+    throw new Error(`لا يمكن الترحيل في فترة محاسبية مقفلة: ${closedFiscalPeriod.name} (${closedFiscalPeriod.status}).`);
   }
 
   const lines = posting.lines.map((line) => {
