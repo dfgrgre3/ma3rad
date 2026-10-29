@@ -1,6 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../database/db';
-import { parseBusinessConfiguration } from '../config/businessProfiles';
+import {
+  getBusinessProfile,
+  parseBusinessConfiguration,
+  type BusinessProfileAttributeDefinition,
+} from '../config/businessProfiles';
 import { SettingsService } from './SettingsService';
 
 /**
@@ -72,10 +76,122 @@ export class BusinessProfileService {
     return { created, existing };
   }
 
+  public static ensureProfileAttributeDefinitions(
+    definitions: BusinessProfileAttributeDefinition[],
+  ): { created: string[]; existing: string[] } {
+    const db = DatabaseManager.getInstance();
+    const created: string[] = [];
+    const existing: string[] = [];
+    const seen = new Set<string>();
+
+    db.executeTransaction((tx) => {
+      for (const definition of definitions) {
+        const name = definition.name.trim();
+        const key = name.toLowerCase();
+        if (!name || seen.has(key)) continue;
+        seen.add(key);
+
+        const byName = tx.query<{ id: string; code: string; dataType: string }>(
+          `SELECT id, code, data_type AS dataType
+           FROM attributes WHERE lower(trim(name)) = ?`,
+          [key],
+        )[0];
+        if (byName) {
+          const hasValues = tx.query<{ id: string }>(
+            `SELECT id FROM product_attribute_values WHERE attribute_id = ? LIMIT 1`,
+            [byName.id],
+          ).length > 0;
+          const hasOptions = tx.query<{ id: string }>(
+            `SELECT id FROM attribute_options WHERE attribute_id = ? LIMIT 1`,
+            [byName.id],
+          ).length > 0;
+          const isManagedLegacyTextField = byName.code === BusinessProfileService.codeFor(name)
+            && byName.dataType === 'TEXT'
+            && !hasValues
+            && !hasOptions;
+          if (isManagedLegacyTextField) {
+            const profileCodeOwner = tx.query<{ id: string }>(
+              `SELECT id FROM attributes WHERE code = ?`,
+              [definition.code],
+            )[0];
+            const code = !profileCodeOwner || profileCodeOwner.id === byName.id
+              ? definition.code
+              : byName.code;
+            tx.run(
+              `UPDATE attributes
+               SET code = ?, data_type = ?, unit = ?, is_required = 0, is_filterable = 1
+               WHERE id = ?`,
+              [code, definition.dataType, definition.unit || null, byName.id],
+            );
+            BusinessProfileService.addProfileAttributeOptions(tx, byName.id, definition.options || []);
+          } else if (byName.dataType === definition.dataType && !hasOptions) {
+            BusinessProfileService.addProfileAttributeOptions(tx, byName.id, definition.options || []);
+          }
+          existing.push(name);
+          continue;
+        }
+
+        let code = definition.code;
+        const codeOwner = tx.query<{ id: string; name: string }>(
+          `SELECT id, name FROM attributes WHERE code = ?`,
+          [code],
+        )[0];
+        if (codeOwner) {
+          if (codeOwner.name.trim().toLowerCase() === key) {
+            existing.push(name);
+            continue;
+          }
+          code = `${code}_${uuidv4().substring(0, 6)}`;
+        }
+
+        const id = `attr_${uuidv4().substring(0, 8)}`;
+        tx.run(
+          `INSERT INTO attributes
+            (id, code, name, data_type, unit, is_required, is_filterable, sort_order)
+           VALUES (?, ?, ?, ?, ?, 0, 1,
+             (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM attributes))`,
+          [id, code, name, definition.dataType, definition.unit || null],
+        );
+        BusinessProfileService.addProfileAttributeOptions(tx, id, definition.options || []);
+        created.push(name);
+      }
+    });
+
+    return { created, existing };
+  }
+
+  private static addProfileAttributeOptions(
+    db: DatabaseManager,
+    attributeId: string,
+    options: string[],
+  ): void {
+    options.forEach((option, index) => {
+      db.run(
+        `INSERT INTO attribute_options (id, attribute_id, value, label, sort_order)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(attribute_id, value) DO NOTHING`,
+        [`attr_opt_${uuidv4().substring(0, 8)}`, attributeId, option, option, index],
+      );
+    });
+  }
+
   /** Apply the attributes declared by the currently saved business profile. */
   public static applyFromSettings(): { created: string[]; existing: string[] } {
     const businessType = SettingsService.getValue('businessType') || 'general';
     const config = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
-    return BusinessProfileService.ensureProfileAttributes(config.productAttributes);
+    const profiles = [businessType, ...config.additionalActivityIds].map(getBusinessProfile);
+    const definitions = [...new Map(
+      profiles.flatMap((profile) => profile.configuration.productAttributeDefinitions || [])
+        .map((definition) => [definition.code, definition]),
+    ).values()];
+    const db = DatabaseManager.getInstance();
+    return db.executeTransaction(() => {
+      const typed = BusinessProfileService.ensureProfileAttributeDefinitions(definitions);
+      const named = BusinessProfileService.ensureProfileAttributes(config.productAttributes);
+      return {
+        created: [...typed.created, ...named.created],
+        existing: [...typed.existing, ...named.existing],
+      };
+    });
   }
 }

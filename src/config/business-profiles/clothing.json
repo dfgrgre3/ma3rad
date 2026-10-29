@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": 1,
+  "profileVersion": 2,
   "id": "clothing",
   "name": {
     "ar": "ملابس وأحذية",
@@ -19,9 +19,24 @@
     ],
     "customUnits": [],
     "productAttributes": [
-      "المقاس",
+      "مقاس الملابس",
       "اللون",
       "الموديل"
+    ],
+    "productAttributeDefinitions": [
+      {
+        "code": "APPAREL_SIZE",
+        "name": "مقاس الملابس",
+        "dataType": "SELECT",
+        "options": [
+          "XS",
+          "S",
+          "M",
+          "L",
+          "XL",
+          "XXL"
+        ]
+      }
     ]
   },
   "modules": {
@@ -44,10 +59,10 @@
   },
   "support": {
     "profileDefaults": "implemented",
-    "productAttributes": "stored-as-text-attributes",
+    "productAttributes": "text-and-typed-profile-fields",
     "industrySpecificWorkflows": "not-implemented",
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented"
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields"
   }
 }

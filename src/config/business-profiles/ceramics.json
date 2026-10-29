@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": 1,
+  "profileVersion": 2,
   "id": "ceramics",
   "name": {
     "ar": "سيراميك وبورسلين",
@@ -26,6 +26,18 @@
       "اللون",
       "النغمة",
       "التشطيب"
+    ],
+    "productAttributeDefinitions": [
+      {
+        "code": "TILE_GRADE",
+        "name": "الفرز",
+        "dataType": "SELECT",
+        "options": [
+          "فرز أول",
+          "فرز ثان",
+          "فرز ثالث"
+        ]
+      }
     ]
   },
   "modules": {
@@ -47,10 +59,10 @@
   },
   "support": {
     "profileDefaults": "implemented",
-    "productAttributes": "stored-as-text-attributes",
+    "productAttributes": "text-and-typed-profile-fields",
     "industrySpecificWorkflows": "not-implemented",
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented"
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields"
   }
 }

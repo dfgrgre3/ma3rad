@@ -8,6 +8,11 @@ relay and HTTPS-only inter-site client are now available in the Electron main
 process. The relay uses a separate append-only, AES-GCM-encrypted journal; it
 never exposes or opens the business database file.
 
+An optional PostgreSQL-backed event relay is also available in `sync-server/`
+for a customer-managed VPN server. It implements the same push/pull protocol
+with durable event and policy tables. It does not change the local SQLite
+databases into a central ERP database or add new domain handlers.
+
 This is a partial multi-branch synchronization implementation, not a
 production-wide ERP sync. Transactional outbox capture and inbound handlers
 cover categories, brands, products, customers, and suppliers. Sales invoices,

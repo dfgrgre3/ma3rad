@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": 1,
+  "profileVersion": 2,
   "id": "cosmetics",
   "name": {
     "ar": "عطور ومستحضرات تجميل",
@@ -23,6 +23,14 @@
       "الحجم",
       "الرائحة",
       "اللون"
+    ],
+    "productAttributeDefinitions": [
+      {
+        "code": "COSMETIC_VOLUME",
+        "name": "الحجم",
+        "dataType": "NUMBER",
+        "unit": "مل"
+      }
     ]
   },
   "modules": {
@@ -45,10 +53,10 @@
   },
   "support": {
     "profileDefaults": "implemented",
-    "productAttributes": "stored-as-text-attributes",
+    "productAttributes": "text-and-typed-profile-fields",
     "industrySpecificWorkflows": "not-implemented",
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented"
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields"
   }
 }

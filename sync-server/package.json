@@ -1,0 +1,17 @@
+{
+  "name": "ceramisys-sync-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PostgreSQL-backed synchronization service for CeramiSys ERP",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.cjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}

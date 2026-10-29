@@ -10,6 +10,10 @@ The wizard collects company identity and registration details, configures the de
 
 The wizard updates the existing company, default branch, and default warehouse records; it does not create additional companies, branches, users, or opening transactions. The chart of accounts is seeded by database migrations. Product, customer, and supplier master data can be imported from the data-import page after setup, and opening balances must be entered through their respective workflows.
 
+## Saved activity configuration format
+
+The `businessProfileConfig` setting is serialized with `schemaVersion: 1`. Setup and activity settings use the shared serializer, and the parser rejects an explicitly stored unsupported schema version rather than silently replacing it with defaults. Existing flat configuration JSON without a schema version remains readable for compatibility; no SQLite migration is needed for this format change. A malformed legacy JSON value continues to resolve to the selected profile defaults.
+
 ## Windows installer
 
 Build the distributable installer with `npm run electron:dist`. electron-builder writes the assisted x64 NSIS installer to `release/` and asks for an installation folder; it creates Start menu and desktop shortcuts. The application stores its SQLite database and backups under `%APPDATA%\CeramiSysERP`, outside the installation directory. The GUI uninstaller keeps these files unless the user explicitly chooses the separate data-removal prompt; silent uninstall and upgrades preserve user data. The installer is not digitally signed.
@@ -36,7 +40,7 @@ The application exposes an Arabic-only interface and does not provide a language
 
 ## Dynamic product attributes
 
-Product attributes can be defined with text, number, boolean, date, single-select, or multi-select values. Profile templates provide a small set of industry-relevant attribute names where useful; these are suggestions stored as text attributes, not enforced industry workflows or typed regulatory data. Select options, required status, units, and the filterability flag are stored with the attribute; values are validated and persisted with products. Category-scoped attributes are shown and saved only for products in their configured category. The filterability flag is not yet connected to product-list filters. This does not yet make profile-specific workflows, reports, or other domain behavior dynamic.
+Product attributes can be defined with text, number, boolean, date, single-select, or multi-select values. Profile templates can declare typed attribute defaults; the current templates include ceramic grade, clothing size, electronics warranty period, food expiry date, and cosmetics volume. These values are persisted through the existing dynamic-attribute tables and product forms. When applying a profile to an existing database, generated text fields are upgraded only when they have no saved values; user-defined fields and populated values are preserved. Expiry dates are informational and do not enforce stock expiry or sales restrictions. Select options, required status, units, and the filterability flag are stored with the attribute; values are validated and persisted with products. Category-scoped attributes are shown and saved only for products in their configured category. The filterability flag is not yet connected to product-list filters. This does not yet make profile-specific workflows, reports, or other domain behavior dynamic.
 
 ## Support boundary
 

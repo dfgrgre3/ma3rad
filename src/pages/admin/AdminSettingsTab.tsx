@@ -17,6 +17,7 @@ import {
   getDefaultBusinessConfiguration,
   parseBusinessConfiguration,
   parseEnabledModules,
+  serializeBusinessConfiguration,
   type BusinessConfiguration,
 } from '../../config/businessProfiles';
 import { ModuleRegistryService } from '../../services/ModuleRegistryService';
@@ -140,7 +141,10 @@ export const AdminSettingsTab: React.FC = () => {
         ...settings,
         businessType: businessProfile.type,
         businessTypeLabel,
-        businessProfileConfig: JSON.stringify({ ...businessConfig, businessType: businessProfile.type }),
+        businessProfileConfig: serializeBusinessConfiguration({
+          ...businessConfig,
+          businessType: businessProfile.type,
+        }),
         businessTerminologyOverrides: JSON.stringify(validatedTerminology),
       }, actor);
       // Applying a profile also creates its declared product attributes; this is

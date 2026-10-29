@@ -44,9 +44,27 @@ export interface BusinessProfile {
   description: { ar: string; en: string };
   category: string;
   familyId?: string;
-  configuration: BusinessConfigurationDefaults;
+  configuration: BusinessConfigurationDefaults & {
+    productAttributeDefinitions?: BusinessProfileAttributeDefinition[];
+  };
   modules: { enabledByDefault: string[]; optional: string[] };
   support: Record<string, string | boolean>;
+}
+
+export type BusinessProfileAttributeDataType =
+  | 'TEXT'
+  | 'NUMBER'
+  | 'BOOLEAN'
+  | 'SELECT'
+  | 'MULTI_SELECT'
+  | 'DATE';
+
+export interface BusinessProfileAttributeDefinition {
+  code: string;
+  name: string;
+  dataType: BusinessProfileAttributeDataType;
+  unit?: string;
+  options?: string[];
 }
 
 const PROFILE_FILES: unknown[] = [
@@ -84,6 +102,8 @@ export interface BusinessConfiguration {
   productAttributes: string[];
   additionalActivityIds: string[];
 }
+
+export const BUSINESS_CONFIGURATION_SCHEMA_VERSION = 1;
 
 type BusinessConfigurationDefaults = Omit<BusinessConfiguration, 'businessType'>;
 
@@ -136,6 +156,46 @@ function validateBusinessProfile(value: unknown): BusinessProfile {
     fail('units, custom units, and product attributes must be non-empty and unique.');
   }
   if (configuration.units.some((unit) => !VALID_UNITS.has(unit))) fail('unknown unit.');
+  if (configuration.productAttributeDefinitions !== undefined) {
+    const definitions = configuration.productAttributeDefinitions;
+    const validTypes = new Set<BusinessProfileAttributeDataType>([
+      'TEXT', 'NUMBER', 'BOOLEAN', 'SELECT', 'MULTI_SELECT', 'DATE',
+    ]);
+    if (!Array.isArray(definitions)) fail('product attribute definitions must be an array.');
+    const codes = new Set<string>();
+    const names = new Set<string>();
+    for (const definition of definitions) {
+      if (!definition || typeof definition !== 'object'
+        || !/^[A-Z][A-Z0-9_]{1,63}$/.test(definition.code)
+        || typeof definition.name !== 'string' || !definition.name.trim()
+        || !validTypes.has(definition.dataType)) {
+        fail('product attribute definition is invalid.');
+      }
+      const code = definition.code.toLowerCase();
+      const name = definition.name.trim().toLowerCase();
+      if (codes.has(code) || names.has(name)
+        || !configuration.productAttributes.some((attribute) => attribute.trim().toLowerCase() === name)) {
+        fail('product attribute definitions must be unique and reference a declared attribute.');
+      }
+      codes.add(code);
+      names.add(name);
+      if (definition.unit !== undefined && typeof definition.unit !== 'string') {
+        fail('product attribute unit must be a string.');
+      }
+      if (definition.options !== undefined
+        && (!isStringArray(definition.options) || !hasUniqueNonEmptyStrings(definition.options))) {
+        fail('product attribute options must be unique non-empty strings.');
+      }
+      if (definition.options?.length
+        && !['SELECT', 'MULTI_SELECT'].includes(definition.dataType)) {
+        fail('only selection attributes may define options.');
+      }
+      if (['SELECT', 'MULTI_SELECT'].includes(definition.dataType)
+        && (!definition.options || definition.options.length === 0)) {
+        fail('selection attributes must define at least one option.');
+      }
+    }
+  }
 
   const modules = profile.modules;
   if (!modules) throw new Error(`Invalid business profile "${profile.id}": module defaults are incomplete.`);
@@ -267,35 +327,58 @@ export const getActivityModuleIds = (businessType: string, additionalActivityIds
     ...uniqueActivityIds(businessType, additionalActivityIds).flatMap(getProfileModuleIds),
   ])];
 
+export const serializeBusinessConfiguration = (configuration: BusinessConfiguration): string => {
+  if (!configuration || typeof configuration.businessType !== 'string'
+    || !configuration.businessType.trim()
+    || !VALID_BUSINESS_MODELS.has(configuration.businessModel)
+    || typeof configuration.trackInventory !== 'boolean'
+    || !isStringArray(configuration.units)
+    || !isStringArray(configuration.customUnits)
+    || !isStringArray(configuration.productAttributes)
+    || !isStringArray(configuration.additionalActivityIds)) {
+    throw new Error('إعدادات النشاط غير صالحة ولا يمكن حفظها.');
+  }
+  return JSON.stringify({
+    ...configuration,
+    schemaVersion: BUSINESS_CONFIGURATION_SCHEMA_VERSION,
+  });
+};
+
 export const parseBusinessConfiguration = (raw: string | undefined, businessType: string): BusinessConfiguration => {
   if (!raw) return getDefaultBusinessConfiguration(businessType);
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return getDefaultBusinessConfiguration(businessType);
-    }
-    const saved = parsed as Partial<BusinessConfiguration>;
-    const additionalActivityIds = uniqueActivityIds(
-      businessType,
-      isStringArray(saved.additionalActivityIds) ? saved.additionalActivityIds : [],
-    );
-    const defaults = getDefaultBusinessConfiguration(businessType, additionalActivityIds);
-    const strings = (value: unknown, fallback: string[]) => Array.isArray(value)
-      ? [...new Set(value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))]
-      : fallback;
-    return {
-      ...defaults,
-      businessType,
-      businessModel: VALID_BUSINESS_MODELS.has(saved.businessModel as BusinessModel) ? saved.businessModel as BusinessModel : defaults.businessModel,
-      trackInventory: typeof saved.trackInventory === 'boolean' ? saved.trackInventory : defaults.trackInventory,
-      units: strings(saved.units, defaults.units).filter((unit) => VALID_UNITS.has(unit)),
-      customUnits: strings(saved.customUnits, defaults.customUnits),
-      productAttributes: strings(saved.productAttributes, defaults.productAttributes),
-      additionalActivityIds,
-    };
+    parsed = JSON.parse(raw);
   } catch {
     return getDefaultBusinessConfiguration(businessType);
   }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return getDefaultBusinessConfiguration(businessType);
+  }
+  const record = parsed as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(record, 'schemaVersion')
+    && record.schemaVersion !== BUSINESS_CONFIGURATION_SCHEMA_VERSION) {
+    throw new Error(`إصدار إعدادات النشاط غير مدعوم: ${String(record.schemaVersion)}.`);
+  }
+  const saved = record as Partial<BusinessConfiguration>;
+  const additionalActivityIds = uniqueActivityIds(
+    businessType,
+    isStringArray(saved.additionalActivityIds) ? saved.additionalActivityIds : [],
+  );
+  const defaults = getDefaultBusinessConfiguration(businessType, additionalActivityIds);
+  const strings = (value: unknown, fallback: string[]) => Array.isArray(value)
+    ? [...new Set(value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))]
+    : fallback;
+  return {
+    ...defaults,
+    businessType,
+    businessModel: VALID_BUSINESS_MODELS.has(saved.businessModel as BusinessModel) ? saved.businessModel as BusinessModel : defaults.businessModel,
+    trackInventory: typeof saved.trackInventory === 'boolean' ? saved.trackInventory : defaults.trackInventory,
+    units: strings(saved.units, defaults.units).filter((unit) => VALID_UNITS.has(unit)),
+    customUnits: strings(saved.customUnits, defaults.customUnits),
+    productAttributes: strings(saved.productAttributes, defaults.productAttributes),
+    additionalActivityIds,
+  };
 };
 
 // The registry is the source of truth for module metadata. `BUSINESS_MODULES`

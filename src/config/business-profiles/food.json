@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": 1,
+  "profileVersion": 2,
   "id": "food",
   "name": {
     "ar": "مواد غذائية وسوبر ماركت",
@@ -25,6 +25,13 @@
     "productAttributes": [
       "تاريخ الصلاحية",
       "العلامة التجارية"
+    ],
+    "productAttributeDefinitions": [
+      {
+        "code": "PRODUCT_EXPIRY",
+        "name": "تاريخ الصلاحية",
+        "dataType": "DATE"
+      }
     ]
   },
   "modules": {
@@ -47,11 +54,11 @@
   },
   "support": {
     "profileDefaults": "implemented",
-    "productAttributes": "stored-as-text-attributes",
+    "productAttributes": "text-and-typed-profile-fields",
     "industrySpecificWorkflows": "not-implemented",
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented",
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields",
     "expiryBatchEnforcement": "not-implemented"
   }
 }

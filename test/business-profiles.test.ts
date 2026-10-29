@@ -23,6 +23,7 @@ import {
   getProfileModuleIds,
   parseBusinessConfiguration,
   parseEnabledModules,
+  serializeBusinessConfiguration,
 } from '../src/config/businessProfiles.ts';
 import { NAV_GROUPS } from '../src/config/navigation.tsx';
 import {
@@ -237,6 +238,25 @@ test('business customizations restore from saved settings and ignore malformed v
   assert.equal(parseBusinessConfiguration('{', 'ceramics').trackInventory, true);
 });
 
+test('saved activity configurations are versioned and legacy flat settings remain readable', () => {
+  const configuration = getDefaultBusinessConfiguration('clothing');
+  const serialized = serializeBusinessConfiguration(configuration);
+  assert.equal(JSON.parse(serialized).schemaVersion, 1);
+  assert.deepEqual(parseBusinessConfiguration(serialized, 'clothing'), configuration);
+  assert.deepEqual(
+    parseBusinessConfiguration(JSON.stringify(configuration), 'clothing'),
+    configuration,
+  );
+  assert.throws(
+    () => parseBusinessConfiguration('{"schemaVersion":2}', 'clothing'),
+    /إصدار إعدادات النشاط غير مدعوم/,
+  );
+  assert.throws(
+    () => serializeBusinessConfiguration({ ...configuration, trackInventory: 'yes' } as never),
+    /إعدادات النشاط غير صالحة/,
+  );
+});
+
 test('nested paths resolve to their configured module for direct-route gating', () => {
   assert.equal(getBusinessModuleForPath('/products/123'), 'inventory');
   assert.equal(getBusinessModuleForPath('/sales/analytics'), 'sales');
@@ -293,6 +313,51 @@ test('saved business profile attributes are materialized on demand', async () =>
     `SELECT name FROM attributes WHERE name IN ('اختبار الخامة ١', 'اختبار الموديل ١') ORDER BY name`
   );
   assert.equal(stored.length, 2);
+});
+
+test('industry profiles materialize typed product fields and selection options', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  const profiles = [
+    { type: 'clothing', code: 'APPAREL_SIZE', dataType: 'SELECT', optionCount: 6 },
+    { type: 'ceramics', code: 'TILE_GRADE', dataType: 'SELECT', optionCount: 3 },
+    { type: 'electronics', code: 'WARRANTY_MONTHS', dataType: 'NUMBER', unit: 'شهر' },
+    { type: 'food', code: 'PRODUCT_EXPIRY', dataType: 'DATE' },
+    { type: 'cosmetics', code: 'COSMETIC_VOLUME', dataType: 'NUMBER', unit: 'مل' },
+  ] as const;
+
+  BusinessProfileService.ensureProfileAttributes(['مقاس الملابس']);
+  for (const profile of profiles) {
+    const configuration = getDefaultBusinessConfiguration(profile.type);
+    manager.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
+      'businessType',
+      profile.type,
+    ]);
+    manager.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
+      'businessProfileConfig',
+      serializeBusinessConfiguration(configuration),
+    ]);
+    BusinessProfileService.applyFromSettings();
+
+    const attribute = manager.query<{ id: string; dataType: string; unit: string | null }>(
+      'SELECT id, data_type AS dataType, unit FROM attributes WHERE code = ?',
+      [profile.code],
+    )[0];
+    assert.ok(attribute, `${profile.type} should create its declared profile field`);
+    assert.equal(attribute.dataType, profile.dataType);
+    if ('unit' in profile) assert.equal(attribute.unit, profile.unit);
+    if ('optionCount' in profile) {
+      assert.equal(
+        manager.query('SELECT id FROM attribute_options WHERE attribute_id = ?', [attribute.id]).length,
+        profile.optionCount,
+      );
+    }
+
+    const repeated = BusinessProfileService.applyFromSettings();
+    assert.equal(repeated.created.includes(
+      getBusinessProfile(profile.type).configuration.productAttributeDefinitions?.[0]?.name || '',
+    ), false);
+  }
 });
 
 test('business configuration is restored from SQLite settings', async () => {

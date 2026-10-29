@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a unique POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-ceramisys}
+    volumes:
+      - ceramisys-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sync-private
+
+  sync-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-ceramisys}
+      PGUSER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      PGSSLMODE: disable
+      ALLOW_INSECURE_DATABASE: "true"
+      CERAMISYS_SYNC_HOST: 0.0.0.0
+      CERAMISYS_SYNC_PORT: 47821
+      CERAMISYS_SYNC_CLIENTS: ${CERAMISYS_SYNC_CLIENTS:?Set device credentials in .env}
+      CERAMISYS_SYNC_TLS_CERT: /run/tls/fullchain.pem
+      CERAMISYS_SYNC_TLS_KEY: /run/tls/private-key.pem
+    ports:
+      - "${SYNC_PUBLISH_ADDRESS:?Set SYNC_PUBLISH_ADDRESS to the server's VPN IP}:47821:47821"
+    volumes:
+      - ./certs:/run/tls:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('node:https').get({hostname:'127.0.0.1',port:47821,path:'/ready',rejectUnauthorized:false},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - sync-private
+
+volumes:
+  ceramisys-postgres:
+
+networks:
+  sync-private:
+    internal: true

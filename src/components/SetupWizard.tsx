@@ -28,6 +28,7 @@ import {
   getProfileModuleIds,
   parseBusinessConfiguration,
   parseEnabledModules,
+  serializeBusinessConfiguration,
   type BusinessConfiguration,
 } from '../config/businessProfiles';
 import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../config/moduleRegistry';
@@ -562,7 +563,10 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         SettingsService.update({
           showroomName: form.showroomName.trim(),
           businessType: form.businessType,
-          businessProfileConfig: JSON.stringify({ ...businessConfig, businessType: form.businessType }),
+          businessProfileConfig: serializeBusinessConfiguration({
+            ...businessConfig,
+            businessType: form.businessType,
+          }),
           businessTypeLabel: form.businessType === 'custom'
             ? form.businessTypeLabel.trim()
             : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || '',

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": 1,
+  "profileVersion": 2,
   "id": "electronics",
   "name": {
     "ar": "أجهزة وإلكترونيات",
@@ -22,6 +22,14 @@
       "الماركة",
       "الموديل",
       "الضمان"
+    ],
+    "productAttributeDefinitions": [
+      {
+        "code": "WARRANTY_MONTHS",
+        "name": "الضمان",
+        "dataType": "NUMBER",
+        "unit": "شهر"
+      }
     ]
   },
   "modules": {
@@ -43,10 +51,10 @@
   },
   "support": {
     "profileDefaults": "implemented",
-    "productAttributes": "stored-as-text-attributes",
+    "productAttributes": "text-and-typed-profile-fields",
     "industrySpecificWorkflows": "not-implemented",
     "industrySpecificReports": "not-implemented",
     "industrySpecificDocumentTemplates": "not-implemented",
-    "typedCustomFieldStorage": "not-implemented"
+    "typedCustomFieldStorage": "implemented-for-profile-declared-fields"
   }
 }
