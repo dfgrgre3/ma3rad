@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { DatabaseManager } from '../database/db';
 import { NavigationService } from '../services/NavigationService';
 import { PermissionService } from '../services/PermissionService';
+import { useBusinessTerm } from '../hooks/useBusinessTerm';
 import type { User } from '../types';
 
 type SearchResult = { label: string; meta: string; path: string; kind: 'page' | 'product' | 'customer' | 'supplier' | 'invoice' };
@@ -18,6 +19,10 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) {
   const navigate = useNavigate();
+  const productsLabel = useBusinessTerm('entities.products.plural');
+  const customersLabel = useBusinessTerm('entities.customers.plural');
+  const suppliersLabel = useBusinessTerm('entities.suppliers.plural');
+  const salesInvoicesLabel = useBusinessTerm('documents.salesInvoices');
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [active, setActive] = useState(0);
@@ -49,7 +54,7 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
           [term, term, term],
         ).map((product) => ({
           label: product.name,
-          meta: `صنف · ${product.sku || product.barcode || ''}`,
+          meta: `${productsLabel} · ${product.sku || product.barcode || ''}`,
           path: `/products/${product.id}`,
           kind: 'product' as const,
         }))
@@ -60,7 +65,7 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
           [term, term, term],
         ).map((customer) => ({
           label: customer.name,
-          meta: `عميل · ${customer.phone || customer.code || ''}`,
+          meta: `${customersLabel} · ${customer.phone || customer.code || ''}`,
           path: `/customers/${customer.id}`,
           kind: 'customer' as const,
         }))
@@ -71,7 +76,7 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
           [term, term, term, term],
         ).map((supplier) => ({
           label: supplier.name,
-          meta: `مورد · ${supplier.phone || supplier.code || ''}`,
+          meta: `${suppliersLabel} · ${supplier.phone || supplier.code || ''}`,
           path: `/suppliers/${supplier.id}`,
           kind: 'supplier' as const,
         }))
@@ -85,7 +90,7 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
           [term, term],
         ).map((invoice) => ({
           label: invoice.invoice_number,
-          meta: `فاتورة مبيعات · ${invoice.customer_name} · ${invoice.total_amount}`,
+          meta: `${salesInvoicesLabel} · ${invoice.customer_name} · ${invoice.total_amount}`,
           path: '/sales',
           kind: 'invoice' as const,
         }))
@@ -147,7 +152,7 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
       <div role="dialog" aria-modal="true" aria-label="بحث شامل" className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 ">
           <Search className="h-5 w-5 text-sky-500" />
-          <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} placeholder="ابحث في الصفحات والأصناف والعملاء والموردين والفواتير..." className="h-14 flex-1 select-text bg-transparent text-sm outline-none text-slate-900 dark:text-slate-100" />
+          <input ref={inputRef} value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} placeholder={`ابحث في الصفحات و${productsLabel} و${customersLabel} و${suppliersLabel} والفواتير...`} className="h-14 flex-1 select-text bg-transparent text-sm outline-none text-slate-900 dark:text-slate-100" />
           <button onClick={onClose} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="إغلاق"><X className="h-4 w-4" /></button>
         </div>
         <div className="max-h-[52vh] overflow-y-auto p-2">

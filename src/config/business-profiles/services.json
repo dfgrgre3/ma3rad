@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "services",
+  "name": {
+    "ar": "شركة خدمات أو صيانة",
+    "en": "Services or maintenance company"
+  },
+  "description": {
+    "ar": "خدمات وفواتير وعملاء دون مخزون افتراضي",
+    "en": "Services, invoices and customers with inventory off by default"
+  },
+  "category": "services",
+  "configuration": {
+    "businessModel": "services",
+    "trackInventory": false,
+    "units": [
+      "SERVICE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "فئة الخدمة",
+      "وصف الخدمة"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "customers",
+      "finance",
+      "reports",
+      "documents",
+      "projects",
+      "hr"
+    ],
+    "optional": [
+      "inventory",
+      "purchasing",
+      "operations",
+      "approvals",
+      "manufacturing"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "serviceSchedulingAndDispatch": "not-implemented"
+  }
+}

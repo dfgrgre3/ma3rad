@@ -57,8 +57,8 @@ export class SettingsService {
       logoPath: map.logoPath || '',
       autoBackupIntervalHours: num(map.autoBackupIntervalHours, 24),
 
-      brandName: map.brandName || 'CeramiSys ERP',
-      brandShortName: map.brandShortName || 'C',
+      brandName: map.brandName === 'CeramiSys ERP' ? 'سيراميسيس' : map.brandName || 'سيراميسيس',
+      brandShortName: map.brandShortName === 'C' ? 'س' : map.brandShortName || 'س',
       brandLogoDataUrl: map.brandLogoDataUrl || '',
       brandPrimaryColor: map.brandPrimaryColor || '#0284c7',
       brandAccentColor: map.brandAccentColor || '#4f46e5',

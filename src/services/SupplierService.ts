@@ -65,6 +65,7 @@ export class SupplierService {
   public createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }): Supplier {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.create');
+    if (Number(supplier.initialBalance || 0) !== 0) PermissionService.require(actor, 'finance.approve');
     const id = `sup_${uuidv4().substring(0, 8)}`;
     const code = supplier.code || `SUP-${Date.now().toString().slice(-5)}`;
 
@@ -95,6 +96,7 @@ export class SupplierService {
   public updateSupplier(id: string, updates: Partial<Supplier>): Supplier {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.update');
+    if (updates.isActive !== undefined) PermissionService.require(actor, 'suppliers.delete');
     const existing = this.readSupplier(id);
     if (!existing) throw new Error('المورد غير موجود.');
 
@@ -238,6 +240,7 @@ export class SupplierService {
 
   public getSupplierStatement(supplierId: string, fromDate?: string, toDate?: string) {
     this.requireSuppliersView();
+    PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
     const sup = this.readSupplier(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
 
@@ -389,6 +392,7 @@ export class SupplierService {
 
   public getInvoicesWithAllocations(supplierId: string) {
     this.requireSuppliersView();
+    PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
     const invoiceScope = this.branchAccess.sqlScope(
       'pi.branch_id',
       '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)',
@@ -418,6 +422,7 @@ export class SupplierService {
 
   public getPaymentsWithAllocations(supplierId: string) {
     this.requireSuppliersView();
+    PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
     const paymentScope = this.branchAccess.sqlScope(
       'sp.branch_id',
       '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = sp.register_id)',
@@ -449,6 +454,7 @@ export class SupplierService {
   public reallocateSupplierPayment(paymentId: string, allocations: { purchaseInvoiceId: string; amount: number }[]) {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.payment');
+    PermissionService.require(actor, 'finance.debts.view');
 
     const payment = this.db.query<any>(`SELECT * FROM supplier_payments WHERE id = ?`, [paymentId])[0];
     if (!payment) throw new Error('سند الصرف غير موجود.');

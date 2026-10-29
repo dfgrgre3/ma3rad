@@ -90,7 +90,7 @@ export const CrmActivitiesPage: React.FC = () => {
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="بحث باسم العميل، الوصف، الملاحظات ثم Enter..."
+            placeholder="بحث باسم العميل، الوصف، الملاحظات ثم اضغط إدخال..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-violet-400 transition"

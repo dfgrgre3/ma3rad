@@ -216,9 +216,25 @@ export const SyncConflictsPage: React.FC = () => {
   const runInstantSync = async () => {
     try {
       PermissionService.require(AuthService.requireAuth(), 'admin.view');
-      const runner = window.ceramisys?.sync?.runSyncNow;
+      const syncBridge = window.ceramisys?.sync;
+      const runner = syncBridge?.runSyncNow;
       if (!runner) {
-        toast.error('مزامنة فورية غير متاحة في هذا الجهاز حالياً.');
+        if (!syncBridge) {
+          toast.error('المزامنة الفورية متاحة من تطبيق سطح المكتب فقط.');
+          return;
+        }
+        if (!syncBridge.status) {
+          toast.error('تعذر قراءة حالة إعداد المزامنة على هذا الجهاز.');
+          return;
+        }
+        const status = await syncBridge.status();
+        if (status.error) {
+          toast.error(`تعذر تهيئة المزامنة: ${status.error}`);
+        } else if (!status.clientConfigured) {
+          toast.error('المزامنة بين الفروع غير مهيأة على هذا الجهاز. يلزم إعداد CERAMISYS_SYNC_URL وCERAMISYS_SYNC_TOKEN ومعرّفات المؤسسة والفرع والجهاز، ثم إعادة تشغيل البرنامج.');
+        } else {
+          toast.error('لم يكتمل تشغيل محرك المزامنة بعد. أعد تشغيل البرنامج وحاول مجدداً.');
+        }
         return;
       }
       await runner();

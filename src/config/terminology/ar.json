@@ -1,0 +1,16 @@
+{
+  "entities.customers.singular": "عميل",
+  "entities.customers.plural": "العملاء",
+  "entities.products.singular": "منتج",
+  "entities.products.plural": "المنتجات",
+  "entities.suppliers.singular": "مورد",
+  "entities.suppliers.plural": "الموردون",
+  "entities.projects.singular": "مشروع",
+  "entities.projects.plural": "المشاريع",
+  "modules.inventory": "المخزون",
+  "modules.sales": "المبيعات",
+  "modules.purchasing": "المشتريات",
+  "modules.operations": "العمليات",
+  "modules.reports": "التقارير",
+  "documents.salesInvoices": "فواتير المبيعات"
+}

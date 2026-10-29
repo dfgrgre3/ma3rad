@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "sanitary",
+  "name": {
+    "ar": "أدوات صحية",
+    "en": "Sanitary ware"
+  },
+  "description": {
+    "ar": "منتجات وماركات ومبيعات المعرض",
+    "en": "Sanitary products, brands and showroom sales"
+  },
+  "category": "retail",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "SET"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "الماركة",
+      "الموديل",
+      "اللون"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "operations",
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

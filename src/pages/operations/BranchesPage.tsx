@@ -98,7 +98,7 @@ export const BranchesPage: React.FC = () => {
       <div className="p-4 bg-white border-b border-slate-200">
         <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم الفرع، العنوان، أو المدينة ثم Enter..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-sky-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم الفرع، العنوان، أو المدينة ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-sky-400" />
         </form>
       </div>
 
@@ -161,14 +161,14 @@ export const BranchesPage: React.FC = () => {
                 <div><label className="font-bold text-slate-700 block mb-1">المدينة</label><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
                 <div className="md:col-span-2"><label className="font-bold text-slate-700 block mb-1">العنوان</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">نوع الجهاز</label><select value={form.deviceType} onChange={(e) => setForm({ ...form, deviceType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
-                  <option value="WINDOWS">Windows</option>
-                  <option value="MAC">Mac</option>
-                  <option value="LINUX">Linux</option>
-                  <option value="ANDROID">Android</option>
-                  <option value="IOS">iOS</option>
+                  <option value="WINDOWS">ويندوز</option>
+                  <option value="MAC">ماك</option>
+                  <option value="LINUX">لينكس</option>
+                  <option value="ANDROID">أندرويد</option>
+                  <option value="IOS">آي أو إس</option>
                   <option value="OTHER">آخر</option>
                 </select></div>
-                <div><label className="font-bold text-slate-700 block mb-1">اسم الجهاز</label><input value={form.deviceName} onChange={(e) => setForm({ ...form, deviceName: e.target.value })} placeholder="Head Office PC" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+                <div><label className="font-bold text-slate-700 block mb-1">اسم الجهاز</label><input value={form.deviceName} onChange={(e) => setForm({ ...form, deviceName: e.target.value })} placeholder="حاسوب المقر الرئيسي" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
                 <div className="md:col-span-2"><label className="font-bold text-slate-700 block mb-1">اسم المدير / المسؤول</label><input value={form.managerName} onChange={(e) => setForm({ ...form, managerName: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               </div>
 

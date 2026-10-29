@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "hospitality",
+  "name": {
+    "ar": "الضيافة",
+    "en": "Hospitality"
+  },
+  "description": {
+    "ar": "عمليات خدمات ومنتجات مختلطة",
+    "en": "Mixed service and product operations"
+  },
+  "category": "hospitality",
+  "configuration": {
+    "businessModel": "mixed",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "LITER",
+      "SERVICE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "نوع الخدمة",
+      "الفئة",
+      "السعة"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "reservationsAndGuestManagement": "not-implemented"
+  }
+}

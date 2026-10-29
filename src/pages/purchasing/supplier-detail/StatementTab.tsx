@@ -11,6 +11,7 @@ export interface StatementTabProps {
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
   onClearFilters: () => void;
+  canExport: boolean;
   onExportCsv: () => void;
   onPrint: () => void;
 }
@@ -23,6 +24,7 @@ export const StatementTab: React.FC<StatementTabProps> = ({
   onFromChange,
   onToChange,
   onClearFilters,
+  canExport,
   onExportCsv,
   onPrint,
 }) => {
@@ -65,21 +67,21 @@ export const StatementTab: React.FC<StatementTabProps> = ({
               )}
             </div>
 
-            <button
+            {canExport && <button
               onClick={onExportCsv}
               className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm"
             >
               <Download className="w-3.5 h-3.5" />
               <span>تصدير CSV</span>
-            </button>
+            </button>}
 
-            <button
+            {canExport && <button
               onClick={onPrint}
               className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>طباعة كشف الحساب</span>
-            </button>
+            </button>}
           </div>
         </div>
 

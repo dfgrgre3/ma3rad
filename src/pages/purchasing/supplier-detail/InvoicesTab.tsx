@@ -6,17 +6,21 @@ import { SupplierInvoiceRow, PAY_STATUS_BADGES } from './types';
 
 export interface InvoicesTabProps {
   invoices: SupplierInvoiceRow[];
+  canViewFinancials: boolean;
+  canCreatePurchase: boolean;
 }
 
-export const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices }) => {
+export const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices, canViewFinancials, canCreatePurchase }) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
           <h3 className="text-base font-extrabold text-slate-900">سجل فواتير التوريد والشراء</h3>
-          <p className="text-xs text-slate-500">كل الفواتير الصادرة من هذا المورد مع حالة السداد والمتبقي</p>
+          <p className="text-xs text-slate-500">
+            {canViewFinancials ? 'كل الفواتير الصادرة من هذا المورد مع حالة السداد والمتبقي' : 'كل فواتير الشراء الصادرة من هذا المورد'}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        {canCreatePurchase && <div className="flex items-center gap-2">
           <Link
             to="/purchases"
             className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5"
@@ -24,7 +28,7 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices }) => {
             <Plus className="w-3.5 h-3.5" />
             <span>فاتورة شراء جديدة</span>
           </Link>
-        </div>
+        </div>}
       </div>
 
       <div className="overflow-x-auto">
@@ -34,9 +38,9 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices }) => {
               <th className="p-3">رقم الفاتورة</th>
               <th className="p-3">التاريخ</th>
               <th className="p-3">الإجمالي</th>
-              <th className="p-3">المدفوع</th>
-              <th className="p-3">المتبقي</th>
-              <th className="p-3">حالة السداد</th>
+              {canViewFinancials && <th className="p-3">المدفوع</th>}
+              {canViewFinancials && <th className="p-3">المتبقي</th>}
+              {canViewFinancials && <th className="p-3">حالة السداد</th>}
               <th className="p-3">ملاحظات</th>
             </tr>
           </thead>
@@ -48,13 +52,13 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices }) => {
                 <td className="p-3 font-black text-slate-900">
                   {CeramicMath.formatCurrency(inv.total_amount)}
                 </td>
-                <td className="p-3 font-bold text-emerald-700">
+                {canViewFinancials && <td className="p-3 font-bold text-emerald-700">
                   {CeramicMath.formatCurrency(inv.paid_amount)}
-                </td>
-                <td className="p-3 font-bold text-rose-700">
+                </td>}
+                {canViewFinancials && <td className="p-3 font-bold text-rose-700">
                   {CeramicMath.formatCurrency(inv.remaining_amount)}
-                </td>
-                <td className="p-3">
+                </td>}
+                {canViewFinancials && <td className="p-3">
                   <span
                     className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                       PAY_STATUS_BADGES[inv.payment_status]?.className ||
@@ -63,13 +67,13 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ invoices }) => {
                   >
                     {PAY_STATUS_BADGES[inv.payment_status]?.label || inv.payment_status}
                   </span>
-                </td>
+                </td>}
                 <td className="p-3 text-slate-500">{inv.notes || '—'}</td>
               </tr>
             ))}
             {invoices.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-10 text-center text-slate-400">
+                <td colSpan={canViewFinancials ? 7 : 4} className="p-10 text-center text-slate-400">
                   لا توجد فواتير مسجلة لهذا المورد.
                 </td>
               </tr>

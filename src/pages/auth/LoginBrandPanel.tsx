@@ -23,10 +23,10 @@ export const LoginBrandPanel: React.FC = () => (
 
     <div className="relative flex items-center gap-3">
       <div className="flex h-11 w-11 items-center justify-center border border-white/40 bg-white/10 text-xl font-bold">
-        C
+        س
       </div>
       <div>
-        <h1 className="text-lg font-semibold tracking-wide">CeramiSys ERP</h1>
+        <h1 className="text-lg font-semibold tracking-wide">سيراميسيس</h1>
         <p className="text-[11px] text-white/80">نظام إدارة معارض السيراميك ومواد التشطيب</p>
       </div>
     </div>
@@ -54,7 +54,7 @@ export const LoginBrandPanel: React.FC = () => (
     </div>
 
     <div className="relative flex items-center justify-between border-t border-white/20 pt-4 text-[10px] text-white/70">
-      <span>CeramiSys ERP · Commercial License</span>
+      <span>سيراميسيس · ترخيص تجاري</span>
       <span className="flex items-center gap-1">
         <ShieldCheck className="h-3 w-3" aria-hidden="true" />
         اتصال محلي آمن

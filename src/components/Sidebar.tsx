@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import type { User } from '../types';
-import { PermissionService } from '../services/PermissionService';
 import { NavigationService } from '../services/NavigationService';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -37,13 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   const visibleGroups = useMemo(
-    () =>
-      NavigationService.getGroups()
-        .map((group) => ({
-          ...group,
-          items: group.items.filter((item) => !item.perm || PermissionService.can(currentUser, item.perm)),
-        }))
-        .filter((group) => group.items.length > 0),
+    () => NavigationService.getAccessibleGroups(currentUser),
     [currentUser, settings]
   );
 

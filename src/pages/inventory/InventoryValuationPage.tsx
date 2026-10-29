@@ -92,7 +92,7 @@ export const InventoryValuationPage: React.FC = () => {
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shrink-0">
           <Download className="w-4 h-4" />
-          تصدير التقرير المالي (Excel)
+          تصدير التقرير المالي في جدول بيانات
         </button>
       </div>
 

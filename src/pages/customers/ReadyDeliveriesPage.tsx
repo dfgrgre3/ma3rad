@@ -2,26 +2,40 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2, MessageCircle, Search, Truck } from 'lucide-react';
 import { CustomerSupplyService, CustomerSupplyRequest } from '../../services/CustomerSupplyService';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { usePermission } from '../../hooks/usePermission';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
 
 export const ReadyDeliveriesPage: React.FC = () => {
   const service = useMemo(() => new CustomerSupplyService(), []);
+  const canView = usePermission()('sales.view');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<CustomerSupplyRequest[]>([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const load = () => {
+      if (!canView) {
+        setRows([]);
+        setError('ليس لديك صلاحية عرض هذه الصفحة.');
+        setLoading(false);
+        return;
+      }
       setLoading(true);
+      setError('');
       try {
         setRows(service.getReadyForDelivery({ search: search.trim() || undefined }));
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'تعذر تحميل الطلبات الجاهزة للتسليم.');
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [search, service]);
+  }, [canView, search, service]);
+
+  if (!canView) return <div className="h-full flex items-center justify-center bg-slate-50 text-rose-700" dir="rtl">ليس لديك صلاحية عرض هذه الصفحة.</div>;
 
   return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
     <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between gap-3">
@@ -36,6 +50,7 @@ export const ReadyDeliveriesPage: React.FC = () => {
     </header>
     <div className="p-4 bg-white border-b border-slate-200"><div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث باسم العميل أو الفاتورة أو المنتج" className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 text-sm" /></div></div>
     <main className="flex-1 overflow-auto p-4 space-y-4">
+      {error && <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-sm">{error}</div>}
       {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-600" /></div> : rows.map((request) => <article key={request.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
           <div>

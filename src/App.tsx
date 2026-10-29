@@ -3,6 +3,7 @@ import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
 import { SettingsService } from './services/SettingsService';
+import { shouldShowFirstRunSetup } from './config/setupLifecycle';
 import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
 import { AppRouter } from './router';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -39,12 +40,43 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (!currentUser) return;
     try {
-      const completed = SettingsService.getValue('setup_completed') === '1';
       const db = DatabaseManager.getInstance();
-      const products = db.query<{ count: number }>('SELECT COUNT(*) AS count FROM products')[0]?.count || 0;
-      const invoices = db.query<{ count: number }>('SELECT COUNT(*) AS count FROM sales_invoices')[0]?.count || 0;
-      setShowSetup(!completed && products === 0 && invoices === 0);
+      const tables = new Set(db.query<{ name: string }>(
+        `SELECT name FROM sqlite_master WHERE type = 'table'`
+      ).map(({ name }) => name));
+      const businessTables = [
+        'products', 'customers', 'suppliers', 'sales_invoices', 'purchase_invoices',
+        'purchase_orders', 'purchase_requests', 'sales_returns', 'purchase_returns',
+        'sales_orders', 'quotations', 'goods_receipts', 'inventory_transactions',
+        'stock_movements', 'inventory_adjustments', 'inventory_transfers', 'stock_counts',
+        'customer_payments', 'supplier_payments', 'cash_transactions', 'expenses',
+        'projects', 'employees', 'employee_contracts', 'employee_leave_requests',
+        'deliveries', 'documents', 'contracts', 'leads', 'manufacturing_orders',
+        'journal_entries',
+      ];
+      const hasBusinessData = businessTables.some((table) =>
+        tables.has(table) && db.query(`SELECT 1 FROM "${table}" LIMIT 1`).length > 0
+      ) || (tables.has('users')
+        && db.query(`SELECT 1 FROM users WHERE lower(username) <> 'admin' LIMIT 1`).length > 0)
+        || ['companies', 'branches', 'warehouses'].some((table) =>
+          tables.has(table) && db.query(`SELECT 1 FROM "${table}" LIMIT 1 OFFSET 1`).length > 0
+        );
+      const legacySettings = db.query<{ key: string; value: string }>(
+        `SELECT key, value FROM system_settings
+         WHERE key IN ('showroomName', 'businessType', 'businessProfileConfig', 'enabledModules')`
+      );
+      const hasLegacyConfiguration = legacySettings.some(({ key, value }) =>
+        (key === 'showroomName' && value.trim().length > 0)
+        || (key !== 'showroomName' && value.trim().length > 0 && value.trim() !== '{}')
+      );
+      setShowSetup(shouldShowFirstRunSetup({
+        completed: SettingsService.getValue('setup_completed') === '1',
+        hasBusinessData,
+        hasLegacyConfiguration,
+      }));
     } catch {
+      // Fail closed: never open a mutating first-run wizard when setup state
+      // cannot be determined safely.
       setShowSetup(false);
     }
   }, [currentUser?.id]);
@@ -58,7 +90,7 @@ export const App: React.FC = () => {
           </div>
           {!initError && <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 animate-ping opacity-20" />}
         </div>
-        <h1 className="text-xl font-black tracking-wide text-slate-900 mb-1">CeramiSys ERP</h1>
+        <h1 className="text-xl font-black tracking-wide text-slate-900 mb-1">سيراميسيس</h1>
         <p className="text-sm text-slate-600 mb-4">نظام إدارة معارض السيراميك ومواد التشطيب</p>
         {initError ? (
           <div className="flex flex-col items-center gap-3">

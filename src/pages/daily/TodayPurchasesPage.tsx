@@ -211,7 +211,7 @@ export const TodayPurchasesPage: React.FC = () => {
       row,
       items: itemsByPurchase.get(row.id) || [],
       currency,
-      storeName: settings?.showroomName || 'CeramiSys ERP',
+      storeName: settings?.showroomName || 'سيراميسيس',
       toast,
     });
   };

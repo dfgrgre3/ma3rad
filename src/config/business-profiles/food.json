@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "food",
+  "name": {
+    "ar": "مواد غذائية وسوبر ماركت",
+    "en": "Food and grocery retail"
+  },
+  "description": {
+    "ar": "أصناف سريعة الحركة ومشتريات ومخزون",
+    "en": "Fast-moving goods, purchasing and inventory"
+  },
+  "category": "retail",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "LITER",
+      "PACK",
+      "BOX"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "تاريخ الصلاحية",
+      "العلامة التجارية"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "expiryBatchEnforcement": "not-implemented"
+  }
+}

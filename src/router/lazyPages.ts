@@ -7,6 +7,7 @@ export const QuickToolsPage = lazy(() => import('../pages/tools/QuickToolsPage')
 
 // Sales & POS
 export const PosView = lazy(() => import('../components/PosView').then(m => ({ default: m.PosView })));
+export const RestaurantPage = lazy(() => import('../pages/restaurant/RestaurantPage').then(m => ({ default: m.RestaurantPage })));
 export const SalesView = lazy(() => import('../components/SalesView').then(m => ({ default: m.SalesView })));
 export const SalesAnalyticsPage = lazy(() => import('../pages/sales/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
 export const InvoiceCyclePage = lazy(() => import('../pages/sales/InvoiceCyclePage').then(m => ({ default: m.InvoiceCyclePage })));

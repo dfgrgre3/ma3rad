@@ -296,7 +296,7 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
                 <Printer className="w-3.5 h-3.5" />طباعة
               </button>
               <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
-                <Download className="w-3.5 h-3.5" />Excel
+                <Download className="w-3.5 h-3.5" />جدول بيانات
               </button>
             </div>
 
@@ -381,7 +381,9 @@ export const CustomerStatementPage: React.FC = () => {
   const customerService = useMemo(() => new CustomerService(), []);
   const salesService = useMemo(() => new SalesService(), []);
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'customers.view');
+  const canView = PermissionService.can(user, 'customers.view')
+    && PermissionService.can(user, 'sales.view')
+    && PermissionService.can(user, 'finance.debts.view');
 
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [loading, setLoading] = useState(true);

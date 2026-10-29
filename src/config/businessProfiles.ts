@@ -1,44 +1,63 @@
+import ceramicsProfile from './business-profiles/ceramics.json' with { type: 'json' };
+import buildingMaterialsProfile from './business-profiles/building_materials.json' with { type: 'json' };
+import sanitaryProfile from './business-profiles/sanitary.json' with { type: 'json' };
+import lightingProfile from './business-profiles/lighting.json' with { type: 'json' };
+import furnitureProfile from './business-profiles/furniture.json' with { type: 'json' };
+import electronicsProfile from './business-profiles/electronics.json' with { type: 'json' };
+import clothingProfile from './business-profiles/clothing.json' with { type: 'json' };
+import automotiveProfile from './business-profiles/automotive.json' with { type: 'json' };
+import homeAppliancesProfile from './business-profiles/home_appliances.json' with { type: 'json' };
+import cosmeticsProfile from './business-profiles/cosmetics.json' with { type: 'json' };
+import foodProfile from './business-profiles/food.json' with { type: 'json' };
+import restaurantProfile from './business-profiles/restaurant.json' with { type: 'json' };
+import servicesProfile from './business-profiles/services.json' with { type: 'json' };
+import workshopProfile from './business-profiles/workshop.json' with { type: 'json' };
+import generalProfile from './business-profiles/general.json' with { type: 'json' };
+import customProfile from './business-profiles/custom.json' with { type: 'json' };
+import manufacturingProfile from './business-profiles/manufacturing.json' with { type: 'json' };
+import constructionProfile from './business-profiles/construction.json' with { type: 'json' };
+import importExportProfile from './business-profiles/import_export.json' with { type: 'json' };
+import ecommerceProfile from './business-profiles/ecommerce.json' with { type: 'json' };
+import logisticsProfile from './business-profiles/logistics.json' with { type: 'json' };
+import professionalServicesProfile from './business-profiles/professional_services.json' with { type: 'json' };
+import educationProfile from './business-profiles/education.json' with { type: 'json' };
+import healthcareAdminProfile from './business-profiles/healthcare_admin.json' with { type: 'json' };
+import hospitalityProfile from './business-profiles/hospitality.json' with { type: 'json' };
 import {
+  MODULE_IDS,
   MODULE_REGISTRY,
   getHiddenModulePaths,
   getManagedModulePaths,
   getModulePathOwner,
 } from './moduleRegistry';
+import {
+  BUSINESS_ACTIVITY_FAMILIES,
+  getActivityRows,
+  type ActivityDefinition,
+} from './activityCatalog';
 
-const LEGACY_BUSINESS_TYPES = [
-  { id: 'ceramics', label: 'سيراميك وبورسلين', description: 'مساحات ومقاسات ومخزون بالمتر والكرتونة' },
-  { id: 'building_materials', label: 'مواد بناء وتشطيب', description: 'أصناف متنوعة ومخازن ومشتريات' },
-  { id: 'sanitary', label: 'أدوات صحية', description: 'منتجات وماركات ومبيعات المعرض' },
-  { id: 'lighting', label: 'إضاءة وكهرباء', description: 'كتالوج أصناف وباركود ومخزون' },
-  { id: 'furniture', label: 'أثاث وديكور', description: 'طلبات ومشروعات وتسليمات' },
-  { id: 'electronics', label: 'أجهزة وإلكترونيات', description: 'كتالوج أجهزة ومبيعات ومتابعة مخزون' },
-  { id: 'clothing', label: 'ملابس وأحذية', description: 'مقاسات وألوان وموديلات وبيع بالتجزئة' },
-  { id: 'automotive', label: 'قطع غيار وسيارات', description: 'أصناف وموردون ومخزون وطلبات شراء' },
-  { id: 'home_appliances', label: 'أجهزة منزلية', description: 'منتجات وضمانات وتوصيل ومتابعة العملاء' },
-  { id: 'cosmetics', label: 'عطور ومستحضرات تجميل', description: 'كتالوج منتجات ومخزون ومبيعات' },
-  { id: 'food', label: 'مواد غذائية وسوبر ماركت', description: 'أصناف سريعة الحركة ومشتريات ومخزون' },
-  { id: 'restaurant', label: 'مطعم أو كافيه', description: 'مبيعات ومواد تشغيل ومخزون اختياري' },
-  { id: 'services', label: 'شركة خدمات أو صيانة', description: 'خدمات وفواتير وعملاء دون مخزون افتراضي' },
-  { id: 'workshop', label: 'ورشة أو خدمات تشغيل', description: 'خدمات ومخزون اختياري' },
-  { id: 'general', label: 'معرض متعدد الأنشطة', description: 'تخصيص مرن لأي نشاط تجاري' },
-  { id: 'custom', label: 'نشاط آخر مخصص', description: 'اكتب نوع نشاطك واختر الوحدات التي تحتاجها' },
-] as const;
+export interface BusinessProfile {
+  schemaVersion: number;
+  profileVersion: number;
+  id: string;
+  name: { ar: string; en: string };
+  description: { ar: string; en: string };
+  category: string;
+  familyId?: string;
+  configuration: BusinessConfigurationDefaults;
+  modules: { enabledByDefault: string[]; optional: string[] };
+  support: Record<string, string | boolean>;
+}
 
-// Additional profiles reuse the current operational modules. They configure
-// defaults only and do not imply industry-specific legal or regulatory support.
-const ADDITIONAL_BUSINESS_TYPES = [
-  { id: 'manufacturing', label: 'Manufacturing and production', description: 'Materials, operations and production planning' },
-  { id: 'construction', label: 'Construction and contracting', description: 'Projects, procurement and cost tracking' },
-  { id: 'import_export', label: 'Import and export', description: 'Purchasing, sales, inventory and multi-currency settings' },
-  { id: 'ecommerce', label: 'E-commerce', description: 'Product sales, customer management and fulfillment' },
-  { id: 'logistics', label: 'Logistics and transportation', description: 'Service operations, deliveries and workforce' },
-  { id: 'professional_services', label: 'Professional services', description: 'Client services, projects and finance' },
-  { id: 'education', label: 'Education and training', description: 'Service operations and workforce' },
-  { id: 'healthcare_admin', label: 'Healthcare administration', description: 'Administrative business operations; configure local policies separately' },
-  { id: 'hospitality', label: 'Hospitality', description: 'Mixed service and product operations' },
-] as const;
-
-export const BUSINESS_TYPES = [...LEGACY_BUSINESS_TYPES, ...ADDITIONAL_BUSINESS_TYPES] as const;
+const PROFILE_FILES: unknown[] = [
+  ceramicsProfile, buildingMaterialsProfile, sanitaryProfile, lightingProfile,
+  furnitureProfile, electronicsProfile, clothingProfile, automotiveProfile,
+  homeAppliancesProfile, cosmeticsProfile, foodProfile, restaurantProfile,
+  servicesProfile, workshopProfile, generalProfile, customProfile,
+  manufacturingProfile, constructionProfile, importExportProfile, ecommerceProfile,
+  logisticsProfile, professionalServicesProfile, educationProfile,
+  healthcareAdminProfile, hospitalityProfile,
+];
 
 export const BUSINESS_UNITS = [
   { id: 'M2', label: 'متر مربع' },
@@ -63,96 +82,204 @@ export interface BusinessConfiguration {
   units: string[];
   customUnits: string[];
   productAttributes: string[];
+  additionalActivityIds: string[];
 }
 
 type BusinessConfigurationDefaults = Omit<BusinessConfiguration, 'businessType'>;
 
-const COMMON_DEFAULTS: BusinessConfigurationDefaults = {
-  businessModel: 'products',
-  trackInventory: true,
-  units: ['PIECE'],
-  customUnits: [],
-  productAttributes: [],
-};
-
-const PROFILE_CONFIGURATIONS: Record<string, BusinessConfigurationDefaults> = {
-  ceramics: {
-    ...COMMON_DEFAULTS,
-    units: ['M2', 'BOX', 'PIECE'],
-    productAttributes: ['المقاس', 'الفرز', 'اللون', 'النغمة', 'التشطيب'],
-  },
-  building_materials: { ...COMMON_DEFAULTS, units: ['PIECE', 'KG', 'TON', 'BOX'] },
-  sanitary: { ...COMMON_DEFAULTS, units: ['PIECE', 'SET'], productAttributes: ['الماركة', 'الموديل', 'اللون'] },
-  lighting: { ...COMMON_DEFAULTS, units: ['PIECE', 'BOX'], productAttributes: ['الماركة', 'الموديل', 'القدرة'] },
-  furniture: { ...COMMON_DEFAULTS, units: ['PIECE', 'SET'], productAttributes: ['الموديل', 'اللون', 'الخامة'] },
-  electronics: {
-    ...COMMON_DEFAULTS,
-    units: ['PIECE'],
-    productAttributes: ['الماركة', 'الموديل', 'الضمان'],
-  },
-  clothing: {
-    ...COMMON_DEFAULTS,
-    units: ['PIECE'],
-    productAttributes: ['المقاس', 'اللون', 'الموديل'],
-  },
-  automotive: { ...COMMON_DEFAULTS, units: ['PIECE', 'SET'], productAttributes: ['رقم القطعة', 'الماركة', 'الموديل'] },
-  home_appliances: {
-    ...COMMON_DEFAULTS,
-    units: ['PIECE'],
-    productAttributes: ['الماركة', 'الموديل', 'الضمان'],
-  },
-  cosmetics: { ...COMMON_DEFAULTS, units: ['PIECE', 'PACK'], productAttributes: ['الحجم', 'الرائحة', 'اللون'] },
-  food: { ...COMMON_DEFAULTS, units: ['PIECE', 'KG', 'LITER', 'PACK', 'BOX'], productAttributes: ['تاريخ الصلاحية', 'العلامة التجارية'] },
-  restaurant: {
-    ...COMMON_DEFAULTS,
-    businessModel: 'mixed',
-    units: ['PIECE', 'KG', 'LITER', 'SERVICE'],
-    productAttributes: ['الفئة', 'الحجم'],
-  },
-  services: {
-    ...COMMON_DEFAULTS,
-    businessModel: 'services',
-    trackInventory: false,
-    units: ['SERVICE'],
-    productAttributes: [],
-  },
-  workshop: {
-    ...COMMON_DEFAULTS,
-    businessModel: 'mixed',
-    units: ['SERVICE', 'PIECE'],
-    productAttributes: ['نوع الخدمة', 'الموديل'],
-  },
-  general: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'METER', 'LINEAR_METER', 'PACK', 'SERVICE'] },
-  custom: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'METER', 'LINEAR_METER', 'PACK', 'SERVICE'] },
-  manufacturing: { ...COMMON_DEFAULTS, units: ['PIECE', 'KG', 'TON', 'METER'] },
-  construction: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'TON', 'METER', 'M2', 'SERVICE'] },
-  import_export: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'TON', 'LITER', 'BOX', 'PACK'] },
-  ecommerce: { ...COMMON_DEFAULTS, units: ['PIECE', 'BOX', 'PACK'] },
-  logistics: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE', 'METER'] },
-  professional_services: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE'] },
-  education: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE', 'PIECE'] },
-  healthcare_admin: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE', 'PIECE'] },
-  hospitality: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'SERVICE'] },
-};
-
 const VALID_BUSINESS_MODELS = new Set<BusinessModel>(['products', 'services', 'mixed']);
 const VALID_UNITS = new Set<string>(BUSINESS_UNITS.map((unit) => unit.id));
 
-export const getDefaultBusinessConfiguration = (businessType: string): BusinessConfiguration => ({
-  businessType,
-  ...(PROFILE_CONFIGURATIONS[businessType] || PROFILE_CONFIGURATIONS.general),
-  units: [...(PROFILE_CONFIGURATIONS[businessType] || PROFILE_CONFIGURATIONS.general).units],
-  customUnits: [...(PROFILE_CONFIGURATIONS[businessType] || PROFILE_CONFIGURATIONS.general).customUnits],
-  productAttributes: [...(PROFILE_CONFIGURATIONS[businessType] || PROFILE_CONFIGURATIONS.general).productAttributes],
-});
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function hasUniqueNonEmptyStrings(values: string[]): boolean {
+  const normalized = values.map((value) => value.trim().toLowerCase());
+  return normalized.every(Boolean) && new Set(normalized).size === normalized.length;
+}
+
+function validateBusinessProfile(value: unknown): BusinessProfile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Business profile must be an object.');
+  }
+  const profile = value as Partial<BusinessProfile>;
+  const fail = (reason: string): never => {
+    throw new Error(`Invalid business profile "${profile.id || 'unknown'}": ${reason}`);
+  };
+  if (profile.schemaVersion !== 1 || !Number.isInteger(profile.profileVersion) || Number(profile.profileVersion) < 1) {
+    fail('unsupported schema or profile version.');
+  }
+  if (typeof profile.id !== 'string' || !/^[a-z][a-z0-9_]*$/.test(profile.id)) fail('invalid id.');
+  if (typeof profile.name?.ar !== 'string' || !profile.name.ar.trim()
+    || typeof profile.name.en !== 'string' || !profile.name.en.trim()
+    || typeof profile.description?.ar !== 'string' || !profile.description.ar.trim()
+    || typeof profile.description.en !== 'string' || !profile.description.en.trim()) {
+    fail('Arabic and English names and descriptions are required.');
+  }
+  if (typeof profile.category !== 'string' || !profile.category.trim()) fail('category is required.');
+
+  const configuration = profile.configuration;
+  if (!configuration) throw new Error(`Invalid business profile "${profile.id}": configuration is incomplete.`);
+  if (!VALID_BUSINESS_MODELS.has(configuration.businessModel)
+    || typeof configuration.trackInventory !== 'boolean') {
+    throw new Error(`Invalid business profile "${profile.id}": configuration is incomplete.`);
+  }
+  if (!isStringArray(configuration.units) || configuration.units.length === 0
+    || !isStringArray(configuration.customUnits)
+    || !isStringArray(configuration.productAttributes)) {
+    throw new Error(`Invalid business profile "${profile.id}": configuration is incomplete.`);
+  }
+  if (!hasUniqueNonEmptyStrings(configuration.units)
+    || !hasUniqueNonEmptyStrings(configuration.customUnits)
+    || !hasUniqueNonEmptyStrings(configuration.productAttributes)) {
+    fail('units, custom units, and product attributes must be non-empty and unique.');
+  }
+  if (configuration.units.some((unit) => !VALID_UNITS.has(unit))) fail('unknown unit.');
+
+  const modules = profile.modules;
+  if (!modules) throw new Error(`Invalid business profile "${profile.id}": module defaults are incomplete.`);
+  if (!isStringArray(modules.enabledByDefault) || !isStringArray(modules.optional)) {
+    throw new Error(`Invalid business profile "${profile.id}": module defaults are incomplete.`);
+  }
+  const moduleIds = new Set(MODULE_IDS);
+  if ([...modules.enabledByDefault, ...modules.optional].some((moduleId) => !moduleIds.has(moduleId))) {
+    fail('unknown module id.');
+  }
+  if (new Set(modules.enabledByDefault).size !== modules.enabledByDefault.length
+    || new Set(modules.optional).size !== modules.optional.length
+    || modules.enabledByDefault.some((moduleId) => modules.optional.includes(moduleId))
+    || [...modules.enabledByDefault, ...modules.optional].length !== MODULE_IDS.length) {
+    fail('modules must be uniquely classified as enabled by default or optional.');
+  }
+  if (!profile.support || typeof profile.support !== 'object' || Array.isArray(profile.support)
+    || profile.support.profileDefaults !== 'implemented') {
+    fail('support status must explicitly declare profile defaults.');
+  }
+  return profile as BusinessProfile;
+}
+
+export const BUSINESS_PROFILES: BusinessProfile[] = PROFILE_FILES.map(validateBusinessProfile);
+const PROFILE_BY_ID = new Map<string, BusinessProfile>();
+for (const profile of BUSINESS_PROFILES) {
+  if (PROFILE_BY_ID.has(profile.id)) throw new Error(`Duplicate business profile id: ${profile.id}`);
+  PROFILE_BY_ID.set(profile.id, profile);
+}
+
+const ACTIVITY_DEFINITIONS: ActivityDefinition[] = getActivityRows();
+export const BUSINESS_ACTIVITY_CATALOG: readonly ActivityDefinition[] = ACTIVITY_DEFINITIONS;
+const ACTIVITY_BY_ID = new Map<string, ActivityDefinition>();
+const ACTIVITY_FAMILY_IDS = new Set(BUSINESS_ACTIVITY_FAMILIES.map((family) => family.id));
+for (const activity of ACTIVITY_DEFINITIONS) {
+  if (!/^[a-z][a-z0-9_]*$/.test(activity.id)) throw new Error(`Invalid activity id: ${activity.id}`);
+  if (ACTIVITY_BY_ID.has(activity.id)) throw new Error(`Duplicate activity id: ${activity.id}`);
+  if (!activity.label.trim() || !ACTIVITY_FAMILY_IDS.has(activity.familyId)) {
+    throw new Error(`Activity "${activity.id}" has incomplete display metadata or an unknown family.`);
+  }
+  if (!PROFILE_BY_ID.has(activity.profileId)) {
+    throw new Error(`Activity "${activity.id}" references unknown profile "${activity.profileId}".`);
+  }
+  ACTIVITY_BY_ID.set(activity.id, activity);
+}
+
+const ACTIVITY_PROFILE_BY_ID = new Map<string, BusinessProfile>();
+for (const activity of ACTIVITY_DEFINITIONS) {
+  const template = PROFILE_BY_ID.get(activity.profileId)!;
+  const family = BUSINESS_ACTIVITY_FAMILIES.find((item) => item.id === activity.familyId);
+  const englishActivityName = activity.id.replace(/_/g, ' ');
+  ACTIVITY_PROFILE_BY_ID.set(activity.id, {
+    ...template,
+    id: activity.id,
+    name: { ar: activity.label, en: `${englishActivityName} (${family?.labelEn || template.category})` },
+    description: {
+      ar: `قالب ${family?.label || template.category} مبني على إعداد ${template.name.ar}.`,
+      en: `${englishActivityName} uses the shared ${template.name.en} profile defaults.`,
+    },
+    category: activity.familyId,
+    familyId: activity.familyId,
+  });
+}
+
+/* Keep old profile ids selectable so existing installations and drafts remain valid. */
+const LEGACY_BUSINESS_TYPES = BUSINESS_PROFILES.map((profile) => ({
+  id: profile.id,
+  label: profile.name.ar,
+  category: profile.category,
+  familyLabel: profile.category,
+  description: profile.description.ar,
+}));
+
+export const getBusinessProfile = (businessType: string): BusinessProfile =>
+  ACTIVITY_PROFILE_BY_ID.get(businessType)
+  || PROFILE_BY_ID.get(businessType)
+  || PROFILE_BY_ID.get('general')!;
+
+export const getBusinessProfileTemplateId = (businessType: string): string =>
+  ACTIVITY_BY_ID.get(businessType)?.profileId
+  || (PROFILE_BY_ID.has(businessType) ? businessType : 'general');
+
+export const BUSINESS_TYPES = [
+  ...ACTIVITY_DEFINITIONS.map((activity) => ({
+    id: activity.id,
+    label: activity.label,
+    category: activity.familyId,
+    familyLabel: BUSINESS_ACTIVITY_FAMILIES.find((family) => family.id === activity.familyId)?.label || activity.familyId,
+    description: getBusinessProfile(activity.id).description.ar,
+  })),
+  ...LEGACY_BUSINESS_TYPES.filter((legacy) => !ACTIVITY_BY_ID.has(legacy.id)),
+];
+
+export const BUSINESS_ACTIVITY_FAMILY_OPTIONS = BUSINESS_ACTIVITY_FAMILIES.map((family) => ({
+  id: family.id,
+  label: family.label,
+}));
+
+function uniqueActivityIds(primaryId: string, additionalIds: string[]): string[] {
+  return [...new Set(additionalIds)]
+    .filter((id) => id !== primaryId && ACTIVITY_BY_ID.has(id));
+}
+
+export const getDefaultBusinessConfiguration = (
+  businessType: string,
+  additionalActivityIds: string[] = [],
+): BusinessConfiguration => {
+  const primary = getBusinessProfile(businessType);
+  const additionalIds = uniqueActivityIds(businessType, additionalActivityIds);
+  const profiles = [primary, ...additionalIds.map(getBusinessProfile)];
+  const models = new Set(profiles.map((profile) => profile.configuration.businessModel));
+  const combinedModel: BusinessModel = models.size > 1
+    ? 'mixed'
+    : primary.configuration.businessModel;
+  return {
+    businessType,
+    businessModel: combinedModel,
+    trackInventory: profiles.some((profile) => profile.configuration.trackInventory),
+    units: [...new Set(profiles.flatMap((profile) => profile.configuration.units))],
+    customUnits: [...new Set(profiles.flatMap((profile) => profile.configuration.customUnits))],
+    productAttributes: [...new Set(profiles.flatMap((profile) => profile.configuration.productAttributes))],
+    additionalActivityIds: additionalIds,
+  };
+};
+
+export const getActivityModuleIds = (businessType: string, additionalActivityIds: string[] = []): string[] =>
+  [...new Set([
+    ...getProfileModuleIds(businessType),
+    ...uniqueActivityIds(businessType, additionalActivityIds).flatMap(getProfileModuleIds),
+  ])];
 
 export const parseBusinessConfiguration = (raw: string | undefined, businessType: string): BusinessConfiguration => {
-  const defaults = getDefaultBusinessConfiguration(businessType);
-  if (!raw) return defaults;
+  if (!raw) return getDefaultBusinessConfiguration(businessType);
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return defaults;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return getDefaultBusinessConfiguration(businessType);
+    }
     const saved = parsed as Partial<BusinessConfiguration>;
+    const additionalActivityIds = uniqueActivityIds(
+      businessType,
+      isStringArray(saved.additionalActivityIds) ? saved.additionalActivityIds : [],
+    );
+    const defaults = getDefaultBusinessConfiguration(businessType, additionalActivityIds);
     const strings = (value: unknown, fallback: string[]) => Array.isArray(value)
       ? [...new Set(value.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))]
       : fallback;
@@ -164,9 +291,10 @@ export const parseBusinessConfiguration = (raw: string | undefined, businessType
       units: strings(saved.units, defaults.units).filter((unit) => VALID_UNITS.has(unit)),
       customUnits: strings(saved.customUnits, defaults.customUnits),
       productAttributes: strings(saved.productAttributes, defaults.productAttributes),
+      additionalActivityIds,
     };
   } catch {
-    return defaults;
+    return getDefaultBusinessConfiguration(businessType);
   }
 };
 
@@ -178,51 +306,11 @@ export const BUSINESS_MODULES = MODULE_REGISTRY.map((module) => ({
   paths: [...module.paths],
 }));
 
-const ALL_MODULE_IDS = BUSINESS_MODULES.map((module) => module.id);
-
-const PROFILE_MODULES: Record<string, string[]> = {
-  ceramics: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  building_materials: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  sanitary: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  lighting: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  furniture: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
-  electronics: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  clothing: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  automotive: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  home_appliances: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
-  cosmetics: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  food: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
-  restaurant: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  services: ['sales', 'customers', 'finance', 'reports'],
-  workshop: ['sales', 'inventory', 'customers', 'finance', 'operations', 'reports'],
-  general: ALL_MODULE_IDS,
-  custom: ALL_MODULE_IDS,
-  manufacturing: ['sales', 'inventory', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  construction: ['sales', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
-  import_export: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports', 'approvals'],
-  ecommerce: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
-  logistics: ['sales', 'customers', 'finance', 'operations', 'reports', 'approvals'],
-  professional_services: ['sales', 'customers', 'finance', 'reports', 'approvals'],
-  education: ['sales', 'customers', 'finance', 'operations', 'reports'],
-  healthcare_admin: ['sales', 'customers', 'finance', 'operations', 'reports'],
-  hospitality: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
+export const getProfileModuleIds = (businessType: string): string[] => {
+  const profile = getBusinessProfile(businessType);
+  return [...profile.modules.enabledByDefault];
 };
 
-export const getProfileModuleIds = (businessType: string): string[] =>
-  [...new Set([
-    ...(PROFILE_MODULES[businessType] || PROFILE_MODULES.general),
-    // Documents/contracts, projects and HR are industry-neutral and were
-    // always visible before they became optional registry modules. Keep them
-    // enabled by default; administrators can still deactivate them explicitly.
-    'documents',
-    'projects',
-    'hr',
-    // Manufacturing depends on inventory: only enable it for profiles that
-    // track stock, otherwise validation would reject the selection.
-    ...(((PROFILE_MODULES[businessType] || PROFILE_MODULES.general).includes('inventory'))
-      ? ['manufacturing']
-      : []),
-  ])];
 
 export const parseEnabledModules = (raw: string | undefined, businessType: string): string[] => {
   if (!raw) return getProfileModuleIds(businessType);

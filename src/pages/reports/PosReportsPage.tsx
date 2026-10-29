@@ -158,7 +158,7 @@ export function PosReportsPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-slate-900 flex items-center gap-2"><CreditCard className="w-4 h-4 text-sky-600" /> توزيع طرق الدفع</h2>
-            <button onClick={exportPaymentMix} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> Excel</button>
+            <button onClick={exportPaymentMix} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
           </div>
           <table className="w-full text-sm">
             <thead><tr className="text-slate-500 text-xs"><th className="text-right py-1">الطريقة</th><th className="text-center py-1">عدد</th><th className="text-left py-1">المبلغ</th></tr></thead>
@@ -203,7 +203,7 @@ export function PosReportsPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-slate-900 flex items-center gap-2"><Package className="w-4 h-4 text-sky-600" /> الأصناف الأكثر مبيعاً (أفضل 15)</h2>
-            <button onClick={exportTopItems} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> Excel</button>
+            <button onClick={exportTopItems} className="text-xs text-sky-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" /> جدول بيانات</button>
           </div>
           <table className="w-full text-sm">
             <thead><tr className="text-slate-500 text-xs"><th className="text-right py-1">#</th><th className="text-right py-1">الصنف</th><th className="text-center py-1">الكمية</th><th className="text-left py-1">المبلغ</th></tr></thead>

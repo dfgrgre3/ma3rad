@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "construction",
+  "name": {
+    "ar": "المقاولات والمشروعات",
+    "en": "Construction and contracting"
+  },
+  "description": {
+    "ar": "مشروعات ومشتريات وتتبع تكلفة",
+    "en": "Projects, procurement and cost tracking"
+  },
+  "category": "projects",
+  "configuration": {
+    "businessModel": "mixed",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "TON",
+      "METER",
+      "M2",
+      "SERVICE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "نوع البند",
+      "المواصفة الفنية",
+      "الخامة"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "customers",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr"
+    ],
+    "optional": [
+      "inventory",
+      "manufacturing"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "projectModule": "available",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "projectCostingAndProgressClaims": "not-implemented"
+  }
+}

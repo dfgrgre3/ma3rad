@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('ceramisys', {
     load: () => ipcRenderer.invoke('db:load'),
     save: (bytes) => ipcRenderer.invoke('db:save', bytes),
     decryptLocalBackup: (bytes) => ipcRenderer.invoke('db:decrypt-local-backup', bytes),
+    encryptXlsxBackup: (bytes, password) => ipcRenderer.invoke('db:encrypt-xlsx-backup', bytes, password),
+    decryptXlsxBackup: (bytes, password) => ipcRenderer.invoke('db:decrypt-xlsx-backup', bytes, password),
     backup: (label) => ipcRenderer.invoke('db:backup', label),
     removeBackup: (fileName) => ipcRenderer.invoke('db:remove-backup', fileName),
     preserveCorrupt: () => ipcRenderer.invoke('db:preserve-corrupt'),

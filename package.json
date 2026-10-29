@@ -1,7 +1,7 @@
 {
   "name": "ceramisys-erp",
   "version": "1.1.3",
-  "description": "Desktop Ceramic & Finishing Materials Showroom Management ERP System",
+  "description": "نظام مكتبي لإدارة معارض السيراميك ومواد التشطيب",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,7 @@
     "check": "npm run typecheck && npm test && npm run build",
     "electron:pack": "npm run build && electron-builder --dir",
     "electron:dist": "npm run build && electron-builder --win nsis",
-    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/auth-login-guard.test.ts test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/data-integrity.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/spreadsheet-import.test.ts test/branch-access.test.ts test/branch-scoped-pages.test.ts test/branch-ledger-reports.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/companies.test.ts test/company-data-scope.test.ts test/uom.test.ts test/cycle-audit.test.ts test/sale-units.test.ts test/order-quotation-units.test.ts test/company-organization-settings.test.ts test/module-registry.test.ts test/inventory-module-guard.test.ts test/operations-module-guard.test.ts test/purchasing-authorization.test.ts test/export-authorization.test.ts test/services-business-sales.test.ts test/purchases-without-inventory.test.ts test/sales-authorization.test.ts test/approval-controls.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/finance-enterprise-lifecycle.test.ts test/product-units.test.ts test/sales-reports.test.ts test/documents.test.ts test/document-approval-trigger.test.ts test/electron-handlers.test.cjs test/electron-documents.test.cjs test/electron-close.test.cjs test/electron-startup.test.ts test/backup-encryption.test.ts test/backup-restore.test.ts test/projects.test.ts test/project-controls.test.ts test/hr-leave.test.ts test/hr-contracts.test.ts test/hr-documents.test.ts test/manufacturing.test.ts test/manufacturing-quality.test.ts test/manufacturing-maintenance.test.ts test/manufacturing-wip.test.ts test/manufacturing-disposition.test.ts test/performance.test.ts test/single-device.test.ts test/sync-foundation.test.ts",
+    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/auth-login-guard.test.ts test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/data-integrity.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/dynamic-attributes.test.ts test/spreadsheet-import.test.ts test/branch-access.test.ts test/branch-scoped-pages.test.ts test/branch-ledger-reports.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/companies.test.ts test/company-data-scope.test.ts test/uom.test.ts test/cycle-audit.test.ts test/sale-units.test.ts test/order-quotation-units.test.ts test/company-organization-settings.test.ts test/module-registry.test.ts test/inventory-module-guard.test.ts test/operations-module-guard.test.ts test/purchasing-authorization.test.ts test/export-authorization.test.ts test/services-business-sales.test.ts test/purchases-without-inventory.test.ts test/sales-authorization.test.ts test/approval-controls.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/finance-enterprise-lifecycle.test.ts test/product-units.test.ts test/sales-reports.test.ts test/documents.test.ts test/document-approval-trigger.test.ts test/electron-handlers.test.cjs test/electron-documents.test.cjs test/electron-close.test.cjs test/electron-startup.test.ts test/backup-encryption.test.ts test/backup-restore.test.ts test/projects.test.ts test/project-controls.test.ts test/hr-leave.test.ts test/hr-contracts.test.ts test/hr-documents.test.ts test/manufacturing.test.ts test/manufacturing-quality.test.ts test/manufacturing-maintenance.test.ts test/manufacturing-wip.test.ts test/manufacturing-disposition.test.ts test/performance.test.ts test/single-device.test.ts test/sync-foundation.test.ts",
     "electron:dist:mac": "npm run build && electron-builder --mac",
     "electron:dist:linux": "npm run build && electron-builder --linux",
     "e2e": "npm run build && playwright test",
@@ -22,7 +22,8 @@
   },
   "build": {
     "appId": "com.ceramisys.erp",
-    "productName": "CeramiSys ERP",
+    "productName": "سيراميسيس",
+    "executableName": "CeramiSys ERP",
     "asar": true,
     "compression": "maximum",
     "electronLanguages": [
@@ -38,6 +39,7 @@
       "package.json"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -45,14 +47,16 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "artifactName": "مثبّت سيراميسيس ${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "CeramiSys ERP"
+      "shortcutName": "سيراميسيس",
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [
@@ -81,7 +85,7 @@
       "category": "Office"
     },
     "dmg": {
-      "title": "CeramiSys ERP"
+      "title": "سيراميسيس"
     }
   },
   "keywords": [
@@ -103,6 +107,7 @@
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^0.475.0",
+    "officecrypto-tool": "^0.0.19",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.6",

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "ecommerce",
+  "name": {
+    "ar": "التجارة الإلكترونية",
+    "en": "E-commerce"
+  },
+  "description": {
+    "ar": "مبيعات منتجات وعملاء وتجهيز طلبات",
+    "en": "Product sales, customers and order fulfillment"
+  },
+  "category": "retail",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "BOX",
+      "PACK"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "العلامة التجارية",
+      "المقاس",
+      "اللون"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "operations",
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "webstoreAndPaymentGatewayIntegration": "not-implemented"
+  }
+}

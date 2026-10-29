@@ -221,7 +221,7 @@ export const SettingsView: React.FC = () => {
               <span>أدوات استيراد وإدارة البيانات</span>
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              استيراد سجلات العملاء والموردين والمنتجات من ملفات Excel، وإدارة أنواع البيانات المرنة المخصصة.
+              استيراد سجلات العملاء والموردين والمنتجات من ملفات جداول البيانات، وإدارة أنواع البيانات المرنة المخصصة.
             </p>
 
             <div className="space-y-2 pt-1">
@@ -231,7 +231,7 @@ export const SettingsView: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4 text-sky-600" />
-                  <span>مركز استيراد الملفات (Excel / CSV)</span>
+                  <span>مركز استيراد الملفات (جداول البيانات وCSV)</span>
                 </div>
                 <ExternalLink className="w-3.5 h-3.5 text-sky-500" />
               </Link>
@@ -287,7 +287,7 @@ export const SettingsView: React.FC = () => {
                   <input
                     id="restore-backup-file"
                     type="file"
-                    accept=".ceramisys-backup,.sqlite.enc,.sqlite,.db"
+                    accept=".xlsx,.ceramisys-backup,.sqlite.enc,.sqlite,.db"
                     onChange={handleImportBackup}
                     className="hidden"
                   />

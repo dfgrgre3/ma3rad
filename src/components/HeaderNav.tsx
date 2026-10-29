@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { User } from '../types';
-import { PermissionService } from '../services/PermissionService';
 import { NavigationService } from '../services/NavigationService';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -30,13 +29,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ currentUser }) => {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const visibleGroups = useMemo(
-    () =>
-      NavigationService.getGroups()
-        .map((group) => ({
-          ...group,
-          items: group.items.filter((item) => !item.perm || PermissionService.can(currentUser, item.perm)),
-        }))
-        .filter((group) => group.items.length > 0),
+    () => NavigationService.getAccessibleGroups(currentUser),
     // `settings` is part of the dependency list because navigation overrides are
     // stored in system settings and must refresh when they change.
     // eslint-disable-next-line react-hooks/exhaustive-deps

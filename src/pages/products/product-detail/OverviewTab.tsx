@@ -7,9 +7,11 @@ import { money } from './format';
 interface OverviewTabProps {
   product: Product;
   margin: number | null;
+  canViewCosts: boolean;
+  canViewPricing: boolean;
 }
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ product, margin }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ product, margin, canViewCosts, canViewPricing }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="bg-white rounded-xl border border-slate-200 p-5">
@@ -33,29 +35,29 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ product, margin }) => 
           ))}
         </dl>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      {(canViewCosts || canViewPricing) && <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="text-sm font-bold text-slate-900 mb-4">الأسعار</h3>
         <div className="space-y-3">
           {[
-            { label: 'سعر التكلفة', value: product.costPrice, color: 'text-rose-600' },
-            { label: `سعر البيع (${getProductUnitLabel(product)})`, value: product.sellingPriceM2, color: 'text-sky-600' },
-            ...(product.productType === 'GENERAL' ? [] : [
+            ...(canViewCosts ? [{ label: 'سعر التكلفة', value: product.costPrice, color: 'text-rose-600' }] : []),
+            ...(canViewPricing ? [{ label: `سعر البيع (${getProductUnitLabel(product)})`, value: product.sellingPriceM2, color: 'text-sky-600' }] : []),
+            ...(canViewPricing && product.productType !== 'GENERAL' ? [
               { label: 'سعر البيع (كرتونة)', value: product.sellingPriceBox, color: 'text-sky-600' },
               { label: 'سعر الجملة (م²)', value: product.wholesalePriceM2, color: 'text-violet-600' },
               { label: 'أقل سعر بيع (م²)', value: product.minSellingPriceM2, color: 'text-amber-600' },
-            ]),
+            ] : []),
           ].map((row) => (
             <div key={row.label} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
               <span className="text-xs text-slate-500">{row.label}</span>
               <span className={`text-sm font-black ${row.color}`}>{money(row.value)}</span>
             </div>
           ))}
-          <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 flex justify-between">
+          {canViewCosts && canViewPricing && <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 flex justify-between">
             <span className="text-xs text-slate-700">هامش الربح</span>
             <span className="text-sm font-black text-emerald-600">{margin === null ? '—' : `${margin.toFixed(1)}%`}</span>
-          </div>
+          </div>}
         </div>
-      </div>
+      </div>}
     </div>
   );
 };

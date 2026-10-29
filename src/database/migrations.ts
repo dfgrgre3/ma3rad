@@ -15,7 +15,7 @@ import { MIGRATION_PART_11 } from './migrations/part11';
 import { MIGRATION_PART_12 } from './migrations/part12';
 import { MIGRATION_PART_13 } from './migrations/part13';
 import { MIGRATION_ENTERPRISE } from './migrations/enterprise';
-import { addColumn, columnExists, DEFAULT_BRANCH_ID, tableExists } from './migrationSupport';
+import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './migrationSupport';
 
 export { DEFAULT_SETTINGS, DEFAULT_BRANCH_ID } from './migrationSupport';
 export type { Migration } from './migrationSupport';
@@ -1990,6 +1990,133 @@ export const MIGRATIONS: Migration[] = [
       if (branchTableInfo.length && !branchTableInfo.some((row) => String(row[1]) === 'activation_code')) {
         db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_branches_activation_code ON sync_branches(activation_code);');
       }
+    },
+  },
+  {
+    id: '097_business_terminology_overrides',
+    description: 'Persist organization-level business terminology overrides in existing settings tables',
+    up: (db: Database) => {
+      db.run('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)', [
+        'businessTerminologyOverrides',
+        DEFAULT_SETTINGS.businessTerminologyOverrides,
+      ]);
+    },
+  },
+  {
+    id: '098_activity_configuration_versions',
+    description: 'Store append-only activity configuration snapshots for review and safe restoration',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS activity_configuration_versions (
+          id TEXT PRIMARY KEY,
+          version INTEGER NOT NULL UNIQUE,
+          snapshot_json TEXT NOT NULL,
+          created_by TEXT NOT NULL,
+          created_by_name TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_activity_config_versions_created
+          ON activity_configuration_versions(created_at DESC, version DESC);
+        CREATE TRIGGER IF NOT EXISTS trg_activity_config_versions_no_update
+        BEFORE UPDATE ON activity_configuration_versions
+        BEGIN
+          SELECT RAISE(ABORT, 'Activity configuration history is append-only.');
+        END;
+        CREATE TRIGGER IF NOT EXISTS trg_activity_config_versions_no_delete
+        BEFORE DELETE ON activity_configuration_versions
+        BEGIN
+          SELECT RAISE(ABORT, 'Activity configuration history is append-only.');
+        END;
+      `);
+    },
+  },
+  {
+    id: '099_restaurant_table_kitchen_workflow',
+    description: 'Add restaurant tables, kitchen tickets, recipe production links, and invoice idempotency',
+    up: (db: Database) => {
+      addColumn(db, 'sales_invoices', 'restaurant_order_id', 'TEXT');
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_invoices_restaurant_order
+          ON sales_invoices(restaurant_order_id)
+          WHERE restaurant_order_id IS NOT NULL;
+
+        CREATE TABLE IF NOT EXISTS restaurant_tables (
+          id TEXT PRIMARY KEY,
+          branch_id TEXT NOT NULL,
+          table_number INTEGER NOT NULL CHECK(table_number > 0),
+          capacity INTEGER NOT NULL DEFAULT 2 CHECK(capacity > 0),
+          is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(branch_id, table_number),
+          FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_restaurant_tables_branch_active
+          ON restaurant_tables(branch_id, is_active, table_number);
+
+        CREATE TABLE IF NOT EXISTS restaurant_menu_items (
+          id TEXT PRIMARY KEY,
+          branch_id TEXT NOT NULL,
+          product_id TEXT NOT NULL,
+          is_available INTEGER NOT NULL DEFAULT 1 CHECK(is_available IN (0, 1)),
+          created_by TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(branch_id, product_id),
+          FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+          FOREIGN KEY (product_id) REFERENCES products(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_restaurant_menu_branch_available
+          ON restaurant_menu_items(branch_id, is_available);
+
+        CREATE TABLE IF NOT EXISTS restaurant_orders (
+          id TEXT PRIMARY KEY,
+          order_number TEXT NOT NULL UNIQUE,
+          branch_id TEXT NOT NULL,
+          table_id TEXT,
+          service_mode TEXT NOT NULL CHECK(service_mode IN ('DINE_IN', 'TAKEAWAY', 'DELIVERY')),
+          customer_id TEXT NOT NULL,
+          warehouse_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN', 'BILLED', 'CANCELLED')),
+          notes TEXT,
+          created_by TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (branch_id) REFERENCES branches(id),
+          FOREIGN KEY (table_id) REFERENCES restaurant_tables(id),
+          FOREIGN KEY (customer_id) REFERENCES customers(id),
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_restaurant_orders_branch_status
+          ON restaurant_orders(branch_id, status, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_restaurant_orders_table_status
+          ON restaurant_orders(table_id, status);
+
+        CREATE TABLE IF NOT EXISTS restaurant_order_items (
+          id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          product_id TEXT NOT NULL,
+          quantity REAL NOT NULL CHECK(quantity > 0),
+          unit_price REAL NOT NULL CHECK(unit_price >= 0),
+          notes TEXT,
+          kitchen_status TEXT NOT NULL DEFAULT 'NEW'
+            CHECK(kitchen_status IN ('NEW', 'PREPARING', 'READY', 'SERVED')),
+          production_order_id TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (order_id) REFERENCES restaurant_orders(id) ON DELETE CASCADE,
+          FOREIGN KEY (product_id) REFERENCES products(id),
+          FOREIGN KEY (production_order_id) REFERENCES production_orders(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_restaurant_order_items_order
+          ON restaurant_order_items(order_id, kitchen_status);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_order_items_production
+          ON restaurant_order_items(production_order_id)
+          WHERE production_order_id IS NOT NULL;
+      `);
     },
   },
 ].flat();

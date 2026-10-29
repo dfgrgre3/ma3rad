@@ -460,7 +460,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
               <button type="button" onClick={handleExport} disabled={!data} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                <Download className="h-4 w-4" /> تصدير Excel
+                <Download className="h-4 w-4" /> تصدير جدول بيانات
               </button>
             </div>
           </div>

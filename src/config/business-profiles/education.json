@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "education",
+  "name": {
+    "ar": "التعليم والتدريب",
+    "en": "Education and training"
+  },
+  "description": {
+    "ar": "خدمات تشغيل وموظفون",
+    "en": "Service operations and workforce"
+  },
+  "category": "services",
+  "configuration": {
+    "businessModel": "services",
+    "trackInventory": false,
+    "units": [
+      "SERVICE",
+      "PIECE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "نوع البرنامج",
+      "المستوى",
+      "نمط التقديم"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "customers",
+      "finance",
+      "operations",
+      "reports",
+      "documents",
+      "projects",
+      "hr"
+    ],
+    "optional": [
+      "inventory",
+      "purchasing",
+      "approvals",
+      "manufacturing"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "studentEnrollmentAndCourseManagement": "not-implemented"
+  }
+}

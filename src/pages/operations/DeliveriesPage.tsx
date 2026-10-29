@@ -100,7 +100,7 @@ export const DeliveriesPage: React.FC = () => {
       <div className="p-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row gap-3">
         <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم الأمر أو العميل أو العنوان ثم Enter..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-sky-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم الأمر أو العميل أو العنوان ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-sky-400" />
         </form>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
           <option value="ALL">كل الحالات</option>

@@ -7,9 +7,11 @@ import { ProductBatch } from '../../../types';
 interface BatchesTabProps {
   productId: string;
   canEdit: boolean;
+  canViewCosts: boolean;
+  canUpdatePricing: boolean;
 }
 
-export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit }) => {
+export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canViewCosts, canUpdatePricing }) => {
   const batchService = new BatchService();
   const db = DatabaseManager.getInstance();
   const [batches, setBatches] = useState<ProductBatch[]>([]);
@@ -49,7 +51,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit }) =>
         toneShade:       form.toneShade.trim(),
         caliber:         form.caliber.trim() || '0',
         quantityM2:      Number(form.quantityM2),
-        costPrice:       Number(form.costPrice) || 0,
+        costPrice:       canUpdatePricing ? Number(form.costPrice) || 0 : undefined,
         receivedDate:    form.receivedDate   || undefined,
         productionDate:  form.productionDate  || undefined,
         notes:           form.notes.trim()    || undefined,
@@ -138,10 +140,10 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit }) =>
                   <label className="block font-bold text-slate-700 mb-1">الكمية (م²) *</label>
                   <input required type="number" min={0.01} step="0.01" placeholder="0.00" value={form.quantityM2} onChange={(e) => setForm({ ...form, quantityM2: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                 </div>
-                <div>
+                {canUpdatePricing && <div>
                   <label className="block font-bold text-slate-700 mb-1">سعر التكلفة (م²)</label>
                   <input type="number" min={0} step="0.01" placeholder="0.00" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
-                </div>
+                </div>}
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">تاريخ الاستلام</label>
                   <input type="date" value={form.receivedDate} onChange={(e) => setForm({ ...form, receivedDate: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
@@ -178,7 +180,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit }) =>
           <table className="w-full text-sm text-right">
             <thead className="bg-slate-50">
               <tr>
-                {['المخزن', 'رقم الدفعة', 'نغمة اللون', 'العيار', 'تاريخ الاستلام', 'الكمية (م²)', 'المتبقي (م²)', 'التكلفة/م²', canEdit ? 'حذف' : ''].filter(Boolean).map((h) => (
+                {['المخزن', 'رقم الدفعة', 'نغمة اللون', 'العيار', 'تاريخ الاستلام', 'الكمية (م²)', 'المتبقي (م²)', ...(canViewCosts ? ['التكلفة/م²'] : []), ...(canEdit ? ['حذف'] : [])].map((h) => (
                   <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500 text-right">{h}</th>
                 ))}
               </tr>
@@ -210,7 +212,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit }) =>
                         {isEmpty && <span className="text-[10px] text-slate-400 font-bold">مُستهلكة</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-rose-600 text-xs">{b.costPrice > 0 ? `${b.costPrice.toFixed(2)} ج.م` : '—'}</td>
+                    {canViewCosts && <td className="px-4 py-3 font-mono text-rose-600 text-xs">{b.costPrice > 0 ? `${b.costPrice.toFixed(2)} ج.م` : '—'}</td>}
                     {canEdit && (
                       <td className="px-4 py-3">
                         <button

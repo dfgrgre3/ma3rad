@@ -203,9 +203,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
         <div className="w-full max-w-[380px]">
           <div className="mb-6 flex flex-col items-center lg:hidden">
             <div className="mb-2 flex h-12 w-12 items-center justify-center border border-[#005a9e] bg-[#0078d4] text-xl font-bold text-white">
-              C
+              س
             </div>
-            <h1 className="text-[15px] font-semibold">CeramiSys ERP</h1>
+            <h1 className="text-[15px] font-semibold">سيراميسيس</h1>
             <p className="text-[11px] text-[#767676] dark:text-[#a6a6a6]">نظام إدارة معارض السيراميك</p>
           </div>
 
@@ -379,7 +379,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               </button>
 
               <p className="text-center text-[10px] text-[#767676] dark:text-[#a6a6a6]">
-                اضغط <kbd className="border border-[#d9d9d9] bg-[#fafafa] px-1 font-mono text-[10px] dark:border-[#565656] dark:bg-[#323232]">Enter</kbd> للدخول
+                اضغط <kbd className="border border-[#d9d9d9] bg-[#fafafa] px-1 font-mono text-[10px] dark:border-[#565656] dark:bg-[#323232]">إدخال</kbd> للدخول
               </p>
             </form>
 

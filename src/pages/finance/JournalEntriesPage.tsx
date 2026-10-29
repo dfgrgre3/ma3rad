@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Plus, Loader2, X, Trash2, Scale, Search, ChevronDown } from 'lucide-react';
 import { FinanceExtrasService, Account, JournalEntry, JournalLine } from '../../services/FinanceExtrasService';
 import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 import { localDateString } from '../../utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
@@ -10,6 +11,7 @@ const emptyLine = (): DraftLine => ({ accountId: '', debit: '', credit: '', desc
 
 export const JournalEntriesPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
+  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'finance.approve');
   const [tab, setTab] = useState<'entries' | 'trial'>('entries');
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -85,9 +87,9 @@ export const JournalEntriesPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">تسجيل القيود المحاسبية المزدوجة ومتابعة أرصدة الحسابات</p>
           </div>
         </div>
-        <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+        {canManage && <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition shrink-0">
           <Plus className="w-4 h-4" /> قيد جديد
-        </button>
+        </button>}
       </div>
 
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-1">
@@ -120,7 +122,7 @@ export const JournalEntriesPage: React.FC = () => {
                   <div className="flex items-center gap-4 shrink-0 text-xs">
                     <span className="text-slate-500">{entry.lineCount || 0} سطور</span>
                     <span className="font-mono font-black text-slate-800">{fmt(Number(entry.totalDebit))}</span>
-                    <button onClick={(e) => { e.stopPropagation(); removeEntry(entry); }} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
+                    {canManage && <button onClick={(e) => { e.stopPropagation(); removeEntry(entry); }} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </button>
                 {expanded === entry.id && (
@@ -178,7 +180,7 @@ export const JournalEntriesPage: React.FC = () => {
         )}
       </div>
 
-      {modal && (
+      {modal && canManage && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">

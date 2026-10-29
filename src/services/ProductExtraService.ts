@@ -2,6 +2,10 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import {
+  normalizeDynamicAttributeValue,
+  type DynamicAttributeDefinition,
+} from './dynamicAttributes';
 
 export interface ProductVariant {
   id: string;
@@ -52,8 +56,14 @@ export class ProductExtraService {
     );
   }
 
-  public createVariant(productId: string, data: Omit<ProductVariant, 'id' | 'parentProductId' | 'createdAt'>): ProductVariant {
+  public createVariant(productId: string, data: Omit<ProductVariant, 'id' | 'parentProductId' | 'createdAt' | 'costPrice' | 'sellingPriceM2'> & {
+    costPrice?: number;
+    sellingPriceM2?: number;
+  }): ProductVariant {
     this.requireWrite();
+    if (data.costPrice !== undefined || data.sellingPriceM2 !== undefined) {
+      PermissionService.require(AuthService.requireAuth(), 'pricing.update');
+    }
     const duplicate = this.db.query(
       `SELECT id FROM product_variants WHERE sku = ? OR (barcode IS NOT NULL AND barcode = ?)`,
       [data.sku, data.barcode || '']
@@ -76,6 +86,9 @@ export class ProductExtraService {
 
   public updateVariant(id: string, updates: Partial<ProductVariant>): void {
     this.requireWrite();
+    if (updates.costPrice !== undefined || updates.sellingPriceM2 !== undefined) {
+      PermissionService.require(AuthService.requireAuth(), 'pricing.update');
+    }
     this.db.run(
       `UPDATE product_variants SET
         variant_name = COALESCE(?, variant_name),
@@ -144,14 +157,48 @@ export class ProductExtraService {
 
   public setAttributeValues(productId: string, values: Record<string, string>): void {
     this.requireWrite();
+    const definitions = this.db.query<DynamicAttributeDefinition>(
+      `SELECT a.id, a.name, a.data_type AS dataType, a.unit,
+              a.is_required AS isRequired, a.is_filterable AS isFilterable,
+              a.applies_to_category_id AS appliesToCategoryId
+       FROM attributes a
+       WHERE a.applies_to_category_id IS NULL
+          OR a.applies_to_category_id = (
+            SELECT category_id FROM products WHERE id = ?
+          )`,
+      [productId]
+    ).map((definition) => ({
+      ...definition,
+      isRequired: Boolean(definition.isRequired),
+      isFilterable: Boolean(definition.isFilterable),
+      values: this.db.query<{ value: string; label: string }>(
+        `SELECT value, label FROM attribute_options WHERE attribute_id = ? ORDER BY sort_order, label`,
+        [definition.id]
+      ),
+    }));
+    const definitionsById = new Map(definitions.map((definition) => [definition.id, definition]));
+    const normalized = new Map<string, string>();
+    for (const [attributeId, rawValue] of Object.entries(values || {})) {
+      const definition = definitionsById.get(attributeId);
+      if (!definition) {
+        if (rawValue?.trim()) throw new Error('تتضمن قيم الخصائص حقلًا غير متاح لهذا الصنف.');
+        continue;
+      }
+      const value = normalizeDynamicAttributeValue(definition, rawValue);
+      if (value !== null) normalized.set(attributeId, value);
+    }
+    for (const definition of definitions) {
+      if (definition.isRequired && !normalized.has(definition.id)) {
+        throw new Error(`الخاصية «${definition.name}» مطلوبة.`);
+      }
+    }
+
     this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(`DELETE FROM product_attribute_values WHERE product_id = ?`, [productId]);
-      Object.entries(values || {}).forEach(([attributeId, value]) => {
-        const clean = (value ?? '').trim();
-        if (!attributeId || !clean) return;
+      normalized.forEach((value, attributeId) => {
         sqliteDb.run(
           `INSERT INTO product_attribute_values (id, product_id, attribute_id, value) VALUES (?, ?, ?, ?)`,
-          [`pav_${uuidv4().substring(0, 8)}`, productId, attributeId, clean]
+          [`pav_${uuidv4().substring(0, 8)}`, productId, attributeId, value]
         );
       });
     });
@@ -170,19 +217,19 @@ export class ProductExtraService {
     fileName: string,
     documentType: string
   ): ProductDocument {
-    this.requireWrite();
-    const actor = AuthService.getCurrentUser();
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'documents.create');
     const id = `doc_${uuidv4().substring(0, 8)}`;
     this.db.run(
       `INSERT INTO product_documents (id, product_id, file_path, file_name, document_type, uploaded_by)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, productId, filePath, fileName, documentType || 'OTHER', actor?.id || null]
+      [id, productId, filePath, fileName, documentType || 'OTHER', actor.id]
     );
     return this.getDocuments(productId).find((d) => d.id === id)!;
   }
 
   public deleteDocument(id: string): void {
-    this.requireWrite();
+    PermissionService.require(AuthService.requireAuth(), 'documents.archive');
     this.db.run(`DELETE FROM product_documents WHERE id = ?`, [id]);
   }
 }

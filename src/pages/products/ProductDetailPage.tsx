@@ -5,6 +5,7 @@ import { DatabaseManager } from '../../database/db';
 import { ProductService } from '../../services/ProductService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { usePermission } from '../../hooks/usePermission';
 import { Product } from '../../types';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import { Tab } from './product-detail/constants';
@@ -31,7 +32,11 @@ export const ProductDetailPage: React.FC = () => {
   const db = DatabaseManager.getInstance();
   const productService = new ProductService();
   const currentUser = AuthService.getCurrentUser();
+  const can = usePermission(currentUser);
   const canEdit = PermissionService.can(currentUser, 'products.update');
+  const canViewCosts = can('finance.view');
+  const canViewPricing = can('pricing.view');
+  const canUpdatePricing = can('pricing.update');
 
   const [tab, setTab] = useState<Tab>('overview');
   const [product, setProduct] = useState<Product | null>(null);
@@ -51,10 +56,14 @@ export const ProductDetailPage: React.FC = () => {
       const p = productService.getProductById(id);
       setProduct(p);
       if (p) {
-        const s = productService.getProductStockSummary(id);
-        setStock({ totalM2: s.totalM2, totalBoxes: s.totalBoxes, totalPieces: s.totalPieces, rows: s.byWarehouse });
+        if (can('inventory.view')) {
+          const s = productService.getProductStockSummary(id);
+          setStock({ totalM2: s.totalM2, totalBoxes: s.totalBoxes, totalPieces: s.totalPieces, rows: s.byWarehouse });
+        } else {
+          setStock({ totalM2: 0, totalBoxes: 0, totalPieces: 0, rows: [] });
+        }
 
-        setSales(db.query(
+        setSales(can('sales.view') ? db.query(
           `SELECT si.date AS date, COALESCE(cu.name, 'عميل نقدي') AS customer,
                   sii.quantity_m2 AS qty, sii.total_price AS price
            FROM sales_invoice_items sii
@@ -62,9 +71,9 @@ export const ProductDetailPage: React.FC = () => {
            LEFT JOIN customers cu ON cu.id = si.customer_id
            WHERE sii.product_id = ? AND si.invoice_status != 'VOID'
            ORDER BY si.date DESC, si.created_at DESC LIMIT 15`, [id]
-        ));
+        ) : []);
 
-        setPurchases(db.query(
+        setPurchases(can('purchases.view') ? db.query(
           `SELECT pi.date AS date, COALESCE(s.name, '—') AS supplier,
                   pii.quantity_m2 AS qty, pii.total_cost AS cost
            FROM purchase_invoice_items pii
@@ -72,20 +81,19 @@ export const ProductDetailPage: React.FC = () => {
            LEFT JOIN suppliers s ON s.id = pi.supplier_id
            WHERE pii.product_id = ?
            ORDER BY pi.date DESC, pi.created_at DESC LIMIT 15`, [id]
-        ));
+        ) : []);
 
-        setActivity(db.query(
+        setActivity(can('audit.view') ? db.query(
           `SELECT action, user_name AS user, created_at AS at, COALESCE(new_values, '') AS details
            FROM audit_logs WHERE module = 'PRODUCTS' AND (record_id = ? OR new_values LIKE ?)
            ORDER BY created_at DESC LIMIT 30`, [id, `%${id}%`]
-        ));
+        ) : []);
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [id, can]);
 
   const openEdit = () => {
     if (!product) return;
@@ -113,11 +121,13 @@ export const ProductDetailPage: React.FC = () => {
         finish: form.finish || undefined, thickness: Number(form.thickness) || 0,
         piecesPerBox: Number(form.piecesPerBox) || 1,
         metersPerBox: Number(form.metersPerBox) || 0,
-        costPrice: Number(form.costPrice) || 0,
-        sellingPriceM2: Number(form.sellingPriceM2) || 0,
-        sellingPriceBox: Number(form.sellingPriceBox) || 0,
-        wholesalePriceM2: Number(form.wholesalePriceM2) || 0,
-        minSellingPriceM2: Number(form.minSellingPriceM2) || 0,
+        ...(canUpdatePricing ? {
+          costPrice: Number(form.costPrice) || 0,
+          sellingPriceM2: Number(form.sellingPriceM2) || 0,
+          sellingPriceBox: Number(form.sellingPriceBox) || 0,
+          wholesalePriceM2: Number(form.wholesalePriceM2) || 0,
+          minSellingPriceM2: Number(form.minSellingPriceM2) || 0,
+        } : {}),
         minStockLevel: Number(form.minStockLevel) || 0,
         maxStockLevel: Number(form.maxStockLevel) || 0,
         isActive: form.isActive,
@@ -155,37 +165,52 @@ export const ProductDetailPage: React.FC = () => {
       />
 
       <div className="flex-1 overflow-y-auto p-6">
-        {tab === 'overview' && <OverviewTab product={product} margin={margin} />}
+        {tab === 'overview' && <OverviewTab product={product} margin={margin} canViewCosts={canViewCosts} canViewPricing={canViewPricing} />}
 
-        {tab === 'inventory' && <InventoryTab product={product} stock={stock} />}
+        {tab === 'inventory' && can('inventory.view') && <InventoryTab product={product} stock={stock} />}
 
-        {tab === 'sales' && <SalesTab product={product} sales={sales} />}
+        {tab === 'sales' && can('sales.view') && <SalesTab product={product} sales={sales} />}
 
-        {tab === 'purchases' && <PurchasesTab product={product} purchases={purchases} />}
+        {tab === 'purchases' && can('purchases.view') && <PurchasesTab product={product} purchases={purchases} />}
 
-        {tab === 'pricing' && (
+        {tab === 'pricing' && canViewPricing && (
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <h3 className="text-sm font-bold text-slate-900 mb-4">قوائم الأسعار المرتبطة بالمنتج</h3>
             <PriceListsForProduct productId={product.id} unitLabel={getProductUnitLabel(product)} />
           </div>
         )}
 
-        {tab === 'batches' && <BatchesTab productId={product.id} canEdit={canEdit} />}
+        {tab === 'batches' && can('inventory.view') && <BatchesTab
+          productId={product.id}
+          canEdit={can('inventory.adjust')}
+          canViewCosts={canViewCosts}
+          canUpdatePricing={canUpdatePricing}
+        />}
 
-        {tab === 'variants' && <VariantsTab productId={product.id} canEdit={canEdit} />}
+        {tab === 'variants' && <VariantsTab
+          productId={product.id}
+          canEdit={canEdit}
+          canViewCosts={canViewCosts}
+          canViewPricing={canViewPricing}
+          canUpdatePricing={canUpdatePricing}
+        />}
 
         {tab === 'images' && <ImagesTab productId={product.id} canEdit={canEdit} />}
 
-        {tab === 'documents' && <DocumentsTab productId={product.id} canEdit={canEdit} />}
+        {tab === 'documents' && can('documents.view') && <DocumentsTab
+          productId={product.id}
+          canCreate={can('documents.create')}
+          canArchive={can('documents.archive')}
+        />}
 
-        {tab === 'history' && (
+        {tab === 'history' && can('inventory.view') && (
           <div className="bg-white rounded-xl border border-slate-200 p-5">
             <h3 className="text-sm font-bold text-slate-900 mb-4">حركات المخزون</h3>
             <InventoryHistory productId={product.id} unitLabel={getProductUnitLabel(product)} />
           </div>
         )}
 
-        {tab === 'activity' && <ActivityTab activity={activity} />}
+        {tab === 'activity' && can('audit.view') && <ActivityTab activity={activity} />}
       </div>
 
       {editOpen && form && (
@@ -193,6 +218,7 @@ export const ProductDetailPage: React.FC = () => {
           product={product}
           form={form}
           saving={saving}
+          canUpdatePricing={canUpdatePricing}
           onChange={setForm}
           onSubmit={saveEdit}
           onClose={() => setEditOpen(false)}

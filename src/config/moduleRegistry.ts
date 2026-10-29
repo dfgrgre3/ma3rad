@@ -51,7 +51,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'عروض الأسعار والطلبات والفواتير والمرتجعات وتحليلات البيع.',
     dependencies: ['customers'],
     permissions: ['sales.view'],
-    paths: ['/daily/sales', '/pos', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/reservations', '/sales/after-sales', '/quotations', '/orders', '/returns'],
+    paths: ['/daily/sales', '/pos', '/restaurant', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/reservations', '/sales/after-sales', '/quotations', '/orders', '/returns'],
     businessEvents: ['invoice.posted', 'invoice.voided', 'sales_return.posted', 'receipt.posted'],
     settings: [
       { key: 'allowCreditSales', label: 'السماح بالبيع الآجل', type: 'boolean', defaultValue: true },

@@ -5,6 +5,7 @@ export interface NavItemDef {
   to: string;
   icon: ComponentType<{ className?: string }>;
   perm?: string;
+  perms?: string[];
   highlight?: boolean;
   badge?: number;
 }
@@ -15,5 +16,6 @@ export interface NavGroupDef {
   icon: ComponentType<{ className?: string }>;
   color: string;
   perm?: string;
+  perms?: string[];
   items: NavItemDef[];
 }

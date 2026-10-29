@@ -37,8 +37,10 @@ export class BatchService {
   private db = DatabaseManager.getInstance();
 
   // ─── Permissions ────────────────────────────────────────────────────────────
-  private requireWrite(): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+  private requireWrite(manageCost = false): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'inventory.adjust');
+    if (manageCost) PermissionService.require(actor, 'pricing.update');
   }
 
   // ─── Read ────────────────────────────────────────────────────────────────────
@@ -124,7 +126,7 @@ export class BatchService {
 
   /** إنشاء دفعة جديدة عند استلام شحنة سيراميك */
   public createBatch(data: CreateBatchDTO): ProductBatch {
-    this.requireWrite();
+    this.requireWrite(data.costPrice !== undefined);
     const actor = AuthService.requireAuth();
 
     if (!data.batchNumber?.trim()) throw new Error('رقم الدفعة / التشغيلة مطلوب.');
@@ -185,7 +187,7 @@ export class BatchService {
       notes: string;
     }>
   ): void {
-    this.requireWrite();
+    this.requireWrite(updates.costPrice !== undefined);
     const fields: string[] = [];
     const values: unknown[] = [];
 

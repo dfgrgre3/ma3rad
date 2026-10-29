@@ -1,38 +1,36 @@
 /**
- * نظام الذاكرة المؤقتة لتحسين الأداء
- * إدارة ذكية للبيانات المتكررة لتخفيف الضغط على قاعدة البيانات
+ * In-memory cache for small, frequently reused application values.
  */
 
 interface CacheItem<T> {
   data: T;
-  timestamp: number;
+  expiresAt: number;
   size: number;
   hits: number;
+  tags: Set<string>;
 }
 
 export interface CacheOptions {
   maxEntries?: number;
-  maxLifetimeMs?: number;  // عمر المادة الأقصى
-  maxSizeBytes?: number;    // الحد الأقصى لحجم الذاكرة المؤقتة (بالبايت)
-  epsilon?: number;         // معامل الاسترجاع (لمسح الذاكرة)
+  maxLifetimeMs?: number;
+  maxSizeBytes?: number;
+  epsilon?: number;
 }
 
 type CacheKey = string | number | boolean;
 
 class LocalCacheService {
   private static instance: LocalCacheService;
-  private cache: Map<string, CacheItem<unknown>> = new Map();
-  private maxEntries = 100;  // الحد الأقصى لعدد العناصر
-  private maxLifetimeMs = 5 * 60 * 1000;  // 5 دقائق
-  private maxSizeBytes = 50 * 1024 * 1024;  // 50MB
+  private cache = new Map<string, CacheItem<unknown>>();
+  private maxEntries = 100;
+  private maxLifetimeMs = 5 * 60 * 1000;
+  private maxSizeBytes = 50 * 1024 * 1024;
   private epsilon = 0.01;
-  private lastLruReclaim: number = Date.now();
+  private hits = 0;
+  private misses = 0;
 
   private constructor(options?: CacheOptions) {
-    if (options) {
-      Object.assign(this, options);
-    }
-    this.startCleanup();
+    if (options) Object.assign(this, options);
   }
 
   static getInstance(options?: CacheOptions): LocalCacheService {
@@ -43,177 +41,109 @@ class LocalCacheService {
   }
 
   private calculateSize(data: unknown): number {
-    return JSON.stringify(data).length * 2; // تقريب بالحجم
+    try {
+      const serialized = JSON.stringify(data);
+      return (serialized ?? String(data)).length * 2;
+    } catch {
+      return Number.POSITIVE_INFINITY;
+    }
   }
 
-  private getEntrySize(entry: CacheItem<unknown>): number {
-    return entry.size;
+  private remove(key: string): void {
+    this.cache.delete(key);
   }
 
   /**
-   * تخزين عنصر في الذاكرة المؤقتة
+   * Store an item until its individual lifetime expires.
    */
   set<K extends CacheKey>(key: K, data: unknown, lifetimeMs?: number): void {
     const keyStr = String(key);
-    const lifetime = lifetimeMs || this.maxLifetimeMs;
+    const size = this.calculateSize(data);
+    const tags = this.cache.get(keyStr)?.tags ?? new Set<string>();
+    this.remove(keyStr);
+    if (!Number.isFinite(size) || size > this.maxSizeBytes) return;
 
-    const newItem: CacheItem<unknown> = {
+    const now = Date.now();
+    this.cache.set(keyStr, {
       data,
-      timestamp: Date.now(),
-      size: this.calculateSize(data),
+      expiresAt: now + Math.max(0, lifetimeMs ?? this.maxLifetimeMs),
+      size,
       hits: 0,
-    };
-
-    // إزالة العنصر القديم إن وجد
-    this.cache.delete(keyStr);
-
-    // قبل الإضافة، تحقق من الحاجة للمسح
-    this.expire(true);
-
-    this.cache.set(keyStr, newItem);
+      tags,
+    });
+    this.expire();
   }
 
   /**
-   * جلب عنصر من الذاكرة المؤقتة
+   * Return a cached item, or null when it is missing or expired.
    */
   get<K extends CacheKey, T = unknown>(key: K): T | null {
     const keyStr = String(key);
     const entry = this.cache.get(keyStr);
-
-    if (!entry) {
+    if (!entry || entry.expiresAt <= Date.now()) {
+      if (entry) this.remove(keyStr);
+      this.misses++;
       return null;
     }
 
-    // التحقق من انتهاء الصلاحية
-    if (entry.timestamp + this.maxLifetimeMs > Date.now()) {
-      this.cache.delete(keyStr);
-      return null;
-    }
-
+    this.hits++;
     entry.hits++;
-    entry.timestamp = Date.now();
-
+    this.cache.delete(keyStr);
+    this.cache.set(keyStr, entry);
     return entry.data as T;
   }
 
-  /**
-   * إزالة عنصر
-   */
   delete(key: CacheKey): void {
-    this.cache.delete(String(key));
+    this.remove(String(key));
   }
 
-  /**
-   * حذف كل العناصر
-   */
   clear(): void {
     this.cache.clear();
+    this.hits = 0;
+    this.misses = 0;
   }
 
   /**
-   * انتهاء صلاحية القِدماء (periodic cleanup)
+   * Remove expired entries and evict least-recently-used entries when bounded
+   * cache limits are exceeded.
    */
-  expire(force = false): void {
+  expire(_force = false): void {
     const now = Date.now();
-    const decadeMilliseconds = this.maxLifetimeMs;
-
-    let reclaimed = false;
-
-    // إذا كان لدينا تراكُم كثير، قم بمسح شائع
-    if (this.cache.size > this.maxEntries * (1 + this.epsilon)) {
-      const sorted = Array.from(this.cache.entries()).sort((a, b) => {
-        const sizeA = this.getEntrySize(a[1]);
-        const sizeB = this.getEntrySize(b[1]);
-        return sizeA - sizeB; // تصاعد حسب الحجم
-      });
-
-      for (const [key, entry] of sorted) {
-        if (now - entry.timestamp >= decadeMilliseconds) {
-          this.cache.delete(key);
-          reclaimed = true;
-        }
-      }
+    for (const [key, entry] of this.cache) {
+      if (entry.expiresAt <= now) this.remove(key);
     }
 
-    // إذا لم يكن، افحص بالتفصيل
-    if (!reclaimed && this.cache.size > this.maxEntries) {
-      const sorted = Array.from(this.cache.entries()).sort((a, b) =>
-        a[1].timestamp - b[1].timestamp
-      );
-
-      for (const [key, entry] of sorted) {
-        if (entry.timestamp + decadeMilliseconds < now) {
-          this.cache.delete(key);
-          this.lastLruReclaim = Date.now();
-          reclaimed = true;
-          break;
-        }
-      }
-    }
-
-    // التحقق من الحجم الكلي
     let totalSize = 0;
-    for (const entry of this.cache.values()) {
-      totalSize += this.getEntrySize(entry);
-    }
-
-    if (totalSize > this.maxSizeBytes && this.lastLruReclaim) {
-      const used = totalSize - this.maxSizeBytes;
-      // قم باستعادة العناصر الكبيرة أولاً
-      const sorted = Array.from(this.cache.entries()).sort((a, b) => {
-        const sizeA = this.getEntrySize(a[1]);
-        const sizeB = this.getEntrySize(b[1]);
-        return sizeA - sizeB;
-      });
-
-      for (const [key, entry] of sorted) {
-        if (now - entry.timestamp >= decadeMilliseconds) {
-          this.cache.delete(key);
-          totalSize -= this.getEntrySize(entry);
-          if (totalSize < this.maxSizeBytes) break;
-        }
-      }
+    for (const entry of this.cache.values()) totalSize += entry.size;
+    while (this.cache.size > this.maxEntries || totalSize > this.maxSizeBytes) {
+      const oldest = this.cache.entries().next();
+      if (oldest.done) break;
+      totalSize -= oldest.value[1].size;
+      this.remove(oldest.value[0]);
     }
   }
 
-  /**
-   * تنظيف دوري
-   */
-  private startCleanup(): void {
-    setInterval(() => {
-      this.expire();
-    }, 30 * 1000);  // كل 30 ثانية
-  }
-
-  /**
-   * الحصول على كمية عشوائية من الذاكرة المؤقتة لعملية معينة
-   */
   getMultiple<T = unknown>(
     keys: readonly CacheKey[],
     loadCallback: (key: CacheKey) => T | null
   ): Map<CacheKey, T> {
     const result = new Map<CacheKey, T>();
-
     for (const key of keys) {
-      const value = this.get(key);
+      const value = this.get<CacheKey, T>(key);
       if (value !== null) {
-        result.set(key, value as T);
-      } else {
-        // تحميل البيانات
-        const loaded = loadCallback(key);
-        if (loaded !== null) {
-          this.set(key, loaded);
-          result.set(key, loaded);
-        }
+        result.set(key, value);
+        continue;
+      }
+
+      const loaded = loadCallback(key);
+      if (loaded !== null) {
+        this.set(key, loaded);
+        result.set(key, loaded);
       }
     }
-
     return result;
   }
 
-  /**
-   * تحديث عداد_MANY_KEY
-   */
   getStats(): {
     count: number;
     sizeBytes: number;
@@ -221,92 +151,42 @@ class LocalCacheService {
     maxSizeBytes: number;
     hitRate: number;
   } {
-    let totalSize = 0;
-    let totalHits = 0;
-    let misses = 0;
-
-    for (const entry of this.cache.values()) {
-      totalSize += entry.hits;
-      totalSize += entry.size;
-      totalHits += entry.hits;
-    }
-
+    this.expire();
+    let sizeBytes = 0;
+    for (const entry of this.cache.values()) sizeBytes += entry.size;
+    const requests = this.hits + this.misses;
     return {
       count: this.cache.size,
-      sizeBytes: totalSize,
+      sizeBytes,
       maxEntries: this.maxEntries,
       maxSizeBytes: this.maxSizeBytes,
-      hitRate: totalHits > 0 ? (totalHits / (totalHits + misses + 1)) * 100 : 0,
+      hitRate: requests > 0 ? (this.hits / requests) * 100 : 0,
     };
   }
 
-  /**
-   * تصفير معدل الاسترجاع
-   */
   resetEpsilon(epsilon?: number): void {
-    if (epsilon !== undefined) {
-      this.epsilon = epsilon;
-    } else {
-      this.epsilon = 0.01;
-    }
+    this.epsilon = epsilon ?? 0.01;
   }
 
-  /**
-   * Adding a key with additional tags for organization
-   */
   taggedSet(tag: string, key: CacheKey, data: unknown, lifetimeMs?: number): void {
-    this.keyTag(key, tag);
     this.set(key, data, lifetimeMs);
+    this.cache.get(String(key))?.tags.add(tag);
   }
 
-  /**
-   * الحصول على الأغراض المتعلقة بعلامة
-   */
   getTagged<T = unknown>(tag: string): T[] {
-    const result = [];
-    for (const [key, entry] of this.cache.entries()) {
-      if (this.isTagged(key, tag)) {
-        result.push(entry.data as T);
-      }
+    this.expire();
+    const result: T[] = [];
+    for (const entry of this.cache.values()) {
+      if (entry.tags.has(tag)) result.push(entry.data as T);
     }
     return result;
   }
 
-  /**
-   * إضافات ارتباط بين المفتاح والعلامة
-   */
-  private keyTag(key: CacheKey, tag: string): void {
-    if (!tagMap.has(key)) {
-      tagMap.set(key, []);
-    }
-    const tags = tagMap.get(key)!;
-    if (!tags.includes(tag)) {
-      tags.push(tag);
-    }
-  }
-
-  /**
-   * هل المفتاح مرتبط بالعلامة
-   */
-  private isTagged(key: CacheKey, tag: string): boolean {
-    const tags = tagMap.get(key);
-    return tags ? tags.includes(tag) : false;
-  }
-
-  /**
-   * مسح القائمة بأرقام من العلامات
-   */
   purgeByTag(tag: string): void {
-    for (const key of tagMap.keys()) {
-      if (this.isTagged(key, tag)) {
-        this.delete(key);
-        tagMap.delete(key);
-      }
+    for (const [key, entry] of this.cache) {
+      if (entry.tags.has(tag)) this.remove(key);
     }
   }
 }
-
-// Map لتتبع العلامات بالمفتاح
-const tagMap = new Map<CacheKey, string[]>();
 
 export const localCache = LocalCacheService.getInstance();

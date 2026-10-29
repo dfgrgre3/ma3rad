@@ -211,7 +211,7 @@ export const ApprovalsPage: React.FC = () => {
       <div className="px-4 pb-3 flex flex-col md:flex-row gap-3">
         <form onSubmit={(e) => { e.preventDefault(); load(); }} className="relative flex-1">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالطلب أو رقمه ثم Enter..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-yellow-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث بالطلب أو رقمه ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-yellow-400" />
         </form>
         <div className="relative">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="appearance-none pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 min-w-[160px]">

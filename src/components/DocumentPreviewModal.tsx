@@ -30,7 +30,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'تعذر حفظ ملف PDF.');
+      setSaveError('تعذر حفظ المستند.');
     } finally {
       setSavingPdf(false);
     }
@@ -58,19 +58,19 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               <button
                 onClick={onDownloadExcel}
                 className="px-2.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[11px] font-bold flex items-center gap-1.5"
-                title="تنزيل نسخة Excel"
+                title="تنزيل نسخة في جدول بيانات"
               >
-                <FileSpreadsheet className="w-4 h-4" /> Excel
+                <FileSpreadsheet className="w-4 h-4" /> جدول بيانات
               </button>
             )}
             <button
               onClick={handleDownloadPdf}
               disabled={savingPdf}
               className="px-2.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-60"
-              title="تنزيل نسخة PDF"
+              title="تنزيل مستند"
             >
               {savingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle2 className="w-4 h-4" /> : <FileDown className="w-4 h-4" />}
-              {saved ? 'تم الحفظ' : 'PDF'}
+              {saved ? 'تم الحفظ' : 'مستند'}
             </button>
             <button
               onClick={() => printHtml(html)}
@@ -106,7 +106,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           {saveError ? (
             <span role="alert" className="text-rose-700 font-bold">{saveError}</span>
           ) : (
-            <span>يمكنك اختيار الطباعة أو تنزيل PDF أو Excel من الأعلى.</span>
+            <span>يمكنك اختيار الطباعة أو تنزيل مستند أو جدول بيانات من الأعلى.</span>
           )}
           <span className="font-mono">{fileName}</span>
         </div>

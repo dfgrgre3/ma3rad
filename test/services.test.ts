@@ -379,6 +379,7 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
   assert.equal(listed.source, 'PRICE_LIST');
 
   pricing.setCustomerOverride({ customerId: customer.id, productId: pid, priceM2: 260 });
+  assert.equal(pricing.getCustomerOverrides(customer.id).length, 1);
   const overridden = pricing.getEffectivePrice(pid, customer.id, 10);
   assert.equal(overridden.priceM2, 260);
   assert.equal(overridden.source, 'OVERRIDE');

@@ -69,10 +69,18 @@ function snakeToCamelKeys<T extends Record<string, unknown>>(row: T): T {
 export class DatabaseManager {
   private static instance: DatabaseManager;
   private db: Database | null = null;
+  private databaseFacade: Database | null = null;
+  private databaseFacadeTarget: Database | null = null;
   private SQL: any = null;
   private transactionDepth = 0;
-  private pageCache = new Map<string, { expiresAt: number; value: any }>();
-  private readonly pageCacheTtlMs = 15000;
+  private queryCache = new Map<string, { expiresAt: number; sizeBytes: number; value: unknown }>();
+  private queryCacheSizeBytes = 0;
+  private queryCacheHits = 0;
+  private queryCacheMisses = 0;
+  private readonly queryCacheTtlMs = 2000;
+  private readonly queryCacheMaxEntries = 300;
+  private readonly queryCacheMaxEntryBytes = 512 * 1024;
+  private readonly queryCacheMaxSizeBytes = 16 * 1024 * 1024;
   private persistQueue: Promise<void> = Promise.resolve();
   private pendingSnapshot: Uint8Array | null = null;
   private isPersisting = false;
@@ -109,6 +117,7 @@ export class DatabaseManager {
   }
 
   private async initializeDatabase(): Promise<Database> {
+    this.clearQueryCache();
     if (this.db) {
       this.db?.close();
       this.db = null;
@@ -622,7 +631,36 @@ export class DatabaseManager {
     if (!this.db) {
       throw new Error('Database not initialized! Call DatabaseManager.getInstance().initialize() first.');
     }
-    return this.db;
+    if (this.databaseFacadeTarget !== this.db || !this.databaseFacade) {
+      const database = this.db;
+      this.databaseFacadeTarget = database;
+      this.databaseFacade = new Proxy(database, {
+        get: (target, property) => {
+          const value = Reflect.get(target, property, target);
+          if (property === 'run' || property === 'exec') {
+            return (...args: unknown[]) => {
+              const sql = args[0];
+              if (typeof sql !== 'string' || this.isMutatingSql(sql)) this.clearQueryCache();
+              if (property === 'exec' && typeof sql === 'string') {
+                const params = Array.isArray(args[1]) ? args[1] : [];
+                const cacheKey = this.createQueryCacheKey(sql, params);
+                if (cacheKey) {
+                  const key = `exec:${cacheKey}`;
+                  const cached = this.getCachedQuery<unknown>(key);
+                  if (cached !== undefined) return cached;
+                  const result = Reflect.apply(value, target, args);
+                  this.setCachedQuery(key, result);
+                  return result;
+                }
+              }
+              return Reflect.apply(value, target, args);
+            };
+          }
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    }
+    return this.databaseFacade;
   }
 
   public getDb(): Database {
@@ -659,6 +697,7 @@ export class DatabaseManager {
       depthReleased = true;
       if (isOuterTransaction) {
         db.exec('COMMIT;');
+        this.clearQueryCache();
         this.saveToStorage();
       } else {
         db.exec(`RELEASE SAVEPOINT ${savepoint};`);
@@ -685,22 +724,29 @@ export class DatabaseManager {
   }
 
   public query<T = any>(sql: string, params: any[] = []): T[] {
+    const cacheKey = this.createQueryCacheKey(sql, params);
+    if (cacheKey) {
+      const cached = this.getCachedQuery<T[]>(`query:${cacheKey}`);
+      if (cached !== undefined) return cached;
+    }
+
     const db = this.getDatabase();
     const stmt = db.prepare(sql);
-    const results: T[] = [];
+    const results: Record<string, unknown>[] = [];
     try {
       stmt.bind(params);
       while (stmt.step()) {
-        results.push(snakeToCamelKeys(stmt.getAsObject()) as unknown as T);
+        results.push(snakeToCamelKeys(stmt.getAsObject()));
       }
     } finally {
       stmt.free();
     }
-    return results;
+    if (cacheKey) this.setCachedQuery(`query:${cacheKey}`, results);
+    return results as T[];
   }
 
   public run(sql: string, params: any[] = []): void {
-    this.pageCache.clear();
+    this.clearQueryCache();
     const db = this.getDatabase();
     db.run(sql, params);
     // Debounce writes outside transactions so sequential queries don't export full snapshots repeatedly
@@ -718,15 +764,139 @@ export class DatabaseManager {
     pageSize = 25,
   ): { items: T[]; page: number; pageSize: number; totalItems: number; totalPages: number } {
     const safePageSize = Math.min(Math.max(Math.floor(pageSize) || 25, 1), 100);
-    const cacheKey = JSON.stringify([dataSql, countSql, params, page, safePageSize]);
-    const cached = this.pageCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return cached.value;
-    if (cached) this.pageCache.delete(cacheKey);
     const totalItems = Number(this.query<any>(countSql, params)[0]?.totalItems ?? 0);
     const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
     const safePage = Math.min(Math.max(Math.floor(page) || 1, 1), totalPages);
     const items = this.query<T>(`${dataSql} LIMIT ? OFFSET ?`, [...params, safePageSize, (safePage - 1) * safePageSize]);
     return { items, page: safePage, pageSize: safePageSize, totalItems, totalPages };
+  }
+
+  private createQueryCacheKey(sql: string, params: unknown[]): string | null {
+    if (
+      this.transactionDepth > 0
+      || !/^\s*SELECT\b/i.test(sql)
+      || /\b(random|randomblob|changes|last_insert_rowid|current_time|current_date|current_timestamp)\b/i.test(sql)
+      || /\b(date|datetime|julianday|unixepoch|strftime)\s*\([^)]*['"]now['"]/i.test(sql)
+      || !params.every((value) =>
+        value === null
+        || typeof value === 'string'
+        || typeof value === 'boolean'
+        || (typeof value === 'number' && Number.isFinite(value))
+      )
+    ) {
+      return null;
+    }
+
+    try {
+      return JSON.stringify([sql, params]);
+    } catch {
+      return null;
+    }
+  }
+
+  private getCachedQuery<T>(key: string): T | undefined {
+    const entry = this.queryCache.get(key);
+    if (!entry || entry.expiresAt <= Date.now()) {
+      if (entry) {
+        this.queryCache.delete(key);
+        this.queryCacheSizeBytes -= entry.sizeBytes;
+      }
+      this.queryCacheMisses++;
+      return undefined;
+    }
+
+    this.queryCacheHits++;
+    this.queryCache.delete(key);
+    this.queryCache.set(key, entry);
+    return this.cloneCachedValue(entry.value) as T;
+  }
+
+  private setCachedQuery(key: string, value: unknown): void {
+    if (!this.isCacheSafeValue(value)) return;
+    let sizeBytes: number;
+    try {
+      sizeBytes = JSON.stringify(value).length * 2;
+    } catch {
+      return;
+    }
+    if (sizeBytes > this.queryCacheMaxEntryBytes) return;
+
+    const previous = this.queryCache.get(key);
+    if (previous) this.queryCacheSizeBytes -= previous.sizeBytes;
+    this.queryCache.delete(key);
+    this.queryCache.set(key, {
+      expiresAt: Date.now() + this.queryCacheTtlMs,
+      sizeBytes,
+      value: this.cloneCachedValue(value),
+    });
+    this.queryCacheSizeBytes += sizeBytes;
+    this.expireQueryCache();
+  }
+
+  private cloneCachedValue<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+
+  private isCacheSafeValue(value: unknown): boolean {
+    if (
+      value === null
+      || typeof value === 'string'
+      || typeof value === 'boolean'
+      || (typeof value === 'number' && Number.isFinite(value))
+    ) return true;
+    if (Array.isArray(value)) return value.every((item) => this.isCacheSafeValue(item));
+    if (typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return false;
+    return Object.values(value).every((item) => this.isCacheSafeValue(item));
+  }
+
+  private expireQueryCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.queryCache) {
+      if (entry.expiresAt <= now) {
+        this.queryCache.delete(key);
+        this.queryCacheSizeBytes -= entry.sizeBytes;
+      }
+    }
+
+    while (
+      this.queryCache.size > this.queryCacheMaxEntries
+      || this.queryCacheSizeBytes > this.queryCacheMaxSizeBytes
+    ) {
+      const oldest = this.queryCache.entries().next();
+      if (oldest.done) break;
+      this.queryCache.delete(oldest.value[0]);
+      this.queryCacheSizeBytes -= oldest.value[1].sizeBytes;
+    }
+  }
+
+  private isMutatingSql(sql: string): boolean {
+    if (/\b(insert|update|delete|replace|create|drop|alter|vacuum|reindex|attach|detach)\b/i.test(sql)) {
+      return true;
+    }
+    return !/^\s*(select|explain|pragma)\b/i.test(sql);
+  }
+
+  private clearQueryCache(): void {
+    this.queryCache.clear();
+    this.queryCacheSizeBytes = 0;
+  }
+
+  public getQueryCacheStats(): {
+    entries: number;
+    sizeBytes: number;
+    hits: number;
+    misses: number;
+    hitRate: number;
+  } {
+    this.expireQueryCache();
+    const requests = this.queryCacheHits + this.queryCacheMisses;
+    return {
+      entries: this.queryCache.size,
+      sizeBytes: this.queryCacheSizeBytes,
+      hits: this.queryCacheHits,
+      misses: this.queryCacheMisses,
+      hitRate: requests > 0 ? (this.queryCacheHits / requests) * 100 : 0,
+    };
   }
 
   public exportDatabaseBinary(): Uint8Array {
@@ -799,6 +969,7 @@ export class DatabaseManager {
 
   public importDatabaseBinary(bytes: Uint8Array): void {
     if (!this.SQL) throw new Error('SQL engine not loaded');
+    this.clearQueryCache();
     let imported: Database | undefined;
     try {
       const candidate = new this.SQL.Database(bytes);

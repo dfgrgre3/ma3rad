@@ -6,8 +6,10 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { CashierService } from '../src/services/CashierService.ts';
 import { CustomerService } from '../src/services/CustomerService.ts';
+import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
 import { PermissionService, ROLE_DEFAULTS } from '../src/services/PermissionService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
+import { SupplierService } from '../src/services/SupplierService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -91,6 +93,30 @@ test('permissions: user-level DENY beats role wildcards (sales.* and *)', async 
   PermissionService.deleteRole(role.id, admin);
 });
 
+test('permissions: supplier financial statements require finance debt access', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'supplier_statement_viewer', name: 'عارض موردين' }, admin);
+  PermissionService.setRolePermissions(role.code, ['suppliers.view', 'suppliers.update'], admin);
+  const limited = makeUser(db, 'usr_supplier_statement_viewer', role.code);
+  db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync('test-password', 10), limited.id]);
+
+  try {
+    AuthService.login(limited.username, 'test-password');
+    const suppliers = new SupplierService();
+    assert.throws(() => suppliers.getSupplierStatement('supplier_missing'), /غير مصرح/);
+    assert.throws(() => suppliers.getInvoicesWithAllocations('supplier_missing'), /غير مصرح/);
+    assert.throws(() => suppliers.getPaymentsWithAllocations('supplier_missing'), /غير مصرح/);
+    assert.throws(() => suppliers.updateSupplier('supplier_missing', { isActive: 0 }), /غير مصرح/);
+  } finally {
+    AuthService.login('admin', 'admin123');
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
+
 test('permissions: manager defaults exclude full-access privileges, including legacy seeded grants', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
@@ -147,6 +173,32 @@ test('permissions: reverse, expense mutation, and shift closing require their de
     }), /cashier\.expense\.update/);
     assert.throws(() => new CashierService().deleteExpense('missing'), /cashier\.expense\.delete/);
     assert.throws(() => new CashierService().closeShift('missing', 0), /cashier\.shift\.close/);
+  } finally {
+    AuthService.logout();
+    AuthService.login('admin', 'admin123');
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
+
+test('permissions: customer reads and supply requests require their view grants', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_customer_read_limits', name: 'اختبار قراءة العملاء' }, admin);
+  PermissionService.setRolePermissions(role.code, ['reports.view'], admin);
+  const limited = makeUser(db, 'usr_customer_read_limits_test', role.code);
+  db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync('test-password', 4), limited.id]);
+
+  try {
+    AuthService.login(limited.username, 'test-password');
+    const customers = new CustomerService();
+    assert.throws(() => customers.getAllCustomers(), /customers\.view/);
+    assert.throws(() => customers.getCustomersPage(), /customers\.view/);
+    assert.throws(() => customers.getCustomerById('missing'), /customers\.view/);
+    assert.throws(() => customers.getCustomerStatement('missing'), /sales\.view/);
+    assert.throws(() => new CustomerSupplyService().getOpenRequests(), /sales\.view/);
   } finally {
     AuthService.logout();
     AuthService.login('admin', 'admin123');

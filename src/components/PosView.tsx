@@ -1420,7 +1420,7 @@ ch.onmessage = (e) => {
                   <button onClick={() => { setActingUser(null); notify('تم العودة للمستخدم الأصلي', 'info'); }} className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold transition">عودة</button>
                 )}
                 <button onClick={openCustomerDisplay} className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition">عرض العميل</button>
-                <button onClick={() => setTouchMode((v) => !v)} className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition ${touchMode ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>Touch</button>
+                <button onClick={() => setTouchMode((v) => !v)} className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition ${touchMode ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>شاشة لمس</button>
               </>
             )}
             {!activeShift && can('cashier.shift.open') && (
@@ -1854,7 +1854,7 @@ ch.onmessage = (e) => {
 
           {/* Coupon code */}
           <div className="flex items-center gap-2">
-            <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="رمز القسيمة (coupon)" className="flex-1 px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-900" />
+            <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="رمز القسيمة" className="flex-1 px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-900" />
             {appliedPromotion && <span className="text-[10px] font-bold text-emerald-600">✓ {appliedPromotion.name} (-{appliedPromotion.discountAmount})</span>}
           </div>
 

@@ -113,7 +113,7 @@ export const DashboardPage: React.FC = () => {
             <Suspense fallback={<DashboardLoader />}><HrDashboardPage /></Suspense>
           </SectionCard>
         )}
-        <footer className="pb-1 text-center text-[10px] text-[#767676] dark:text-[#a6a6a6]">CeramiSys ERP</footer>
+        <footer className="pb-1 text-center text-[10px] text-[#767676] dark:text-[#a6a6a6]">سيراميسيس</footer>
       </div>
     </div>
   );

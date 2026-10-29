@@ -5,6 +5,11 @@ import { PermissionService } from './PermissionService';
 import { AuditService } from './AuditService';
 import { localDateString } from '../utils/date';
 import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup, isEncryptedLocalDatabase } from './backupEncryption';
+import {
+  createXlsxBackupWorkbook,
+  extractDatabaseFromXlsxBackup,
+  hasOfficeCompoundFileSignature,
+} from './xlsxBackup';
 
 export class BackupServicePart01 {
 protected db = DatabaseManager.getInstance();
@@ -17,20 +22,25 @@ private require(): { id: string; fullName: string } {
 
 public async exportBackupFile(): Promise<void> {
     const user = this.require();
-    const password = window.prompt('أنشئ كلمة مرور للنسخة المشفرة (12 حرفًا على الأقل). لن تُحفظ كلمة المرور داخل التطبيق:');
+    const password = window.prompt('أنشئ كلمة مرور لملف XLSX المشفر (12 حرفًا على الأقل). لن تُحفظ كلمة المرور داخل التطبيق:');
     if (!password) throw new Error('أُلغي تصدير النسخة المشفرة.');
-    if (password.length < 12) throw new Error('يجب أن تكون كلمة مرور النسخة 12 حرفًا على الأقل.');
+    if (password.length < 12 || password.length > 255) throw new Error('يجب أن تتراوح كلمة مرور النسخة بين 12 و255 حرفًا.');
     const repeatedPassword = window.prompt('أعد إدخال كلمة مرور النسخة للتأكيد:');
     if (password !== repeatedPassword) throw new Error('كلمتا المرور غير متطابقتين.');
     await this.db.flush();
     const binary = this.db.exportDatabaseBinary();
     const inspection = this.verifyBackupFile(binary);
     if (!inspection.valid) throw new Error(`تعذر التحقق من النسخة الحالية: ${inspection.error || inspection.integrity}`);
-    const encrypted = await encryptExternalBackup(binary, password);
-    const blob = new Blob([encrypted as any], { type: 'application/octet-stream' });
+    const workbook = createXlsxBackupWorkbook(binary);
+    const encryptXlsx = window.ceramisys?.db?.encryptXlsxBackup;
+    if (!encryptXlsx) throw new Error('تشفير ملف XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
+    const encrypted = await encryptXlsx(workbook, password);
+    const blobBytes = new ArrayBuffer(encrypted.byteLength);
+    new Uint8Array(blobBytes).set(encrypted);
+    const blob = new Blob([blobBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const fileName = `ceramisys_backup_${localDateString()}_${Date.now().toString().slice(-4)}.ceramisys-backup`;
+    const fileName = `ceramisys_backup_${localDateString()}_${Date.now().toString().slice(-4)}.xlsx`;
     a.href = url;
     a.download = fileName;
     a.click();
@@ -38,7 +48,7 @@ public async exportBackupFile(): Promise<void> {
 
     this.db.run(
       `INSERT INTO backup_history (id, file_name, file_path, file_size_bytes, backup_type, status)
-       VALUES (?, ?, ?, ?, 'MANUAL_DOWNLOAD_ENCRYPTED', 'SUCCESS')`,
+       VALUES (?, ?, ?, ?, 'MANUAL_DOWNLOAD_ENCRYPTED_XLSX', 'SUCCESS')`,
       [`bak_${uuidv4().substring(0, 8)}`, fileName, 'Browser / User Download', encrypted.length]
     );
 
@@ -47,7 +57,7 @@ public async exportBackupFile(): Promise<void> {
       userName: user.fullName,
       action: 'تصدير نسخة احتياطية',
       module: 'SYSTEM',
-      newValues: JSON.stringify({ fileName, bytes: encrypted.length, encryption: 'AES-256-GCM/PBKDF2-SHA-256' }),
+      newValues: JSON.stringify({ fileName, bytes: encrypted.length, encryption: 'Office OOXML password encryption' }),
     });
   }
 
@@ -57,6 +67,13 @@ public verifyBackupFile(bytes: Uint8Array) {
 
 private async readBackupBytes(file: File): Promise<Uint8Array> {
     const fileBytes = new Uint8Array(await file.arrayBuffer());
+    if (hasOfficeCompoundFileSignature(fileBytes)) {
+      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:');
+      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
+      const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
+      if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
+      return extractDatabaseFromXlsxBackup(await decryptXlsx(fileBytes, password));
+    }
     if (isEncryptedBackup(fileBytes)) {
       const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
       if (!password) throw new Error('أُلغي فك تشفير النسخة.');
@@ -152,16 +169,28 @@ public async restoreBackupFromFile(file: File): Promise<{
       rows: Array<Record<string, unknown>>;
     }>> {
       this.require();
-      if (!file.name.toLocaleLowerCase().endsWith('.ceramisys-backup')) {
-        throw new Error('اختر نسخة مشفرة بامتداد ‎.ceramisys-backup‎.');
+      const extension = file.name.split('.').pop()?.toLocaleLowerCase();
+      if (extension !== 'ceramisys-backup' && extension !== 'xlsx') {
+        throw new Error('اختر نسخة مشفرة بصيغة XLSX أو بامتداد ‎.ceramisys-backup‎.');
       }
       if (!file.size || file.size > 100 * 1024 * 1024) {
         throw new Error('حجم ملف النسخة فارغ أو يتجاوز الحد المسموح (100 ميجابايت).');
       }
       const encryptedBytes = new Uint8Array(await file.arrayBuffer());
-      if (!isEncryptedBackup(encryptedBytes)) {
-        throw new Error('محتوى الملف ليس نسخة مشفرة صالحة بامتداد ‎.ceramisys-backup‎.');
+      const isEncryptedXlsx = hasOfficeCompoundFileSignature(encryptedBytes);
+      if (isEncryptedXlsx) {
+        const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:');
+        if (!password) throw new Error('أُلغي فك تشفير النسخة.');
+        const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
+        if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
+        const bytes = extractDatabaseFromXlsxBackup(await decryptXlsx(encryptedBytes, password));
+        const inspection = this.verifyBackupFile(bytes);
+        if (!inspection.valid) {
+          throw new Error(`الملف تالف أو غير صالح للاستيراد: ${inspection.error || inspection.integrity}`);
+        }
+        return this.db.readImportTablesBinary(bytes);
       }
+      if (!isEncryptedBackup(encryptedBytes)) throw new Error('محتوى الملف ليس نسخة مشفرة صالحة.');
       const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
       if (!password) throw new Error('أُلغي فك تشفير النسخة.');
       const bytes = await decryptExternalBackup(encryptedBytes, password);

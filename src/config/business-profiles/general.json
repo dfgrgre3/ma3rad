@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "general",
+  "name": {
+    "ar": "معرض متعدد الأنشطة",
+    "en": "General retail and trade"
+  },
+  "description": {
+    "ar": "تخصيص مرن لأي نشاط تجاري",
+    "en": "Flexible defaults for general trade"
+  },
+  "category": "general",
+  "configuration": {
+    "businessModel": "mixed",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "LITER",
+      "METER",
+      "LINEAR_METER",
+      "PACK",
+      "SERVICE"
+    ],
+    "customUnits": [],
+    "productAttributes": []
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": []
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

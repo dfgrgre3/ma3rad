@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "cosmetics",
+  "name": {
+    "ar": "عطور ومستحضرات تجميل",
+    "en": "Cosmetics and perfumes"
+  },
+  "description": {
+    "ar": "كتالوج منتجات ومخزون ومبيعات",
+    "en": "Product catalog, inventory and sales"
+  },
+  "category": "retail",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "PACK"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "الحجم",
+      "الرائحة",
+      "اللون"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "operations",
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

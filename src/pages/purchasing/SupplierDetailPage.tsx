@@ -75,6 +75,25 @@ export const SupplierDetailPage: React.FC = () => {
   const currentUser = AuthService.getCurrentUser();
   const canUpdate = PermissionService.can(currentUser, 'suppliers.update');
   const canPay = PermissionService.can(currentUser, 'suppliers.payment');
+  const canDelete = PermissionService.can(currentUser, 'suppliers.delete');
+  const canViewPurchases = PermissionService.can(currentUser, 'purchases.view');
+  const canViewFinancials = PermissionService.can(currentUser, 'finance.debts.view');
+  const canExportStatement = PermissionService.can(currentUser, 'suppliers.export')
+    && PermissionService.can(currentUser, 'finance.debts.view');
+
+  useEffect(() => {
+    const requiredPermission: Partial<Record<Tab, string>> = {
+      invoices: 'purchases.view',
+      orders: 'purchases.view',
+      returns: 'purchases.view',
+      scorecard: 'purchases.view',
+      price_history: 'purchases.view',
+      payments: 'finance.debts.view',
+      statement: 'finance.debts.view',
+    };
+    const required = requiredPermission[tab];
+    if (required && !PermissionService.can(currentUser, required)) setTab('overview');
+  }, [tab, currentUser?.id, currentUser?.role]);
 
   const loadSupplierData = () => {
     if (!id) return;
@@ -108,81 +127,88 @@ export const SupplierDetailPage: React.FC = () => {
           notes: sup.notes || '',
         });
 
-        // Load invoices
-        const invs = db.query<any>(
-          `SELECT pi.id, pi.invoice_number, pi.date, pi.total_amount, pi.paid_amount, pi.remaining_amount,
-                  pi.payment_status, pi.notes, pi.created_at
+        if (canViewPurchases) {
+          const paymentColumns = canViewFinancials
+            ? 'pi.paid_amount, pi.remaining_amount, pi.payment_status'
+            : '0 AS paid_amount, 0 AS remaining_amount, NULL AS payment_status';
+          const invs = db.query<any>(
+          `SELECT pi.id, pi.invoice_number, pi.date, pi.total_amount, ${paymentColumns}, pi.notes, pi.created_at
            FROM purchase_invoices pi
            WHERE pi.supplier_id = ? AND ${invoiceScope.clause}
            ORDER BY pi.date DESC, pi.created_at DESC`,
           [id, ...invoiceScope.params]
-        );
-        setInvoices(invs);
+          );
+          setInvoices(invs);
 
-        // Load payments
-        const pays = db.query<any>(
+          const ords = db.query<any>(
+            `SELECT po.id, po.order_number, po.date, po.expected_date AS expected_delivery_date,
+                    po.total_amount, po.status, po.created_at
+             FROM purchase_orders po
+             LEFT JOIN warehouses w ON w.id = po.warehouse_id
+             WHERE po.supplier_id = ? AND ${orderScope.clause}
+             ORDER BY po.date DESC, po.created_at DESC`,
+            [id, ...orderScope.params]
+          );
+          setOrders(ords);
+
+          const rets = db.query<any>(
+            `SELECT pr.id, pr.return_number, pr.date, pr.total_amount, pr.reason, pr.created_at
+             FROM purchase_returns pr
+             LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
+             LEFT JOIN warehouses w ON w.id = pr.warehouse_id
+             WHERE pr.supplier_id = ? AND ${returnScope.clause}
+             ORDER BY pr.date DESC, pr.created_at DESC`,
+            [id, ...returnScope.params]
+          );
+          setReturns(rets);
+
+          const proc = new ProcurementService();
+          try {
+            setScorecard(proc.getSupplierScorecard(sup.id));
+          } catch {
+            // Some suppliers have no scored activity yet.
+            setScorecard(null);
+          }
+
+          const historyRows = db.query<any>(`
+            SELECT
+              pi.date,
+              pi.invoice_number AS invoiceNumber,
+              pii.product_id AS productId,
+              pii.product_name AS productName,
+              pii.quantity_m2 AS quantityM2,
+              pii.unit_cost AS unitCost,
+              COALESCE(NULLIF(pii.effective_unit_cost, 0), pii.unit_cost) AS effectiveUnitCost,
+              pi.matching_status AS matchingStatus
+            FROM purchase_invoice_items pii
+            JOIN purchase_invoices pi ON pi.id = pii.purchase_id
+            WHERE pi.supplier_id = ? AND ${invoiceScope.clause}
+            ORDER BY pi.date DESC, pi.created_at DESC
+          `, [sup.id, ...invoiceScope.params]);
+          setPriceHistory(historyRows);
+        } else {
+          setInvoices([]);
+          setOrders([]);
+          setReturns([]);
+          setScorecard(null);
+          setPriceHistory([]);
+        }
+
+        if (canViewFinancials) {
+          const pays = db.query<any>(
           `SELECT sp.id, sp.receipt_number, sp.date, sp.amount, sp.payment_type, sp.notes,
                   sp.register_id, sp.created_at
            FROM supplier_payments sp
            WHERE sp.supplier_id = ? AND ${paymentScope.clause}
            ORDER BY sp.date DESC, sp.created_at DESC`,
           [id, ...paymentScope.params]
-        );
-        setPayments(pays);
-
-        // Load purchase orders
-        const ords = db.query<any>(
-          `SELECT po.id, po.order_number, po.date, po.expected_date AS expected_delivery_date,
-                  po.total_amount, po.status, po.created_at
-           FROM purchase_orders po
-           LEFT JOIN warehouses w ON w.id = po.warehouse_id
-           WHERE po.supplier_id = ? AND ${orderScope.clause}
-           ORDER BY po.date DESC, po.created_at DESC`,
-          [id, ...orderScope.params]
-        );
-        setOrders(ords);
-
-        // Load purchase returns
-        const rets = db.query<any>(
-          `SELECT pr.id, pr.return_number, pr.date, pr.total_amount, pr.reason, pr.created_at
-           FROM purchase_returns pr
-           LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
-           LEFT JOIN warehouses w ON w.id = pr.warehouse_id
-           WHERE pr.supplier_id = ? AND ${returnScope.clause}
-           ORDER BY pr.date DESC, pr.created_at DESC`,
-          [id, ...returnScope.params]
-        );
-        setReturns(rets);
-
-        // Load statement
-        const stmt = supplierService.getSupplierStatement(sup.id, statementFrom, statementTo);
-        setStatement(stmt);
-
-        // Load scorecard & price history
-        const proc = new ProcurementService();
-        try {
-          const sc = proc.getSupplierScorecard(sup.id);
-          setScorecard(sc);
-        } catch {
-          // ignore if no stats yet
+          );
+          setPayments(pays);
+          setStatement(supplierService.getSupplierStatement(sup.id, statementFrom, statementTo));
+        } else {
+          setPayments([]);
+          setStatement(null);
         }
-
-        const historyRows = db.query<any>(`
-          SELECT
-            pi.date,
-            pi.invoice_number AS invoiceNumber,
-            pii.product_id AS productId,
-            pii.product_name AS productName,
-            pii.quantity_m2 AS quantityM2,
-            pii.unit_cost AS unitCost,
-            COALESCE(NULLIF(pii.effective_unit_cost, 0), pii.unit_cost) AS effectiveUnitCost,
-            pi.matching_status AS matchingStatus
-          FROM purchase_invoice_items pii
-          JOIN purchase_invoices pi ON pi.id = pii.purchase_id
-          WHERE pi.supplier_id = ? AND ${invoiceScope.clause}
-          ORDER BY pi.date DESC, pi.created_at DESC
-        `, [sup.id, ...invoiceScope.params]);
-        setPriceHistory(historyRows);
       }
     } catch (e) {
       console.error(e);
@@ -193,7 +219,7 @@ export const SupplierDetailPage: React.FC = () => {
 
   useEffect(() => {
     loadSupplierData();
-  }, [id, statementFrom, statementTo]);
+  }, [id, statementFrom, statementTo, canViewPurchases, canViewFinancials]);
 
   const handleRecordPayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,6 +263,7 @@ export const SupplierDetailPage: React.FC = () => {
   };
 
   const handleToggleStatus = () => {
+    if (!canDelete || !canUpdate) return;
     if (!supplier) return;
     const nextStatus = supplier.isActive === 0 ? 1 : 0;
     const msg = nextStatus === 1 ? 'هل تريد تفعيل حساب المورد؟' : 'هل تريد تعطيل حساب المورد؟';
@@ -261,6 +288,7 @@ export const SupplierDetailPage: React.FC = () => {
   };
 
   const exportStatementCsv = () => {
+    if (!canExportStatement) return;
     if (!statement || !supplier) return;
     const csvCell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [
@@ -325,6 +353,10 @@ export const SupplierDetailPage: React.FC = () => {
         returnCount={returns.length}
         canUpdate={canUpdate}
         canPay={canPay}
+        canDelete={canDelete && canUpdate}
+        canViewPurchases={canViewPurchases}
+        canViewFinancials={canViewFinancials}
+        canExportStatement={canExportStatement}
         onOpenPaymentModal={openPaymentModal}
         onOpenEditModal={() => setIsEditModalOpen(true)}
         onToggleStatus={handleToggleStatus}
@@ -344,16 +376,24 @@ export const SupplierDetailPage: React.FC = () => {
             payments={payments}
             orders={orders}
             canUpdate={canUpdate}
+            canViewPurchases={canViewPurchases}
+            canViewFinancials={canViewFinancials}
             onOpenEditModal={() => setIsEditModalOpen(true)}
             onTabChange={setTab}
           />
         )}
 
         {/* INVOICES TAB */}
-        {tab === 'invoices' && <InvoicesTab invoices={invoices} />}
+        {tab === 'invoices' && canViewPurchases && (
+          <InvoicesTab
+            invoices={invoices}
+            canViewFinancials={canViewFinancials}
+            canCreatePurchase={PermissionService.can(currentUser, 'purchases.create')}
+          />
+        )}
 
         {/* PAYMENTS TAB */}
-        {tab === 'payments' && (
+        {tab === 'payments' && canViewFinancials && (
           <PaymentsTab
             payments={payments}
             canPay={canPay}
@@ -362,13 +402,13 @@ export const SupplierDetailPage: React.FC = () => {
         )}
 
         {/* PURCHASE ORDERS TAB */}
-        {tab === 'orders' && <OrdersTab orders={orders} />}
+        {tab === 'orders' && canViewPurchases && <OrdersTab orders={orders} />}
 
         {/* PURCHASE RETURNS TAB */}
-        {tab === 'returns' && <ReturnsTab returns={returns} />}
+        {tab === 'returns' && canViewPurchases && <ReturnsTab returns={returns} />}
 
         {/* STATEMENT TAB */}
-        {tab === 'statement' && statement && (
+        {tab === 'statement' && canViewFinancials && statement && (
           <StatementTab
             supplierName={supplier.name}
             statement={statement}
@@ -380,20 +420,21 @@ export const SupplierDetailPage: React.FC = () => {
               setStatementFrom('');
               setStatementTo('');
             }}
+            canExport={canExportStatement}
             onExportCsv={exportStatementCsv}
             onPrint={() => window.print()}
           />
         )}
 
         {/* SCORECARD TAB */}
-        {tab === 'scorecard' && <ScorecardTab scorecard={scorecard} />}
+        {tab === 'scorecard' && canViewPurchases && <ScorecardTab scorecard={scorecard} />}
 
         {/* PRICE HISTORY TAB */}
-        {tab === 'price_history' && <PriceHistoryTab priceHistory={priceHistory} />}
+        {tab === 'price_history' && canViewPurchases && <PriceHistoryTab priceHistory={priceHistory} />}
       </div>
 
       {/* RECORD PAYMENT MODAL */}
-      {isPaymentModalOpen && (
+      {isPaymentModalOpen && canPay && (
         <RecordPaymentModal
           supplier={supplier}
           paymentData={paymentData}
@@ -405,7 +446,7 @@ export const SupplierDetailPage: React.FC = () => {
       )}
 
       {/* EDIT SUPPLIER MODAL */}
-      {isEditModalOpen && (
+      {isEditModalOpen && canUpdate && (
         <EditSupplierModal
           editFormData={editFormData}
           onChange={setEditFormData}

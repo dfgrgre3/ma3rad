@@ -5,10 +5,11 @@ import { DOC_TYPES } from './constants';
 
 interface DocumentsTabProps {
   productId: string;
-  canEdit: boolean;
+  canCreate: boolean;
+  canArchive: boolean;
 }
 
-export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canEdit }) => {
+export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canCreate, canArchive }) => {
   const service = new ProductExtraService();
   const [rows, setRows] = useState<ProductDocument[]>([]);
   const [form, setForm] = useState({ filePath: '', fileName: '', documentType: 'OTHER' });
@@ -33,7 +34,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canEdit }
 
   return (
     <div className="space-y-4">
-      {canEdit && (
+      {canCreate && (
         <form onSubmit={add} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[220px]">
             <label className="block text-xs font-bold text-slate-700 mb-1">مسار المستند أو رابطها</label>
@@ -59,7 +60,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canEdit }
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         {rows.length === 0 ? <div className="text-center text-slate-500 py-12 text-sm">لا توجد مستندات لهذا المنتج</div> : (
           <table className="w-full text-sm text-right">
-            <thead className="bg-slate-50"><tr>{['المستند', 'النوع', 'المسار', 'التاريخ', canEdit ? 'حذف' : ''].filter(Boolean).map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr></thead>
+            <thead className="bg-slate-50"><tr>{['المستند', 'النوع', 'المسار', 'التاريخ', ...(canArchive ? ['حذف'] : [])].map((h) => <th key={h} className="px-4 py-3 text-xs font-bold text-slate-500">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((d) => (
                 <tr key={d.id} className="hover:bg-slate-50/70">
@@ -67,7 +68,7 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canEdit }
                   <td className="px-4 py-3 text-slate-600">{DOC_TYPES[d.documentType] || d.documentType}</td>
                   <td className="px-4 py-3 text-xs font-mono text-slate-500 max-w-[260px] truncate">{d.filePath}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{d.createdAt ? new Date(d.createdAt).toLocaleDateString('ar-EG') : '—'}</td>
-                  {canEdit && <td className="px-4 py-3"><button onClick={() => remove(d.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button></td>}
+                  {canArchive && <td className="px-4 py-3"><button onClick={() => remove(d.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button></td>}
                 </tr>
               ))}
             </tbody>

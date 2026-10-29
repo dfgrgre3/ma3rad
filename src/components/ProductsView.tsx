@@ -13,6 +13,7 @@ import { CategoryService, CategoryWithCount } from '../services/CategoryService'
 import { BrandService, BrandWithCount } from '../services/BrandService';
 import { AttributeService, AttributeCategory } from '../services/AttributeService';
 import { ProductExtraService, ProductImage } from '../services/ProductExtraService';
+import { normalizeDynamicAttributeValue } from '../services/dynamicAttributes';
 import { Product, CeramicGrade, UnitType, Warehouse } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { getProductUnitLabel } from '../utils/productUnits';
@@ -22,6 +23,7 @@ import { BusinessProfileService } from '../services/BusinessProfileService';
 import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
+import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 import {
   GRADES, SURFACES, UNITS, calcMetersFromSize, emptyForm, emptyVariant, gradeLabel,
   parseGrade, pickCell, round, unitLabelFor,
@@ -32,6 +34,9 @@ import { Field, ListPagination, StatCard } from './products/ProductUi';
 
 
 export const ProductsView: React.FC = () => {
+  const productsLabel = useBusinessTerm('entities.products.plural');
+  const productSingularLabel = useBusinessTerm('entities.products.singular');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
@@ -100,6 +105,19 @@ export const ProductsView: React.FC = () => {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const navigate = useNavigate();
+  const permissionUser = AuthService.getCurrentUser();
+  const canCreateProduct = PermissionService.can(permissionUser, 'products.create');
+  const canUpdateProduct = PermissionService.can(permissionUser, 'products.update');
+  const canDeleteProduct = PermissionService.can(permissionUser, 'products.delete');
+  const canExportProducts = PermissionService.can(permissionUser, 'products.export');
+  const canImportProducts = PermissionService.can(permissionUser, 'products.import');
+  const canAdjustInventory = PermissionService.can(permissionUser, 'inventory.adjust');
+  const canCreateCategory = PermissionService.can(permissionUser, 'categories.create');
+  const canCreateBrand = PermissionService.can(permissionUser, 'brands.create');
+  const canViewCosts = PermissionService.can(permissionUser, 'finance.view');
+  const canViewPricing = PermissionService.can(permissionUser, 'pricing.view');
+  const canUpdatePricing = PermissionService.can(permissionUser, 'pricing.update');
+  const canManagePricing = editingProduct ? canUpdatePricing : canCreateProduct;
 
   const productService = new ProductService();
   const inventoryService = new InventoryService();
@@ -479,6 +497,17 @@ export const ProductsView: React.FC = () => {
     if (!formData.categoryId) { alert('اختر نوع المنتج أو أضف نوعًا جديدًا.'); return false; }
     if (formData.productType === 'CERAMIC' && !formData.brandId) { alert('اختر الماركة أو أضف ماركة جديدة.'); return false; }
     if (!formData.barcode.trim() || !formData.sku.trim()) { alert('الباركود وكود الصنف مطلوبان.'); return false; }
+    const applicableAttributes = attributes.filter(
+      (attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId,
+    );
+    try {
+      for (const attribute of applicableAttributes) {
+        normalizeDynamicAttributeValue(attribute, attributeValues[attribute.id]);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'راجع قيم الخصائص الإضافية.');
+      return false;
+    }
     return true;
   };
 
@@ -571,7 +600,14 @@ export const ProductsView: React.FC = () => {
 
       if (productId) {
         syncVariants(productId);
-        extraService.setAttributeValues(productId, attributeValues);
+        const applicableAttributeIds = new Set(
+          attributes
+            .filter((attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId)
+            .map((attribute) => attribute.id),
+        );
+        extraService.setAttributeValues(productId, Object.fromEntries(
+          Object.entries(attributeValues).filter(([attributeId]) => applicableAttributeIds.has(attributeId)),
+        ));
 
         removedImageIds.forEach((id) => {
           try { extraService.deleteImage(id); } catch (err) { console.error(err); }
@@ -883,7 +919,7 @@ export const ProductsView: React.FC = () => {
               product.id,
               warehouseId,
               round(openingBoxes * metersPerBox, 3),
-              'رصيد افتتاحي من استيراد Excel',
+              'رصيد افتتاحي من استيراد جدول بيانات',
             );
           }
           created += 1;
@@ -916,38 +952,41 @@ export const ProductsView: React.FC = () => {
   const tabs = useMemo(() => ([
     { id: 'basic' as TabId, label: 'البيانات الأساسية', icon: <Package className="w-4 h-4" /> },
     { id: 'units' as TabId, label: 'المقاس والوحدات', icon: <Ruler className="w-4 h-4" /> },
-    { id: 'pricing' as TabId, label: 'التسعير', icon: <Banknote className="w-4 h-4" /> },
-    ...(tracksInventory ? [{ id: 'stock' as TabId, label: 'المخزون', icon: <Boxes className="w-4 h-4" /> }] : []),
+    ...(canManagePricing ? [{ id: 'pricing' as TabId, label: 'التسعير', icon: <Banknote className="w-4 h-4" /> }] : []),
+    ...(tracksInventory && canAdjustInventory ? [{ id: 'stock' as TabId, label: 'المخزون', icon: <Boxes className="w-4 h-4" /> }] : []),
     { id: 'extras' as TabId, label: 'المتغيرات والصور', icon: <GitBranch className="w-4 h-4" /> },
-  ]), [tracksInventory]);
+  ]), [tracksInventory, canAdjustInventory, canManagePricing]);
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900">إدارة المنتجات المتكاملة</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">
+            إدارة {productsLabel} المتكاملة
+            <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
+          </h2>
           <p className="text-xs text-slate-500">الأنواع والماركات والمقاسات والعدد والكمية والمترات والتسعير والمخزون والصور والمتغيرات</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          <button onClick={() => setIsImportOpen(true)} className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-50 transition text-sm">
+          {canImportProducts && <button onClick={() => setIsImportOpen(true)} className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-50 transition text-sm">
             <Upload className="w-4 h-4" />
-            <span>استيراد Excel</span>
-          </button>
-          <button onClick={handleExport} className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-50 transition text-sm">
+            <span>استيراد جدول بيانات</span>
+          </button>}
+          {canExportProducts && <button onClick={handleExport} className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-50 transition text-sm">
             <Download className="w-4 h-4" />
-            <span>تصدير Excel</span>
-          </button>
-          <button onClick={handleOpenAddModal} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm">
+            <span>تصدير جدول بيانات</span>
+          </button>}
+          {canCreateProduct && <button onClick={handleOpenAddModal} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm">
             <Plus className="w-4 h-4" />
-            <span>إضافة صنف جديد</span>
-          </button>
+            <span>إضافة {productSingularLabel} جديد</span>
+          </button>}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatCard label="إجمالي الأصناف" value={String(stats?.totalProducts ?? totalItems)} hint={`نشط: ${stats?.activeProducts ?? 0} | موقوف: ${stats?.inactiveProducts ?? 0}`} icon={<Package className="w-5 h-5 text-sky-600" />} tone="bg-sky-50" />
         <StatCard label="إجمالي الكميات" value={String(stats?.totalStockM2 ?? 0)} icon={<Boxes className="w-5 h-5 text-emerald-600" />} tone="bg-emerald-50" />
-        <StatCard label="قيمة المخزون" value={CeramicMath.formatCurrency(stats?.totalStockValue ?? 0)} icon={<Banknote className="w-5 h-5 text-indigo-600" />} tone="bg-indigo-50" />
+        {canViewCosts && <StatCard label="قيمة المخزون" value={CeramicMath.formatCurrency(stats?.totalStockValue ?? 0)} icon={<Banknote className="w-5 h-5 text-indigo-600" />} tone="bg-indigo-50" />}
         <StatCard label="أصناف قاربت على النفاذ" value={String(stats?.lowStock ?? 0)} icon={<AlertTriangle className="w-5 h-5 text-amber-600" />} tone="bg-amber-50" />
         <StatCard label="أصناف نافدة" value={String(stats?.outOfStock ?? 0)} icon={<XCircle className="w-5 h-5 text-rose-600" />} tone="bg-rose-50" />
         <StatCard label="الأنواع / الماركات" value={`${categories.length} / ${brands.length}`} hint={`${attributes.length} خصائص`} icon={<Layers className="w-5 h-5 text-violet-600" />} tone="bg-violet-50" />
@@ -1003,23 +1042,23 @@ export const ProductsView: React.FC = () => {
               <option value="stock_asc">المخزون: الأقل</option>
               <option value="stock_desc">المخزون: الأكثر</option>
             </select>
-            <select aria-label="Product status" value={productStatus} onChange={(e) => setProductStatus(e.target.value as typeof productStatus)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
-              <option value="active">Active products</option>
-              <option value="inactive">Inactive products</option>
-              <option value="all">All products</option>
+            <select aria-label="حالة الصنف" value={productStatus} onChange={(e) => setProductStatus(e.target.value as typeof productStatus)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+              <option value="active">الأصناف النشطة</option>
+              <option value="inactive">الأصناف غير النشطة</option>
+              <option value="all">كل الأصناف</option>
             </select>
-            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">Clear filters</button>
+            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">مسح عوامل التصفية</button>
           </div>
         )}
       </div>
 
-      {selectedProductIds.length > 0 && (
+      {selectedProductIds.length > 0 && (canExportProducts || canDeleteProduct) && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3">
           <div className="text-xs font-bold text-sky-900">تم تحديد {selectedProductIds.length} صنف من الصفحة الحالية</div>
           <div className="flex items-center gap-2">
-            <button onClick={handleExport} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-100">Export selected</button>
-            <button onClick={() => handleBulkStatus(true)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">تفعيل المحدد</button>
-            <button onClick={() => handleBulkStatus(false)} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700">إيقاف المحدد</button>
+            {canExportProducts && <button onClick={handleExport} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-sky-800 hover:bg-sky-100">تصدير المحدد</button>}
+            {canDeleteProduct && <button onClick={() => handleBulkStatus(true)} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">تفعيل المحدد</button>}
+            {canDeleteProduct && <button onClick={() => handleBulkStatus(false)} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700">إيقاف المحدد</button>}
             <button onClick={() => setSelectedProductIds([])} className="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">مسح التحديد</button>
           </div>
         </div>
@@ -1037,15 +1076,15 @@ export const ProductsView: React.FC = () => {
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                 <tr>
-                  <th className="p-3.5 text-center"><input aria-label="تحديد كل أصناف الصفحة" type="checkbox" checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))} onChange={togglePageSelection} className="rounded border-slate-300 text-sky-600" /></th>
+                  {(canExportProducts || canDeleteProduct) && <th className="p-3.5 text-center"><input aria-label="تحديد كل أصناف الصفحة" type="checkbox" checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))} onChange={togglePageSelection} className="rounded border-slate-300 text-sky-600" /></th>}
                   <th className="p-3.5">الصنف</th>
                   <th className="p-3.5">الباركود / الكود</th>
                   <th className="p-3.5">النوع والماركة</th>
                   {hasCeramicRows && <th className="p-3.5">المقاس والفرز</th>}
                   <th className="p-3.5">التحويل</th>
-                  <th className="p-3.5">التكلفة</th>
-                  <th className="p-3.5">سعر الوحدة</th>
-                  {hasCeramicRows && <th className="p-3.5">سعر الكرتونة</th>}
+                  {canViewCosts && <th className="p-3.5">التكلفة</th>}
+                  {canViewPricing && <th className="p-3.5">سعر الوحدة</th>}
+                  {hasCeramicRows && canViewPricing && <th className="p-3.5">سعر الكرتونة</th>}
                   <th className="p-3.5 text-center">المخزون</th>
                   <th className="p-3.5 text-center">الإجراءات</th>
                 </tr>
@@ -1055,7 +1094,7 @@ export const ProductsView: React.FC = () => {
                   const stock = stockOf(p);
                   return (
                     <tr key={p.id} className={`hover:bg-slate-50 transition ${p.isActive ? '' : 'opacity-60'}`}>
-                      <td className="p-3.5 text-center"><input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="rounded border-slate-300 text-sky-600" /></td>
+                      {(canExportProducts || canDeleteProduct) && <td className="p-3.5 text-center"><input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="rounded border-slate-300 text-sky-600" /></td>}
                       <td className="p-3.5">
                         <div className="flex items-center gap-2">
                           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
@@ -1091,9 +1130,9 @@ export const ProductsView: React.FC = () => {
                           <div className="text-[10px] text-slate-500">{p.piecesPerBox} قطعة / كرتونة</div>
                         </>}
                       </td>
-                      <td className="p-3.5 font-mono text-slate-600">{CeramicMath.formatCurrency(p.costPrice)}</td>
-                      <td className="p-3.5 font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</td>
-                      {hasCeramicRows && (
+                      {canViewCosts && <td className="p-3.5 font-mono text-slate-600">{CeramicMath.formatCurrency(p.costPrice)}</td>}
+                      {canViewPricing && <td className="p-3.5 font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</td>}
+                      {hasCeramicRows && canViewPricing && (
                         <td className="p-3.5 font-bold text-slate-900">{p.productType === 'GENERAL' ? '—' : CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
                       )}
                       <td className="p-3.5 text-center">
@@ -1110,12 +1149,12 @@ export const ProductsView: React.FC = () => {
                       <td className="p-3.5 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => navigate(`/products/${p.id}`)} className="p-1.5 rounded-lg text-slate-500 hover:bg-sky-50 hover:text-sky-600 transition" title="عرض التفاصيل"><Eye className="w-4 h-4" /></button>
-                          <button onClick={() => openStockModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition" title="إضافة كمية للمخزون"><PackagePlus className="w-4 h-4" /></button>
-                          <button onClick={() => handleOpenEditModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition" title="تعديل"><Edit className="w-4 h-4" /></button>
-                          <button onClick={() => handleDuplicate(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition" title="نسخ الصنف"><Copy className="w-4 h-4" /></button>
-                          <button onClick={() => navigate('/products/barcodes')} className="p-1.5 rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-600 transition" title="طباعة باركود"><Barcode className="w-4 h-4" /></button>
-                          <button onClick={() => handleToggleActive(p)} className={`p-1.5 rounded-lg transition ${p.isActive ? 'text-slate-500 hover:bg-amber-50 hover:text-amber-600' : 'text-emerald-600 hover:bg-emerald-50'}`} title={p.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'}><Power className="w-4 h-4" /></button>
-                          <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="حذف"><Trash2 className="w-4 h-4" /></button>
+                          {canAdjustInventory && <button onClick={() => openStockModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition" title="إضافة كمية للمخزون"><PackagePlus className="w-4 h-4" /></button>}
+                          {canUpdateProduct && <button onClick={() => handleOpenEditModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition" title="تعديل"><Edit className="w-4 h-4" /></button>}
+                          {canCreateProduct && <button onClick={() => handleDuplicate(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition" title="نسخ الصنف"><Copy className="w-4 h-4" /></button>}
+                          {canExportProducts && <button onClick={() => navigate('/products/barcodes')} className="p-1.5 rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-600 transition" title="طباعة باركود"><Barcode className="w-4 h-4" /></button>}
+                          {canDeleteProduct && <button onClick={() => handleToggleActive(p)} className={`p-1.5 rounded-lg transition ${p.isActive ? 'text-slate-500 hover:bg-amber-50 hover:text-amber-600' : 'text-emerald-600 hover:bg-emerald-50'}`} title={p.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'}><Power className="w-4 h-4" /></button>}
+                          {canDeleteProduct && <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="حذف"><Trash2 className="w-4 h-4" /></button>}
                         </div>
                       </td>
                     </tr>
@@ -1133,7 +1172,7 @@ export const ProductsView: React.FC = () => {
                   <div className="relative h-36 bg-slate-100">
                     {p.imagePath ? <img src={p.imagePath} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-10 w-10" /></div>}
                     <span className={`absolute right-2 top-2 rounded-lg px-2 py-1 text-[10px] font-black ${stockTone(p)}`}>{p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : CeramicMath.formatM2(stock.m2)}</span>
-                    <input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="absolute left-2 top-2 h-4 w-4 rounded border-slate-300 text-sky-600" />
+                    {(canExportProducts || canDeleteProduct) && <input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="absolute left-2 top-2 h-4 w-4 rounded border-slate-300 text-sky-600" />}
                     {!p.isActive && <span className="absolute left-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-black text-white">موقوف</span>}
                   </div>
                   <div className="flex-1 space-y-2 p-3.5">
@@ -1148,15 +1187,20 @@ export const ProductsView: React.FC = () => {
                         <span className="rounded-md bg-sky-50 px-2 py-0.5 text-sky-700">{p.piecesPerBox} قطعة / {p.metersPerBox} م²</span>
                       </>}
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <div className="rounded-lg border border-slate-200 py-1.5">
+                    <div className={`grid gap-2 text-center ${canViewCosts && canViewPricing ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                      {canViewPricing && <div className="rounded-lg border border-slate-200 py-1.5">
                         <div className="text-[9px] font-bold text-slate-400">سعر {getProductUnitLabel(p)}</div>
                         <div className="text-xs font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</div>
-                      </div>
-                      <div className="rounded-lg border border-slate-200 py-1.5">
-                        <div className="text-[9px] font-bold text-slate-400">{p.productType === 'GENERAL' ? 'التكلفة للوحدة' : 'سعر الكرتونة'}</div>
-                        <div className="text-xs font-black text-slate-800">{CeramicMath.formatCurrency(p.productType === 'GENERAL' ? p.costPrice : p.sellingPriceBox || p.sellingPriceM2 * p.metersPerBox)}</div>
-                      </div>
+                      </div>}
+                      {p.productType === 'GENERAL' ? (
+                        canViewCosts && <div className="rounded-lg border border-slate-200 py-1.5">
+                          <div className="text-[9px] font-bold text-slate-400">التكلفة للوحدة</div>
+                          <div className="text-xs font-black text-slate-800">{CeramicMath.formatCurrency(p.costPrice)}</div>
+                        </div>
+                      ) : canViewPricing && <div className="rounded-lg border border-slate-200 py-1.5">
+                        <div className="text-[9px] font-bold text-slate-400">سعر الكرتونة</div>
+                        <div className="text-xs font-black text-slate-800">{CeramicMath.formatCurrency(p.sellingPriceBox || p.sellingPriceM2 * p.metersPerBox)}</div>
+                      </div>}
                     </div>
                     <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
                       {p.productType === 'GENERAL'
@@ -1171,12 +1215,12 @@ export const ProductsView: React.FC = () => {
                   <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
                     <div className="flex items-center gap-0.5">
                       <button onClick={() => navigate(`/products/${p.id}`)} className="p-1.5 rounded-lg text-slate-500 hover:bg-white" title="تفاصيل"><Eye className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => openStockModal(p)} className="p-1.5 rounded-lg text-emerald-600 hover:bg-white" title="إضافة كمية"><PackagePlus className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleOpenEditModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-white" title="تعديل"><Edit className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleDuplicate(p)} className="p-1.5 rounded-lg text-indigo-600 hover:bg-white" title="نسخ"><Copy className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleToggleActive(p)} className="p-1.5 rounded-lg text-amber-600 hover:bg-white" title={p.isActive ? 'إيقاف' : 'تفعيل'}><Power className="w-3.5 h-3.5" /></button>
+                      {canAdjustInventory && <button onClick={() => openStockModal(p)} className="p-1.5 rounded-lg text-emerald-600 hover:bg-white" title="إضافة كمية"><PackagePlus className="w-3.5 h-3.5" /></button>}
+                      {canUpdateProduct && <button onClick={() => handleOpenEditModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-white" title="تعديل"><Edit className="w-3.5 h-3.5" /></button>}
+                      {canCreateProduct && <button onClick={() => handleDuplicate(p)} className="p-1.5 rounded-lg text-indigo-600 hover:bg-white" title="نسخ"><Copy className="w-3.5 h-3.5" /></button>}
+                      {canDeleteProduct && <button onClick={() => handleToggleActive(p)} className="p-1.5 rounded-lg text-amber-600 hover:bg-white" title={p.isActive ? 'إيقاف' : 'تفعيل'}><Power className="w-3.5 h-3.5" /></button>}
                     </div>
-                    <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 rounded-lg text-rose-500 hover:bg-white" title="حذف"><Trash2 className="w-3.5 h-3.5" /></button>
+                    {canDeleteProduct && <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 rounded-lg text-rose-500 hover:bg-white" title="حذف"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </div>
               );
@@ -1187,14 +1231,14 @@ export const ProductsView: React.FC = () => {
       </div>
 
       {/* ADD / EDIT PRODUCT MODAL */}
-      {isModalOpen && (
+      {isModalOpen && (editingProduct ? canUpdateProduct : canCreateProduct) && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm">
           <div className="my-6 w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><Package className="w-5 h-5" /></div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900">{editingProduct ? 'تعديل الصنف' : 'إضافة صنف جديد'}</h3>
+                  <h3 className="text-base font-extrabold text-slate-900">{editingProduct ? `تعديل ${productSingularLabel}` : `إضافة ${productSingularLabel} جديد`}</h3>
                   <p className="text-[11px] text-slate-500">{editingProduct ? editingProduct.name : 'أكمل بيانات النوع والعدد والكمية والمترات والتسعير والمخزون'}</p>
                 </div>
               </div>
@@ -1221,7 +1265,7 @@ export const ProductsView: React.FC = () => {
                             <option value="GENERAL">صنف عام (مواد تشطيب وغيرها)</option>
                           </select>
                         </Field>
-                        <Field label="اسم الصنف" required>
+                        <Field label={`اسم ${productSingularLabel}`} required>
                           <input required placeholder="مثال: سيراميك رويال 60×60 رمادي" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500" />
                         </Field>
                         <Field label="الباركود" required>
@@ -1242,7 +1286,7 @@ export const ProductsView: React.FC = () => {
                           {showNewCategory ? (
                             <div className="flex gap-2">
                               <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="اسم النوع الجديد" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
-                              <button type="button" onClick={handleAddCategory} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>
+                              {canCreateCategory && <button type="button" onClick={handleAddCategory} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>}
                               <button type="button" onClick={() => setShowNewCategory(false)} className="rounded-xl border border-slate-200 px-2 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
                             </div>
                           ) : (
@@ -1251,7 +1295,7 @@ export const ProductsView: React.FC = () => {
                                 <option value="">— اختر النوع —</option>
                                 {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name} ({cat.productCount})</option>)}
                               </select>
-                              <button type="button" onClick={() => setShowNewCategory(true)} className="rounded-xl border border-dashed border-sky-300 px-2.5 text-sky-600 hover:bg-sky-50" title="إضافة نوع"><Plus className="w-4 h-4" /></button>
+                              {canCreateCategory && <button type="button" onClick={() => setShowNewCategory(true)} className="rounded-xl border border-dashed border-sky-300 px-2.5 text-sky-600 hover:bg-sky-50" title="إضافة نوع"><Plus className="w-4 h-4" /></button>}
                             </div>
                           )}
                         </Field>
@@ -1259,7 +1303,7 @@ export const ProductsView: React.FC = () => {
                           {showNewBrand ? (
                             <div className="flex gap-2">
                               <input value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="اسم الماركة الجديدة" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
-                              <button type="button" onClick={handleAddBrand} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>
+                              {canCreateBrand && <button type="button" onClick={handleAddBrand} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>}
                               <button type="button" onClick={() => setShowNewBrand(false)} className="rounded-xl border border-slate-200 px-2 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
                             </div>
                           ) : (
@@ -1268,7 +1312,7 @@ export const ProductsView: React.FC = () => {
                                 <option value="">— اختر الماركة —</option>
                                 {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name} ({brand.productCount})</option>)}
                               </select>
-                              <button type="button" onClick={() => setShowNewBrand(true)} className="rounded-xl border border-dashed border-sky-300 px-2.5 text-sky-600 hover:bg-sky-50" title="إضافة ماركة"><Plus className="w-4 h-4" /></button>
+                              {canCreateBrand && <button type="button" onClick={() => setShowNewBrand(true)} className="rounded-xl border border-dashed border-sky-300 px-2.5 text-sky-600 hover:bg-sky-50" title="إضافة ماركة"><Plus className="w-4 h-4" /></button>}
                             </div>
                           )}
                         </Field>
@@ -1420,7 +1464,7 @@ export const ProductsView: React.FC = () => {
                 </div>
               )}
 
-              {activeTab === 'pricing' && (
+              {activeTab === 'pricing' && canManagePricing && (
                 <section className="space-y-3">
                   <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Banknote className="w-4 h-4 text-emerald-600" /> التسعير</div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -1548,23 +1592,80 @@ export const ProductsView: React.FC = () => {
 
                   <section className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-violet-800"><SlidersHorizontal className="w-4 h-4" /> خصائص ومواصفات إضافية</div>
-                    {attributes.length === 0 ? (
+                    {attributes.filter((attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId).length === 0 ? (
                       <p className="rounded-xl border border-violet-200 bg-white px-3 py-3 text-[11px] text-slate-500">لا توجد خصائص معرّفة. يمكنك إدارتها من صفحة خصائص المنتجات.</p>
                     ) : (
                       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                        {attributes.map((attr) => (
-                          <Field key={attr.id} label={`${attr.name}${attr.unit ? ` (${attr.unit})` : ''}`}>
-                            {attr.values.length > 0 ? (
-                              <select value={attributeValues[attr.id] || ''} onChange={(e) => setAttributeValues((prev) => ({ ...prev, [attr.id]: e.target.value }))} className="w-full px-3 py-2 bg-white rounded-xl border border-violet-200 font-bold">
-                                <option value="">— بدون —</option>
-                                {attr.values.map((opt) => <option key={opt.id} value={opt.value}>{opt.label}</option>)}
-                                {attributeValues[attr.id] && !attr.values.some((o) => o.value === attributeValues[attr.id]) && <option value={attributeValues[attr.id]}>{attributeValues[attr.id]}</option>}
-                              </select>
-                            ) : (
-                              <input value={attributeValues[attr.id] || ''} onChange={(e) => setAttributeValues((prev) => ({ ...prev, [attr.id]: e.target.value }))} className="w-full px-3 py-2 bg-white rounded-xl border border-violet-200 font-bold" />
-                            )}
-                          </Field>
-                        ))}
+                        {attributes
+                          .filter((attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId)
+                          .map((attr) => {
+                            const value = attributeValues[attr.id] || '';
+                            const options = attr.values;
+                            const update = (next: string) => setAttributeValues((previous) => ({
+                              ...previous,
+                              [attr.id]: next,
+                            }));
+                            const commonClass = 'w-full px-3 py-2 bg-white rounded-xl border border-violet-200 font-bold';
+                            let control: React.ReactNode;
+
+                            if (attr.dataType === 'BOOLEAN') {
+                              control = (
+                                <select value={value} onChange={(event) => update(event.target.value)} className={commonClass}>
+                                  <option value="">— بدون —</option>
+                                  <option value="true">نعم</option>
+                                  <option value="false">لا</option>
+                                </select>
+                              );
+                            } else if (attr.dataType === 'MULTI_SELECT' && options.length > 0) {
+                              let selected: string[] = [];
+                              try {
+                                const parsed: unknown = value ? JSON.parse(value) : [];
+                                if (Array.isArray(parsed)) selected = parsed.filter((item): item is string => typeof item === 'string');
+                              } catch {
+                                selected = value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
+                              }
+                              control = (
+                                <select
+                                  multiple
+                                  value={selected}
+                                  onChange={(event) => update(JSON.stringify(
+                                    Array.from(event.currentTarget.selectedOptions, (option) => option.value),
+                                  ))}
+                                  className={`${commonClass} min-h-24`}
+                                >
+                                  {options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}
+                                </select>
+                              );
+                            } else if (attr.dataType === 'SELECT' && options.length > 0) {
+                              control = (
+                                <select value={value} onChange={(event) => update(event.target.value)} className={commonClass}>
+                                  <option value="">— بدون —</option>
+                                  {options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}
+                                </select>
+                              );
+                            } else {
+                              const inputType = attr.dataType === 'NUMBER'
+                                ? 'number'
+                                : attr.dataType === 'DATE'
+                                  ? 'date'
+                                  : 'text';
+                              control = (
+                                <input
+                                  type={inputType}
+                                  step={inputType === 'number' ? 'any' : undefined}
+                                  value={value}
+                                  onChange={(event) => update(event.target.value)}
+                                  className={commonClass}
+                                />
+                              );
+                            }
+
+                            return (
+                              <Field key={attr.id} label={`${attr.name}${attr.isRequired ? ' *' : ''}${attr.unit ? ` (${attr.unit})` : ''}`}>
+                                {control}
+                              </Field>
+                            );
+                          })}
                       </div>
                     )}
                   </section>
@@ -1590,7 +1691,7 @@ export const ProductsView: React.FC = () => {
       )}
 
       {/* STOCK MODAL */}
-      {stockProduct && (
+      {stockProduct && canAdjustInventory && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
@@ -1641,27 +1742,27 @@ export const ProductsView: React.FC = () => {
       )}
 
       {/* IMPORT MODAL */}
-      {isImportOpen && (
+      {isImportOpen && canImportProducts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <div className="flex items-center gap-2">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><FileSpreadsheet className="w-5 h-5" /></div>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900">استيراد المنتجات من Excel</h3>
-                  <p className="text-[11px] text-slate-500">ارفع ملف Excel (.xlsx) لإنشاء الأصناف دفعة واحدة</p>
+                  <h3 className="text-base font-extrabold text-slate-900">استيراد الأصناف من جدول بيانات</h3>
+                  <p className="text-[11px] text-slate-500">ارفع ملف جدول بيانات (.xlsx) لإضافة الأصناف دفعة واحدة</p>
                 </div>
               </div>
               <button onClick={() => { setIsImportOpen(false); setImportResult(null); }} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-4 p-6 text-xs">
               <button onClick={downloadImportTemplate} className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-slate-700 hover:bg-slate-100">
-                <span className="flex items-center gap-2"><Download className="w-4 h-4 text-sky-600" /> تحميل قالب Excel جاهز</span>
+                <span className="flex items-center gap-2"><Download className="w-4 h-4 text-sky-600" /> تحميل قالب جدول بيانات جاهز</span>
                 <span className="text-[10px] text-slate-400">xlsx</span>
               </button>
               <button type="button" onClick={() => importInputRef.current?.click()} className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-sky-300 bg-sky-50/50 px-4 py-10 text-center hover:border-sky-500">
                 {isImporting ? <Loader2 className="w-8 h-8 animate-spin text-sky-600" /> : <Upload className="w-8 h-8 text-sky-500" />}
-                <span className="text-sm font-bold text-slate-700">{isImporting ? 'جاري استيراد الأصناف...' : 'اضغط لاختيار ملف Excel'}</span>
+                <span className="text-sm font-bold text-slate-700">{isImporting ? 'جارٍ استيراد الأصناف...' : 'اضغط لاختيار ملف جدول بيانات'}</span>
                 <span className="text-[10px] text-slate-500">يتم إنشاء الأنواع والماركات غير الموجودة تلقائيًا</span>
               </button>
               <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleImportFile(file); e.target.value = ''; }} />

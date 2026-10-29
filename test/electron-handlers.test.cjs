@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
+const XLSX = require('xlsx');
 const {
   registerDatabaseHandlers,
 } = require('../electron/databaseHandlers');
@@ -175,6 +176,40 @@ test('registered app and printing handlers receive their directory and size depe
         printerName: 'test-printer',
       }),
       { ok: false, error: 'حجم بيانات الطباعة يتجاوز الحد المسموح به' },
+    );
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('XLSX backup handlers create and restore password-protected Office workbooks', async () => {
+  const context = await createHandlers();
+  try {
+    const { handlers, event } = context;
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([['CeramiSys'], ['backup payload']]),
+      'Backup',
+    );
+    const plainBytes = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    const encrypted = await handlers.get('db:encrypt-xlsx-backup')(
+      event,
+      new Uint8Array(plainBytes),
+      'correct horse battery',
+    );
+
+    assert.deepEqual(Array.from(encrypted.subarray(0, 8)), [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    assert.equal(require('officecrypto-tool').isEncrypted(Buffer.from(encrypted)), true);
+    const restored = await handlers.get('db:decrypt-xlsx-backup')(
+      event,
+      encrypted,
+      'correct horse battery',
+    );
+    assert.deepEqual(Buffer.from(restored), plainBytes);
+    await assert.rejects(
+      handlers.get('db:decrypt-xlsx-backup')(event, encrypted, 'wrong password'),
+      /كلمة المرور غير صحيحة/,
     );
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });

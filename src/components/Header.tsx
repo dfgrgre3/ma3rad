@@ -55,7 +55,7 @@ export function resolvePageTitle(pathname: string): { title: string; group: stri
       closest = { title, length: path.length };
     }
   }
-  return { title: closest?.title ?? 'CeramiSys ERP', group: 'CeramiSys ERP' };
+  return { title: closest?.title ?? 'سيراميسيس', group: 'سيراميسيس' };
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -84,8 +84,8 @@ export const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('keydown', handleSearchShortcut);
   }, []);
 
-  const brandName = settings.brandName || 'CeramiSys ERP';
-  const shortName = settings.brandShortName || 'C';
+  const brandName = settings.brandName || 'سيراميسيس';
+  const shortName = settings.brandShortName === 'C' ? 'س' : settings.brandShortName || 'س';
 
   return (
     <header className="app-header win-header flex h-12 shrink-0 select-none items-center gap-2 px-2 sm:px-3">
@@ -103,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
       <NavLink to="/dashboard" className="flex min-w-0 shrink-0 items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[2px] bg-[#0078d4] text-xs font-bold text-white">
           {settings.brandLogoDataUrl ? (
-            <img src={settings.brandLogoDataUrl} alt="logo" className="h-full w-full object-cover" />
+            <img src={settings.brandLogoDataUrl} alt="الشعار" className="h-full w-full object-cover" />
           ) : (
             shortName.slice(0, 2)
           )}

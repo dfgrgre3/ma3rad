@@ -10,6 +10,7 @@ import { ProductService } from '../../services/ProductService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import type { Product } from '../../types';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/useBusinessTerm';
 
 const STATUS: Record<ProjectStatus, { label: string; color: string }> = {
   PLANNED: { label: 'قيد التخطيط', color: 'text-amber-700 bg-amber-50 border-amber-200' },
@@ -28,6 +29,8 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) 
 export const ProjectDetailPage: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const projectsLabel = useBusinessTerm('entities.projects.plural');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
   const service = new ProjectService();
   const user = AuthService.getCurrentUser();
   const canUpdate = PermissionService.can(user, 'projects.update');
@@ -155,6 +158,7 @@ export const ProjectDetailPage: React.FC = () => {
             </div>
             <div className="min-w-0">
               <h1 className="text-base font-black text-slate-900 truncate">{project.name}</h1>
+              <div className="mt-1 text-[11px] font-bold text-sky-700">{projectsLabel} · {businessProfileLabel}</div>
               <p className="text-xs text-slate-500 font-mono">{project.code} • {project.customerName}</p>
             </div>
           </div>

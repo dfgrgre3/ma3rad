@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "workshop",
+  "name": {
+    "ar": "ورشة أو خدمات تشغيل",
+    "en": "Workshop or field services"
+  },
+  "description": {
+    "ar": "خدمات ومخزون اختياري",
+    "en": "Services with optional inventory"
+  },
+  "category": "services",
+  "configuration": {
+    "businessModel": "mixed",
+    "trackInventory": true,
+    "units": [
+      "SERVICE",
+      "PIECE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "نوع الخدمة",
+      "الموديل"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "finance",
+      "operations",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "purchasing",
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "workOrdersAndTechnicianScheduling": "not-implemented"
+  }
+}

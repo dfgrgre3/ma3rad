@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { DatabaseManager } from '../src/database/db.ts';
+import { PermissionService } from '../src/services/PermissionService.ts';
 import { NavigationService } from '../src/services/NavigationService.ts';
 
 const require = createRequire(import.meta.url);
@@ -59,11 +61,65 @@ test('network printing validates byte arrays and caps their size', () => {
   assert.equal(isValidPrintBytes(new Uint8Array([0, 1]), 3), false);
 });
 
-test('route guards use the same permissions as navigation entries', () => {
-  assert.equal(NavigationService.getRequiredPermission('/sales/cycle'), 'sales.view');
-  assert.equal(NavigationService.getRequiredPermission('/purchases/returns'), 'purchases.return');
-  assert.equal(NavigationService.getRequiredPermission('/finance/installments'), 'finance.installments.view');
-  assert.equal(NavigationService.getRequiredPermission('/admin/data-deletion'), 'admin.data.delete');
-  assert.equal(NavigationService.getRequiredPermission('/products/prod-1'), 'products.view');
+test('route guards use the same permissions as navigation entries', async () => {
+  await DatabaseManager.getInstance().initialize();
+  PermissionService.seed();
+  const protectedRoutes: Array<[string, string]> = [
+    ['/sales/cycle', 'sales.view'],
+    ['/purchases/returns', 'purchases.return'],
+    ['/finance/installments', 'finance.installments.view'],
+    ['/finance/expenses', 'cashier.expense'],
+    ['/admin/data-deletion', 'admin.data.delete'],
+    ['/products/prod-1', 'products.view'],
+    ['/customers/cust-1', 'customers.view'],
+    ['/employees/documents', 'hr.documents.view'],
+    ['/inventory/transfers', 'inventory.transfer'],
+    ['/tools', 'dashboard.view'],
+  ];
+  for (const [path, permission] of protectedRoutes) {
+    assert.equal(NavigationService.getRequiredPermission(path), permission, path);
+  }
   assert.equal(NavigationService.getRequiredPermission('/unmapped-route'), null);
+  assert.deepEqual(
+    NavigationService.getRequiredPermissions('/sales/statement'),
+    ['customers.view', 'sales.view', 'finance.debts.view']
+  );
+  assert.ok(!NavigationService.getAccessibleGroups(null)
+    .flatMap((group) => group.items)
+    .some((item) => item.to === '/sales/statement'));
+});
+
+test('navigation only exposes pages granted to the current user', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  db.run(
+    'INSERT INTO roles (id, code, name) VALUES (?, ?, ?)',
+    ['role_route_visibility_test', 'ROUTE_VISIBILITY_TEST', 'اختبار إظهار الصفحات']
+  );
+  db.run(
+    'INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+    ['ROUTE_VISIBILITY_TEST', 'products.view']
+  );
+  const user = {
+    id: 'usr_route_visibility_test',
+    username: 'route_visibility_test',
+    fullName: 'اختبار الصلاحيات',
+    role: 'ROUTE_VISIBILITY_TEST',
+    phone: null,
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+
+  try {
+    PermissionService.invalidate(user);
+    const groups = NavigationService.getAccessibleGroups(user);
+    const paths = groups.flatMap((group) => group.items.map((item) => item.to));
+    assert.deepEqual(paths, ['/products', '/products/attributes', '/products/barcodes']);
+    assert.equal(NavigationService.getFirstAccessiblePath(user), '/products');
+  } finally {
+    PermissionService.invalidate(user);
+    db.run('DELETE FROM roles WHERE code = ?', ['ROUTE_VISIBILITY_TEST']);
+  }
 });

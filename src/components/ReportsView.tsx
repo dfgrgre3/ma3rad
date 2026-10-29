@@ -187,10 +187,10 @@ export const ReportsView: React.FC = () => {
 
       <div className="flex items-center justify-end gap-2">
         <button onClick={() => handleExport('excel')} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition">
-          <FileSpreadsheet className="w-4 h-4" /> تصدير Excel
+          <FileSpreadsheet className="w-4 h-4" /> تصدير جدول بيانات
         </button>
         <button onClick={() => handleExport('pdf')} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition">
-          <FileDown className="w-4 h-4" /> تصدير PDF
+          <FileDown className="w-4 h-4" /> تصدير مستند
         </button>
       </div>
 

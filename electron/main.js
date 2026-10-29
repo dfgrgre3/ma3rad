@@ -89,7 +89,7 @@ function createWindow() {
     height: 768,
     minWidth: 480,
     minHeight: 560,
-    title: 'CeramiSys ERP - نظام إدارة معرض السيراميك ومواد التشطيب',
+    title: 'سيراميسيس - نظام إدارة معرض السيراميك ومواد التشطيب',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

@@ -3,6 +3,8 @@ import { SettingsService } from './SettingsService';
 import { PermissionService } from './PermissionService';
 import { AuthService } from './AuthService';
 import type { User } from '../types';
+import { resolveBusinessTerm, type BusinessTermKey } from '../config/businessTerminology';
+import { TerminologyService } from './TerminologyService';
 
 export interface NavOverrides {
   hidden: string[];
@@ -21,19 +23,45 @@ function parseJson<T>(raw: string | undefined, fallback: T): T {
 }
 
 export class NavigationService {
-  private static readonly routePermissions: Array<[string, string]> = [
-    ['/admin/data-deletion', 'admin.data.delete'],
-    ['/admin/sync-conflicts', 'admin.view'],
-    ['/data-import/types', 'settings.view'],
-    ['/finance/debts', 'finance.debts.view'],
-    ['/crm', 'crm.view'],
-    ['/dashboard/executive', 'dashboard.view'],
+  private static readonly groupTerms: Partial<Record<string, BusinessTermKey>> = {
+    sales: 'modules.sales',
+    inventory: 'modules.inventory',
+    products: 'entities.products.plural',
+    crm: 'entities.customers.plural',
+    purchasing: 'modules.purchasing',
+    operations: 'modules.operations',
+    reports: 'modules.reports',
+  };
+
+  private static readonly pathTerms: Partial<Record<string, BusinessTermKey>> = {
+    '/customers': 'entities.customers.plural',
+    '/products': 'entities.products.plural',
+    '/suppliers': 'entities.suppliers.plural',
+    '/inventory': 'modules.inventory',
+    '/sales': 'documents.salesInvoices',
+  };
+
+  private static readonly routePermissions: Array<[string, string[]]> = [
+    ['/admin/data-deletion', ['admin.data.delete']],
+    ['/admin/sync-conflicts', ['admin.view']],
+    ['/data-import/types', ['settings.view']],
+    ['/finance/debts', ['finance.debts.view']],
+    ['/crm', ['crm.view']],
+    ['/dashboard/executive', ['dashboard.view']],
+    ['/tools', ['dashboard.view']],
   ];
 
   public static getRequiredPermission(pathname: string): string | null {
+    return NavigationService.getRequiredPermissions(pathname)?.[0] ?? null;
+  }
+
+  public static getRequiredPermissions(pathname: string): string[] | null {
     const routes = [
       ...NAV_GROUPS.flatMap((group) =>
-        group.items.flatMap((item) => item.perm ? [[item.to, item.perm] as [string, string]] : [])
+        group.items.flatMap((item) => {
+          const permissions = [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])];
+          return permissions.length ? [[item.to, permissions] as [string, string[]]] : [];
+        })
       ),
       ...NavigationService.routePermissions,
     ];
@@ -57,16 +85,44 @@ export class NavigationService {
     return NavigationService.merge(NavigationService.getOverrides());
   }
 
+  public static getAccessibleGroups(user: User | null): NavGroupDef[] {
+    return NavigationService.getGroups()
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])]
+            .every((permission) => PermissionService.can(user, permission))
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }
+
+  public static getFirstAccessiblePath(user: User | null): string | null {
+    return NavigationService.getAccessibleGroups(user)[0]?.items[0]?.to ?? null;
+  }
+
   public static merge(source: NavOverrides): NavGroupDef[] {
     const { hidden, labels, groupsOrder, itemsOrder } = source;
     const hiddenSet = new Set(hidden);
+    const businessType = SettingsService.getValue('businessType') || 'ceramics';
+    const termOverrides = TerminologyService.getOverrides();
+    const term = (key: BusinessTermKey) => resolveBusinessTerm(key, {
+      businessType,
+      language: 'ar',
+      overrides: termOverrides,
+    });
 
     const merged = NAV_GROUPS.map((group) => {
       const order = itemsOrder[group.id] || [];
       const rank = new Map(order.map((path, index) => [path, index]));
       const items = group.items
         .filter((item) => !hiddenSet.has(item.to))
-        .map((item) => ({ ...item, label: labels[item.to] || item.label }))
+        .map((item) => ({
+          ...item,
+          label: labels[item.to] || (NavigationService.pathTerms[item.to]
+            ? term(NavigationService.pathTerms[item.to]!)
+            : item.label),
+        }))
         .sort((a, b) => {
           const ra = rank.has(a.to) ? rank.get(a.to)! : 9999;
           const rb = rank.has(b.to) ? rank.get(b.to)! : 9999;
@@ -74,7 +130,10 @@ export class NavigationService {
         });
       return {
         ...group,
-        label: labels[`group:${group.id}`] || group.label,
+        label: labels[`group:${group.id}`]
+          || (NavigationService.groupTerms[group.id]
+            ? term(NavigationService.groupTerms[group.id]!)
+            : group.label),
         items,
       };
     });
@@ -109,9 +168,15 @@ export class NavigationService {
     NavigationService.saveOverrides({ hidden: [], labels: {}, groupsOrder: [], itemsOrder: {} }, actor);
   }
 
-  public static getFlatItems(): { groupId: string; label: string; to: string; perm?: string }[] {
+  public static getFlatItems(): { groupId: string; label: string; to: string; perm?: string; perms?: string[] }[] {
     return NavigationService.getGroups().flatMap((group) =>
-      group.items.map((item) => ({ groupId: group.id, label: item.label, to: item.to, perm: item.perm }))
+      group.items.map((item) => ({
+        groupId: group.id,
+        label: item.label,
+        to: item.to,
+        perm: item.perm,
+        perms: item.perms,
+      }))
     );
   }
 }

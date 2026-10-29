@@ -633,7 +633,7 @@ export const WarehouseLocationsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="text-[10px] text-slate-400">CeramiSys ERP • Shelf Location Label</div>
+              <div className="text-[10px] text-slate-400">سيراميسيس • ملصق موقع الرف</div>
             </div>
 
             <div className="flex gap-2 justify-center">

@@ -5,6 +5,7 @@ export interface CreateSaleDTO {
   warehouseId: string;
   shiftId?: string;
   orderId?: string;
+  restaurantOrderId?: string;
   projectId?: string;
   items: {
     productId: string;

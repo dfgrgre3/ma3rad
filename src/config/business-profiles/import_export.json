@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "import_export",
+  "name": {
+    "ar": "الاستيراد والتصدير",
+    "en": "Import and export"
+  },
+  "description": {
+    "ar": "مشتريات ومبيعات ومخزون وإعدادات عملات",
+    "en": "Purchasing, sales, inventory and currency settings"
+  },
+  "category": "trade",
+  "configuration": {
+    "businessModel": "mixed",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "TON",
+      "LITER",
+      "BOX",
+      "PACK"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "بلد المنشأ",
+      "رمز التصنيف",
+      "نوع التعبئة"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "operations"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "customsAndLandedCostWorkflows": "not-implemented",
+    "multiCurrencyTradeProcessing": "not-implemented"
+  }
+}

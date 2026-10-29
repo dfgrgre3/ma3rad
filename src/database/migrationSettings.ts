@@ -29,8 +29,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   maxFailedLoginAttempts: '5',
 
   // Branding & appearance — controlled from the Admin Control Center.
-  brandName: 'CeramiSys ERP',
-  brandShortName: 'C',
+  brandName: 'سيراميسيس',
+  brandShortName: 'س',
   brandLogoDataUrl: '',
   brandPrimaryColor: '#0284c7',
   brandAccentColor: '#4f46e5',
@@ -39,6 +39,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   showBrandText: '1',
   sidebarStyle: 'default',
   navigationLayout: 'sidebar',
+  businessTerminologyOverrides: '{}',
 };
 
 // Keys added after the original settings backfill. Migration 012 inserts any
@@ -46,7 +47,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
 export const EXTENDED_SETTINGS_KEYS = [
   'brandName', 'brandShortName', 'brandLogoDataUrl', 'brandPrimaryColor',
   'brandAccentColor', 'themeMode', 'fontFamily', 'showBrandText', 'sidebarStyle',
-  'navigationLayout',
+  'navigationLayout', 'businessTerminologyOverrides',
 ];
 
 export const DEFAULT_BRANCH_ID = 'br_main';

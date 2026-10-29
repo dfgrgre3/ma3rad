@@ -5,6 +5,8 @@ import { getProductUnitLabel } from '../../../utils/productUnits';
 import { TABS, GRADE_LABELS, Tab } from './constants';
 import { fmt } from './format';
 import { StockSummary } from './types';
+import { usePermission } from '../../../hooks/usePermission';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/useBusinessTerm';
 
 interface ProductDetailHeaderProps {
   product: Product;
@@ -17,6 +19,11 @@ interface ProductDetailHeaderProps {
 }
 
 export const ProductDetailHeader: React.FC<ProductDetailHeaderProps> = ({ product, stock, canEdit, tab, onTabChange, onBack, onEdit }) => {
+  const can = usePermission();
+  const canViewInventory = can('inventory.view');
+  const productsLabel = useBusinessTerm('entities.products.plural');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
+
   return (
     <div className="bg-white border-b border-slate-200 px-6 py-4">
       <div className="flex items-start justify-between gap-4">
@@ -31,6 +38,7 @@ export const ProductDetailHeader: React.FC<ProductDetailHeaderProps> = ({ produc
               {product.productType !== 'GENERAL' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 font-bold">{GRADE_LABELS[product.grade] || product.grade}</span>}
             </div>
             <h1 className="text-lg font-black text-slate-900">{product.name}</h1>
+            <div className="mt-1 text-[11px] font-bold text-sky-700">{productsLabel} · {businessProfileLabel}</div>
             <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
               <span>#{product.sku}</span>
               <span>باركود: {product.barcode}</span>
@@ -40,15 +48,15 @@ export const ProductDetailHeader: React.FC<ProductDetailHeaderProps> = ({ produc
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <div className="text-center px-3 py-2 bg-slate-100 rounded-xl">
+          {canViewInventory && <div className="text-center px-3 py-2 bg-slate-100 rounded-xl">
             <div className="text-base font-black text-sky-600">{fmt(stock.totalM2)}</div>
             <div className="text-[10px] text-slate-500">{product.productType === 'GENERAL' ? `${getProductUnitLabel(product)} متاح` : 'م² متاح'}</div>
-          </div>
-          {product.productType !== 'GENERAL' && <div className="text-center px-3 py-2 bg-slate-100 rounded-xl">
+          </div>}
+          {canViewInventory && product.productType !== 'GENERAL' && <div className="text-center px-3 py-2 bg-slate-100 rounded-xl">
             <div className="text-base font-black text-slate-700">{fmt(stock.totalBoxes)}</div>
             <div className="text-[10px] text-slate-500">كرتونة</div>
           </div>}
-          {product.productType !== 'GENERAL' && <div className="text-center px-3 py-2 bg-slate-100 rounded-xl">
+          {canViewInventory && product.productType !== 'GENERAL' && <div className="text-center px-3 py-2 bg-slate-100 rounded-xl">
             <div className="text-base font-black text-slate-700">{fmt(stock.totalPieces)}</div>
             <div className="text-[10px] text-slate-500">قطعة</div>
           </div>}
@@ -61,7 +69,16 @@ export const ProductDetailHeader: React.FC<ProductDetailHeaderProps> = ({ produc
       </div>
 
       <div className="flex gap-1 mt-4 overflow-x-auto">
-        {TABS.filter((t) => t.id !== 'batches' || product.productType !== 'GENERAL').map((t) => {
+        {TABS.filter((t) => {
+          if (t.id === 'batches' && product.productType === 'GENERAL') return false;
+          if ((t.id === 'batches' || t.id === 'inventory' || t.id === 'history') && !canViewInventory) return false;
+          if (t.id === 'sales' && !can('sales.view')) return false;
+          if (t.id === 'purchases' && !can('purchases.view')) return false;
+          if (t.id === 'pricing' && !can('pricing.view')) return false;
+          if (t.id === 'documents' && !can('documents.view')) return false;
+          if (t.id === 'activity' && !can('audit.view')) return false;
+          return true;
+        }).map((t) => {
           const Icon = t.icon;
           return (
             <button key={t.id} onClick={() => onTabChange(t.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${tab === t.id ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}>

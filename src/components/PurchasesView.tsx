@@ -11,9 +11,12 @@ import { ProductService } from '../services/ProductService';
 import { InventoryService } from '../services/InventoryService';
 import { ProcurementService } from '../services/ProcurementService';
 import { PurchaseOrderService } from '../services/PurchaseOrderService';
+import { AuthService } from '../services/AuthService';
+import { PermissionService } from '../services/PermissionService';
 import { PurchaseInvoice, Supplier, Product, Warehouse, PaymentType } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
+import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -23,12 +26,16 @@ const getBoxesCount = (product: Product | undefined, quantity: number): number =
 };
 
 export const PurchasesView: React.FC = () => {
+  const purchasingLabel = useBusinessTerm('modules.purchasing');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
   const purchaseService = useMemo(() => new PurchaseService(), []);
   const supplierService = useMemo(() => new SupplierService(), []);
   const productService = useMemo(() => new ProductService(), []);
   const inventoryService = useMemo(() => new InventoryService(), []);
   const procurementService = useMemo(() => new ProcurementService(), []);
   const poService = useMemo(() => new PurchaseOrderService(), []);
+  const currentUser = AuthService.getCurrentUser();
+  const canCreatePurchase = PermissionService.can(currentUser, 'purchases.create');
 
   const [purchases, setPurchases] = useState<PurchaseInvoice[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -207,18 +214,21 @@ export const PurchasesView: React.FC = () => {
             <Truck className="w-6 h-6 text-orange-600" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-slate-900">فواتير المشتريات وتكاليف الوصول (Landed Cost)</h2>
+            <h2 className="text-lg font-black text-slate-900">
+              فواتير {purchasingLabel} وتكاليف الوصول (Landed Cost)
+              <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
+            </h2>
             <p className="text-xs text-slate-500 font-medium">تسجيل فواتير المصانع، توزيع مصاريف النقل والتفريغ، والمطابقة مع أوامر الشراء وأذونات الاستلام</p>
           </div>
         </div>
 
-        <button
+        {canCreatePurchase && <button
           onClick={() => setIsModalOpen(true)}
           className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-md shadow-orange-600/20 transition text-sm shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>فاتورة توريد / مشتريات جديدة</span>
-        </button>
+        </button>}
       </div>
 
       {/* Filter Bar */}
@@ -355,7 +365,7 @@ export const PurchasesView: React.FC = () => {
       </div>
 
       {/* Modal: Create Purchase Invoice with Landed Cost & Matching */}
-      {isModalOpen && (
+      {isModalOpen && canCreatePurchase && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
@@ -464,7 +474,7 @@ export const PurchasesView: React.FC = () => {
               <div className="border border-slate-200 rounded-xl overflow-hidden">
                 <div className="bg-slate-100 p-2.5 font-black text-slate-800 flex justify-between items-center">
                   <span>أصناف الفاتورة والكميات:</span>
-                  <button
+                  {canCreatePurchase && <button
                     type="button"
                     onClick={() => {
                       const product = products[0];
@@ -477,7 +487,7 @@ export const PurchasesView: React.FC = () => {
                     className="text-xs text-orange-600 hover:underline font-bold"
                   >
                     + إضافة صنف آخر
-                  </button>
+                  </button>}
                 </div>
                 <div className="divide-y divide-slate-100 p-2">
                   {dto.items.map((it, idx) => {
@@ -539,7 +549,7 @@ export const PurchasesView: React.FC = () => {
                       <div className="w-28 text-left font-black text-slate-800">
                         {fmt(it.quantityM2 * it.unitCost)}
                       </div>
-                      {dto.items.length > 1 && (
+                      {canCreatePurchase && dto.items.length > 1 && (
                         <button
                           type="button"
                           onClick={() => setDto({ ...dto, items: dto.items.filter((_, i) => i !== idx) })}

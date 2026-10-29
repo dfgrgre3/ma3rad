@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "restaurant",
+  "name": {
+    "ar": "مطعم أو كافيه",
+    "en": "Restaurant or cafe"
+  },
+  "description": {
+    "ar": "طلبات الطاولات والمطبخ والوصفات والمخزون",
+    "en": "Table service, kitchen orders, recipes and inventory"
+  },
+  "category": "food-service",
+  "configuration": {
+    "businessModel": "mixed",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "LITER",
+      "SERVICE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "نوع الوجبة",
+      "حجم الحصة",
+      "مستوى الحدة",
+      "النظام الغذائي",
+      "مسببات الحساسية",
+      "مدة التحضير"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "operations",
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "restaurant-table-and-kitchen-implemented; other-industry-workflows-not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "recipesAndMenuManagement": "implemented-with-manufacturing-bom",
+    "branchScopedRestaurantMenu": "implemented",
+    "tableAndKitchenOrderManagement": "implemented",
+    "recipeIngredientStockConsumption": "implemented-through-production-orders",
+    "restaurantInvoiceLinking": "implemented"
+  }
+}

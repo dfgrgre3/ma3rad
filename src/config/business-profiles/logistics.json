@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "logistics",
+  "name": {
+    "ar": "الخدمات اللوجستية والنقل",
+    "en": "Logistics and transportation"
+  },
+  "description": {
+    "ar": "خدمات تشغيل وتوصيل وقوى عاملة",
+    "en": "Service operations, deliveries and workforce"
+  },
+  "category": "services",
+  "configuration": {
+    "businessModel": "services",
+    "trackInventory": false,
+    "units": [
+      "SERVICE",
+      "METER"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "نوع الخدمة",
+      "نوع الشحنة",
+      "منطقة التغطية"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "customers",
+      "finance",
+      "operations",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr"
+    ],
+    "optional": [
+      "inventory",
+      "purchasing",
+      "manufacturing"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "deliveryModule": "available",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "routeAndFleetOptimization": "not-implemented"
+  }
+}

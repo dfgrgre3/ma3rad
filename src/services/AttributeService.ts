@@ -2,14 +2,17 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import type { DynamicAttributeDataType } from './dynamicAttributes';
 
 export interface AttributeCategory {
   id: string;
   code: string;
   name: string;
-  dataType: string;
+  dataType: DynamicAttributeDataType;
   unit?: string | null;
+  isRequired: boolean;
   isFilterable: boolean;
+  appliesToCategoryId?: string | null;
   values: Array<{ id: string; value: string; label: string }>;
 }
 
@@ -25,7 +28,9 @@ export class AttributeService {
       name: a.name,
       dataType: a.dataType,
       unit: a.unit,
+      isRequired: Boolean(a.isRequired),
       isFilterable: Boolean(a.isFilterable),
+      appliesToCategoryId: a.appliesToCategoryId || null,
       values: options
         .filter((o) => o.attributeId === a.id)
         .map((o) => ({ id: o.id, value: o.value, label: o.label })),
@@ -62,15 +67,46 @@ export class AttributeService {
     this.db.run(`DELETE FROM attribute_options WHERE id = ?`, [optionId]);
   }
 
-  public addCategory(input: { name: string; code: string; dataType?: string; unit?: string }): void {
+  public addCategory(input: {
+    name: string;
+    code: string;
+    dataType?: DynamicAttributeDataType;
+    unit?: string;
+    isRequired?: boolean;
+    isFilterable?: boolean;
+    options?: string[];
+  }): void {
     PermissionService.require(AuthService.requireAuth(), 'products.create');
-    if (!input.name.trim() || !input.code.trim()) throw new Error('اسم ورمز الخاصية مطلوبان.');
+    const name = input.name.trim();
+    const code = input.code.trim();
+    if (!name || !code) throw new Error('اسم ورمز الخاصية مطلوبان.');
+    const dataType = input.dataType || 'SELECT';
+    const validDataTypes = new Set<DynamicAttributeDataType>([
+      'TEXT', 'NUMBER', 'BOOLEAN', 'SELECT', 'MULTI_SELECT', 'DATE',
+    ]);
+    if (!validDataTypes.has(dataType)) throw new Error('نوع بيانات الخاصية غير مدعوم.');
+    if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(code)) throw new Error('رمز الخاصية يجب أن يحتوي أحرفًا إنجليزية كبيرة وأرقامًا وشرطة سفلية فقط.');
+    const options = [...new Set((input.options || []).map((value) => value.trim()).filter(Boolean))];
+    if (options.length > 0 && !['SELECT', 'MULTI_SELECT'].includes(dataType)) {
+      throw new Error('القيم الاختيارية متاحة فقط لحقول الاختيار.');
+    }
     const dup = this.db.query(`SELECT id FROM attributes WHERE code = ?`, [input.code.trim()])[0];
     if (dup) throw new Error('رمز الخاصية مستخدم بالفعل.');
-    this.db.run(
-      `INSERT INTO attributes (id, code, name, data_type, unit, is_filterable, sort_order)
-       VALUES (?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM attributes))`,
-      [`attr_${uuidv4().substring(0, 8)}`, input.code.trim(), input.name.trim(), input.dataType || 'SELECT', input.unit || null]
-    );
+    const id = `attr_${uuidv4().substring(0, 8)}`;
+    this.db.executeTransaction((tx) => {
+      tx.run(
+        `INSERT INTO attributes
+          (id, code, name, data_type, unit, is_required, is_filterable, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM attributes))`,
+        [id, code, name, dataType, input.unit?.trim() || null, input.isRequired ? 1 : 0, input.isFilterable === false ? 0 : 1]
+      );
+      options.forEach((value, index) => {
+        tx.run(
+          `INSERT INTO attribute_options (id, attribute_id, value, label, sort_order)
+           VALUES (?, ?, ?, ?, ?)`,
+          [`attr_opt_${uuidv4().substring(0, 8)}`, id, value, value, index]
+        );
+      });
+    });
   }
 }

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "clothing",
+  "name": {
+    "ar": "ملابس وأحذية",
+    "en": "Clothing and footwear"
+  },
+  "description": {
+    "ar": "مقاسات وألوان وموديلات وبيع بالتجزئة",
+    "en": "Sizes, colors, styles and retail sales"
+  },
+  "category": "retail",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "PIECE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "المقاس",
+      "اللون",
+      "الموديل"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "operations",
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

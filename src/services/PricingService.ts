@@ -207,6 +207,7 @@ export class PricingService {
   }
 
   public getCustomerOverrides(customerId: string): Array<{ id: string; productId: string; productName: string; priceM2: number; validFrom?: string | null; validTo?: string | null }> {
+    PermissionService.require(AuthService.requireAuth(), 'pricing.view');
     return this.db.query(
       `SELECT o.id, o.product_id AS productId, p.name AS productName, o.price_m2 AS priceM2,
               o.valid_from AS validFrom, o.valid_to AS validTo

@@ -16,7 +16,11 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 export const SupplierStatementPage: React.FC = () => {
   const service = useMemo(() => new SupplierService(), []);
   const toast = useToast();
-  const canUpdate = PermissionService.can(AuthService.getCurrentUser(), 'suppliers.payment');
+  const currentUser = AuthService.getCurrentUser();
+  const canUpdate = PermissionService.can(currentUser, 'suppliers.payment')
+    && PermissionService.can(currentUser, 'finance.debts.view');
+  const canExport = PermissionService.can(currentUser, 'suppliers.export')
+    && PermissionService.can(currentUser, 'finance.debts.view');
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -69,6 +73,7 @@ export const SupplierStatementPage: React.FC = () => {
   const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId);
 
   const handleExport = (type: 'excel' | 'pdf') => {
+    if (!canExport) return;
     if (!statementData || !selectedSupplier) return;
     const title = `كشف حساب المورد: ${selectedSupplier.name}`;
     const columns = [
@@ -93,6 +98,7 @@ export const SupplierStatementPage: React.FC = () => {
   };
 
   const handleOpenReallocate = (pay: any) => {
+    if (!canUpdate) return;
     setSelectedPayment(pay);
     const draft: Record<string, number> = {};
     for (const al of pay.allocations || []) {
@@ -104,7 +110,7 @@ export const SupplierStatementPage: React.FC = () => {
 
   const handleSaveReallocation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPayment) return;
+    if (!canUpdate || !selectedPayment) return;
 
     const allocations = Object.entries(allocDraft)
       .map(([purchaseInvoiceId, amount]) => ({ purchaseInvoiceId, amount: Number(amount) }))
@@ -135,18 +141,18 @@ export const SupplierStatementPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
+          {canExport && <button
             onClick={() => handleExport('excel')}
             className="px-3 py-2 bg-emerald-700 text-white rounded-xl text-xs font-bold hover:bg-emerald-800 transition"
           >
-            تصدير Excel
-          </button>
-          <button
+            تصدير جدول بيانات
+          </button>}
+          {canExport && <button
             onClick={() => handleExport('pdf')}
             className="px-3 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition flex items-center gap-1.5"
           >
-            <Printer className="w-3.5 h-3.5" /> طباعة / PDF
-          </button>
+            <Printer className="w-3.5 h-3.5" /> طباعة / مستند
+          </button>}
         </div>
       </header>
 

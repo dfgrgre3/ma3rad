@@ -86,7 +86,7 @@ export const VehiclesPage: React.FC = () => {
       <div className="p-4 bg-white border-b border-slate-200">
         <form onSubmit={(e) => { e.preventDefault(); load(search); }} className="relative">
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم اللوحة أو الماركة ثم Enter..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم اللوحة أو الماركة ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400" />
         </form>
       </div>
 

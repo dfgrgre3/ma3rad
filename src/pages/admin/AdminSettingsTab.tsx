@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check,
+  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History,
 } from 'lucide-react';
 import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
@@ -9,8 +9,11 @@ import { useToast } from '../../components/ui/Toast';
 import type { SystemSettings } from '../../types';
 import {
   BUSINESS_MODULES,
+  BUSINESS_ACTIVITY_FAMILY_OPTIONS,
   BUSINESS_TYPES,
   BUSINESS_UNITS,
+  getActivityModuleIds,
+  getBusinessProfile,
   getDefaultBusinessConfiguration,
   parseBusinessConfiguration,
   parseEnabledModules,
@@ -20,6 +23,18 @@ import { ModuleRegistryService } from '../../services/ModuleRegistryService';
 import { BusinessProfileService } from '../../services/BusinessProfileService';
 import { CompaniesPanel } from '../../components/CompaniesPanel';
 import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../../config/moduleRegistry';
+import {
+  BUSINESS_TERMINOLOGY,
+  BUSINESS_TERM_KEYS,
+  resolveBusinessTerm,
+  type BusinessTermKey,
+  type BusinessTermOverrides,
+} from '../../config/businessTerminology';
+import { TerminologyService } from '../../services/TerminologyService';
+import {
+  ConfigurationVersionService,
+  type ActivityConfigurationVersion,
+} from '../../services/ConfigurationVersionService';
 
 const inputCls =
   'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
@@ -45,13 +60,38 @@ export const AdminSettingsTab: React.FC = () => {
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
   const [businessProfile, setBusinessProfile] = useState(readBusinessProfile);
   const [businessConfig, setBusinessConfig] = useState(readBusinessConfiguration);
+  const [terminologyOverrides, setTerminologyOverrides] = useState<BusinessTermOverrides>(
+    () => TerminologyService.getOverrides(),
+  );
   const [dirty, setDirty] = useState(false);
+  const [activitySearch, setActivitySearch] = useState('');
+  const [activityFamily, setActivityFamily] = useState('all');
+  const canViewConfigHistory = can('audit.view');
+  const [configurationVersions, setConfigurationVersions] = useState<ActivityConfigurationVersion[]>([]);
+  const [configurationHistoryError, setConfigurationHistoryError] = useState<string | null>(null);
+  const [compareVersionIds, setCompareVersionIds] = useState<[string, string]>(['', '']);
 
   useEffect(() => {
     setSettings(SettingsService.getSettings());
     setBusinessProfile(readBusinessProfile());
     setBusinessConfig(readBusinessConfiguration());
+    setTerminologyOverrides(TerminologyService.getOverrides());
   }, []);
+
+  useEffect(() => {
+    if (tab !== 'business' || !canViewConfigHistory) return;
+    try {
+      const versions = ConfigurationVersionService.getVersions();
+      setConfigurationVersions(versions);
+      setCompareVersionIds((current) => [
+        versions.some((version) => version.id === current[0]) ? current[0] : versions[0]?.id || '',
+        versions.some((version) => version.id === current[1]) ? current[1] : versions[1]?.id || versions[0]?.id || '',
+      ]);
+      setConfigurationHistoryError(null);
+    } catch (error) {
+      setConfigurationHistoryError(error instanceof Error ? error.message : String(error));
+    }
+  }, [tab, canViewConfigHistory]);
 
   const set = <K extends keyof SystemSettings>(key: K, value: SystemSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -78,6 +118,7 @@ export const AdminSettingsTab: React.FC = () => {
         return;
       }
       const enabledModules = moduleValidation.enabled;
+      const validatedTerminology = TerminologyService.validateOverrides(terminologyOverrides);
       const currentModules = ModuleRegistryService.getEnabledModuleIds();
       for (const removed of currentModules.filter((id) => !enabledModules.includes(id))) {
         const blocker = ModuleRegistryService.getDeactivationBlocker(removed, enabledModules);
@@ -100,10 +141,15 @@ export const AdminSettingsTab: React.FC = () => {
         businessType: businessProfile.type,
         businessTypeLabel,
         businessProfileConfig: JSON.stringify({ ...businessConfig, businessType: businessProfile.type }),
+        businessTerminologyOverrides: JSON.stringify(validatedTerminology),
       }, actor);
       // Applying a profile also creates its declared product attributes; this is
       // additive and never removes manually created attributes.
       BusinessProfileService.applyFromSettings();
+      ConfigurationVersionService.recordCurrent('تحديث من إعدادات النشاط', actor);
+      if (canViewConfigHistory) {
+        setConfigurationVersions(ConfigurationVersionService.getVersions());
+      }
       setSettings(next);
       setBusinessProfile((current) => ({ ...current, enabledModules }));
       setDirty(false);
@@ -118,21 +164,59 @@ export const AdminSettingsTab: React.FC = () => {
     setSettings(SettingsService.getSettings());
     setBusinessProfile(readBusinessProfile());
     setBusinessConfig(readBusinessConfiguration());
+    setTerminologyOverrides(TerminologyService.getOverrides());
     setDirty(false);
   };
 
   const selectBusinessType = (type: string) => {
+    if (type === businessProfile.type) return;
     setBusinessProfile((current) => ({
       ...current,
       type,
       enabledModules: parseEnabledModules(undefined, type),
+      additionalActivityIds: [],
     }));
     setBusinessConfig(getDefaultBusinessConfiguration(type));
     setDirty(true);
   };
 
+  const toggleAdditionalActivity = (activityId: string, enabled: boolean) => {
+    const additionalActivityIds = enabled
+      ? [...new Set([...businessProfile.additionalActivityIds, activityId])]
+      : businessProfile.additionalActivityIds.filter((id) => id !== activityId);
+    const defaults = getDefaultBusinessConfiguration(businessProfile.type, additionalActivityIds);
+    setBusinessConfig((current) => ({
+      ...defaults,
+      businessModel: current.businessModel === 'mixed' || defaults.businessModel === 'mixed'
+        ? 'mixed'
+        : current.businessModel,
+      trackInventory: current.trackInventory || defaults.trackInventory,
+      units: [...new Set([...current.units, ...defaults.units])],
+      customUnits: [...new Set([...current.customUnits, ...defaults.customUnits])],
+      productAttributes: [...new Set([...current.productAttributes, ...defaults.productAttributes])],
+    }));
+    setBusinessProfile((current) => ({
+      ...current,
+      additionalActivityIds,
+      enabledModules: enabled
+        ? [...new Set([...current.enabledModules, ...getActivityModuleIds(current.type, additionalActivityIds)])]
+        : current.enabledModules,
+    }));
+    setDirty(true);
+  };
+
   const updateBusinessConfig = (patch: Partial<BusinessConfiguration>) => {
     setBusinessConfig((current) => ({ ...current, ...patch }));
+    setDirty(true);
+  };
+
+  const updateTermOverride = (key: BusinessTermKey, value: string) => {
+    setTerminologyOverrides((current) => {
+      const arabic = { ...current.ar };
+      if (value.trim()) arabic[key] = value;
+      else delete arabic[key];
+      return { ...current, ar: arabic };
+    });
     setDirty(true);
   };
 
@@ -145,6 +229,36 @@ export const AdminSettingsTab: React.FC = () => {
         : current.enabledModules.filter((module) => module !== 'inventory'),
     }));
   };
+
+  const visibleBusinessTypes = useMemo(() => {
+    const query = activitySearch.trim().toLocaleLowerCase('ar');
+    return BUSINESS_TYPES.filter((type) =>
+      (activityFamily === 'all' || type.category === activityFamily)
+      && (!query
+        || type.label.toLocaleLowerCase('ar').includes(query)
+        || type.description.toLocaleLowerCase('ar').includes(query)
+        || type.familyLabel.toLocaleLowerCase('ar').includes(query))
+    );
+  }, [activityFamily, activitySearch]);
+
+  const restoreConfigurationForReview = (version: ActivityConfigurationVersion) => {
+    const snapshot = version.snapshot;
+    setBusinessProfile({
+      type: snapshot.businessType,
+      customName: snapshot.businessTypeLabel,
+      enabledModules: [...snapshot.enabledModules],
+      additionalActivityIds: [...snapshot.configuration.additionalActivityIds],
+    });
+    setBusinessConfig(snapshot.configuration);
+    setTerminologyOverrides(snapshot.terminologyOverrides);
+    setDirty(true);
+    setTab('business');
+    toast.info(`تم تحميل الإصدار ${version.version} للمراجعة. لن تُطبّق التغييرات حتى تضغط «حفظ التغييرات».`);
+  };
+
+  const comparedVersions = compareVersionIds.map((id) =>
+    configurationVersions.find((version) => version.id === id)
+  );
 
   const toggleBusinessModule = (moduleId: string) => {
     const definition = getModuleDefinition(moduleId);
@@ -253,23 +367,76 @@ export const AdminSettingsTab: React.FC = () => {
                 غيّر نوع النشاط والوحدات الظاهرة في القائمة في أي وقت. إخفاء الوحدة لا يحذف بياناتها.
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {BUSINESS_TYPES.map((type) => (
-                <button
-                  key={type.id}
-                  type="button"
-                  onClick={() => selectBusinessType(type.id)}
-                  className={`rounded-xl border p-3 text-right transition ${
-                    businessProfile.type === type.id
-                      ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-500/10'
-                      : 'border-slate-200 hover:border-sky-300 dark:border-slate-700'
-                  }`}
-                >
-                  <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">{type.label}</span>
-                  <span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{type.description}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_14rem]">
+              <input
+                type="search"
+                aria-label="البحث في الأنشطة"
+                value={activitySearch}
+                onChange={(event) => setActivitySearch(event.target.value)}
+                placeholder="ابحث باسم النشاط أو عائلته..."
+                className={inputCls}
+              />
+              <select
+                aria-label="تصنيف النشاط"
+                value={activityFamily}
+                onChange={(event) => setActivityFamily(event.target.value)}
+                className={inputCls}
+              >
+                <option value="all">جميع عائلات الأنشطة</option>
+                {BUSINESS_ACTIVITY_FAMILY_OPTIONS.map((family) => (
+                  <option key={family.id} value={family.id}>{family.label}</option>
+                ))}
+              </select>
             </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400" aria-live="polite">
+              {visibleBusinessTypes.length} نشاط متاح. اختيار النشاط هنا لا يحذف أو يحوّل السجلات السابقة.
+            </p>
+            {visibleBusinessTypes.length === 0 ? (
+              <p className="rounded-lg border border-slate-200 p-4 text-center text-xs text-slate-500">لا توجد أنشطة تطابق البحث.</p>
+            ) : (
+              <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                {visibleBusinessTypes.map((type) => {
+                  const isPrimary = businessProfile.type === type.id;
+                  const isAdditional = businessProfile.additionalActivityIds.includes(type.id);
+                  return (
+                    <article
+                      key={type.id}
+                      className={`rounded-xl border p-3 transition ${
+                        isPrimary
+                          ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-500/10'
+                          : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => selectBusinessType(type.id)}
+                        aria-pressed={isPrimary}
+                        className="w-full text-right"
+                      >
+                        <span className="mb-1 block text-[9px] font-semibold text-sky-700 dark:text-sky-300">{type.familyLabel}</span>
+                        <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">{type.label}</span>
+                        <span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{type.description}</span>
+                      </button>
+                      <label className="mt-2 flex items-center gap-2 border-t border-slate-200 pt-2 text-[10px] font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={isAdditional}
+                          disabled={isPrimary}
+                          onChange={(event) => toggleAdditionalActivity(type.id, event.target.checked)}
+                          className="accent-sky-600"
+                        />
+                        نشاط فرعي
+                      </label>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+              {getBusinessProfile(businessProfile.type).support.industrySpecificWorkflows === 'implemented'
+                ? 'ملف النشاط يفعّل إعدادات ومسارات متخصصة مدعومة.'
+                : 'ملف النشاط يضبط الإعدادات الافتراضية والوحدات والخصائص والوحدات المفعّلة؛ راجع ملف JSON لمعرفة الوظائف المتخصصة غير المنفذة.'}
+            </p>
             {businessProfile.type === 'custom' && (
               <Field label="اسم النشاط التجاري *">
                 <input
@@ -325,6 +492,65 @@ export const AdminSettingsTab: React.FC = () => {
                 placeholder="مثال: المقاس، اللون، الموديل"
               />
             </Field>
+            <section className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div>
+                <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">مصطلحات النشاط</h4>
+                <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                  هذه الأسماء للعرض فقط؛ لا تغيّر مفاتيح البيانات أو قواعد العمليات. يسبق تخصيص المنشأة ملف النشاط ثم القيمة الافتراضية.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {BUSINESS_TERM_KEYS.map((key) => {
+                  const definition = BUSINESS_TERMINOLOGY[key];
+                  const value = terminologyOverrides.ar?.[key] || '';
+                  const preview = resolveBusinessTerm(key, {
+                    businessType: businessProfile.type,
+                    language: 'ar',
+                    overrides: terminologyOverrides,
+                  });
+                  const source = TerminologyService.getSource(
+                    key,
+                    businessProfile.type,
+                    terminologyOverrides,
+                  );
+                  const sourceLabel = source === 'organization'
+                    ? 'تخصيص المنشأة'
+                    : source === 'profile'
+                      ? 'ملف النشاط'
+                      : 'الافتراضي العام';
+                  return (
+                    <Field key={key} label={definition.label}>
+                      <div className="space-y-1.5">
+                        <div className="flex gap-2">
+                          <input
+                            value={value}
+                            onChange={(event) => updateTermOverride(key, event.target.value)}
+                            className={inputCls}
+                            maxLength={80}
+                            placeholder={preview}
+                            aria-label={`تخصيص ${definition.label}`}
+                          />
+                          {value && (
+                            <button
+                              type="button"
+                              onClick={() => updateTermOverride(key, '')}
+                              className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                              title="العودة إلى قيمة ملف النشاط"
+                            >
+                              افتراضي
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">
+                          {definition.description} المعاينة: <strong>{preview}</strong> · المصدر: {sourceLabel}
+                        </p>
+                        <code className="block text-[9px] text-slate-400" dir="ltr">{key}</code>
+                      </div>
+                    </Field>
+                  );
+                })}
+              </div>
+            </section>
             <div>
               <CompaniesPanel />
             </div>
@@ -353,6 +579,128 @@ export const AdminSettingsTab: React.FC = () => {
                 })}
               </div>
             </div>
+            {canViewConfigHistory && (
+              <section className="space-y-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700" aria-labelledby="activity-configuration-history">
+                <div className="flex items-start gap-2">
+                  <History className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
+                  <div>
+                    <h4 id="activity-configuration-history" className="text-xs font-extrabold text-slate-800 dark:text-slate-200">سجل إصدارات التكوين</h4>
+                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                      الإصدارات محفوظة كسجل إضافي غير قابل للتعديل. تحميل إصدار يجهزه للمراجعة؛ الحفظ يمر بفحوص الوحدات والاعتمادات المعتادة.
+                    </p>
+                  </div>
+                </div>
+                {configurationHistoryError && (
+                  <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">
+                    تعذر تحميل سجل التكوين: {configurationHistoryError}
+                  </p>
+                )}
+                {!configurationHistoryError && configurationVersions.length === 0 && (
+                  <p className="rounded-lg border border-slate-200 px-3 py-3 text-center text-[10px] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    لا توجد إصدارات محفوظة بعد. سيُحفظ إصدار عند إنهاء الإعداد أو حفظ تغيير في النشاط.
+                  </p>
+                )}
+                {configurationVersions.length > 0 && (
+                  <>
+                    <div className="max-h-56 space-y-2 overflow-y-auto">
+                      {configurationVersions.map((version) => {
+                        const activity = BUSINESS_TYPES.find((type) => type.id === version.snapshot.businessType);
+                        return (
+                          <article key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
+                            <div className="min-w-0">
+                              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                                الإصدار {version.version} · {version.snapshot.businessTypeLabel || activity?.label || version.snapshot.businessType}
+                              </p>
+                              <p className="mt-1 text-[9px] text-slate-500 dark:text-slate-400">
+                                {version.reason} · {version.createdByName} · {version.createdAt}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => restoreConfigurationForReview(version)}
+                              disabled={readOnly}
+                              className="rounded-lg border border-sky-200 px-2.5 py-1.5 text-[10px] font-bold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/40"
+                            >
+                              تحميل للمراجعة
+                            </button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                    {configurationVersions.length > 1 && (
+                      <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+                        <h5 className="text-[11px] font-bold text-slate-700 dark:text-slate-200">مقارنة إصدارين</h5>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {[0, 1].map((index) => (
+                            <select
+                              key={index}
+                              aria-label={`إصدار المقارنة ${index + 1}`}
+                              value={compareVersionIds[index]}
+                              onChange={(event) => setCompareVersionIds((current) => {
+                                const next: [string, string] = [...current];
+                                next[index] = event.target.value;
+                                return next;
+                              })}
+                              className={inputCls}
+                            >
+                              {configurationVersions.map((version) => (
+                                <option key={version.id} value={version.id}>الإصدار {version.version} · {version.createdAt}</option>
+                              ))}
+                            </select>
+                          ))}
+                        </div>
+                        {comparedVersions[0] && comparedVersions[1] && (() => {
+                          const first = comparedVersions[0].snapshot;
+                          const second = comparedVersions[1].snapshot;
+                          const activityLabel = (snapshot: typeof first) =>
+                            snapshot.businessTypeLabel
+                            || BUSINESS_TYPES.find((type) => type.id === snapshot.businessType)?.label
+                            || snapshot.businessType;
+                          const moduleLabels = (snapshot: typeof first) => snapshot.enabledModules
+                            .map((id) => BUSINESS_MODULES.find((module) => module.id === id)?.label || id)
+                            .sort()
+                            .join('، ') || 'لا توجد وحدات';
+                          const unitLabels = (snapshot: typeof first) => snapshot.configuration.units
+                            .map((id) => BUSINESS_UNITS.find((unit) => unit.id === id)?.label || id)
+                            .join('، ') || 'لا توجد';
+                          const customTerms = (snapshot: typeof first) => Object.entries(snapshot.terminologyOverrides)
+                            .flatMap(([language, terms]) => Object.entries(terms || {}).map(([key, value]) => `${language}.${key}: ${value}`))
+                            .sort()
+                            .join('، ') || 'لا توجد مصطلحات مخصصة';
+                          const modelLabel = (model: typeof first.configuration.businessModel) => ({
+                            products: 'بيع منتجات',
+                            services: 'تقديم خدمات',
+                            mixed: 'منتجات وخدمات',
+                          })[model];
+                          const comparisonRows = [
+                            ['النشاط الرئيسي', activityLabel(first), activityLabel(second)],
+                            ['الأنشطة الفرعية', first.configuration.additionalActivityIds.join('، ') || 'لا توجد', second.configuration.additionalActivityIds.join('، ') || 'لا توجد'],
+                            ['نموذج العمل', modelLabel(first.configuration.businessModel), modelLabel(second.configuration.businessModel)],
+                            ['إدارة المخزون', first.configuration.trackInventory ? 'مفعلة' : 'معطلة', second.configuration.trackInventory ? 'مفعلة' : 'معطلة'],
+                            ['وحدات النظام', moduleLabels(first), moduleLabels(second)],
+                            ['خصائص المنتجات', first.configuration.productAttributes.join('، ') || 'لا توجد', second.configuration.productAttributes.join('، ') || 'لا توجد'],
+                            ['وحدات القياس', unitLabels(first), unitLabels(second)],
+                            ['وحدات مخصصة', first.configuration.customUnits.join('، ') || 'لا توجد', second.configuration.customUnits.join('، ') || 'لا توجد'],
+                            ['مصطلحات مخصصة', customTerms(first), customTerms(second)],
+                          ];
+                          return (
+                            <div className="space-y-1.5">
+                              {comparisonRows.map(([label, firstValue, secondValue]) => (
+                                <div key={label} className={`grid grid-cols-[7rem_minmax(0,1fr)_minmax(0,1fr)] gap-2 rounded-md px-2 py-1.5 text-[9px] ${firstValue === secondValue ? 'bg-slate-50 dark:bg-slate-800/40' : 'bg-amber-50 dark:bg-amber-950/20'}`}>
+                                  <span className="font-bold text-slate-600 dark:text-slate-300">{label}</span>
+                                  <span className="break-words text-slate-700 dark:text-slate-200">{firstValue}</span>
+                                  <span className="break-words text-slate-700 dark:text-slate-200">{secondValue}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+            )}
           </div>
         )}
 
@@ -376,11 +724,11 @@ export const AdminSettingsTab: React.FC = () => {
               </Field>
               <Field label="الخط">
                 <select value={settings.fontFamily || 'Cairo'} onChange={(e) => set('fontFamily', e.target.value)} className={inputCls}>
-                  <option value="Cairo">Cairo</option>
-                  <option value="Tajawal">Tajawal</option>
-                  <option value="system-ui">System UI</option>
-                  <option value="Arial">Arial</option>
-                  <option value="Tahoma">Tahoma</option>
+                  <option value="Cairo">القاهرة</option>
+                  <option value="Tajawal">تجوال</option>
+                  <option value="system-ui">خط واجهة النظام</option>
+                  <option value="Arial">أريال</option>
+                  <option value="Tahoma">تاهوما</option>
                 </select>
               </Field>
               <Field label="إظهار اسم العلامة في الهيدر">
@@ -435,13 +783,13 @@ export const AdminSettingsTab: React.FC = () => {
               <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl text-lg font-black text-white shadow-lg" style={previewStyle}>
                   {settings.brandLogoDataUrl ? (
-                    <img src={settings.brandLogoDataUrl} alt="logo" className="h-full w-full object-cover" />
+                    <img src={settings.brandLogoDataUrl} alt="الشعار" className="h-full w-full object-cover" />
                   ) : (
-                    (settings.brandShortName || 'C').slice(0, 2)
+                    (settings.brandShortName === 'C' ? 'س' : settings.brandShortName || 'س').slice(0, 2)
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-extrabold text-slate-900 dark:text-slate-100">{settings.brandName || 'CeramiSys ERP'}</div>
+                  <div className="truncate text-sm font-extrabold text-slate-900 dark:text-slate-100">{settings.brandName || 'سيراميسيس'}</div>
                   <div className="truncate text-[11px] text-slate-500">{settings.showroomName}</div>
                 </div>
               </div>
@@ -489,7 +837,7 @@ export const AdminSettingsTab: React.FC = () => {
               </Field>
               <Field label="كود صفحة الأحرف (Codepage)">
                 <select value={settings.thermalCodepage ?? 54} onChange={(e) => set('thermalCodepage', Number(e.target.value))} className={inputCls}>
-                  <option value={54}>54 — عربي Windows-1256 (الأغلب)</option>
+                  <option value={54}>54 — عربي ويندوز-1256 (الأغلب)</option>
                   <option value={32}>32 — عربي (بعض الأجهزة)</option>
                   <option value={16}>16 — WPC1256 (أخرى)</option>
                 </select>
@@ -588,15 +936,18 @@ interface BusinessProfileForm {
   type: string;
   customName: string;
   enabledModules: string[];
+  additionalActivityIds: string[];
 }
 
 function readBusinessProfile(): BusinessProfileForm {
   const storedType = SettingsService.getValue('businessType') || 'ceramics';
   const type = BUSINESS_TYPES.some((item) => item.id === storedType) ? storedType : 'custom';
+  const config = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), type);
   return {
     type,
     customName: SettingsService.getValue('businessTypeLabel') || (type === 'custom' ? storedType : ''),
     enabledModules: parseEnabledModules(SettingsService.getValue('enabledModules'), type),
+    additionalActivityIds: config.additionalActivityIds,
   };
 }
 

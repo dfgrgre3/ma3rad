@@ -18,6 +18,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'sales/statement', element: <P.CustomerStatementPage /> },
   { path: 'sales/reservations', element: <P.ReservationsDepositPage /> },
   { path: 'sales/after-sales', element: <P.AfterSalesPage /> },
+  { path: 'restaurant', element: <P.RestaurantPage /> },
   { path: 'pos', element: <P.PosView /> },
   { path: 'sales', element: <P.SalesView /> },
   { path: 'daily/sales', element: <P.TodaySalesPage /> },

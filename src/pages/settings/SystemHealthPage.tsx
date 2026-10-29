@@ -86,7 +86,7 @@ export const SystemHealthPage: React.FC = () => {
     try {
       db.run('VACUUM');
       DatabaseManager.getInstance().saveToStorage();
-      setActionMessage('تم تفريغ وضغط مساحة قاعدة البيانات (VACUUM) بنجاح!');
+      setActionMessage('تم ضغط قاعدة البيانات وتحرير المساحة غير المستخدمة بنجاح.');
       runHealthAudit();
     } catch (err: any) {
       setActionMessage(`خطأ: ${err?.message}`);
@@ -99,7 +99,7 @@ export const SystemHealthPage: React.FC = () => {
     try {
       db.run('REINDEX');
       DatabaseManager.getInstance().saveToStorage();
-      setActionMessage('تمت إعادة بناء جميع الفهارس (REINDEX) وتسريع استعلامات البحث!');
+      setActionMessage('تمت إعادة بناء الفهارس لتحسين سرعة البحث.');
       runHealthAudit();
     } catch (err: any) {
       setActionMessage(`خطأ: ${err?.message}`);
@@ -121,7 +121,7 @@ export const SystemHealthPage: React.FC = () => {
             <Cpu className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-base font-black text-slate-900">مركز صحة وتشخيص النظام (System Health & Diagnostics)</h1>
+            <h1 className="text-base font-black text-slate-900">مركز صحة النظام وتشخيصه</h1>
             <p className="text-xs text-slate-500 font-medium">
               فحص سلامة قاعدة بيانات SQLite، تماسك القيود المالية، وسرعة الاستعلامات
             </p>
@@ -160,7 +160,7 @@ export const SystemHealthPage: React.FC = () => {
             <div className="text-base font-bold text-slate-900 flex items-center gap-2 mt-0.5">
               <span>{stats?.isConsistent ? 'سليمة 100%' : 'تتطلب فحص'}</span>
             </div>
-            <div className="text-[11px] text-emerald-600 mt-0.5 font-mono">PRAGMA integrity_check: ok</div>
+            <div className="text-[11px] text-emerald-600 mt-0.5">نتيجة الفحص: {stats?.isConsistent ? 'سليمة' : 'غير سليمة'}</div>
           </div>
         </div>
 
@@ -174,7 +174,7 @@ export const SystemHealthPage: React.FC = () => {
             <div className="text-base font-bold text-sky-600 mt-0.5 font-mono">
               {stats ? formatBytes(stats.databaseSizeBytes) : '...'}
             </div>
-            <div className="text-[11px] text-slate-500 mt-0.5">SQLite WebAssembly Storage</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">قاعدة بيانات محلية داخل التطبيق</div>
           </div>
         </div>
 
@@ -221,31 +221,31 @@ export const SystemHealthPage: React.FC = () => {
           <div className="space-y-3">
             <div className="p-4 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-xs font-bold text-slate-900">ضغط وتحرير المساحة غير المستخدمة (VACUUM)</h3>
+                <h3 className="text-xs font-bold text-slate-900">ضغط قاعدة البيانات وتحرير المساحة غير المستخدمة</h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  إعادة ترتيب صفحات SQLite وتقليص حجم الملف بحذف المساحات الملغاة
+                  إعادة ترتيب بيانات قاعدة SQLite وتقليص حجم الملف بحذف المساحات غير المستخدمة
                 </p>
               </div>
               <button
                 onClick={handleVacuum}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-teal-600 font-bold rounded-xl text-xs border border-slate-300 shrink-0"
               >
-                تنفيذ VACUUM
+                ضغط قاعدة البيانات
               </button>
             </div>
 
             <div className="p-4 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-xs font-bold text-slate-900">إعادة بناء جميع الفهارس (REINDEX)</h3>
+                <h3 className="text-xs font-bold text-slate-900">إعادة بناء الفهارس</h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  تحديث أشجار B-Tree للفهارس لتسريع البحث بالباركود وأرقام الفواتير
+                  تحديث فهارس البحث لتسريع البحث بالباركود وأرقام الفواتير
                 </p>
               </div>
               <button
                 onClick={handleReindex}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-sky-600 font-bold rounded-xl text-xs border border-slate-300 shrink-0"
               >
-                تنفيذ REINDEX
+                إعادة بناء الفهارس
               </button>
             </div>
           </div>
@@ -273,7 +273,7 @@ export const SystemHealthPage: React.FC = () => {
             </div>
             <div className="flex justify-between p-2.5 rounded-lg bg-white">
               <span className="text-slate-500">وضع المعاملات المتزامنة:</span>
-              <span className="font-bold text-emerald-600">ACID WAL Mode (مفعل وآمن)</span>
+              <span className="font-bold text-emerald-600">وضع المعاملات الآمن (مفعّل)</span>
             </div>
           </div>
         </div>

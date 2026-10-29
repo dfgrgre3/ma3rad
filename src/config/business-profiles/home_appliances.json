@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "home_appliances",
+  "name": {
+    "ar": "أجهزة منزلية",
+    "en": "Home appliances"
+  },
+  "description": {
+    "ar": "منتجات وضمانات وتوصيل ومتابعة العملاء",
+    "en": "Products, warranties, deliveries and customer follow-up"
+  },
+  "category": "retail",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "PIECE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "الماركة",
+      "الموديل",
+      "الضمان"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "approvals"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

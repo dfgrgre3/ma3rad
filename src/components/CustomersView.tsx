@@ -6,6 +6,8 @@ import {
 import { CustomerService } from '../services/CustomerService';
 import { Customer } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
+import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
+import { usePermission } from '../hooks/usePermission';
 
 const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
   <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs border-slate-200">
@@ -15,6 +17,15 @@ const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItem
 );
 
 export const CustomersView: React.FC = () => {
+  const customersLabel = useBusinessTerm('entities.customers.plural');
+  const customerSingularLabel = useBusinessTerm('entities.customers.singular');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
+  const can = usePermission();
+  const canCreate = can('customers.create');
+  const canCollect = can('customers.payment');
+  const canViewPurchases = can('sales.view');
+  const canViewDebts = can('finance.debts.view');
+  const canViewStatement = canViewPurchases && canViewDebts;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -69,6 +80,7 @@ export const CustomersView: React.FC = () => {
   useEffect(() => { setPage(1); }, [search]);
 
   const handleOpenStatement = (cust: Customer) => {
+    if (!canViewStatement) return;
     setSelectedCustomer(cust);
     const stmt = customerService.getCustomerStatement(cust.id);
     setStatement(stmt);
@@ -112,7 +124,12 @@ export const CustomersView: React.FC = () => {
       );
       setIsPaymentModalOpen(false);
       loadCustomers();
-      handleOpenStatement(customerService.getCustomerById(selectedCustomer.id)!);
+      if (canViewStatement) {
+        handleOpenStatement(customerService.getCustomerById(selectedCustomer.id)!);
+      } else {
+        setSelectedCustomer(null);
+        setStatement(null);
+      }
       alert('تم تسجيل سند القبض وتحصيل الدفعة بنجاح.');
     } catch (err: any) {
       alert(`خطأ: ${err.message || err}`);
@@ -124,11 +141,14 @@ export const CustomersView: React.FC = () => {
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900">إدارة العملاء والآجل وكشوف الحسابات</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">
+            إدارة {customersLabel}
+            <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
+          </h2>
           <p className="text-xs text-slate-500">متابعة مديونيات العملاء، تحصيل الدفعات، وكشوف الحساب التفصيلية</p>
         </div>
 
-        <button
+        {canCreate && <button
           onClick={() => {
             setFormData({
               name: '',
@@ -148,8 +168,8 @@ export const CustomersView: React.FC = () => {
           className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm"
         >
           <Plus className="w-4 h-4" />
-          <span>إضافة عميل جديد</span>
-        </button>
+          <span>إضافة {customerSingularLabel} جديد</span>
+        </button>}
       </div>
 
       {/* Search */}
@@ -180,23 +200,23 @@ export const CustomersView: React.FC = () => {
                   <th className="p-3.5">الاسم والبيانات</th>
                   <th className="p-3.5">الهاتف</th>
                   <th className="p-3.5">النوع</th>
-                  <th className="p-3.5">إجمالي المشتريات</th>
-                  <th className="p-3.5">الرصيد المستحق</th>
-                  <th className="p-3.5 text-center">كشف الحساب</th>
+                  {canViewPurchases && <th className="p-3.5">إجمالي المشتريات</th>}
+                  {canViewDebts && <th className="p-3.5">الرصيد المستحق</th>}
+                  {canViewStatement && <th className="p-3.5 text-center">كشف الحساب</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 ">
                 {customers.map((c) => {
-                  const hasDebt = c.currentBalance > 0;
+                  const hasDebt = canViewDebts && c.currentBalance > 0;
                   const isSelected = selectedCustomer?.id === c.id;
 
                   return (
                     <tr
                       key={c.id}
-                      className={`hover:bg-slate-100 transition cursor-pointer ${
+                      className={`hover:bg-slate-100 transition ${canViewStatement ? 'cursor-pointer' : ''} ${
  isSelected ? 'bg-sky-50/60 ' : ''
  }`}
-                      onClick={() => handleOpenStatement(c)}
+                      onClick={canViewStatement ? () => handleOpenStatement(c) : undefined}
                     >
                       <td className="p-3.5 font-mono font-bold text-slate-500">{c.code}</td>
                       <td className="p-3.5 font-bold text-slate-900">
@@ -209,15 +229,15 @@ export const CustomersView: React.FC = () => {
                           {c.customerType === 'CONTRACTOR' ? 'مقاول / مهندس' : 'قطاعي / أفراد'}
                         </span>
                       </td>
-                      <td className="p-3.5 font-bold text-slate-700">
+                      {canViewPurchases && <td className="p-3.5 font-bold text-slate-700">
                         {CeramicMath.formatCurrency(c.totalPurchases)}
-                      </td>
-                      <td className="p-3.5">
+                      </td>}
+                      {canViewDebts && <td className="p-3.5">
                         <span className={`font-black text-sm ${hasDebt ? 'text-amber-600' : 'text-emerald-600'}`}>
                           {CeramicMath.formatCurrency(c.currentBalance)}
                         </span>
-                      </td>
-                      <td className="p-3.5 text-center">
+                      </td>}
+                      {canViewStatement && <td className="p-3.5 text-center">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -227,7 +247,7 @@ export const CustomersView: React.FC = () => {
                         >
                           <FileText className="w-4 h-4" />
                         </button>
-                      </td>
+                      </td>}
                     </tr>
                   );
                 })}
@@ -246,13 +266,13 @@ export const CustomersView: React.FC = () => {
                   <h3 className="font-extrabold text-sm text-slate-900">{selectedCustomer.name}</h3>
                   <p className="text-[11px] text-slate-500 font-mono">{selectedCustomer.phone}</p>
                 </div>
-                <button
+                {canCollect && <button
                   onClick={() => setIsPaymentModalOpen(true)}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30"
                 >
                   <DollarSign className="w-4 h-4" />
                   <span>سند قبض / تحصيل</span>
-                </button>
+                </button>}
               </div>
 
               {/* Statement Summary Card */}
@@ -306,14 +326,14 @@ export const CustomersView: React.FC = () => {
       </div>
 
       {/* Add Customer Modal */}
-      {isAddModalOpen && (
+      {isAddModalOpen && canCreate && (
         <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900">إضافة عميل جديد</h3>
+            <h3 className="text-base font-extrabold text-slate-900">إضافة {customerSingularLabel} جديد</h3>
 
             <form onSubmit={handleSaveCustomer} className="space-y-3 text-xs">
               <div>
-                <label htmlFor="customer-name" className="font-bold text-slate-700 block mb-1">اسم العميل *</label>
+                <label htmlFor="customer-name" className="font-bold text-slate-700 block mb-1">اسم {customerSingularLabel} *</label>
                 <input
                   id="customer-name"
                   type="text"
@@ -410,7 +430,7 @@ export const CustomersView: React.FC = () => {
       )}
 
       {/* Record Payment Modal */}
-      {isPaymentModalOpen && selectedCustomer && (
+      {isPaymentModalOpen && selectedCustomer && canCollect && (
         <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
             <h3 className="text-base font-extrabold text-slate-900">سند قبض / تحصيل دفعة</h3>

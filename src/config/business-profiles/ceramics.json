@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "ceramics",
+  "name": {
+    "ar": "سيراميك وبورسلين",
+    "en": "Ceramics and porcelain"
+  },
+  "description": {
+    "ar": "مساحات ومقاسات ومخزون بالمتر والكرتونة",
+    "en": "Tile sizes, area units, boxes and inventory"
+  },
+  "category": "retail",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "M2",
+      "BOX",
+      "PIECE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "المقاس",
+      "الفرز",
+      "اللون",
+      "النغمة",
+      "التشطيب"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": []
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

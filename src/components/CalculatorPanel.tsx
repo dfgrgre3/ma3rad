@@ -147,7 +147,7 @@ export const CalculatorPanel: React.FC<{ onClose?: () => void; floating?: boolea
           <div className="min-h-4 truncate text-xs text-slate-500" aria-hidden="true">{pendingExpression}</div>
           <div className="min-h-10 truncate text-3xl font-bold tabular-nums" aria-live="polite" aria-atomic="true">{display}</div>
         </div>
-        <p className="mb-3 text-left text-[10px] text-slate-400" dir="ltr">لوحة المفاتيح: الأرقام · Enter للحساب · Backspace للحذف · Esc للمسح</p>
+        <p className="mb-3 text-left text-[10px] text-slate-400" dir="rtl">لوحة المفاتيح: الأرقام · إدخال للحساب · مسافة للخلف للحذف · هروب للمسح</p>
         <div className="grid grid-cols-4 gap-1" dir="ltr">
           {keys.map(({ key, label = key, kind = 'number' }) => <button key={key} onClick={() => press(key)} aria-label={label} className={`min-h-14 rounded-lg border border-slate-200 px-2 py-3 text-xl font-medium transition hover:bg-slate-100 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-slate-700 dark:hover:bg-slate-800 ${key === '0' ? 'col-span-2' : ''} ${kind === 'equals' ? 'bg-sky-600 text-white hover:bg-sky-700 active:bg-sky-800' : kind === 'operator' ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100'}`}>{key}</button>)}
         </div>

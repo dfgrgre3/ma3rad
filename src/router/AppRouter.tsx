@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import type { User } from '../types';
 import { S } from './RouteGuard';
+import { getPersistedLocation } from './navigationPersistence';
 import { appRoutes } from './routesList';
 
 export interface AppRouterProps {
@@ -21,7 +22,10 @@ export const AppRouter: React.FC<AppRouterProps> = ({ currentUser, onLogout }) =
         />
       }
     >
-      <Route index element={<Navigate to="/dashboard" replace />} />
+      <Route
+        index
+        element={<Navigate to={getPersistedLocation(currentUser.id) ?? '/dashboard'} replace />}
+      />
       <Route path="finance/debts" element={<Navigate to="/finance/other-receivables" replace />} />
       <Route path="crm" element={<Navigate to="/crm/dashboard" replace />} />
 

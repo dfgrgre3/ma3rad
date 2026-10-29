@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Calculator, NotebookPen, ShieldAlert, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Calculator, NotebookPen, X } from 'lucide-react';
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { NotificationService } from '../services/NotificationService';
@@ -9,6 +9,11 @@ import { NavigationService } from '../services/NavigationService';
 import { CalculatorPanel } from '../components/CalculatorPanel';
 import { NotesPanel } from '../components/NotesPanel';
 import { useTheme } from '../contexts/ThemeContext';
+import {
+  getPersistedScrollPosition,
+  saveNavigationLocation,
+  saveNavigationScrollPosition,
+} from '../router/navigationPersistence';
 import { User } from '../types';
 
 interface MainLayoutProps {
@@ -27,7 +32,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   onLogout,
 }) => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement>(null);
   const { settings } = useTheme();
   const navigationLayout = settings.navigationLayout === 'header' ? 'header' : 'sidebar';
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -37,8 +42,42 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const required = NavigationService.getRequiredPermission(location.pathname);
-  const isAllowed = !required || PermissionService.can(currentUser, required);
+  const required = NavigationService.getRequiredPermissions(location.pathname);
+  const isAllowed = !required || required.every((permission) => PermissionService.can(currentUser, permission));
+  const fallbackPath = isAllowed ? null : NavigationService.getFirstAccessiblePath(currentUser) ?? '/not-found';
+  const persistedLocation = `${location.pathname}${location.search}${location.hash}`;
+
+  useEffect(() => {
+    if (!currentUser?.id || !isAllowed || location.pathname === '/') return;
+    saveNavigationLocation(currentUser.id, persistedLocation);
+    if (mainRef.current) {
+      mainRef.current.scrollTop = getPersistedScrollPosition(currentUser.id, persistedLocation);
+    }
+  }, [currentUser?.id, isAllowed, location.pathname, persistedLocation]);
+
+  useEffect(() => {
+    const userId = currentUser?.id;
+    const main = mainRef.current;
+    if (!userId || !isAllowed || !main || location.pathname === '/') return;
+
+    const savePosition = () => {
+      saveNavigationScrollPosition(userId, persistedLocation, main.scrollTop);
+    };
+    let timer: number | null = null;
+    const handleScroll = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(savePosition, 250);
+    };
+
+    main.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('pagehide', savePosition);
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      savePosition();
+      main.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('pagehide', savePosition);
+    };
+  }, [currentUser?.id, isAllowed, location.pathname, persistedLocation]);
 
   useEffect(() => {
     const refreshNotifications = () => {
@@ -96,27 +135,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           )}
 
           {/* ── Page content ────────────────────────────────────────────────────── */}
-          <main className="app-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
-            {isAllowed ? (
-              <Outlet />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-[2px] border border-[#e5b8b3] bg-[#fdf3f2]">
-                  <ShieldAlert className="h-6 w-6 text-[#c42b1c]" />
-                </div>
-                <h2 className="text-base font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">غير مصرح لك بالوصول</h2>
-                <p className="max-w-sm text-[12px] text-[#4d4d4d] dark:text-[#c8c8c8]">
-                  حسابك الحالي لا يملك الصلاحية المطلوبة لعرض هذه الصفحة ({required}).
-                  تواصل مع مدير النظام لمنحك الصلاحية المناسبة.
-                </p>
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="win-btn win-btn--primary mt-2"
-                >
-                  العودة إلى لوحة المعلومات
-                </button>
-              </div>
-            )}
+          <main ref={mainRef} className="app-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+            {isAllowed ? <Outlet /> : <Navigate to={fallbackPath ?? '/not-found'} replace />}
           </main>
         </div>
 
@@ -150,7 +170,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             </button>
             <span aria-hidden="true" className="h-3 w-px bg-[#c8c8c8] dark:bg-[#4a4a4a]" />
             {currentUser && <span className="truncate">{currentUser.fullName}</span>}
-            <span className="hidden sm:inline">CeramiSys ERP</span>
+            <span className="hidden sm:inline">سيراميسيس</span>
           </span>
         </footer>
         {mobileSidebarOpen && (

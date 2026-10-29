@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { AlertCircle, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload, WandSparkles } from 'lucide-react';
 import { DataImportService, ENTITY_META, ImportEntity, ParsedImport, ImportIssue } from '../../services/DataImportService';
+import { BackupService } from '../../services/BackupService';
+import { DataAdminService, type DataImportPreview, type DataImportSheet } from '../../services/DataAdminService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { DynamicDataService, DynamicImportResult } from '../../services/DynamicDataService';
@@ -14,6 +16,8 @@ import {
   validateSpreadsheetFileHeader,
   validateSpreadsheetFileMetadata,
 } from '../../services/SpreadsheetImportService';
+import { formatImportValue } from '../admin/adminDataUtils';
+import { hasOfficeCompoundFileSignature } from '../../services/xlsxBackup';
 
 const parseSpreadsheetInWorker = (buffer: ArrayBuffer, fileName: string): Promise<{ buffer: ArrayBuffer; sheets: ParsedSpreadsheetSheet[] }> =>
   new Promise((resolve, reject) => {
@@ -33,6 +37,8 @@ const parseSpreadsheetInWorker = (buffer: ArrayBuffer, fileName: string): Promis
 
 export const DataImportPage: React.FC = () => {
   const service = useMemo(() => new DataImportService(), []);
+  const backupService = useMemo(() => new BackupService(), []);
+  const adminDataService = useMemo(() => new DataAdminService(), []);
   const dynamicService = useMemo(() => new DynamicDataService(), []);
   const [data, setData] = useState<ParsedImport | null>(null);
   const [fileName, setFileName] = useState('');
@@ -49,16 +55,29 @@ export const DataImportPage: React.FC = () => {
   const [dynamicName, setDynamicName] = useState('');
   const [dynamicPreview, setDynamicPreview] = useState<{ headers: string[]; rows: Record<string, unknown>[] } | null>(null);
   const [dynamicResult, setDynamicResult] = useState<DynamicImportResult | null>(null);
+  const [backupImport, setBackupImport] = useState<{ sheets: DataImportSheet[]; preview: DataImportPreview } | null>(null);
   const currentUser = AuthService.getCurrentUser();
   const canOpen = service.canOpen(currentUser);
 
   const handleFile = async (file?: File) => {
     if (!file) return;
     setBusy(true); setMessage(''); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]);
-    setDynamicPreview(null); setDynamicResult(null); setFileName(file.name);
+    setDynamicPreview(null); setDynamicResult(null); setBackupImport(null); setFileName(file.name);
     try {
-      const extension = validateSpreadsheetFileMetadata(file.name, file.size);
+      const lowerName = file.name.toLocaleLowerCase();
       const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+      const isEncryptedXlsx = lowerName.endsWith('.xlsx') && hasOfficeCompoundFileSignature(header);
+      if (lowerName.endsWith('.ceramisys-backup') || isEncryptedXlsx) {
+        if (!PermissionService.can(currentUser, 'admin.data.delete')) {
+          throw new Error('لا تملك صلاحية استيراد النسخ الاحتياطية. يلزم منح صلاحية إدارة البيانات.');
+        }
+        const sheets = await backupService.readBackupDataForImport(file);
+        const preview = adminDataService.previewDataImport(sheets);
+        setBackupImport({ sheets, preview });
+        setMessage('تمت قراءة النسخة المشفرة. راجع ملخص السجلات قبل دمجها مع البيانات الحالية.');
+        return;
+      }
+      const extension = validateSpreadsheetFileMetadata(file.name, file.size);
       validateSpreadsheetFileHeader(extension, header);
       const parsedFile = await parseSpreadsheetInWorker(await file.arrayBuffer(), file.name);
       setFileBuffer(parsedFile.buffer); setSpreadsheetSheets(parsedFile.sheets);
@@ -76,6 +95,17 @@ export const DataImportPage: React.FC = () => {
       setManualEntity(parsed.entity);
       if (parsed.confidence < 0.35 && parsed.entity !== 'dynamic') setMessage('التعرف التلقائي غير واثق. اختر نوع البيانات الصحيح وراجع مطابقة الأعمدة.');
     } catch (e: any) { setData(null); setMessage(e?.message || 'تعذرت قراءة الملف.'); }
+    finally { setBusy(false); }
+  };
+
+  const runBackupImport = async () => {
+    if (!backupImport) return;
+    setBusy(true); setMessage('');
+    try {
+      const outcome = await adminDataService.importData(backupImport.sheets);
+      setBackupImport(null);
+      setMessage(`تم استيراد النسخة: أُضيف ${outcome.insertedRows} سجل، واستُبدل ${outcome.updatedRows} سجل، وتم تخطي ${outcome.skippedRows} سجل.`);
+    } catch (e: any) { setMessage(e?.message || 'تعذر استيراد النسخة المشفرة.'); }
     finally { setBusy(false); }
   };
 
@@ -138,7 +168,7 @@ export const DataImportPage: React.FC = () => {
         to="/data-import"
         className="px-4 py-2 rounded-xl text-xs font-black bg-sky-600 text-white shadow-sm"
       >
-        مركز استيراد الملفات (Excel / CSV)
+        مركز استيراد الملفات (جداول البيانات وCSV)
       </Link>
       <Link
         to="/data-import/types"
@@ -149,7 +179,7 @@ export const DataImportPage: React.FC = () => {
     </div>
 
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><div className="flex items-center gap-3"><span className="rounded-2xl bg-sky-100 p-3 text-sky-700"><FileSpreadsheet className="w-6 h-6" /></span><div><h1 className="text-2xl font-black text-slate-900">مركز استيراد البيانات</h1><p className="mt-1 text-sm text-slate-500">ارفع ملف Excel أو CSV، دع النظام يتعرف على محتواه أو اختر النوع يدويًا، ثم راجع الصفوف قبل الإضافة.</p></div></div></div>
+      <div><div className="flex items-center gap-3"><span className="rounded-2xl bg-sky-100 p-3 text-sky-700"><FileSpreadsheet className="w-6 h-6" /></span><div><h1 className="text-2xl font-black text-slate-900">مركز استيراد البيانات</h1><p className="mt-1 text-sm text-slate-500">ارفع ملف جدول بيانات أو CSV لاستيراد سجلات محددة، أو نسخة مشفرة لدمج سجلاتها بعد مراجعتها.</p></div></div></div>
       {data && data.entity !== 'dynamic' && <button onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4"/>تنزيل قالب {ENTITY_META[data.entity].label}</button>}
     </div>
 
@@ -157,10 +187,21 @@ export const DataImportPage: React.FC = () => {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block"><span className="mb-2 block text-xs font-black text-slate-600">تحديد نوع البيانات</span><select value={manualEntity} onChange={e=>changeEntity(e.target.value as ImportEntity)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold"><option value="">اكتشاف تلقائي من الملف</option>{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><option key={key} value={key}>{meta.label}</option>)}{PermissionService.can(currentUser,'admin.data')&&<option value="dynamic">إنشاء نوع بيانات مرن</option>}</select></label>
-          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملف Excel أو CSV'}<input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
+          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملف جدول بيانات أو CSV أو نسخة مشفرة'}<input type="file" accept=".xlsx,.xls,.csv,.ceramisys-backup,application/octet-stream" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
         </div>
-        <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV. الحد الأقصى {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت، و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود لكل مصنف.</p>
+        <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV والنسخ المشفرة ‎.xlsx‎ و‎.ceramisys-backup‎. حد ملفات الجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت، و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. النسخة المشفرة تُدمج بعد فك تشفيرها ومراجعة السجلات، ولا تستبدل قاعدة البيانات كاملة.</p>
         {message && <div className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${result?.created ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{message}</span></div>}
+        {backupImport && <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <div><h2 className="font-black text-amber-950">مراجعة النسخة المشفرة قبل الدمج</h2><p className="mt-1 text-xs leading-5 text-amber-900">السجلات الجديدة ستُضاف، والسجلات المتعارضة ستُحدّث بعد موافقتك. لن تُحذف البيانات الأخرى ولن تُستبدل قاعدة البيانات كاملة. الجداول المحمية لن تُستورد.</p></div>
+          <div className="flex flex-wrap gap-2 text-xs font-bold">
+            <span className="rounded-lg bg-white px-3 py-2">جداول: {backupImport.preview.tables.length}</span>
+            <span className="rounded-lg bg-emerald-100 px-3 py-2 text-emerald-900">جديد: {backupImport.preview.newRows}</span>
+            <span className="rounded-lg bg-orange-100 px-3 py-2 text-orange-900">متعارض: {backupImport.preview.conflictRows}</span>
+            <span className="rounded-lg bg-white px-3 py-2">متخطى: {backupImport.preview.skippedRows}</span>
+          </div>
+          <div className="max-h-64 space-y-2 overflow-auto">{backupImport.preview.tables.map(table=><div key={table.table} className="rounded-lg border border-amber-200 bg-white p-3 text-xs"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="font-mono">{table.table}</strong><span>الملف: {table.incomingRows} · الحالي: {table.existingRows} · جديد: {table.newRows} · متعارض: {table.conflictRows} · متخطى: {table.skippedRows}</span></div>{table.protected&&<p className="mt-2 font-bold text-amber-700">جدول محمي — لن يتم استيراده</p>}{table.sampleConflicts.map((conflict,index)=><div key={`${conflict.key}-${index}`} className="mt-2 rounded-lg bg-amber-50 p-2"><div className="font-bold">مفتاح السجل: {conflict.key}</div>{conflict.changes.length?conflict.changes.map(change=><div key={change.column} className="mt-1 break-words text-slate-700">{change.column} — الحالي: {formatImportValue(change.existing)} ← الملف: {formatImportValue(change.imported)}</div>):<div className="mt-1 text-slate-600">لا توجد اختلافات في القيم.</div>}</div>)}</div>)}</div>
+          <div className="flex flex-wrap gap-2"><button onClick={()=>void runBackupImport()} disabled={busy||backupImport.preview.newRows+backupImport.preview.conflictRows===0} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">دمج السجلات المعروضة</button><button onClick={()=>setBackupImport(null)} disabled={busy} className="rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-40">إلغاء</button></div>
+        </div>}
         {data?.entity === 'dynamic' && dynamicPreview && <div className="space-y-4 rounded-xl border border-violet-200 bg-violet-50/60 p-4"><div className="flex items-start gap-3"><WandSparkles className="mt-1 h-5 w-5 text-violet-700"/><div><h2 className="font-black text-violet-950">نوع غير معروف — سيُنشأ له تعريف قابل لإعادة الاستخدام</h2><p className="mt-1 text-xs leading-5 text-violet-900">سيتم استنتاج أنواع الحقول مبدئيًا، وحفظ كل قيمة أصلية كما وردت في الملف. يمكن تعديل التعريف والبحث والتصدير من إدارة الأنواع.</p></div></div><label className="block text-xs font-black text-slate-700">اسم نوع البيانات<input value={dynamicName} onChange={e=>setDynamicName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="اسم الورقة أو اسم واضح لهذا النوع"/></label><div className="overflow-auto rounded-lg border border-slate-200 bg-white"><table className="min-w-full text-right text-xs"><thead className="bg-slate-100"><tr>{dynamicPreview.headers.map(h=><th key={h} className="p-2.5">{h}</th>)}</tr></thead><tbody>{dynamicPreview.rows.slice(0,8).map((row,i)=><tr key={i} className="border-t border-slate-100">{dynamicPreview.headers.map(h=><td key={h} className="max-w-48 truncate p-2.5">{String(row[h]??'')}</td>)}</tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{dynamicPreview.rows.length} سجل · {dynamicPreview.headers.length} حقل · ستُحفظ القيم الأصلية كاملة</span><button onClick={runImport} disabled={!dynamicName.trim()||busy||!PermissionService.can(currentUser,'admin.data')} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">إنشاء النوع واستيراد البيانات</button></div>{dynamicResult&&<Link className="inline-block text-sm font-black text-violet-800 underline" to="/data-import/types">فتح إدارة الأنواع والسجلات</Link>}</div>}
         {data && data.entity !== 'dynamic' && <>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><WandSparkles className="h-4 w-4 text-violet-600"/><span className="text-sm font-black">نوع البيانات: {ENTITY_META[data.entity].label}</span><span className="text-xs text-slate-500">({data.rows.length} صف)</span></div><span className="text-xs font-bold text-slate-500">تم ربط {Object.keys(data.mapping).length} من {fields.length} عمود</span></div>

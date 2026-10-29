@@ -7,6 +7,8 @@ import { PermissionService } from '../src/services/PermissionService.ts';
 import { CustomerService } from '../src/services/CustomerService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { BackupService } from '../src/services/BackupService.ts';
+import officeCrypto from 'officecrypto-tool';
+import { createXlsxBackupWorkbook } from '../src/services/xlsxBackup.ts';
 
 /**
  * Restoring a production backup is a destructive, all-or-nothing operation:
@@ -55,6 +57,8 @@ function stubDesktopBackupApi(): { snapshots: Array<{ label: string; bytes: numb
         snapshots.push({ label, bytes: DatabaseManager.getInstance().exportDatabaseBinary().length });
         return { ok: true, path: `C:\\backups\\${label}_snapshot.sqlite`, bytes: 1024 };
       },
+      decryptXlsxBackup: async (bytes: Uint8Array, password: string) =>
+        new Uint8Array(await officeCrypto.decrypt(Buffer.from(bytes), { password })),
     },
   };
   return { snapshots };
@@ -70,6 +74,7 @@ test('restoring a production backup replaces live data only after a verified sna
     customerType: 'RETAIL',
     creditLimit: 100000,
   });
+
   const sales = new SalesService();
 
   const kept = sales.createSale({
@@ -178,4 +183,25 @@ test('restoring a production backup replaces live data only after a verified sna
     Number(one<{ q: number }>(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_restore_a'`).q),
     37
   );
+});
+
+test('an encrypted XLSX workbook restores the complete SQLite backup through the restore flow', async () => {
+  const manager = await boot();
+  const databaseBytes = manager.exportDatabaseBinary();
+  const password = 'correct horse battery';
+  const workbookBytes = createXlsxBackupWorkbook(databaseBytes);
+  const encryptedWorkbook = officeCrypto.encrypt(Buffer.from(workbookBytes), { password });
+  const { snapshots } = stubDesktopBackupApi();
+  (globalThis as any).window.prompt = () => password;
+
+  const restored = await new BackupService().restoreBackupFromFile(
+    new File([new Uint8Array(encryptedWorkbook)], 'ceramisys_backup_test.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+  );
+
+  assert.deepEqual(snapshots.map((snapshot) => snapshot.label), ['pre_restore']);
+  assert.equal(restored.invoicesCount, Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM sales_invoices').n));
+  assert.equal(restored.productsCount, Number(one<{ n: number }>('SELECT COUNT(*) AS n FROM products').n));
+  assert.equal(new BackupService().verifyBackupFile(manager.exportDatabaseBinary()).valid, true);
 });

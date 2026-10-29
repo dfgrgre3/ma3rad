@@ -10,6 +10,7 @@ import { useToast } from '../../components/ui/Toast';
 
 import { downloadExcel, formatBytes, formatImportValue, parseAdminDataWorkbook } from './adminDataUtils';
 import { AdminDataTable } from './AdminDataTable';
+import { hasOfficeCompoundFileSignature } from '../../services/xlsxBackup';
 
 export const AdminDataTab: React.FC = () => {
   const toast = useToast();
@@ -87,7 +88,10 @@ export const AdminDataTab: React.FC = () => {
     event.currentTarget.value = '';
     if (!file) return;
     try {
-      const sourceType = file.name.toLocaleLowerCase().endsWith('.ceramisys-backup') ? 'backup' : 'xlsx';
+      const lowerName = file.name.toLocaleLowerCase();
+      const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+      const isEncryptedXlsx = lowerName.endsWith('.xlsx') && hasOfficeCompoundFileSignature(header);
+      const sourceType = lowerName.endsWith('.ceramisys-backup') || isEncryptedXlsx ? 'backup' : 'xlsx';
       if (sourceType === 'backup' && !canImportBackup) {
         throw new Error('لا تملك صلاحية استيراد النسخ الاحتياطية المشفرة.');
       }
@@ -180,10 +184,10 @@ export const AdminDataTab: React.FC = () => {
           <RefreshCw className="h-4 w-4" />
         </button>
         {canExport && <button onClick={exportAll} className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700">
-          <Download className="h-4 w-4" /> تصدير كل البيانات Excel
+          <Download className="h-4 w-4" /> تصدير كل البيانات في جدول بيانات
         </button>}
         {canImport && <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-sky-200 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10">
-          <Upload className="h-4 w-4" /> استيراد Excel أو نسخة مشفرة
+          <Upload className="h-4 w-4" /> استيراد جدول بيانات أو نسخة مشفرة
           <input type="file" accept=".xlsx,.ceramisys-backup,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream" onChange={(event) => void handleImportFile(event)} className="hidden" />
         </label>}
         <button onClick={runIntegrity} className="flex items-center gap-1.5 rounded-xl border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/30 dark:hover:bg-emerald-500/10">

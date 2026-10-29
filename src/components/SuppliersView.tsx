@@ -9,6 +9,7 @@ import { Supplier, PaymentType } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
+import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 import { Link } from 'react-router-dom';
 
 const csvCell = (value: unknown) => {
@@ -28,6 +29,9 @@ const downloadCsv = (name: string, rows: unknown[][]) => {
 };
 
 export const SuppliersView: React.FC = () => {
+  const suppliersLabel = useBusinessTerm('entities.suppliers.plural');
+  const supplierSingularLabel = useBusinessTerm('entities.suppliers.singular');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
@@ -63,7 +67,13 @@ export const SuppliersView: React.FC = () => {
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'suppliers.create');
   const canUpdate = PermissionService.can(currentUser, 'suppliers.update');
+  const canDelete = PermissionService.can(currentUser, 'suppliers.delete');
   const canPay = PermissionService.can(currentUser, 'suppliers.payment');
+  const canExport = PermissionService.can(currentUser, 'suppliers.export');
+  const canViewPurchases = PermissionService.can(currentUser, 'purchases.view');
+  const canViewFinancials = PermissionService.can(currentUser, 'finance.debts.view');
+  const canApproveFinancials = PermissionService.can(currentUser, 'finance.approve');
+  const canImport = PermissionService.can(currentUser, 'settings.view');
 
   const loadSuppliers = () => {
     try {
@@ -84,16 +94,15 @@ export const SuppliersView: React.FC = () => {
       const current = supplierService.getSupplierById(selectedSupplier.id);
       if (!current) return;
       setSelectedSupplier(current);
-      setStatement(supplierService.getSupplierStatement(current.id, statementFrom, statementTo));
+      setStatement(canViewFinancials ? supplierService.getSupplierStatement(current.id, statementFrom, statementTo) : null);
     } catch (e) {
       console.error(e);
     }
-  }, [selectedSupplier?.id, statementFrom, statementTo]);
+  }, [selectedSupplier?.id, statementFrom, statementTo, canViewFinancials]);
 
   const handleOpenStatement = (sup: Supplier) => {
     setSelectedSupplier(sup);
-    const stmt = supplierService.getSupplierStatement(sup.id, statementFrom, statementTo);
-    setStatement(stmt);
+    setStatement(canViewFinancials ? supplierService.getSupplierStatement(sup.id, statementFrom, statementTo) : null);
   };
 
   const handleSaveSupplier = (e: React.FormEvent) => {
@@ -102,7 +111,7 @@ export const SuppliersView: React.FC = () => {
       if (editingSupplier) {
         const updated = supplierService.updateSupplier(editingSupplier.id, formData);
         setSelectedSupplier(updated);
-        setStatement(supplierService.getSupplierStatement(updated.id, statementFrom, statementTo));
+        if (canViewFinancials) setStatement(supplierService.getSupplierStatement(updated.id, statementFrom, statementTo));
       } else {
         supplierService.createSupplier({
           code: `SUP-${Date.now().toString().slice(-4)}`,
@@ -142,7 +151,9 @@ export const SuppliersView: React.FC = () => {
       );
       setIsPaymentModalOpen(false);
       loadSuppliers();
-      handleOpenStatement(supplierService.getSupplierById(selectedSupplier.id)!);
+      const updatedSupplier = supplierService.getSupplierById(selectedSupplier.id)!;
+      if (canViewFinancials) handleOpenStatement(updatedSupplier);
+      else setSelectedSupplier(updatedSupplier);
       alert('تم تسجيل سند الصرف وسداد دفعة المورد بنجاح.');
     } catch (err: any) {
       alert(`خطأ: ${err.message || err}`);
@@ -167,11 +178,12 @@ export const SuppliersView: React.FC = () => {
   };
 
   const toggleSupplierStatus = (supplier: Supplier) => {
+    if (!canDelete || !canUpdate) return;
     try {
       const updated = supplierService.updateSupplier(supplier.id, { isActive: supplier.isActive === 0 ? 1 : 0 });
       if (selectedSupplier?.id === supplier.id) {
         setSelectedSupplier(updated);
-        setStatement(supplierService.getSupplierStatement(updated.id, statementFrom, statementTo));
+        if (canViewFinancials) setStatement(supplierService.getSupplierStatement(updated.id, statementFrom, statementTo));
       }
       loadSuppliers();
     } catch (err: any) {
@@ -180,19 +192,28 @@ export const SuppliersView: React.FC = () => {
   };
 
   const exportSuppliers = () => {
+    if (!canExport) return;
+    const headers = ['الكود', 'اسم المورد', 'الشركة', 'الهاتف', 'البريد الإلكتروني', 'الرقم الضريبي', 'السجل التجاري', 'العنوان'];
+    if (canViewPurchases) headers.push('إجمالي المشتريات');
+    if (canViewFinancials) headers.push('الرصيد');
+    headers.push('مدة السداد', 'الحالة', 'ملاحظات');
     downloadCsv('suppliers.csv', [
-      ['الكود', 'اسم المورد', 'الشركة', 'الهاتف', 'البريد الإلكتروني', 'الرقم الضريبي', 'السجل التجاري', 'العنوان', 'الرصيد', 'إجمالي المشتريات', 'مدة السداد', 'الحالة', 'ملاحظات'],
-      ...suppliers.map((supplier) => [
-        supplier.code, supplier.name, supplier.companyName, supplier.phone, supplier.email,
-        supplier.taxNumber, supplier.commercialRecord, supplier.address, supplier.currentBalance,
-        supplier.totalPurchases, supplier.paymentTermsDays, supplier.isActive === 0 ? 'غير نشط' : 'نشط',
-        supplier.notes
-      ])
+      headers,
+      ...suppliers.map((supplier) => {
+        const row: unknown[] = [
+          supplier.code, supplier.name, supplier.companyName, supplier.phone, supplier.email,
+          supplier.taxNumber, supplier.commercialRecord, supplier.address,
+        ];
+        if (canViewPurchases) row.push(supplier.totalPurchases);
+        if (canViewFinancials) row.push(supplier.currentBalance);
+        row.push(supplier.paymentTermsDays, supplier.isActive === 0 ? 'غير نشط' : 'نشط', supplier.notes);
+        return row;
+      })
     ]);
   };
 
   const exportStatement = () => {
-    if (!statement || !selectedSupplier) return;
+    if (!canExport || !canViewFinancials || !statement || !selectedSupplier) return;
     downloadCsv(`supplier-${selectedSupplier.code}-statement.csv`, [
       ['التاريخ', 'النوع', 'رقم المستند', 'البيان', 'مدين', 'دائن', 'الرصيد بعد الحركة'],
       ...statement.transactions.map((tx: any) => [
@@ -207,17 +228,20 @@ export const SuppliersView: React.FC = () => {
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900">إدارة الموردين ومصانع السيراميك</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">
+            إدارة {suppliersLabel}
+            <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
+          </h2>
           <p className="text-xs text-slate-500">متابعة حسابات المصانع، سداد الدفعات، وكشوف الحساب التفصيلية</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={exportSuppliers} className="px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-sm">
+          {canExport && <button onClick={exportSuppliers} className="px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-sm">
             <Download className="w-4 h-4" /><span>تصدير CSV</span>
-          </button>
-          <Link to="/data-import" className="px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-sm">
+          </button>}
+          {canImport && <Link to="/data-import" className="px-3 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-sm">
             <Upload className="w-4 h-4" /><span>استيراد الموردين</span>
-          </Link>
+          </Link>}
           {canCreate && <button
           onClick={() => {
             setEditingSupplier(null);
@@ -238,7 +262,7 @@ export const SuppliersView: React.FC = () => {
           className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm"
         >
           <Plus className="w-4 h-4" />
-          <span>إضافة مورد / مصنع جديد</span>
+          <span>إضافة {supplierSingularLabel} جديد</span>
           </button>}
         </div>
       </div>
@@ -249,7 +273,7 @@ export const SuppliersView: React.FC = () => {
           { label: 'إجمالي المشتريات', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Number(supplier.totalPurchases || 0), 0)), color: 'text-indigo-700' },
           { label: 'مستحقات الموردين', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Math.max(Number(supplier.currentBalance || 0), 0), 0)), color: 'text-rose-700' },
           { label: 'رصيد لنا لدى الموردين', value: CeramicMath.formatCurrency(suppliers.reduce((sum, supplier) => sum + Math.max(-Number(supplier.currentBalance || 0), 0), 0)), color: 'text-emerald-700' }
-        ].map((card) => (
+        ].filter((card) => card.label === 'الموردون المعروضون' || (card.label === 'إجمالي المشتريات' ? canViewPurchases : canViewFinancials)).map((card) => (
           <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-[11px] font-bold text-slate-500">{card.label}</div>
             <div className={`mt-1 text-lg font-black ${card.color}`}>{card.value}</div>
@@ -278,7 +302,7 @@ export const SuppliersView: React.FC = () => {
       {/* Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Suppliers List */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className={`${canViewFinancials ? 'lg:col-span-2' : 'lg:col-span-3'} bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
@@ -286,9 +310,9 @@ export const SuppliersView: React.FC = () => {
                   <th className="p-3.5">كود المورد</th>
                   <th className="p-3.5">اسم المورد / الشركة</th>
                   <th className="p-3.5">الهاتف</th>
-                  <th className="p-3.5">إجمالي المشتريات</th>
-                  <th className="p-3.5">الرصيد المستحق للمورد</th>
-                  <th className="p-3.5 text-center">كشف الحساب</th>
+                  {canViewPurchases && <th className="p-3.5">إجمالي المشتريات</th>}
+                  {canViewFinancials && <th className="p-3.5">الرصيد المستحق للمورد</th>}
+                  <th className="p-3.5 text-center">إجراءات</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 ">
@@ -297,10 +321,10 @@ export const SuppliersView: React.FC = () => {
                   return (
                     <tr
                       key={s.id}
-                      className={`hover:bg-slate-100 transition cursor-pointer ${
+                      className={`hover:bg-slate-100 transition ${canViewFinancials ? 'cursor-pointer' : ''} ${
  isSelected ? 'bg-sky-50/60 ' : ''
  }`}
-                      onClick={() => handleOpenStatement(s)}
+                      onClick={canViewFinancials ? () => handleOpenStatement(s) : undefined}
                     >
                       <td className="p-3.5 font-mono font-bold text-slate-500">{s.code}</td>
                       <td className="p-3.5 font-bold text-slate-900">
@@ -311,12 +335,12 @@ export const SuppliersView: React.FC = () => {
                         {s.companyName && <div className="text-[10px] text-slate-500 font-normal">{s.companyName}</div>}
                       </td>
                       <td className="p-3.5 font-mono text-slate-600 ">{s.phone}</td>
-                      <td className="p-3.5 font-bold text-slate-700">
+                      {canViewPurchases && <td className="p-3.5 font-bold text-slate-700">
                         {CeramicMath.formatCurrency(s.totalPurchases)}
-                      </td>
-                      <td className="p-3.5 font-black text-sm text-red-600">
+                      </td>}
+                      {canViewFinancials && <td className="p-3.5 font-black text-sm text-red-600">
                         {CeramicMath.formatCurrency(s.currentBalance)}
-                      </td>
+                      </td>}
                       <td className="p-3.5 text-center">
                         <div className="flex justify-center gap-1">
                         {canUpdate && <button
@@ -326,14 +350,14 @@ export const SuppliersView: React.FC = () => {
                         >
                           <Pencil className="w-4 h-4" />
                         </button>}
-                        {canUpdate && <button
+                        {canDelete && canUpdate && <button
                           title={s.isActive === 0 ? 'إعادة تفعيل المورد' : 'تعطيل المورد'}
                           onClick={(e) => { e.stopPropagation(); toggleSupplierStatus(s); }}
                           className={`p-1.5 rounded-lg transition ${s.isActive === 0 ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500 hover:text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-600 hover:text-white'}`}
                         >
                           <Power className="w-4 h-4" />
                         </button>}
-                        <button
+                        {canViewFinancials && <button
                           title="عرض كشف الحساب السريع"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -342,7 +366,7 @@ export const SuppliersView: React.FC = () => {
                           className="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 hover:bg-sky-600 hover:text-white transition"
                         >
                           <FileText className="w-4 h-4" />
-                        </button>
+                        </button>}
                         <Link
                           to={`/suppliers/${s.id}`}
                           onClick={(e) => e.stopPropagation()}
@@ -356,14 +380,14 @@ export const SuppliersView: React.FC = () => {
                     </tr>
                   );
                 })}
-                {suppliers.length === 0 && <tr><td colSpan={6} className="p-10 text-center text-sm font-bold text-slate-400">لا يوجد موردون مطابقون لبحثك.</td></tr>}
+                {suppliers.length === 0 && <tr><td colSpan={4 + Number(canViewPurchases) + Number(canViewFinancials)} className="p-10 text-center text-sm font-bold text-slate-400">لا يوجد موردون مطابقون لبحثك.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
 
         {/* Statement Panel */}
-        <div className="supplier-statement-print-area bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+        {canViewFinancials && <div className="supplier-statement-print-area bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           {selectedSupplier && statement ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -414,8 +438,8 @@ export const SuppliersView: React.FC = () => {
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div className="text-xs font-bold text-slate-500">سجل حركات كشف الحساب:</div>
                   <div className="flex gap-1 no-print">
-                    <button onClick={exportStatement} title="تصدير كشف الحساب" className="p-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100"><Download className="w-4 h-4" /></button>
-                    <button onClick={() => window.print()} title="طباعة كشف الحساب" className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"><Printer className="w-4 h-4" /></button>
+                    {canExport && <button onClick={exportStatement} title="تصدير كشف الحساب" className="p-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100"><Download className="w-4 h-4" /></button>}
+                    {canExport && <button onClick={() => window.print()} title="طباعة كشف الحساب" className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"><Printer className="w-4 h-4" /></button>}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 no-print">
@@ -465,18 +489,18 @@ export const SuppliersView: React.FC = () => {
               <p className="text-xs font-bold">اختر مورداً لعرض كشف حسابه</p>
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Add Supplier Modal */}
-      {isAddModalOpen && (
+      {isAddModalOpen && (editingSupplier ? canUpdate : canCreate) && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-base font-extrabold text-slate-900">{editingSupplier ? 'تعديل بيانات المورد' : 'إضافة مورد / مصنع سيراميك'}</h3>
+            <h3 className="text-base font-extrabold text-slate-900">{editingSupplier ? `تعديل بيانات ${supplierSingularLabel}` : `إضافة ${supplierSingularLabel} جديد`}</h3>
 
             <form onSubmit={handleSaveSupplier} className="space-y-3 text-xs">
               <div>
-                <label htmlFor="supplier-name" className="font-bold text-slate-700 block mb-1">اسم المورد / المسؤول *</label>
+                <label htmlFor="supplier-name" className="font-bold text-slate-700 block mb-1">اسم {supplierSingularLabel} / المسؤول *</label>
                 <input
                   id="supplier-name"
                   type="text"
@@ -538,7 +562,7 @@ export const SuppliersView: React.FC = () => {
                 </div>
               </div>
 
-              {!editingSupplier && <div>
+              {!editingSupplier && canApproveFinancials && <div>
                 <label htmlFor="supplier-initial-balance" className="font-bold text-slate-700 block mb-1">الرصيد الافتتاحي (المستحق للمورد موجب، ورصيدنا لديه سالب)</label>
                 <input
                   id="supplier-initial-balance"
@@ -572,7 +596,7 @@ export const SuppliersView: React.FC = () => {
       )}
 
       {/* Record Payment Modal */}
-      {isPaymentModalOpen && selectedSupplier && (
+      {isPaymentModalOpen && selectedSupplier && canPay && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
             <h3 className="text-base font-extrabold text-slate-900">سند صرف / سداد دفعة للمورد</h3>

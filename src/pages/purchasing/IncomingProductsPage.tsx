@@ -67,7 +67,7 @@ export const IncomingProductsPage: React.FC = () => {
       <select value={statusFilter} onChange={(e)=>setStatusFilter(e.target.value)} className="border rounded-xl px-3 py-2 text-sm"><option value="ALL">كل الحالات</option><option value="SENT">مرسل</option><option value="CONFIRMED">مؤكد</option><option value="PARTIAL">استلام جزئي</option></select>
       <input aria-label="من موعد الوصول المتوقع" type="date" value={dateFrom} onChange={(e)=>setDateFrom(e.target.value)} className="border rounded-xl px-2 py-2 text-sm"/><input aria-label="إلى موعد الوصول المتوقع" type="date" value={dateTo} onChange={(e)=>setDateTo(e.target.value)} className="border rounded-xl px-2 py-2 text-sm"/>
       <button onClick={load} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold">تحديث</button>
-      <button onClick={()=>report('excel')} className="px-3 py-2 rounded-xl bg-emerald-700 text-white text-sm">Excel</button><button onClick={()=>report('pdf')} className="px-3 py-2 rounded-xl bg-slate-700 text-white text-sm">طباعة / PDF</button>
+      <button onClick={()=>report('excel')} className="px-3 py-2 rounded-xl bg-emerald-700 text-white text-sm">جدول بيانات</button><button onClick={()=>report('pdf')} className="px-3 py-2 rounded-xl bg-slate-700 text-white text-sm">طباعة / مستند</button>
     </div>
     <main className="flex-1 overflow-auto p-4 space-y-3">
       {filtered.map((order) => {

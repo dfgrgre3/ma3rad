@@ -504,14 +504,14 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
 
     sqliteDb.run(`
       INSERT INTO sales_invoices (
-        id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, company_id, shift_id, order_id, project_id,
+        id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, company_id, shift_id, order_id, restaurant_order_id, project_id,
         subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
         shipping_cost, total_amount, paid_amount, remaining_amount, payment_type,
         payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
     `, [
       invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, dto.shiftId || null,
-      dto.orderId || null, dto.projectId || null,
+      dto.orderId || null, dto.restaurantOrderId || null, dto.projectId || null,
       totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
       totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, storedPaymentType,
       totals.paymentStatus, financialTotals.totalCost, financialTotals.grossProfit, dto.notes || null, actor.id

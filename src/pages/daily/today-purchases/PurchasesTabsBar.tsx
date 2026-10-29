@@ -45,22 +45,22 @@ export const PurchasesTabsBar: React.FC<PurchasesTabsBarProps> = ({
     <div className="flex items-center gap-2">
       {tab === 'invoices' && (
         <button type="button" onClick={onExportInvoices} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-          <Download className="h-3.5 w-3.5" /> Excel
+          <Download className="h-3.5 w-3.5" /> جدول بيانات
         </button>
       )}
       {tab === 'items' && (
         <button type="button" onClick={onExportItems} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-          <Download className="h-3.5 w-3.5" /> Excel
+          <Download className="h-3.5 w-3.5" /> جدول بيانات
         </button>
       )}
       {tab === 'suppliers' && (
         <button type="button" onClick={onExportSuppliers} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-          <Download className="h-3.5 w-3.5" /> Excel
+          <Download className="h-3.5 w-3.5" /> جدول بيانات
         </button>
       )}
       {tab === 'payments' && (
         <button type="button" onClick={onExportPayments} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-          <Download className="h-3.5 w-3.5" /> Excel
+          <Download className="h-3.5 w-3.5" /> جدول بيانات
         </button>
       )}
     </div>

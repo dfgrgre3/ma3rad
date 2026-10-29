@@ -1,7 +1,62 @@
+const officeCrypto = require('officecrypto-tool');
+
+const OLE_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+const ZIP_SIGNATURE = Buffer.from([0x50, 0x4b]);
+const MAX_XLSX_BACKUP_SIZE = 700 * 1024 * 1024;
+
+function toOfficeFileBuffer(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 || bytes.byteLength > MAX_XLSX_BACKUP_SIZE) {
+    throw new Error('حجم ملف XLSX فارغ أو يتجاوز الحد المسموح.');
+  }
+  return Buffer.from(bytes);
+}
+
+function hasSignature(bytes, signature) {
+  return bytes.length >= signature.length && signature.every((byte, index) => bytes[index] === byte);
+}
+
 function registerAppHandlers({
   ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
   appDataDir, DATA_DIR, BACKUP_DIR, ensureDirs,
 }) {
+  ipcMain.handle('db:encrypt-xlsx-backup', async (event, bytes, password) => {
+    validateIpcSender(event);
+    const workbook = toOfficeFileBuffer(bytes);
+    if (!hasSignature(workbook, ZIP_SIGNATURE)) {
+      throw new Error('محتوى ملف النسخة ليس مصنف XLSX صالحًا.');
+    }
+    if (typeof password !== 'string' || password.length < 12 || password.length > 255) {
+      throw new Error('يجب أن تتراوح كلمة مرور ملف XLSX بين 12 و255 حرفًا.');
+    }
+    return new Uint8Array(officeCrypto.encrypt(workbook, { password }));
+  });
+
+  ipcMain.handle('db:decrypt-xlsx-backup', async (event, bytes, password) => {
+    validateIpcSender(event);
+    const encrypted = toOfficeFileBuffer(bytes);
+    if (!hasSignature(encrypted, OLE_SIGNATURE)) {
+      throw new Error('الملف ليس نسخة XLSX مشفرة.');
+    }
+    if (typeof password !== 'string' || !password || password.length > 255) {
+      throw new Error('كلمة مرور ملف XLSX غير صالحة.');
+    }
+    try {
+      if (!officeCrypto.isEncrypted(encrypted)) throw new Error('الملف ليس نسخة XLSX مشفرة.');
+      const workbook = await officeCrypto.decrypt(encrypted, { password });
+      if (!hasSignature(workbook, ZIP_SIGNATURE)) {
+        throw new Error('محتوى الملف بعد فك التشفير ليس مصنف XLSX صالحًا.');
+      }
+      return new Uint8Array(workbook);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'الملف ليس نسخة XLSX مشفرة.') throw error;
+      if (error instanceof Error && error.message === 'محتوى الملف بعد فك التشفير ليس مصنف XLSX صالحًا.') throw error;
+      if (error instanceof Error && error.message === 'The password is incorrect') {
+        throw new Error('كلمة المرور غير صحيحة أو ملف XLSX تالف.');
+      }
+      throw new Error(`تعذر فك تشفير ملف XLSX: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+
   ipcMain.handle('app:info', async (event) => {
     validateIpcSender(event);
     return {

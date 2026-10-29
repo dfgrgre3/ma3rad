@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "custom",
+  "name": {
+    "ar": "نشاط آخر مخصص",
+    "en": "Custom business"
+  },
+  "description": {
+    "ar": "اكتب نوع نشاطك واختر الوحدات التي تحتاجها",
+    "en": "Name your business and choose the modules you need"
+  },
+  "category": "custom",
+  "configuration": {
+    "businessModel": "mixed",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "LITER",
+      "METER",
+      "LINEAR_METER",
+      "PACK",
+      "SERVICE"
+    ],
+    "customUnits": [],
+    "productAttributes": []
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "customers",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": []
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productAttributes": "stored-as-text-attributes",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

@@ -57,6 +57,7 @@ export class CustomerService {
   private sync = new MasterDataSyncService(this.db);
 
   public getAllCustomers(search?: string): Customer[] {
+    PermissionService.require(AuthService.requireAuth(), 'customers.view');
     const scope = this.branchAccess.companyScope('company_id');
     let sql = `SELECT * FROM customers WHERE ${scope.clause}`;
     const params: any[] = [...scope.params];
@@ -72,6 +73,7 @@ export class CustomerService {
   }
 
   public getCustomersPage(search = '', page = 1, pageSize = 25) {
+    PermissionService.require(AuthService.requireAuth(), 'customers.view');
     const scope = this.branchAccess.companyScope('company_id');
     const params: any[] = [...scope.params];
     let where = ` WHERE ${scope.clause}`;
@@ -88,7 +90,13 @@ export class CustomerService {
   }
 
   public getCustomerById(id: string): Customer | null {
-    const rows = this.db.query<Customer>(`SELECT * FROM customers WHERE id = ? AND ${this.branchAccess.companyScope('company_id').clause}`, [id, ...this.branchAccess.companyScope('company_id').params]);
+    PermissionService.require(AuthService.requireAuth(), 'customers.view');
+    return this.findCustomerById(id);
+  }
+
+  private findCustomerById(id: string): Customer | null {
+    const scope = this.branchAccess.companyScope('company_id');
+    const rows = this.db.query<Customer>(`SELECT * FROM customers WHERE id = ? AND ${scope.clause}`, [id, ...scope.params]);
     return rows.length > 0 ? rows[0] : null;
   }
 
@@ -117,14 +125,14 @@ export class CustomerService {
         VALUES (?, ?, 'المدير', 'إضافة عميل جديد', 'CUSTOMERS', ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, id, JSON.stringify(customer)]);
 
-      return this.getCustomerById(id)!;
+      return this.findCustomerById(id)!;
     });
   }
 
   public updateCustomer(id: string, updates: Partial<Customer>): Customer {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.update');
-    const existing = this.getCustomerById(id);
+    const existing = this.findCustomerById(id);
     if (!existing) throw new Error('العميل غير موجود.');
 
     const sql = `
@@ -156,7 +164,7 @@ export class CustomerService {
         VALUES (?, ?, ?, 'تعديل بيانات عميل', 'CUSTOMERS', ?, ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(existing), JSON.stringify(updates)]);
 
-      return this.getCustomerById(id)!;
+      return this.findCustomerById(id)!;
     });
   }
 
@@ -175,7 +183,7 @@ export class CustomerService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.payment');
 
-    const cust = this.getCustomerById(customerId);
+    const cust = this.findCustomerById(customerId);
     if (!cust) throw new Error('العميل غير موجود.');
     const register = registerId || 'cr_main';
     const branchId = this.branchAccess.requireRegisterAccess(register, actor);
@@ -344,29 +352,48 @@ export class CustomerService {
       balanceAfter: number;
     }[];
   } {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'sales.view');
+    PermissionService.require(actor, 'finance.debts.view');
+
     const cust = this.getCustomerById(customerId);
     if (!cust) throw new Error('العميل غير موجود.');
 
-    // Fetch Invoices
+    const invoiceScope = this.branchAccess.sqlScope(
+      'si.branch_id',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)',
+      actor
+    );
+    const invoiceCompanyScope = this.branchAccess.companyScope('si.company_id', actor);
+    const paymentScope = this.branchAccess.sqlScope(
+      'cp.branch_id',
+      '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = cp.register_id)',
+      actor
+    );
+    const returnScope = this.branchAccess.sqlScope(
+      '(SELECT si.branch_id FROM sales_invoices si WHERE si.id = sr.original_invoice_id)',
+      '(SELECT w.branch_id FROM warehouses w WHERE w.id = sr.warehouse_id)',
+      actor
+    );
+
     const invoices = this.db.query<any>(`
-      SELECT id, date, invoice_number as docNumber, total_amount as debit, paid_amount, created_at
-      FROM sales_invoices
-      WHERE customer_id = ? AND invoice_status != 'VOID'
-    `, [customerId]);
+      SELECT si.id, si.date, si.invoice_number as docNumber, si.total_amount as debit, si.paid_amount, si.created_at
+      FROM sales_invoices si
+      WHERE si.customer_id = ? AND si.invoice_status != 'VOID'
+        AND ${invoiceScope.clause} AND ${invoiceCompanyScope.clause}
+    `, [customerId, ...invoiceScope.params, ...invoiceCompanyScope.params]);
 
-    // Fetch Payments
     const payments = this.db.query<any>(`
-      SELECT id, date, receipt_number as docNumber, amount as credit, created_at, notes
-      FROM customer_payments
-      WHERE customer_id = ?
-    `, [customerId]);
+      SELECT cp.id, cp.date, cp.receipt_number as docNumber, cp.amount as credit, cp.created_at, cp.notes
+      FROM customer_payments cp
+      WHERE cp.customer_id = ? AND ${paymentScope.clause}
+    `, [customerId, ...paymentScope.params]);
 
-    // Fetch Returns
-    const returns = this.db.query<any>(`
-      SELECT id, date, return_number as docNumber, total_amount as credit, created_at, reason
-      FROM sales_returns
-      WHERE customer_id = ?
-    `, [customerId]);
+    const returns = PermissionService.can(actor, 'returns.view') ? this.db.query<any>(`
+      SELECT sr.id, sr.date, sr.return_number as docNumber, sr.total_amount as credit, sr.created_at, sr.reason
+      FROM sales_returns sr
+      WHERE sr.customer_id = ? AND ${returnScope.clause}
+    `, [customerId, ...returnScope.params]) : [];
 
     // Aggregate and sort chronologically
     const allRecords: any[] = [

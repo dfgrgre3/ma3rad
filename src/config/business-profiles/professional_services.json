@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "professional_services",
+  "name": {
+    "ar": "الخدمات المهنية",
+    "en": "Professional services"
+  },
+  "description": {
+    "ar": "خدمات للعملاء ومشروعات ومالية",
+    "en": "Client services, projects and finance"
+  },
+  "category": "services",
+  "configuration": {
+    "businessModel": "services",
+    "trackInventory": false,
+    "units": [
+      "SERVICE"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "تخصص الخدمة",
+      "نطاق الخدمة",
+      "مستوى الخدمة"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "customers",
+      "finance",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr"
+    ],
+    "optional": [
+      "inventory",
+      "purchasing",
+      "operations",
+      "manufacturing"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "projectModule": "available",
+    "industrySpecificWorkflows": "not-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented",
+    "timeTrackingAndServiceBilling": "not-implemented"
+  }
+}

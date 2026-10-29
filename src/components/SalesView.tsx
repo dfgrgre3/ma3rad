@@ -19,6 +19,7 @@ import { exportToExcel, buildExportHtml } from '../utils/export';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { localDateString } from '../utils/date';
 import { buildWhatsAppUrl, openExternalShare } from '../utils/externalLinks';
+import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 
 type InvoiceRow = SalesInvoice & { itemsCount?: number; returnedAmount?: number };
 
@@ -42,6 +43,8 @@ const paymentTypeLabel: Record<string, string> = {
 
 export const SalesView: React.FC = () => {
   const navigate = useNavigate();
+  const salesLabel = useBusinessTerm('modules.sales');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
   const salesService = useMemo(() => new SalesService(), []);
   const customerService = useMemo(() => new CustomerService(), []);
   const inventoryService = useMemo(() => new InventoryService(), []);
@@ -49,7 +52,13 @@ export const SalesView: React.FC = () => {
   const user = AuthService.getCurrentUser();
   const canVoid = PermissionService.can(user, 'sales.void');
   const canCollect = PermissionService.can(user, 'customers.payment');
+  const canViewDebts = PermissionService.can(user, 'finance.debts.view');
+  const canViewCustomerStatement = PermissionService.can(user, 'customers.view') && canViewDebts;
+  const canViewReturns = PermissionService.can(user, 'returns.view');
   const canRefund = PermissionService.can(user, 'sales.refund');
+  const canExport = PermissionService.can(user, 'sales.export');
+  const canCreate = PermissionService.can(user, 'sales.create');
+  const canExportCustomers = PermissionService.can(user, 'customers.export');
 
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
@@ -181,13 +190,13 @@ export const SalesView: React.FC = () => {
     const full = salesService.getInvoiceById(invoice.id);
     if (!full) return;
     setSelected(full);
-    setPayments(salesService.getInvoicePayments(invoice.id));
+    setPayments(canViewDebts ? salesService.getInvoicePayments(invoice.id) : []);
   };
 
   const refreshSelected = (invoiceId: string) => {
     const full = salesService.getInvoiceById(invoiceId);
     setSelected(full);
-    setPayments(salesService.getInvoicePayments(invoiceId));
+    setPayments(canViewDebts ? salesService.getInvoicePayments(invoiceId) : []);
   };
 
   const openVoid = (invoice: InvoiceRow) => {
@@ -246,11 +255,13 @@ export const SalesView: React.FC = () => {
     phone: inv.customerPhone || '',
     warehouse: inv.warehouseName || '',
     total: inv.totalAmount,
-    paid: inv.paidAmount,
-    remaining: inv.remainingAmount,
-    returned: inv.returnedAmount || 0,
+    ...(canViewDebts ? {
+      paid: inv.paidAmount,
+      remaining: inv.remainingAmount,
+      status: paymentStatusLabel[inv.paymentStatus] || inv.paymentStatus,
+    } : {}),
+    ...(canViewReturns ? { returned: inv.returnedAmount || 0 } : {}),
     profit: inv.grossProfit,
-    status: paymentStatusLabel[inv.paymentStatus] || inv.paymentStatus,
     invoiceStatus: inv.invoiceStatus === 'VOID' ? 'ملغاة' : 'مكتملة',
   }));
 
@@ -261,11 +272,13 @@ export const SalesView: React.FC = () => {
     { key: 'phone', label: 'الهاتف' },
     { key: 'warehouse', label: 'المخزن' },
     { key: 'total', label: 'الإجمالي' },
-    { key: 'paid', label: 'المدفوع' },
-    { key: 'remaining', label: 'المتبقي' },
-    { key: 'returned', label: 'المرتجع' },
+    ...(canViewDebts ? [
+      { key: 'paid', label: 'المدفوع' },
+      { key: 'remaining', label: 'المتبقي' },
+      { key: 'status', label: 'حالة السداد' },
+    ] : []),
+    ...(canViewReturns ? [{ key: 'returned', label: 'المرتجع' }] : []),
     { key: 'profit', label: 'الربح' },
-    { key: 'status', label: 'حالة السداد' },
     { key: 'invoiceStatus', label: 'حالة الفاتورة' },
   ];
 
@@ -351,31 +364,34 @@ export const SalesView: React.FC = () => {
             <Receipt className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h1 className="text-base font-black text-slate-900">سجل فواتير المبيعات</h1>
+            <h1 className="text-base font-black text-slate-900">
+              سجل فواتير {salesLabel}
+              <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
+            </h1>
             <p className="text-xs text-slate-500 font-medium">
               متابعة الفواتير، التحصيلات، المرتجعات، وإعادة الطباعة مع رقابة كاملة على الحسابات
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button
+          {canExport && <button
             onClick={() => doExport('excel')}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel
-          </button>
-          <button
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات
+          </button>}
+          {canExport && <button
             onClick={() => doExport('pdf')}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition"
           >
-            <FileDown className="w-4 h-4 text-rose-600" /> PDF
-          </button>
-          <button
+            <FileDown className="w-4 h-4 text-rose-600" /> مستند
+          </button>}
+          {canCreate && <button
             onClick={() => navigate('/pos')}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shrink-0"
           >
             <Plus className="w-4 h-4" /> فاتورة جديدة (POS)
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -383,9 +399,9 @@ export const SalesView: React.FC = () => {
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           <StatCard label="عدد الفواتير" value={String(stats?.count ?? 0)} icon={Receipt} tone="text-slate-700 bg-slate-50 border-slate-200" />
           <StatCard label="إجمالي المبيعات" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingUp} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
-          <StatCard label="المحصّل" value={fmt(stats?.paidAmount ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />
-          <StatCard label="المتبقي (آجل)" value={fmt(stats?.remainingAmount ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />
-          <StatCard label="المرتجعات" value={fmt(stats?.returnedAmount ?? 0)} icon={RotateCcw} tone="text-rose-700 bg-rose-50 border-rose-200" />
+          {canViewDebts && <StatCard label="المحصّل" value={fmt(stats?.paidAmount ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />}
+          {canViewDebts && <StatCard label="المتبقي (آجل)" value={fmt(stats?.remainingAmount ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />}
+          {canViewReturns && <StatCard label="المرتجعات" value={fmt(stats?.returnedAmount ?? 0)} icon={RotateCcw} tone="text-rose-700 bg-rose-50 border-rose-200" />}
           <StatCard label="الربح الإجمالي" value={fmt(stats?.grossProfit ?? 0)} icon={Percent} tone="text-violet-700 bg-violet-50 border-violet-200" />
         </div>
 
@@ -465,9 +481,9 @@ export const SalesView: React.FC = () => {
                     <th className="px-4 py-3">التاريخ</th>
                     <th className="px-4 py-3">البنود</th>
                     <th className="px-4 py-3">الإجمالي</th>
-                    <th className="px-4 py-3">المدفوع</th>
-                    <th className="px-4 py-3">المتبقي</th>
-                    <th className="px-4 py-3">الحالة</th>
+                    {canViewDebts && <th className="px-4 py-3">المدفوع</th>}
+                    {canViewDebts && <th className="px-4 py-3">المتبقي</th>}
+                    <th className="px-4 py-3">حالة الفاتورة</th>
                     <th className="px-4 py-3 text-center">الإجراءات</th>
                   </tr>
                 </thead>
@@ -483,22 +499,24 @@ export const SalesView: React.FC = () => {
                       <td className="px-4 py-3 font-mono text-slate-500">{inv.date}</td>
                       <td className="px-4 py-3 text-slate-500">{inv.itemsCount ?? inv.items?.length ?? 0}</td>
                       <td className="px-4 py-3 font-black text-slate-900">{fmt(inv.totalAmount)}</td>
-                      <td className="px-4 py-3 font-bold text-emerald-600">{fmt(inv.paidAmount)}</td>
-                      <td className="px-4 py-3 font-bold text-amber-600">{fmt(inv.remainingAmount)}</td>
+                      {canViewDebts && <td className="px-4 py-3 font-bold text-emerald-600">{fmt(inv.paidAmount)}</td>}
+                      {canViewDebts && <td className="px-4 py-3 font-bold text-amber-600">{fmt(inv.remainingAmount)}</td>}
                       <td className="px-4 py-3">
                         <div className="space-y-1">
                           <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
                             inv.invoiceStatus === 'VOID'
                               ? 'bg-rose-500/10 text-rose-600'
-                              : inv.paymentStatus === 'PAID'
+                              : canViewDebts && inv.paymentStatus === 'PAID'
                                 ? 'bg-emerald-500/10 text-emerald-600'
-                                : inv.paymentStatus === 'PARTIAL'
+                                : canViewDebts && inv.paymentStatus === 'PARTIAL'
                                   ? 'bg-sky-500/10 text-sky-600'
-                                  : 'bg-amber-500/10 text-amber-600'
+                                  : canViewDebts
+                                    ? 'bg-amber-500/10 text-amber-600'
+                                    : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {inv.invoiceStatus === 'VOID' ? 'ملغاة' : paymentStatusLabel[inv.paymentStatus]}
+                            {inv.invoiceStatus === 'VOID' ? 'ملغاة' : canViewDebts ? paymentStatusLabel[inv.paymentStatus] : 'مكتملة'}
                           </span>
-                          {(inv.returnedAmount || 0) > 0 && (
+                          {canViewReturns && (inv.returnedAmount || 0) > 0 && (
                             <div className="text-[9px] text-rose-500 font-bold">مرتجع: {fmt(inv.returnedAmount || 0)}</div>
                           )}
                         </div>
@@ -506,7 +524,7 @@ export const SalesView: React.FC = () => {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <IconButton title="معاينة الفاتورة" onClick={() => openInvoicePreview(inv)}><Eye className="w-4 h-4" /></IconButton>
-                          <IconButton title="تفاصيل الفاتورة والمدفوعات" onClick={() => openDetails(inv)}><Info className="w-4 h-4" /></IconButton>
+                          <IconButton title="تفاصيل الفاتورة" onClick={() => openDetails(inv)}><Info className="w-4 h-4" /></IconButton>
                           <IconButton title="طباعة A4" onClick={() => {
                             const full = salesService.getInvoiceById(inv.id);
                             if (full) printService.printInvoice(full);
@@ -531,7 +549,7 @@ export const SalesView: React.FC = () => {
                     </tr>
                   ))}
                   {invoices.length === 0 && (
-                    <tr><td colSpan={10} className="py-16 text-center text-slate-400">لا توجد فواتير مطابقة للفلتر الحالي.</td></tr>
+                    <tr><td colSpan={canViewDebts ? 10 : 8} className="py-16 text-center text-slate-400">لا توجد فواتير مطابقة للفلتر الحالي.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -568,7 +586,7 @@ export const SalesView: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <InfoBox label="العميل" value={selected.customerName || 'عميل نقدي'} sub={selected.customerPhone} />
-            <InfoBox label="طريقة الدفع" value={paymentTypeLabel[selected.paymentType] || selected.paymentType} sub={paymentStatusLabel[selected.paymentStatus]} />
+            <InfoBox label="طريقة الدفع" value={paymentTypeLabel[selected.paymentType] || selected.paymentType} sub={canViewDebts ? paymentStatusLabel[selected.paymentStatus] : undefined} />
             <InfoBox label="حالة الفاتورة" value={selected.invoiceStatus === 'VOID' ? 'ملغاة' : 'مكتملة'} sub={`${selected.items.length} بند`} />
           </div>
 
@@ -613,9 +631,9 @@ export const SalesView: React.FC = () => {
                 <SummaryRow label="المشال والنقل" value={selected.shippingCost} />
                 <div className="border-t border-slate-300 mt-1 pt-2">
                   <SummaryRow label="إجمالي الفاتورة" value={selected.totalAmount} strong />
-                  <SummaryRow label="المدفوع" value={selected.paidAmount} tone="text-emerald-600" />
-                  <SummaryRow label="المتبقي" value={selected.remainingAmount} tone="text-amber-600" />
-                  {(selected.returnedAmount || 0) > 0 && <SummaryRow label="المرتجع" value={selected.returnedAmount || 0} tone="text-rose-600" />}
+                  {canViewDebts && <SummaryRow label="المدفوع" value={selected.paidAmount} tone="text-emerald-600" />}
+                  {canViewDebts && <SummaryRow label="المتبقي" value={selected.remainingAmount} tone="text-amber-600" />}
+                  {canViewReturns && (selected.returnedAmount || 0) > 0 && <SummaryRow label="المرتجع" value={selected.returnedAmount || 0} tone="text-rose-600" />}
                 </div>
               </div>
               {selected.notes && (
@@ -625,7 +643,7 @@ export const SalesView: React.FC = () => {
               )}
             </div>
 
-            <div>
+            {canViewDebts && <div>
               <div className="text-[11px] font-black text-slate-600 mb-2 flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5" /> تحصيلات الفاتورة ({payments.length})
               </div>
@@ -642,7 +660,7 @@ export const SalesView: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </div>}
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
@@ -655,9 +673,9 @@ export const SalesView: React.FC = () => {
             <button onClick={() => printService.printThermalReceipt(selected)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
               <Receipt className="w-3.5 h-3.5" /> إيصال حراري
             </button>
-            <button onClick={() => openStatement(selected.customerId)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
+            {canViewCustomerStatement && <button onClick={() => openStatement(selected.customerId)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
               <FileBarChart className="w-3.5 h-3.5" /> كشف حساب العميل
-            </button>
+            </button>}
             {selected.invoiceStatus !== 'VOID' && canRefund && (
               <button onClick={() => goToReturn(selected.id)} className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
                 <RotateCcw className="w-3.5 h-3.5" /> مرتجع مبيعات
@@ -803,7 +821,7 @@ export const SalesView: React.FC = () => {
             </table>
           </div>
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <button
+            {canExportCustomers && <button
               onClick={() => {
                 const options = statementExportOptions(statement);
                 setDocPreview({
@@ -817,7 +835,7 @@ export const SalesView: React.FC = () => {
               className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"
             >
               <FileDown className="w-3.5 h-3.5" /> معاينة وتصدير
-            </button>
+            </button>}
             <button onClick={() => setStatement(null)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold">إغلاق</button>
           </div>
         </Modal>

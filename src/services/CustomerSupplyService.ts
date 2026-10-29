@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { getProductUnitLabel } from '../utils/productUnits';
 
 export type CustomerSupplyStatus = 'OPEN' | 'PARTIAL' | 'READY' | 'CANCELLED';
@@ -48,6 +49,7 @@ export interface CustomerSupplyRequest {
 
 export class CustomerSupplyService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   private ensureTables(): void {
     this.db.run(`CREATE TABLE IF NOT EXISTS customer_supply_requests (
@@ -87,9 +89,11 @@ export class CustomerSupplyService {
   }
 
   public getOpenRequests(filters: { customerId?: string; warehouseId?: string; search?: string } = {}): CustomerSupplyRequest[] {
-    PermissionService.require(AuthService.requireAuth(), 'customers.view');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'sales.view');
     this.ensureTables();
-    const params: any[] = [];
+    const companyScope = this.branchAccess.companyScope('w.company_id', actor);
+    const params: any[] = [...companyScope.params];
     let sql = `
       SELECT r.id, r.customer_id AS customerId, c.name AS customerName, c.phone, c.address,
              r.invoice_id AS invoiceId, r.invoice_number AS invoiceNumber, r.warehouse_id AS warehouseId,
@@ -98,8 +102,26 @@ export class CustomerSupplyService {
       FROM customer_supply_requests r
       JOIN customers c ON c.id = r.customer_id
       LEFT JOIN warehouses w ON w.id = r.warehouse_id
-      WHERE r.status IN ('OPEN', 'PARTIAL', 'READY')
+      WHERE r.status IN ('OPEN', 'PARTIAL', 'READY') AND ${companyScope.clause}
     `;
+
+    const accessibleBranches = this.branchAccess.getAccessibleBranchIds(actor);
+    if (accessibleBranches !== null) {
+      if (!accessibleBranches.length) {
+        sql += ` AND 1 = 0`;
+      } else {
+        const branchParams = accessibleBranches.map(() => '?');
+        const branchList = branchParams.join(', ');
+        sql += ` AND (
+          w.branch_id IN (${branchList})
+          OR EXISTS (
+            SELECT 1 FROM branch_warehouses bw
+            WHERE bw.warehouse_id = w.id AND bw.branch_id IN (${branchList})
+          )
+        )`;
+        params.push(...accessibleBranches, ...accessibleBranches);
+      }
+    }
 
     if (filters.customerId) {
       sql += ` AND r.customer_id = ?`;
@@ -125,7 +147,6 @@ export class CustomerSupplyService {
   }
 
   public getReadyRequests(filters: { customerId?: string } = {}): CustomerSupplyRequest[] {
-    this.ensureTables();
     const all = this.getOpenRequests(filters);
     return all.filter((request) => request.status === 'READY' || request.items.every((item) => item.status === 'READY'));
   }

@@ -5,11 +5,16 @@ import {
 } from 'lucide-react';
 import { InventoryService } from '../services/InventoryService';
 import { ProductService } from '../services/ProductService';
+import { AuthService } from '../services/AuthService';
+import { PermissionService } from '../services/PermissionService';
 import { WarehouseStock, InventoryTransaction, Warehouse as IWarehouse, Product } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
+import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 
 export const InventoryView: React.FC = () => {
+  const inventoryLabel = useBusinessTerm('modules.inventory');
+  const { label: businessProfileLabel } = useBusinessProfileMeta();
   const [stockList, setStockList] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
@@ -43,6 +48,10 @@ export const InventoryView: React.FC = () => {
 
   const inventoryService = new InventoryService();
   const productService = new ProductService();
+  const currentUser = AuthService.getCurrentUser();
+  const canTransfer = PermissionService.can(currentUser, 'inventory.transfer');
+  const canAdjust = PermissionService.can(currentUser, 'inventory.adjust');
+  const canViewFinancials = PermissionService.can(currentUser, 'finance.view');
 
   const loadData = () => {
     try {
@@ -113,18 +122,21 @@ export const InventoryView: React.FC = () => {
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900">إدارة المخازن وحركات المخزون</h2>
+          <h2 className="text-xl font-extrabold text-slate-900">
+            إدارة {inventoryLabel}
+            <span className="ml-2 text-sm font-bold text-sky-700">· {businessProfileLabel}</span>
+          </h2>
           <p className="text-xs text-slate-500">مراقبة الأرصدة بوحدة كل صنف، والتحويلات بين المخازن، وسجل الحركات</p>
         </div>
 
         <div className="flex gap-2">
-          <button
+          {canTransfer && <button
             onClick={() => setIsTransferModalOpen(true)}
             className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-xs"
           >
             <ArrowLeftRight className="w-4 h-4" />
             <span>تحويل بين المخازن</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -199,7 +211,7 @@ export const InventoryView: React.FC = () => {
                     <th className="p-3.5">الصادر</th>
                     <th className="p-3.5">الرصيد بالكرتونة</th>
                     <th className="p-3.5">الرصيد بالقطع</th>
-                    <th className="p-3.5">قيمة الرصيد (تكلفة)</th>
+                    {canViewFinancials && <th className="p-3.5">قيمة الرصيد (تكلفة)</th>}
                     <th className="p-3.5 text-center">إجراءات</th>
                   </tr>
                 </thead>
@@ -236,11 +248,11 @@ export const InventoryView: React.FC = () => {
                         <td className="p-3.5 text-slate-600 ">
                           {stk.productType === 'GENERAL' ? '—' : `${stk.quantityPieces} قطعة`}
                         </td>
-                        <td className="p-3.5 font-mono font-bold text-slate-700">
+                        {canViewFinancials && <td className="p-3.5 font-mono font-bold text-slate-700">
                           {CeramicMath.formatCurrency(stk.quantityM2 * stk.costPrice)}
-                        </td>
+                        </td>}
                         <td className="p-3.5 text-center">
-                          <button
+                          {canAdjust && <button
                             onClick={() => {
                               setAdjustData({
                                 warehouseId: stk.warehouseId,
@@ -254,7 +266,7 @@ export const InventoryView: React.FC = () => {
                             className="px-2.5 py-1 bg-slate-100 hover:bg-sky-500 hover:text-slate-900 rounded-lg text-[11px] font-bold transition"
                           >
                             تسوية جردية
-                          </button>
+                          </button>}
                         </td>
                       </tr>
                     ))
@@ -314,7 +326,7 @@ export const InventoryView: React.FC = () => {
       )}
 
       {/* Stock Transfer Modal */}
-      {isTransferModalOpen && (
+      {isTransferModalOpen && canTransfer && (
         <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-base font-extrabold text-slate-900">تحويل مخزني بين الفروع والمخازن</h3>
@@ -408,7 +420,7 @@ export const InventoryView: React.FC = () => {
       )}
 
       {/* Adjust Modal */}
-      {isAdjustModalOpen && (
+      {isAdjustModalOpen && canAdjust && (
         <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-base font-extrabold text-slate-900">تسوية جردية للمخزون</h3>

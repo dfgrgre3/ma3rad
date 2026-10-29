@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Plus, Search, Loader2, X, Trash2, Power, Pencil } from 'lucide-react';
 import { FinanceExtrasService, Account, AccountType } from '../../services/FinanceExtrasService';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 
 const TYPE_LABELS: Record<AccountType, string> = {
   ASSET: 'أصول',
@@ -20,6 +22,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 
 export const ChartOfAccountsPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
+  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'finance.approve');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | AccountType>('ALL');
@@ -95,9 +98,9 @@ export const ChartOfAccountsPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">هيكل الحسابات المحاسبية وأرصدتها المستخرجة من القيود</p>
           </div>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+        {canManage && <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-bold transition shrink-0">
           <Plus className="w-4 h-4" /> إضافة حساب
-        </button>
+        </button>}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 bg-white border-b border-slate-200">
@@ -137,9 +140,9 @@ export const ChartOfAccountsPage: React.FC = () => {
                     <td className="px-4 py-3"><span className={`text-[10px] px-2 py-1 rounded-full font-bold ${a.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{a.isActive ? 'نشط' : 'موقوف'}</span></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
-                        <button onClick={() => toggle(a)} title="تفعيل/إيقاف" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><Power className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => openEdit(a)} title="Edit account" className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50"><Pencil className="w-3.5 h-3.5" /></button>
-                        <button onClick={() => remove(a)} title="حذف" className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
+                        {canManage && <button onClick={() => toggle(a)} title="تفعيل/إيقاف" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><Power className="w-3.5 h-3.5" /></button>}
+                        {canManage && <button onClick={() => openEdit(a)} title="تعديل الحساب" className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50"><Pencil className="w-3.5 h-3.5" /></button>}
+                        {canManage && <button onClick={() => remove(a)} title="حذف" className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>}
                       </div>
                     </td>
                   </tr>
@@ -151,7 +154,7 @@ export const ChartOfAccountsPage: React.FC = () => {
         )}
       </div>
 
-      {modal && (
+      {modal && canManage && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">

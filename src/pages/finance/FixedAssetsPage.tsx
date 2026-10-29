@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building, Plus, Loader2, Trash2, TrendingDown, Search } from 'lucide-react';
 import { FinanceExtrasService, FixedAsset } from '../../services/FinanceExtrasService';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 import { localDateString } from '../../utils/date';
 
 import { fmt, CATEGORY_LABELS } from './fixedAssetsHelpers';
@@ -8,6 +10,7 @@ import { FixedAssetEditorModal } from './FixedAssetEditorModal';
 
 export const FixedAssetsPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
+  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'finance.approve');
   const [rows, setRows] = useState<FixedAsset[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -97,9 +100,9 @@ export const FixedAssetsPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">سجل الأصول والقيمة الدفترية وجداول الإهلاك الشهري</p>
           </div>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition shrink-0">
+        {canManage && <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition shrink-0">
           <Plus className="w-4 h-4" /> إضافة أصل
-        </button>
+        </button>}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-white border-b border-slate-200">
@@ -157,12 +160,12 @@ export const FixedAssetsPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-1">
-                    <button onClick={() => depreciate(row)} disabled={row.status !== 'ACTIVE'} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-bold hover:bg-violet-100 disabled:opacity-40">
+                    {canManage && <button onClick={() => depreciate(row)} disabled={row.status !== 'ACTIVE'} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg bg-violet-50 text-violet-700 font-bold hover:bg-violet-100 disabled:opacity-40">
                       <TrendingDown className="w-3 h-3" /> ترحيل إهلاك
-                    </button>
+                    </button>}
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(row)} className="text-[10px] px-2 py-1 rounded-lg bg-slate-100 text-slate-600 font-bold hover:bg-slate-200">تعديل</button>
-                      <button onClick={() => remove(row)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {canManage && <button onClick={() => openEdit(row)} className="text-[10px] px-2 py-1 rounded-lg bg-slate-100 text-slate-600 font-bold hover:bg-slate-200">تعديل</button>}
+                      {canManage && <button onClick={() => remove(row)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>}
                     </div>
                   </div>
                 </div>
@@ -172,7 +175,7 @@ export const FixedAssetsPage: React.FC = () => {
         )}
       </div>
 
-      {modal && <FixedAssetEditorModal form={form} setForm={setForm} editing={editing} saving={saving} onClose={() => setModal(false)} onSubmit={submit} />}
+      {modal && canManage && <FixedAssetEditorModal form={form} setForm={setForm} editing={editing} saving={saving} onClose={() => setModal(false)} onSubmit={submit} />}
     </div>
   );
 };

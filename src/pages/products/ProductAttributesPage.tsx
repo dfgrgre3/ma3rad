@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Ruler, Plus, Search, Layers, Sparkles, Tag, Shield, Compass, Loader2, X } from 'lucide-react';
 import { AttributeService, AttributeCategory } from '../../services/AttributeService';
+import type { DynamicAttributeDataType } from '../../services/dynamicAttributes';
 
 const ICONS: Record<string, React.ElementType> = {
   TILE_SIZES: Ruler, TILE_FINISH: Sparkles, TILE_APPLICATION: Compass,
   TILE_GRADES: Shield, TILE_EDGES: Layers,
 };
 
-const DATA_TYPES: Record<string, string> = {
+const DATA_TYPES: Record<DynamicAttributeDataType, string> = {
   TEXT: 'نص', NUMBER: 'رقم', BOOLEAN: 'نعم/لا', SELECT: 'قائمة اختيار', MULTI_SELECT: 'اختيار متعدد', DATE: 'تاريخ',
 };
 
@@ -21,7 +22,23 @@ export const ProductAttributesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', code: '', dataType: 'SELECT', unit: '' });
+  const [form, setForm] = useState<{
+    name: string;
+    code: string;
+    dataType: DynamicAttributeDataType;
+    unit: string;
+    isRequired: boolean;
+    isFilterable: boolean;
+    options: string;
+  }>({
+    name: '',
+    code: '',
+    dataType: 'SELECT',
+    unit: '',
+    isRequired: false,
+    isFilterable: true,
+    options: '',
+  });
 
   const load = () => {
     setLoading(true);
@@ -55,9 +72,25 @@ export const ProductAttributesPage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      service.addCategory({ name: form.name, code: form.code.toUpperCase(), dataType: form.dataType, unit: form.unit || undefined });
+      service.addCategory({
+        name: form.name,
+        code: form.code.toUpperCase(),
+        dataType: form.dataType,
+        unit: form.unit || undefined,
+        isRequired: form.isRequired,
+        isFilterable: form.isFilterable,
+        options: form.options.split(/\r?\n/),
+      });
       setModalOpen(false);
-      setForm({ name: '', code: '', dataType: 'SELECT', unit: '' });
+      setForm({
+        name: '',
+        code: '',
+        dataType: 'SELECT',
+        unit: '',
+        isRequired: false,
+        isFilterable: true,
+        options: '',
+      });
       load();
     } catch (err: any) { alert(err?.message); }
     finally { setSaving(false); }
@@ -111,7 +144,12 @@ export const ProductAttributesPage: React.FC = () => {
                     <h2 className="text-base font-black text-slate-900">{activeCategory.name}</h2>
                     <span className="text-xs font-mono text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">{activeCategory.code}</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">النوع: {DATA_TYPES[activeCategory.dataType] || activeCategory.dataType}{activeCategory.unit ? ` • الوحدة: ${activeCategory.unit}` : ''}</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    النوع: {DATA_TYPES[activeCategory.dataType] || activeCategory.dataType}
+                    {activeCategory.unit ? ` • الوحدة: ${activeCategory.unit}` : ''}
+                    {activeCategory.isRequired ? ' • مطلوب' : ''}
+                    {activeCategory.isFilterable ? ' • مفعّل لإعداد التصفية' : ''}
+                  </p>
                 </div>
 
                 <form onSubmit={handleAddValue} className="flex gap-2">
@@ -158,9 +196,42 @@ export const ProductAttributesPage: React.FC = () => {
               </div>
               <div>
                 <label className="font-bold text-slate-700 block mb-1">نوع البيانات</label>
-                <select value={form.dataType} onChange={(e) => setForm({ ...form, dataType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
+                <select value={form.dataType} onChange={(e) => setForm({ ...form, dataType: e.target.value as DynamicAttributeDataType })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                   {Object.entries(DATA_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
+              </div>
+              {['SELECT', 'MULTI_SELECT'].includes(form.dataType) && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">خيارات الاختيار (خيار لكل سطر)</label>
+                  <textarea
+                    rows={3}
+                    value={form.options}
+                    onChange={(event) => setForm({ ...form, options: event.target.value })}
+                    className="w-full resize-y px-3 py-2 bg-slate-50 rounded-xl border border-slate-200"
+                    placeholder={'أحمر\nأزرق\nأخضر'}
+                  />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={form.isRequired}
+                    onChange={(event) => setForm({ ...form, isRequired: event.target.checked })}
+                  />
+                  مطلوب عند حفظ المنتج
+                </label>
+                <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={form.isFilterable}
+                    onChange={(event) => setForm({ ...form, isFilterable: event.target.checked })}
+                  />
+                  تفعيل إعداد التصفية
+                </label>
+                <p className="col-span-2 text-[11px] text-slate-500">
+                  يُحفظ هذا الإعداد مع الخاصية؛ لم يُربط بعد بقائمة تصفية المنتجات.
+                </p>
               </div>
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": 1,
+  "id": "manufacturing",
+  "name": {
+    "ar": "التصنيع والإنتاج",
+    "en": "Manufacturing and production"
+  },
+  "description": {
+    "ar": "مواد وعمليات وتخطيط إنتاج",
+    "en": "Materials, operations and production planning"
+  },
+  "category": "manufacturing",
+  "configuration": {
+    "businessModel": "products",
+    "trackInventory": true,
+    "units": [
+      "PIECE",
+      "KG",
+      "TON",
+      "METER"
+    ],
+    "customUnits": [],
+    "productAttributes": [
+      "نوع المنتج",
+      "الخامة",
+      "المواصفة"
+    ]
+  },
+  "modules": {
+    "enabledByDefault": [
+      "sales",
+      "inventory",
+      "purchasing",
+      "finance",
+      "operations",
+      "reports",
+      "approvals",
+      "documents",
+      "projects",
+      "hr",
+      "manufacturing"
+    ],
+    "optional": [
+      "customers"
+    ]
+  },
+  "support": {
+    "profileDefaults": "implemented",
+    "productionModule": "available",
+    "industrySpecificWorkflows": "partially-implemented",
+    "industrySpecificReports": "not-implemented",
+    "industrySpecificDocumentTemplates": "not-implemented",
+    "typedCustomFieldStorage": "not-implemented"
+  }
+}

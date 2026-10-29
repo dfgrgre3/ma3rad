@@ -104,8 +104,8 @@ export function FinancialStatementsHeader({
           <button onClick={onRefresh} aria-label="تحديث القوائم المالية" className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100" title="تحديث">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button onClick={onExport} aria-label="تصدير إلى Excel" disabled={!onExport} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold disabled:opacity-40">
-            <FileSpreadsheet className="w-4 h-4" /> Excel
+          <button onClick={onExport} aria-label="تصدير إلى جدول بيانات" disabled={!onExport} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold disabled:opacity-40">
+            <FileSpreadsheet className="w-4 h-4" /> جدول بيانات
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Clock3, Loader2, MapPin, MessageCircle, PackageCheck, Phone, RefreshCw, Search, X } from 'lucide-react';
 import { CustomerSupplyService } from '../../services/CustomerSupplyService';
+import { usePermission } from '../../hooks/usePermission';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
 
@@ -31,6 +32,7 @@ function normalizeEgyptianPhone(value: string): string {
 export const CustomerImportedProductsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const canView = usePermission()('sales.view');
   const supplyService = useMemo(() => new CustomerSupplyService(), []);
   const [groups, setGroups] = useState<InvoiceGroup[]>([]);
   const [search, setSearch] = useState('');
@@ -39,6 +41,11 @@ export const CustomerImportedProductsPage: React.FC = () => {
   const [draft, setDraft] = useState<Draft | null>(null);
 
   const refresh = useCallback(() => {
+    if (!canView) {
+      setError('ليس لديك صلاحية عرض هذه الصفحة.');
+      setLoading(false);
+      return;
+    }
     setError('');
     try {
       const requests = supplyService.getOpenRequests({ customerId: id && id !== 'imported-products' ? id : undefined });
@@ -81,14 +88,15 @@ export const CustomerImportedProductsPage: React.FC = () => {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'تعذر تحميل المنتجات المطلوبة.');
     } finally { setLoading(false); }
-  }, [id, supplyService]);
+  }, [canView, id, supplyService]);
 
   useEffect(() => {
     refresh();
+    if (!canView) return;
     const timer = window.setInterval(refresh, 15000);
     window.addEventListener('focus', refresh);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
-  }, [refresh]);
+  }, [canView, refresh]);
 
   const buildMessage = (group: InvoiceGroup, fee: number) => {
     const lines = group.items.map((item) => `• ${item.productName}${item.size ? ` (${item.size})` : ''} — ${formatProductQuantity(item.quantityM2, item)} × ${fmt(item.unitPrice)} ج = ${fmt(item.totalPrice)} ج`).join('\n');
@@ -103,6 +111,8 @@ export const CustomerImportedProductsPage: React.FC = () => {
     if (!phone) return;
     openExternalShare(buildWhatsAppUrl(phone, encodeURIComponent(draft.text)), draft.text);
   };
+
+  if (!canView) return <div className="h-full flex items-center justify-center bg-slate-50 text-rose-700" dir="rtl">ليس لديك صلاحية عرض هذه الصفحة.</div>;
 
   return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
     <header className="bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between gap-3">

@@ -2,6 +2,7 @@ import React from 'react';
 import { FileText, DollarSign } from 'lucide-react';
 import { Supplier } from '../../../types';
 import { CeramicMath } from '../../../utils/ceramicMath';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/useBusinessTerm';
 import {
   Tab, SupplierInvoiceRow, SupplierOrderRow, SupplierPaymentRow, PAY_STATUS_BADGES,
 } from './types';
@@ -12,6 +13,8 @@ export interface OverviewTabProps {
   payments: SupplierPaymentRow[];
   orders: SupplierOrderRow[];
   canUpdate: boolean;
+  canViewPurchases: boolean;
+  canViewFinancials: boolean;
   onOpenEditModal: () => void;
   onTabChange: (tab: Tab) => void;
 }
@@ -22,63 +25,70 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   payments,
   orders,
   canUpdate,
+  canViewPurchases,
+  canViewFinancials,
   onOpenEditModal,
   onTabChange,
 }) => {
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-slate-500">إجمالي المشتريات والتوريدات</span>
-          <div className="mt-2 text-2xl font-black text-slate-900">
-            {CeramicMath.formatCurrency(supplier.totalPurchases)}
+        {canViewPurchases && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span className="text-xs font-bold text-slate-500">إجمالي المشتريات والتوريدات</span>
+            <div className="mt-2 text-2xl font-black text-slate-900">
+              {CeramicMath.formatCurrency(supplier.totalPurchases)}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">{invoices.length} فاتورة مسجلة</div>
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">{invoices.length} فاتورة مسجلة</div>
-        </div>
+        )}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-slate-500">الرصيد المستحق الحالي للمورد</span>
-          <div
-            className={`mt-2 text-2xl font-black ${
-              supplier.currentBalance > 0
-                ? 'text-rose-600'
+        {canViewFinancials && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span className="text-xs font-bold text-slate-500">الرصيد المستحق الحالي للمورد</span>
+            <div
+              className={`mt-2 text-2xl font-black ${
+                supplier.currentBalance > 0
+                  ? 'text-rose-600'
+                  : supplier.currentBalance < 0
+                  ? 'text-emerald-600'
+                  : 'text-slate-600'
+              }`}
+            >
+              {CeramicMath.formatCurrency(supplier.currentBalance)}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">
+              {supplier.currentBalance > 0
+                ? 'مستحقات واجبة السداد'
                 : supplier.currentBalance < 0
-                ? 'text-emerald-600'
-                : 'text-slate-600'
-            }`}
-          >
-            {CeramicMath.formatCurrency(supplier.currentBalance)}
+                ? 'رصيد دائن لصالح المعرض'
+                : 'الحساب خالص'}
+            </div>
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">
-            {supplier.currentBalance > 0
-              ? 'مستحقات واجبة السداد'
-              : supplier.currentBalance < 0
-              ? 'رصيد دائن لصالح المعرض'
-              : 'الحساب خالص'}
-          </div>
-        </div>
+        )}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-slate-500">إجمالي المدفوعات المسددة</span>
-          <div className="mt-2 text-2xl font-black text-emerald-600">
-            {CeramicMath.formatCurrency(payments.reduce((s, p) => s + Number(p.amount || 0), 0))}
+        {canViewFinancials && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span className="text-xs font-bold text-slate-500">إجمالي المدفوعات المسددة</span>
+            <div className="mt-2 text-2xl font-black text-emerald-600">
+              {CeramicMath.formatCurrency(payments.reduce((s, p) => s + Number(p.amount || 0), 0))}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">{payments.length} سند صرف مسجل</div>
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">{payments.length} سند صرف مسجل</div>
-        </div>
+        )}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span className="text-xs font-bold text-slate-500">أوامر الشراء المفتوحة</span>
-          <div className="mt-2 text-2xl font-black text-indigo-600">
-            {orders.filter((o) => o.status !== 'RECEIVED' && o.status !== 'CANCELLED').length}
+        {canViewPurchases && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <span className="text-xs font-bold text-slate-500">أوامر الشراء المفتوحة</span>
+            <div className="mt-2 text-2xl font-black text-indigo-600">
+              {orders.filter((o) => o.status !== 'RECEIVED' && o.status !== 'CANCELLED').length}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">من إجمالي {orders.length} أمر شراء</div>
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">من إجمالي {orders.length} أمر شراء</div>
-        </div>
+        )}
       </div>
 
-      {/* Two Column Layout: Details Card + Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Supplier Info Profile */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
           <h3 className="text-sm font-extrabold text-slate-900 border-b border-slate-100 pb-3 flex items-center justify-between">
             <span>بيانات الاتصال والملف التجاري</span>
@@ -139,128 +149,129 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
         </div>
 
-        {/* Recent Invoices & Payments summary */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Recent Invoices */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-sky-600" />
-                <span>آخر فواتير التوريد</span>
-              </h3>
-              <button
-                onClick={() => onTabChange('invoices')}
-                className="text-xs text-sky-600 hover:text-sky-700 font-bold"
-              >
-                عرض الكل ({invoices.length})
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-right">
-                <thead className="bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="p-2.5">رقم الفاتورة</th>
-                    <th className="p-2.5">التاريخ</th>
-                    <th className="p-2.5">الإجمالي</th>
-                    <th className="p-2.5">المسدد</th>
-                    <th className="p-2.5">المتبقي</th>
-                    <th className="p-2.5">الحالة</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {invoices.slice(0, 5).map((inv) => (
-                    <tr key={inv.id} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-mono font-bold text-slate-900">{inv.invoice_number}</td>
-                      <td className="p-2.5 text-slate-600">{inv.date}</td>
-                      <td className="p-2.5 font-bold text-slate-900">
-                        {CeramicMath.formatCurrency(inv.total_amount)}
-                      </td>
-                      <td className="p-2.5 text-emerald-700 font-bold">
-                        {CeramicMath.formatCurrency(inv.paid_amount)}
-                      </td>
-                      <td className="p-2.5 text-rose-700 font-bold">
-                        {CeramicMath.formatCurrency(inv.remaining_amount)}
-                      </td>
-                      <td className="p-2.5">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                            PAY_STATUS_BADGES[inv.payment_status]?.className ||
-                            'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}
-                        >
-                          {PAY_STATUS_BADGES[inv.payment_status]?.label || inv.payment_status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {invoices.length === 0 && (
+          {canViewPurchases && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-sky-600" />
+                  <span>آخر فواتير التوريد</span>
+                </h3>
+                <button
+                  onClick={() => onTabChange('invoices')}
+                  className="text-xs text-sky-600 hover:text-sky-700 font-bold"
+                >
+                  عرض الكل ({invoices.length})
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-right">
+                  <thead className="bg-slate-50 text-slate-500">
                     <tr>
-                      <td colSpan={6} className="p-6 text-center text-slate-400">
-                        لا توجد فواتير توريد مسجلة لهذا المورد حتى الآن.
-                      </td>
+                      <th className="p-2.5">رقم الفاتورة</th>
+                      <th className="p-2.5">التاريخ</th>
+                      <th className="p-2.5">الإجمالي</th>
+                      <th className="p-2.5">المسدد</th>
+                      <th className="p-2.5">المتبقي</th>
+                      <th className="p-2.5">الحالة</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {invoices.slice(0, 5).map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50">
+                        <td className="p-2.5 font-mono font-bold text-slate-900">{inv.invoice_number}</td>
+                        <td className="p-2.5 text-slate-600">{inv.date}</td>
+                        <td className="p-2.5 font-bold text-slate-900">
+                          {CeramicMath.formatCurrency(inv.total_amount)}
+                        </td>
+                        <td className="p-2.5 text-emerald-700 font-bold">
+                          {CeramicMath.formatCurrency(inv.paid_amount)}
+                        </td>
+                        <td className="p-2.5 text-rose-700 font-bold">
+                          {CeramicMath.formatCurrency(inv.remaining_amount)}
+                        </td>
+                        <td className="p-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              PAY_STATUS_BADGES[inv.payment_status]?.className ||
+                              'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {PAY_STATUS_BADGES[inv.payment_status]?.label || inv.payment_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {invoices.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-slate-400">
+                          لا توجد فواتير توريد مسجلة لهذا المورد حتى الآن.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Recent Payments */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-                <span>آخر سندات الصرف والمدفوعات</span>
-              </h3>
-              <button
-                onClick={() => onTabChange('payments')}
-                className="text-xs text-sky-600 hover:text-sky-700 font-bold"
-              >
-                عرض الكل ({payments.length})
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-right">
-                <thead className="bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="p-2.5">رقم السند</th>
-                    <th className="p-2.5">التاريخ</th>
-                    <th className="p-2.5">المبلغ</th>
-                    <th className="p-2.5">طريقة الدفع</th>
-                    <th className="p-2.5">البيان / ملاحظات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {payments.slice(0, 5).map((pay) => (
-                    <tr key={pay.id} className="hover:bg-slate-50">
-                      <td className="p-2.5 font-mono font-bold text-slate-900">{pay.receipt_number}</td>
-                      <td className="p-2.5 text-slate-600">{pay.date}</td>
-                      <td className="p-2.5 font-black text-emerald-700">
-                        {CeramicMath.formatCurrency(pay.amount)}
-                      </td>
-                      <td className="p-2.5 font-bold text-slate-700">
-                        {pay.payment_type === 'CASH'
-                          ? 'نقدي'
-                          : pay.payment_type === 'BANK'
-                          ? 'تحويل بنكي'
-                          : pay.payment_type === 'CHEQUE'
-                          ? 'شيك'
-                          : pay.payment_type}
-                      </td>
-                      <td className="p-2.5 text-slate-500 truncate max-w-xs">{pay.notes || '—'}</td>
-                    </tr>
-                  ))}
-                  {payments.length === 0 && (
+          {canViewFinancials && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                  <span>آخر سندات الصرف والمدفوعات</span>
+                </h3>
+                <button
+                  onClick={() => onTabChange('payments')}
+                  className="text-xs text-sky-600 hover:text-sky-700 font-bold"
+                >
+                  عرض الكل ({payments.length})
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-right">
+                  <thead className="bg-slate-50 text-slate-500">
                     <tr>
-                      <td colSpan={5} className="p-6 text-center text-slate-400">
-                        لا توجد سندات صرف مسجلة لهذا المورد.
-                      </td>
+                      <th className="p-2.5">رقم السند</th>
+                      <th className="p-2.5">التاريخ</th>
+                      <th className="p-2.5">المبلغ</th>
+                      <th className="p-2.5">طريقة الدفع</th>
+                      <th className="p-2.5">البيان / ملاحظات</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {payments.slice(0, 5).map((pay) => (
+                      <tr key={pay.id} className="hover:bg-slate-50">
+                        <td className="p-2.5 font-mono font-bold text-slate-900">{pay.receipt_number}</td>
+                        <td className="p-2.5 text-slate-600">{pay.date}</td>
+                        <td className="p-2.5 font-black text-emerald-700">
+                          {CeramicMath.formatCurrency(pay.amount)}
+                        </td>
+                        <td className="p-2.5 font-bold text-slate-700">
+                          {pay.payment_type === 'CASH'
+                            ? 'نقدي'
+                            : pay.payment_type === 'BANK'
+                            ? 'تحويل بنكي'
+                            : pay.payment_type === 'CHEQUE'
+                            ? 'شيك'
+                            : pay.payment_type}
+                        </td>
+                        <td className="p-2.5 text-slate-500 truncate max-w-xs">{pay.notes || '—'}</td>
+                      </tr>
+                    ))}
+                    {payments.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-slate-400">
+                          لا توجد سندات صرف مسجلة لهذا المورد.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
