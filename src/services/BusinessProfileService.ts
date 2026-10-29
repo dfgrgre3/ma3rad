@@ -180,10 +180,27 @@ export class BusinessProfileService {
     const businessType = SettingsService.getValue('businessType') || 'general';
     const config = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
     const profiles = [businessType, ...config.additionalActivityIds].map(getBusinessProfile);
-    const definitions = [...new Map(
-      profiles.flatMap((profile) => profile.configuration.productAttributeDefinitions || [])
-        .map((definition) => [definition.code, definition]),
-    ).values()];
+    const definitionsByCode = new Map<string, BusinessProfileAttributeDefinition>();
+    const definitionsByName = new Map<string, BusinessProfileAttributeDefinition>();
+    for (const definition of profiles.flatMap((profile) =>
+      profile.configuration.productAttributeDefinitions || [])) {
+      const byCode = definitionsByCode.get(definition.code);
+      const byName = definitionsByName.get(definition.name.trim().toLowerCase());
+      const sameDefinition = (existing: BusinessProfileAttributeDefinition | undefined) =>
+        !existing || (
+          existing.code === definition.code
+          && existing.name === definition.name
+          && existing.dataType === definition.dataType
+          && existing.unit === definition.unit
+          && JSON.stringify(existing.options || []) === JSON.stringify(definition.options || [])
+        );
+      if (!sameDefinition(byCode) || !sameDefinition(byName)) {
+        throw new Error(`تعارض تعريف خاصية النشاط «${definition.name}».`);
+      }
+      definitionsByCode.set(definition.code, definition);
+      definitionsByName.set(definition.name.trim().toLowerCase(), definition);
+    }
+    const definitions = [...definitionsByCode.values()];
     const db = DatabaseManager.getInstance();
     return db.executeTransaction(() => {
       const typed = BusinessProfileService.ensureProfileAttributeDefinitions(definitions);
