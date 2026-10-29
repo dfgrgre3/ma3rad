@@ -94,43 +94,43 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ currentUser, onLogout 
     <div className="relative" ref={rootRef}>
       <button
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+        className="flex min-h-8 items-center gap-2 rounded-[2px] border border-transparent px-2 hover:border-[#d9d9d9] hover:bg-[#f0f0f0] dark:hover:border-[#4a4a4a] dark:hover:bg-[#3a3a3a]"
         title="حسابي"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-600 text-xs font-bold text-white">
-          <UserIcon className="h-4 w-4" />
-        </div>
+        <span className="flex h-6 w-6 items-center justify-center rounded-[2px] bg-[#0078d4] text-[11px] font-bold text-white">
+          <UserIcon className="h-3.5 w-3.5" />
+        </span>
         <div className="hidden text-right sm:block">
-          <div className="max-w-[140px] truncate text-xs font-bold text-slate-900 dark:text-slate-100">{currentUser.fullName}</div>
-          <div className="text-[10px] font-extrabold text-sky-600 dark:text-sky-400">{roleName}</div>
+          <div className="max-w-[140px] truncate text-[12px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">{currentUser.fullName}</div>
+          <div className="text-[10px] font-semibold text-[#0078d4]">@{currentUser.username}</div>
         </div>
-        <ChevronDown className={`hidden h-3.5 w-3.5 text-slate-400 transition sm:block ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`hidden h-3.5 w-3.5 text-[#767676] sm:block ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-          <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-            <div className="truncate text-sm font-black text-slate-900 dark:text-slate-100">{currentUser.fullName}</div>
-            <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">@{currentUser.username} · {roleName}</div>
+        <div className="win-popover absolute left-0 top-full z-50 mt-1 w-60 overflow-hidden rounded-[2px] border border-[#b3b3b3] bg-white dark:border-[#565656] dark:bg-[#2b2b2b]">
+          <div className="border-b border-[#e5e5e5] px-4 py-2.5 dark:border-[#3d3d3d]">
+            <div className="truncate text-[12.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">{currentUser.fullName}</div>
+            <div className="truncate text-[11px] text-[#767676] dark:text-[#a6a6a6]">@{currentUser.username} · {roleName}</div>
           </div>
           <button
             onClick={() => { setOpen(false); setPasswordOpen(true); }}
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="win-nav-item w-full !mx-0 !text-[12px]"
           >
-            <KeyRound className="h-4 w-4 text-sky-500" /> تغيير كلمة المرور
+            <KeyRound className="win-nav-icon" /> تغيير كلمة المرور
           </button>
           <button
             onClick={() => { setOpen(false); setRestartOpen(true); }}
-            className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-2.5 text-xs font-bold text-amber-600 transition hover:bg-amber-50 dark:border-slate-800 dark:hover:bg-amber-500/10"
+            className="win-nav-item w-full !mx-0 !text-[12px]"
           >
-            <Power className="h-4 w-4" /> إعادة تشغيل التطبيق
+            <Power className="win-nav-icon" /> إعادة تشغيل التطبيق
           </button>
           {onLogout && (
             <button
               onClick={() => { setOpen(false); onLogout(); }}
-              className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-50 dark:border-slate-800 dark:hover:bg-rose-500/10"
+              className="win-nav-item w-full !mx-0 !text-[12px] !text-[#c42b1c]"
             >
-              <LogOut className="h-4 w-4" /> تسجيل الخروج
+              <LogOut className="win-nav-icon !text-[#c42b1c]" /> تسجيل الخروج
             </button>
           )}
         </div>
@@ -139,19 +139,19 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ currentUser, onLogout 
       {passwordOpen && <ChangePasswordModal current={current} next={next} confirm={confirm} busy={busy} setCurrent={setCurrent} setNext={setNext} setConfirm={setConfirm} onClose={() => { setPasswordOpen(false); resetForm(); }} onSubmit={submitPassword} />}
 
       {restartOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/50 p-4" dir="rtl">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-4" dir="rtl">
+          <div className="w-full max-w-md rounded-[2px] border border-[#b3b3b3] bg-white p-5 dark:border-[#565656] dark:bg-[#2b2b2b]" role="dialog" aria-modal="true">
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <h3 className="text-base font-black text-slate-900 dark:text-slate-100">إعادة تشغيل التطبيق</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <h3 className="text-[14px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">إعادة تشغيل التطبيق</h3>
+                <p className="mt-1 text-[12px] text-[#4d4d4d] dark:text-[#c8c8c8]">
                   سيتم إغلاق البرنامج وتشغيله من جديد. احفظ أي عمل غير محفوظ قبل المتابعة.
                 </p>
               </div>
               <button
                 onClick={() => setRestartOpen(false)}
                 disabled={restarting}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"
+                className="win-btn win-btn--ghost !min-h-7 !px-1.5 disabled:opacity-50"
                 aria-label="إغلاق"
               >
                 <X className="h-4 w-4" />
@@ -161,14 +161,14 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ currentUser, onLogout 
               <button
                 onClick={restartApp}
                 disabled={restarting}
-                className="flex-1 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-black text-white transition hover:bg-amber-600 disabled:opacity-60"
+                className="win-btn win-btn--primary flex-1 disabled:opacity-60"
               >
                 {restarting ? 'جارٍ إعادة التشغيل…' : 'إعادة التشغيل الآن'}
               </button>
               <button
                 onClick={() => setRestartOpen(false)}
                 disabled={restarting}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                className="win-btn disabled:opacity-50"
               >
                 إلغاء
               </button>

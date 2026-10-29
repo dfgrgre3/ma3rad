@@ -10,8 +10,9 @@ export function buildInvoiceWhere(
   includeVoid: boolean
 ): { where: string; params: any[] } {
   const scope = branchAccess.sqlScope('si.branch_id', 'w.branch_id');
-  let where = `WHERE ${scope.clause}`;
-  const params: any[] = [...scope.params];
+  const companyScope = branchAccess.companyScope('si.company_id');
+  let where = `WHERE ${scope.clause} AND ${companyScope.clause}`;
+  const params: any[] = [...scope.params, ...companyScope.params];
 
   if (filters.invoiceStatus && filters.invoiceStatus !== 'ALL') {
     where += ` AND si.invoice_status = ?`;
@@ -107,7 +108,9 @@ export function fetchInvoiceById(
   id: string
 ): (SalesInvoice & { items: SalesInvoiceItem[] }) | null {
   AuthService.requireAuth();
+  const actor = AuthService.getCurrentUser();
   const scope = ctx.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
+  const companyScope = ctx.branchAccess.companyScope('si.company_id');
   const invoices = ctx.db.query<SalesInvoice>(`
     SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
            c.current_balance as customerBalance, c.credit_limit as customerCreditLimit,
@@ -116,8 +119,8 @@ export function fetchInvoiceById(
     JOIN customers c ON si.customer_id = c.id
     JOIN warehouses w ON si.warehouse_id = w.id
     LEFT JOIN users u ON si.created_by = u.id
-    WHERE si.id = ? AND ${scope.clause}
-  `, [id, ...scope.params]);
+    WHERE si.id = ? AND ${scope.clause} AND ${companyScope.clause}
+  `, [id, ...scope.params, ...companyScope.params]);
 
   if (invoices.length === 0) return null;
   const inv = invoices[0];

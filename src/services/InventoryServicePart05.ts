@@ -19,6 +19,7 @@ public updateWarehouseLocation(id: string, input: {
     maxCapacityM2?: number;
     notes?: string;
   }): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 
@@ -53,6 +54,7 @@ public updateWarehouseLocation(id: string, input: {
   }
 
 public deleteWarehouseLocation(id: string): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 
@@ -65,6 +67,7 @@ public deleteWarehouseLocation(id: string): void {
   }
 
 public assignProductLocation(locationId: string, productId: string, quantityM2: number): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
     if (quantityM2 < 0) throw new Error('الكمية يجب ألا تكون سالبة.');

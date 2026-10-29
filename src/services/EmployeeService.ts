@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 import { BranchAccessService } from './BranchAccessService';
+import { ModuleRegistryService } from './ModuleRegistryService';
 import { localDateString } from '../utils/date';
 
 export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
@@ -88,6 +89,7 @@ export class EmployeeService {
 
   private static requireManage() {
     const actor = AuthService.requireAuth();
+    ModuleRegistryService.assertModuleEnabled('hr');
     PermissionService.require(actor, 'employees.manage');
     return actor;
   }
@@ -112,6 +114,7 @@ export class EmployeeService {
     const conditions: string[] = [];
     const params: any[] = [];
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const companyScope = this.branchAccess.companyScope('e.company_id', actor);
 
     if (opts.search && opts.search.trim()) {
       conditions.push(`(name LIKE ? OR role LIKE ? OR phone LIKE ?)`);
@@ -128,6 +131,8 @@ export class EmployeeService {
     }
     conditions.push(scope.clause);
     params.push(...scope.params);
+    conditions.push(companyScope.clause);
+    params.push(...companyScope.params);
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const sql = `SELECT e.id, e.branch_id AS branchId, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
@@ -139,13 +144,15 @@ export class EmployeeService {
   static getById(id: string): Employee | null {
     const actor = this.requireView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const companyScope = this.branchAccess.companyScope('e.company_id', actor);
     const salaryColumns = PermissionService.can(actor, 'employees.manage')
       ? 'base_salary AS baseSalary, salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
     const rows = this.db.query<Employee>(
       `SELECT e.id, e.branch_id AS branchId, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
-              e.joined_date, e.notes, e.created_at, e.updated_at FROM employees e WHERE e.id = ? AND ${scope.clause}`,
-      [id, ...scope.params]
+              e.joined_date, e.notes, e.created_at, e.updated_at FROM employees e
+       WHERE e.id = ? AND ${scope.clause} AND ${companyScope.clause}`,
+      [id, ...scope.params, ...companyScope.params]
     );
     return rows[0] ?? null;
   }
@@ -162,11 +169,12 @@ export class EmployeeService {
       db.run(
         `INSERT INTO employees (
            id, code, full_name, name, phone, email, job_title, role, location, branch_id,
-           employment_type, hired_at, joined_date, base_salary, salary_type, status, is_active, notes
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'FULL_TIME', ?, ?, ?, ?, ?, ?, ?)`,
+           employment_type, hired_at, joined_date, base_salary, salary_type, status, is_active, notes, company_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'FULL_TIME', ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, code, data.name, data.name, data.phone, data.email || null, data.role, data.role,
          data.location || '', branchId, data.joinedDate, data.joinedDate, data.baseSalary,
-         data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes || null]
+         data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes || null,
+         this.branchAccess.getAccessibleCompanyIds(actor)?.[0] || 'cmp_main']
       );
       return this.getById(id)!;
     });
@@ -406,9 +414,13 @@ export class EmployeeService {
     const year = Number(period.slice(0, 4));
     const month = Number(period.slice(5, 7));
     const periodEnd = localDateString(new Date(year, month, 0));
-    const employees = this.db.query<{ id: string; name: string; baseSalary: number; salaryType: SalaryType }>(
-      `SELECT id, name, base_salary AS baseSalary, salary_type AS salaryType
-       FROM employees e WHERE joined_date <= ? AND status != 'SUSPENDED' AND ${scope.clause} ORDER BY id`,
+    const employees = this.db.query<{ id: string; name: string; baseSalary: number; salaryType: SalaryType; workingDays: number }>(
+      `SELECT e.id, e.name, e.base_salary AS baseSalary, e.salary_type AS salaryType,
+              COALESCE(c.working_days_per_month, 26) AS workingDays
+       FROM employees e
+       LEFT JOIN branches b ON b.id = e.branch_id
+       LEFT JOIN companies c ON c.id = b.company_id
+       WHERE e.joined_date <= ? AND e.status != 'SUSPENDED' AND ${scope.clause} ORDER BY e.id`,
       [periodEnd, ...scope.params]
     );
     let created = 0;
@@ -420,7 +432,8 @@ export class EmployeeService {
           skipped++;
           continue;
         }
-        const salary = Math.round(Number(employee.baseSalary || 0) * (employee.salaryType === 'DAILY' ? 26 : 1) * 100) / 100;
+        const workingDays = Number(employee.workingDays) > 0 ? Number(employee.workingDays) : 26;
+        const salary = Math.round(Number(employee.baseSalary || 0) * (employee.salaryType === 'DAILY' ? workingDays : 1) * 100) / 100;
         if (salary <= 0) continue;
         postLedgerEntry(db.getDatabase(), {
           date: `${period}-01`,

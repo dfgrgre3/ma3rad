@@ -32,8 +32,8 @@ interface StockAdjustmentCost {
 interface AdjustmentProduct {
   costPrice: number;
   metersPerBox: number;
-  product_type: string;
-  base_unit: string;
+  productType: string;
+  baseUnit: string;
 }
 
 export class InventoryServicePart02 extends InventoryServicePart01 {
@@ -44,6 +44,7 @@ public adjustStock(
     reason: string,
     performedBy = 'usr_admin'
   ): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
     const performedBy2 = actor.id;
@@ -93,7 +94,7 @@ public adjustStock(
   ): StockAdjustmentCost {
     const { productId, warehouseId, diffM2 } = context;
     const product = sqliteDb.query<AdjustmentProduct>(
-      'SELECT cost_price, meters_per_box, product_type, base_unit FROM products WHERE id = ?',
+      'SELECT cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?',
       [productId]
     )[0];
     const fifoEnabled = InventoryCostingService.costingMethod(sqliteDb) === 'FIFO';
@@ -102,8 +103,8 @@ public adjustStock(
       : null;
     const unitCost = costPlan ? costPlan.unitCost : (product ? product.costPrice : 0);
     const metersPerBox = product ? product.metersPerBox : 1.44;
-    const transactionBoxes = product?.product_type === 'GENERAL'
-      ? product.base_unit === 'BOX' ? diffM2 : 0
+    const transactionBoxes = product?.productType === 'GENERAL'
+      ? product.baseUnit === 'BOX' ? diffM2 : 0
       : Number((diffM2 / metersPerBox).toFixed(2));
     const totalCost = Math.round(Math.abs(diffM2 * Number(unitCost || 0)) * 100) / 100;
 

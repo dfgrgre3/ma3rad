@@ -1,4 +1,4 @@
-import type { PaymentType, UnitType } from '../../types';
+import type { PaymentType } from '../../types';
 
 export interface CreateSaleDTO {
   customerId: string;
@@ -8,8 +8,14 @@ export interface CreateSaleDTO {
   projectId?: string;
   items: {
     productId: string;
-    soldBy: UnitType;
+    /** Unit the cashier entered the line in; kept for display/reporting. */
+    soldBy: string;
+    /** Legacy base-unit quantity. Ignored for math when `uom` + `quantity` are given. */
     quantityM2: number;
+    /** Explicit selling unit (e.g. BOX or TON). When present, `quantity` is in it. */
+    uom?: string;
+    /** Quantity expressed in `uom`. When present, `unitPrice` is per `uom`. */
+    quantity?: number;
     boxesCount: number;
     piecesCount: number;
     unitPrice: number;
@@ -59,6 +65,7 @@ export interface ReturnableItem {
   unitCost: number;
   boxesCount: number;
   metersPerBox: number;
+  piecesPerBox?: number;
   productType?: 'CERAMIC' | 'GENERAL';
   baseUnit?: string;
   customUnit?: string;
@@ -75,7 +82,12 @@ export interface ReturnStats {
 
 export interface ReturnRequestItem {
   productId: string;
+  /** Base-unit quantity, used when `uom`/`quantity` are not supplied. */
   quantityM2: number;
+  /** Optional selling unit for the returned quantity (e.g. BOX). */
+  uom?: string;
+  /** Quantity expressed in `uom`; converted to `quantityM2` before validation. */
+  quantity?: number;
   boxesCount: number;
   unitPrice: number;
   unitCost: number;

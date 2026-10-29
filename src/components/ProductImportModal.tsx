@@ -63,6 +63,7 @@ export const ProductImportModal: React.FC<Props> = ({ open, onClose, onImported 
         category: '', brand: '', grade: 'GRADE_1', size: '60x60', pieces: 4,
         meters: 1.44, cost: 120, price: 220, wholesale: 200, min: 150, stock: 100,
       }],
+      permission: 'products.import',
     });
   };
 

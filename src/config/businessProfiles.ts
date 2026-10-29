@@ -1,4 +1,11 @@
-export const BUSINESS_TYPES = [
+import {
+  MODULE_REGISTRY,
+  getHiddenModulePaths,
+  getManagedModulePaths,
+  getModulePathOwner,
+} from './moduleRegistry';
+
+const LEGACY_BUSINESS_TYPES = [
   { id: 'ceramics', label: 'سيراميك وبورسلين', description: 'مساحات ومقاسات ومخزون بالمتر والكرتونة' },
   { id: 'building_materials', label: 'مواد بناء وتشطيب', description: 'أصناف متنوعة ومخازن ومشتريات' },
   { id: 'sanitary', label: 'أدوات صحية', description: 'منتجات وماركات ومبيعات المعرض' },
@@ -16,6 +23,22 @@ export const BUSINESS_TYPES = [
   { id: 'general', label: 'معرض متعدد الأنشطة', description: 'تخصيص مرن لأي نشاط تجاري' },
   { id: 'custom', label: 'نشاط آخر مخصص', description: 'اكتب نوع نشاطك واختر الوحدات التي تحتاجها' },
 ] as const;
+
+// Additional profiles reuse the current operational modules. They configure
+// defaults only and do not imply industry-specific legal or regulatory support.
+const ADDITIONAL_BUSINESS_TYPES = [
+  { id: 'manufacturing', label: 'Manufacturing and production', description: 'Materials, operations and production planning' },
+  { id: 'construction', label: 'Construction and contracting', description: 'Projects, procurement and cost tracking' },
+  { id: 'import_export', label: 'Import and export', description: 'Purchasing, sales, inventory and multi-currency settings' },
+  { id: 'ecommerce', label: 'E-commerce', description: 'Product sales, customer management and fulfillment' },
+  { id: 'logistics', label: 'Logistics and transportation', description: 'Service operations, deliveries and workforce' },
+  { id: 'professional_services', label: 'Professional services', description: 'Client services, projects and finance' },
+  { id: 'education', label: 'Education and training', description: 'Service operations and workforce' },
+  { id: 'healthcare_admin', label: 'Healthcare administration', description: 'Administrative business operations; configure local policies separately' },
+  { id: 'hospitality', label: 'Hospitality', description: 'Mixed service and product operations' },
+] as const;
+
+export const BUSINESS_TYPES = [...LEGACY_BUSINESS_TYPES, ...ADDITIONAL_BUSINESS_TYPES] as const;
 
 export const BUSINESS_UNITS = [
   { id: 'M2', label: 'متر مربع' },
@@ -101,6 +124,15 @@ const PROFILE_CONFIGURATIONS: Record<string, BusinessConfigurationDefaults> = {
   },
   general: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'METER', 'LINEAR_METER', 'PACK', 'SERVICE'] },
   custom: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'METER', 'LINEAR_METER', 'PACK', 'SERVICE'] },
+  manufacturing: { ...COMMON_DEFAULTS, units: ['PIECE', 'KG', 'TON', 'METER'] },
+  construction: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'TON', 'METER', 'M2', 'SERVICE'] },
+  import_export: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'TON', 'LITER', 'BOX', 'PACK'] },
+  ecommerce: { ...COMMON_DEFAULTS, units: ['PIECE', 'BOX', 'PACK'] },
+  logistics: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE', 'METER'] },
+  professional_services: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE'] },
+  education: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE', 'PIECE'] },
+  healthcare_admin: { ...COMMON_DEFAULTS, businessModel: 'services', trackInventory: false, units: ['SERVICE', 'PIECE'] },
+  hospitality: { ...COMMON_DEFAULTS, businessModel: 'mixed', units: ['PIECE', 'KG', 'LITER', 'SERVICE'] },
 };
 
 const VALID_BUSINESS_MODELS = new Set<BusinessModel>(['products', 'services', 'mixed']);
@@ -138,16 +170,13 @@ export const parseBusinessConfiguration = (raw: string | undefined, businessType
   }
 };
 
-export const BUSINESS_MODULES = [
-  { id: 'sales', label: 'المبيعات ونقطة البيع', paths: ['/daily/sales', '/pos', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/reservations', '/sales/after-sales', '/quotations', '/orders', '/returns'] },
-  { id: 'inventory', label: 'المخزون والمنتجات', paths: ['/inventory', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/products', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'] },
-  { id: 'customers', label: 'العملاء والمشروعات', paths: ['/crm/dashboard', '/customers', '/customers/imported-products', '/customers/ready-deliveries', '/crm/leads', '/crm/pipeline', '/crm/activities', '/crm/campaigns', '/projects'] },
-  { id: 'purchasing', label: 'المشتريات والموردون', paths: ['/daily/purchases', '/suppliers', '/purchases/requests', '/purchases/quotations', '/purchases/orders', '/purchases/receipts', '/purchases/incoming', '/purchases', '/purchases/statement', '/purchases/claims', '/purchases/returns'] },
-  { id: 'finance', label: 'الحسابات والمالية', paths: ['/daily/expenses', '/daily/debts', '/finance', '/cashboxes', '/finance/expenses', '/finance/accounts', '/finance/journal', '/finance/cheques', '/finance/bank-reconciliation', '/finance/fiscal-closing', '/finance/budgets-cost-centers', '/finance/cash-forecast', '/finance/epayment-settlements', '/finance/assets', '/finance/debts', '/finance/other-receivables', '/finance/installments'] },
-  { id: 'operations', label: 'الفروع والموظفون والتوصيل', paths: ['/fleet/dashboard', '/hr/dashboard', '/branches', '/warehouses', '/employees', '/employees/attendance', '/employees/payroll', '/employees/commissions', '/deliveries', '/drivers', '/vehicles'] },
-  { id: 'reports', label: 'التقارير', paths: ['/reports', '/reports/statements', '/reports/profit-loss', '/reports/tax'] },
-  { id: 'approvals', label: 'الموافقات', paths: ['/approvals'] },
-] as const;
+// The registry is the source of truth for module metadata. `BUSINESS_MODULES`
+// stays exported for existing UI code and keeps its original shape.
+export const BUSINESS_MODULES = MODULE_REGISTRY.map((module) => ({
+  id: module.id,
+  label: module.label,
+  paths: [...module.paths],
+}));
 
 const ALL_MODULE_IDS = BUSINESS_MODULES.map((module) => module.id);
 
@@ -168,10 +197,32 @@ const PROFILE_MODULES: Record<string, string[]> = {
   workshop: ['sales', 'inventory', 'customers', 'finance', 'operations', 'reports'],
   general: ALL_MODULE_IDS,
   custom: ALL_MODULE_IDS,
+  manufacturing: ['sales', 'inventory', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
+  construction: ['sales', 'customers', 'purchasing', 'finance', 'operations', 'reports', 'approvals'],
+  import_export: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports', 'approvals'],
+  ecommerce: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'reports'],
+  logistics: ['sales', 'customers', 'finance', 'operations', 'reports', 'approvals'],
+  professional_services: ['sales', 'customers', 'finance', 'reports', 'approvals'],
+  education: ['sales', 'customers', 'finance', 'operations', 'reports'],
+  healthcare_admin: ['sales', 'customers', 'finance', 'operations', 'reports'],
+  hospitality: ['sales', 'inventory', 'customers', 'purchasing', 'finance', 'operations', 'reports'],
 };
 
 export const getProfileModuleIds = (businessType: string): string[] =>
-  [...(PROFILE_MODULES[businessType] || PROFILE_MODULES.general)];
+  [...new Set([
+    ...(PROFILE_MODULES[businessType] || PROFILE_MODULES.general),
+    // Documents/contracts, projects and HR are industry-neutral and were
+    // always visible before they became optional registry modules. Keep them
+    // enabled by default; administrators can still deactivate them explicitly.
+    'documents',
+    'projects',
+    'hr',
+    // Manufacturing depends on inventory: only enable it for profiles that
+    // track stock, otherwise validation would reject the selection.
+    ...(((PROFILE_MODULES[businessType] || PROFILE_MODULES.general).includes('inventory'))
+      ? ['manufacturing']
+      : []),
+  ])];
 
 export const parseEnabledModules = (raw: string | undefined, businessType: string): string[] => {
   if (!raw) return getProfileModuleIds(businessType);
@@ -189,19 +240,11 @@ export const parseEnabledModules = (raw: string | undefined, businessType: strin
   }
 };
 
-export const getProfileHiddenPaths = (enabledModuleIds: string[]): string[] => {
-  const enabled = new Set(enabledModuleIds);
-  return BUSINESS_MODULES
-    .filter((module) => !enabled.has(module.id))
-    .flatMap((module) => [...module.paths]);
-};
+export const getProfileHiddenPaths = (enabledModuleIds: string[]): string[] =>
+  getHiddenModulePaths(enabledModuleIds);
 
-export const getBusinessModuleForPath = (pathname: string): string | undefined => {
-  const candidates = BUSINESS_MODULES.flatMap((module) =>
-    module.paths.map((path) => ({ path, moduleId: module.id }))
-  ).filter(({ path }) => pathname === path || pathname.startsWith(`${path}/`));
-  return candidates.sort((a, b) => b.path.length - a.path.length)[0]?.moduleId;
-};
+export const getBusinessModuleForPath = (pathname: string): string | undefined =>
+  getModulePathOwner(pathname);
 
 export const getManagedBusinessPaths = (): Set<string> =>
-  new Set(BUSINESS_MODULES.flatMap((module) => [...module.paths]));
+  getManagedModulePaths();

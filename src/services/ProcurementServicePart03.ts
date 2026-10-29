@@ -7,6 +7,8 @@ import { round2 } from './financials';
 import { postLedgerEntry } from '../database/ledger';
 import type { ReorderSuggestion, SupplierRfqRow, SupplierRfqItem, SupplierQuotationRow, SupplierQuotationItem, GoodsReceiptRow, SupplierClaimRow, SupplierClaimItem, ThreeWayMatchingResult, LandedCostBreakdownItem, SupplierScorecard, ProductPriceHistoryEntry } from './procurementTypes';
 import { ProcurementServicePart02 } from './ProcurementServicePart02';
+import { ModuleRegistryService } from './ModuleRegistryService';
+import { isServiceProduct } from '../utils/productUnits';
 
 type GoodsReceiptInputItem = {
   purchaseOrderItemId?: string;
@@ -45,11 +47,10 @@ type GoodsReceiptTotals = {
 
 type GoodsReceiptProduct = {
   name: string;
-  cost_price: number | string | null;
-  meters_per_box: number | string | null;
-  metersPerBox?: number | string | null;
-  product_type: string;
-  base_unit: string;
+  costPrice: number | string | null;
+  metersPerBox: number | string | null;
+  productType: string;
+  baseUnit: string;
 };
 
 export abstract class ProcurementServicePart03 extends ProcurementServicePart02 {
@@ -144,11 +145,13 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     )[0];
     if (!product) throw new Error(`المنتج ${item.productId} غير موجود.`);
 
-    const unitCost = Number(item.unitCost) || Number(product.cost_price) || 0;
+    const unitCost = Number(item.unitCost) || Number(product.costPrice) || 0;
     const batchNumber = item.batchNumber || `LOT-${Date.now().toString().slice(-6)}`;
     this.insertGoodsReceiptItemRow(db, item, product.name, grnId, batchNumber, unitCost);
 
-    if (Number(item.acceptedQuantityM2) > 0) {
+    const receivesStock = ModuleRegistryService.isInventoryTracked()
+      && !isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
+    if (Number(item.acceptedQuantityM2) > 0 && receivesStock) {
       this.receiveGoodsReceiptInventory(db, dto, item, product, actor, grnId, grnNumber, today, batchNumber, unitCost);
     }
     if (item.purchaseOrderItemId) {
@@ -193,7 +196,7 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     unitCost: number,
   ): void {
     this.increaseWarehouseStock(db, dto.warehouseId, item.productId, item.acceptedQuantityM2);
-    if (product.product_type !== 'GENERAL') {
+    if (product.productType !== 'GENERAL') {
       this.insertProductBatch(db, dto, item, actor.id, today, grnNumber, batchNumber, unitCost);
     }
     this.insertGoodsReceiptInventoryTransaction(db, dto, item, product, actor.id, grnId, grnNumber, batchNumber, unitCost);
@@ -248,9 +251,9 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     batchNumber: string,
     unitCost: number,
   ): void {
-    const metersPerBox = Number(product.metersPerBox ?? product.meters_per_box) || 1.44;
-    const boxesCount = product.product_type === 'GENERAL'
-      ? product.base_unit === 'BOX' ? item.acceptedQuantityM2 : 0
+    const metersPerBox = Number(product.metersPerBox) || 1.44;
+    const boxesCount = product.productType === 'GENERAL'
+      ? product.baseUnit === 'BOX' ? item.acceptedQuantityM2 : 0
       : round2(item.acceptedQuantityM2 / metersPerBox);
     db.run(`
       INSERT INTO inventory_transactions (

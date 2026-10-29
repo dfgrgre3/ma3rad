@@ -56,11 +56,15 @@ export interface SalesInvoiceItem {
   productGrade: CeramicGrade;
   size: string;
   
-  soldBy: UnitType;
+  soldBy: string;
   productType?: 'CERAMIC' | 'GENERAL';
   baseUnit?: UnitType;
   customUnit?: string;
   quantityM2: number; // الكمية الصافية بالمتر
+  /** Generic base-unit quantity (equals quantityM2 unless the product uses another base unit). */
+  quantity?: number;
+  /** Unit that `quantity` is expressed in (the product base unit). */
+  uom?: string;
   boxesCount: number; // عدد الكراتين
   piecesCount: number; // عدد القطع
   
@@ -103,6 +107,8 @@ export interface SalesReturnItem {
   productName: string;
   grade: CeramicGrade;
   quantityM2: number;
+  quantity?: number;
+  uom?: string;
   boxesCount: number;
   unitPrice: number;
   unitCost: number;

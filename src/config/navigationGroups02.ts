@@ -6,7 +6,7 @@ import {
   Undo2, Wallet, TrendingDown, Banknote, CalendarDays, Building2, Warehouse, PackageCheck,
   HardHat, Truck, Car, BarChart3, CheckSquare, Bell, ShieldCheck, Settings,
   Download, Cpu, SlidersHorizontal, BadgeDollarSign, BookmarkPlus, FileSpreadsheet, MessageCircle,
-  Trash2, ShieldAlert, PieChart, CreditCard, Lock, Target, Award,
+  Trash2, ShieldAlert, PieChart, CreditCard, Lock, Target, Award, FileSignature, Factory,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { NavGroupDef } from './navigationTypes';
@@ -27,9 +27,13 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'الحضور والانصراف', to: '/employees/attendance', icon: CheckSquare, perm: 'employees.view' },
       { label: 'الرواتب والمسحوبات', to: '/employees/payroll', icon: Wallet, perm: 'employees.view' },
       { label: 'عمولات المبيعات', to: '/employees/commissions', icon: BadgeDollarSign, perm: 'employees.view' },
+      { label: 'الإجازات', to: '/employees/leave', icon: CalendarDays, perm: 'hr.leave.view' },
+      { label: 'عقود الموظفين', to: '/employees/contracts', icon: FileSignature, perm: 'hr.contracts.view' },
+      { label: 'مستندات الموظفين', to: '/employees/documents', icon: FileText, perm: 'hr.documents.view' },
       { label: 'التوصيل', to: '/deliveries', icon: Truck, perm: 'deliveries.view' },
       { label: 'السائقون', to: '/drivers', icon: UserRound, perm: 'drivers.view' },
       { label: 'المركبات', to: '/vehicles', icon: Car, perm: 'vehicles.view' },
+      { label: 'التصنيع', to: '/manufacturing', icon: Factory, perm: 'manufacturing.view' },
     ],
   },
 {
@@ -53,6 +57,17 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     perm: 'approvals.view',
     items: [
       { label: 'صندوق الموافقات', to: '/approvals', icon: CheckSquare, perm: 'approvals.view' },
+    ],
+  },
+{
+    id: 'documents',
+    label: 'المستندات والعقود',
+    icon: FileText,
+    color: 'text-indigo-600',
+    perm: 'documents.view',
+    items: [
+      { label: 'مركز المستندات', to: '/documents', icon: FileText, perm: 'documents.view' },
+      { label: 'العقود والتجديدات', to: '/contracts', icon: ClipboardList, perm: 'contracts.view' },
     ],
   },
 {

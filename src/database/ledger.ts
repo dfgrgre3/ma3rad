@@ -121,6 +121,23 @@ function resolvePostingBranchId(db: Database, posting: LedgerPosting): string | 
   return priorBranch ?? null;
 }
 
+/**
+ * Company owning a posted entry: the branch's legal entity, else the main
+ * company. Keeping it explicit on the row is what lets every report scope by
+ * company even when entries are not reachable through a branch.
+ */
+function resolvePostingCompanyId(db: Database, branchId: string | null): string {
+  if (branchId) {
+    const companyId = queryLedgerRows<{ company_id: string | null }>(
+      db,
+      'SELECT company_id FROM branches WHERE id = ?',
+      [branchId]
+    )[0]?.company_id;
+    if (companyId) return companyId;
+  }
+  return 'cmp_main';
+}
+
 export function paymentAccountCode(paymentType: string): string {
   switch (paymentType) {
     case 'CASH': return '1101';
@@ -205,14 +222,15 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   const entryNumber = `JV-${new Date().getFullYear()}-${String(next).padStart(6, '0')}`;
   const entryId = `jv_${uuidv4().slice(0, 8)}`;
   const branchId = resolvePostingBranchId(db, posting);
+  const companyId = resolvePostingCompanyId(db, branchId);
 
   db.run(
     `INSERT INTO journal_entries (
        id, entry_number, date, description, reference_type, reference_id,
-       total_debit, total_credit, is_posted, created_by, branch_id
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+       total_debit, total_credit, is_posted, created_by, branch_id, company_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     [entryId, entryNumber, posting.date, posting.description.trim(), posting.referenceType,
-      posting.referenceId, totalDebit, totalCredit, posting.createdBy, branchId]
+      posting.referenceId, totalDebit, totalCredit, posting.createdBy, branchId, companyId]
   );
 
   for (const line of lines) {

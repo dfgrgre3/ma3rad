@@ -33,6 +33,7 @@ public createTransferRequest(input: {
     items: Array<{ productId: string; quantityM2: number; notes?: string }>;
     notes?: string;
   }): string {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer');
 
@@ -68,12 +69,12 @@ public createTransferRequest(input: {
           throw new Error(`الرصيد المتاح للصنف ${item.productId} (${stock?.availableM2 || 0} ${unitLabel}) لا يكفي لتحويل ${item.quantityM2} ${unitLabel}`);
         }
 
-        const prod = txDb.query<any>(`SELECT name, cost_price AS costPrice, meters_per_box, product_type, base_unit FROM products WHERE id = ?`, [item.productId])[0];
+        const prod = txDb.query<any>(`SELECT name, cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [item.productId])[0];
         const unitCost = Number(prod?.costPrice || 0);
         const itemCost = Number((item.quantityM2 * unitCost).toFixed(2));
-        const boxes = prod?.product_type === 'GENERAL'
-          ? prod.base_unit === 'BOX' ? item.quantityM2 : 0
-          : Number((item.quantityM2 / (prod?.metersPerBox ?? prod?.meters_per_box ?? 1.44)).toFixed(2));
+        const boxes = prod?.productType === 'GENERAL'
+          ? prod.baseUnit === 'BOX' ? item.quantityM2 : 0
+          : Number((item.quantityM2 / (prod?.metersPerBox ?? 1.44)).toFixed(2));
 
         totalQty += item.quantityM2;
         totalCost += itemCost;
@@ -121,6 +122,7 @@ public createTransferRequest(input: {
   }
 
 public approveTransfer(transferId: string): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer');
 
@@ -136,6 +138,7 @@ public approveTransfer(transferId: string): void {
   }
 
 public prepareTransfer(transferId: string): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer');
 

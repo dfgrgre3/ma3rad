@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
+import { ModuleRegistryService } from './ModuleRegistryService';
 
 export type ApprovalType =
   | 'DISCOUNT' | 'PRICE_CHANGE' | 'SALES_RETURN' | 'PURCHASE_RETURN'
@@ -62,6 +63,16 @@ export class ApprovalService {
           'SELECT branch_id AS branchId FROM purchase_requests WHERE id = ?',
           [referenceId]
         )[0]?.branchId ?? null;
+      case 'DOCUMENT':
+        return this.db.query<{ branchId: string | null }>(
+          'SELECT branch_id AS branchId FROM enterprise_documents WHERE id = ?',
+          [referenceId]
+        )[0]?.branchId ?? null;
+      case 'CONTRACT':
+        return this.db.query<{ branchId: string | null }>(
+          'SELECT branch_id AS branchId FROM enterprise_contracts WHERE id = ?',
+          [referenceId]
+        )[0]?.branchId ?? null;
       default:
         return null;
     }
@@ -113,6 +124,7 @@ export class ApprovalService {
   }): ApprovalRequest {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'approvals.create');
+    ModuleRegistryService.assertModuleEnabled('approvals');
     if (!input.title.trim()) throw new Error('عنوان الطلب مطلوب.');
     const referenceBranchId = this.resolveReferenceBranch(input.referenceType, input.referenceId);
     const referenceType = input.referenceType?.toUpperCase();
@@ -150,6 +162,7 @@ export class ApprovalService {
   public decide(id: string, approved: boolean, notes?: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, approved ? 'approvals.approve' : 'approvals.reject');
+    ModuleRegistryService.assertModuleEnabled('approvals');
     const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const row = this.db.query<ApprovalRequest>(
       `SELECT * FROM approval_requests WHERE id = ? AND ${scope.clause}`,
@@ -157,6 +170,10 @@ export class ApprovalService {
     )[0];
     if (!row) throw new Error('الطلب غير موجود.');
     if (row.status !== 'PENDING') throw new Error('تم اتخاذ قرار في هذا الطلب بالفعل.');
+    if (ModuleRegistryService.getModuleSettings('approvals').requireSegregationOfDuties === true
+      && row.requestedBy === actor.id) {
+      throw new Error('لا يمكنك اعتماد طلب أنشأته بنفسك وفق سياسة فصل المهام.');
+    }
 
     this.db.executeTransaction((db) => {
       db.run(
@@ -178,6 +195,39 @@ export class ApprovalService {
 
   /** Execute the approved operation when it has an unambiguous system effect. */
   private applyApprovedEffect(row: ApprovalRequest, db: any): string | null {
+
+    if (row.referenceType === 'CONTRACT' && row.referenceId) {
+      const contract = db.query(
+        `SELECT status, start_date AS startDate, end_date AS endDate FROM enterprise_contracts WHERE id = ?`,
+        [row.referenceId]
+      )[0];
+      if (contract && contract.status === 'DRAFT') {
+        const today = new Date().toISOString().slice(0, 10);
+        const startDate = contract.startDate && contract.startDate <= contract.endDate ? contract.startDate : today;
+        db.run(
+          "UPDATE enterprise_contracts SET status = 'ACTIVE', start_date = ?, updated_at = ? WHERE id = ?",
+          [startDate, new Date().toISOString(), row.referenceId]
+        );
+        return `تم تفعيل العقد ${row.referenceId}`;
+      }
+      return null;
+    }
+
+    if (row.referenceType === 'DOCUMENT' && row.referenceId) {
+      const document = db.query(
+        `SELECT status FROM enterprise_documents WHERE id = ?`,
+        [row.referenceId]
+      )[0];
+      if (document && document.status === 'DRAFT') {
+        db.run(
+          "UPDATE enterprise_documents SET status = 'ACTIVE', updated_at = ? WHERE id = ?",
+          [new Date().toISOString(), row.referenceId]
+        );
+        return `تم تفعيل المستند ${row.referenceId}`;
+      }
+      return null;
+    }
+
     if (!row.referenceId || row.requestedValue == null) return null;
     const value = Number(row.requestedValue);
     if (!Number.isFinite(value) || value < 0) return null;
@@ -201,13 +251,13 @@ export class ApprovalService {
       );
       return `تم تحديث سعر البيع من ${Number(product.selling_price_m2) || 0} إلى ${value}`;
     }
-
     return null;
   }
 
   public cancel(id: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'approvals.cancel');
+    ModuleRegistryService.assertModuleEnabled('approvals');
     const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const row = this.db.query<ApprovalRequest>(
       `SELECT * FROM approval_requests WHERE id = ? AND ${scope.clause}`,

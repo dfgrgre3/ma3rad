@@ -2,8 +2,12 @@ import { DatabaseManager } from '../database/db';
 import type { Product, WarehouseStock, InventoryTransaction } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
+import { BranchAccessService } from './BranchAccessService';
 import { PermissionService } from './PermissionService';
 import { InventoryCostingService } from './InventoryCostingService';
+import { ModuleRegistryService } from './ModuleRegistryService';
+import { SettingsService } from './SettingsService';
+import { parseBusinessConfiguration } from '../config/businessProfiles';
 
 export interface ProductQueryOptions {
   brandId?: string;
@@ -29,16 +33,18 @@ const STOCK_SUBQUERY = `(SELECT product_id, SUM(quantity_m2) AS qty FROM warehou
 
 export class ProductService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   public getAllProducts(search?: string, categoryId?: string, brandId?: string): Product[] {
+    const scope = this.branchAccess.companyScope('p.company_id');
     let sql = `
       SELECT p.*, c.name as categoryName, b.name as brandName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
-      WHERE p.is_active = 1
+      WHERE p.is_active = 1 AND ${scope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...scope.params];
 
     if (search && search.trim()) {
       sql += ` AND (p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ? OR p.size LIKE ?)`;
@@ -68,8 +74,9 @@ export class ProductService {
     pageSize = 25,
     options: ProductQueryOptions = {},
   ) {
-    const filters: string[] = [];
-    const params: any[] = [];
+    const scope = this.branchAccess.companyScope('p.company_id');
+    const filters: string[] = [scope.clause];
+    const params: any[] = [...scope.params];
     if (options.status === 'active') filters.push('p.is_active = 1');
     else if (options.status === 'inactive') filters.push('p.is_active = 0');
     else if (!options.includeInactive) filters.push('p.is_active = 1');
@@ -141,30 +148,43 @@ export class ProductService {
   }
 
   public getProductById(id: string): Product | null {
+    const scope = this.branchAccess.companyScope('p.company_id');
     const rows = this.db.query<Product>(`
       SELECT p.*, c.name as categoryName, b.name as brandName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
-      WHERE p.id = ?
-    `, [id]);
+      WHERE p.id = ? AND ${scope.clause}
+    `, [id, ...scope.params]);
     return rows.length > 0 ? rows[0] : null;
   }
 
   public getProductByBarcode(barcode: string): Product | null {
+    const scope = this.branchAccess.companyScope('p.company_id');
     const rows = this.db.query<Product>(`
       SELECT p.*, c.name as categoryName, b.name as brandName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
-      WHERE (p.barcode = ? OR p.sku = ?) AND p.is_active = 1
-    `, [barcode, barcode]);
+      WHERE (p.barcode = ? OR p.sku = ?) AND p.is_active = 1 AND ${scope.clause}
+    `, [barcode, barcode, ...scope.params]);
     return rows.length > 0 ? rows[0] : null;
   }
 
   public createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, initialStock?: { warehouseId: string; quantityM2: number; unitCost: number }, performedBy = 'usr_admin'): Product {
     PermissionService.require(AuthService.requireAuth(), 'products.create');
+    if (initialStock && initialStock.quantityM2 > 0 && !ModuleRegistryService.isInventoryTracked()) {
+      throw new Error('هذا النشاط لا يتبّع المخزون، لذلك لا يمكن تسجيل رصيد افتتاحي. اضبط كميات المخزون من إعدادات النشاط أولًا.');
+    }
     const id = `prod_${uuidv4().substring(0, 8)}`;
+    const trackInventory = ModuleRegistryService.isInventoryTracked();
+    const profile = parseBusinessConfiguration(
+      SettingsService.getValue('businessProfileConfig'),
+      ModuleRegistryService.getBusinessType()
+    );
+    const defaultUnit = profile.units[0] || 'PIECE';
+    const defaultProductType = trackInventory ? 'CERAMIC' : 'GENERAL';
+    const defaultSurface = trackInventory ? 'FLOOR' : '';
     
     // Check barcode uniqueness
     const existing = this.db.query(`SELECT id FROM products WHERE barcode = ? OR sku = ?`, [product.barcode, product.sku]);
@@ -179,16 +199,17 @@ export class ProductService {
             thickness, color, tone, finish, surface_location, base_unit, sell_unit,
           pieces_per_box, meters_per_box, weight_per_box, cost_price,
           selling_price_m2, selling_price_box, wholesale_price_m2, min_selling_price_m2,
-          min_stock_level, max_stock_level, image_path, notes, is_active
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          min_stock_level, max_stock_level, image_path, notes, is_active, company_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        id, product.productType || 'CERAMIC', product.customUnit || '', product.sku, product.barcode, product.name, product.categoryId, product.brandId,
+        id, product.productType || defaultProductType, product.customUnit || '', product.sku, product.barcode, product.name, product.categoryId, product.brandId,
           product.grade || 'GRADE_1', product.size || '', product.thickness || 0, product.color || '', product.tone || '', product.finish || '',
-        product.surfaceLocation || 'FLOOR', product.baseUnit || 'M2', product.sellUnit || 'M2',
+        product.surfaceLocation || defaultSurface, product.baseUnit || defaultUnit, product.sellUnit || defaultUnit,
         product.piecesPerBox || 1, product.metersPerBox || 1, product.weightPerBox || 0,
         product.costPrice || 0, product.sellingPriceM2 || 0, product.sellingPriceBox || 0,
         product.wholesalePriceM2 || 0, product.minSellingPriceM2 || 0, product.minStockLevel || 10,
-        product.maxStockLevel || 1000, product.imagePath || '', product.notes || '', 1
+        product.maxStockLevel || 1000, product.imagePath || '', product.notes || '', 1,
+        (this.branchAccess.getAccessibleCompanyIds(AuthService.requireAuth()) || ['cmp_main'])[0]
       ]);
 
       // Initialize stock record if provided
@@ -227,7 +248,7 @@ export class ProductService {
       // Log Audit
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-        VALUES (?, ?, 'المدير', 'إضافة صنف سيراميك جديد', 'PRODUCTS', ?, ?)
+        VALUES (?, ?, 'المدير', 'إضافة صنف جديد', 'PRODUCTS', ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id, JSON.stringify(product)]);
 
       return this.getProductById(id)!;

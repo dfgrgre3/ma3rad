@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Clock3, Loader2, MapPin, MessageCircle, PackageCheck, Phone, RefreshCw, Search, X } from 'lucide-react';
 import { CustomerSupplyService } from '../../services/CustomerSupplyService';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
 
 type PendingItem = {
   invoiceId: string; invoiceNumber: string; invoiceDate: string; customerId: string; customerName: string;
@@ -100,7 +101,7 @@ export const CustomerImportedProductsPage: React.FC = () => {
     if (!draft) return;
     const phone = normalizeEgyptianPhone(draft.group.phone);
     if (!phone) return;
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft.text)}`, '_blank', 'noopener,noreferrer');
+    openExternalShare(buildWhatsAppUrl(phone, encodeURIComponent(draft.text)), draft.text);
   };
 
   return <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

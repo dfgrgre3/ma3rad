@@ -135,6 +135,7 @@ export function fetchReturnableItems(ctx: SalesContext, invoiceId: string): Retu
   const rows = ctx.db.query<any>(
     `SELECT sii.product_id, sii.product_name, sii.product_grade, sii.size, sii.quantity_m2,
             sii.unit_price, sii.unit_cost, sii.boxes_count, sii.meters_per_box,
+            p.pieces_per_box AS piecesPerBox,
             p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
      FROM sales_invoice_items sii
      LEFT JOIN products p ON p.id = sii.product_id
@@ -178,6 +179,7 @@ export function fetchReturnableItems(ctx: SalesContext, invoiceId: string): Retu
         unitCost: Number(r.unitCost || 0),
         boxesCount: Number(r.boxesCount || 0),
         metersPerBox: Number(r.metersPerBox) || 1.44,
+        piecesPerBox: Number(r.piecesPerBox) || 1,
         productType: r.productType,
         baseUnit: r.baseUnit,
         customUnit: r.customUnit,

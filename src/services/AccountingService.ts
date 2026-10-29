@@ -45,6 +45,16 @@ export class AccountingService {
     return this.branchAccess.sqlScope(expression, fallbackExpression);
   }
 
+  /** Journal entries are scoped by branch *and* the legal entity that owns it. */
+  private ledgerScope(alias = 'e') {
+    const branch = this.branchAccess.sqlScope(`${alias}.branch_id`);
+    const company = this.branchAccess.companyScope(`${alias}.company_id`);
+    return {
+      clause: `(${branch.clause}) AND (${company.clause})`,
+      params: [...branch.params, ...company.params],
+    };
+  }
+
   public getBranchScopeWarning(): string | null {
     if (this.branchAccess.getAccessibleBranchIds() === null) return null;
     const count = Number(this.db.query<{ count: number }>(
@@ -428,7 +438,7 @@ export class AccountingService {
     }
     const conditions = ['e.is_posted = 1', "a.type IN ('REVENUE', 'EXPENSE')"];
     const params: string[] = [];
-    const scope = this.branchScope('e.branch_id');
+    const scope = this.ledgerScope();
     conditions.push(scope.clause);
     params.push(...scope.params);
     if (dateFrom) { conditions.push('e.date >= ?'); params.push(dateFrom); }

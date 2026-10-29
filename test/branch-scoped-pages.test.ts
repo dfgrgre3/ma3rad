@@ -30,9 +30,9 @@ test('inventory, report and party pages only expose data from accessible branche
   PermissionService.seed();
 
   db.run(
-    `INSERT OR IGNORE INTO branches (id, code, name, is_main, is_active)
-     VALUES ('br_page_a', 'PAGE-A', 'Page Branch A', 0, 1),
-            ('br_page_b', 'PAGE-B', 'Page Branch B', 0, 1)`
+    `INSERT OR IGNORE INTO branches (id, code, name, is_main, is_active, company_id)
+     VALUES ('br_page_a', 'PAGE-A', 'Page Branch A', 0, 1, 'cmp_main'),
+            ('br_page_b', 'PAGE-B', 'Page Branch B', 0, 1, 'cmp_main')`
   );
   db.run(
     `INSERT OR IGNORE INTO warehouses (id, name, code, branch_id, is_active)
@@ -52,13 +52,18 @@ test('inventory, report and party pages only expose data from accessible branche
     `INSERT OR IGNORE INTO users_branches (user_id, branch_id) VALUES ('usr_page_scope', 'br_page_a')`
   );
   db.run(
+    `INSERT OR IGNORE INTO user_permissions (user_id, permission_code, effect)
+     VALUES ('usr_page_scope', 'suppliers.view', 'GRANT'),
+            ('usr_page_scope', 'purchases.view', 'GRANT')`
+  );
+  db.run(
     `INSERT OR IGNORE INTO customers (id, code, name, phone) VALUES
       ('cust_page_a', 'PAGE-CUST-A', 'Page Customer A', '0100000001'),
       ('cust_page_b', 'PAGE-CUST-B', 'Page Customer B', '0100000002')`
   );
   db.run(
-    `INSERT OR IGNORE INTO suppliers (id, code, name, phone) VALUES
-      ('sup_page', 'PAGE-SUP', 'Page Supplier', '0100000003')`
+    `INSERT OR IGNORE INTO suppliers (id, code, name, phone, company_id) VALUES
+      ('sup_page', 'PAGE-SUP', 'Page Supplier', '0100000003', 'cmp_main')`
   );
 
   const today = localDateString();

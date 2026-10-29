@@ -257,6 +257,7 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
       ],
       rows: rows as any,
       fileName: `statement_${customer.code}`,
+      permission: 'customers.export',
     });
   };
 

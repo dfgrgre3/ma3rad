@@ -149,6 +149,13 @@ export interface SystemSettings {
   fontFamily?: string;
   showBrandText?: boolean;
   sidebarStyle?: 'default' | 'compact' | 'hidden';
+  /**
+   * Main navigation container on large screens:
+   * - `sidebar`: top title bar + vertical side navigation (default)
+   * - `header`: horizontal navigation inside the top bar, no side rail
+   * Small screens always use the slide-out drawer.
+   */
+  navigationLayout?: 'sidebar' | 'header';
 
   // Operational settings surfaced in the admin center
   lowStockAlertThresholdM2?: number;

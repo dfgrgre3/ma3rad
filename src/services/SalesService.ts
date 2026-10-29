@@ -1,6 +1,9 @@
 import { DatabaseManager } from '../database/db';
 import type { SalesInvoice, SalesInvoiceItem, SalesReturn, SalesReturnItem, PaymentType, CustomerPayment } from '../types';
 import { BranchAccessService } from './BranchAccessService';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
+import { ModuleRegistryService } from './ModuleRegistryService';
 import type { SalesContext } from './sales/context';
 import type { CreateSaleDTO, InvoiceFilters, InvoiceStats, ReturnableItem, ReturnRequestItem, ReturnStats } from './sales/types';
 import {
@@ -36,13 +39,24 @@ export class SalesService {
     return {
       db: this.db,
       branchAccess: this.branchAccess,
-      getInvoiceById: (id: string) => this.getInvoiceById(id),
+      getInvoiceById: (id: string) => this.readInvoice(id),
     };
+  }
+
+  /** Internal invoice read used by mutations; public reads add `sales.view`. */
+  private readInvoice(id: string): (SalesInvoice & { items: SalesInvoiceItem[] }) | null {
+    return fetchInvoiceById(this.context(), id);
+  }
+
+  private requireSalesView(): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'sales.view');
   }
 
   // ─── Invoices ───────────────────────────────────────────────────────────────
 
   public getAllInvoices(search?: string, dateFrom?: string, dateTo?: string): SalesInvoice[] {
+    this.requireSalesView();
     return this.getInvoicesFiltered({ search, dateFrom, dateTo }, false);
   }
 
@@ -50,18 +64,22 @@ export class SalesService {
     filters: InvoiceFilters = {},
     includeVoid = true
   ): (SalesInvoice & { returnedAmount?: number; itemsCount?: number })[] {
+    this.requireSalesView();
     return fetchInvoicesFiltered(this.context(), filters, includeVoid);
   }
 
   public getStats(filters: InvoiceFilters = {}, includeVoid = true): InvoiceStats {
+    this.requireSalesView();
     return fetchInvoiceStats(this.context(), filters, includeVoid);
   }
 
   public getInvoiceById(id: string): (SalesInvoice & { items: SalesInvoiceItem[] }) | null {
-    return fetchInvoiceById(this.context(), id);
+    this.requireSalesView();
+    return this.readInvoice(id);
   }
 
   public createSale(dto: CreateSaleDTO): SalesInvoice {
+    ModuleRegistryService.assertModuleEnabled('sales');
     return createSalesInvoice(this.context(), dto);
   }
 
@@ -74,6 +92,7 @@ export class SalesService {
     shiftId?: string,
     notes = ''
   ): CustomerPayment {
+    ModuleRegistryService.assertModuleEnabled('sales');
     return recordInvoicePaymentEntry(this.context(), invoiceId, amount, paymentType, registerId, shiftId, notes);
   }
 
@@ -89,6 +108,7 @@ export class SalesService {
     shiftId?: string,
     idempotencyKey?: string,
   ): { groupId: string; total: number; receipts: string[] } {
+    ModuleRegistryService.assertModuleEnabled('sales');
     return recordCustomerPaymentAllocationsEntry(
       this.context(),
       customerId,
@@ -104,6 +124,7 @@ export class SalesService {
   }
 
   public getInvoicePayments(invoiceId: string): CustomerPayment[] {
+    this.requireSalesView();
     return fetchInvoicePayments(this.context(), invoiceId);
   }
 
@@ -124,6 +145,7 @@ export class SalesService {
       refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
     } = {}
   ): SalesReturn {
+    ModuleRegistryService.assertModuleEnabled('sales');
     return createSaleReturn(this.context(), invoiceId, returnItems, refundCash, performedBy, options);
   }
 
@@ -133,27 +155,33 @@ export class SalesService {
   }
 
   public getReturns(search = '', dateFrom?: string, dateTo?: string): (SalesReturn & { customerName: string; invoiceNumber: string })[] {
+    this.requireSalesView();
     return fetchReturns(this.context(), search, dateFrom, dateTo);
   }
 
   public getReturnById(id: string): (SalesReturn & { items: SalesReturnItem[]; customerName?: string; invoiceNumber?: string }) | null {
+    this.requireSalesView();
     return fetchReturnById(this.context(), id);
   }
 
   public getReturnsStats(): ReturnStats {
+    this.requireSalesView();
     return fetchReturnStats(this.context());
   }
 
   public getTopReturnReasons(limit = 5): { reason: string; count: number; amount: number }[] {
+    this.requireSalesView();
     return fetchTopReturnReasons(this.context(), limit);
   }
 
   public getReturnItems(returnId: string): SalesReturnItem[] {
+    this.requireSalesView();
     return fetchReturnItems(this.context(), returnId);
   }
 
   /** Remaining returnable quantity per product for an invoice, after prior returns. */
   public getReturnableItems(invoiceId: string): ReturnableItem[] {
+    this.requireSalesView();
     return fetchReturnableItems(this.context(), invoiceId);
   }
 }

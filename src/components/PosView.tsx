@@ -21,6 +21,11 @@ import { PermissionService } from '../services/PermissionService';
 import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, SystemSettings, ToneMixingConflict } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
+import {
+  basePriceFromUnitPrice, convertQuantity, fromBaseQuantity, getSellableUnits,
+  getUomLabel, isWholeUnit, pricePerUnit, toBaseQuantity,
+} from '../utils/uom';
+import { buildWhatsAppUrl, openExternalShare } from '../utils/externalLinks';
 import { CeramicCalculatorModal } from './CeramicCalculatorModal';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { exportToExcel } from '../utils/export';
@@ -54,17 +59,10 @@ interface CartLineProps {
   onUpdateLineDiscount: (index: number, value: number) => void;
 }
 
-const getCartQuantityStep = (item: CartItem) => {
-  const isWholeUnit = item.product.baseUnit === 'BOX'
-    || item.product.baseUnit === 'PIECE'
-    || item.product.baseUnit === 'SET';
-  return item.product.productType === 'GENERAL'
-    ? isWholeUnit ? 1 : 0.01
-    : item.soldBy === 'BOX' ? 1 : 0.01;
-};
+const getCartQuantityStep = (item: CartItem) =>
+  isWholeUnit(item.soldBy, item.product) ? 1 : 0.01;
 
-const getCartPriceUnitLabel = (item: CartItem, isGeneral: boolean) =>
-  isGeneral ? getProductUnitLabel(item.product) : item.soldBy === 'BOX' ? 'كرتونة' : 'م²';
+const getCartPriceUnitLabel = (item: CartItem) => getUomLabel(item.soldBy, item.product);
 
 const CartLine: React.FC<CartLineProps> = ({
   item,
@@ -78,12 +76,14 @@ const CartLine: React.FC<CartLineProps> = ({
   onUpdatePrice,
   onUpdateLineDiscount,
 }) => {
-  const metersPerBox = item.product.metersPerBox || 1.44;
   const lineTotal = round2(item.quantityM2 * item.unitPrice - item.discountAmount);
-  const isGeneral = item.product.productType === 'GENERAL';
-  const displayQty = !isGeneral && item.soldBy === 'BOX' ? item.boxesCount : item.quantityM2;
-  const displayPrice = !isGeneral && item.soldBy === 'BOX' ? round2(item.unitPrice * metersPerBox) : item.unitPrice;
-  const overStock = item.quantityM2 > item.availableStockM2 && !enableNegativeStock;
+  const isGeneral = item.product.productType === 'GENERAL' || item.product.baseUnit === 'SERVICE';
+  // General goods and services are not stock-tracked, so an availability
+  // shortage must never block their sale from the POS.
+  const tracksStock = !isGeneral;
+  const sellableUnits = getSellableUnits(item.product);
+  const displayPrice = round2(pricePerUnit(item.unitPrice, item.soldBy, item.product));
+  const overStock = tracksStock && item.quantityM2 > item.availableStockM2 && !enableNegativeStock;
 
   return (
     <div
@@ -93,7 +93,7 @@ const CartLine: React.FC<CartLineProps> = ({
         <div className="min-w-0">
           <div className="font-bold text-slate-900 line-clamp-1">{item.product.name}</div>
           <div className="text-[10px] text-slate-500">
-            {isGeneral ? `الوحدة: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
+            {isGeneral ? `الوحدة الأساسية: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
           </div>
         </div>
         <button
@@ -110,19 +110,18 @@ const CartLine: React.FC<CartLineProps> = ({
         </div>
       )}
 
-      {!isGeneral && <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onUpdateUnit(index, 'M2')}
-          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'M2' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
-        >م²</button>
-        <button
-          type="button"
-          onClick={() => onUpdateUnit(index, 'BOX')}
-          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === 'BOX' ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
-        >كرتونة</button>
+      {sellableUnits.length > 1 && <div className="flex flex-wrap items-center gap-1">
+        {sellableUnits.map((unit) => (
+          <button
+            key={unit}
+            type="button"
+            onClick={() => onUpdateUnit(index, unit)}
+            className={`px-2 py-0.5 rounded text-[10px] font-bold border ${item.soldBy === unit ? 'bg-sky-600 text-slate-900 border-sky-500' : 'bg-white border-slate-200'}`}
+          >{getUomLabel(unit, item.product)}</button>
+        ))}
         <span className="text-[10px] text-slate-500 mr-auto">
-          {item.piecesCount} قطعة • {item.boxesCount} كرتونة
+          {round2(item.quantityM2)} {getProductUnitLabel(item.product)}
+          {item.product?.productType !== 'GENERAL' ? ` • ${item.boxesCount} كرتونة` : ''}
         </span>
       </div>}
 
@@ -137,7 +136,7 @@ const CartLine: React.FC<CartLineProps> = ({
           <input
             type="number"
             step={getCartQuantityStep(item)}
-            value={displayQty}
+            value={item.soldQuantity}
             onChange={(e) => { if (e.target.value !== '') onUpdateQuantity(index, Number.parseFloat(e.target.value)); }}
             aria-label={`تغيير الكمية للمنتج ${item.product.name}`}
             className="w-14 text-center font-bold bg-transparent focus:outline-none text-xs text-slate-900"
@@ -159,7 +158,7 @@ const CartLine: React.FC<CartLineProps> = ({
             className="w-16 text-center font-bold bg-white border border-slate-200 rounded-lg p-1 text-xs text-slate-900"
           />
           <span className="text-[10px] text-slate-500">ج.م</span>
-          <span className="text-[10px] text-slate-500">/{getCartPriceUnitLabel(item, isGeneral)}</span>
+          <span className="text-[10px] text-slate-500">/{getCartPriceUnitLabel(item)}</span>
         </div>
 
         <div className="font-black text-sky-600 w-20 text-left">{CeramicMath.formatCurrency(lineTotal)}</div>
@@ -377,7 +376,8 @@ export const PosView: React.FC = () => {
       const matchesGrade = selectedGrade === 'ALL' || p.grade === selectedGrade;
       const matchesSize = selectedSize === 'ALL' || p.size === selectedSize;
       const matchesColor = selectedColor === 'ALL' || (p.color || '') === selectedColor;
-      const matchesStock = !inStockOnly || stockOf(p.id) > 0;
+      const tracksStock = p.productType !== 'GENERAL' && p.baseUnit !== 'SERVICE';
+      const matchesStock = !inStockOnly || !tracksStock || stockOf(p.id) > 0;
       return matchesSearch && matchesCategory && matchesBrand && matchesGrade && matchesSize && matchesColor && matchesStock;
     });
 
@@ -402,8 +402,17 @@ export const PosView: React.FC = () => {
       .map((category) => ({ ...category, productCount: counts.get(category.id) || 0 }));
   }, [categories, products]);
   const visibleBrands = useMemo(() => [...new Map(products.filter((p) => p.brandId).map((p) => [p.brandId, p.brandName || ''])).entries()], [products]);
+  // Ceramic-only controls (grade, size, tiling calculator) are hidden for
+  // service-only or general-goods catalogues.
+  const hasCeramicCatalog = useMemo(
+    () => products.some((p) => p.productType !== 'GENERAL' && p.baseUnit !== 'SERVICE'),
+    [products]
+  );
   const visibleSizes = useMemo(
-    () => [...new Set(products.map((p) => p.size).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar', { numeric: true })),
+    () => [...new Set(products
+      .filter((p) => p.productType !== 'GENERAL' && p.baseUnit !== 'SERVICE')
+      .map((p) => p.size)
+      .filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar', { numeric: true })),
     [products]
   );
   const visibleColors = useMemo(
@@ -433,9 +442,15 @@ export const PosView: React.FC = () => {
     } catch {
       unitPrice = product.sellingPriceM2;
     }
+    // Default to the configured selling unit when it is usable, otherwise the
+    // base unit. Quantity is always kept in the base unit for stock math.
+    const sellable = getSellableUnits(product);
+    const preferred = product.sellUnit && sellable.includes(product.sellUnit) ? product.sellUnit : (product.baseUnit || 'M2');
+    const soldBy = sellable.includes(preferred) ? preferred : sellable[0];
     return {
       product,
-      soldBy: isGeneral && (product.baseUnit === 'BOX' || product.baseUnit === 'PIECE') ? product.baseUnit : 'M2',
+      soldBy,
+      soldQuantity: round2(fromBaseQuantity(quantityM2, soldBy, product)),
       quantityM2: round2(quantityM2),
       boxesCount: boxes,
       piecesCount: isGeneral
@@ -460,12 +475,23 @@ export const PosView: React.FC = () => {
   const addToCart = useCallback((product: Product, requestedM2?: number) => {
     setCart((prev) => {
       const existingIndex = prev.findIndex((item) => item.product.id === product.id);
-      const stepM2 = requestedM2 ?? (product.productType === 'GENERAL' ? 1 : (product.metersPerBox || 1.44));
+      const sellable = getSellableUnits(product);
+      const preferred = product.sellUnit && sellable.includes(product.sellUnit)
+        ? product.sellUnit
+        : (product.baseUnit || 'M2');
+      // One press adds one whole selling unit when that unit is countable
+      // (a box of 12 pieces, a carton of tiles, a ton); otherwise one base unit.
+      const oneSellUnitInBase = toBaseQuantity(1, preferred, product).quantity;
+      const stepM2 = requestedM2
+        ?? (product.productType === 'GENERAL'
+          ? (preferred !== (product.baseUnit || 'M2') ? oneSellUnitInBase : 1)
+          : (product.metersPerBox || 1.44));
       if (existingIndex > -1) {
         const updated = [...prev];
         const current = { ...updated[existingIndex] };
         const newM2 = round2(current.quantityM2 + stepM2);
         current.quantityM2 = newM2;
+        current.soldQuantity = round2(fromBaseQuantity(newM2, current.soldBy, current.product));
         if (current.product.productType === 'GENERAL') {
           current.boxesCount = current.product.baseUnit === 'BOX' ? newM2 : 0;
           current.piecesCount = current.product.baseUnit === 'PIECE' ? newM2 : 0;
@@ -499,22 +525,30 @@ export const PosView: React.FC = () => {
     setCart((prev) => {
       const updated = [...prev];
       const item = { ...updated[index] };
-      if (item.product.productType === 'GENERAL') {
-        item.quantityM2 = round2(value);
-        item.boxesCount = item.product.baseUnit === 'BOX' ? value : 0;
-        item.piecesCount = item.product.baseUnit === 'PIECE' ? value : 0;
-        updated[index] = item;
-        return updated;
+      let baseQuantity: number;
+      try {
+        baseQuantity = round2(convertQuantity(value, item.soldBy, item.product.baseUnit || 'M2', item.product));
+      } catch {
+        // The selected unit is not convertible for this product; keep the line.
+        return prev;
       }
+      item.soldQuantity = round2(value);
+      item.quantityM2 = baseQuantity;
       const metersPerBox = item.product.metersPerBox || 1.44;
-      if (item.soldBy === 'BOX') {
-        item.boxesCount = round2(value);
-        item.quantityM2 = round2(value * metersPerBox);
-        item.piecesCount = CeramicMath.calculatePiecesFromBoxes(item.boxesCount, item.product.piecesPerBox || 4);
+      const piecesPerBox = item.product.piecesPerBox || 4;
+      const soldInBoxes = String(item.soldBy).toUpperCase() === 'BOX';
+      const soldInPieces = String(item.soldBy).toUpperCase() === 'PIECE';
+
+      if (item.product.productType === 'GENERAL' || item.product.baseUnit === 'SERVICE') {
+        item.boxesCount = soldInBoxes ? value : item.product.baseUnit === 'BOX' ? baseQuantity : 0;
+        item.piecesCount = soldInPieces ? value : item.product.baseUnit === 'PIECE' ? baseQuantity : 0;
       } else {
-        item.quantityM2 = round2(value);
-        item.boxesCount = CeramicMath.calculateBoxes(value, metersPerBox, true);
-        item.piecesCount = CeramicMath.calculatePiecesFromBoxes(item.boxesCount, item.product.piecesPerBox || 4);
+        item.boxesCount = soldInBoxes
+          ? round2(value)
+          : CeramicMath.calculateBoxes(baseQuantity, metersPerBox, true);
+        item.piecesCount = soldInPieces
+          ? Math.round(value)
+          : CeramicMath.calculatePiecesFromBoxes(item.boxesCount, piecesPerBox);
       }
       updated[index] = item;
       return updated;
@@ -524,32 +558,29 @@ export const PosView: React.FC = () => {
   const stepCartQuantity = (index: number, direction: 1 | -1) => {
     const item = cart[index];
     if (!item) return;
-    if (item.product.productType === 'GENERAL') {
-      const step = item.product.baseUnit === 'BOX' || item.product.baseUnit === 'PIECE' || item.product.baseUnit === 'SET' ? 1 : 0.01;
-      updateCartQuantity(index, round2(item.quantityM2 + direction * step));
+    const step = getCartQuantityStep(item);
+    const next = round2(item.soldQuantity + direction * step);
+    if (next <= 0) {
+      removeFromCart(index);
       return;
     }
-    const metersPerBox = item.product.metersPerBox || 1.44;
-    if (item.soldBy === 'BOX') {
-      updateCartQuantity(index, round2(item.boxesCount + direction));
-    } else {
-      updateCartQuantity(index, round2(item.quantityM2 + direction * metersPerBox));
-    }
+    updateCartQuantity(index, next);
   };
 
   const updateCartUnit = (index: number, unit: PosUnit) => {
     setCart((prev) => {
       const updated = [...prev];
       const item = { ...updated[index] };
-      if (item.soldBy !== unit) {
-        if (item.product.productType === 'GENERAL') return prev;
-        const metersPerBox = item.product.metersPerBox || 1.44;
+      if (item.soldBy === unit) return prev;
+      try {
         item.soldBy = unit;
-        item.unitPrice = unit === 'BOX'
-          ? round2(item.unitPrice * metersPerBox)
-          : round2(item.unitPrice / metersPerBox);
-        updated[index] = item;
+        // Base quantity and base price stay untouched; only the entry unit and
+        // the quantity shown against it change.
+        item.soldQuantity = round2(fromBaseQuantity(item.quantityM2, unit, item.product));
+      } catch {
+        return prev;
       }
+      updated[index] = item;
       return updated;
     });
   };
@@ -563,14 +594,7 @@ export const PosView: React.FC = () => {
     setCart((prev) => {
       const updated = [...prev];
       const item = { ...updated[index] };
-      if (item.product.productType === 'GENERAL') {
-        item.unitPrice = round2(value);
-      } else {
-        const metersPerBox = item.product.metersPerBox || 1.44;
-        item.unitPrice = item.soldBy === 'BOX'
-          ? round2(value / metersPerBox)
-          : round2(value);
-      }
+      item.unitPrice = round2(basePriceFromUnitPrice(value, item.soldBy, item.product));
       updated[index] = item;
       return updated;
     });
@@ -615,8 +639,8 @@ export const PosView: React.FC = () => {
   const totalBoxes = round2(ceramicCart.reduce((sum, item) => sum + item.boxesCount, 0));
   const generalQuantitiesByUnit = new Map<string, number>();
   cart.filter((item) => item.product.productType === 'GENERAL').forEach((item) => {
-    const unit = getProductUnitLabel(item.product);
-    generalQuantitiesByUnit.set(unit, (generalQuantitiesByUnit.get(unit) || 0) + item.quantityM2);
+    const unit = getUomLabel(item.soldBy, item.product);
+    generalQuantitiesByUnit.set(unit, (generalQuantitiesByUnit.get(unit) || 0) + item.soldQuantity);
   });
   const cartQuantitySummary = [
     totalItems > 0 ? `${totalItems} م² / ${totalBoxes} كرتونة` : '',
@@ -751,7 +775,15 @@ export const PosView: React.FC = () => {
     const cust = customers.find((c) => c.id === order.customerId) || null;
     setSelectedCustomer(cust);
     if (order.warehouseId) setSelectedWarehouseId(order.warehouseId);
-    setCart(order.items);
+    // Held orders saved before per-line selling units existed only carry a
+    // base-unit quantity; derive the sell-unit quantity on the way in.
+    setCart((order.items || []).map((item) => ({
+      ...item,
+      soldBy: item.soldBy || item.product.baseUnit || 'M2',
+      soldQuantity: Number.isFinite(item.soldQuantity)
+        ? item.soldQuantity
+        : round2(fromBaseQuantity(item.quantityM2, item.soldBy || item.product.baseUnit || 'M2', item.product)),
+    })));
     setDiscountAmount(order.discountAmount || 0);
     setTaxPercentage(order.taxPercentage ?? settings?.defaultTaxPercentage ?? 0);
     setShippingCost(order.shippingCost || 0);
@@ -991,10 +1023,13 @@ export const PosView: React.FC = () => {
         items: cart.map((item) => ({
           productId: item.product.id,
           soldBy: item.soldBy,
+          uom: item.soldBy,
+          quantity: item.soldQuantity,
           quantityM2: item.quantityM2,
           boxesCount: item.boxesCount,
           piecesCount: item.piecesCount,
-          unitPrice: item.unitPrice,
+          // The service treats `unitPrice` as per `uom` when `quantity` is sent.
+          unitPrice: round2(pricePerUnit(item.unitPrice, item.soldBy, item.product)),
           unitCost: item.product.costPrice,
           discountAmount: item.discountAmount
         })),
@@ -1058,6 +1093,7 @@ export const PosView: React.FC = () => {
         total: item.totalPrice,
       })),
       fileName: `invoice-${inv.invoiceNumber}`,
+      permission: 'sales.export',
     };
     setInvoicePreview({
       title: `معاينة الفاتورة ${inv.invoiceNumber}`,
@@ -1073,13 +1109,13 @@ export const PosView: React.FC = () => {
           (inv.remainingAmount > 0 ? `المتبقي: ${CeramicMath.formatCurrency(inv.remainingAmount)}\n` : '') +
           `شكراً لتعاملكم معنا.`
         );
-        window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+        openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
       } : undefined,
     });
   };
 
   const latest = useRef<any>({});
-  latest.current = { handleCheckout, cart, isCalculatorOpen, isCustomerModalOpen, isHeldModalOpen, isShortcutsOpen, isShiftModalOpen, isCloseShiftModalOpen, isToneWarningOpen, invoicePreview, successInvoice };
+  latest.current = { handleCheckout, cart, isCalculatorOpen, isCustomerModalOpen, isHeldModalOpen, isShortcutsOpen, isShiftModalOpen, isCloseShiftModalOpen, isToneWarningOpen, invoicePreview, successInvoice, hasCeramicCatalog };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -1096,7 +1132,7 @@ export const PosView: React.FC = () => {
         paidInputRef.current?.focus();
       } else if (e.key === 'F8') {
         e.preventDefault();
-        setIsCalculatorOpen((v) => !v);
+        if (s.hasCeramicCatalog) setIsCalculatorOpen((v) => !v);
       } else if (e.key === 'F9') {
         e.preventDefault();
         s.handleCheckout();
@@ -1281,14 +1317,18 @@ export const PosView: React.FC = () => {
             <select id="pos-brand-filter" aria-label="فلتر الماركة" value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
               <option value="ALL">كل الماركات</option>{visibleBrands.map(([id, name]) => <option key={id} value={id}>{name || 'بدون ماركة'}</option>)}
             </select>
+            {hasCeramicCatalog && (<>
             <label htmlFor="pos-grade-filter" className="sr-only">فلتر الفرز</label>
             <select id="pos-grade-filter" aria-label="فلتر الفرز" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
               <option value="ALL">كل الأنواع والفرز</option><option value="GRADE_1">فرز أول</option><option value="GRADE_2">فرز ثاني</option><option value="GRADE_3">فرز ثالث</option><option value="COMMERCIAL">تجاري</option>
             </select>
+            {visibleSizes.length > 0 && (<>
             <label htmlFor="pos-size-filter" className="sr-only">فلتر المقاس</label>
             <select id="pos-size-filter" aria-label="فلتر المقاس" value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
               <option value="ALL">كل المقاسات</option>{visibleSizes.map((size) => <option key={size} value={size}>{size}</option>)}
             </select>
+            </>)}
+            </>)}
             {visibleColors.length > 0 && (<>
               <label htmlFor="pos-color-filter" className="sr-only">فلتر اللون</label>
               <select id="pos-color-filter" aria-label="فلتر اللون" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800">
@@ -1296,6 +1336,7 @@ export const PosView: React.FC = () => {
               </select>
             </>)}
 
+            {hasCeramicCatalog && (
             <button
               type="button"
               onClick={() => setIsCalculatorOpen(true)}
@@ -1303,6 +1344,7 @@ export const PosView: React.FC = () => {
             >
               <Calculator className="w-4 h-4" /> حاسبة المقايسة (F8)
             </button>
+            )}
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-slate-500">
@@ -1650,12 +1692,14 @@ export const PosView: React.FC = () => {
             >
               <RotateCcwIcon /> إفراغ
             </button>
+            {hasCeramicCatalog && (
             <button
               onClick={() => setIsCalculatorOpen(true)}
               className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
             >
               <Calculator className="w-4 h-4" /> مقايسة
             </button>
+            )}
           </div>
 
           <button

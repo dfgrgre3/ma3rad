@@ -115,6 +115,7 @@ public updateProductPlanningParameters(productId: string, input: {
     minStockLevel?: number;
     maxStockLevel?: number;
   }): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 

@@ -11,6 +11,7 @@ import { InventoryServicePart06 } from './InventoryServicePart06';
 
 export class InventoryServicePart07 extends InventoryServicePart06 {
 public resolveSpecialStock(id: string, action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 'RESTORE_TO_STOCK', notes: string): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 
@@ -61,10 +62,10 @@ public resolveSpecialStock(id: string, action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 
 
         const txId = `tx_${uuidv4().substring(0, 8)}`;
         const txNum = txDb.nextNumber('TX-RES');
-        const prod = txDb.query<any>(`SELECT meters_per_box, product_type, base_unit FROM products WHERE id = ?`, [productId])[0];
-        const boxes = prod?.product_type === 'GENERAL'
-          ? prod.base_unit === 'BOX' ? quantityM2 : 0
-          : Number((quantityM2 / (prod?.metersPerBox ?? prod?.meters_per_box ?? 1.44)).toFixed(2));
+        const prod = txDb.query<any>(`SELECT meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [productId])[0];
+        const boxes = prod?.productType === 'GENERAL'
+          ? prod.baseUnit === 'BOX' ? quantityM2 : 0
+          : Number((quantityM2 / (prod?.metersPerBox ?? 1.44)).toFixed(2));
 
         txDb.run(`
           INSERT INTO inventory_transactions (

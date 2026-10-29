@@ -12,7 +12,10 @@ import { PermissionService } from '../../services/PermissionService';
 import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
-import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { formatProductQuantity } from '../../utils/productUnits';
+import {
+  convertQuantity, fromBaseQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
+} from '../../utils/uom';
 import { computeReturnImpact, round2 } from '../../services/financials';
 
 const PAGE_SIZE = 15;
@@ -46,7 +49,7 @@ const RETURN_REASONS = [
 
 type ReturnRow = SalesReturn & { customerName: string; invoiceNumber: string };
 type ReturnDetail = SalesReturn & { items: SalesReturnItem[]; customerName?: string; invoiceNumber?: string };
-type ReturnLine = ReturnableItem & { quantityM2: number; reason: string };
+type ReturnLine = ReturnableItem & { quantityM2: number; reason: string; entryUnit: string };
 
 export const ReturnsPage: React.FC = () => {
   const location = useLocation() as { state?: { invoiceId?: string } };
@@ -109,7 +112,12 @@ export const ReturnsPage: React.FC = () => {
     setInvoiceInfo(inv);
     if (!inv) { setLines([]); return; }
     const returnable = service.getReturnableItems(id);
-    setLines(returnable.map((r) => ({ ...r, quantityM2: 0, reason: '' })));
+    setLines(returnable.map((r) => ({
+      ...r,
+      quantityM2: 0,
+      reason: '',
+      entryUnit: r.baseUnit || 'M2',
+    })));
   }, [service]);
 
   const openModal = useCallback((presetInvoiceId?: string) => {
@@ -138,6 +146,30 @@ export const ReturnsPage: React.FC = () => {
 
   const setLine = (idx: number, patch: Partial<ReturnLine>) =>
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+
+  /** Quantity shown in the unit the user chose for this line. */
+  const entryQuantity = (l: ReturnLine): number => {
+    try {
+      return round2(fromBaseQuantity(l.quantityM2, l.entryUnit, l));
+    } catch {
+      return l.quantityM2;
+    }
+  };
+
+  const setEntryQuantity = (idx: number, value: number) => {
+    const line = lines[idx];
+    if (!line) return;
+    const safe = Math.max(0, Number(value) || 0);
+    let base: number;
+    try {
+      base = round2(convertQuantity(safe, line.entryUnit, line.baseUnit || 'M2', line));
+    } catch {
+      return;
+    }
+    // Do not clamp silently: an over-quantity must stay visible so submit can
+    // explain it, and typing "2" must not jump to "1.66" under the cursor.
+    setLine(idx, { quantityM2: base });
+  };
 
   const total = round2(lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice, 0));
   const refundPreview = useMemo(() => {
@@ -198,6 +230,7 @@ export const ReturnsPage: React.FC = () => {
         refundMethod: REFUND_LABEL[r.refundMethod || 'CASH'] || 'نقدي',
       })),
       fileName: 'sales-returns',
+      permission: 'returns.export',
     };
     setDocPreview({
       title: 'معاينة سجل مرتجعات المبيعات',
@@ -364,9 +397,37 @@ export const ReturnsPage: React.FC = () => {
                         <td className="px-3 py-2 font-mono">{formatProductQuantity(l.soldM2, l)}</td>
                         <td className="px-3 py-2 font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</td>
                         <td className="px-3 py-2 font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</td>
-                        <td className="px-3 py-2 font-mono">{l.unitPrice}</td>
+                        <td className="px-3 py-2 font-mono">{round2(pricePerUnit(l.unitPrice, l.entryUnit, l))} <span className="text-[9px] text-slate-400">/{getUomLabel(l.entryUnit, l)}</span></td>
                         <td className="px-3 py-2">
-                          <input type="number" min={0} max={l.returnableM2} step={l.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(l.baseUnit || '') ? 1 : 0.01} value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Math.min(Number(e.target.value) || 0, l.returnableM2) })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono" aria-label={`كمية الإرجاع ${getProductUnitLabel(l)}`} />
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              max={entryQuantity({ ...l, quantityM2: l.returnableM2 })}
+                              step={isWholeUnit(l.entryUnit, l) ? 1 : 0.01}
+                              value={l.quantityM2 > 0 ? entryQuantity(l) : ''}
+                              onChange={(e) => setEntryQuantity(idx, Number.parseFloat(e.target.value))}
+                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg font-mono"
+                              aria-label={`كمية الإرجاع ${getUomLabel(l.entryUnit, l)}`}
+                            />
+                            {getSellableUnits(l).length > 1 && (
+                              <select
+                                value={l.entryUnit}
+                                onChange={(e) => setLine(idx, { entryUnit: e.target.value })}
+                                className="px-1 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold"
+                                aria-label={`وحدة الإرجاع للصنف ${l.productName}`}
+                              >
+                                {getSellableUnits(l).map((unit) => (
+                                  <option key={unit} value={unit}>{getUomLabel(unit, l)}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                          {l.entryUnit !== (l.baseUnit || 'M2') && l.quantityM2 > 0 && (
+                            <div className="text-[9px] text-slate-400 mt-1 font-normal">
+                              = {formatProductQuantity(l.quantityM2, l)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-3 py-2"><input list="return-reasons" value={l.reason} onChange={(e) => setLine(idx, { reason: e.target.value })} placeholder="كسر / عيب..." className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg" /></td>
                         <td className="px-3 py-2 font-bold text-rose-600">{fmt(l.quantityM2 * l.unitPrice)}</td>

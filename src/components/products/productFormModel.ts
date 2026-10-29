@@ -94,35 +94,51 @@ export interface VariantDraft {
 
 export type TabId = 'basic' | 'units' | 'pricing' | 'stock' | 'extras';
 
-export const emptyForm = (categoryId = '', brandId = '', productType: FormState['productType'] = 'CERAMIC'): FormState => ({
-  productType,
-  name: '',
-  sku: '',
-  barcode: '',
-  categoryId,
-  brandId,
-  grade: 'GRADE_1',
-  size: '60x60',
-  thickness: 8,
-  color: '',
-  tone: '',
-  finish: 'لامع',
-  surfaceLocation: 'FLOOR',
-  baseUnit: 'M2',
-  sellUnit: 'M2',
-  customUnit: '',
-  piecesPerBox: 4,
-  metersPerBox: 1.44,
-  weightPerBox: 0,
-  costPrice: 150,
-  sellingPriceM2: 220,
-  sellingPriceBox: 316.8,
-  wholesalePriceM2: 190,
-  minSellingPriceM2: 180,
-  minStockLevel: 20,
-  maxStockLevel: 1000,
-  notes: '',
-});
+export interface FormDefaults {
+  /** Default stocking/selling unit, usually the first unit of the business profile. */
+  baseUnit?: UnitType;
+}
+
+export const emptyForm = (
+  categoryId = '',
+  brandId = '',
+  productType: FormState['productType'] = 'CERAMIC',
+  defaults: FormDefaults = {},
+): FormState => {
+  const ceramic = productType === 'CERAMIC';
+  const baseUnit = defaults.baseUnit || (ceramic ? 'M2' : 'PIECE');
+  return {
+    productType,
+    name: '',
+    sku: '',
+    barcode: '',
+    categoryId,
+    brandId,
+    grade: 'GRADE_1',
+    size: ceramic ? '60x60' : '',
+    thickness: ceramic ? 8 : 0,
+    color: '',
+    tone: '',
+    finish: ceramic ? 'لامع' : '',
+    // Ceramic products default to flooring; everything else stays neutral and
+    // lets the service layer apply the business-profile default.
+    surfaceLocation: ceramic ? 'FLOOR' : 'GENERAL',
+    baseUnit,
+    sellUnit: baseUnit,
+    customUnit: '',
+    piecesPerBox: ceramic ? 4 : 1,
+    metersPerBox: ceramic ? 1.44 : 1,
+    weightPerBox: 0,
+    costPrice: ceramic ? 150 : 0,
+    sellingPriceM2: ceramic ? 220 : 0,
+    sellingPriceBox: ceramic ? 316.8 : 0,
+    wholesalePriceM2: ceramic ? 190 : 0,
+    minSellingPriceM2: ceramic ? 180 : 0,
+    minStockLevel: ceramic ? 20 : 0,
+    maxStockLevel: 1000,
+    notes: '',
+  };
+};
 
 export const emptyVariant = (): VariantDraft => ({
   variantName: '', sku: '', barcode: '', color: '', size: '',

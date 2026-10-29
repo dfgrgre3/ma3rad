@@ -40,6 +40,8 @@ export interface PurchaseInvoiceItem {
   grade: CeramicGrade;
   
   quantityM2: number;
+  quantity?: number;
+  uom?: string;
   boxesCount: number;
   unitCost: number;
   totalCost: number;

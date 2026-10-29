@@ -6,6 +6,7 @@ import { PermissionService } from './services/PermissionService';
 import { SettingsService } from './services/SettingsService';
 import type { BackupService } from './services/BackupService';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from './config/businessProfiles';
+import { withModuleDependencies } from './config/moduleRegistry';
 import { User } from './types';
 import { LoginPage } from './pages/auth/LoginPage';
 import { SetupWizard } from './components/SetupWizard';
@@ -305,17 +306,28 @@ export const App: React.FC = () => {
   // survives reloads and supports deep links (e.g. #/products/123).
   // The "/" index route redirects to /dashboard.
   return (
-    <ThemeProvider>
+    <ThemeProvider ready={dbReady}>
       <ToastProvider>
         <ErrorBoundary>
-          {currentUser?.mustChangePassword && (
+          {/* The setup wizard already secures the default admin password, so the
+              standalone modal only appears outside the wizard. Rendering both at
+              once let the modal change the password while the wizard still
+              demanded the (now stale) default-password fields. */}
+          {!showSetup && currentUser?.mustChangePassword && (
             <ForcePasswordChangeModal
               user={currentUser}
               onSuccess={(updated) => setCurrentUser(updated)}
             />
           )}
           {showSetup ? (
-            <SetupWizard onComplete={() => setShowSetup(false)} />
+            <SetupWizard
+              onComplete={() => {
+                setShowSetup(false);
+                // The wizard forces a non-default admin password, so the account
+                // no longer needs the forced password change screen.
+                setCurrentUser((current) => (current ? { ...current, mustChangePassword: false } : current));
+              }}
+            />
           ) : (
             <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <AppRouterWithProps
@@ -491,6 +503,10 @@ const AttendancePage         = lazy(() => import('./pages/operations/AttendanceP
 const PayrollPage            = lazy(() => import('./pages/operations/PayrollPage').then(m => ({ default: m.PayrollPage })));
 const CommissionsPage        = lazy(() => import('./pages/hr/CommissionsPage').then(m => ({ default: m.CommissionsPage })));
 const HrDashboardPage        = lazy(() => import('./pages/hr/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
+const LeavePage              = lazy(() => import('./pages/hr/LeavePage').then(m => ({ default: m.LeavePage })));
+const EmployeeContractsPage  = lazy(() => import('./pages/hr/EmployeeContractsPage').then(m => ({ default: m.EmployeeContractsPage })));
+const EmployeeDocumentsPage   = lazy(() => import('./pages/hr/EmployeeDocumentsPage').then(m => ({ default: m.EmployeeDocumentsPage })));
+const ManufacturingPage       = lazy(() => import('./pages/manufacturing/ManufacturingPage').then(m => ({ default: m.ManufacturingPage })));
 const CampaignsPage          = lazy(() => import('./pages/crm/CampaignsPage').then(m => ({ default: m.CampaignsPage })));
 const ProjectsPage           = lazy(() => import('./pages/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 const ProjectDetailPage      = lazy(() => import('./pages/projects/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
@@ -501,6 +517,7 @@ const FleetDashboardPage     = lazy(() => import('./pages/operations/FleetDashbo
 const EmployeesPage          = lazy(() => import('./pages/operations/EmployeesPage').then(m => ({ default: m.EmployeesPage })));
 const ReportsView            = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
 const ApprovalsPage          = lazy(() => import('./pages/approvals/ApprovalsPage').then(m => ({ default: m.ApprovalsPage })));
+const DocumentsPage          = lazy(() => import('./pages/documents/DocumentsPage').then(m => ({ default: m.DocumentsPage })));
 const NotificationsView      = lazy(() => import('./components/NotificationsView').then(m => ({ default: m.NotificationsView })));
 const AuditLogView           = lazy(() => import('./components/AuditLogView').then(m => ({ default: m.AuditLogView })));
 const SettingsView           = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
@@ -515,7 +532,7 @@ const NotFoundPage           = lazy(() => import('./pages/common/NotFoundPage').
 function S({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const businessType = SettingsService.getValue('businessType') || 'ceramics';
-  const modules = parseEnabledModules(SettingsService.getValue('enabledModules'), businessType);
+  const modules = withModuleDependencies(parseEnabledModules(SettingsService.getValue('enabledModules'), businessType));
   const businessConfig = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
   const moduleId = getBusinessModuleForPath(pathname);
   if (moduleId && (!modules.includes(moduleId) || (moduleId === 'inventory' && !businessConfig.trackInventory))) {
@@ -648,6 +665,10 @@ const AppRouterWithProps: React.FC<{
       <Route path="employees/attendance" element={<S><AttendancePage /></S>} />
       <Route path="employees/payroll" element={<S><PayrollPage /></S>} />
       <Route path="employees/commissions" element={<S><CommissionsPage /></S>} />
+      <Route path="employees/leave" element={<S><LeavePage /></S>} />
+      <Route path="employees/contracts" element={<S><EmployeeContractsPage /></S>} />
+      <Route path="employees/documents" element={<S><EmployeeDocumentsPage /></S>} />
+      <Route path="manufacturing" element={<S><ManufacturingPage /></S>} />
       <Route path="hr/dashboard" element={<S><HrDashboardPage /></S>} />
 
       {/* Reports */}
@@ -660,6 +681,10 @@ const AppRouterWithProps: React.FC<{
 
       {/* Approvals */}
       <Route path="approvals" element={<S><ApprovalsPage /></S>} />
+
+      {/* Documents & contracts */}
+      <Route path="documents" element={<S><DocumentsPage mode="documents" /></S>} />
+      <Route path="contracts" element={<S><DocumentsPage mode="contracts" /></S>} />
 
       {/* Notifications & Audit */}
       <Route path="notifications" element={<S><NotificationsView /></S>} />

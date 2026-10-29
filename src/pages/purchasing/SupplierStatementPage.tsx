@@ -88,8 +88,8 @@ export const SupplierStatementPage: React.FC = () => {
       balanceAfter: fmt(t.balanceAfter),
     }));
 
-    if (type === 'excel') exportToExcel({ title, columns, rows, fileName: `كشف-حساب-${selectedSupplier.name}` });
-    else exportToPdf({ title, columns, rows, fileName: `كشف-حساب-${selectedSupplier.name}` });
+    if (type === 'excel') exportToExcel({ title, columns, rows, fileName: `كشف-حساب-${selectedSupplier.name}`, permission: 'suppliers.export' });
+    else exportToPdf({ title, columns, rows, fileName: `كشف-حساب-${selectedSupplier.name}`, permission: 'suppliers.export' });
   };
 
   const handleOpenReallocate = (pay: any) => {

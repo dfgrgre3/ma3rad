@@ -1,14 +1,20 @@
 import type { PaymentType, Product } from '../../types';
 
-export type PosUnit = 'M2' | 'BOX' | 'PIECE';
+/** Any unit a line can be sold in; the canonical list comes from `getSellableUnits`. */
+export type PosUnit = string;
 export type SortMode = 'NAME' | 'PRICE_ASC' | 'PRICE_DESC' | 'STOCK_DESC';
 
 export interface CartItem {
   product: Product;
+  /** Unit the cashier is entering quantity and price in. */
   soldBy: PosUnit;
+  /** Quantity expressed in `soldBy` (what the cashier typed). */
+  soldQuantity: number;
+  /** Quantity in the product's base unit (what stock and costing use). */
   quantityM2: number;
   boxesCount: number;
   piecesCount: number;
+  /** Price per base unit; display/entry price is derived for `soldBy`. */
   unitPrice: number;
   discountAmount: number;
   availableStockM2: number;

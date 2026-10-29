@@ -121,6 +121,7 @@ public createWarehouseLocation(input: {
     maxCapacityM2?: number;
     notes?: string;
   }): any {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 

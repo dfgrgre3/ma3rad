@@ -6,34 +6,29 @@ export interface SectionCardProps {
   title: string;
   subtitle: string;
   icon: React.ComponentType<{ className?: string }>;
-  iconBg: string;
-  iconColor: string;
+  iconBg?: string;
+  iconColor?: string;
   badge?: string;
   onScrollTop?: () => void;
   children: React.ReactNode;
 }
 
-export const SectionCard: React.FC<SectionCardProps> = ({ id, title, subtitle, icon: Icon, iconBg, iconColor, badge, onScrollTop, children }) => {
+export const SectionCard: React.FC<SectionCardProps> = ({ id, title, subtitle, icon: Icon, badge, onScrollTop, children }) => {
   return (
-    <section
-      id={id}
-      className="scroll-mt-24 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs p-3.5 sm:p-4 space-y-4"
-    >
-      <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-lg ${iconBg} ${iconColor} flex items-center justify-center font-bold shrink-0`}>
-            <Icon className="w-4 h-4" />
-          </div>
-          <div>
+    <section id={id} className="win-card scroll-mt-24">
+      <div className="flex items-center justify-between gap-3 border-b border-[#d9d9d9] px-3 py-2 dark:border-[#3d3d3d]">
+        <div className="flex min-w-0 items-center gap-2">
+          <Icon className="h-4 w-4 shrink-0 text-[#0078d4]" />
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">{title}</h2>
+              <h2 className="truncate text-[13px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">{title}</h2>
               {badge && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                <span className="rounded-[2px] border border-[#d9d9d9] bg-[#fafafa] px-1.5 py-0.5 text-[10px] font-semibold text-[#4d4d4d] dark:border-[#4a4a4a] dark:bg-[#323232] dark:text-[#c8c8c8]">
                   {badge}
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+            <p className="truncate text-[11px] text-[#767676] dark:text-[#a6a6a6]">{subtitle}</p>
           </div>
         </div>
 
@@ -41,16 +36,16 @@ export const SectionCard: React.FC<SectionCardProps> = ({ id, title, subtitle, i
           <button
             type="button"
             onClick={onScrollTop}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="win-btn win-btn--ghost !min-h-7 !px-2 !text-[11px]"
             title="العودة لأعلى الصفحة"
           >
-            <ArrowUp className="w-3.5 h-3.5" />
+            <ArrowUp className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">للأعلى</span>
           </button>
         )}
       </div>
 
-      <div className="dashboard-embedded-scope [&>div]:!h-auto [&>div]:!overflow-visible [&>main]:!h-auto [&>main]:!overflow-visible [&>div]:!p-0 [&>main]:!p-0 [&>div]:!bg-transparent [&>main]:!bg-transparent [&_header]:!hidden [&_h1]:!hidden [&_.border-b.border-slate-200.px-6.py-4]:!hidden">
+      <div className="dashboard-embedded-scope p-2.5 sm:p-3 [&>div]:!h-auto [&>div]:!overflow-visible [&>main]:!h-auto [&>main]:!overflow-visible [&>div]:!p-0 [&>main]:!p-0 [&>div]:!bg-transparent [&>main]:!bg-transparent [&_header]:!hidden [&_h1]:!hidden [&_.border-b.border-slate-200.px-6.py-4]:!hidden">
         {children}
       </div>
     </section>

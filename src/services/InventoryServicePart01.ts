@@ -8,10 +8,16 @@ import { localDateString } from '../utils/date';
 import { postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { getProductUnitLabel } from '../utils/productUnits';
+import { ModuleRegistryService } from './ModuleRegistryService';
 
 export class InventoryServicePart01 {
 protected db = DatabaseManager.getInstance();
 protected branchAccess = new BranchAccessService();
+
+/** Service-layer guard: a deactivated inventory module must not accept new stock movements. */
+protected assertInventoryModuleEnabled(): void {
+  ModuleRegistryService.assertModuleEnabled('inventory');
+}
 
 protected getUnitLabel(productId: string): string {
     const product = this.db.query<{ productType: 'CERAMIC' | 'GENERAL'; baseUnit: UnitType; customUnit: string }>(
@@ -27,9 +33,11 @@ public getAllWarehouses(): Warehouse[] {
         'w.branch_id',
         '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)'
       );
+      const company = this.branchAccess.companyScope('w.company_id');
       return this.db.query<Warehouse>(
-        `SELECT w.* FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} ORDER BY w.is_default DESC, w.name ASC`,
-        scope.params
+        `SELECT w.* FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} AND ${company.clause}
+         ORDER BY w.is_default DESC, w.name ASC`,
+        [...scope.params, ...company.params]
       );
   }
 
@@ -40,6 +48,7 @@ public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)'
     );
+    const company = this.branchAccess.companyScope('w.company_id');
     let sql = `
       SELECT 
         ws.id, ws.warehouse_id as warehouseId, ws.product_id as productId,
@@ -63,9 +72,9 @@ public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock
         GROUP BY product_id, warehouse_id
       ) movement_totals ON movement_totals.product_id = ws.product_id
                        AND movement_totals.warehouse_id = ws.warehouse_id
-      WHERE p.is_active = 1 AND ${scope.clause}
+      WHERE p.is_active = 1 AND ${scope.clause} AND ${company.clause}
     `;
-    const params: any[] = [...scope.params];
+    const params: any[] = [...scope.params, ...company.params];
 
     if (warehouseId) {
       sql += ` AND ws.warehouse_id = ?`;

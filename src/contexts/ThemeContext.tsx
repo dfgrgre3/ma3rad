@@ -42,7 +42,7 @@ function resolve(mode: ThemeMode): 'light' | 'dark' {
   return mode === 'dark' ? 'dark' : 'light';
 }
 
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ThemeProvider: React.FC<{ children: React.ReactNode; ready?: boolean }> = ({ children, ready = true }) => {
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
   const [localOverride, setLocalOverride] = useState<ThemeMode | null>(() => readLocalOverride());
 
@@ -69,6 +69,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applySettings]);
+
+  // The provider mounts before SQLite finishes loading, so the first read can
+  // fall back to defaults. Re-read once the database is ready.
+  useEffect(() => {
+    if (ready) refresh();
+  }, [ready, refresh]);
 
   useEffect(() => {
     const root = document.documentElement;

@@ -121,7 +121,8 @@ export const ReportsView: React.FC = () => {
     const options = getExportOptions();
     if (!options) return;
     if (options.rows.length === 0) return alert('لا توجد بيانات لتصديرها.');
-    if (type === 'excel') exportToExcel(options); else exportToPdf(options);
+    const guarded = { ...options, permission: 'reports.export' };
+    if (type === 'excel') exportToExcel(guarded); else exportToPdf(guarded);
   };
 
   return (

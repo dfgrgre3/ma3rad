@@ -132,6 +132,7 @@ export const FinancialStatementsPage: React.FC = () => {
     if (!balance) return;
     exportToExcel({
       title: 'الميزانية العمومية', subtitle: `كما في ${balance.asOf}`, fileName: 'balance-sheet',
+      permission: 'reports.export',
       columns: [{ key: 'section', label: 'القسم' }, { key: 'label', label: 'البند' }, { key: 'amount', label: 'المبلغ' }],
       rows: [
         ...balance.assets.map((l) => ({ section: 'الأصول', label: l.label, amount: l.amount })),
@@ -146,6 +147,7 @@ export const FinancialStatementsPage: React.FC = () => {
     exportToExcel({
       title: agingType === 'customer' ? 'أعمار مديونيات العملاء' : 'أعمار مديونيات الموردين',
       subtitle: `كما في ${asOf}`, fileName: `aging-${agingType}`,
+      permission: 'reports.export',
       columns: [
         { key: 'name', label: 'الاسم' }, { key: 'current', label: 'حتى 30 يوم' },
         { key: 'days30', label: '31-60' }, { key: 'days60', label: '61-90' },

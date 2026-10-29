@@ -233,6 +233,7 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
         paymentStatus: PAY_LABEL[row.paymentStatus] || row.paymentStatus,
       })),
       fileName: `sales-${date}`,
+      permission: 'sales.export',
     },
     purchases: {
       title: 'مشتريات اليوم',
@@ -246,6 +247,7 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
         paymentStatus: PAY_LABEL[row.paymentStatus] || row.paymentStatus,
       })),
       fileName: `purchases-${date}`,
+      permission: 'purchases.export',
     },
     expenses: {
       title: 'منصرف اليوم',
@@ -261,6 +263,7 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
         paymentType: PAY_LABEL[row.paymentType] || row.paymentType,
       })),
       fileName: `expenses-${date}`,
+      permission: 'finance.export',
     },
     debts: {
       title: 'ديون اليوم',
@@ -272,6 +275,7 @@ const getDailyExportOptions = (kind: DailyKind, date: string, data: any) => {
       ],
       rows: data.rows,
       fileName: `debts-${date}`,
+      permission: 'finance.export',
     },
   };
   return exportOptions[kind];

@@ -80,12 +80,24 @@ export class SalesFinancialReconciliationService {
   public getReconciliation(dateFrom: string, dateTo: string): SalesFinancialCheck[] {
     this.validatePeriod(dateFrom, dateTo);
     PermissionService.require(AuthService.requireAuth(), 'finance.view');
-    const invoiceScope = this.branchAccess.sqlScope('si.branch_id');
-    const ledgerScope = this.branchAccess.sqlScope('e.branch_id');
+    // Documents are owned by a branch *and* a legal entity, so a reconciliation
+    // must never mix two companies that happen to share branch access.
+    const mergedScope = (branchExpression: string, companyExpression: string) => {
+      const branch = this.branchAccess.sqlScope(branchExpression);
+      const company = this.branchAccess.companyScope(companyExpression);
+      return {
+        clause: `(${branch.clause}) AND (${company.clause})`,
+        params: [...branch.params, ...company.params],
+      };
+    };
+    const invoiceScope = mergedScope('si.branch_id', 'si.company_id');
+    const returnScope = mergedScope('original.branch_id', 'original.company_id');
+    const ledgerScope = mergedScope('e.branch_id', 'e.company_id');
     const warehouseScope = this.branchAccess.sqlScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
     );
+    const warehouseCompanyScope = this.branchAccess.companyScope('w.company_id');
 
     const netSales = Number(this.db.query<{ amount: number }>(`
       SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost), 0)
@@ -96,12 +108,12 @@ export class SalesFinancialReconciliationService {
           FROM sales_returns sr
           JOIN sales_invoices original ON original.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
-            AND ${this.branchAccess.sqlScope('original.branch_id').clause}
+            AND ${returnScope.clause}
         ), 0) AS amount
       FROM sales_invoices si
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
     `, [
-      dateFrom, dateTo, ...this.branchAccess.sqlScope('original.branch_id').params,
+      dateFrom, dateTo, ...returnScope.params,
       dateFrom, dateTo, ...invoiceScope.params,
     ])[0]?.amount || 0);
     const ledgerSales = Number(this.db.query<{ amount: number }>(`
@@ -133,12 +145,12 @@ export class SalesFinancialReconciliationService {
           JOIN sales_returns sr ON sr.id = sri.return_id
           JOIN sales_invoices original ON original.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
-            AND ${this.branchAccess.sqlScope('original.branch_id').clause}
+            AND ${returnScope.clause}
         ), 0) AS amount
       FROM sales_invoices si
       WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${invoiceScope.clause}
     `, [
-      dateFrom, dateTo, ...this.branchAccess.sqlScope('original.branch_id').params,
+      dateFrom, dateTo, ...returnScope.params,
       dateFrom, dateTo, ...invoiceScope.params,
     ])[0]?.amount || 0);
     const ledgerCostOfSales = Number(this.db.query<{ amount: number }>(`
@@ -181,8 +193,8 @@ export class SalesFinancialReconciliationService {
       SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
       FROM inventory_cost_layers icl
       JOIN warehouses w ON w.id = icl.warehouse_id
-      WHERE icl.quantity_remaining > 0.009 AND ${warehouseScope.clause}
-    `, warehouseScope.params)[0]?.value || 0);
+      WHERE icl.quantity_remaining > 0.009 AND ${warehouseScope.clause} AND (${warehouseCompanyScope.clause})
+    `, [...warehouseScope.params, ...warehouseCompanyScope.params])[0]?.value || 0);
     const costingMethod = this.db.query<{ value: string }>(
       "SELECT value FROM system_settings WHERE key = 'costingMethod'"
     )[0]?.value || 'AVERAGE_COST';
@@ -193,8 +205,8 @@ export class SalesFinancialReconciliationService {
           FROM warehouse_stock ws
           JOIN warehouses w ON w.id = ws.warehouse_id
           JOIN products p ON p.id = ws.product_id
-          WHERE ${warehouseScope.clause}
-        `, warehouseScope.params)[0]?.value || 0);
+          WHERE ${warehouseScope.clause} AND (${warehouseCompanyScope.clause})
+        `, [...warehouseScope.params, ...warehouseCompanyScope.params])[0]?.value || 0);
     const registerScope = this.branchAccess.sqlScope('branch_id');
     const cashRegisters = Number(this.db.query<{ balance: number }>(
       `SELECT COALESCE(SUM(current_balance), 0) AS balance FROM cash_registers WHERE ${registerScope.clause}`,

@@ -18,6 +18,9 @@ import { CeramicMath } from '../utils/ceramicMath';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { exportToExcel } from '../utils/export';
 import { SettingsService } from '../services/SettingsService';
+import { BusinessProfileService } from '../services/BusinessProfileService';
+import { AuthService } from '../services/AuthService';
+import { PermissionService } from '../services/PermissionService';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
 import {
   GRADES, SURFACES, UNITS, calcMetersFromSize, emptyForm, emptyVariant, gradeLabel,
@@ -110,6 +113,12 @@ export const ProductsView: React.FC = () => {
       setCategories(categoryService.getAllCategories());
       setBrands(brandService.getAllBrands());
       setWarehouses(inventoryService.getAllWarehouses());
+      // Older installations saved a profile before attributes were materialized;
+      // applying it here is idempotent and additive, and only for users who are
+      // allowed to create products.
+      if (PermissionService.can(AuthService.getCurrentUser(), 'products.create')) {
+        BusinessProfileService.applyFromSettings();
+      }
       setAttributes(attributeService.getCategories());
     } catch (e) {
       console.error(e);
@@ -174,6 +183,9 @@ export const ProductsView: React.FC = () => {
     setSelectedCategory((prev) => (prev === category ? prev : category));
   }, [searchParams]);
 
+  // Dimensions/grade columns only make sense for a ceramic catalogue.
+  const hasCeramicRows = products.some((p) => p.productType !== 'GENERAL');
+
   const stockOf = (p: Product) => {
     const m2 = Number(p.totalStockM2 ?? 0);
     if (p.productType === 'GENERAL') return {
@@ -214,6 +226,7 @@ export const ProductsView: React.FC = () => {
         categories[0]?.id || '',
         brands[0]?.id || '',
         businessConfig.businessType === 'ceramics' ? 'CERAMIC' : 'GENERAL',
+        { baseUnit: businessConfig.units[0] as any },
       ),
       sku: `${businessConfig.businessType === 'ceramics' ? 'TILE' : 'SKU'}-${randCode}`,
       barcode: `622${randCode}01`,
@@ -518,6 +531,8 @@ export const ProductsView: React.FC = () => {
   };
 
   const saveOpeningStock = (productId: string) => {
+    // A business that does not track inventory has no stock to open.
+    if (!tracksInventory) return;
     openingRows
       .filter((row) => row.warehouseId && row.meters > 0)
       .forEach((row) => {
@@ -711,10 +726,14 @@ export const ProductsView: React.FC = () => {
           stockPieces: stock.totalPieces,
         };
       });
+      // Box/piece breakdowns only make sense when the selection contains
+      // packaged products; a pure general-goods catalogue exports unit columns.
+      const hasBoxUnits = all.some((p) => p.productType !== 'GENERAL');
       exportToExcel({
         title: 'دليل المنتجات',
         subtitle: `عدد المنتجات: ${rows.length}`,
         fileName: 'products',
+        permission: 'products.export',
         columns: [
           { key: 'barcode', label: 'الباركود' },
           { key: 'sku', label: 'الكود' },
@@ -727,16 +746,20 @@ export const ProductsView: React.FC = () => {
           { key: 'color', label: 'اللون' },
           { key: 'tone', label: 'التون' },
           { key: 'finish', label: 'التشطيب' },
-          { key: 'piecesPerBox', label: 'قطع/كرتونة' },
-          { key: 'metersPerBox', label: 'م²/كرتونة' },
+          ...(hasBoxUnits ? [
+            { key: 'piecesPerBox', label: 'قطع/كرتونة' },
+            { key: 'metersPerBox', label: 'م²/كرتونة' },
+          ] : []),
           { key: 'costPrice', label: 'التكلفة' },
           { key: 'sellingPriceM2', label: 'سعر الوحدة' },
-          { key: 'sellingPriceBox', label: 'سعر الكرتونة' },
+          ...(hasBoxUnits ? [{ key: 'sellingPriceBox', label: 'سعر الكرتونة' }] : []),
           { key: 'wholesalePriceM2', label: 'سعر الجملة' },
           { key: 'minStockLevel', label: 'حد الطلب' },
           { key: 'stockM2', label: 'المخزون بوحدة الصنف' },
-          { key: 'stockBoxes', label: 'المخزون كرتونة' },
-          { key: 'stockPieces', label: 'المخزون قطعة' },
+          ...(hasBoxUnits ? [
+            { key: 'stockBoxes', label: 'المخزون كرتونة' },
+            { key: 'stockPieces', label: 'المخزون قطعة' },
+          ] : []),
         ],
         rows,
       });
@@ -809,9 +832,17 @@ export const ProductsView: React.FC = () => {
           const stamp = `${Date.now().toString().slice(-5)}${String(index).padStart(3, '0')}`;
           const sku = pickCell(row, ['sku', 'الكود', 'كود الصنف']) || `IMP-${stamp}`;
           const barcode = pickCell(row, ['barcode', 'الباركود']) || `622${stamp}${String(index).padStart(2, '0')}`;
-          const size = pickCell(row, ['size', 'المقاس']) || '60x60';
-          const piecesPerBox = Number(pickCell(row, ['piecesPerBox', 'قطع بالكرتونة', 'عدد القطع'])) || 4;
-          const metersPerBox = Number(pickCell(row, ['metersPerBox', 'م² بالكرتونة', 'المترات'])) || calcMetersFromSize(size, piecesPerBox) || 1.44;
+          const rowType = pickCell(row, ['productType', 'نوع الصنف', 'النوع']).toUpperCase();
+          const ceramicRow = rowType.includes('CERAMIC')
+            || rowType.includes('سيراميك')
+            || (!rowType && businessConfig.businessType === 'ceramics');
+          const importUnit = (pickCell(row, ['unit', 'الوحدة']) as any)
+            || businessConfig.units[0]
+            || 'PIECE';
+          const size = pickCell(row, ['size', 'المقاس']) || (ceramicRow ? '60x60' : '');
+          const piecesPerBox = Number(pickCell(row, ['piecesPerBox', 'قطع بالكرتونة', 'عدد القطع'])) || (ceramicRow ? 4 : 1);
+          const metersPerBox = Number(pickCell(row, ['metersPerBox', 'م² بالكرتونة', 'المترات']))
+            || (ceramicRow ? calcMetersFromSize(size, piecesPerBox) || 1.44 : 1);
           const costPrice = Number(pickCell(row, ['costPrice', 'التكلفة', 'سعر الشراء'])) || 0;
           const sellingPriceM2 = Number(pickCell(row, ['sellingPriceM2', 'سعر المتر', 'سعر البيع'])) || round(costPrice * 1.4);
 
@@ -821,14 +852,15 @@ export const ProductsView: React.FC = () => {
             barcode,
             categoryId,
             brandId,
+            productType: ceramicRow ? 'CERAMIC' : 'GENERAL',
             grade: parseGrade(pickCell(row, ['grade', 'الفرز'])),
             size,
             thickness: Number(pickCell(row, ['thickness', 'السمك'])) || 0,
             color: pickCell(row, ['color', 'اللون']),
             finish: pickCell(row, ['finish', 'التشطيب']),
-            surfaceLocation: 'FLOOR',
-            baseUnit: 'M2',
-            sellUnit: 'M2',
+            surfaceLocation: ceramicRow ? 'FLOOR' : 'GENERAL',
+            baseUnit: ceramicRow ? 'M2' : importUnit,
+            sellUnit: ceramicRow ? 'M2' : importUnit,
             piecesPerBox,
             metersPerBox,
             weightPerBox: Number(pickCell(row, ['weightPerBox', 'الوزن'])) || 0,
@@ -846,7 +878,7 @@ export const ProductsView: React.FC = () => {
           const openingBoxes = Number(pickCell(row, ['openingBoxes', 'كراتين افتتاحية', 'الكمية'])) || 0;
           const warehouseName = pickCell(row, ['warehouse', 'المخزن']);
           const warehouseId = warehouseMap.get(warehouseName) || warehouses[0]?.id;
-          if (openingBoxes > 0 && warehouseId) {
+          if (tracksInventory && openingBoxes > 0 && warehouseId) {
             inventoryService.adjustStock(
               product.id,
               warehouseId,
@@ -879,13 +911,15 @@ export const ProductsView: React.FC = () => {
   const stockValue = formData.costPrice * openingRows.reduce((sum, row) => sum + row.meters, 0);
   const unitLabel = unitLabelFor(formData.baseUnit, formData.customUnit);
 
+  const tracksInventory = businessConfig.trackInventory !== false;
+
   const tabs = useMemo(() => ([
     { id: 'basic' as TabId, label: 'البيانات الأساسية', icon: <Package className="w-4 h-4" /> },
     { id: 'units' as TabId, label: 'المقاس والوحدات', icon: <Ruler className="w-4 h-4" /> },
     { id: 'pricing' as TabId, label: 'التسعير', icon: <Banknote className="w-4 h-4" /> },
-    { id: 'stock' as TabId, label: 'المخزون', icon: <Boxes className="w-4 h-4" /> },
+    ...(tracksInventory ? [{ id: 'stock' as TabId, label: 'المخزون', icon: <Boxes className="w-4 h-4" /> }] : []),
     { id: 'extras' as TabId, label: 'المتغيرات والصور', icon: <GitBranch className="w-4 h-4" /> },
-  ]), []);
+  ]), [tracksInventory]);
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
@@ -951,10 +985,10 @@ export const ProductsView: React.FC = () => {
               <option value="">جميع الماركات</option>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
             </select>
-            <select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            {businessConfig.businessType === 'ceramics' && (<select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="">جميع الفرزات</option>
               {GRADES.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </select>
+            </select>)}
             <select value={stockStatus} onChange={(e) => setStockStatus(e.target.value as any)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="all">حالة المخزون: الكل</option>
               <option value="in">متوفر</option>
@@ -1007,11 +1041,11 @@ export const ProductsView: React.FC = () => {
                   <th className="p-3.5">الصنف</th>
                   <th className="p-3.5">الباركود / الكود</th>
                   <th className="p-3.5">النوع والماركة</th>
-                  <th className="p-3.5">المقاس والفرز</th>
+                  {hasCeramicRows && <th className="p-3.5">المقاس والفرز</th>}
                   <th className="p-3.5">التحويل</th>
                   <th className="p-3.5">التكلفة</th>
                   <th className="p-3.5">سعر الوحدة</th>
-                  <th className="p-3.5">سعر الكرتونة</th>
+                  {hasCeramicRows && <th className="p-3.5">سعر الكرتونة</th>}
                   <th className="p-3.5 text-center">المخزون</th>
                   <th className="p-3.5 text-center">الإجراءات</th>
                 </tr>
@@ -1041,12 +1075,16 @@ export const ProductsView: React.FC = () => {
                         <div className="font-bold text-slate-700">{p.categoryName || '—'}</div>
                         <div className="text-[10px] text-slate-500">{p.brandName || '—'}</div>
                       </td>
+                      {hasCeramicRows && (
                       <td className="p-3.5">
-                        <span className="font-bold text-slate-700">{p.size}</span>
+                        <span className="font-bold text-slate-700">{p.productType === 'GENERAL' ? '—' : p.size}</span>
+                        {p.productType !== 'GENERAL' && (
                         <div className="text-[10px]">
                           <span className={`font-extrabold ${p.grade === 'GRADE_1' ? 'text-sky-600' : 'text-amber-600'}`}>{gradeLabel(p.grade)}</span>
                         </div>
+                        )}
                       </td>
+                      )}
                       <td className="p-3.5 font-semibold text-slate-700">
                         {p.productType === 'GENERAL' ? <div>وحدة المخزون: {getProductUnitLabel(p)}</div> : <>
                           <div>{p.metersPerBox} {p.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
@@ -1055,7 +1093,9 @@ export const ProductsView: React.FC = () => {
                       </td>
                       <td className="p-3.5 font-mono text-slate-600">{CeramicMath.formatCurrency(p.costPrice)}</td>
                       <td className="p-3.5 font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</td>
-                      <td className="p-3.5 font-bold text-slate-900">{p.productType === 'GENERAL' ? '—' : CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
+                      {hasCeramicRows && (
+                        <td className="p-3.5 font-bold text-slate-900">{p.productType === 'GENERAL' ? '—' : CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
+                      )}
                       <td className="p-3.5 text-center">
                         <span className={`inline-block px-2 py-1 rounded-lg font-black text-[11px] ${stockTone(p)}`}>
                           {p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : <>
@@ -1288,7 +1328,19 @@ export const ProductsView: React.FC = () => {
                           </select>
                         </Field>
                         {formData.baseUnit === ('CUSTOM' as UnitType) && <Field label="اسم الوحدة" required>
-                          <input required value={formData.customUnit} onChange={(e) => setFormData({ ...formData, customUnit: e.target.value })} placeholder="جردل، شيكارة، لفة..." className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
+                          <>
+                            <input
+                              required
+                              list="business-custom-units"
+                              value={formData.customUnit}
+                              onChange={(e) => setFormData({ ...formData, customUnit: e.target.value })}
+                              placeholder="اختر من وحدات النشاط أو اكتب وحدة جديدة"
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold"
+                            />
+                            <datalist id="business-custom-units">
+                              {businessConfig.customUnits.map((unit) => <option key={unit} value={unit} />)}
+                            </datalist>
+                          </>
                         </Field>}
                         <Field label={`سعر البيع / ${unitLabel}`}>
                           <input type="number" min="0" step="0.01" value={formData.sellingPriceM2} onChange={(e) => setFormData({ ...formData, sellingPriceM2: Number.parseFloat(e.target.value) || 0, sellingPriceBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
@@ -1372,24 +1424,24 @@ export const ProductsView: React.FC = () => {
                 <section className="space-y-3">
                   <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Banknote className="w-4 h-4 text-emerald-600" /> التسعير</div>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <Field label="سعر الشراء / التكلفة (للمتر)">
+                    <Field label={`سعر الشراء / التكلفة (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
-                    <Field label="سعر بيع المتر (قطاعي)">
+                    <Field label={`سعر البيع (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.sellingPriceM2} onChange={(e) => { const price = Number.parseFloat(e.target.value) || 0; setFormData({ ...formData, sellingPriceM2: price, sellingPriceBox: round(price * formData.metersPerBox) }); }} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold text-sky-600" />
                     </Field>
-                    <Field label="سعر الكرتونة">
+                    {formData.productType === 'CERAMIC' && <Field label="سعر الكرتونة">
                       <input type="number" step="0.01" value={formData.sellingPriceBox} onChange={(e) => setFormData({ ...formData, sellingPriceBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                    </Field>
-                    <Field label="سعر الجملة (للمتر)">
+                    </Field>}
+                    <Field label={`سعر الجملة (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.wholesalePriceM2} onChange={(e) => setFormData({ ...formData, wholesalePriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
-                    <Field label="الحد الأدنى لسعر المتر">
+                    <Field label={`الحد الأدنى لسعر البيع (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.minSellingPriceM2} onChange={(e) => setFormData({ ...formData, minSellingPriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <div className="grid grid-cols-2 gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
                       <div>
-                        <div className="text-[10px] font-bold text-emerald-700">ربح المتر</div>
+                        <div className="text-[10px] font-bold text-emerald-700">ربح الوحدة</div>
                         <div className="font-black text-emerald-700">{CeramicMath.formatCurrency(profitPerMeter)}</div>
                       </div>
                       <div>
@@ -1399,7 +1451,7 @@ export const ProductsView: React.FC = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                    <Field label="حد الطلب الأدنى (للمتر)">
+                    <Field label={`حد الطلب الأدنى (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.minStockLevel} onChange={(e) => setFormData({ ...formData, minStockLevel: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
                     <Field label="الحد الأقصى للمخزون">
@@ -1465,9 +1517,10 @@ export const ProductsView: React.FC = () => {
 
               {activeTab === 'extras' && (
                 <div className="space-y-5">
+                  {formData.productType === 'CERAMIC' && (
                   <section className="space-y-3 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-sm font-extrabold text-indigo-800"><GitBranch className="w-4 h-4" /> متغيرات الصنف (ألوان / مقاسات / فرزات)</div>
+                      <div className="flex items-center gap-1.5 text-sm font-extrabold text-indigo-800"><GitBranch className="w-4 h-4" /> متغيرات الصنف (خصائص الصنف)</div>
                       <button type="button" onClick={addVariantDraft} className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100">+ إضافة متغير</button>
                     </div>
                     {variants.length === 0 ? (
@@ -1491,6 +1544,7 @@ export const ProductsView: React.FC = () => {
                       </div>
                     ))}
                   </section>
+                  )}
 
                   <section className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-violet-800"><SlidersHorizontal className="w-4 h-4" /> خصائص ومواصفات إضافية</div>

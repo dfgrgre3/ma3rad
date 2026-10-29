@@ -26,6 +26,8 @@ export interface InventoryTransaction {
   warehouseId: string;
   warehouseName?: string;
   quantityM2: number; // موجب أو سالب
+  quantity?: number;
+  uom?: string;
   boxesCount?: number;
   unitCost: number;
   totalCost: number;

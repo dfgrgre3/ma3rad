@@ -55,11 +55,12 @@ export class CustomerService {
   private branchAccess = new BranchAccessService();
 
   public getAllCustomers(search?: string): Customer[] {
-    let sql = `SELECT * FROM customers`;
-    const params: any[] = [];
+    const scope = this.branchAccess.companyScope('company_id');
+    let sql = `SELECT * FROM customers WHERE ${scope.clause}`;
+    const params: any[] = [...scope.params];
 
     if (search && search.trim()) {
-      sql += ` WHERE name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?`;
+      sql += ` AND (name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?)`;
       const term = `%${search.trim()}%`;
       params.push(term, term, term, term);
     }
@@ -69,10 +70,11 @@ export class CustomerService {
   }
 
   public getCustomersPage(search = '', page = 1, pageSize = 25) {
-    const params: any[] = [];
-    let where = '';
+    const scope = this.branchAccess.companyScope('company_id');
+    const params: any[] = [...scope.params];
+    let where = ` WHERE ${scope.clause}`;
     if (search.trim()) {
-      where = ' WHERE name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?';
+      where += ' AND (name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?)';
       const term = `%${search.trim()}%`;
       params.push(term, term, term, term);
     }
@@ -84,7 +86,7 @@ export class CustomerService {
   }
 
   public getCustomerById(id: string): Customer | null {
-    const rows = this.db.query<Customer>(`SELECT * FROM customers WHERE id = ?`, [id]);
+    const rows = this.db.query<Customer>(`SELECT * FROM customers WHERE id = ? AND ${this.branchAccess.companyScope('company_id').clause}`, [id, ...this.branchAccess.companyScope('company_id').params]);
     return rows.length > 0 ? rows[0] : null;
   }
 
@@ -98,13 +100,13 @@ export class CustomerService {
       sqliteDb.run(`
         INSERT INTO customers (
           id, code, name, phone, phone2, national_id, address, city,
-          customer_type, credit_limit, payment_terms_days, current_balance, total_purchases, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+          customer_type, credit_limit, payment_terms_days, current_balance, total_purchases, notes, company_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
       `, [
         id, code, customer.name, customer.phone, customer.phone2 || null,
         customer.nationalId || null, customer.address || null, customer.city || null,
         customer.customerType || 'RETAIL', customer.creditLimit || 0, customer.paymentTermsDays || 0, customer.initialBalance || 0,
-        customer.notes || null
+        customer.notes || null, this.branchAccess.getAccessibleCompanyIds(AuthService.requireAuth())?.[0] ?? null
       ]);
 
       sqliteDb.run(`

@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
+import { BranchAccessService } from './BranchAccessService';
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
@@ -90,6 +91,7 @@ const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
 export class FinanceExtrasService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   private requireView() {
     const actor = AuthService.requireAuth();
@@ -183,17 +185,27 @@ export class FinanceExtrasService {
 
   getJournalEntries(limit = 200): JournalEntry[] {
     this.requireView();
+    const branch = this.branchAccess.sqlScope('e.branch_id');
+    const company = this.branchAccess.companyScope('e.company_id');
     return this.db.query<JournalEntry>(
       `SELECT e.*, (SELECT COUNT(*) FROM journal_entry_lines l WHERE l.entry_id = e.id) AS line_count
        FROM journal_entries e
+       WHERE (${branch.clause}) AND (${company.clause})
        ORDER BY e.date DESC, e.created_at DESC
        LIMIT ?`,
-      [limit]
+      [...branch.params, ...company.params, limit]
     );
   }
 
   getJournalLines(entryId: string): JournalLine[] {
     this.requireView();
+    const branch = this.branchAccess.sqlScope('e.branch_id');
+    const company = this.branchAccess.companyScope('e.company_id');
+    const visible = this.db.query<{ id: string }>(
+      `SELECT e.id FROM journal_entries e WHERE e.id = ? AND (${branch.clause}) AND (${company.clause})`,
+      [entryId, ...branch.params, ...company.params]
+    )[0];
+    if (!visible) throw new Error('القيد المحاسبي غير موجود ضمن نطاق صلاحيتك.');
     return this.db.query<JournalLine>(
       `SELECT l.*, a.code AS account_code, a.name AS account_name
        FROM journal_entry_lines l

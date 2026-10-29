@@ -7,6 +7,8 @@ import { round2 } from './financials';
 import type { PaymentType, SalesInvoice } from '../types';
 import { localDateString } from '../utils/date';
 import { getProductUnitLabel } from '../utils/productUnits';
+import { normalizeUom } from '../utils/uom';
+import { resolveSaleUnits } from './sales/unitResolution';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED';
 
@@ -84,9 +86,14 @@ export interface OrderStatusEntry {
 
 export interface OrderItemInput {
   productId: string;
+  /** Quantity in the product's base unit; used when `uom`/`quantity` are absent. */
   quantityM2: number;
   unitPrice: number;
   discountAmount?: number;
+  /** Selling unit the user typed the line in (services are always base-unit only). */
+  uom?: string;
+  /** Quantity expressed in `uom`; `unitPrice` is then per `uom`. */
+  quantity?: number;
 }
 
 export interface OrderInput {
@@ -499,7 +506,7 @@ export class OrderService {
         shiftId: options.shiftId,
         items: order.items!.map((item) => ({
           productId: item.productId,
-          soldBy: 'M2',
+          soldBy: item.baseUnit || 'M2',
           quantityM2: item.quantityM2,
           boxesCount: item.boxesCount,
           piecesCount: Math.round(item.boxesCount * 4),
@@ -567,38 +574,46 @@ export class OrderService {
   }
 
   private normalizeItems(items: OrderItemInput[]) {
-    const filtered = (items || []).filter((i) => i.productId && Number(i.quantityM2) > 0);
+    const filtered = (items || []).filter((i) =>
+      i.productId && (Number(i.quantity) > 0 || Number(i.quantityM2) > 0)
+    );
     return filtered.map((item) => {
       const product = this.db.query<any>(
-        `SELECT id, name, grade, meters_per_box, is_active,
+        `SELECT id, name, grade, meters_per_box AS metersPerBox, pieces_per_box AS piecesPerBox, is_active,
                 product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit
          FROM products WHERE id = ?`,
         [item.productId]
       )[0];
       if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
       if (!product.isActive) throw new Error(`الصنف "${product.name}" غير نشط.`);
-      const quantityM2 = round2(Math.max(0, Number(item.quantityM2) || 0));
-      const unitPrice = round2(Math.max(0, Number(item.unitPrice) || 0));
+
+      // Orders store base-unit quantities like every other stock path; the
+      // entered unit only affects how the line was typed and priced.
+      const units = resolveSaleUnits(item, product);
+      const unitPrice = Math.max(0, units.baseUnitPrice);
       const discountAmount = round2(Math.min(
         Math.max(0, Number(item.discountAmount) || 0),
-        quantityM2 * unitPrice
+        units.gross
       ));
-      const metersPerBox = Number(product.metersPerBox ?? product.meters_per_box) || 1.44;
-      const boxesCount = product.productType === 'GENERAL'
-        ? product.baseUnit === 'BOX' ? quantityM2 : 0
-        : round2(quantityM2 / metersPerBox);
+      const metersPerBox = Number(product.metersPerBox) || 1.44;
+      const soldInBoxes = normalizeUom(units.sellUnit, product) === 'BOX';
+      const boxesCount = soldInBoxes
+        ? round2(units.sellQuantity)
+        : product.productType === 'GENERAL' && product.baseUnit === 'BOX'
+          ? round2(units.baseQuantity)
+          : round2(units.baseQuantity / metersPerBox);
       return {
         productId: product.id as string,
         productName: product.name as string,
         grade: (product.grade as string) || 'GRADE_1',
-        quantityM2,
+        quantityM2: units.baseQuantity,
         unitPrice,
         discountAmount,
         boxesCount,
         productType: product.productType,
         baseUnit: product.baseUnit,
         customUnit: product.customUnit,
-        totalPrice: round2(quantityM2 * unitPrice - discountAmount),
+        totalPrice: round2(units.gross - discountAmount),
       };
     });
   }

@@ -12,9 +12,39 @@ export class SupplierService {
   private branchAccess = new BranchAccessService();
 
   public getAllSuppliers(search?: string, includeInactive = false): Supplier[] {
+    this.requireSuppliersDirectory();
+    return this.fetchSuppliers(search, includeInactive);
+  }
+
+  public getSupplierById(id: string): Supplier | null {
+    this.requireSuppliersView();
+    return this.readSupplier(id);
+  }
+
+  private requireSuppliersView(): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'suppliers.view');
+  }
+
+  /** Supplier directory is also needed to record purchases, receipts and quotations. */
+  private requireSuppliersDirectory(): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.requireAny(actor, ['suppliers.view', 'purchases.create', 'purchases.view']);
+  }
+
+  /** Internal read used by mutations; public reads additionally require `suppliers.view`. */
+  private readSupplier(id: string): Supplier | null {
+    const scope = this.branchAccess.companyScope('company_id');
+    const rows = this.db.query<Supplier>(`SELECT * FROM suppliers WHERE id = ? AND ${scope.clause}`, [id, ...scope.params]);
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  private fetchSuppliers(search?: string, includeInactive = false): Supplier[] {
+    const scope = this.branchAccess.companyScope('company_id');
     let sql = `SELECT * FROM suppliers`;
     const params: any[] = [];
-    const conditions: string[] = [];
+    const conditions: string[] = [scope.clause];
+    params.push(...scope.params);
 
     if (!includeInactive) conditions.push('is_active = 1');
 
@@ -24,14 +54,9 @@ export class SupplierService {
       params.push(term, term, term, term);
     }
 
-    if (conditions.length) sql += ` WHERE ${conditions.join(' AND ')}`;
+    sql += ` WHERE ${conditions.join(' AND ')}`;
     sql += ` ORDER BY name ASC`;
     return this.db.query<Supplier>(sql, params);
-  }
-
-  public getSupplierById(id: string): Supplier | null {
-    const rows = this.db.query<Supplier>(`SELECT * FROM suppliers WHERE id = ?`, [id]);
-    return rows.length > 0 ? rows[0] : null;
   }
 
   public createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }): Supplier {
@@ -44,13 +69,14 @@ export class SupplierService {
       sqliteDb.run(`
         INSERT INTO suppliers (
           id, code, name, company_name, phone, email, tax_number, commercial_record,
-          address, current_balance, total_purchases, payment_terms_days, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+          address, current_balance, total_purchases, payment_terms_days, notes, company_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
       `, [
         id, code, supplier.name, supplier.companyName || null, supplier.phone,
         supplier.email || null, supplier.taxNumber || null, supplier.commercialRecord || null,
         supplier.address || null, supplier.initialBalance || 0, supplier.paymentTermsDays || 30,
-        supplier.notes || null
+        supplier.notes || null,
+        (this.branchAccess.getAccessibleCompanyIds(actor) || ['cmp_main'])[0]
       ]);
 
       sqliteDb.run(`
@@ -58,14 +84,14 @@ export class SupplierService {
         VALUES (?, ?, ?, 'إضافة مورد / مصنع جديد', 'SUPPLIERS', ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(supplier)]);
 
-      return this.getSupplierById(id)!;
+      return this.readSupplier(id)!;
     });
   }
 
   public updateSupplier(id: string, updates: Partial<Supplier>): Supplier {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.update');
-    const existing = this.getSupplierById(id);
+    const existing = this.readSupplier(id);
     if (!existing) throw new Error('المورد غير موجود.');
 
     const sql = `
@@ -96,7 +122,7 @@ export class SupplierService {
         VALUES (?, ?, ?, 'تعديل بيانات مورد', 'SUPPLIERS', ?, ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(existing), JSON.stringify(updates)]);
 
-      return this.getSupplierById(id)!;
+      return this.readSupplier(id)!;
     });
   }
 
@@ -113,7 +139,7 @@ export class SupplierService {
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
     const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
 
-    const sup = this.getSupplierById(supplierId);
+    const sup = this.readSupplier(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
 
     const paymentId = `spay_${uuidv4().substring(0, 8)}`;
@@ -204,7 +230,8 @@ export class SupplierService {
   }
 
   public getSupplierStatement(supplierId: string, fromDate?: string, toDate?: string) {
-    const sup = this.getSupplierById(supplierId);
+    this.requireSuppliersView();
+    const sup = this.readSupplier(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
 
     const invoiceScope = this.branchAccess.sqlScope(
@@ -354,6 +381,7 @@ export class SupplierService {
   }
 
   public getInvoicesWithAllocations(supplierId: string) {
+    this.requireSuppliersView();
     const invoiceScope = this.branchAccess.sqlScope(
       'pi.branch_id',
       '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)',
@@ -382,6 +410,7 @@ export class SupplierService {
   }
 
   public getPaymentsWithAllocations(supplierId: string) {
+    this.requireSuppliersView();
     const paymentScope = this.branchAccess.sqlScope(
       'sp.branch_id',
       '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = sp.register_id)',

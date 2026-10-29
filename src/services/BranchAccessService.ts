@@ -35,6 +35,38 @@ export class BranchAccessService {
     ).map(row => row.branchId);
   }
 
+  /** Company ids reachable through the user's branches. `null` means unrestricted (central access). */
+  public getAccessibleCompanyIds(user = this.actor()): string[] | null {
+    const branchIds = this.getAccessibleBranchIds(user);
+    if (branchIds === null) return null;
+    if (!branchIds.length) return [];
+    const placeholders = branchIds.map(() => '?').join(', ');
+    return this.db.query<{ companyId: string }>(
+      `SELECT DISTINCT company_id AS companyId FROM branches
+       WHERE id IN (${placeholders}) AND company_id IS NOT NULL`,
+      branchIds
+    ).map((row) => row.companyId);
+  }
+
+  public companyScope(column = 'company_id', user = this.actor()): { clause: string; params: string[] } {
+    const allowed = this.getAccessibleCompanyIds(user);
+    if (allowed === null) return { clause: '1 = 1', params: [] };
+    if (!allowed.length) return { clause: '1 = 0', params: [] };
+    return { clause: `${column} IN (${allowed.map(() => '?').join(', ')})`, params: allowed };
+  }
+
+  public hasCompanyAccess(companyId: string, user = this.actor()): boolean {
+    const allowed = this.getAccessibleCompanyIds(user);
+    if (allowed === null) return true;
+    return allowed.includes(companyId);
+  }
+
+  public requireCompanyAccess(companyId: string, user = this.actor()): void {
+    if (!this.hasCompanyAccess(companyId, user)) {
+      throw new Error('ليس لديك صلاحية الوصول إلى بيانات هذه الشركة.');
+    }
+  }
+
   public hasBranchAccess(branchId: string, user = this.actor()): boolean {
     const allowed = this.getAccessibleBranchIds(user);
     if (allowed === null) return true;

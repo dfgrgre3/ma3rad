@@ -40,4 +40,9 @@ contextBridge.exposeInMainWorld('ceramisys', {
     }),
     rawCups: (bytes, printerName) => ipcRenderer.invoke('print:rawCups', { bytes: Array.from(bytes || []), printerName }),
   },
+  documents: {
+    importFile: () => ipcRenderer.invoke('documents:import'),
+    openFile: (storageName) => ipcRenderer.invoke('documents:open', storageName),
+    info: () => ipcRenderer.invoke('documents:info'),
+  },
 });

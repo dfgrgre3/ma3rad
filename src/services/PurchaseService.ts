@@ -10,6 +10,7 @@ import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { SettingsService } from './SettingsService';
+import { ModuleRegistryService } from './ModuleRegistryService';
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -51,17 +52,34 @@ export class PurchaseService {
   }
 
   public getAllPurchases(search?: string): PurchaseInvoice[] {
+    this.requirePurchasesView();
+    return this.fetchPurchases(search);
+  }
+
+  public getPurchaseById(id: string): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
+    this.requirePurchasesView();
+    return this.readPurchaseById(id);
+  }
+
+  private requirePurchasesView(): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.view');
+  }
+
+  private fetchPurchases(search?: string): PurchaseInvoice[] {
     AuthService.requireAuth();
+    const actor = AuthService.getCurrentUser();
     const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
+    const companyScope = this.branchAccess.companyScope('pi.company_id');
     let sql = `
       SELECT pi.*, s.name as supplierName, w.name as warehouseName, u.full_name as createdByName
       FROM purchase_invoices pi
       JOIN suppliers s ON pi.supplier_id = s.id
       JOIN warehouses w ON pi.warehouse_id = w.id
       LEFT JOIN users u ON pi.created_by = u.id
-      WHERE ${scope.clause}
+      WHERE ${scope.clause} AND ${companyScope.clause}
     `;
-    const params: any[] = [...scope.params];
+    const params: any[] = [...scope.params, ...companyScope.params];
 
     if (search && search.trim()) {
       sql += ` AND (pi.invoice_number LIKE ? OR s.name LIKE ? OR pi.supplier_invoice_number LIKE ?)`;
@@ -73,17 +91,19 @@ export class PurchaseService {
     return this.db.query<PurchaseInvoice>(sql, params);
   }
 
-  public getPurchaseById(id: string): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
+  /** Internal read used by mutations; public reads additionally require `purchases.view`. */
+  private readPurchaseById(id: string): (PurchaseInvoice & { items: PurchaseInvoiceItem[] }) | null {
     AuthService.requireAuth();
     const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
+    const companyScope = this.branchAccess.companyScope('pi.company_id');
     const rows = this.db.query<PurchaseInvoice>(`
       SELECT pi.*, s.name as supplierName, s.phone as supplierPhone, w.name as warehouseName, u.full_name as createdByName
       FROM purchase_invoices pi
       JOIN suppliers s ON pi.supplier_id = s.id
       JOIN warehouses w ON pi.warehouse_id = w.id
       LEFT JOIN users u ON pi.created_by = u.id
-      WHERE pi.id = ? AND ${scope.clause}
-    `, [id, ...scope.params]);
+      WHERE pi.id = ? AND ${scope.clause} AND ${companyScope.clause}
+    `, [id, ...scope.params, ...companyScope.params]);
 
     if (rows.length === 0) return null;
     const inv = rows[0];
@@ -122,14 +142,14 @@ export class PurchaseService {
         productName: prod.name,
         grade: prod.grade,
         quantityM2: item.quantityM2,
-        boxesCount: prod.product_type === 'GENERAL'
-          ? prod.base_unit === 'BOX' ? item.quantityM2 : 0
+        boxesCount: prod.productType === 'GENERAL'
+          ? prod.baseUnit === 'BOX' ? item.quantityM2 : 0
           : item.boxesCount,
-        productType: prod.product_type,
+        productType: prod.productType,
         unitCost: item.unitCost,
         totalCost: lineTotalCost,
-        metersPerBox: prod.meters_per_box || 1.44,
-        piecesPerBox: prod.pieces_per_box || 4,
+        metersPerBox: prod.metersPerBox || 1.44,
+        piecesPerBox: prod.piecesPerBox || 4,
         orderedUnitCost: item.orderedUnitCost || item.unitCost,
         grnAcceptedQty: item.grnAcceptedQty || item.quantityM2,
         landedCostShare: 0,
@@ -201,7 +221,8 @@ export class PurchaseService {
     performedBy: string,
     today: string,
     alreadyReceivedInGrn: boolean,
-    method: string
+    method: string,
+    trackInventory: boolean
   ) {
     for (const item of preparedItems) {
       sqliteDb.run(`
@@ -218,6 +239,12 @@ export class PurchaseService {
       ]);
 
       const stockRow = sqliteDb.query(`SELECT quantity_m2 FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`, [item.productId, dto.warehouseId])[0] as any;
+      if (!trackInventory) {
+        // No stock ledger for this business: keep the last purchase cost on the
+        // product as an expense reference, but never create stock or cost layers.
+        sqliteDb.run(`UPDATE products SET cost_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [round2(item.effectiveUnitCost), item.productId]);
+        continue;
+      }
       if (!alreadyReceivedInGrn) {
         if (stockRow) {
           sqliteDb.run(`
@@ -274,7 +301,12 @@ export class PurchaseService {
     }
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'purchases.create');
+    ModuleRegistryService.assertModuleEnabled('purchasing');
     const branchId = this.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
+    const companyId = this.db.query<{ companyId: string | null }>(
+      `SELECT b.company_id AS companyId FROM branches b JOIN warehouses w ON w.branch_id = b.id WHERE w.id = ?`,
+      [dto.warehouseId]
+    )[0]?.companyId ?? null;
     const branchRegisterId = this.branchAccess.getDefaultRegisterId(branchId, actor);
 
     if (!dto.isNoNumberSupplier && dto.supplierInvoiceNumber && dto.supplierInvoiceNumber.trim()) {
@@ -304,6 +336,7 @@ export class PurchaseService {
     const dueDateString = localDateString(dueDate);
 
     const invoice = this.db.executeTransaction((sqliteDb) => {
+      const trackInventory = ModuleRegistryService.isInventoryTracked();
       const invoiceNumber = sqliteDb.nextNumber('PUR');
       const { subtotal, preparedItems } = this.preparePurchaseItems(sqliteDb, purchaseId, dto.items);
       const discountAmount = round2(dto.discountAmount || 0);
@@ -317,15 +350,15 @@ export class PurchaseService {
 
       sqliteDb.run(`
         INSERT INTO purchase_invoices (
-          id, invoice_number, supplier_invoice_number, date, due_date, supplier_id, warehouse_id, branch_id,
+          id, invoice_number, supplier_invoice_number, date, due_date, supplier_id, warehouse_id, branch_id, company_id,
           subtotal, discount_amount, tax_amount, shipping_cost, total_amount,
           paid_amount, remaining_amount, payment_type, payment_status, notes, created_by,
           grn_id, purchase_order_id, landed_freight, landed_loading, landed_customs_taxes,
           landed_insurance, landed_other, landed_allocation_method, is_no_number_supplier,
           matching_status, price_variance_amount, qty_variance_amount
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dueDateString, dto.supplierId, dto.warehouseId, branchId,
+        purchaseId, invoiceNumber, dto.supplierInvoiceNumber || null, today, dueDateString, dto.supplierId, dto.warehouseId, branchId, companyId,
         subtotal, discountAmount, taxAmount, shippingCost, totalAmount,
         dto.paidAmount, remainingAmount, dto.paymentType, paymentStatus, dto.notes || null, performedBy,
         dto.grnId || null, dto.purchaseOrderId || null, landedFreight, landedLoading, landedCustoms,
@@ -335,7 +368,7 @@ export class PurchaseService {
 
       const method = this.costingMethod();
       const alreadyReceivedInGrn = Boolean(dto.grnId);
-      this.persistPurchaseItems(sqliteDb, dto, purchaseId, invoiceNumber, preparedItems, performedBy, today, alreadyReceivedInGrn, method);
+      this.persistPurchaseItems(sqliteDb, dto, purchaseId, invoiceNumber, preparedItems, performedBy, today, alreadyReceivedInGrn, method, trackInventory);
 
       sqliteDb.run(`
         UPDATE suppliers SET
@@ -384,7 +417,9 @@ export class PurchaseService {
         });
       }
 
-      const inventoryCost = round2(preparedItems.reduce((sum, item) => sum + Number(item.totalCost), 0));
+      const inventoryCost = trackInventory
+        ? round2(preparedItems.reduce((sum, item) => sum + Number(item.totalCost), 0))
+        : 0;
       const purchaseAdjustment = round2(totalAmount - inventoryCost - taxAmount);
       postLedgerEntry(sqliteDb.getDatabase(), {
         date: today,
@@ -409,8 +444,10 @@ export class PurchaseService {
         VALUES (?, ?, ?, 'إدخال فاتورة مشتريات وتوريد', 'PURCHASES', ?, ?)
       `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, actor.fullName, purchaseId, JSON.stringify({ invoiceNumber, totalAmount })]);
 
-      for (const item of dto.items) {
-        new CustomerSupplyService().allocateReceivedQuantity(dto.warehouseId, item.productId, item.quantityM2, sqliteDb);
+      if (trackInventory) {
+        for (const item of dto.items) {
+          new CustomerSupplyService().allocateReceivedQuantity(dto.warehouseId, item.productId, item.quantityM2, sqliteDb);
+        }
       }
 
       return {
@@ -448,7 +485,8 @@ export class PurchaseService {
   ): { id: string; receiptNumber: string; amount: number } {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.payment');
-    const invoice = this.getPurchaseById(purchaseId);
+    ModuleRegistryService.assertModuleEnabled('purchasing');
+    const invoice = this.readPurchaseById(purchaseId);
     if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
     if (invoice.remainingAmount <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
     const invoiceBranchId = invoice.branchId || this.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
@@ -510,7 +548,8 @@ export class PurchaseService {
   public deletePurchase(purchaseId: string, reason: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'purchases.delete');
-    const invoice = this.getPurchaseById(purchaseId);
+    ModuleRegistryService.assertModuleEnabled('purchasing');
+    const invoice = this.readPurchaseById(purchaseId);
     if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
     const invoiceBranchId = invoice.branchId || this.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
     if (!reason || !reason.trim()) throw new Error('سبب الحذف مطلوب.');
@@ -518,8 +557,11 @@ export class PurchaseService {
     this.ensurePurchaseHasNoReturns(purchaseId);
 
     this.db.executeTransaction((db) => {
-      this.validatePurchaseInventoryDeletion(db, purchaseId, invoice);
-      this.reversePurchaseInventory(db, purchaseId, invoice, reason, actor.id);
+      const trackInventory = ModuleRegistryService.isInventoryTracked();
+      if (trackInventory) {
+        this.validatePurchaseInventoryDeletion(db, purchaseId, invoice);
+        this.reversePurchaseInventory(db, purchaseId, invoice, reason, actor.id);
+      }
       db.run(
         `UPDATE suppliers SET
            current_balance = current_balance - ?,
@@ -530,7 +572,7 @@ export class PurchaseService {
       );
 
       this.reversePurchasePayments(db, invoice, invoiceBranchId, actor);
-      this.postPurchaseVoidLedger(db, purchaseId, invoice, actor.id);
+      this.postPurchaseVoidLedger(db, purchaseId, invoice, actor.id, trackInventory);
       db.run('DELETE FROM purchase_invoice_items WHERE purchase_id = ?', [purchaseId]);
       db.run('DELETE FROM purchase_invoices WHERE id = ?', [purchaseId]);
       this.logPurchaseDeletion(db, purchaseId, invoice, reason, actor.id, actor.fullName);
@@ -539,7 +581,7 @@ export class PurchaseService {
 
   private ensurePurchaseHasNoReturns(purchaseId: string): void {
     const returnsCount = this.db.query<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM purchase_returns WHERE original_invoice_id = ?',
+      'SELECT COUNT(*) AS count FROM purchase_returns WHERE original_purchase_id = ?',
       [purchaseId]
     )[0]?.count ?? 0;
     if (returnsCount > 0) throw new Error('لا يمكن حذف فاتورة لها مرتجعات مسجلة. احذف المرتجعات أولًا.');
@@ -577,12 +619,12 @@ export class PurchaseService {
     const currentQuantity = stockRow ? Number(stockRow.quantityM2) : 0;
     if (currentQuantity >= item.quantityM2) return;
 
-    const product = db.query<{ product_type: string; base_unit: string; custom_unit?: string }>(
+    const product = db.query<{ productType: string; baseUnit: string; customUnit?: string }>(
       `SELECT product_type, base_unit, custom_unit FROM products WHERE id = ?`,
       [item.productId]
     )[0];
-    const unit = product?.product_type === 'GENERAL'
-      ? product.custom_unit || ({ M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة', KG: 'كجم', TON: 'طن', SET: 'طقم' } as Record<string, string>)[product.base_unit] || 'وحدة'
+    const unit = product?.productType === 'GENERAL'
+      ? product.customUnit || ({ M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة', KG: 'كجم', TON: 'طن', SET: 'طقم' } as Record<string, string>)[product.baseUnit] || 'وحدة'
       : 'م²';
     throw new Error(`لا يمكن حذف فاتورة التوريد. الرصيد الحالي للصنف (${currentQuantity} ${unit}) أقل من كمية الفاتورة (${item.quantityM2} ${unit}). تم استخدام جزء من الكمية في مبيعات. استخدم مرتجع بدلاً من الحذف.`);
   }
@@ -655,9 +697,12 @@ export class PurchaseService {
     db: DatabaseManager,
     purchaseId: string,
     invoice: PurchaseInvoice & { items: PurchaseInvoiceItem[] },
-    actorId: string
+    actorId: string,
+    trackInventory: boolean
   ): void {
-    const inventoryCost = round2(invoice.items.reduce((sum, item) => sum + Number(item.totalCost), 0));
+    const inventoryCost = trackInventory
+      ? round2(invoice.items.reduce((sum, item) => sum + Number(item.totalCost), 0))
+      : 0;
     const purchaseAdjustment = round2(invoice.totalAmount - inventoryCost - invoice.taxAmount);
     postLedgerEntry(db.getDatabase(), {
       date: localDateString(),

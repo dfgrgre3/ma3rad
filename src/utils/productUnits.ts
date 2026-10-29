@@ -16,13 +16,16 @@ const UNIT_LABELS: Record<Exclude<UnitType, 'CUSTOM'>, string> = {
 
 // Invoice rows saved before unit metadata was added may not include baseUnit.
 type ProductUnitInfo = {
-  productType?: 'CERAMIC' | 'GENERAL';
+  productType?: string;
   baseUnit?: string;
   customUnit?: string;
 };
 
 export const getProductUnitLabel = (product: ProductUnitInfo): string => {
-  if (product.productType !== 'GENERAL') {
+  // Ceramic products keep the historical area/linear-meter wording even when
+  // their stored base unit differs. Every other product type (GENERAL, SERVICE)
+  // is described by its configured unit.
+  if (!product.productType || product.productType === 'CERAMIC') {
     return product.baseUnit === 'LINEAR_METER' ? 'متر طولي' : 'م²';
   }
   if (product.baseUnit === 'CUSTOM') return product.customUnit?.trim() || 'وحدة';
@@ -34,4 +37,12 @@ export const formatProductQuantity = (quantity: number, product: ProductUnitInfo
   `${Number(quantity || 0).toLocaleString('ar-EG')} ${getProductUnitLabel(product)}`;
 
 export const getStockQuantityLabel = (product: ProductUnitInfo): string =>
-  product.productType === 'GENERAL' ? getProductUnitLabel(product) : 'م²';
+  !product.productType || product.productType === 'CERAMIC' ? 'م²' : getProductUnitLabel(product);
+
+/**
+ * A service line is sold without a stock movement even when the business tracks
+ * inventory for its other products (mixed businesses such as restaurants,
+ * workshops or contractors).
+ */
+export const isServiceProduct = (product: ProductUnitInfo): boolean =>
+  product.productType === 'SERVICE' || product.baseUnit === 'SERVICE';

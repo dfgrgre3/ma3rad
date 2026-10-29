@@ -11,3 +11,4 @@ export * from './customerPrograms';
 export * from './organization';
 export * from './inventory';
 export * from './finance';
+export * from './documents';

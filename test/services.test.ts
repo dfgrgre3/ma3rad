@@ -292,6 +292,24 @@ test('FIFO cost layers consume oldest lots first and can restore a returned issu
   assert.equal(db.query<any>('SELECT quantity_remaining AS q FROM inventory_cost_layers WHERE id=?',[firstLayer])[0].q,2);
 });
 
+test('navigation layout setting accepts only header or sidebar and persists', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  AuthService.login('admin', 'admin123');
+
+  assert.throws(
+    () => SettingsService.update({ navigationLayout: 'floating' }),
+    /تخطيط التنقل غير صالح/
+  );
+
+  SettingsService.update({ navigationLayout: 'header' });
+  assert.equal(SettingsService.getValue('navigationLayout'), 'header');
+  assert.equal(SettingsService.getSettings().navigationLayout, 'header');
+
+  SettingsService.update({ navigationLayout: 'sidebar' });
+  assert.equal(SettingsService.getSettings().navigationLayout, 'sidebar');
+});
+
 test('enabling FIFO refuses destructive conversion when cost history exists', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

@@ -56,8 +56,8 @@ export const DashboardView: React.FC = () => {
   const isOverview = activeTab === 'all';
 
   return (
-    <div id="dashboard-scroll-root" className="h-full overflow-y-auto bg-[#f5f5f2] dark:bg-slate-950" dir="rtl">
-      <div className="mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6 lg:p-8">
+    <div id="dashboard-scroll-root" className="h-full overflow-y-auto bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
+      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 lg:p-5">
         <DashboardHeader today={today} onRefresh={refresh} />
 
         <DashboardSectionNav activeTab={activeTab} onSelectSection={selectSection} />
@@ -77,7 +77,7 @@ export const DashboardView: React.FC = () => {
         {(activeTab === 'all' || activeTab === 'crm') && <SectionCard id="sec-crm" title="إدارة العملاء والفرص" subtitle="متابعة العملاء المحتملين والأنشطة التسويقية" icon={Target} iconBg="bg-violet-50 dark:bg-violet-950" iconColor="text-violet-700 dark:text-violet-300"><Suspense fallback={<DashboardLoader />}><CrmDashboardPage /></Suspense></SectionCard>}
         {(activeTab === 'all' || activeTab === 'fleet') && <SectionCard id="sec-fleet" title="التوصيل والأسطول" subtitle="متابعة الشحنات والسائقين والمركبات" icon={Truck} iconBg="bg-cyan-50 dark:bg-cyan-950" iconColor="text-cyan-700 dark:text-cyan-300"><Suspense fallback={<DashboardLoader />}><FleetDashboardPage /></Suspense></SectionCard>}
         {(activeTab === 'all' || activeTab === 'hr') && <SectionCard id="sec-hr" title="الموارد البشرية" subtitle="متابعة فريق العمل والحضور والعمولات" icon={Award} iconBg="bg-teal-50 dark:bg-teal-950" iconColor="text-teal-700 dark:text-teal-300"><Suspense fallback={<DashboardLoader />}><HrDashboardPage /></Suspense></SectionCard>}
-        <footer className="pb-2 text-center text-[10px] font-medium text-slate-400">CeramiSys ERP <span className="px-1.5">·</span> إدارة أكثر وضوحاً لمعرضك</footer>
+        <footer className="pb-1 text-center text-[10px] text-[#767676] dark:text-[#a6a6a6]">CeramiSys ERP</footer>
       </div>
     </div>
   );

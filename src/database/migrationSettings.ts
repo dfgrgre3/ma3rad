@@ -38,6 +38,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   fontFamily: 'Cairo',
   showBrandText: '1',
   sidebarStyle: 'default',
+  navigationLayout: 'sidebar',
 };
 
 // Keys added after the original settings backfill. Migration 012 inserts any
@@ -45,6 +46,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
 export const EXTENDED_SETTINGS_KEYS = [
   'brandName', 'brandShortName', 'brandLogoDataUrl', 'brandPrimaryColor',
   'brandAccentColor', 'themeMode', 'fontFamily', 'showBrandText', 'sidebarStyle',
+  'navigationLayout',
 ];
 
 export const DEFAULT_BRANCH_ID = 'br_main';

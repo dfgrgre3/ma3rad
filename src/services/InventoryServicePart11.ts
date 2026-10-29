@@ -11,6 +11,7 @@ import { InventoryServicePart10 } from './InventoryServicePart10';
 
 export class InventoryServicePart11 extends InventoryServicePart10 {
 public rejectTransfer(transferId: string, reason: string): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer');
 

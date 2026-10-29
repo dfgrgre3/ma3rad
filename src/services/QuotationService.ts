@@ -7,18 +7,24 @@ import { OrderService, type Order } from './OrderService';
 import { round2 } from './financials';
 import type { PaymentType, SalesInvoice } from '../types';
 import { addLocalDays, localDateString } from '../utils/date';
-import { getProductUnitLabel } from '../utils/productUnits';
+import { getUomLabel, normalizeUom } from '../utils/uom';
+import { resolveSaleUnits } from './sales/unitResolution';
 
 export type QuotationStatus = 'PENDING' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
 
 export interface QuotationItemInput {
   productId: string;
+  /** Quantity in the product's base unit; used when `uom`/`quantity` are absent. */
   quantityM2: number;
   unitPrice: number;
   discountAmount?: number;
   soldBy?: 'M2' | 'BOX' | 'PIECE';
   boxesCount?: number;
   piecesCount?: number;
+  /** Selling unit the user typed the line in (services are always base-unit only). */
+  uom?: string;
+  /** Quantity expressed in `uom`; `unitPrice` is then per `uom`. */
+  quantity?: number;
 }
 
 export interface QuotationInput {
@@ -504,7 +510,7 @@ export class QuotationService {
         warehouseId,
         items: quotation.items!.map((item) => ({
           productId: item.productId,
-          soldBy: 'M2',
+          soldBy: this.baseUnitOf(item.productId),
           quantityM2: item.quantityM2,
           boxesCount: item.boxesCount,
           piecesCount: Math.round(item.boxesCount * 4),
@@ -544,13 +550,23 @@ export class QuotationService {
     )[0]?.id;
   }
 
+  /** Quotation lines are stored in base units, so invoices must inherit that unit. */
+  private baseUnitOf(productId: string): string {
+    const row = this.db.query<{ baseUnit?: string }>(
+      `SELECT base_unit AS baseUnit FROM products WHERE id = ?`,
+      [productId]
+    )[0];
+    return row?.baseUnit || 'M2';
+  }
+
   private prepareItems(items: QuotationItemInput[], actor: ReturnType<typeof AuthService.requireAuth>) {
     if (!items || items.length === 0) {
       throw new Error('أضف بنداً واحداً على الأقل إلى عرض السعر.');
     }
     return items.map((item) => {
       const product = this.db.query<any>(
-        `SELECT id, name, sku, grade, size, meters_per_box, pieces_per_box, min_selling_price_m2, is_active,
+        `SELECT id, name, sku, grade, size, meters_per_box AS metersPerBox, pieces_per_box AS piecesPerBox,
+                min_selling_price_m2, is_active,
                 product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit
          FROM products WHERE id = ?`,
         [item.productId]
@@ -558,26 +574,33 @@ export class QuotationService {
       if (!product) throw new Error(`الصنف ذو المعرف ${item.productId} غير موجود.`);
       if (!product.isActive) throw new Error(`الصنف "${product.name}" غير نشط.`);
 
-      const unitLabel = getProductUnitLabel(product);
-      const quantityM2 = round2(Math.max(0, item.quantityM2 || 0));
-      if (quantityM2 <= 0) throw new Error(`كمية الصنف "${product.name}" (${unitLabel}) يجب أن تكون أكبر من صفر.`);
+      // The line is typed in `uom` (defaults to the base unit) but stored in
+      // base units, so conversion, stock and invoicing all agree.
+      const units = resolveSaleUnits(item, product);
+      const unitLabel = getUomLabel(units.sellUnit, product);
+      if (units.baseQuantity <= 0) {
+        throw new Error(`كمية الصنف "${product.name}" (${unitLabel}) يجب أن تكون أكبر من صفر.`);
+      }
 
-      const unitPrice = round2(Math.max(0, item.unitPrice || 0));
-      if (unitPrice <= 0) throw new Error(`سعر الصنف "${product.name}" لكل ${unitLabel} يجب أن يكون أكبر من صفر.`);
-      if (unitPrice < Number(product.minSellingPriceM2 || 0)) {
+      const saleUnitPrice = round2(Math.max(0, units.sellUnitPrice));
+      if (saleUnitPrice <= 0) {
+        throw new Error(`سعر الصنف "${product.name}" لكل ${unitLabel} يجب أن يكون أكبر من صفر.`);
+      }
+      if (round2(units.baseUnitPrice) < Number(product.minSellingPriceM2 || 0)) {
         PermissionService.require(actor, 'sales.approve');
       }
 
       const discountAmount = round2(Math.max(0, item.discountAmount || 0));
-      const gross = round2(quantityM2 * unitPrice);
+      const gross = round2(units.sellQuantity * saleUnitPrice);
       if (discountAmount > gross) throw new Error(`خصم الصنف "${product.name}" أكبر من قيمته.`);
       const totalPrice = round2(gross - discountAmount);
       const metersPerBox = Number(product.metersPerBox ?? product.meters_per_box) || 1.44;
-      const boxesCount = product.productType === 'GENERAL'
-        ? product.baseUnit === 'BOX' ? quantityM2 : 0
-        : item.boxesCount !== undefined
-          ? round2(Math.max(0, item.boxesCount))
-          : round2(quantityM2 / metersPerBox);
+      const soldInBoxes = normalizeUom(units.sellUnit, product) === 'BOX';
+      const boxesCount = soldInBoxes
+        ? round2(units.sellQuantity)
+        : product.productType === 'GENERAL' && product.baseUnit === 'BOX'
+          ? round2(units.baseQuantity)
+          : round2(units.baseQuantity / metersPerBox);
 
       return {
         productId: product.id as string,
@@ -585,9 +608,9 @@ export class QuotationService {
         grade: (product.grade as string) || 'GRADE_1',
         size: product.size as string,
         sku: product.sku as string,
-        quantityM2,
+        quantityM2: units.baseQuantity,
         boxesCount,
-        unitPrice,
+        unitPrice: units.baseUnitPrice,
         discountAmount,
         totalPrice,
       };

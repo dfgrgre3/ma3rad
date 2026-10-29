@@ -5,12 +5,17 @@ const fsSync = require('fs');
 const { registerPrintingHandlers } = require('./printing');
 const { registerDatabaseHandlers } = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
+const { registerDocumentHandlers } = require('./documentHandlers');
 const { isAllowedAppUrl, isAllowedIpcSender } = require('./security');
 const { installGracefulClose } = require('./gracefulShutdown');
 
 // Keep application data in the OS-standard roaming profile. This is always
 // writable, even when the app itself is installed under Program Files.
-const APP_DATA_DIR = path.join(app.getPath('appData'), 'CeramiSysERP');
+// End-to-end tests point CERAMISYS_USER_DATA_DIR at a throwaway folder so a
+// test run never touches a real installation's data.
+const APP_DATA_DIR = process.env.CERAMISYS_USER_DATA_DIR
+  ? path.resolve(process.env.CERAMISYS_USER_DATA_DIR)
+  : path.join(app.getPath('appData'), 'CeramiSysERP');
 app.setPath('userData', APP_DATA_DIR);
 const DATA_DIR = path.join(APP_DATA_DIR, 'data');
 const BACKUP_DIR = path.join(APP_DATA_DIR, 'backups');
@@ -123,7 +128,7 @@ function createWindow() {
 
   if (!app.isPackaged) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173');
-    win.webContents.openDevTools();
+    if (!process.env.CERAMISYS_E2E) win.webContents.openDevTools();
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'));
   }
@@ -141,9 +146,40 @@ registerAppHandlers({
   ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
   appDataDir: APP_DATA_DIR, DATA_DIR, BACKUP_DIR, ensureDirs,
 });
+registerDocumentHandlers({
+  ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, appDataDir: APP_DATA_DIR,
+});
 registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR, MAX_PRINT_DATA });
+
+// ─── Offline guard ───────────────────────────────────────────────────────────
+// The product is delivered for a single machine with no Internet access. Any
+// renderer request that tries to leave the machine is cancelled so a missing
+// connection can never stall the UI or leak data. The Vite dev server is the
+// only permitted HTTP(S) target, and only while running unpackaged.
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+function installOfflineNetworkGuard(ses) {
+  ses.webRequest.onBeforeRequest((details, callback) => {
+    try {
+      const url = new URL(details.url);
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        const isDevServer = !app.isPackaged && LOOPBACK_HOSTS.has(url.hostname);
+        if (!isDevServer) {
+          console.warn(`Offline guard: blocked outbound request to ${url.origin}${url.pathname}`);
+          callback({ cancel: true });
+          return;
+        }
+      }
+    } catch {
+      // Unparsable URLs are left to Chromium.
+    }
+    callback({});
+  });
+}
+
 app.whenReady().then(() => {
   ensureDirs();
+  installOfflineNetworkGuard(session.defaultSession);
   createWindow();
 
   app.on('activate', () => {

@@ -5,13 +5,15 @@ import { SettingsService } from '../SettingsService';
 import { InventoryCostingService } from '../InventoryCostingService';
 import { BatchService } from '../BatchService';
 import { localDateString } from '../../utils/date';
-import { getProductUnitLabel } from '../../utils/productUnits';
+import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
+import { convertQuantity } from '../../utils/uom';
 import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
 import { computeReturnImpact, round2 } from '../financials';
 import type { SalesReturn } from '../../types';
 import type { DatabaseManager } from '../../database/db';
 import type { InvoiceWithItems, SalesContext } from './context';
 import type { ReturnRequestItem } from './types';
+import { ModuleRegistryService } from '../ModuleRegistryService';
 
 type ReturnOptions = {
   registerId?: string;
@@ -28,14 +30,17 @@ interface ReturnTransactionParams {
   refundCash: boolean;
   options: ReturnOptions;
   actor: ReturnType<typeof AuthService.requireAuth>;
+  trackInventory: boolean;
 }
 
 interface ReturnProduct {
   name: string;
   grade: string;
-  meters_per_box: number;
-  product_type: string;
-  base_unit: string;
+  size: string;
+  metersPerBox: number;
+  piecesPerBox: number;
+  productType: string;
+  baseUnit: string;
 }
 
 export function createSaleReturn(
@@ -52,20 +57,50 @@ export function createSaleReturn(
   if (!inv) throw new Error('الفاتورة الأصلية غير موجودة.');
   if (inv.invoiceStatus === 'VOID') throw new Error('لا يمكن مرتجعة فاتورة ملغاة.');
 
-  const requestedByProduct = validateReturnRequest(inv, returnItems);
+  const normalizedItems = normalizeReturnUnits(ctx, returnItems);
+  const requestedByProduct = validateReturnRequest(inv, normalizedItems);
   const returnId = `ret_${uuidv4().substring(0, 8)}`;
   const today = localDateString();
+  const trackInventory = ModuleRegistryService.isInventoryTracked();
 
   return ctx.db.executeTransaction((sqliteDb) => createReturnInTransaction(sqliteDb, {
     invoiceId,
     returnId,
     today,
     inv,
-    items: returnItems,
+    items: normalizedItems,
     refundCash,
     options,
     actor,
+    trackInventory,
   }, requestedByProduct));
+}
+
+/**
+ * Converts return lines entered in a selling unit (e.g. "2 boxes") into base
+ * units, mirroring sales. Lines without `uom` keep their historical meaning.
+ */
+function normalizeReturnUnits(ctx: SalesContext, returnItems: ReturnRequestItem[]): ReturnRequestItem[] {
+  return (returnItems || []).map((item) => {
+    const explicit = Boolean(item.uom) && item.quantity !== undefined && item.quantity !== null;
+    if (!explicit) return item;
+    const product = ctx.db.query<{
+      name: string;
+      baseUnit: string;
+      customUnit: string;
+      metersPerBox: number;
+      piecesPerBox: number;
+    }>(
+      `SELECT name, base_unit AS baseUnit, custom_unit AS customUnit,
+              meters_per_box AS metersPerBox, pieces_per_box AS piecesPerBox
+       FROM products WHERE id = ?`,
+      [item.productId]
+    )[0];
+    if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
+    const baseUnit = product.baseUnit || 'M2';
+    const baseQuantity = round2(convertQuantity(Number(item.quantity), String(item.uom), baseUnit, product));
+    return { ...item, quantityM2: baseQuantity };
+  });
 }
 
 function validateReturnRequest(
@@ -97,7 +132,6 @@ function createReturnInTransaction(
 ): SalesReturn {
   const { invoiceId, returnId, today, inv, items, refundCash, options, actor } = params;
   validateReturnQuantities(sqliteDb, invoiceId, inv, requestedByProduct);
-
   const authoritativeItems = getAuthoritativeReturnItems(inv, items);
   const returnNumber = sqliteDb.nextNumber('RET');
   const totalReturnAmount = round2(authoritativeItems.reduce(
@@ -113,13 +147,16 @@ function createReturnInTransaction(
   });
 
   insertSalesReturn(sqliteDb, params, authoritativeItems, returnNumber, totalReturnAmount, refundMethod, impact);
-  const fifoEnabled = SettingsService.getSettings().costingMethod === 'FIFO';
-  const fifoReturnedCost = processReturnItems(sqliteDb, params, authoritativeItems, fifoEnabled);
+  const fifoEnabled = params.trackInventory && SettingsService.getSettings().costingMethod === 'FIFO';
+  const returnCosts = processReturnItems(sqliteDb, params, authoritativeItems, fifoEnabled);
   updateCustomerAfterReturn(sqliteDb, inv.customerId, impact.balanceDelta, totalReturnAmount);
   updateCashRegisterAfterReturn(sqliteDb, options, refundMethod, impact.cashRefund);
 
-  const returnedCost = getReturnedCost(authoritativeItems, fifoEnabled, fifoReturnedCost);
-  postReturnLedger(sqliteDb, params, returnId, returnNumber, totalReturnAmount, impact, returnedCost);
+  // No stock was relieved when the sale was created, so a return must not
+  // restore inventory value to the ledger.
+  const returnedCost = params.trackInventory ? returnCosts.inventoryCost : 0;
+  const returnedServiceCost = params.trackInventory ? returnCosts.serviceCost : 0;
+  postReturnLedger(sqliteDb, params, returnId, returnNumber, totalReturnAmount, impact, returnedCost, returnedServiceCost);
   updateShiftRefunds(sqliteDb, options.shiftId, impact.cashRefund);
   updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnAmount);
   insertReturnAuditLog(sqliteDb, params, returnId, returnNumber, totalReturnAmount, impact.cashRefund);
@@ -211,12 +248,15 @@ function processReturnItems(
   params: ReturnTransactionParams,
   items: ReturnRequestItem[],
   fifoEnabled: boolean
-): number {
-  let fifoReturnedCost = 0;
+): { inventoryCost: number; serviceCost: number } {
+  let inventoryCost = 0;
+  let serviceCost = 0;
   for (const item of items) {
-    fifoReturnedCost = round2(fifoReturnedCost + processReturnItem(sqliteDb, params, item, fifoEnabled));
+    const costs = processReturnItem(sqliteDb, params, item, fifoEnabled);
+    inventoryCost = round2(inventoryCost + costs.inventoryCost);
+    serviceCost = round2(serviceCost + costs.serviceCost);
   }
-  return fifoReturnedCost;
+  return { inventoryCost, serviceCost };
 }
 
 function processReturnItem(
@@ -224,7 +264,7 @@ function processReturnItem(
   params: ReturnTransactionParams,
   item: ReturnRequestItem,
   fifoEnabled: boolean
-): number {
+): { inventoryCost: number; serviceCost: number } {
   const { invoiceId, returnId, inv, actor } = params;
   const lineTotal = round2(item.quantityM2 * item.unitPrice);
   const product = sqliteDb.query<ReturnProduct>(
@@ -234,36 +274,46 @@ function processReturnItem(
   if (!product) throw new Error(`الصنف ${item.productId} غير موجود.`);
 
   const boxesCount = getReturnedBoxesCount(product, item.quantityM2);
-  const actualCost = fifoEnabled
+  const serviceLine = isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
+  const itemFifoEnabled = fifoEnabled && !serviceLine;
+  const actualCost = itemFifoEnabled
     ? InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2)
     : 0;
-  const unitCost = fifoEnabled
+  const unitCost = itemFifoEnabled
     ? round2(actualCost / item.quantityM2)
     : item.unitCost > 0 ? item.unitCost : 0;
   const returnItemId = `ritem_${uuidv4().substring(0, 8)}`;
   insertSalesReturnItem(sqliteDb, item, product, returnId, returnItemId, boxesCount, unitCost, lineTotal);
-  restoreReturnStock(sqliteDb, inv.warehouseId, item, product);
-  insertReturnInventoryTransaction(sqliteDb, params, item, returnId, boxesCount, unitCost);
+  if (params.trackInventory && !serviceLine) {
+    restoreReturnStock(sqliteDb, inv.warehouseId, item, product);
+    insertReturnInventoryTransaction(sqliteDb, params, item, returnId, boxesCount, unitCost);
 
-  if (product.product_type !== 'GENERAL') {
-    new BatchService().restoreForSaleReturn({
-      returnItemId,
-      invoiceId,
-      productId: item.productId,
-      warehouseId: inv.warehouseId,
-      quantityM2: item.quantityM2,
-      costPrice: unitCost,
-      performedBy: actor.id,
-      reason: item.reason,
-    });
+    if (product.productType !== 'GENERAL') {
+      new BatchService().restoreForSaleReturn({
+        returnItemId,
+        invoiceId,
+        productId: item.productId,
+        warehouseId: inv.warehouseId,
+        quantityM2: item.quantityM2,
+        costPrice: unitCost,
+        performedBy: actor.id,
+        reason: item.reason,
+      });
+    }
   }
-  return actualCost;
+  // Service lines posted a direct cost against accrued service costs at sale
+  // time (5102/2105); a return must reverse the proportional amount.
+  const serviceCost = serviceLine ? round2(item.quantityM2 * (item.unitCost || 0)) : 0;
+  return {
+    inventoryCost: itemFifoEnabled ? actualCost : (serviceLine ? 0 : round2(item.quantityM2 * unitCost)),
+    serviceCost,
+  };
 }
 
 function getReturnedBoxesCount(product: ReturnProduct, quantityM2: number): number {
-  const metersPerBox = Number(product.meters_per_box) || 1.44;
-  if (product.product_type !== 'GENERAL') return round2(quantityM2 / metersPerBox);
-  return product.base_unit === 'BOX' ? round2(quantityM2) : 0;
+  const metersPerBox = Number(product.metersPerBox) || 1.44;
+  if (product.productType !== 'GENERAL') return round2(quantityM2 / metersPerBox);
+  return product.baseUnit === 'BOX' ? round2(quantityM2) : 0;
 }
 
 function insertSalesReturnItem(
@@ -356,17 +406,6 @@ function updateCashRegisterAfterReturn(
   }
 }
 
-function getReturnedCost(
-  items: ReturnRequestItem[],
-  fifoEnabled: boolean,
-  fifoReturnedCost: number
-): number {
-  return fifoEnabled ? fifoReturnedCost : round2(items.reduce(
-    (sum, item) => sum + Number(item.quantityM2) * Number(item.unitCost || 0),
-    0
-  ));
-}
-
 function postReturnLedger(
   sqliteDb: DatabaseManager,
   params: ReturnTransactionParams,
@@ -374,7 +413,8 @@ function postReturnLedger(
   returnNumber: string,
   totalReturnAmount: number,
   impact: ReturnType<typeof computeReturnImpact>,
-  returnedCost: number
+  returnedCost: number,
+  returnedServiceCost = 0
 ): void {
   const { today, actor, inv } = params;
   const taxReduction = inv.totalAmount > 0
@@ -390,6 +430,10 @@ function postReturnLedger(
   if (returnedCost > 0) {
     lines.push({ accountCode: '1104', debit: returnedCost, credit: 0 });
     lines.push({ accountCode: '5101', debit: 0, credit: returnedCost });
+  }
+  if (returnedServiceCost > 0) {
+    lines.push({ accountCode: '2105', debit: returnedServiceCost, credit: 0 });
+    lines.push({ accountCode: '5102', debit: 0, credit: returnedServiceCost });
   }
   postLedgerEntry(sqliteDb.getDatabase(), {
     date: today,

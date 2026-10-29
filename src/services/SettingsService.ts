@@ -66,6 +66,7 @@ export class SettingsService {
       fontFamily: map.fontFamily || 'Cairo',
       showBrandText: bool(map.showBrandText === undefined ? '1' : map.showBrandText),
       sidebarStyle: (map.sidebarStyle as SystemSettings['sidebarStyle']) || 'default',
+      navigationLayout: map.navigationLayout === 'header' ? 'header' : 'sidebar',
 
       lowStockAlertThresholdM2: num(map.lowStockAlertThresholdM2, 20),
       discountApprovalThresholdPercent: num(map.discountApprovalThresholdPercent, 10),

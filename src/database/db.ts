@@ -95,7 +95,7 @@ export class DatabaseManager {
   }
 
   public initialize(): Promise<Database> {
-    if (this.db && this.initializedSuccessfully) return this.db;
+    if (this.db && this.initializedSuccessfully) return Promise.resolve(this.db);
     if (this.initializationPromise) return this.initializationPromise;
 
     const initialization = this.initializeDatabase();

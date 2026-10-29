@@ -66,6 +66,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'quotations.update', name: 'تعديل عرض سعر', module: 'QUOTATIONS' },
   { code: 'quotations.delete', name: 'حذف عرض سعر', module: 'QUOTATIONS' },
   { code: 'quotations.approve', name: 'اعتماد عرض سعر', module: 'QUOTATIONS' },
+  { code: 'quotations.export', name: 'تصدير عروض الأسعار', module: 'QUOTATIONS' },
 
   // Orders
   { code: 'orders.view', name: 'عرض الطلبات', module: 'ORDERS' },
@@ -73,11 +74,13 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'orders.update', name: 'تعديل طلب', module: 'ORDERS' },
   { code: 'orders.delete', name: 'حذف طلب', module: 'ORDERS' },
   { code: 'orders.approve', name: 'اعتماد طلب', module: 'ORDERS' },
+  { code: 'orders.export', name: 'تصدير الأوامر', module: 'ORDERS' },
 
   // Returns
   { code: 'returns.view', name: 'عرض المرتجعات', module: 'RETURNS' },
   { code: 'returns.create', name: 'إنشاء مرتجع', module: 'RETURNS' },
   { code: 'returns.approve', name: 'اعتماد مرتجع', module: 'RETURNS' },
+  { code: 'returns.export', name: 'تصدير المرتجعات', module: 'RETURNS' },
 
   // Purchases
   { code: 'purchases.view', name: 'عرض المشتريات', module: 'PURCHASES' },
@@ -88,6 +91,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'purchases.cancel_request', name: 'إلغاء طلب شراء', module: 'PURCHASES' },
   { code: 'purchases.return', name: 'مرتجعات الشراء', module: 'PURCHASES' },
   { code: 'purchases.approve', name: 'اعتماد طلبات الشراء', module: 'PURCHASES' },
+  { code: 'purchases.export', name: 'تصدير المشتريات', module: 'PURCHASES' },
 
   // Customers
   { code: 'customers.view', name: 'عرض العملاء', module: 'CUSTOMERS' },
@@ -104,6 +108,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'suppliers.update', name: 'تعديل مورد', module: 'SUPPLIERS' },
   { code: 'suppliers.delete', name: 'حذف مورد', module: 'SUPPLIERS' },
   { code: 'suppliers.payment', name: 'سداد لمورد', module: 'SUPPLIERS' },
+  { code: 'suppliers.export', name: 'تصدير الموردين', module: 'SUPPLIERS' },
 
   // Cashier / treasury
   { code: 'cashier.view', name: 'عرض الخزينة', module: 'CASHIER' },
@@ -123,6 +128,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'finance.debts.view', name: 'عرض الديون والذمم', module: 'FINANCE' },
   { code: 'finance.installments.view', name: 'عرض الأقساط', module: 'FINANCE' },
   { code: 'finance.installments.manage', name: 'إدارة الأقساط', module: 'FINANCE' },
+  { code: 'finance.export', name: 'تصدير التقارير المالية', module: 'FINANCE' },
 
   // Reports
   { code: 'reports.view', name: 'عرض التقارير', module: 'REPORTS' },
@@ -134,11 +140,16 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'crm.update', name: 'تعديل ومتابعة العملاء المحتملين', module: 'CRM' },
   { code: 'crm.delete', name: 'حذف عميل محتمل', module: 'CRM' },
 
+  // Manufacturing
+  { code: 'manufacturing.view', name: 'عرض التصنيع وأوامر الإنتاج', module: 'MANUFACTURING' },
+  { code: 'manufacturing.manage', name: 'إدارة BOM وأوامر الإنتاج', module: 'MANUFACTURING' },
+
   // Projects
   { code: 'projects.view', name: 'عرض المشاريع', module: 'PROJECTS' },
   { code: 'projects.create', name: 'إضافة مشروع', module: 'PROJECTS' },
   { code: 'projects.update', name: 'تعديل مشروع', module: 'PROJECTS' },
   { code: 'projects.delete', name: 'حذف مشروع', module: 'PROJECTS' },
+  { code: 'projects.approve', name: 'اعتماد طلبات تغيير المشروع', module: 'PROJECTS' },
 
   // Pricing & promotions
   { code: 'pricing.view', name: 'عرض قوائم الأسعار والعروض', module: 'PRICING' },
@@ -154,6 +165,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'warehouses.view', name: 'عرض المخازن', module: 'WAREHOUSES' },
   { code: 'warehouses.manage', name: 'إدارة المخازن', module: 'WAREHOUSES' },
   { code: 'employees.view', name: 'عرض الموظفين', module: 'EMPLOYEES' },
+  { code: 'employees.export', name: 'تصدير بيانات الموظفين', module: 'EMPLOYEES' },
   { code: 'employees.manage', name: 'إدارة الموظفين والرواتب', module: 'EMPLOYEES' },
   { code: 'deliveries.view', name: 'عرض التوصيل', module: 'DELIVERIES' },
   { code: 'deliveries.manage', name: 'إدارة التوصيل', module: 'DELIVERIES' },
@@ -219,6 +231,42 @@ export const PERMISSIONS: PermissionDef[] = [
   // Analytics
   { code: 'analytics.view', name: 'عرض التحليلات المتقدمة', module: 'ANALYTICS' },
   { code: 'analytics.write', name: 'تسجيل مقاييس التحليلات', module: 'ANALYTICS' },
+
+  // Module registry (activation lifecycle and per-module configuration)
+  { code: 'modules.view', name: 'عرض الوحدات المفعّلة', module: 'MODULES' },
+  { code: 'modules.manage', name: 'تفعيل وتعطيل وحدات الأعمال', module: 'MODULES' },
+
+  // Companies / legal entities
+  { code: 'companies.view', name: 'عرض الشركات والكيانات القانونية', module: 'COMPANIES' },
+  { code: 'companies.create', name: 'إضافة شركة أو كيان قانوني', module: 'COMPANIES' },
+  { code: 'companies.update', name: 'تعديل بيانات الشركة', module: 'COMPANIES' },
+  { code: 'companies.delete', name: 'تعطيل شركة', module: 'COMPANIES' },
+
+  // Documents and contracts
+  { code: 'documents.view', name: 'عرض المستندات', module: 'DOCUMENTS' },
+  { code: 'documents.create', name: 'إضافة مستند', module: 'DOCUMENTS' },
+  { code: 'documents.update', name: 'تعديل مستند أو إضافة نسخة', module: 'DOCUMENTS' },
+  { code: 'documents.archive', name: 'أرشفة مستند واستعادته', module: 'DOCUMENTS' },
+  { code: 'documents.export', name: 'تصدير سجل المستندات', module: 'DOCUMENTS' },
+  { code: 'contracts.view', name: 'عرض العقود', module: 'CONTRACTS' },
+  { code: 'contracts.create', name: 'إضافة عقد', module: 'CONTRACTS' },
+  { code: 'contracts.update', name: 'تعديل عقد أو تجديده', module: 'CONTRACTS' },
+  { code: 'contracts.terminate', name: 'فسخ عقد', module: 'CONTRACTS' },
+  { code: 'contracts.export', name: 'تصدير سجل العقود', module: 'CONTRACTS' },
+
+  // HR leave
+  { code: 'hr.leave.view', name: 'عرض طلبات الإجازات', module: 'HR' },
+  { code: 'hr.leave.request', name: 'تقديم طلب إجازة', module: 'HR' },
+  { code: 'hr.leave.approve', name: 'اعتماد أو رفض الإجازات', module: 'HR' },
+
+  // HR contracts
+  { code: 'hr.contracts.view', name: 'عرض عقود الموظفين', module: 'HR' },
+  { code: 'hr.contracts.manage', name: 'إدارة عقود الموظفين وتجديدها', module: 'HR' },
+  { code: 'hr.contracts.terminate', name: 'إنهاء عقود الموظفين', module: 'HR' },
+
+  // HR documents
+  { code: 'hr.documents.view', name: 'عرض مستندات الموظفين', module: 'HR' },
+  { code: 'hr.documents.manage', name: 'إدارة مستندات الموظفين وأرشفتها', module: 'HR' },
 ];
 
 // Default permissions per built-in role. These are only used to seed a role
@@ -245,19 +293,22 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'dashboard.view', 'dashboard.export',
     'products.view', 'categories.view', 'brands.view',
     'inventory.view', 'sales.view', 'sales.export',
-    'quotations.view', 'orders.view', 'returns.view',
-    'purchases.view', 'purchases.approve', 'purchases.reject', 'purchases.cancel_request',
+    'quotations.view', 'quotations.export', 'orders.view', 'orders.export', 'returns.view', 'returns.export',
+    'purchases.view', 'purchases.approve', 'purchases.reject', 'purchases.cancel_request', 'purchases.export',
     'customers.view', 'customers.payment', 'customers.export',
-    'suppliers.view', 'suppliers.payment',
+    'suppliers.view', 'suppliers.payment', 'suppliers.export',
     'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
-    'finance.view', 'finance.approve', 'finance.close', 'finance.debts.view',
+    'finance.view', 'finance.approve', 'finance.close', 'finance.debts.view', 'finance.export',
     'finance.installments.view', 'finance.installments.manage',
     'reports.view', 'reports.export',
     'crm.view', 'projects.view', 'pricing.view', 'promotions.view',
+    'manufacturing.view',
     'operations.view', 'branches.view', 'warehouses.view',
-    'employees.view', 'deliveries.view', 'drivers.view', 'vehicles.view',
+    'employees.view', 'employees.export', 'deliveries.view', 'drivers.view', 'vehicles.view',
     'approvals.view', 'approvals.create', 'approvals.approve', 'approvals.reject', 'approvals.cancel',
     'notifications.view', 'audit.view', 'audit.export',
+    'documents.view', 'documents.export', 'contracts.view', 'contracts.export',
+    'hr.leave.view', 'hr.contracts.view', 'hr.documents.view',
   ],
   SALES: [
     'dashboard.view',
@@ -272,14 +323,17 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'pricing.view', 'promotions.view',
     'approvals.view', 'approvals.create', 'notifications.view',
     'employees.view', 'deliveries.view', 'branches.view', 'warehouses.view',
+    'documents.view', 'contracts.view',
+    'hr.leave.view', 'hr.leave.request',
   ],
   CASHIER: [
     'dashboard.view', 'products.view', 'categories.view', 'brands.view',
     'sales.view', 'sales.create', 'sales.refund', 'sales.credit',
-    'quotations.view', 'orders.view', 'returns.view', 'returns.create',
+    'quotations.view', 'quotations.export', 'orders.view', 'orders.export', 'returns.view', 'returns.export', 'returns.create',
     'customers.view', 'customers.create', 'customers.payment',
     'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
     'approvals.create', 'crm.view', 'notifications.view',
+    'documents.view', 'hr.leave.view',
   ],
   WAREHOUSE: [
     'dashboard.view', 'products.view', 'categories.view', 'brands.view',
@@ -288,11 +342,36 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'operations.view', 'branches.view', 'warehouses.view', 'warehouses.manage',
     'deliveries.view', 'deliveries.manage', 'drivers.view', 'vehicles.view',
     'employees.view', 'approvals.view', 'approvals.create', 'notifications.view',
+    'documents.view', 'hr.leave.view', 'hr.leave.request',
   ],
 };
 
-const ROLE_NAMES: Record<string, string> = {
-  ADMIN: 'مدير النظام',
+/**
+ * Export rights that were introduced after the original seeding. A role that
+ * could already read the domain keeps its ability to export it, so upgrading
+ * does not silently remove capabilities. The backfill runs once per role and is
+ * marked in system_settings, which keeps later administrator choices intact.
+ */
+const EXPORT_PERMISSION_SOURCES: Record<string, string> = {
+  'purchases.export': 'purchases.view',
+  'suppliers.export': 'suppliers.view',
+  'finance.export': 'finance.view',
+  'employees.export': 'employees.view',
+  'sales.export': 'sales.view',
+  'orders.export': 'orders.view',
+  'quotations.export': 'quotations.view',
+  'returns.export': 'returns.view',
+  'inventory.export': 'inventory.view',
+  'dashboard.export': 'dashboard.view',
+  'reports.export': 'reports.view',
+  'customers.export': 'customers.view',
+  'products.export': 'products.view',
+  'documents.export': 'documents.view',
+  'contracts.export': 'contracts.view',
+  'audit.export': 'audit.view',
+};
+
+const ROLE_NAMES: Record<string, string> = {  ADMIN: 'مدير النظام',
   MANAGER: 'مدير',
   ACCOUNTANT: 'محاسب',
   SALES: 'مبيعات',
@@ -369,6 +448,26 @@ export class PermissionService {
     if (roleCode === 'MANAGER') {
       PermissionService.reconcileManagerPermissions(db, defaults);
     }
+    PermissionService.backfillExportPermissions(db, roleCode);
+  }
+
+  private static backfillExportPermissions(db: DatabaseManager, roleCode: string): void {
+    const markerKey = `rbac.exportBackfill.v2.${roleCode}`;
+    const done = db.query('SELECT value FROM system_settings WHERE key = ?', [markerKey]);
+    if (done.length > 0) return;
+    for (const [exportCode, viewCode] of Object.entries(EXPORT_PERMISSION_SOURCES)) {
+      const hasView = db.query(
+        'SELECT 1 FROM role_permissions WHERE role_code = ? AND permission_code = ?',
+        [roleCode, viewCode]
+      ).length > 0;
+      if (hasView) {
+        db.run(
+          'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+          [roleCode, exportCode]
+        );
+      }
+    }
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
   }
 
   private static ensureAdminDataPermissions(db: DatabaseManager): void {
@@ -634,6 +733,23 @@ export class PermissionService {
         { required, path: typeof window !== 'undefined' ? window.location.hash : '' }
       );
       throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${required}).`);
+    }
+  }
+
+  /** Require any one of several permission codes (least-privilege alternatives). */
+  public static requireAny(user: User | null, required: string[]): void {
+    if (required.length === 0) throw new Error('لم تُحدد صلاحية مطلوبة.');
+    if (!PermissionService.canAny(user, required)) {
+      const codes = required.join(' أو ');
+      PermissionService.audit(
+        user,
+        'محاولة وصول مرفوضة',
+        'SECURITY',
+        `perm:${codes}`,
+        null,
+        { required: codes, path: typeof window !== 'undefined' ? window.location.hash : '' }
+      );
+      throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${codes}).`);
     }
   }
 

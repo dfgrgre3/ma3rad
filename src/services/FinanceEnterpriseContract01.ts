@@ -23,9 +23,25 @@ import type {
   MultiDimensionalReportFilters,
 } from '../types/finance';
 import type { Cheque } from './FinanceExtrasService';
+import { BranchAccessService } from './BranchAccessService';
 
 export abstract class FinanceEnterpriseContract01 {
   protected db = DatabaseManager.getInstance();
+  protected branchAccess = new BranchAccessService();
+
+  /**
+   * Journal entries belong to a branch *and* the legal entity that owns it.
+   * Report aggregates must apply both so figures never mix companies that
+   * happen to share branch visibility.
+   */
+  protected ledgerScope(alias = 'e'): { clause: string; params: string[] } {
+    const branch = this.branchAccess.sqlScope(`${alias}.branch_id`);
+    const company = this.branchAccess.companyScope(`${alias}.company_id`);
+    return {
+      clause: `(${branch.clause}) AND (${company.clause})`,
+      params: [...branch.params, ...company.params],
+    };
+  }
 
   protected abstract requireView(): any;
 

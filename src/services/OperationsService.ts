@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 import { BranchAccessService } from './BranchAccessService';
+import { ModuleRegistryService } from './ModuleRegistryService';
 
 export interface Branch {
   id: string;
@@ -125,6 +126,7 @@ export class OperationsService {
   }
 
   public createBranch(input: { name: string; phone?: string; address?: string; city?: string }): Branch {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('branches.manage');
     PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
     if (!input.name.trim()) throw new Error('اسم الفرع مطلوب.');
@@ -141,6 +143,7 @@ export class OperationsService {
   }
 
   public toggleBranch(id: string, active: boolean): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('branches.manage');
     PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
     this.db.run(`UPDATE branches SET is_active = ? WHERE id = ?`, [active ? 1 : 0, id]);
@@ -171,6 +174,7 @@ export class OperationsService {
   }
 
   public createWarehouse(input: { name: string; location?: string; branchId?: string }): WarehouseRow {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('warehouses.manage');
     if (!input.name.trim()) throw new Error('اسم المخزن مطلوب.');
     const actor = AuthService.requireAuth();
@@ -180,10 +184,14 @@ export class OperationsService {
     const id = `wh_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('WH');
+      const companyId = db.query<{ companyId: string | null }>(
+        'SELECT company_id AS companyId FROM branches WHERE id = ?',
+        [branchId]
+      )[0]?.companyId ?? null;
       db.run(
-        `INSERT INTO warehouses (id, name, code, location, branch_id, is_default, is_active)
-         VALUES (?, ?, ?, ?, ?, 0, 1)`,
-        [id, input.name.trim(), code, input.location || null, branchId]
+        `INSERT INTO warehouses (id, name, code, location, branch_id, company_id, is_default, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
+        [id, input.name.trim(), code, input.location || null, branchId, companyId]
       );
       return this.getWarehouses().find((w) => w.id === id)!;
     });
@@ -209,6 +217,7 @@ export class OperationsService {
   public createDriver(input: {
     fullName: string; phone: string; licenseNumber?: string; licenseExpiresAt?: string; notes?: string;
   }): Driver {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('drivers.manage');
     if (!input.fullName.trim() || !input.phone.trim()) throw new Error('اسم السائق والهاتف مطلوبان.');
     const id = `drv_${uuidv4().substring(0, 8)}`;
@@ -224,6 +233,7 @@ export class OperationsService {
   }
 
   public toggleDriver(id: string, active: boolean): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('drivers.manage');
     this.db.run(`UPDATE drivers SET is_active = ? WHERE id = ?`, [active ? 1 : 0, id]);
   }
@@ -249,6 +259,7 @@ export class OperationsService {
     plateNumber: string; vehicleType?: string; make?: string; model?: string; year?: number;
     capacityKg?: number; assignedDriverId?: string; licenseExpiresAt?: string; insuranceExpiresAt?: string;
   }): Vehicle {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('vehicles.manage');
     if (!input.plateNumber.trim()) throw new Error('رقم اللوحة مطلوب.');
     const dup = this.db.query(`SELECT id FROM vehicles WHERE plate_number = ?`, [input.plateNumber.trim()])[0];
@@ -272,6 +283,7 @@ export class OperationsService {
   }
 
   public updateVehicleStatus(id: string, status: Vehicle['status']): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('vehicles.manage');
     this.db.run(`UPDATE vehicles SET status = ? WHERE id = ?`, [status, id]);
   }
@@ -311,6 +323,7 @@ export class OperationsService {
     customerId: string; address: string; city?: string; date?: string;
     driverId?: string; vehicleId?: string; scheduledAt?: string; deliveryFee?: number; notes?: string;
   }): Delivery {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('deliveries.manage');
     if (!input.customerId) throw new Error('يجب اختيار العميل.');
     if (!input.address.trim()) throw new Error('عنوان التسليم مطلوب.');
@@ -337,6 +350,7 @@ export class OperationsService {
   }
 
   public updateDeliveryStatus(id: string, status: Delivery['status'], failureReason?: string): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('deliveries.manage');
     this.db.run(
       `UPDATE deliveries SET status = ?, failure_reason = ?, delivered_at = ?, updated_at = ? WHERE id = ?`,

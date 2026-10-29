@@ -9,7 +9,9 @@ import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
 import { round2 } from '../financials';
 import type { SalesInvoice } from '../../types';
 import type { DatabaseManager } from '../../database/db';
+import { isServiceProduct } from '../../utils/productUnits';
 import type { InvoiceWithItems, SalesContext } from './context';
+import { ModuleRegistryService } from '../ModuleRegistryService';
 
 function restoreInvoiceItem(
   sqliteDb: DatabaseManager,
@@ -75,6 +77,7 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
   if (!reason || !reason.trim()) throw new Error('يرجى إدخال سبب إلغاء الفاتورة.');
 
   return ctx.db.executeTransaction((sqliteDb) => {
+    const trackInventory = ModuleRegistryService.isInventoryTracked();
     const linkedPayments = sqliteDb.query<{ count: number }>(
       'SELECT COUNT(*) AS count FROM customer_payments WHERE invoice_id = ?',
       [invoiceId]
@@ -86,6 +89,8 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     }
 
     for (const item of inv.items) {
+      if (!trackInventory) break;
+      if (isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit })) continue;
       restoreInvoiceItem(sqliteDb, inv, invoiceId, reason, actor.id, item);
     }
 
@@ -102,7 +107,11 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
       sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE is_default = 1`, [inv.paidAmount]);
     }
 
-    const invoiceCost = round2(inv.items.reduce((sum, item) => sum + Number(item.totalCost || 0), 0));
+    const invoiceCost = trackInventory
+      ? round2(inv.items
+        .filter((item) => !isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit }))
+        .reduce((sum, item) => sum + Number(item.totalCost || 0), 0))
+      : 0;
     postLedgerEntry(sqliteDb.getDatabase(), {
       date: localDateString(),
       description: `Void sale ${inv.invoiceNumber}`,

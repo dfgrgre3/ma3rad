@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon,
+  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check,
 } from 'lucide-react';
 import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
@@ -12,14 +12,14 @@ import {
   BUSINESS_TYPES,
   BUSINESS_UNITS,
   getDefaultBusinessConfiguration,
-  getManagedBusinessPaths,
-  getProfileHiddenPaths,
   parseBusinessConfiguration,
   parseEnabledModules,
   type BusinessConfiguration,
 } from '../../config/businessProfiles';
-import { NAV_STORAGE_KEYS } from '../../config/navigation';
-import { NavigationService } from '../../services/NavigationService';
+import { ModuleRegistryService } from '../../services/ModuleRegistryService';
+import { BusinessProfileService } from '../../services/BusinessProfileService';
+import { CompaniesPanel } from '../../components/CompaniesPanel';
+import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../../config/moduleRegistry';
 
 const inputCls =
   'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
@@ -60,8 +60,6 @@ export const AdminSettingsTab: React.FC = () => {
 
   const save = () => {
     try {
-      const managedPaths = getManagedBusinessPaths();
-      const existingHidden = NavigationService.getOverrides().hidden.filter((path) => !managedPaths.has(path));
       const customName = businessProfile.customName.trim();
       if (businessProfile.type === 'custom' && customName.length < 2) {
         toast.error('اكتب اسم النشاط التجاري (حرفان على الأقل).');
@@ -71,22 +69,43 @@ export const AdminSettingsTab: React.FC = () => {
       const businessTypeLabel = businessProfile.type === 'custom'
         ? customName
         : BUSINESS_TYPES.find((type) => type.id === businessProfile.type)?.label || '';
+      const moduleValidation = validateModuleSelection(businessProfile.enabledModules, {
+        trackInventory: businessConfig.trackInventory,
+      });
+      if (moduleValidation.errors.length > 0) {
+        toast.error('تعذر تفعيل الوحدات', moduleValidation.errors.join(' '));
+        setTab('business');
+        return;
+      }
+      const enabledModules = moduleValidation.enabled;
+      const currentModules = ModuleRegistryService.getEnabledModuleIds();
+      for (const removed of currentModules.filter((id) => !enabledModules.includes(id))) {
+        const blocker = ModuleRegistryService.getDeactivationBlocker(removed, enabledModules);
+        if (blocker) {
+          toast.error('لا يمكن تعطيل وحدة مستخدمة', blocker);
+          setTab('business');
+          return;
+        }
+      }
       if (businessProfile.type !== readBusinessProfile().type
         && !window.confirm('تغيير نوع النشاط سيغيّر الوحدات والقوائم الافتراضية فقط. لن تُحذف أو تُحوّل أي بيانات سابقة. هل تريد المتابعة؟')) return;
+      const actor = AuthService.getCurrentUser();
+      // Module lifecycle changes go through the registry so activation history,
+      // dependency guards and navigation visibility stay in one transaction.
+      ModuleRegistryService.setEnabledModules(enabledModules, actor, 'تحديث من إعدادات النشاط');
       const next = SettingsService.update({
         ...settings,
         businessType: businessProfile.type,
         businessTypeLabel,
         businessProfileConfig: JSON.stringify({ ...businessConfig, businessType: businessProfile.type }),
-        enabledModules: JSON.stringify(businessProfile.enabledModules),
-        [NAV_STORAGE_KEYS.hidden]: JSON.stringify([
-          ...existingHidden,
-          ...getProfileHiddenPaths(businessProfile.enabledModules),
-        ]),
-      }, AuthService.getCurrentUser());
+      }, actor);
+      // Applying a profile also creates its declared product attributes; this is
+      // additive and never removes manually created attributes.
+      BusinessProfileService.applyFromSettings();
       setSettings(next);
+      setBusinessProfile((current) => ({ ...current, enabledModules }));
       setDirty(false);
-      toast.success('تم حفظ إعدادات النشاط وبقية الإعدادات بنجاح.');
+      toast.success('تم حفظ إعدادات النشاط وبقية الإعدادات بنجاح.', moduleValidation.warnings.join(' '));
     } catch (error: any) {
       toast.error('تعذر حفظ الإعدادات', error?.message || String(error));
     }
@@ -126,13 +145,28 @@ export const AdminSettingsTab: React.FC = () => {
   };
 
   const toggleBusinessModule = (moduleId: string) => {
-    if (moduleId === 'inventory' && !businessConfig.trackInventory) return;
-    setBusinessProfile((current) => ({
-      ...current,
-      enabledModules: current.enabledModules.includes(moduleId)
-        ? current.enabledModules.filter((id) => id !== moduleId)
-        : [...current.enabledModules, moduleId],
-    }));
+    const definition = getModuleDefinition(moduleId);
+    if (definition?.activation.requiresInventoryTracking && !businessConfig.trackInventory) {
+      toast.error('الوحدة غير متاحة', definition.activation.requiresInventoryTracking
+        ? 'فعّل تتبع المخزون أولًا من إعدادات النشاط.'
+        : 'هذه الوحدة غير متاحة.');
+      return;
+    }
+    const current = businessProfile.enabledModules;
+    if (current.includes(moduleId)) {
+      const next = withModuleDependencies(current.filter((id) => id !== moduleId));
+      const blocker = ModuleRegistryService.getDeactivationBlocker(moduleId, next);
+      if (blocker) {
+        toast.error('لا يمكن تعطيل الوحدة', blocker);
+        return;
+      }
+      setBusinessProfile((state) => ({ ...state, enabledModules: next }));
+    } else {
+      setBusinessProfile((state) => ({
+        ...state,
+        enabledModules: withModuleDependencies([...state.enabledModules, moduleId]),
+      }));
+    }
     setDirty(true);
   };
 
@@ -290,20 +324,31 @@ export const AdminSettingsTab: React.FC = () => {
               />
             </Field>
             <div>
+              <CompaniesPanel />
+            </div>
+            <div>
               <h4 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">وحدات النظام</h4>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {BUSINESS_MODULES.map((module) => (
-                  <label key={module.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={businessProfile.enabledModules.includes(module.id)}
-                      onChange={() => toggleBusinessModule(module.id)}
-                      disabled={module.id === 'inventory' && !businessConfig.trackInventory}
-                      className="accent-sky-600"
-                    />
-                    {module.label}
-                  </label>
-                ))}
+                {BUSINESS_MODULES.map((module) => {
+                  const definition = getModuleDefinition(module.id);
+                  const unavailable = Boolean(definition?.activation.requiresInventoryTracking && !businessConfig.trackInventory);
+                  return (
+                    <label
+                      key={module.id}
+                      title={definition?.description}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-300 ${unavailable ? 'cursor-not-allowed opacity-60' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={businessProfile.enabledModules.includes(module.id)}
+                        onChange={() => toggleBusinessModule(module.id)}
+                        disabled={unavailable}
+                        className="accent-sky-600"
+                      />
+                      {module.label}
+                    </label>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -338,6 +383,36 @@ export const AdminSettingsTab: React.FC = () => {
               </Field>
               <Field label="إظهار اسم العلامة في الهيدر">
                 <Toggle checked={settings.showBrandText !== false} onChange={(v) => set('showBrandText', v)} label={settings.showBrandText !== false ? 'ظاهر' : 'مخفي'} />
+              </Field>
+              <Field label="تخطيط التنقل في الشاشات الكبيرة" full>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {NAVIGATION_LAYOUT_OPTIONS.map((option) => {
+                    const active = (settings.navigationLayout || 'sidebar') === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => set('navigationLayout', option.value)}
+                        aria-pressed={active}
+                        className={`rounded-xl border p-3 text-right transition ${
+                          active
+                            ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-500/10'
+                            : 'border-slate-200 hover:border-sky-300 dark:border-slate-700'
+                        }`}
+                      >
+                        <NavigationLayoutPreview variant={option.value} />
+                        <span className="mt-2 flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{option.label}</span>
+                          {active && <Check className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />}
+                        </span>
+                        <span className="mt-1 block text-[10px] leading-relaxed text-slate-500 dark:text-slate-400">{option.hint}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400">
+                  يطبَّق على الشاشات الكبيرة (1024px فأكثر). الشاشات الصغيرة تبقى على القائمة المنسدلة دائمًا.
+                </p>
               </Field>
               <Field label="شعار الصورة">
                 <div className="flex items-center gap-2">
@@ -532,6 +607,47 @@ const Field: React.FC<{ label: string; full?: boolean; children: React.ReactNode
   <div className={full ? 'md:col-span-2' : ''}>
     <label className={labelCls}>{label}</label>
     {children}
+  </div>
+);
+
+const NAVIGATION_LAYOUT_OPTIONS: { value: 'sidebar' | 'header'; label: string; hint: string }[] = [
+  {
+    value: 'sidebar',
+    label: 'قائمة جانبية',
+    hint: 'شريط علوي للعنوان + قائمة تنقل رأسية على الجانب (الافتراضي).',
+  },
+  {
+    value: 'header',
+    label: 'شريط علوي',
+    hint: 'القائمة الرئيسية داخل الهيدر أفقيًا بدون قائمة جانبية على الشاشات الكبيرة.',
+  },
+];
+
+const NavigationLayoutPreview: React.FC<{ variant: 'sidebar' | 'header' }> = ({ variant }) => (
+  <div
+    className="flex h-16 w-full gap-1 overflow-hidden rounded-[2px] border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800"
+    aria-hidden="true"
+  >
+    {variant === 'sidebar' ? (
+      <>
+        <div className="h-full w-5 shrink-0 rounded-[1px] bg-sky-500/80" />
+        <div className="flex h-full flex-1 flex-col gap-1">
+          <div className="h-2.5 w-full rounded-[1px] bg-slate-300 dark:bg-slate-600" />
+          <div className="flex-1 rounded-[1px] bg-white dark:bg-slate-900" />
+        </div>
+      </>
+    ) : (
+      <div className="flex h-full flex-1 flex-col gap-1">
+        <div className="flex h-2.5 items-center gap-1">
+          <div className="h-2.5 w-2.5 shrink-0 rounded-[1px] bg-sky-500" />
+          <div className="h-2 w-4 rounded-[1px] bg-slate-300 dark:bg-slate-600" />
+          <div className="h-2 w-4 rounded-[1px] bg-slate-300 dark:bg-slate-600" />
+          <div className="h-2 w-4 rounded-[1px] bg-slate-300 dark:bg-slate-600" />
+          <div className="mr-auto h-2 w-3 rounded-[1px] bg-slate-300 dark:bg-slate-600" />
+        </div>
+        <div className="flex-1 rounded-[1px] bg-white dark:bg-slate-900" />
+      </div>
+    )}
   </div>
 );
 

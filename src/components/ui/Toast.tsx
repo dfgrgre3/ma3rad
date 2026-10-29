@@ -21,10 +21,17 @@ interface ToastApi {
 const ToastContext = createContext<ToastApi | null>(null);
 
 const STYLES: Record<ToastKind, string> = {
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300',
-  error: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
-  info: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300',
+  success: 'border-[#d9d9d9] border-r-[3px] border-r-[#107c10] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#6cc36c] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
+  error: 'border-[#d9d9d9] border-r-[3px] border-r-[#c42b1c] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#f1707b] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
+  warning: 'border-[#d9d9d9] border-r-[3px] border-r-[#9d5d00] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#e0a54a] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
+  info: 'border-[#d9d9d9] border-r-[3px] border-r-[#0078d4] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#4aa3e0] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
+};
+
+const ICON_TONES: Record<ToastKind, string> = {
+  success: 'text-[#107c10] dark:text-[#6cc36c]',
+  error: 'text-[#c42b1c] dark:text-[#f1707b]',
+  warning: 'text-[#9d5d00] dark:text-[#e0a54a]',
+  info: 'text-[#0078d4] dark:text-[#4aa3e0]',
 };
 
 const ICONS: Record<ToastKind, React.ElementType> = {
@@ -89,16 +96,16 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return (
             <div
               key={item.id}
-              className={`flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur ${STYLES[item.kind]}`}
+              className={`flex items-start gap-3 rounded-[2px] border px-3 py-2.5 ${STYLES[item.kind]}`}
               role="status"
             >
-              <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ICON_TONES[item.kind]}`} />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-extrabold">{item.title}</div>
-                {item.message && <div className="mt-0.5 text-xs opacity-90 leading-relaxed">{item.message}</div>}
+                <div className="text-[12.5px] font-semibold">{item.title}</div>
+                {item.message && <div className="mt-0.5 text-[11.5px] leading-relaxed opacity-85">{item.message}</div>}
               </div>
-              <button onClick={() => remove(item.id)} className="rounded p-0.5 opacity-70 hover:opacity-100" aria-label="إغلاق">
-                <X className="h-4 w-4" />
+              <button onClick={() => remove(item.id)} className="rounded-[2px] p-0.5 opacity-60 hover:opacity-100" aria-label="إغلاق">
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
           );

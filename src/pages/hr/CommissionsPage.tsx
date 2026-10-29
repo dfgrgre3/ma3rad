@@ -73,6 +73,7 @@ export const CommissionsPage: React.FC = () => {
   const exportRows = () => {
     exportToExcel({
       title: 'تقرير العمولات', subtitle: `شهر ${month}`, fileName: `commissions-${month}`,
+      permission: 'employees.export',
       columns: [
         { key: 'employeeName', label: 'الموظف' }, { key: 'invoiceNumber', label: 'الفاتورة' },
         { key: 'baseAmount', label: 'أساس العمولة' }, { key: 'percentage', label: 'النسبة %' },

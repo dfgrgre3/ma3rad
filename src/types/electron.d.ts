@@ -35,6 +35,20 @@ declare global {
         ) => Promise<{ ok: boolean; error?: string }>;
         rawCups?: (bytes: Uint8Array, printerName: string) => Promise<{ ok: boolean; error?: string }>;
       };
+      documents?: {
+        importFile?: () => Promise<{
+          ok: boolean;
+          canceled?: boolean;
+          storageName?: string;
+          fileName?: string;
+          mimeType?: string;
+          fileSize?: number;
+          checksum?: string;
+          error?: string;
+        }>;
+        openFile?: (storageName: string) => Promise<{ ok: boolean; error?: string }>;
+        info?: () => Promise<{ ok: boolean; directory?: string; maxBytes?: number }>;
+      };
     };
   }
 }

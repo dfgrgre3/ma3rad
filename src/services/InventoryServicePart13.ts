@@ -86,6 +86,7 @@ public saveReconciliationLog(input: {
     status: string;
     notes?: string;
   }): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 

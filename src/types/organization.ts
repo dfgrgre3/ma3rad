@@ -1,7 +1,7 @@
 export interface Branch {
   id: string;
-  name: string;
   code: string;
+  name: string;
   address?: string | null;
   phone?: string | null;
   managerId?: string | null;
@@ -9,6 +9,47 @@ export interface Branch {
   isActive: boolean;
   createdAt: string;
   managerName?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+}
+
+export interface Company {
+  id: string;
+  code: string;
+  name: string;
+  legalName?: string | null;
+  taxNumber?: string | null;
+  commercialRecord?: string | null;
+  currency?: string | null;
+  fiscalYearStartMonth?: number | null;
+  timeZone?: string | null;
+  locale?: string | null;
+  dateFormat?: string | null;
+  payrollTaxRate?: number | null;
+  overtimeMultiplier?: number | null;
+  workingDaysPerMonth?: number | null;
+  parentCompanyId?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  branchCount?: number;
+}
+
+export interface CreateCompanyDTO {
+  code: string;
+  name: string;
+  legalName?: string;
+  taxNumber?: string;
+  commercialRecord?: string;
+  currency?: string;
+  fiscalYearStartMonth?: number;
+  timeZone?: string;
+  locale?: string;
+  dateFormat?: string;
+  payrollTaxRate?: number;
+  overtimeMultiplier?: number;
+  workingDaysPerMonth?: number;
+  parentCompanyId?: string;
 }
 
 export interface BranchWarehouse {
@@ -31,6 +72,7 @@ export interface CreateBranchDTO {
   phone?: string;
   managerId?: string;
   isDefault?: boolean;
+  companyId?: string;
 }
 
 // ─── ADVANCED ANALYTICS ───────────────────────────────────────────────────────

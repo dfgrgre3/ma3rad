@@ -13,7 +13,7 @@ export const STATUS_LABELS: Record<OrderStatus, { label: string; color: string }
 
 export const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
 
-export type Line = { productId: string; quantityM2: number; unitPrice: number; discountAmount: number };
+export type Line = { productId: string; uom: string; quantity: number; unitPrice: number; discountAmount: number };
 
 export interface FormState {
   customerId: string;
@@ -29,5 +29,5 @@ export interface FormState {
 export const emptyForm = (): FormState => ({
   customerId: '', warehouseId: '', deliveryDate: '', notes: '',
   shipping: '', discount: '', tax: '',
-  lines: [{ productId: '', quantityM2: 0, unitPrice: 0, discountAmount: 0 }],
+  lines: [{ productId: '', uom: '', quantity: 0, unitPrice: 0, discountAmount: 0 }],
 });

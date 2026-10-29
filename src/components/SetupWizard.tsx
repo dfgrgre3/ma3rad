@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Store, Percent, CheckCircle2, ArrowLeft, ArrowRight, Loader2,
   ShieldCheck, Boxes, Layers, Shirt, Zap, Sofa, Car, Apple,
@@ -14,21 +14,36 @@ import { DatabaseManager } from '../database/db';
 import { SettingsService } from '../services/SettingsService';
 import { AuthService } from '../services/AuthService';
 import { useToast } from './ui/Toast';
-import { NAV_STORAGE_KEYS } from '../config/navigation';
 import {
   BUSINESS_UNITS,
   BUSINESS_MODULES,
   BUSINESS_TYPES,
   getDefaultBusinessConfiguration,
   getProfileModuleIds,
-  getProfileHiddenPaths,
   parseBusinessConfiguration,
   parseEnabledModules,
   type BusinessConfiguration,
 } from '../config/businessProfiles';
+import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../config/moduleRegistry';
+import { ModuleRegistryService } from '../services/ModuleRegistryService';
+import { BusinessProfileService } from '../services/BusinessProfileService';
 
 interface SetupWizardProps {
   onComplete: () => void;
+}
+
+/** Detect whether the built-in admin account still uses the default password. */
+function readDefaultAdminState(): { required: boolean; userId: string } {
+  try {
+    if (AuthService.getCurrentUser()?.role !== 'ADMIN') return { required: false, userId: '' };
+    const admin = DatabaseManager.getInstance().query<any>(
+      `SELECT id, password_hash AS passwordHash FROM users WHERE username = 'admin' LIMIT 1`
+    )[0];
+    if (admin && bcrypt.compareSync('admin123', admin.passwordHash)) {
+      return { required: true, userId: admin.id };
+    }
+  } catch { /* ignore */ }
+  return { required: false, userId: '' };
 }
 
 const CURRENCIES = [
@@ -38,24 +53,23 @@ const CURRENCIES = [
   { code: 'USD', symbol: '$', label: 'دولار أمريكي' },
 ];
 
+const STEPS = [
+  { label: 'بيانات المعرض', icon: Store },
+  { label: 'نوع النشاط والوحدات', icon: Boxes },
+  { label: 'الإعدادات المالية', icon: Settings2 },
+  { label: 'جاهز للانطلاق', icon: Rocket },
+] as const;
+
 export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const toast = useToast();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousStep = useRef(0);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [security] = useState(() => {
-    try {
-      if (AuthService.getCurrentUser()?.role !== 'ADMIN') return { required: false, userId: '' };
-      const admin = DatabaseManager.getInstance().query<any>(
-        `SELECT id, password_hash AS passwordHash FROM users WHERE username = 'admin' LIMIT 1`
-      )[0];
-      if (admin && bcrypt.compareSync('admin123', admin.passwordHash)) {
-        return { required: true, userId: admin.id };
-      }
-    } catch { /* ignore */ }
-    return { required: false, userId: '' };
-  });
+  const [security, setSecurity] = useState(readDefaultAdminState);
   const [form, setForm] = useState(() => {
     let current: ReturnType<typeof SettingsService.getSettings> | null = null;
     try { current = SettingsService.getSettings(); } catch { current = null; }
@@ -118,15 +132,33 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     ...prev,
     enabledModules: prev.enabledModules.includes(id)
       ? prev.enabledModules.filter((module) => module !== id)
-      : [...prev.enabledModules, id],
+      : withModuleDependencies([...prev.enabledModules, id]),
   }));
 
   const canContinue = step !== 0 || form.showroomName.trim().length >= 2;
 
+  // The default password may have been changed from the forced-password modal
+  // (or another window) after this wizard mounted, so re-check before deciding
+  // whether the admin password fields are still required.
+  useEffect(() => {
+    if (!security.required || step < 2) return;
+    const current = readDefaultAdminState();
+    if (!current.required) setSecurity(current);
+  }, [step, security.required]);
+
+  // Keep the wizard usable on short screens: whenever the step changes, scroll the
+  // content area back to the top and move focus to the new step heading.
+  useEffect(() => {
+    if (previousStep.current === step) return;
+    previousStep.current = step;
+    bodyRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    stepHeadingRef.current?.focus({ preventScroll: true });
+  }, [step]);
+
   const passwordValid = !security.required
     || (newPassword.length >= 8 && newPassword === confirmPassword);
 
-  const finish = () => {
+  const finish = async () => {
     if (form.showroomName.trim().length < 2) {
       setStep(0);
       toast.error('اسم المعرض مطلوب (حرفان على الأقل)');
@@ -148,15 +180,33 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       toast.error('راجع نسبة الضريبة وحدود المخزون والخصم قبل المتابعة');
       return;
     }
-    if (!passwordValid) {
+    const activeSecurity = readDefaultAdminState();
+    if (activeSecurity.required !== security.required) setSecurity(activeSecurity);
+    const requiresPassword = activeSecurity.required;
+    if (requiresPassword && !(newPassword.length >= 8 && newPassword === confirmPassword)) {
       setStep(2);
       toast.error('يجب تغيير كلمة مرور المسؤول الافتراضية (8 أحرف على الأقل)');
       return;
     }
+    const moduleValidation = validateModuleSelection(form.enabledModules, {
+      trackInventory: businessConfig.trackInventory,
+    });
+    if (moduleValidation.errors.length > 0) {
+      setStep(1);
+      toast.error('راجع الوحدات المفعّلة', moduleValidation.errors.join(' '));
+      return;
+    }
     setSaving(true);
     try {
-      if (security.required) {
-        new AuthService().resetPassword(security.userId, newPassword);
+      if (requiresPassword) {
+        const current = AuthService.getCurrentUser();
+        // Changing the signed-in admin's own password keeps this session active;
+        // resetPassword is reserved for other accounts.
+        if (current && current.id === activeSecurity.userId) {
+          new AuthService().changeOwnPassword(current.id, 'admin123', newPassword);
+        } else {
+          new AuthService().resetPassword(activeSecurity.userId, newPassword);
+        }
       }
       SettingsService.update({
         showroomName: form.showroomName.trim(),
@@ -165,8 +215,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         businessTypeLabel: form.businessType === 'custom'
           ? form.businessTypeLabel.trim()
           : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || '',
-        enabledModules: JSON.stringify(form.enabledModules),
-        [NAV_STORAGE_KEYS.hidden]: JSON.stringify(getProfileHiddenPaths(form.enabledModules)),
         phone: form.phone.trim(),
         address: form.address.trim(),
         taxNumber: form.taxNumber.trim(),
@@ -180,9 +228,20 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         lowStockAlertThresholdM2: lowStockThreshold,
         discountApprovalThresholdPercent: discountThreshold,
       });
+      ModuleRegistryService.setEnabledModules(moduleValidation.enabled, AuthService.getCurrentUser(), 'إعداد أولي');
+      // Materialize the profile's attribute names so the product form is usable
+      // immediately after setup instead of showing an empty attributes panel.
+      BusinessProfileService.applyFromSettings();
       DatabaseManager.getInstance().run(
         `INSERT OR REPLACE INTO system_settings (key, value) VALUES ('setup_completed', '1')`
       );
+      // Persist immediately so the wizard does not reappear after a restart even
+      // if the app is closed before the regular autosave tick.
+      try {
+        await DatabaseManager.getInstance().flush();
+      } catch (error) {
+        console.warn('Setup persistence flush failed:', error);
+      }
       toast.success('تم إعداد النظام بنجاح، مرحبًا بك في CeramiSys');
       onComplete();
     } catch (e: any) {
@@ -192,33 +251,75 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     }
   };
 
-  const inputClass = 'w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white';
-  const labelClass = 'block text-xs font-semibold text-slate-600 mb-1.5';
+  const inputClass = 'w-full min-h-10 px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500';
+  const labelClass = 'block text-xs font-semibold text-slate-600 mb-1.5 dark:text-slate-300';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-sky-50 flex items-center justify-center p-4" dir="rtl">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200 overflow-hidden">
-        <div className="bg-gradient-to-l from-sky-600 to-indigo-600 px-6 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center">
-              <Store className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-lg font-black">إعداد نظام ERP</h1>
-              <p className="text-xs text-sky-100">خصص النظام لنشاط معرضك قبل بدء العمل</p>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-5">
-            {['بيانات المعرض', 'نوع النشاط والوحدات', 'الإعدادات المالية', 'جاهز للانطلاق'].map((label, index) => (
-              <div key={label} className="flex-1">
-                <div className={`h-1.5 rounded-full ${index <= step ? 'bg-white' : 'bg-white/25'}`} />
-                <p className={`mt-2 text-[10px] font-semibold ${index <= step ? 'text-white' : 'text-sky-200'}`}>{label}</p>
+    <div
+      className="flex min-h-dvh w-full items-center justify-center bg-gradient-to-br from-slate-100 via-white to-sky-50 p-2 sm:p-4 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950"
+      dir="rtl"
+    >
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl dark:border-slate-800 dark:bg-slate-900">
+        {/* Header stays visible while only the step content scrolls. */}
+        <header className="shrink-0 bg-gradient-to-l from-sky-600 to-indigo-600 px-4 py-4 text-white sm:px-6 sm:py-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 sm:h-11 sm:w-11">
+                <Store className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
               </div>
-            ))}
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-black sm:text-lg">إعداد نظام ERP</h1>
+                <p className="truncate text-[11px] text-sky-100 sm:text-xs">خصص النظام لنشاط معرضك قبل بدء العمل</p>
+              </div>
+            </div>
+            <span
+              className="shrink-0 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-bold sm:text-[11px]"
+              aria-live="polite"
+            >
+              الخطوة {step + 1} من {STEPS.length}
+            </span>
           </div>
-        </div>
 
-        <div className="p-6 min-h-[290px]">
+          <div className="mt-4">
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label="تقدم الإعداد">
+              {STEPS.map((item, index) => (
+                <div key={item.label} aria-hidden="true">
+                  <div className={`h-1.5 rounded-full transition-colors ${index <= step ? 'bg-white' : 'bg-white/25'}`} />
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 hidden grid-cols-4 gap-2 sm:grid">
+              {STEPS.map((item, index) => {
+                const Icon = item.icon;
+                const reached = index <= step;
+                return (
+                  <div
+                    key={item.label}
+                    className={`flex min-w-0 items-center gap-1 text-[10px] font-semibold ${reached ? 'text-white' : 'text-sky-200/70'}`}
+                  >
+                    {index < step ? (
+                      <Check className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] font-semibold text-sky-100 sm:hidden" aria-live="polite">
+              {STEPS[step].label}
+            </p>
+          </div>
+        </header>
+
+        <div
+          ref={bodyRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5"
+        >
+          <h2 ref={stepHeadingRef} tabIndex={-1} className="sr-only">
+            {STEPS[step].label}
+          </h2>
           {step === 0 && (
             <div className="space-y-4">
               <div>
@@ -336,12 +437,16 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 />
               </div>
               <div><h3 className="mb-2 text-xs font-bold text-slate-700">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {BUSINESS_MODULES.map((module) => (
-                  <div key={module.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 ${module.id === 'inventory' && !businessConfig.trackInventory ? 'opacity-50' : ''}`}>
-                    <input id={`setup-module-${module.id}`} type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={module.id === 'inventory' && !businessConfig.trackInventory} className="accent-sky-600" />
-                    <label htmlFor={`setup-module-${module.id}`} className="cursor-pointer">{module.label}</label>
-                  </div>
-                ))}
+                {BUSINESS_MODULES.map((module) => {
+                  const definition = getModuleDefinition(module.id);
+                  const unavailable = Boolean(definition?.activation.requiresInventoryTracking && !businessConfig.trackInventory);
+                  return (
+                    <div key={module.id} title={definition?.description} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 ${unavailable ? 'opacity-50' : ''}`}>
+                      <input id={`setup-module-${module.id}`} type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={unavailable} className="accent-sky-600" />
+                      <label htmlFor={`setup-module-${module.id}`} className="cursor-pointer">{module.label}</label>
+                    </div>
+                  );
+                })}
               </div></div>
             </div>
           )}

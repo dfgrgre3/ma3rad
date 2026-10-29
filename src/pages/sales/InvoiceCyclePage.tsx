@@ -444,6 +444,7 @@ export const InvoiceCyclePage: React.FC = () => {
       columns,
       rows: exportRows,
       fileName: 'invoice_cycle',
+      permission: 'sales.export',
     });
     setDocPreview({
       title: 'دورة الفواتير',
@@ -454,6 +455,7 @@ export const InvoiceCyclePage: React.FC = () => {
         columns,
         rows: exportRows,
         fileName: 'invoice_cycle',
+        permission: 'sales.export',
       }),
     });
   };

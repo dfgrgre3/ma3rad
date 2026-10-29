@@ -10,7 +10,10 @@ import { PrintService } from '../../services/PrintService';
 import { Customer, Product, Warehouse, PaymentType } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
-import { getProductUnitLabel } from '../../utils/productUnits';
+import {
+  basePriceFromUnitPrice, convertQuantity, pricePerUnit,
+} from '../../utils/uom';
+import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
 import { PAGE_SIZE, emptyForm, fmt, FormState, Line } from './orders/types';
 import { buildOrderExportRows } from './orders/helpers';
 import { OrdersHeader } from './orders/OrdersHeader';
@@ -119,7 +122,8 @@ export const OrdersPage: React.FC = () => {
         tax: String(full.taxAmount || ''),
         lines: (full.items || []).map((i) => ({
           productId: i.productId,
-          quantityM2: i.quantityM2,
+          uom: i.baseUnit || 'M2',
+          quantity: i.quantityM2,
           unitPrice: i.unitPrice,
           discountAmount: i.discountAmount || 0,
         })),
@@ -131,14 +135,33 @@ export const OrdersPage: React.FC = () => {
   const setLine = (idx: number, patch: Partial<Line>) =>
     setForm((prev) => ({ ...prev, lines: prev.lines.map((l, i) => (i === idx ? { ...l, ...patch } : l)) }));
 
-  const getFormUnit = (productId: string) => {
-    const product = products.find((item) => item.id === productId);
-    return product ? getProductUnitLabel(product) : 'وحدة';
-  };
-
   const pickProduct = (idx: number, productId: string) => {
     const p = products.find((x) => x.id === productId);
-    setLine(idx, { productId, unitPrice: p ? p.sellingPriceM2 : 0 });
+    setLine(idx, {
+      productId,
+      uom: p ? (p.baseUnit || 'M2') : '',
+      unitPrice: p ? p.sellingPriceM2 : 0,
+    });
+  };
+
+  /** Switch the line unit while keeping the same effective base-unit price. */
+  const changeLineUnit = (idx: number, unit: string) => {
+    const line = form.lines[idx];
+    const product = products.find((p) => p.id === line.productId);
+    if (!product) return setLine(idx, { uom: unit });
+    const basePrice = basePriceFromUnitPrice(line.unitPrice, line.uom || product.baseUnit || 'M2', product);
+    const converted = pricePerUnit(basePrice, unit, product);
+    setLine(idx, { uom: unit, unitPrice: Math.round(converted * 100) / 100 });
+  };
+
+  const lineBaseQuantity = (line: Line) => {
+    const product = products.find((p) => p.id === line.productId);
+    if (!product || !line.uom) return line.quantity;
+    try {
+      return convertQuantity(line.quantity, line.uom, product.baseUnit || 'M2', product);
+    } catch {
+      return line.quantity;
+    }
   };
 
   const stockOf = (productId: string, warehouseId: string): number => {
@@ -149,12 +172,12 @@ export const OrdersPage: React.FC = () => {
     } catch { return 0; }
   };
 
-  const subtotal = form.lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice - (l.discountAmount || 0), 0);
+  const subtotal = form.lines.reduce((s, l) => s + l.quantity * l.unitPrice - (l.discountAmount || 0), 0);
   const total = Math.max(0, subtotal - (Number(form.discount) || 0) + (Number(form.tax) || 0) + (Number(form.shipping) || 0));
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    const items = form.lines.filter((l) => l.productId && l.quantityM2 > 0);
+    const items = form.lines.filter((l) => l.productId && l.quantity > 0);
     if (!form.customerId) return alert('اختر العميل.');
     if (!form.warehouseId) return alert('اختر المخزن.');
     if (items.length === 0) return alert('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
@@ -168,7 +191,14 @@ export const OrdersPage: React.FC = () => {
         shippingCost: Number(form.shipping) || 0,
         discountAmount: Number(form.discount) || 0,
         taxAmount: Number(form.tax) || 0,
-        items,
+        items: items.map((l) => ({
+          productId: l.productId,
+          quantityM2: 0,
+          quantity: l.quantity,
+          uom: l.uom || undefined,
+          unitPrice: l.unitPrice,
+          discountAmount: l.discountAmount || 0,
+        })),
       };
       if (editingId) service.updateOrder(editingId, payload);
       else service.createOrder(payload);
@@ -249,7 +279,7 @@ export const OrdersPage: React.FC = () => {
       (order.expectedDeliveryDate ? `موعد التسليم المتوقع: ${order.expectedDeliveryDate}\n` : '') +
       `شكراً لتعاملكم معنا.`
     );
-    window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+    openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
   };
 
   const openConvert = (order: Order) => {
@@ -308,6 +338,7 @@ export const OrdersPage: React.FC = () => {
       ],
       rows: exportRows(),
       fileName: 'sales-orders',
+      permission: 'orders.export',
     };
     setDocPreview({
       title: 'معاينة سجل أوامر البيع',
@@ -378,7 +409,8 @@ export const OrdersPage: React.FC = () => {
           onSubmit={submitForm}
           setLine={setLine}
           pickProduct={pickProduct}
-          getFormUnit={getFormUnit}
+          changeLineUnit={changeLineUnit}
+          lineBaseQuantity={lineBaseQuantity}
           stockOf={stockOf}
           total={total}
         />

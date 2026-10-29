@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { localDateString } from './date';
+import { ExportService } from '../services/ExportService';
 
 export interface ExportColumn {
   key: string;
@@ -12,6 +13,8 @@ export interface ExportOptions {
   columns: ExportColumn[];
   rows: Array<Record<string, unknown>>;
   fileName: string;
+  /** Permission code enforced before the document is built or written (for example `sales.export`). */
+  permission?: string;
 }
 
 const stamp = () => localDateString();
@@ -26,9 +29,10 @@ function safeName(name: string): string {
  * download, print or share it.
  */
 export function buildExportHtml(
-  { title, subtitle, columns, rows }: ExportOptions,
+  { title, subtitle, columns, rows, permission }: ExportOptions,
   autoPrint = false
 ): string {
+  if (permission) ExportService.assertAllowed(permission);
   const esc = (s: unknown) =>
     String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -117,7 +121,8 @@ export async function downloadPdf(html: string, fileName: string): Promise<void>
   printHtml(html.replace('<body>', '<body onload="window.print()">'));
 }
 
-export function exportToExcel({ title, subtitle, columns, rows, fileName }: ExportOptions): void {
+export function exportToExcel({ title, subtitle, columns, rows, fileName, permission }: ExportOptions): void {
+  if (permission) ExportService.assertAllowed(permission);
   const header = columns.map((c) => c.label);
   const body = rows.map((row) =>
     columns.map((c) => {

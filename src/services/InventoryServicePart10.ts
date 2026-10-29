@@ -17,6 +17,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
     damagedM2?: number;
     notes?: string;
   }>): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer');
 
@@ -143,12 +144,12 @@ public receiveTransfer(transferId: string, receipts: Array<{
     const txId = `tx_${uuidv4().substring(0, 8)}`;
     const txNum = txDb.nextNumber('TX-TRF-IN');
     const product = txDb.query<any>(
-      `SELECT meters_per_box, product_type, base_unit FROM products WHERE id = ?`,
+      `SELECT meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`,
       [productId]
     )[0];
-    const boxes = product?.product_type === 'GENERAL'
-      ? product.base_unit === 'BOX' ? received : 0
-      : Number((received / (product?.metersPerBox ?? product?.meters_per_box ?? 1.44)).toFixed(2));
+    const boxes = product?.productType === 'GENERAL'
+      ? product.baseUnit === 'BOX' ? received : 0
+      : Number((received / (product?.metersPerBox ?? 1.44)).toFixed(2));
 
     txDb.run(`
       INSERT INTO inventory_transactions (

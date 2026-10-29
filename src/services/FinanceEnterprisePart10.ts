@@ -37,6 +37,9 @@ public getMultiDimensionalPnL(filters: MultiDimensionalReportFilters = {}): {
     this.requireView();
     const conditions = ['e.is_posted = 1', "a.type IN ('REVENUE', 'EXPENSE')"];
     const params: any[] = [];
+    const scope = this.ledgerScope();
+    conditions.push(scope.clause);
+    params.push(...scope.params);
 
     if (filters.dateFrom) { conditions.push('e.date >= ?'); params.push(filters.dateFrom); }
     if (filters.dateTo) { conditions.push('e.date <= ?'); params.push(filters.dateTo); }

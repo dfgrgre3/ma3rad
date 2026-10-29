@@ -18,6 +18,7 @@ import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnit
 import { exportToExcel, buildExportHtml } from '../utils/export';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { localDateString } from '../utils/date';
+import { buildWhatsAppUrl, openExternalShare } from '../utils/externalLinks';
 
 type InvoiceRow = SalesInvoice & { itemsCount?: number; returnedAmount?: number };
 
@@ -146,6 +147,7 @@ export const SalesView: React.FC = () => {
       debit: tx.debit, credit: tx.credit, balanceAfter: tx.balanceAfter,
     })),
     fileName: `statement-${st.customer.code || st.customer.id}`,
+    permission: 'customers.export',
   });
 
   const clearFilters = () => {
@@ -274,6 +276,7 @@ export const SalesView: React.FC = () => {
       columns: exportColumns,
       rows: exportRows(),
       fileName: 'sales-invoices',
+      permission: 'sales.export',
     };
     setDocPreview({
       title: 'معاينة سجل فواتير المبيعات',
@@ -308,6 +311,7 @@ export const SalesView: React.FC = () => {
       total: item.totalPrice,
     })),
     fileName: `invoice-${full.invoiceNumber}`,
+    permission: 'sales.export',
   });
 
   const shareInvoiceWhatsApp = (full: SalesInvoice & { items: SalesInvoiceItem[] }) => {
@@ -318,7 +322,7 @@ export const SalesView: React.FC = () => {
       (full.remainingAmount > 0 ? `المتبقي: ${fmt(full.remainingAmount)}\n` : '') +
       `شكراً لتعاملكم معنا.`
     );
-    window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+    openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
   };
 
   const openInvoicePreview = (invoice: InvoiceRow) => {

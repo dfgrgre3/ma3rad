@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../database/db';
-import type { Branch, BranchWarehouse, UserBranch, CreateBranchDTO } from '../types';
+import type { Branch, BranchWarehouse, UserBranch, CreateBranchDTO, User } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
@@ -14,9 +14,10 @@ export class BranchService {
     PermissionService.require(actor, 'branches.view');
     const scope = this.access.sqlScope('b.id', undefined, actor);
     return this.db.query<any>(`
-      SELECT b.*, b.is_main AS is_default, u.full_name as managerName
+      SELECT b.*, b.is_main AS is_default, u.full_name as managerName, c.name as companyName
       FROM branches b
       LEFT JOIN users u ON b.manager_id = u.id
+      LEFT JOIN companies c ON c.id = b.company_id
       WHERE ${scope.clause}
       ORDER BY b.name ASC
     `, scope.params) as Branch[];
@@ -27,9 +28,10 @@ export class BranchService {
     PermissionService.require(actor, 'branches.view');
     this.access.requireBranchAccess(id, actor);
     const rows = this.db.query<any>(`
-      SELECT b.*, b.is_main AS is_default, u.full_name as managerName
+      SELECT b.*, b.is_main AS is_default, u.full_name as managerName, c.name as companyName
       FROM branches b
       LEFT JOIN users u ON b.manager_id = u.id
+      LEFT JOIN companies c ON c.id = b.company_id
       WHERE b.id = ?
     `, [id]);
     return rows.length > 0 ? rows[0] : null;
@@ -52,6 +54,7 @@ export class BranchService {
   public createBranch(dto: CreateBranchDTO): Branch {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'branches.create');
+    const companyId = this.resolveCompanyForNewBranch(dto.companyId, actor);
     const id = `br_${uuidv4().substring(0, 8)}`;
     const now = new Date().toISOString();
     return this.db.executeTransaction((sqliteDb) => {
@@ -59,15 +62,48 @@ export class BranchService {
         sqliteDb.run('UPDATE branches SET is_main = 0 WHERE is_main = 1');
       }
       sqliteDb.run(`
-        INSERT INTO branches (id, name, code, address, phone, manager_id, is_main, is_active, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
-      `, [id, dto.name, dto.code, dto.address || null, dto.phone || null, dto.managerId || null, dto.isDefault ? 1 : 0, now]);
+        INSERT INTO branches (id, name, code, address, phone, manager_id, is_main, is_active, created_at, company_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `, [id, dto.name, dto.code, dto.address || null, dto.phone || null, dto.managerId || null, dto.isDefault ? 1 : 0, now, companyId]);
       sqliteDb.run(`
         INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id)
         VALUES (?, ?, 0, 1, 1, ?)
       `, [`cr_${id}`, `الخزينة الرئيسية - ${dto.code}`, id]);
       return this.getBranchRow(id)!;
     });
+  }
+
+  /**
+   * Resolve the owning company for a new branch. Explicit input must be an
+   * existing, active company inside the actor's scope; otherwise the actor's
+   * current branch company is used.
+   */
+  private resolveCompanyForNewBranch(companyId: string | undefined, actor: User): string {
+    if (companyId) {
+      const company = this.db.query<{ isActive: number }>(
+        'SELECT is_active AS isActive FROM companies WHERE id = ?',
+        [companyId]
+      )[0];
+      if (!company) throw new Error('الشركة المحددة غير موجودة.');
+      if (Number(company.isActive) !== 1) throw new Error('لا يمكن إضافة فرع لشركة معطلة.');
+      this.access.requireCompanyAccess(companyId, actor);
+      return companyId;
+    }
+    const accessible = this.access.getAccessibleBranchIds(actor);
+    const preferredBranch = accessible === null
+      ? this.db.query<{ companyId: string }>(
+        'SELECT company_id AS companyId FROM branches WHERE is_main = 1 AND company_id IS NOT NULL LIMIT 1'
+      )[0]
+      : accessible.length
+        ? this.db.query<{ companyId: string }>(
+          `SELECT company_id AS companyId FROM branches
+           WHERE id IN (${accessible.map(() => '?').join(', ')}) AND company_id IS NOT NULL
+           ORDER BY is_main DESC, id ASC LIMIT 1`,
+          accessible
+        )[0]
+        : undefined;
+    if (!preferredBranch) throw new Error('تعذر تحديد الشركة المالكة للفرع الجديد. اختر شركة صريحة.');
+    return preferredBranch.companyId;
   }
 
   public updateBranch(id: string, updates: Partial<CreateBranchDTO>): Branch {
@@ -85,6 +121,17 @@ export class BranchService {
     if (updates.address !== undefined) { fields.push('address = ?'); params.push(updates.address); }
     if (updates.phone !== undefined) { fields.push('phone = ?'); params.push(updates.phone); }
     if (updates.managerId !== undefined) { fields.push('manager_id = ?'); params.push(updates.managerId); }
+    if (updates.companyId !== undefined) {
+      const company = this.db.query<{ isActive: number }>(
+        'SELECT is_active AS isActive FROM companies WHERE id = ?',
+        [updates.companyId]
+      )[0];
+      if (!company) throw new Error('الشركة المحددة غير موجودة.');
+      if (Number(company.isActive) !== 1) throw new Error('لا يمكن نقل فرع إلى شركة معطلة.');
+      this.access.requireCompanyAccess(updates.companyId, actor);
+      fields.push('company_id = ?');
+      params.push(updates.companyId);
+    }
     if (updates.isDefault !== undefined) { fields.push('is_main = ?'); params.push(updates.isDefault ? 1 : 0); }
     if (fields.length > 0) {
       fields.push('updated_at = CURRENT_TIMESTAMP');
@@ -345,9 +392,10 @@ export class BranchService {
 
   private getBranchRow(id: string): Branch | null {
     const rows = this.db.query<any>(`
-      SELECT b.*, b.is_main AS is_default, u.full_name as managerName
+      SELECT b.*, b.is_main AS is_default, u.full_name as managerName, c.name as companyName
       FROM branches b
       LEFT JOIN users u ON b.manager_id = u.id
+      LEFT JOIN companies c ON c.id = b.company_id
       WHERE b.id = ?
     `, [id]);
     return rows.length > 0 ? rows[0] : null;

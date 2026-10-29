@@ -19,6 +19,7 @@ public recordSpecialStock(input: {
     sourceId?: string;
     notes?: string;
   }): any {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 
@@ -31,10 +32,10 @@ public recordSpecialStock(input: {
         throw new Error(`الرصيد المتاح بالمخزن (${stock?.availableM2 || 0} ${unitLabel}) غير كافٍ لعزل ${input.quantityM2} ${unitLabel}`);
       }
 
-      const prod = txDb.query<any>(`SELECT cost_price AS costPrice, meters_per_box, product_type, base_unit FROM products WHERE id = ?`, [input.productId])[0];
-      const metersPerBox = prod?.metersPerBox ?? prod?.meters_per_box ?? 1.44;
-      const boxes = prod?.product_type === 'GENERAL'
-        ? prod.base_unit === 'BOX' ? input.quantityM2 : 0
+      const prod = txDb.query<any>(`SELECT cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [input.productId])[0];
+      const metersPerBox = prod?.metersPerBox ?? 1.44;
+      const boxes = prod?.productType === 'GENERAL'
+        ? prod.baseUnit === 'BOX' ? input.quantityM2 : 0
         : Number((input.quantityM2 / metersPerBox).toFixed(2));
 
       // Calculate FIFO plan
@@ -91,6 +92,7 @@ public recordSpecialStock(input: {
   }
 
 public inspectSpecialStock(id: string, notes: string): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
 

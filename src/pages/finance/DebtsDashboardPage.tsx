@@ -55,9 +55,13 @@ export const DebtsDashboardPage: React.FC = () => {
       const invoices = db.query<{ id: string; invoiceNumber: string; date: string; total: number; paid: number; remaining: number }>(
         `SELECT id, invoice_number AS invoiceNumber, date, total_amount AS total, paid_amount AS paid, remaining_amount AS remaining FROM sales_invoices WHERE customer_id = ? AND invoice_status <> 'VOID' ORDER BY date DESC`, [id]
       ).map((invoice) => ({ ...invoice, items: db.query<{ name: string; sku:string; grade:string; size:string; quantity: number; unit: string; unitPrice:number; discount:number; total:number; returned:number }>(
-        `SELECT i.product_name AS name,i.product_sku AS sku,i.product_grade AS grade,i.size,i.quantity_m2 AS quantity,i.sold_by AS unit,i.unit_price AS unitPrice,i.discount_amount AS discount,i.total_price AS total,
+        `SELECT i.product_name AS name,i.product_sku AS sku,i.product_grade AS grade,i.size,i.quantity_m2 AS quantity,
+          COALESCE(p.base_unit, i.uom, i.sold_by, 'M2') AS unit,
+          i.unit_price AS unitPrice,i.discount_amount AS discount,i.total_price AS total,
           COALESCE((SELECT SUM(sri.quantity_m2) FROM sales_return_items sri JOIN sales_returns sr ON sr.id=sri.return_id WHERE sr.original_invoice_id=i.invoice_id AND sri.product_id=i.product_id),0) AS returned
-         FROM sales_invoice_items i WHERE i.invoice_id = ?`, [invoice.id]
+         FROM sales_invoice_items i
+         LEFT JOIN products p ON p.id = i.product_id
+         WHERE i.invoice_id = ?`, [invoice.id]
       ) }));
       const payments = db.query<{ id:string; invoiceId:string|null; paymentGroupId:string|null; receiptNumber: string; date: string; amount: number; paymentType: string; notes: string | null }>(`SELECT id,invoice_id AS invoiceId,payment_group_id AS paymentGroupId,receipt_number AS receiptNumber,date,amount,payment_type AS paymentType,notes FROM customer_payments WHERE customer_id=? ORDER BY date`,[id]);
       const promises=db.query<PromiseRow>(`SELECT id,promised_amount AS promisedAmount,promise_date AS promiseDate,followup_date AS followupDate,status,notes FROM customer_payment_promises WHERE customer_id=? ORDER BY created_at DESC`,[id]);
@@ -73,12 +77,12 @@ export const DebtsDashboardPage: React.FC = () => {
       ...detail.invoices.map((invoice) => ({ type: 'فاتورة', document: invoice.invoiceNumber, date: invoice.date, debit: invoice.total, credit: invoice.paid, balance: invoice.remaining, details: invoice.items.map((item) => `${item.name} ${item.sku} ${item.grade} ${item.size} (${item.quantity} ${item.unit} × ${item.unitPrice}، خصم ${item.discount}، مرتجع ${item.returned})`).join('، ') })),
       ...detail.payments.map((payment) => ({ type: 'تحصيل', document: payment.receiptNumber, date: payment.date, debit: 0, credit: payment.amount, balance: '', details: [payment.paymentType,payment.notes].filter(Boolean).join(' · ') })),
     ];
-    const options = { title: `كشف حساب ${customer.name}`, subtitle: `الهاتف: ${customer.phone || '—'} · العنوان: ${detail.address}`, fileName: `كشف-حساب-${customer.name}`, columns: [{key:'type',label:'النوع'},{key:'document',label:'المرجع'},{key:'date',label:'التاريخ'},{key:'debit',label:'مدين'},{key:'credit',label:'دائن'},{key:'balance',label:'متبقي'},{key:'details',label:'التفاصيل'}], rows };
+    const options = { title: `كشف حساب ${customer.name}`, subtitle: `الهاتف: ${customer.phone || '—'} · العنوان: ${detail.address}`, fileName: `كشف-حساب-${customer.name}`, permission: 'customers.export', columns: [{key:'type',label:'النوع'},{key:'document',label:'المرجع'},{key:'date',label:'التاريخ'},{key:'debit',label:'مدين'},{key:'credit',label:'دائن'},{key:'balance',label:'متبقي'},{key:'details',label:'التفاصيل'}], rows };
     if (format === 'excel') exportToExcel(options); else exportToPdf(options);
   };
   const exportOverdueReport = (format:'excel'|'pdf') => {
     const rows=DatabaseManager.getInstance().query(`SELECT c.name AS customer,c.phone,si.invoice_number AS invoice,si.date,si.due_date AS dueDate,si.total_amount AS total,si.paid_amount AS paid,si.remaining_amount AS remaining,CAST(julianday(date('now','localtime'))-julianday(si.due_date) AS INTEGER) AS daysOverdue FROM sales_invoices si JOIN customers c ON c.id=si.customer_id WHERE si.invoice_status<>'VOID' AND si.due_date IS NOT NULL AND si.due_date<date('now','localtime') AND si.remaining_amount>0.009 ORDER BY si.due_date`);
-    const options={title:'تقرير الفواتير المتأخرة',columns:[{key:'customer',label:'العميل'},{key:'phone',label:'الهاتف'},{key:'invoice',label:'الفاتورة'},{key:'date',label:'تاريخ الفاتورة'},{key:'dueDate',label:'الاستحقاق'},{key:'total',label:'الإجمالي'},{key:'paid',label:'المدفوع'},{key:'remaining',label:'المتبقي'},{key:'daysOverdue',label:'أيام التأخير'}],rows,fileName:'الفواتير-المتأخرة'};
+    const options={title:'تقرير الفواتير المتأخرة',permission:'reports.export',columns:[{key:'customer',label:'العميل'},{key:'phone',label:'الهاتف'},{key:'invoice',label:'الفاتورة'},{key:'date',label:'تاريخ الفاتورة'},{key:'dueDate',label:'الاستحقاق'},{key:'total',label:'الإجمالي'},{key:'paid',label:'المدفوع'},{key:'remaining',label:'المتبقي'},{key:'daysOverdue',label:'أيام التأخير'}],rows,fileName:'الفواتير-المتأخرة'};
     if(format==='excel') exportToExcel(options); else exportToPdf(options);
   };
   const reverseCustomerPayment = (customerId:string,payment:{id:string;invoiceId:string|null;paymentGroupId:string|null;receiptNumber:string}) => {

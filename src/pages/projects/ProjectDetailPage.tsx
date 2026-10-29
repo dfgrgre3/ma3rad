@@ -5,6 +5,7 @@ import {
   MapPin, Package, Plus, Trash2, User, Wallet, X, Activity,
 } from 'lucide-react';
 import { ProjectService, Project, ProjectUnit, ProjectProduct, ProjectStatus } from '../../services/ProjectService';
+import { ProjectControlsPanel } from '../../components/ProjectControlsPanel';
 import { ProductService } from '../../services/ProductService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
@@ -30,6 +31,7 @@ export const ProjectDetailPage: React.FC = () => {
   const service = new ProjectService();
   const user = AuthService.getCurrentUser();
   const canUpdate = PermissionService.can(user, 'projects.update');
+  const canApprove = PermissionService.can(user, 'projects.approve');
 
   const [project, setProject] = useState<Project | null>(null);
   const [units, setUnits] = useState<ProjectUnit[]>([]);
@@ -37,7 +39,7 @@ export const ProjectDetailPage: React.FC = () => {
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'units' | 'products' | 'info'>('units');
+  const [tab, setTab] = useState<'units' | 'products' | 'controls' | 'info'>('units');
 
   const [unitForm, setUnitForm] = useState({ name: '', unitType: 'APARTMENT', areaM2: '', parentId: '' });
   const [productForm, setProductForm] = useState({ productId: '', unitId: '', plannedQuantityM2: '', agreedPriceM2: '' });
@@ -204,6 +206,7 @@ export const ProjectDetailPage: React.FC = () => {
         {[
           { key: 'units', label: `الوحدات (${units.length})` },
           { key: 'products', label: `بنود المنتجات (${products.length})` },
+          { key: 'controls', label: 'المتابعة والميزانية' },
           { key: 'info', label: 'بيانات المشروع' },
         ].map((t) => (
           <button
@@ -395,6 +398,10 @@ export const ProjectDetailPage: React.FC = () => {
               </form>
             )}
           </div>
+        )}
+
+        {tab === 'controls' && (
+          <ProjectControlsPanel projectId={id} canUpdate={canUpdate} canApprove={canApprove} />
         )}
 
         {tab === 'info' && (

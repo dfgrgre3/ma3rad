@@ -122,13 +122,15 @@ public getBudgetWithItems(budgetId: string): Budget | null {
       ORDER BY coa.code ASC
     `, [budgetId]).map(i => {
       // Calculate actual spending for this account within this fiscal year and optional cost center
+      const scope = this.ledgerScope();
       let actualSql = `
         SELECT COALESCE(SUM(l.debit - l.credit), 0) as spent
         FROM journal_entry_lines l
         JOIN journal_entries e ON e.id = l.entry_id
         WHERE l.account_id = ? AND e.is_posted = 1 AND e.date >= ? AND e.date <= ?
+          AND ${scope.clause}
       `;
-      const actualParams: any[] = [i.accountId, startDate, endDate];
+      const actualParams: any[] = [i.accountId, startDate, endDate, ...scope.params];
       if (budget.costCenterId) {
         actualSql += ' AND l.cost_center_id = ?';
         actualParams.push(budget.costCenterId);

@@ -403,6 +403,7 @@ export const SalesReportsPage: React.FC = () => {
           title: `تقرير مبيعات يومي`,
           subtitle: `الفترة: ${from} — ${to}`,
           fileName: `تقرير-يومي-${from}-${to}`,
+          permission: 'sales.export',
           columns: [
             { key: 'date', label: 'التاريخ' },
             { key: 'revenue', label: 'الإيرادات' },
@@ -417,6 +418,7 @@ export const SalesReportsPage: React.FC = () => {
           title: `تقرير مبيعات - ${currentType.label}`,
           subtitle: `الفترة: ${from} — ${to}`,
           fileName: `تقرير-مبيعات-${reportType}-${from}-${to}`,
+          permission: 'sales.export',
           columns: reportType === 'by_city'
             ? [
                 { key: 'label', label: 'المنطقة' },

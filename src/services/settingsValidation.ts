@@ -12,6 +12,9 @@ function validateStringSetting(key: string, value: string): string {
     case 'sidebarStyle':
       if (!['default', 'compact', 'hidden'].includes(value)) throw new Error('نمط القائمة غير صالح.');
       break;
+    case 'navigationLayout':
+      if (!['sidebar', 'header'].includes(value)) throw new Error('تخطيط التنقل غير صالح.');
+      break;
     case 'costingMethod':
       if (!['AVERAGE_COST', 'FIFO'].includes(value)) throw new Error('Invalid inventory costing method.');
       break;

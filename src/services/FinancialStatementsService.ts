@@ -88,7 +88,12 @@ export class FinancialStatementsService {
   }
 
   private ledgerScope(alias = 'e'): BranchSqlScope {
-    return this.branchAccess.sqlScope(`${alias}.branch_id`);
+    const branch = this.branchAccess.sqlScope(`${alias}.branch_id`);
+    const company = this.branchAccess.companyScope(`${alias}.company_id`);
+    return {
+      clause: `(${branch.clause}) AND (${company.clause})`,
+      params: [...branch.params, ...company.params],
+    };
   }
 
   public getBranchScopeWarning(): string | null {
@@ -448,6 +453,11 @@ export class FinancialStatementsService {
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid aging date.');
     const scope = this.branchAccess.sqlScope('si.branch_id');
+    const company = this.branchAccess.companyScope('si.company_id');
+    const agingScope = {
+      clause: `(${scope.clause}) AND (${company.clause})`,
+      params: [...scope.params, ...company.params],
+    };
     return this.buildAging(`
       SELECT c.id, c.name, c.phone, COALESCE(si.due_date, si.date) AS docDate,
         MAX(0, si.total_amount
@@ -460,7 +470,7 @@ export class FinancialStatementsService {
               WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0)
         ) AS remaining
       FROM sales_invoices si JOIN customers c ON c.id = si.customer_id
-      WHERE si.invoice_status != 'VOID' AND si.date <= ? AND ${scope.clause}
+      WHERE si.invoice_status != 'VOID' AND si.date <= ? AND ${agingScope.clause}
         AND si.total_amount
           - MAX(0, si.paid_amount - COALESCE((SELECT SUM(cpa0.amount) FROM customer_payment_allocations cpa0
               WHERE cpa0.sales_invoice_id = si.id), 0))
@@ -469,7 +479,7 @@ export class FinancialStatementsService {
               WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?), 0)
           - COALESCE((SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
               WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0) > 0.009
-    `, [date, date, date, date, date, ...scope.params], date);
+    `, [date, date, date, date, date, ...agingScope.params], date);
   }
 
   public getSupplierAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
@@ -477,6 +487,11 @@ export class FinancialStatementsService {
     const date = asOf || localDateString();
     if (!isValidDate(date)) throw new Error('Invalid aging date.');
     const scope = this.branchAccess.sqlScope('pi.branch_id');
+    const company = this.branchAccess.companyScope('pi.company_id');
+    const agingScope = {
+      clause: `(${scope.clause}) AND (${company.clause})`,
+      params: [...scope.params, ...company.params],
+    };
     return this.buildAging(`
       SELECT s.id, s.name, s.phone, pi.date AS docDate,
         MAX(0, pi.total_amount
@@ -489,7 +504,7 @@ export class FinancialStatementsService {
               WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0)
         ) AS remaining
       FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id
-      WHERE pi.date <= ? AND ${scope.clause}
+      WHERE pi.date <= ? AND ${agingScope.clause}
         AND pi.total_amount
           - MAX(0, pi.paid_amount - COALESCE((SELECT SUM(spa0.amount) FROM supplier_payment_allocations spa0
               WHERE spa0.purchase_invoice_id = pi.id), 0))
@@ -498,7 +513,7 @@ export class FinancialStatementsService {
               WHERE spa.purchase_invoice_id = pi.id AND sp.date <= ?), 0)
           - COALESCE((SELECT SUM(pr.remaining_to_balance) FROM purchase_returns pr
               WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0) > 0.009
-    `, [date, date, date, date, date, ...scope.params], date);
+    `, [date, date, date, date, date, ...agingScope.params], date);
   }
 
   private buildAging(sql: string, params: any[], asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {

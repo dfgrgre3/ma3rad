@@ -177,6 +177,7 @@ export const PurchaseReturnsPage: React.FC = () => {
         refundMethod: REFUND_LABEL[r.refundMethod] || r.refundMethod,
       })),
       fileName: 'purchase-returns',
+      permission: 'purchases.export',
     };
     setDocPreview({
       title: 'معاينة سجل مرتجعات الشراء',

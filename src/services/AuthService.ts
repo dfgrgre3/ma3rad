@@ -9,6 +9,22 @@ import { BranchAccessService } from './BranchAccessService';
 const SESSION_KEY = 'ceramisys_session_user_id';
 const SESSION_ID_KEY = 'ceramisys_session_id';
 
+/** Window during which failed attempts are counted before the account is temporarily locked. */
+export const LOGIN_LOCKOUT_WINDOW_MINUTES = 15;
+
+export interface LoginGuardStatus {
+  /** Configured maximum failed attempts. 0 means lockout is disabled. */
+  maxAttempts: number;
+  /** Failed attempts counted inside the current window. */
+  failedAttempts: number;
+  /** Attempts left before lockout, or null when lockout is disabled. */
+  remainingAttempts: number | null;
+  isLocked: boolean;
+  /** ISO timestamp when the lockout expires, or null when not locked. */
+  lockedUntil: string | null;
+  windowMinutes: number;
+}
+
 export class AuthService {
   private db = DatabaseManager.getInstance();
   private static currentUser: User | null = null;
@@ -137,13 +153,88 @@ export class AuthService {
   private static recordLogin(userId: string | null, username: string, succeeded: boolean, reason?: string): void {
     try {
       DatabaseManager.getInstance().run(
-        `INSERT INTO login_history (id, user_id, username_attempted, succeeded, failure_reason, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [`lh_${uuidv4().substring(0, 8)}`, userId, username, succeeded ? 1 : 0, reason || null, new Date().toISOString()]
+        `INSERT INTO login_history (id, user_id, username_attempted, succeeded, failure_reason, device_label, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          `lh_${uuidv4().substring(0, 8)}`,
+          userId,
+          username,
+          succeeded ? 1 : 0,
+          reason || null,
+          AuthService.deviceLabel(),
+          new Date().toISOString(),
+        ]
       );
     } catch {
       // login must never fail because audit logging failed
     }
+  }
+
+  /**
+   * Read-only lockout state for a username. Safe to call from the login screen:
+   * never throws, never requires authentication, and returns a disabled state
+   * when the security settings are unavailable.
+   */
+  public static getLoginGuardStatus(username: string): LoginGuardStatus {
+    const disabled: LoginGuardStatus = {
+      maxAttempts: 0,
+      failedAttempts: 0,
+      remainingAttempts: null,
+      isLocked: false,
+      lockedUntil: null,
+      windowMinutes: LOGIN_LOCKOUT_WINDOW_MINUTES,
+    };
+    if (!username) return disabled;
+
+    try {
+      const db = DatabaseManager.getInstance();
+      const maxRow = db.query<{ value: string }>(
+        `SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`
+      )[0];
+      const maxAttempts = Number(maxRow?.value ?? 0);
+      if (!Number.isFinite(maxAttempts) || maxAttempts <= 0) return disabled;
+
+      const windowMs = LOGIN_LOCKOUT_WINDOW_MINUTES * 60_000;
+      const cutoff = new Date(Date.now() - windowMs).toISOString();
+      const lastSuccess = db.query<{ createdAt: string }>(
+        `SELECT created_at AS createdAt FROM login_history
+         WHERE username_attempted = ? AND succeeded = 1
+         ORDER BY created_at DESC LIMIT 1`,
+        [username]
+      )[0]?.createdAt;
+      const since = lastSuccess && lastSuccess > cutoff ? lastSuccess : cutoff;
+
+      const rows = db.query<{ createdAt: string }>(
+        `SELECT created_at AS createdAt FROM login_history
+         WHERE username_attempted = ? AND succeeded = 0 AND created_at > ?
+         ORDER BY created_at ASC`,
+        [username, since]
+      );
+      const failedAttempts = rows.length;
+      const isLocked = failedAttempts >= maxAttempts;
+      // The lockout lifts once the oldest counted failure leaves the window.
+      const lockedUntil = isLocked && rows[0]?.createdAt
+        ? new Date(new Date(rows[0].createdAt).getTime() + windowMs).toISOString()
+        : null;
+
+      return {
+        maxAttempts,
+        failedAttempts,
+        remainingAttempts: Math.max(0, maxAttempts - failedAttempts),
+        isLocked,
+        lockedUntil,
+        windowMinutes: LOGIN_LOCKOUT_WINDOW_MINUTES,
+      };
+    } catch {
+      // Login must still work if the security settings table is unavailable.
+      return disabled;
+    }
+  }
+
+  private static lockoutMessage(lockedUntil: string | null): string {
+    const remainingMs = lockedUntil ? new Date(lockedUntil).getTime() - Date.now() : 0;
+    const minutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+    return `تم إيقاف المحاولات مؤقتاً بسبب كثرة الأخطاء. حاول مجدداً بعد ${minutes} دقيقة.`;
   }
 
   public static validatePasswordPolicy(password: string, username?: string): void {
@@ -225,38 +316,26 @@ export class AuthService {
     }
 
     const userRecord = rows[0];
-    try {
-      const maxRow = db.query<{ value: string }>(
-        `SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`
-      )[0];
-      const maxAttempts = Number(maxRow?.value ?? 0);
-      if (maxAttempts > 0) {
-        const cutoff = new Date(Date.now() - 15 * 60_000).toISOString();
-        const lastSuccess = db.query<{ createdAt: string }>(
-          `SELECT created_at AS createdAt FROM login_history
-           WHERE username_attempted = ? AND succeeded = 1
-           ORDER BY created_at DESC LIMIT 1`,
-          [username]
-        )[0]?.createdAt;
-        const since = lastSuccess && lastSuccess > cutoff ? lastSuccess : cutoff;
-        const failures = db.query<{ c: number }>(
-          `SELECT COUNT(*) AS c FROM login_history
-           WHERE username_attempted = ? AND succeeded = 0 AND created_at > ?`,
-          [username, since]
-        )[0]?.c ?? 0;
-        if (failures >= maxAttempts) {
-          AuthService.recordLogin(userRecord.id, username, false, 'LOCKED_OUT');
-          throw new Error('تم إيقاف المحاولات مؤقتاً بسبب كثرة الأخطاء. حاول مجدداً بعد 15 دقيقة.');
-        }
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('إيقاف المحاولات')) throw error;
-      // Login must still work if the security settings table is unavailable.
+    const guard = AuthService.getLoginGuardStatus(username);
+    if (guard.isLocked) {
+      AuthService.recordLogin(userRecord.id, username, false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(guard.lockedUntil));
     }
 
     const isValid = bcrypt.compareSync(passwordAttempt, userRecord.passwordHash);
     if (!isValid) {
       AuthService.recordLogin(userRecord.id, username, false, 'WRONG_PASSWORD');
+      const updated = AuthService.getLoginGuardStatus(username);
+      if (updated.isLocked) {
+        // The triggering attempt is still reported as a wrong password; the next
+        // attempt is refused by the lockout check above.
+        throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+      }
+      if (updated.remainingAttempts != null) {
+        throw new Error(
+          `اسم المستخدم أو كلمة المرور غير صحيحة. المحاولات المتبقية قبل الإيقاف المؤقت: ${updated.remainingAttempts}.`
+        );
+      }
       throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
     }
 

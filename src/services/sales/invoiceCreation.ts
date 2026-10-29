@@ -5,8 +5,11 @@ import { SettingsService } from '../SettingsService';
 import { InventoryCostingService } from '../InventoryCostingService';
 import { BatchService } from '../BatchService';
 import { localDateString } from '../../utils/date';
+import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
 import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
+import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../financials';
+import { ModuleRegistryService } from '../ModuleRegistryService';
 import type { SalesInvoice } from '../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from './types';
@@ -21,6 +24,7 @@ type PreparedSaleItem = {
   size: string;
   soldBy: CreateSaleDTO['items'][number]['soldBy'];
   quantityM2: number;
+  baseUom: string;
   boxesCount: number;
   piecesCount: number;
   unitPrice: number;
@@ -34,6 +38,7 @@ type PreparedSaleItem = {
   metersPerBox: number;
   piecesPerBox: number;
   productType: string;
+  tracksStock: boolean;
 };
 
 function assertSaleHasItems(dto: CreateSaleDTO): void {
@@ -61,19 +66,19 @@ function validateItemQuantity(quantityM2: number): void {
   if (quantityM2 <= 0) throw new Error('كمية أحد الأصناف في الفاتورة غير صحيحة.');
 }
 
-function getUnitLabel(product: any, isGeneralProduct: boolean): string {
-  if (!isGeneralProduct) return 'م²';
-  return product.custom_unit || ({
-    M2: 'م²', LINEAR_METER: 'متر طولي', BOX: 'كرتونة', PIECE: 'قطعة',
-    KG: 'كجم', TON: 'طن', SET: 'طقم',
-  } as Record<string, string>)[product.base_unit] || 'وحدة';
+function getUnitLabel(product: any): string {
+  return getProductUnitLabel({
+    productType: product.productType,
+    baseUnit: product.baseUnit,
+    customUnit: product.customUnit,
+  });
 }
 
-function validateProductPricing(item: CreateSaleDTO['items'][number], product: any, actor: any): void {
-  if (item.unitPrice !== Number(product.sellingPriceM2) && !PermissionService.can(actor, 'sales.approve')) {
+function validateProductPricing(item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number): void {
+  if (round2(baseUnitPrice) !== Number(product.sellingPriceM2) && !PermissionService.can(actor, 'sales.approve')) {
     throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${product.name}».`);
   }
-  if (item.unitPrice < (product.minSellingPriceM2 || 0)) {
+  if (round2(baseUnitPrice) < (product.minSellingPriceM2 || 0)) {
     PermissionService.require(actor, 'sales.approve');
   }
 }
@@ -104,19 +109,44 @@ function getFifoPlan(sqliteDb: any, item: CreateSaleDTO['items'][number], dto: C
   return fifoPlan;
 }
 
-function getBoxesCount(product: any, item: CreateSaleDTO['items'][number], quantityM2: number): number {
-  const isGeneralProduct = product.product_type === 'GENERAL';
+function getBoxesCount(
+  product: any,
+  item: CreateSaleDTO['items'][number],
+  units: ResolvedSaleUnits,
+  baseQuantity: number
+): number {
+  const isGeneralProduct = product.productType === 'GENERAL';
   const metersPerBox = Number(product.metersPerBox) || 1.44;
+  const soldInBoxes = String(units.sellUnit || '').toUpperCase() === 'BOX';
 
   if (isGeneralProduct) {
-    return product.base_unit === 'BOX' ? quantityM2 : 0;
+    if (soldInBoxes) return round2(units.sellQuantity);
+    if (product.baseUnit === 'BOX') return round2(baseQuantity);
+    return item.boxesCount ? round2(Math.max(0, item.boxesCount)) : 0;
   }
 
   if (item.boxesCount !== undefined && item.boxesCount !== null) {
     return round2(Math.max(0, item.boxesCount));
   }
+  if (soldInBoxes) return round2(units.sellQuantity);
 
-  return round2(quantityM2 / metersPerBox);
+  return round2(baseQuantity / metersPerBox);
+}
+
+function getPiecesCount(
+  product: any,
+  item: CreateSaleDTO['items'][number],
+  units: ResolvedSaleUnits,
+  baseQuantity: number,
+  boxesCount: number
+): number {
+  const soldInPieces = String(units.sellUnit || '').toUpperCase() === 'PIECE';
+  if (soldInPieces) return Math.round(units.sellQuantity);
+  if (product.productType === 'GENERAL') {
+    return product.baseUnit === 'PIECE' ? Math.round(baseQuantity) : 0;
+  }
+  if (item.piecesCount) return item.piecesCount;
+  return Math.round(boxesCount * (Number(product.piecesPerBox) || 4));
 }
 
 function buildPreparedItem(
@@ -126,34 +156,49 @@ function buildPreparedItem(
   actor: any,
   plannedByProduct: Map<string, number>,
   plannedFifoByLayer: Map<string, number>,
-  costingMethod: string
+  costingMethod: string,
+  trackInventory: boolean
 ): PreparedSaleItem {
-  const quantityM2 = round2(Math.max(0, item.quantityM2 || 0));
-  validateItemQuantity(quantityM2);
-
   const product = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
   if (!product) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
 
-  const isGeneralProduct = product.product_type === 'GENERAL';
-  const unitLabel = getUnitLabel(product, isGeneralProduct);
-  validateProductPricing(item, product, actor);
+  const units = resolveSaleUnits(item, product);
+  const baseQuantity = units.baseQuantity;
+  validateItemQuantity(baseQuantity);
 
-  const availableM2 = getAvailableStockM2(sqliteDb, item.productId, dto.warehouseId);
-  const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
-  assertAvailableStock(product, unitLabel, availableM2, alreadyPlanned, quantityM2);
-  plannedByProduct.set(item.productId, alreadyPlanned + quantityM2);
+  const isGeneralProduct = product.productType === 'GENERAL';
+  const serviceLine = isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
+  const tracksStock = trackInventory && !serviceLine;
+  const unitLabel = getUnitLabel(product);
+  validateProductPricing(item, product, actor, units.baseUnitPrice);
 
-  const fifoPlan = getFifoPlan(sqliteDb, item, dto, quantityM2, plannedFifoByLayer, costingMethod);
+  if (tracksStock) {
+    const availableM2 = getAvailableStockM2(sqliteDb, item.productId, dto.warehouseId);
+    const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
+    assertAvailableStock(product, unitLabel, availableM2, alreadyPlanned, baseQuantity);
+    plannedByProduct.set(item.productId, alreadyPlanned + baseQuantity);
+  }
+
+  const fifoPlan = tracksStock
+    ? getFifoPlan(sqliteDb, item, dto, baseQuantity, plannedFifoByLayer, costingMethod)
+    : null;
+  // Financials are computed in the unit the cashier used, so a price of
+  // 100/box over 2 boxes totals exactly 200 instead of drifting through the
+  // per-m² conversion. Costs are converted to the same unit for the margin.
+  const costPerSellUnit = fifoPlan
+    ? fifoPlan.totalCost / (units.sellQuantity || 1)
+    : (item.unitCost ?? product.costPrice ?? 0) * units.factor;
   const line = computeSaleLine({
-    quantity: quantityM2,
-    unitPrice: item.unitPrice,
-    unitCost: fifoPlan ? fifoPlan.totalCost / quantityM2 : (item.unitCost ?? product.costPrice ?? 0),
+    quantity: units.sellQuantity,
+    unitPrice: units.sellUnitPrice,
+    unitCost: costPerSellUnit,
     discountAmount: item.discountAmount || 0,
   });
 
   const metersPerBox = Number(product.metersPerBox) || 1.44;
   const piecesPerBox = Number(product.piecesPerBox) || 4;
-  const boxesCount = getBoxesCount(product, item, quantityM2);
+  const boxesCount = getBoxesCount(product, item, units, baseQuantity);
+  const piecesCount = getPiecesCount(product, item, units, baseQuantity, boxesCount);
   return {
     id: `item_${uuidv4().substring(0, 8)}`,
     invoiceId: '',
@@ -162,15 +207,14 @@ function buildPreparedItem(
     productSku: product.sku,
     productGrade: product.grade,
     size: product.size,
-    soldBy: item.soldBy,
-    quantityM2,
+    soldBy: units.sellUnit,
+    quantityM2: baseQuantity,
+    baseUom: product.baseUnit || 'M2',
     boxesCount,
-    piecesCount: isGeneralProduct
-      ? product.base_unit === 'PIECE' ? quantityM2 : 0
-      : item.piecesCount || Math.round(boxesCount * piecesPerBox),
-    unitPrice: item.unitPrice,
+    piecesCount,
+    unitPrice: units.baseUnitPrice,
     originalUnitPrice: product.sellingPriceM2,
-    unitCost: line.lineCost / (quantityM2 || 1),
+    unitCost: line.lineCost / (baseQuantity || 1),
     discountAmount: line.lineDiscount,
     totalPrice: line.lineTotal,
     totalCost: line.lineCost,
@@ -178,7 +222,8 @@ function buildPreparedItem(
     fifoPlan,
     metersPerBox,
     piecesPerBox,
-    productType: product.product_type,
+    productType: product.productType,
+    tracksStock,
   };
 }
 
@@ -186,7 +231,8 @@ function prepareSaleItems(
   sqliteDb: any,
   dto: CreateSaleDTO,
   actor: any,
-  costingMethod: string
+  costingMethod: string,
+  trackInventory: boolean
 ): { preparedItems: PreparedSaleItem[]; totalLineDiscount: number } {
   let totalLineDiscount = 0;
   const preparedItems: PreparedSaleItem[] = [];
@@ -194,7 +240,7 @@ function prepareSaleItems(
   const plannedFifoByLayer = new Map<string, number>();
 
   for (const item of dto.items) {
-    const preparedItem = buildPreparedItem(sqliteDb, dto, item, actor, plannedByProduct, plannedFifoByLayer, costingMethod);
+    const preparedItem = buildPreparedItem(sqliteDb, dto, item, actor, plannedByProduct, plannedFifoByLayer, costingMethod, trackInventory);
     totalLineDiscount += preparedItem.discountAmount;
     preparedItems.push(preparedItem);
   }
@@ -261,16 +307,17 @@ function insertInvoiceItems(
     sqliteDb.run(`
       INSERT INTO sales_invoice_items (
         id, invoice_id, product_id, product_name, product_sku, product_grade, size,
-        sold_by, quantity_m2, boxes_count, pieces_count, unit_price, original_unit_price,
+        sold_by, quantity_m2, quantity, uom, boxes_count, pieces_count, unit_price, original_unit_price,
         unit_cost, discount_amount, total_price, total_cost, profit, meters_per_box, pieces_per_box
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       item.id, item.invoiceId, item.productId, item.productName, item.productSku, item.productGrade,
-      item.size, item.soldBy, item.quantityM2, item.boxesCount, item.piecesCount,
+      item.size, item.soldBy, item.quantityM2, item.quantityM2, item.baseUom, item.boxesCount, item.piecesCount,
       item.unitPrice, item.originalUnitPrice, round2(item.unitCost), item.discountAmount,
       item.totalPrice, item.totalCost, item.profit, item.metersPerBox, item.piecesPerBox
     ]);
 
+    if (!item.tracksStock) continue;
     const stockUpdate = sqliteDb.query(
       `SELECT id FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
       [item.productId, dto.warehouseId]
@@ -336,7 +383,12 @@ function updateCustomerAndCash(
   sqliteDb.run(`UPDATE cash_shifts SET ${col} = ${col} + ? WHERE id = ?`, [totals.paidAmount, dto.shiftId]);
 }
 
-function buildLedgerEntries(dto: CreateSaleDTO, totals: ReturnType<typeof computeSaleTotals>): any[] {
+function buildLedgerEntries(
+  dto: CreateSaleDTO,
+  totals: ReturnType<typeof computeSaleTotals>,
+  inventoryCost: number,
+  serviceCost = 0
+): any[] {
   return [
     ...(totals.paidAmount > 0 ? [{
       accountCode: paymentAccountCode(dto.paymentType),
@@ -363,9 +415,15 @@ function buildLedgerEntries(dto: CreateSaleDTO, totals: ReturnType<typeof comput
       debit: 0,
       credit: totals.taxAmount,
     }] : []),
-    ...(totals.totalCost > 0 ? [
-      { accountCode: '5101', debit: totals.totalCost, credit: 0 },
-      { accountCode: '1104', debit: 0, credit: totals.totalCost },
+    ...(inventoryCost > 0 ? [
+      { accountCode: '5101', debit: inventoryCost, credit: 0 },
+      { accountCode: '1104', debit: 0, credit: inventoryCost },
+    ] : []),
+    // Service lines carry a real direct cost but no inventory asset to relieve.
+    // Post it against an accrued-service liability so the entry stays balanced.
+    ...(serviceCost > 0 ? [
+      { accountCode: '5102', debit: serviceCost, credit: 0 },
+      { accountCode: '2105', debit: 0, credit: serviceCost },
     ] : []),
   ];
 }
@@ -382,10 +440,15 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'sales.create');
   const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor);
+  const companyId = ctx.db.query<{ companyId: string | null }>(
+    `SELECT b.company_id AS companyId FROM branches b WHERE b.id = ?`,
+    [branchId]
+  )[0]?.companyId ?? null;
 
   return ctx.db.executeTransaction((sqliteDb) => {
     const costingMethod = SettingsService.getSettings().costingMethod;
-    const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod);
+    const trackInventory = ModuleRegistryService.isInventoryTracked();
+    const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod, trackInventory);
     const headerDiscount = dto.discountAmount || 0;
     const totals = computeSaleTotals({
       lines: preparedItems.map((p) => ({
@@ -400,6 +463,13 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
 
     validateDiscountAndCredit(sqliteDb, dto, actor, totals, totalLineDiscount);
 
+    // Without inventory tracking there is no inventory asset to relieve, so the
+    // invoice-level cost and margin stay at zero. Line costs are still stored so
+    // the business can see the direct cost of what it sold.
+    const financialTotals = trackInventory
+      ? totals
+      : { ...totals, totalCost: 0, grossProfit: round2(totals.subtotal - totals.discountAmount) };
+
     const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
     const invoiceNumber = sqliteDb.nextNumber('INV');
     const today = localDateString();
@@ -407,23 +477,28 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
 
     sqliteDb.run(`
       INSERT INTO sales_invoices (
-        id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, shift_id, order_id, project_id,
+        id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, company_id, shift_id, order_id, project_id,
         subtotal, discount_percentage, discount_amount, tax_percentage, tax_amount,
         shipping_cost, total_amount, paid_amount, remaining_amount, payment_type,
         payment_status, invoice_status, total_cost, gross_profit, returned_amount, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?, ?, 0, ?, ?)
     `, [
-      invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, dto.shiftId || null,
+      invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, dto.shiftId || null,
       dto.orderId || null, dto.projectId || null,
       totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
       totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, dto.paymentType,
-      totals.paymentStatus, totals.totalCost, totals.grossProfit, dto.notes || null, actor.id
+      totals.paymentStatus, financialTotals.totalCost, financialTotals.grossProfit, dto.notes || null, actor.id
     ]);
 
     insertInvoiceItems(sqliteDb, dto, preparedItems, invoiceId, invoiceNumber, actor, costingMethod);
     updateCustomerAndCash(sqliteDb, dto, totals, cashRegisterId);
 
-    const ledgerLines = buildLedgerEntries(dto, totals);
+    const inventoryCost = trackInventory
+      ? round2(preparedItems.filter((item) => item.tracksStock).reduce((sum, item) => sum + item.totalCost, 0))
+      : 0;
+    // Any cost not relieved from inventory belongs to stock-free lines (services).
+    const serviceCost = trackInventory ? round2(financialTotals.totalCost - inventoryCost) : 0;
+    const ledgerLines = buildLedgerEntries(dto, financialTotals, inventoryCost, Math.max(0, serviceCost));
     postLedgerEntry(sqliteDb.getDatabase(), {
       date: today,
       description: `Sale ${invoiceNumber}`,

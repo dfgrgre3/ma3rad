@@ -52,6 +52,9 @@ venv/
 coverage/
 .nyc_output/
 *.lcov
+test-results/
+playwright-report/
+blob-report/
 
 # OS files
 Thumbs.db

@@ -16,7 +16,11 @@ import { Customer, Product, Warehouse, PaymentType } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import { addLocalDays, localDateString } from '../../utils/date';
-import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { formatProductQuantity } from '../../utils/productUnits';
+import {
+  basePriceFromUnitPrice, convertQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
+} from '../../utils/uom';
+import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
 
 const PAGE_SIZE = 12;
 
@@ -29,7 +33,7 @@ const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> =
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
 
-type Line = { productId: string; quantityM2: number; unitPrice: number; discountAmount: number };
+type Line = { productId: string; uom: string; quantity: number; unitPrice: number; discountAmount: number };
 
 interface FormState {
   customerId: string;
@@ -43,7 +47,7 @@ interface FormState {
 
 const emptyForm = (): FormState => ({
   customerId: '', warehouseId: '', validDays: '15', discount: '', tax: '', notes: '',
-  lines: [{ productId: '', quantityM2: 0, unitPrice: 0, discountAmount: 0 }],
+  lines: [{ productId: '', uom: '', quantity: 0, unitPrice: 0, discountAmount: 0 }],
 });
 
 export const QuotationsPage: React.FC = () => {
@@ -156,7 +160,11 @@ export const QuotationsPage: React.FC = () => {
         tax: String(full.taxAmount || ''),
         notes: full.notes || '',
         lines: (full.items || []).map((i) => ({
-          productId: i.productId, quantityM2: i.quantityM2, unitPrice: i.unitPrice, discountAmount: i.discountAmount || 0,
+          productId: i.productId,
+          uom: i.baseUnit || 'M2',
+          quantity: i.quantityM2,
+          unitPrice: i.unitPrice,
+          discountAmount: i.discountAmount || 0,
         })),
       });
       setFormOpen(true);
@@ -168,20 +176,39 @@ export const QuotationsPage: React.FC = () => {
 
   const pickProduct = (idx: number, productId: string) => {
     const p = products.find((x) => x.id === productId);
-    setLine(idx, { productId, unitPrice: p ? (p.sellingPriceM2 || 0) : 0 });
+    setLine(idx, {
+      productId,
+      uom: p ? (p.baseUnit || 'M2') : '',
+      unitPrice: p ? (p.sellingPriceM2 || 0) : 0,
+    });
   };
 
-  const getFormUnit = (productId: string) => {
-    const product = products.find((item) => item.id === productId);
-    return product ? getProductUnitLabel(product) : 'وحدة';
+  /** Switch the line unit while keeping the same effective base-unit price. */
+  const changeLineUnit = (idx: number, unit: string) => {
+    const line = form.lines[idx];
+    const product = products.find((p) => p.id === line.productId);
+    if (!product) return setLine(idx, { uom: unit });
+    const basePrice = basePriceFromUnitPrice(line.unitPrice, line.uom || product.baseUnit || 'M2', product);
+    const converted = pricePerUnit(basePrice, unit, product);
+    setLine(idx, { uom: unit, unitPrice: Math.round(converted * 100) / 100 });
   };
 
-  const subtotal = form.lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice - (l.discountAmount || 0), 0);
+  const lineBaseQuantity = (line: Line) => {
+    const product = products.find((p) => p.id === line.productId);
+    if (!product || !line.uom) return line.quantity;
+    try {
+      return convertQuantity(line.quantity, line.uom, product.baseUnit || 'M2', product);
+    } catch {
+      return line.quantity;
+    }
+  };
+
+  const subtotal = form.lines.reduce((s, l) => s + l.quantity * l.unitPrice - (l.discountAmount || 0), 0);
   const total = Math.max(0, subtotal - (Number(form.discount) || 0) + (Number(form.tax) || 0));
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
-    const items = form.lines.filter((l) => l.productId && l.quantityM2 > 0);
+    const items = form.lines.filter((l) => l.productId && l.quantity > 0);
     if (!form.customerId) return alert('اختر العميل.');
     if (items.length === 0) return alert('أضف بنداً واحداً على الأقل بكمية أكبر من صفر.');
     setSaving(true);
@@ -193,7 +220,14 @@ export const QuotationsPage: React.FC = () => {
         discountAmount: Number(form.discount) || 0,
         taxAmount: Number(form.tax) || 0,
         notes: form.notes || undefined,
-        items,
+        items: items.map((l) => ({
+          productId: l.productId,
+          quantityM2: 0,
+          quantity: l.quantity,
+          uom: l.uom || undefined,
+          unitPrice: l.unitPrice,
+          discountAmount: l.discountAmount || 0,
+        })),
       };
       if (editingId) service.updateQuotation(editingId, payload);
       else service.createQuotation(payload);
@@ -265,7 +299,7 @@ export const QuotationsPage: React.FC = () => {
       `الإجمالي: ${fmt(quotation.totalAmount)}\nصالح حتى: ${quotation.validUntil}\n` +
       `يسعدنا خدمتكم.`
     );
-    window.open(phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank');
+    openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
   };
 
   const openFollowUp = (quotation: Quotation) => {
@@ -353,6 +387,7 @@ export const QuotationsPage: React.FC = () => {
         invoice: q.convertedInvoiceNumber || '',
       })),
       fileName: 'quotations',
+      permission: 'quotations.export',
     };
     setDocPreview({
       title: 'معاينة سجل عروض الأسعار',
@@ -541,10 +576,16 @@ export const QuotationsPage: React.FC = () => {
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full text-right text-[11px]">
                 <thead className="bg-slate-50 text-slate-500 font-bold">
-                  <tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-24">الكمية</th><th className="px-3 py-2 w-28">سعر الوحدة</th><th className="px-3 py-2 w-28">خصم البند</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
+                  <tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2 w-36">الكمية / الوحدة</th><th className="px-3 py-2 w-28">سعر الوحدة</th><th className="px-3 py-2 w-28">خصم البند</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {form.lines.map((l, idx) => (
+                  {form.lines.map((l, idx) => {
+                    const selectedProduct = products.find((p) => p.id === l.productId);
+                    const units = selectedProduct ? getSellableUnits(selectedProduct) : [];
+                    const baseQty = lineBaseQuantity(l);
+                    const showEquivalent = Boolean(selectedProduct) && l.quantity > 0
+                      && l.uom !== (selectedProduct?.baseUnit || 'M2');
+                    return (
                     <tr key={idx}>
                       <td className="px-3 py-2">
                         <select value={l.productId} onChange={(e) => pickProduct(idx, e.target.value)} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold">
@@ -552,17 +593,48 @@ export const QuotationsPage: React.FC = () => {
                           {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.size} — {p.grade}</option>)}
                         </select>
                       </td>
-                      <td className="px-3 py-2"><input type="number" min={0} step={products.find((product) => product.id === l.productId)?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(products.find((product) => product.id === l.productId)?.baseUnit || '') ? 1 : 0.01} aria-label={`الكمية ${getFormUnit(l.productId)}`} value={l.quantityM2 || ''} onChange={(e) => setLine(idx, { quantityM2: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                      <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.unitPrice || ''} onChange={(e) => setLine(idx, { unitPrice: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={0}
+                            step={isWholeUnit(l.uom, selectedProduct) ? 1 : 0.01}
+                            aria-label={`الكمية ${getUomLabel(l.uom, selectedProduct)}`}
+                            value={l.quantity || ''}
+                            onChange={(e) => setLine(idx, { quantity: Number(e.target.value) || 0 })}
+                            className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono"
+                          />
+                          {units.length > 1 && (
+                            <select
+                              value={l.uom}
+                              onChange={(e) => changeLineUnit(idx, e.target.value)}
+                              aria-label={`وحدة البند ${selectedProduct?.name || ''}`}
+                              className="px-1 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold"
+                            >
+                              {units.map((unit) => (
+                                <option key={unit} value={unit}>{getUomLabel(unit, selectedProduct)}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                        {showEquivalent && (
+                          <div className="text-[9px] text-slate-400 mt-1 font-normal">= {formatProductQuantity(baseQty, selectedProduct!)}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="number" min={0} step="0.01" value={l.unitPrice || ''} onChange={(e) => setLine(idx, { unitPrice: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" />
+                        {selectedProduct && <div className="text-[9px] text-slate-400 mt-1 font-normal">/{getUomLabel(l.uom, selectedProduct)}</div>}
+                      </td>
                       <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={l.discountAmount || ''} onChange={(e) => setLine(idx, { discountAmount: Number(e.target.value) || 0 })} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
-                      <td className="px-3 py-2 font-bold text-slate-700">{fmt(l.quantityM2 * l.unitPrice - (l.discountAmount || 0))}</td>
+                      <td className="px-3 py-2 font-bold text-slate-700">{fmt(l.quantity * l.unitPrice - (l.discountAmount || 0))}</td>
                       <td className="px-3 py-2"><button type="button" onClick={() => setForm((p) => ({ ...p, lines: p.lines.length > 1 ? p.lines.filter((_, i) => i !== idx) : p.lines }))} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
               <div className="p-2 border-t border-slate-100">
-                <button type="button" onClick={() => setForm((p) => ({ ...p, lines: [...p.lines, { productId: '', quantityM2: 0, unitPrice: 0, discountAmount: 0 }] }))} className="text-[11px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة بند</button>
+                <button type="button" onClick={() => setForm((p) => ({ ...p, lines: [...p.lines, { productId: '', uom: '', quantity: 0, unitPrice: 0, discountAmount: 0 }] }))} className="text-[11px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة بند</button>
               </div>
             </div>
 
@@ -612,7 +684,7 @@ export const QuotationsPage: React.FC = () => {
                     <td className="px-3 py-2 font-bold text-slate-800">{i.productName}<div className="text-[9px] text-slate-400 font-normal">{i.size} • {i.grade}</div></td>
                     <td className="px-3 py-2 font-mono">{formatProductQuantity(Number(i.quantityM2), i)}</td>
                     <td className="px-3 py-2 font-mono">{i.productType === 'GENERAL' ? '—' : i.boxesCount}</td>
-                    <td className="px-3 py-2 font-mono">{fmt(i.unitPrice)}</td>
+                    <td className="px-3 py-2 font-mono">{fmt(i.unitPrice)} <span className="text-[9px] text-slate-400">/{getUomLabel(i.baseUnit, i)}</span></td>
                     <td className="px-3 py-2 font-mono text-rose-600">{i.discountAmount ? `-${fmt(i.discountAmount)}` : '—'}</td>
                     <td className="px-3 py-2 font-bold">{fmt(i.totalPrice)}</td>
                   </tr>

@@ -18,6 +18,7 @@ public transferStock(
     notes = '',
     performedBy = 'usr_admin'
   ): void {
+    this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer');
     const performedBy2 = actor.id;
@@ -35,17 +36,21 @@ public transferStock(
 
     this.db.executeTransaction((sqliteDb) => {
       // 1. Calculate FIFO plan BEFORE changing any stock quantities
-      const prod = sqliteDb.query(`SELECT cost_price, meters_per_box FROM products WHERE id = ?`, [productId])[0];
+      const prod = sqliteDb.query(`SELECT cost_price AS costPrice, meters_per_box AS metersPerBox, product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`, [productId])[0];
       const costPlan = InventoryCostingService.costingMethod(sqliteDb) === 'FIFO'
         ? InventoryCostingService.planFifo(sqliteDb, productId, fromWarehouseId, quantityM2)
         : null;
       const unitCost = costPlan ? costPlan.unitCost : (prod ? (prod as any).costPrice : 0);
       const metersPerBox = prod ? (prod as any).metersPerBox : 1.44;
-      const boxes = prod?.product_type === 'GENERAL'
-        ? prod.base_unit === 'BOX' ? quantityM2 : 0
+      const boxes = prod?.productType === 'GENERAL'
+        ? prod.baseUnit === 'BOX' ? quantityM2 : 0
         : Number((quantityM2 / metersPerBox).toFixed(2));
       const refOut = sqliteDb.nextNumber('TX-TRF-OUT');
       const refIn = sqliteDb.nextNumber('TX-TRF-IN');
+      // `inventory_cost_layers.source_transaction_id` references
+      // `inventory_transactions.id`, not the human-readable number.
+      const outTxId = `tx_${uuidv4().substring(0, 8)}`;
+      const inTxId = `tx_${uuidv4().substring(0, 8)}`;
 
       // 2. Decrease source warehouse
       sqliteDb.run(`
@@ -78,7 +83,7 @@ public transferStock(
           notes, performed_by
         ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?)
       `, [
-        `tx_${uuidv4().substring(0, 8)}`, refOut, productId, fromWarehouseId,
+        outTxId, refOut, productId, fromWarehouseId,
         -quantityM2, -boxes, unitCost, quantityM2 * unitCost,
         `تحويل مخزني صادر إلى ${toWarehouseId}. ${notes}`, performedBy2
       ]);
@@ -90,7 +95,7 @@ public transferStock(
           notes, performed_by
         ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?)
       `, [
-        `tx_${uuidv4().substring(0, 8)}`, refIn, productId, toWarehouseId,
+        inTxId, refIn, productId, toWarehouseId,
         quantityM2, boxes, unitCost, quantityM2 * unitCost,
         `تحويل مخزني وارد من ${fromWarehouseId}. ${notes}`, performedBy2
       ]);
@@ -99,7 +104,7 @@ public transferStock(
       if (costPlan) {
         for (const allocation of costPlan.allocations) {
           sqliteDb.run('UPDATE inventory_cost_layers SET quantity_remaining=MAX(0,quantity_remaining-?) WHERE id=?', [allocation.quantity, allocation.layerId]);
-          InventoryCostingService.addLayer(sqliteDb, { productId, warehouseId: toWarehouseId, sourceTransactionId: refIn, sourceType: 'TRANSFER', sourceId: refIn,
+          InventoryCostingService.addLayer(sqliteDb, { productId, warehouseId: toWarehouseId, sourceTransactionId: inTxId, sourceType: 'TRANSFER', sourceId: refIn,
             date: localDateString(), quantity: allocation.quantity, unitCost: allocation.unitCost });
         }
       }
@@ -114,6 +119,7 @@ public getTransactions(limit = 100): InventoryTransaction[] {
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)',
       actor
     );
+    const company = this.branchAccess.companyScope('w.company_id', actor);
     return this.db.query<InventoryTransaction>(`
       SELECT it.*, p.name as productName, p.sku as productSku,
              p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
@@ -122,9 +128,9 @@ public getTransactions(limit = 100): InventoryTransaction[] {
       JOIN products p ON it.product_id = p.id
       JOIN warehouses w ON it.warehouse_id = w.id
       LEFT JOIN users u ON it.performed_by = u.id
-      WHERE ${scope.clause}
+      WHERE ${scope.clause} AND ${company.clause}
       ORDER BY it.created_at DESC
       LIMIT ?
-    `, [...scope.params, limit]);
+    `, [...scope.params, ...company.params, limit]);
   }
 }
