@@ -29,6 +29,8 @@ export interface CreateSaleDTO {
   shippingCost?: number;
   paidAmount: number;
   paymentType: PaymentType;
+  /** Optional split-payment breakdown. When provided, sum(amount) should equal paidAmount. */
+  payments?: { method: PaymentType; amount: number; reference?: string }[];
   notes?: string;
   performedBy?: string;
 }

@@ -11,6 +11,7 @@ import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { SettingsService } from './SettingsService';
 import { ModuleRegistryService } from './ModuleRegistryService';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -415,6 +416,7 @@ export class PurchaseService {
             { accountCode: paymentAccountCode(dto.paymentType), debit: 0, credit: dto.paidAmount },
           ],
         });
+        new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'supplier_payment', paymentId, 'CREATE');
       }
 
       const inventoryCost = trackInventory
@@ -449,6 +451,8 @@ export class PurchaseService {
           new CustomerSupplyService().allocateReceivedQuantity(dto.warehouseId, item.productId, item.quantityM2, sqliteDb);
         }
       }
+
+      new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'purchase_invoice', purchaseId, 'CREATE');
 
       return {
         id: purchaseId,
@@ -533,6 +537,7 @@ export class PurchaseService {
           { accountCode: paymentAccountCode(paymentType), debit: 0, credit: value },
         ],
       });
+      new BusinessRecordSyncService(db).capture(db, 'supplier_payment', paymentId, 'CREATE');
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
          VALUES (?, ?, ?, 'سداد دفعة لمورد', 'PURCHASES', ?, ?)`,

@@ -7,6 +7,7 @@ import { BranchAccessService } from './BranchAccessService';
 import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
+import { MasterDataSyncService } from '../sync/MasterDataSyncService';
 
 function getExistingCustomerPayment(
   prior: CustomerPayment[],
@@ -53,6 +54,7 @@ function getExistingCustomerPayment(
 export class CustomerService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+  private sync = new MasterDataSyncService(this.db);
 
   public getAllCustomers(search?: string): Customer[] {
     const scope = this.branchAccess.companyScope('company_id');
@@ -108,6 +110,7 @@ export class CustomerService {
         customer.customerType || 'RETAIL', customer.creditLimit || 0, customer.paymentTermsDays || 0, customer.initialBalance || 0,
         customer.notes || null, this.branchAccess.getAccessibleCompanyIds(AuthService.requireAuth())?.[0] ?? null
       ]);
+      this.sync.capture(sqliteDb, 'customer', id, 'CREATE');
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
@@ -146,6 +149,7 @@ export class CustomerService {
         updates.address ?? null, updates.city ?? null, updates.customerType ?? null, updates.creditLimit ?? null, updates.paymentTermsDays ?? null,
         updates.notes ?? null, id
       ]);
+      this.sync.capture(sqliteDb, 'customer', id, 'UPDATE');
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)

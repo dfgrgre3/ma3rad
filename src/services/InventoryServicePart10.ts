@@ -8,6 +8,7 @@ import { postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { InventoryServicePart09 } from './InventoryServicePart09';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export class InventoryServicePart10 extends InventoryServicePart09 {
 public receiveTransfer(transferId: string, receipts: Array<{
@@ -43,6 +44,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
         actor
       );
       this.updateTransferReceiptStatus(txDb, transferId, totalQuantityM2, totals, actor.id);
+      new BusinessRecordSyncService(txDb).capture(txDb, 'stock_transfer', transferId, 'UPDATE');
     });
   }
 

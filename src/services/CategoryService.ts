@@ -3,6 +3,7 @@ import type { Category } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { MasterDataSyncService } from '../sync/MasterDataSyncService';
 
 export interface CategoryWithCount extends Category {
   productCount: number;
@@ -11,6 +12,7 @@ export interface CategoryWithCount extends Category {
 
 export class CategoryService {
   private db = DatabaseManager.getInstance();
+  private sync = new MasterDataSyncService(this.db);
 
   public getAllCategories(): CategoryWithCount[] {
     const rows = this.db.query<any>(`
@@ -50,16 +52,18 @@ export class CategoryService {
     }
 
     const id = `cat_${uuidv4().substring(0, 8)}`;
-    this.db.run(
-      'INSERT INTO categories (id, name, parent_id, description) VALUES (?, ?, ?, ?)',
-      [id, name, parentId || null, description || null]
-    );
-
-    this.db.run(
-      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-       VALUES (?, ?, ?, 'إضافة تصنيف جديد', 'PRODUCTS', ?, ?)`,
-      [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify({ name, parentId, description })]
-    );
+    this.db.executeTransaction((transaction) => {
+      transaction.run(
+        'INSERT INTO categories (id, name, parent_id, description) VALUES (?, ?, ?, ?)',
+        [id, name, parentId || null, description || null]
+      );
+      this.sync.capture(transaction, 'category', id, 'CREATE');
+      transaction.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, 'إضافة تصنيف جديد', 'PRODUCTS', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify({ name, parentId, description })]
+      );
+    });
 
     return { id, name, parentId: parentId || null, description, createdAt: new Date().toISOString() };
   }
@@ -76,20 +80,22 @@ export class CategoryService {
       if (dup.length > 0) throw new Error('اسم التصنيف مسجل مسبقاً.');
     }
 
-    this.db.run(
-      `UPDATE categories SET 
-        name = COALESCE(?, name),
-        parent_id = ?,
-        description = COALESCE(?, description)
-       WHERE id = ?`,
-      [updates.name || null, updates.parentId !== undefined ? updates.parentId : old.parentId, updates.description !== undefined ? updates.description : old.description, id]
-    );
-
-    this.db.run(
-      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
-       VALUES (?, ?, ?, 'تعديل تصنيف', 'PRODUCTS', ?, ?, ?)`,
-      [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(old), JSON.stringify(updates)]
-    );
+    this.db.executeTransaction((transaction) => {
+      transaction.run(
+        `UPDATE categories SET
+          name = COALESCE(?, name),
+          parent_id = ?,
+          description = COALESCE(?, description)
+         WHERE id = ?`,
+        [updates.name || null, updates.parentId !== undefined ? updates.parentId : old.parentId, updates.description !== undefined ? updates.description : old.description, id]
+      );
+      this.sync.capture(transaction, 'category', id, 'UPDATE');
+      transaction.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+         VALUES (?, ?, ?, 'تعديل تصنيف', 'PRODUCTS', ?, ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(old), JSON.stringify(updates)]
+      );
+    });
   }
 
   public deleteCategory(id: string): void {
@@ -109,13 +115,14 @@ export class CategoryService {
       throw new Error('لا يمكن حذف تصنيف مرتبط بمنتجات. قم بتعديل أو حذف المنتجات أولاً.');
     }
 
-    this.db.run('DELETE FROM categories WHERE id = ?', [id]);
-
-    this.db.run(
-      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)
-       VALUES (?, ?, ?, 'حذف تصنيف', 'PRODUCTS', ?, ?)`,
-      [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(category)]
-    );
+    this.db.executeTransaction((transaction) => {
+      this.sync.capture(transaction, 'category', id, 'DELETE');
+      transaction.run('DELETE FROM categories WHERE id = ?', [id]);
+      transaction.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)
+         VALUES (?, ?, ?, 'حذف تصنيف', 'PRODUCTS', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(category)]
+      );
+    });
   }
 }
-

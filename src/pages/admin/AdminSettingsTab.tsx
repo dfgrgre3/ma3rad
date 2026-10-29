@@ -92,7 +92,9 @@ export const AdminSettingsTab: React.FC = () => {
       const actor = AuthService.getCurrentUser();
       // Module lifecycle changes go through the registry so activation history,
       // dependency guards and navigation visibility stay in one transaction.
-      ModuleRegistryService.setEnabledModules(enabledModules, actor, 'تحديث من إعدادات النشاط');
+      ModuleRegistryService.setEnabledModules(enabledModules, actor, 'تحديث من إعدادات النشاط', {
+        trackInventory: businessConfig.trackInventory,
+      });
       const next = SettingsService.update({
         ...settings,
         businessType: businessProfile.type,

@@ -8,6 +8,7 @@ import { InventoryCostingService } from './InventoryCostingService';
 import { ModuleRegistryService } from './ModuleRegistryService';
 import { SettingsService } from './SettingsService';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
+import { MasterDataSyncService } from '../sync/MasterDataSyncService';
 
 export interface ProductQueryOptions {
   brandId?: string;
@@ -34,6 +35,7 @@ const STOCK_SUBQUERY = `(SELECT product_id, SUM(quantity_m2) AS qty FROM warehou
 export class ProductService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+  private sync = new MasterDataSyncService(this.db);
 
   public getAllProducts(search?: string, categoryId?: string, brandId?: string): Product[] {
     const scope = this.branchAccess.companyScope('p.company_id');
@@ -211,6 +213,7 @@ export class ProductService {
         product.maxStockLevel || 1000, product.imagePath || '', product.notes || '', 1,
         (this.branchAccess.getAccessibleCompanyIds(AuthService.requireAuth()) || ['cmp_main'])[0]
       ]);
+      this.sync.capture(sqliteDb, 'product', id, 'CREATE');
 
       // Initialize stock record if provided
       if (initialStock && initialStock.quantityM2 > 0) {
@@ -304,6 +307,7 @@ export class ProductService {
         updates.wholesalePriceM2 ?? null, updates.minSellingPriceM2 ?? null, updates.minStockLevel ?? null,
         updates.maxStockLevel ?? null, updates.notes ?? null, updates.imagePath ?? null, id
       ]);
+      this.sync.capture(sqliteDb, 'product', id, 'UPDATE');
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
@@ -316,28 +320,33 @@ export class ProductService {
 
   public deleteProduct(id: string, performedBy = 'usr_admin'): void {
     PermissionService.require(AuthService.requireAuth(), 'products.delete');
-    // Soft delete product & check relations
-    const hasSales = this.db.query(`SELECT id FROM sales_invoice_items WHERE product_id = ? LIMIT 1`, [id]);
-    if (hasSales.length > 0) {
-      // Deactivate only to preserve accounting history
-      this.db.run(`UPDATE products SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
-    } else {
-      this.db.run(`DELETE FROM products WHERE id = ?`, [id]);
-    }
+    this.db.executeTransaction((sqliteDb) => {
+      const hasSales = sqliteDb.query(`SELECT id FROM sales_invoice_items WHERE product_id = ? LIMIT 1`, [id]);
+      if (hasSales.length > 0) {
+        sqliteDb.run(`UPDATE products SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
+        this.sync.capture(sqliteDb, 'product', id, 'UPDATE');
+      } else {
+        this.sync.capture(sqliteDb, 'product', id, 'DELETE');
+        sqliteDb.run(`DELETE FROM products WHERE id = ?`, [id]);
+      }
 
-    this.db.run(`
-      INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
-      VALUES (?, ?, 'المدير', 'حذف/تعطيل صنف', 'PRODUCTS', ?)
-    `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id]);
+      sqliteDb.run(`
+        INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
+        VALUES (?, ?, 'المدير', 'حذف/تعطيل صنف', 'PRODUCTS', ?)
+      `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, id]);
+    });
   }
 
   public setProductActive(id: string, active: boolean, performedBy = 'usr_admin'): void {
     PermissionService.require(AuthService.requireAuth(), 'products.update');
-    this.db.run(`UPDATE products SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [active ? 1 : 0, id]);
-    this.db.run(`
-      INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-      VALUES (?, ?, 'المدير', ?, 'PRODUCTS', ?, ?)
-    `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, active ? 'تفعيل صنف' : 'إيقاف صنف', id, JSON.stringify({ isActive: active })]);
+    this.db.executeTransaction((sqliteDb) => {
+      sqliteDb.run(`UPDATE products SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [active ? 1 : 0, id]);
+      this.sync.capture(sqliteDb, 'product', id, 'UPDATE');
+      sqliteDb.run(`
+        INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+        VALUES (?, ?, 'المدير', ?, 'PRODUCTS', ?, ?)
+      `, [`aud_${uuidv4().substring(0, 8)}`, performedBy, active ? 'تفعيل صنف' : 'إيقاف صنف', id, JSON.stringify({ isActive: active })]);
+    });
   }
 
   public duplicateProduct(id: string, performedBy = 'usr_admin'): Product {

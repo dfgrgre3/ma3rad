@@ -6,6 +6,7 @@ import { localDateString } from '../utils/date';
 import { postLedgerEntry } from '../database/ledger';
 import { round2 } from './financials';
 import { InventoryCostingService } from './InventoryCostingService';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 import { getProductUnitLabel } from '../utils/productUnits';
 
 export interface ReturnablePurchaseItem {
@@ -302,6 +303,8 @@ export class PurchaseReturnService {
         `aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, returnId,
         JSON.stringify({ returnNumber, total, refundMethod: dto.refundMethod }),
       ]);
+
+      new BusinessRecordSyncService(db).capture(db, 'purchase_return', returnId, 'CREATE');
 
       return this.getReturnById(returnId)!;
     });

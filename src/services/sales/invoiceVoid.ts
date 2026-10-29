@@ -12,6 +12,7 @@ import type { DatabaseManager } from '../../database/db';
 import { isServiceProduct } from '../../utils/productUnits';
 import type { InvoiceWithItems, SalesContext } from './context';
 import { ModuleRegistryService } from '../ModuleRegistryService';
+import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
 
 function restoreInvoiceItem(
   sqliteDb: DatabaseManager,
@@ -103,8 +104,16 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
       WHERE id = ?
     `, [inv.remainingAmount, inv.totalAmount, inv.customerId]);
 
-    if (inv.paidAmount > 0 && inv.paymentType === 'CASH') {
-      sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE is_default = 1`, [inv.paidAmount]);
+    if (inv.paidAmount > 0) {
+      // Reverse the cash portion of the payment (including split payments).
+      const cashPortion = sqliteDb.query<{ amount: number }>(
+        `SELECT COALESCE(SUM(amount), 0) AS amount FROM sales_invoice_payments WHERE invoice_id = ? AND method = 'CASH'`,
+        [invoiceId]
+      )[0]?.amount ?? 0;
+      const reverseAmount = cashPortion > 0 ? cashPortion : (inv.paymentType === 'CASH' ? inv.paidAmount : 0);
+      if (reverseAmount > 0) {
+        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE is_default = 1`, [reverseAmount]);
+      }
     }
 
     const invoiceCost = trackInventory
@@ -136,6 +145,7 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     });
 
     sqliteDb.run(`UPDATE sales_invoices SET invoice_status = 'VOID', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [invoiceId]);
+    new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_invoice', invoiceId, 'UPDATE');
 
     sqliteDb.run(`
       INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)

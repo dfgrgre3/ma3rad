@@ -6,10 +6,13 @@ import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
+import { MasterDataSyncService } from '../sync/MasterDataSyncService';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export class SupplierService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+  private sync = new MasterDataSyncService(this.db);
 
   public getAllSuppliers(search?: string, includeInactive = false): Supplier[] {
     this.requireSuppliersDirectory();
@@ -78,6 +81,7 @@ export class SupplierService {
         supplier.notes || null,
         (this.branchAccess.getAccessibleCompanyIds(actor) || ['cmp_main'])[0]
       ]);
+      this.sync.capture(sqliteDb, 'supplier', id, 'CREATE');
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
@@ -116,6 +120,7 @@ export class SupplierService {
         updates.taxNumber ?? null, updates.commercialRecord ?? null, updates.address ?? null,
         updates.paymentTermsDays ?? null, updates.notes ?? null, updates.isActive ?? null, id
       ]);
+      this.sync.capture(sqliteDb, 'supplier', id, 'UPDATE');
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
@@ -201,6 +206,8 @@ export class SupplierService {
           { accountCode: paymentAccountCode(paymentType), debit: 0, credit: amount },
         ],
       });
+
+      new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'supplier_payment', paymentId, 'CREATE');
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)

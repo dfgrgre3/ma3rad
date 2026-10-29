@@ -17,6 +17,11 @@ contextBridge.exposeInMainWorld('ceramisys', {
     set: (username, password) => ipcRenderer.invoke('credentials:set', { username, password }),
     clear: () => ipcRenderer.invoke('credentials:clear'),
   },
+  sync: {
+    status: () => ipcRenderer.invoke('sync:status'),
+    pushEvents: (events) => ipcRenderer.invoke('sync:push', events),
+    pullEvents: (scope, cursor, limit) => ipcRenderer.invoke('sync:pull', scope, cursor, limit),
+  },
   app: {
     info: () => ipcRenderer.invoke('app:info'),
     openFolder: (target) => ipcRenderer.invoke('app:openFolder', target),

@@ -6,7 +6,7 @@ import {
   Undo2, Wallet, TrendingDown, Banknote, CalendarDays, Building2, Warehouse, PackageCheck,
   HardHat, Truck, Car, BarChart3, CheckSquare, Bell, ShieldCheck, Settings,
   Download, Cpu, SlidersHorizontal, BadgeDollarSign, BookmarkPlus, FileSpreadsheet, MessageCircle,
-  Trash2, ShieldAlert, PieChart, CreditCard, Lock, Target, Award, FileSignature, Factory,
+  Trash2, ShieldAlert, PieChart, CreditCard, Lock, Target, Award, FileSignature, Factory, RefreshCw,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { NavGroupDef } from './navigationTypes';
@@ -78,6 +78,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     perm: 'settings.view',
     items: [
       { label: 'مركز التحكم', to: '/admin', icon: SlidersHorizontal, highlight: true, perm: 'admin.view' },
+      { label: 'تعارضات مزامنة الفروع', to: '/admin/sync-conflicts', icon: RefreshCw, perm: 'admin.view' },
       { label: 'مركز استيراد البيانات', to: '/data-import', icon: FileSpreadsheet, perm: 'settings.view' },
       { label: 'الإشعارات', to: '/notifications', icon: Bell, perm: 'notifications.view' },
       { label: 'سجل التدقيق', to: '/audit', icon: ShieldCheck, perm: 'audit.view' },

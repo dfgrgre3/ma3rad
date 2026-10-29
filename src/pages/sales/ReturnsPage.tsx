@@ -6,10 +6,11 @@ import {
   Wallet, TrendingDown, FileText, CheckCircle2, PackageX,
 } from 'lucide-react';
 import { SalesService, ReturnableItem, ReturnStats } from '../../services/SalesService';
+import { ProductService } from '../../services/ProductService';
 import { PrintService } from '../../services/PrintService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
-import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../types';
+import { SalesInvoice, SalesReturn, SalesReturnItem, Product } from '../../types';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import { formatProductQuantity } from '../../utils/productUnits';
@@ -54,6 +55,7 @@ type ReturnLine = ReturnableItem & { quantityM2: number; reason: string; entryUn
 export const ReturnsPage: React.FC = () => {
   const location = useLocation() as { state?: { invoiceId?: string } };
   const service = useMemo(() => new SalesService(), []);
+  const productService = useMemo(() => new ProductService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'sales.refund');
 
@@ -83,7 +85,21 @@ export const ReturnsPage: React.FC = () => {
   const [lines, setLines] = useState<ReturnLine[]>([]);
   const [topReasons, setTopReasons] = useState<{ reason: string; count: number; amount: number }[]>([]);
 
+  // Exchange (swap) state
+  const [exchangeMode, setExchangeMode] = useState(false);
+  const [newItems, setNewItems] = useState<{ productId: string; productName: string; quantityM2: number; unitPrice: number; boxesCount: number }[]>([]);
+  const [newSearch, setNewSearch] = useState('');
+  const [newResults, setNewResults] = useState<Product[]>([]);
+  const [newQty, setNewQty] = useState<number>(1);
+  const [selectedNewProduct, setSelectedNewProduct] = useState<Product | null>(null);
+
   const [detail, setDetail] = useState<ReturnDetail | null>(null);
+
+  useEffect(() => {
+    if (!exchangeMode || !newSearch.trim()) { setNewResults([]); return; }
+    const r = productService.getAllProducts(newSearch.trim());
+    setNewResults(r.slice(0, 8));
+  }, [exchangeMode, newSearch, productService]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -190,19 +206,38 @@ export const ReturnsPage: React.FC = () => {
     if (selected.length === 0) return alert('حدد كمية لصنف واحد على الأقل.');
     const over = selected.find((l) => l.quantityM2 > l.returnableM2 + 1e-6);
     if (over) return alert(`الكمية المرتجعة من "${over.productName}" تتجاوز القابل للإرجاع (${formatProductQuantity(over.returnableM2, over)}).`);
+    if (exchangeMode && newItems.length === 0) return alert('في وضع الاستبدال، أضف صنفاً بديلاً واحداً على الأقل.');
     setSaving(true);
     try {
-      service.returnSale(
-        invoiceId,
-        selected.map((l) => ({
-          productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
-          unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'مرتجع سيراميك',
-        })),
-        refundCash && refundMethod !== 'BALANCE',
-        AuthService.getCurrentUser()?.id || 'usr_admin',
-        { refundMethod }
-      );
+      if (exchangeMode) {
+        service.exchangeSale(
+          invoiceId,
+          selected.map((l) => ({
+            productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
+            unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'استبدال',
+          })),
+          newItems.map((n) => ({
+            productId: n.productId, soldBy: 'PIECE', quantityM2: n.quantityM2, boxesCount: n.boxesCount,
+            piecesCount: 0, unitPrice: n.unitPrice, unitCost: 0, discountAmount: 0,
+          })),
+          AuthService.getCurrentUser()?.id || 'usr_admin',
+          { warehouseId: invoiceInfo?.warehouseId }
+        );
+      } else {
+        service.returnSale(
+          invoiceId,
+          selected.map((l) => ({
+            productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
+            unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'مرتجع سيراميك',
+          })),
+          refundCash && refundMethod !== 'BALANCE',
+          AuthService.getCurrentUser()?.id || 'usr_admin',
+          { refundMethod }
+        );
+      }
       setModalOpen(false);
+      setExchangeMode(false);
+      setNewItems([]);
       load();
     } catch (err: any) { alert(err?.message || 'تعذر تسجيل المرتجع.'); }
     finally { setSaving(false); }
@@ -360,7 +395,7 @@ export const ReturnsPage: React.FC = () => {
         <Modal onClose={() => setModalOpen(false)} wide>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-black text-slate-900 flex items-center gap-2"><RotateCcw className="w-5 h-5 text-rose-600" /> تسجيل مرتجع جديد</h3>
-            <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
+            <button onClick={() => { setModalOpen(false); setExchangeMode(false); setNewItems([]); }} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
           </div>
           <form onSubmit={submit} className="space-y-3 text-xs">
             <div>
@@ -438,6 +473,55 @@ export const ReturnsPage: React.FC = () => {
               </div>
             )}
 
+            <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+              <input type="checkbox" id="exchange-mode" checked={exchangeMode} onChange={(e) => { setExchangeMode(e.target.checked); if (!e.target.checked) setNewItems([]); }} />
+              <label htmlFor="exchange-mode" className="text-xs font-bold text-sky-700 cursor-pointer">استبدال (Exchange): إضافة أصناف بديلة — المرتجع يُسجل كرصيد دائن للعميل</label>
+            </div>
+
+            {exchangeMode && (
+              <div className="border border-sky-200 rounded-xl p-3 space-y-2 bg-sky-50/50">
+                <div className="flex gap-2">
+                  <input value={newSearch} onChange={(e) => setNewSearch(e.target.value)} placeholder="بحث عن صنف بديل..." className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs" />
+                  <input type="number" min={1} step={1} value={newQty} onChange={(e) => setNewQty(Number.parseFloat(e.target.value) || 1)} className="w-20 px-2 py-2 bg-white border border-slate-200 rounded-xl text-xs" placeholder="كمية" />
+                </div>
+                {newResults.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-xl max-h-40 overflow-y-auto">
+                    {newResults.map((p) => (
+                      <button key={p.id} type="button" onClick={() => { setSelectedNewProduct(p); setNewSearch(p.name); setNewResults([]); }} className="w-full text-right px-3 py-2 hover:bg-sky-50 text-xs border-b border-slate-100 last:border-0">
+                        <span className="font-bold">{p.name}</span> <span className="text-slate-400">— {p.sku} — {fmt(Number(p.sellingPriceM2 || 0))}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedNewProduct && (
+                  <button type="button" onClick={() => {
+                    const qty = newQty > 0 ? newQty : 1;
+                    const baseQty = qty; // assuming piece/box? simplify: use as M2 for now
+                    setNewItems((prev) => [...prev, { productId: selectedNewProduct.id, productName: selectedNewProduct.name, quantityM2: baseQty, unitPrice: Number(selectedNewProduct.sellingPriceM2 || 0), boxesCount: 0 }]);
+                    setSelectedNewProduct(null);
+                    setNewSearch('');
+                    setNewQty(1);
+                  }} className="px-3 py-1.5 bg-sky-600 text-white font-bold rounded-lg text-xs">إضافة للقائمة</button>
+                )}
+                {newItems.length > 0 && (
+                  <table className="w-full text-[11px]">
+                    <thead><tr className="text-slate-500"><th className="text-right py-1">الصنف</th><th className="text-center py-1">الكمية</th><th className="text-left py-1">السعر</th><th></th></tr></thead>
+                    <tbody>
+                      {newItems.map((n, i) => (
+                        <tr key={i} className="border-t border-slate-100">
+                          <td className="py-1">{n.productName}</td>
+                          <td className="text-center py-1">{n.quantityM2}</td>
+                          <td className="text-left py-1 font-bold">{fmt(n.quantityM2 * n.unitPrice)}</td>
+                          <td className="text-left py-1"><button type="button" onClick={() => setNewItems((prev) => prev.filter((_, j) => j !== i))} className="text-rose-600 hover:text-rose-800"><X className="w-3 h-3" /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {!exchangeMode && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">طريقة التعويض</label>
@@ -450,6 +534,7 @@ export const ReturnsPage: React.FC = () => {
                 <div className="mt-0.5 text-[9px] text-slate-400">يُحسب الاسترداد النقدي من الجزء المسدد فقط، والباقي يُسجل كرصيد دائن للعميل.</div>
               </div>
             </div>
+            )}
             <datalist id="return-reasons">
               {RETURN_REASONS.map((reason) => <option key={reason} value={reason} />)}
             </datalist>
@@ -460,8 +545,8 @@ export const ReturnsPage: React.FC = () => {
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-              <button type="submit" disabled={saving} className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} <FileText className="w-3.5 h-3.5" /> اعتماد المرتجع</button>
+              <button type="button" onClick={() => { setModalOpen(false); setExchangeMode(false); setNewItems([]); }} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
+              <button type="submit" disabled={saving} className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} <FileText className="w-3.5 h-3.5" /> {exchangeMode ? 'اعتماد الاستبدال' : 'اعتماد المرتجع'}</button>
             </div>
           </form>
         </Modal>

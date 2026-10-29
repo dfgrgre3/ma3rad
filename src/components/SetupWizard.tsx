@@ -332,7 +332,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   placeholder="مثال: معرض النور للسيراميك"
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="setup-phone" className={labelClass}>رقم الهاتف</label>
                   <input id="setup-phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputClass} placeholder="01000000000" />
@@ -356,8 +356,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 <label htmlFor="setup-address" className={labelClass}>العنوان</label>
                 <input id="setup-address" value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} placeholder="المدينة - الشارع" />
               </div>
-              <p className="text-xs font-semibold text-slate-600">بيانات التسجيل الاختيارية</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">بيانات التسجيل الاختيارية</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="setup-tax-number" className={labelClass}>الرقم الضريبي</label>
                   <input id="setup-tax-number" value={form.taxNumber} onChange={(e) => set('taxNumber', e.target.value)} className={inputClass} />
@@ -374,11 +374,11 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
             <div className="space-y-4">
               <div className="flex items-start gap-3 rounded-xl border border-sky-100 bg-sky-50 p-3">
                 <Boxes className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
-                <div><h2 className="text-sm font-bold text-slate-900">خصص النظام حسب طبيعة عملك</h2><p className="mt-1 text-xs text-slate-600">تُحفظ هذه الخيارات محليًا ويمكن تعديلها لاحقًا من إعدادات النشاط.</p></div>
+                <div><h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">خصص النظام حسب طبيعة عملك</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">تُحفظ هذه الخيارات محليًا ويمكن تعديلها لاحقًا من إعدادات النشاط.</p></div>
               </div>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {BUSINESS_TYPES.map((type) => <button key={type.id} type="button" onClick={() => selectBusinessType(type.id)} className={`rounded-xl border p-3 text-right transition ${form.businessType === type.id ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500' : 'border-slate-200 hover:border-sky-300'}`}>
-                  <span className="block text-xs font-bold text-slate-900">{type.label}</span><span className="mt-1 block text-[10px] text-slate-500">{type.description}</span>
+                {BUSINESS_TYPES.map((type) => <button key={type.id} type="button" onClick={() => selectBusinessType(type.id)} className={`rounded-xl border p-3 text-right transition ${form.businessType === type.id ? 'border-sky-500 bg-sky-50 ring-1 ring-sky-500 dark:bg-sky-900/30' : 'border-slate-200 hover:border-sky-300 dark:border-slate-700 dark:hover:border-sky-500 dark:bg-slate-800/30'}`}>
+                  <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">{type.label}</span><span className="mt-1 block text-[10px] text-slate-500 dark:text-slate-400">{type.description}</span>
                 </button>)}
               </div>
               {form.businessType === 'custom' && (
@@ -402,16 +402,16 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                     <option value="mixed">منتجات وخدمات</option>
                   </select>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
                   <label htmlFor="setup-track-inventory" className="cursor-pointer">إدارة المخزون</label>
                   <input id="setup-track-inventory" type="checkbox" checked={businessConfig.trackInventory} onChange={(e) => setInventoryEnabled(e.target.checked)} className="h-4 w-4 accent-sky-600" />
                 </div>
               </div>
               <div>
-                <h3 className="mb-2 text-xs font-bold text-slate-700">وحدات المنتجات والخدمات</h3>
+                <h3 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-200">وحدات المنتجات والخدمات</h3>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {BUSINESS_UNITS.map((unit) => (
-                    <div key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">
+                    <div key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-200">
                       <input id={`setup-unit-${unit.id}`} type="checkbox" checked={businessConfig.units.includes(unit.id)} onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })} className="accent-sky-600" />
                       <label htmlFor={`setup-unit-${unit.id}`} className="cursor-pointer">{unit.label}</label>
                     </div>
@@ -436,12 +436,12 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   placeholder="مثال: المقاس، اللون، الموديل"
                 />
               </div>
-              <div><h3 className="mb-2 text-xs font-bold text-slate-700">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div><h3 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-200">الوحدات التي تحتاجها</h3><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {BUSINESS_MODULES.map((module) => {
                   const definition = getModuleDefinition(module.id);
                   const unavailable = Boolean(definition?.activation.requiresInventoryTracking && !businessConfig.trackInventory);
                   return (
-                    <div key={module.id} title={definition?.description} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 ${unavailable ? 'opacity-50' : ''}`}>
+                    <div key={module.id} title={definition?.description} className={`flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-200 ${unavailable ? 'opacity-50' : ''}`}>
                       <input id={`setup-module-${module.id}`} type="checkbox" checked={form.enabledModules.includes(module.id)} onChange={() => toggleModule(module.id)} disabled={unavailable} className="accent-sky-600" />
                       <label htmlFor={`setup-module-${module.id}`} className="cursor-pointer">{module.label}</label>
                     </div>
@@ -453,11 +453,11 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
 
           {step === 2 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="setup-default-tax" className={labelClass}>نسبة ضريبة القيمة المضافة الافتراضية %</label>
                   <div className="relative">
-                    <Percent className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                    <Percent className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-3.5" />
                     <input
                       id="setup-default-tax"
                       type="number" min="0" max="100" step="0.1"
@@ -487,17 +487,17 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   onChange={(e) => set('discountThreshold', e.target.value)}
                   className={inputClass}
                 />
-                <p className="text-[11px] text-slate-500 mt-1.5">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
                   أي خصم يتجاوز هذه النسبة سيُرسل كطلب اعتماد للمسؤول من نقطة البيع.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
                   <label htmlFor="setup-is-tax-inclusive" className="cursor-pointer">الأسعار شاملة الضريبة</label>
                   <input id="setup-is-tax-inclusive" type="checkbox" checked={form.isTaxInclusive} onChange={(e) => setForm((prev) => ({ ...prev, isTaxInclusive: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
                   <label htmlFor="setup-enable-negative-stock" className="cursor-pointer">السماح بالبيع من رصيد سالب</label>
                   <input id="setup-enable-negative-stock" type="checkbox" checked={form.enableNegativeStock} onChange={(e) => setForm((prev) => ({ ...prev, enableNegativeStock: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
                 </div>
@@ -508,16 +508,16 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   <option value="AVERAGE_COST">متوسط التكلفة</option>
                   <option value="FIFO">الوارد أولاً يصرف أولاً (FIFO)</option>
                 </select>
-                <p className="mt-1.5 text-[11px] text-slate-500">طريقة التكلفة تؤثر على تقييم المخزون والأرباح.</p>
+                <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">طريقة التكلفة تؤثر على تقييم المخزون والأرباح.</p>
               </div>
 
               {security.required && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/60 dark:bg-amber-950/30">
                   <div className="flex items-center gap-2 mb-3">
                     <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <h3 className="text-xs font-bold text-amber-800">تأمين حساب المسؤول</h3>
+                    <h3 className="text-xs font-bold text-amber-800 dark:text-amber-300">تأمين حساب المسؤول</h3>
                   </div>
-                  <p className="text-[11px] text-amber-700 mb-3">
+                  <p className="text-[11px] text-amber-700 mb-3 dark:text-amber-200/80">
                     لا يزال حساب admin يستخدم كلمة المرور الافتراضية. اختر كلمة مرور جديدة للمتابعة.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -559,8 +559,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 mx-auto">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h2 className="text-center text-base font-black text-slate-900">كل شيء جاهز</h2>
-              <p className="text-center text-xs text-slate-500">راجع الملخص ثم اضغط «بدء الاستخدام».</p>
+              <h2 className="text-center text-base font-black text-slate-900 dark:text-slate-100">كل شيء جاهز</h2>
+              <p className="text-center text-xs text-slate-500 dark:text-slate-400">راجع الملخص ثم اضغط «بدء الاستخدام».</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                 {[
                   ['المعرض', form.showroomName || '—'],
@@ -575,9 +575,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   ['تنبيه المخزون', `${form.lowStockThreshold || 0} بوحدة الصنف`],
                   ['حد اعتماد الخصم', `${form.discountThreshold || 0}%`],
                 ].map(([label, value]) => (
-                  <div key={label} className="flex items-center justify-between px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
-                    <span className="text-[11px] text-slate-500">{label}</span>
-                    <span className="text-xs font-bold text-slate-900">{value}</span>
+                  <div key={label} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/50">
+                    <span className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">{label}</span>
+                    <span className="min-w-0 max-w-[60%] truncate text-xs font-bold text-slate-900 dark:text-slate-100" title={value}>{value}</span>
                   </div>
                 ))}
               </div>
@@ -585,33 +585,38 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
           )}
         </div>
 
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
+        <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:px-6 sm:py-4">
           <button
+            type="button"
             onClick={() => setStep((s) => Math.max(0, s - 1))}
             disabled={step === 0 || saving}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-40"
+            className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-800 sm:flex-none sm:px-4 sm:text-sm"
           >
-            <ArrowRight className="w-4 h-4" /> السابق
+            <ArrowRight className="h-4 w-4" aria-hidden="true" /> السابق
           </button>
-          {step < 3 ? (
-            <button
-              onClick={() => canContinue && setStep((s) => s + 1)}
-              disabled={!canContinue || (step === 2 && !passwordValid)}
-              className="flex items-center gap-1.5 px-5 py-2 bg-sky-600 text-white rounded-lg text-sm font-bold hover:bg-sky-700 disabled:opacity-40"
-            >
-              التالي <ArrowLeft className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              onClick={finish}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              بدء الاستخدام
-            </button>
-          )}
-        </div>
+          <div className="flex flex-1 justify-end sm:flex-none">
+            {step < 3 ? (
+              <button
+                type="button"
+                onClick={() => canContinue && setStep((s) => s + 1)}
+                disabled={!canContinue || (step === 2 && !passwordValid)}
+                className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-700 disabled:opacity-40 sm:w-auto sm:px-5 sm:text-sm"
+              >
+                التالي <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={finish}
+                disabled={saving}
+                className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60 sm:w-auto sm:px-5 sm:text-sm"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+                بدء الاستخدام
+              </button>
+            )}
+          </div>
+        </footer>
       </div>
     </div>
   );

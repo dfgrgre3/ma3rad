@@ -1,0 +1,7 @@
+﻿src/pages/admin/SecurityCenterPage.tsx(6,27): error TS2305: Module '"../../services/SecurityService"' has no exported member 'ActiveSession'.
+src/pages/admin/SecurityCenterPage.tsx(6,42): error TS2305: Module '"../../services/SecurityService"' has no exported member 'LoginRecord'.
+src/pages/admin/SecurityCenterPage.tsx(6,55): error TS2724: '"../../services/SecurityService"' has no exported member named 'SecurityOverview'. Did you mean 'SecurityService'?
+src/pages/admin/SecurityCenterPage.tsx(17,33): error TS2673: Constructor of class 'SecurityService' is private and only accessible within the class declaration.
+src/services/index.ts(16,15): error TS2305: Module '"./types.ts"' has no exported member 'HealthScore'.
+src/services/index.ts(16,28): error TS2305: Module '"./types.ts"' has no exported member 'HealthAlert'.
+src/services/index.ts(16,41): error TS2305: Module '"./types.ts"' has no exported member 'SystemHealthReport'.

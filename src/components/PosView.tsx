@@ -12,8 +12,12 @@ import { InventoryService } from '../services/InventoryService';
 import { CustomerService } from '../services/CustomerService';
 import { CategoryService, CategoryWithCount } from '../services/CategoryService';
 import { SalesService } from '../services/SalesService';
+import { AuthService } from '../services/AuthService';
 import { BatchService } from '../services/BatchService';
 import { CashierService } from '../services/CashierService';
+import { HeldOrderService } from '../services/HeldOrderService';
+import { PromotionService, AppliedPromotion } from '../services/PromotionService';
+import { LoyaltyService } from '../services/LoyaltyService';
 import { PrintService } from '../services/PrintService';
 import { PricingService } from '../services/PricingService';
 import { ApprovalService } from '../services/ApprovalService';
@@ -35,7 +39,7 @@ import {
   type CartItem, type HeldOrder, type PosUnit, type SortMode, type Toast,
 } from './pos/types';
 import {
-  CloseShiftModal, HeldOrdersModal, NewCustomerModal, OpenShiftModal,
+  CloseShiftModal, HeldOrdersModal, ManagerOverrideModal, NewCustomerModal, OpenShiftModal, PinLoginModal,
   PosToast, ShortcutsModal, SuccessInvoiceModal, ToneWarningModal,
 } from './pos/PosModals';
 
@@ -182,6 +186,8 @@ const CartLine: React.FC<CartLineProps> = ({
 export const PosView: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useContext(LayoutContext);
+  const [actingUser, setActingUser] = useState<any>(null);
+  const effectiveUser = actingUser || currentUser;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
@@ -210,6 +216,15 @@ export const PosView: React.FC = () => {
   const [taxPercentage, setTaxPercentage] = useState<number>(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
+  const [splitCash, setSplitCash] = useState<number>(0);
+  const [splitCard, setSplitCard] = useState<number>(0);
+  const [splitBank, setSplitBank] = useState<number>(0);
+  const [splitCheque, setSplitCheque] = useState<number>(0);
+  const [couponCode, setCouponCode] = useState<string>('');
+  const [appliedPromotion, setAppliedPromotion] = useState<AppliedPromotion | null>(null);
+  const [promotionDiscount, setPromotionDiscount] = useState<number>(0);
+  const [redeemPoints, setRedeemPoints] = useState<number>(0);
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState<number>(0);
   const [notes, setNotes] = useState('');
 
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
@@ -260,6 +275,9 @@ export const PosView: React.FC = () => {
   const salesService  = useMemo(() => new SalesService(), []);
   const batchService  = useMemo(() => new BatchService(), []);
   const cashierService = useMemo(() => new CashierService(), []);
+  const heldOrderService = useMemo(() => new HeldOrderService(), []);
+  const promotionService = useMemo(() => new PromotionService(), []);
+  const loyaltyService = useMemo(() => new LoyaltyService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const pricingService = useMemo(() => new PricingService(), []);
 
@@ -282,8 +300,8 @@ export const PosView: React.FC = () => {
   }, []);
 
   const can = useCallback(
-    (permission: string) => PermissionService.can(currentUser, permission),
-    [currentUser]
+    (permission: string) => PermissionService.can(effectiveUser, permission),
+    [effectiveUser]
   );
 
   const stockOf = useCallback(
@@ -343,18 +361,25 @@ export const PosView: React.FC = () => {
   useEffect(() => {
     loadInitialData();
     try {
-      const raw = localStorage.getItem(HELD_STORAGE_KEY);
-      if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        const restored = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
-        heldOrdersRef.current = restored;
-        setHeldOrders(restored);
+      const dbRows = heldOrderService.getAll();
+      let restored: HeldOrder[] = [];
+      if (dbRows.length > 0) {
+        restored = dbRows.map((r) => { try { return JSON.parse(r.data) as HeldOrder; } catch { return null; } }).filter(Boolean) as HeldOrder[];
+      } else {
+        const raw = localStorage.getItem(HELD_STORAGE_KEY);
+        if (raw) {
+          const parsed: unknown = JSON.parse(raw);
+          restored = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
+          restored.forEach((h) => heldOrderService.save(h.id, JSON.stringify(h), currentUser?.id));
+        }
       }
+      heldOrdersRef.current = restored;
+      setHeldOrders(restored);
     } catch {
       heldOrdersRef.current = [];
       setHeldOrders([]);
     }
-  }, [loadInitialData]);
+  }, [loadInitialData, heldOrderService, currentUser?.id]);
 
   useEffect(() => {
     if (selectedWarehouseId) loadStock(selectedWarehouseId);
@@ -628,7 +653,7 @@ export const PosView: React.FC = () => {
   const lineSubtotal = round2(cart.reduce((sum, item) => sum + item.quantityM2 * item.unitPrice, 0));
   const lineDiscountTotal = round2(cart.reduce((sum, item) => sum + item.discountAmount, 0));
   const subtotal = round2(lineSubtotal - lineDiscountTotal);
-  const taxableBase = round2(Math.max(0, subtotal - discountAmount));
+  const taxableBase = round2(Math.max(0, subtotal - discountAmount - promotionDiscount - loyaltyDiscount));
   const taxAmount = round2(taxableBase * (taxPercentage || 0) / 100);
   const totalAmount = round2(Math.max(0, taxableBase + taxAmount + (shippingCost || 0)));
   const remainingAmount = round2(Math.max(0, totalAmount - (paidAmount || 0)));
@@ -739,6 +764,13 @@ export const PosView: React.FC = () => {
     } catch {
       /* storage full — ignore */
     }
+    // Mirror to DB for crash recovery.
+    try {
+      heldOrderService.clearAll();
+      next.forEach((h) => heldOrderService.save(h.id, JSON.stringify(h), currentUser?.id));
+    } catch {
+      /* ignore */
+    }
   };
 
   const holdCurrentOrder = () => {
@@ -833,7 +865,7 @@ export const PosView: React.FC = () => {
       return;
     }
     try {
-      cashierService.closeShift(activeShift.id, Math.max(0, closingCash), closingNotes, currentUser?.id || 'usr_admin');
+      cashierService.closeShift(activeShift.id, Math.max(0, closingCash), closingNotes, effectiveUser?.id || currentUser?.id || 'usr_admin');
       setActiveShift(null);
       setIsCloseShiftModalOpen(false);
       setClosingCash(0);
@@ -1033,19 +1065,41 @@ export const PosView: React.FC = () => {
           unitCost: item.product.costPrice,
           discountAmount: item.discountAmount
         })),
-        discountAmount,
+        discountAmount: round2(discountAmount + promotionDiscount + loyaltyDiscount),
         taxPercentage,
         taxAmount,
         shippingCost,
         paidAmount,
         paymentType,
+        payments: paymentType === 'MIXED' ? ([
+          { method: 'CASH', amount: splitCash },
+          { method: 'CARD', amount: splitCard },
+          { method: 'BANK_TRANSFER', amount: splitBank },
+          { method: 'CHEQUE', amount: splitCheque },
+        ].filter((p) => p.amount > 0) as { method: PaymentType; amount: number }[]) : undefined,
         notes,
-        performedBy: currentUser?.id || 'usr_admin'
+        performedBy: effectiveUser?.id || currentUser?.id || 'usr_admin'
       });
 
       setSuccessInvoice(invoice);
+      // Record promotion usage
+      if (appliedPromotion) {
+        try { promotionService.recordUsage(appliedPromotion.promotionId, invoice.id, couponCode || undefined, appliedPromotion.discountAmount); } catch { /* ignore */ }
+      }
+      // Earn loyalty points (1 point per 10 currency units of total)
+      if (selectedCustomer?.id) {
+        try {
+          const points = Math.floor((invoice.totalAmount || 0) / 10);
+          if (points > 0) loyaltyService.earnPoints({ customerId: selectedCustomer.id, points, referenceType: 'SALES_INVOICE', referenceId: invoice.id, description: `نقاط من فاتورة ${invoice.invoiceNumber}` });
+        } catch { /* ignore */ }
+      }
       setCart([]);
       setDiscountAmount(0);
+      setPromotionDiscount(0);
+      setLoyaltyDiscount(0);
+      setAppliedPromotion(null);
+      setCouponCode('');
+      setRedeemPoints(0);
       setShippingCost(0);
       setNotes('');
       setPaidAmount(0);
@@ -1114,6 +1168,169 @@ export const PosView: React.FC = () => {
     });
   };
 
+  const [pendingVoid, setPendingVoid] = useState<{ invoice: any; reason: string } | null>(null);
+  const [isOverrideOpen, setIsOverrideOpen] = useState(false);
+  const [isPinLoginOpen, setIsPinLoginOpen] = useState(false);
+  const [touchMode, setTouchMode] = useState(false);
+  const customerDisplayRef = useRef<Window | null>(null);
+
+  // Auto-evaluate promotions on cart/coupon change
+  useEffect(() => {
+    if (cart.length === 0) { setAppliedPromotion(null); setPromotionDiscount(0); return; }
+    const cartItems = cart.map((item) => ({
+      productId: item.product.id,
+      categoryId: (item.product as any).categoryId,
+      qty: item.quantityM2,
+      unitPrice: item.unitPrice,
+      amount: item.quantityM2 * item.unitPrice,
+    }));
+    const applied = promotionService.evaluate(cartItems, couponCode || undefined);
+    if (applied) {
+      setAppliedPromotion(applied);
+      setPromotionDiscount(applied.discountAmount);
+    } else {
+      setAppliedPromotion(null);
+      setPromotionDiscount(0);
+    }
+  }, [cart, couponCode, promotionService]);
+
+  const doVoidInvoice = useCallback(async (invoice: any, reason: string) => {
+    try {
+      setIsProcessing(true);
+      salesService.voidInvoice(invoice.id, reason);
+      setSuccessInvoice(null);
+      if (selectedWarehouseId) loadStock(selectedWarehouseId);
+      setActiveShift(cashierService.getActiveShift());
+      notify(`تم إلغاء الفاتورة ${invoice.invoiceNumber}`, 'success');
+    } catch (e: any) {
+      notify(e?.message || 'فشل إلغاء الفاتورة', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [salesService, selectedWarehouseId, loadStock, cashierService, notify]);
+
+  const handleVoidInvoice = useCallback(async (invoice: any) => {
+    if (!invoice?.id) return;
+    const reason = window.prompt('سبب إلغاء الفاتورة:');
+    if (!reason || !reason.trim()) {
+      notify('يرجى إدخال سبب الإلغاء', 'warning');
+      return;
+    }
+    if (!can('sales.void')) {
+      setPendingVoid({ invoice, reason: reason.trim() });
+      setIsOverrideOpen(true);
+      return;
+    }
+    await doVoidInvoice(invoice, reason.trim());
+  }, [can, doVoidInvoice, notify]);
+
+  const openCustomerDisplay = useCallback(() => {
+    if (customerDisplayRef.current && !customerDisplayRef.current.closed) {
+      customerDisplayRef.current.focus();
+      return;
+    }
+    const w = window.open('', 'pos-customer-display', 'width=420,height=720');
+    if (!w) { notify('يرجى السماح بالنوافذ المنبثقة', 'error'); return; }
+    customerDisplayRef.current = w;
+    w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>عرض العميل</title>
+<style>body{font-family:Tahoma,sans-serif;margin:0;padding:16px;background:#0f172a;color:#fff;} .total{font-size:48px;font-weight:900;color:#38bdf8;} .item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #334155;font-size:16px;} .change{font-size:32px;color:#34d399;font-weight:800;}</style></head><body>
+<div id="root"><div style="text-align:center;opacity:.5;">في انتظار عناصر...</div></div>
+<script>
+const ch = new BroadcastChannel('pos-customer-display');
+ch.onmessage = (e) => {
+  const d = e.data;
+  let html = '';
+  if (d.items && d.items.length) {
+    html += d.items.map(i => '<div class="item"><span>'+i.name+'</span><span>'+i.qty+' × '+i.price+'</span></div>').join('');
+  }
+  html += '<div style="margin-top:16px;border-top:2px solid #38bdf8;padding-top:12px;">';
+  html += '<div class="item"><span>المجموع الفرعي</span><span>'+d.subtotal+'</span></div>';
+  if (d.discount>0) html += '<div class="item"><span>خصم</span><span>-'+d.discount+'</span></div>';
+  if (d.tax>0) html += '<div class="item"><span>ضريبة</span><span>'+d.tax+'</span></div>';
+  html += '<div class="total">الإجمالي: '+d.total+'</div>';
+  if (d.paid>0) html += '<div class="item"><span>المدفوع</span><span>'+d.paid+'</span></div>';
+  if (d.change>0) html += '<div class="change">الباقي: '+d.change+'</div>';
+  html += '</div>';
+  document.getElementById('root').innerHTML = html;
+};
+</script></body></html>`);
+    w.document.close();
+  }, [notify]);
+
+  // Sync cart to customer display
+  useEffect(() => {
+    if (!customerDisplayRef.current || customerDisplayRef.current.closed) return;
+    try {
+      const ch = new BroadcastChannel('pos-customer-display');
+      ch.postMessage({
+        items: cart.map((i) => ({ name: i.product.name, qty: i.soldQuantity, price: i.unitPrice })),
+        subtotal: lineSubtotal,
+        discount: round2(discountAmount + promotionDiscount + loyaltyDiscount),
+        tax: taxAmount,
+        total: totalAmount,
+        paid: paidAmount,
+        change: changeDue,
+      });
+      ch.close();
+    } catch { /* ignore */ }
+  }, [cart, lineSubtotal, discountAmount, promotionDiscount, loyaltyDiscount, taxAmount, totalAmount, paidAmount, changeDue]);
+
+  const handlePinLogin = useCallback(async (pin: string): Promise<boolean> => {
+    try {
+      const u = AuthService.loginByPin(pin);
+      setActingUser(u);
+      notify(`تم التبديل إلى ${u.fullName}`, 'success');
+      return true;
+    } catch (e: any) {
+      notify(e?.message || 'رمز PIN غير صحيح', 'error');
+      return false;
+    }
+  }, [notify]);
+
+  const handleManagerOverride = useCallback(async (username: string, password: string): Promise<boolean> => {
+    try {
+      const u = AuthService.login(username, password);
+      if (!PermissionService.can(u, 'sales.void')) {
+        notify('المستخدم المحدد لا يملك صلاحية إلغاء الفاتورة', 'error');
+        return false;
+      }
+      if (pendingVoid) {
+        await doVoidInvoice(pendingVoid.invoice, pendingVoid.reason);
+        setPendingVoid(null);
+      }
+      setIsOverrideOpen(false);
+      return true;
+    } catch (e: any) {
+      notify(e?.message || 'فشل التحقق', 'error');
+      return false;
+    }
+  }, [pendingVoid, doVoidInvoice, notify]);
+
+  const printZReport = useCallback(() => {
+    if (!activeShift) return;
+    const w = window.open('', '_blank', 'width=420,height=720');
+    if (!w) { notify('يرجى السماح بالنوافذ المنبثقة', 'error'); return; }
+    const html = `
+      <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>Z-Report ${activeShift.shiftNumber}</title>
+      <style>body{font-family:Tahoma,sans-serif;width:76mm;margin:0 auto;padding:6px;font-size:12px;} .c{text-align:center;} .b{font-weight:800;} .row{display:flex;justify-content:space-between;} .div{border-top:1px dashed #000;margin:6px 0;}</style></head><body>
+      <div class="c b">${activeShift.shiftNumber ? 'تقرير Z - إقفال الوردية' : ''}</div>
+      <div class="div"></div>
+      <div class="row"><span>رقم الوردية</span><span>${activeShift.shiftNumber}</span></div>
+      <div class="row"><span>الافتتاحي</span><span>${CeramicMath.formatCurrency(activeShift.openingBalance)}</span></div>
+      <div class="row"><span>مبيعات نقدية</span><span>${CeramicMath.formatCurrency(activeShift.totalSalesCash)}</span></div>
+      <div class="row"><span>تحصيلات العملاء</span><span>${CeramicMath.formatCurrency(activeShift.totalCustomerPayments)}</span></div>
+      <div class="row"><span>مصروفات/مرتجعات</span><span>${CeramicMath.formatCurrency((activeShift.totalExpenses || 0) + (activeShift.totalRefunds || 0))}</span></div>
+      <div class="row b"><span>النقد المتوقع</span><span>${CeramicMath.formatCurrency(expectedClosingCash)}</span></div>
+      <div class="row"><span>النقد الفعلي</span><span>${CeramicMath.formatCurrency(closingCash)}</span></div>
+      <div class="row"><span>الفرق</span><span>${CeramicMath.formatCurrency(closingCash - expectedClosingCash)}</span></div>
+      <div class="div"></div>
+      <div class="c" style="font-size:10px;">${new Date().toLocaleString('ar')}</div>
+      <script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}</script>
+      </body></html>`;
+    w.document.write(html);
+    w.document.close();
+  }, [activeShift, expectedClosingCash, closingCash, notify]);
+
   const latest = useRef<any>({});
   latest.current = { handleCheckout, cart, isCalculatorOpen, isCustomerModalOpen, isHeldModalOpen, isShortcutsOpen, isShiftModalOpen, isCloseShiftModalOpen, isToneWarningOpen, invoicePreview, successInvoice, hasCeramicCatalog };
 
@@ -1158,7 +1375,7 @@ export const PosView: React.FC = () => {
   const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col" dir="rtl">
+    <div className={`flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col ${touchMode ? 'pos-touch-mode' : ''}`} dir="rtl">
       {/* ═══ Left: Catalog ═══ */}
       <div className="flex-1 flex flex-col overflow-hidden border-l border-slate-200 min-w-0">
         {/* Header / shift bar */}
@@ -1198,6 +1415,12 @@ export const PosView: React.FC = () => {
                   <span className="font-black text-sky-600">{CeramicMath.formatCurrency(activeShift.totalSalesCard)}</span>
                 </div>
                 {can('cashier.shift.close') && <button onClick={() => setIsCloseShiftModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition"><Lock className="w-4 h-4" /> إغلاق الوردية</button>}
+                <button onClick={() => setIsPinLoginOpen(true)} className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition"><UserPlus className="w-4 h-4" /> {actingUser ? actingUser.fullName : 'تبديل المستخدم'}</button>
+                {actingUser && (
+                  <button onClick={() => { setActingUser(null); notify('تم العودة للمستخدم الأصلي', 'info'); }} className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold transition">عودة</button>
+                )}
+                <button onClick={openCustomerDisplay} className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition">عرض العميل</button>
+                <button onClick={() => setTouchMode((v) => !v)} className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition ${touchMode ? 'bg-sky-600 text-white border-sky-500' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>Touch</button>
               </>
             )}
             {!activeShift && can('cashier.shift.open') && (
@@ -1602,6 +1825,54 @@ export const PosView: React.FC = () => {
             </div>
           </div>
 
+          {paymentType === 'MIXED' && (
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500">نقداً</label>
+                <input type="number" min="0" step="0.01" value={splitCash || ''} onChange={(e) => setSplitCash(Number.parseFloat(e.target.value) || 0)} className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500">بطاقة</label>
+                <input type="number" min="0" step="0.01" value={splitCard || ''} onChange={(e) => setSplitCard(Number.parseFloat(e.target.value) || 0)} className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500">تحويل بنكي</label>
+                <input type="number" min="0" step="0.01" value={splitBank || ''} onChange={(e) => setSplitBank(Number.parseFloat(e.target.value) || 0)} className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500">شيك</label>
+                <input type="number" min="0" step="0.01" value={splitCheque || ''} onChange={(e) => setSplitCheque(Number.parseFloat(e.target.value) || 0)} className="w-full px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-900 mt-0.5" />
+              </div>
+              <div className="col-span-2 text-[10px] text-slate-500">
+                مجموع الدفع: {CeramicMath.formatCurrency(splitCash + splitCard + splitBank + splitCheque)}
+                {Math.abs((splitCash + splitCard + splitBank + splitCheque) - paidAmount) > 0.001 && (
+                  <span className="text-rose-600 font-bold"> — يجب أن يساوي المبلغ المدفوع {CeramicMath.formatCurrency(paidAmount)}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Coupon code */}
+          <div className="flex items-center gap-2">
+            <input value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="رمز القسيمة (coupon)" className="flex-1 px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-900" />
+            {appliedPromotion && <span className="text-[10px] font-bold text-emerald-600">✓ {appliedPromotion.name} (-{appliedPromotion.discountAmount})</span>}
+          </div>
+
+          {/* Loyalty redeem */}
+          {selectedCustomer && (
+            <div className="flex items-center gap-2">
+              <input type="number" min={0} value={redeemPoints || ''} onChange={(e) => setRedeemPoints(Number.parseFloat(e.target.value) || 0)} placeholder="استبدال نقاط" className="w-28 px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-900" />
+              <button type="button" onClick={() => {
+                if (!redeemPoints || redeemPoints <= 0) return;
+                try {
+                  loyaltyService.redeemPoints({ customerId: selectedCustomer.id, points: redeemPoints, referenceType: 'SALES_INVOICE', description: 'استبدال نقاط' });
+                  setLoyaltyDiscount(redeemPoints);
+                  notify(`تم استبدال ${redeemPoints} نقطة`, 'success');
+                } catch (e: any) { notify(e?.message || 'فشل الاستبدال', 'error'); }
+              }} className="px-2 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold">استبدال</button>
+            </div>
+          )}
+
           {/* Paid amount */}
           <div className="flex items-center justify-between">
             <label htmlFor="pos-paid-amount" className="text-xs font-bold text-slate-500">المبلغ المدفوع (F4):</label>
@@ -1721,6 +1992,22 @@ export const PosView: React.FC = () => {
           onPrintThermal={() => printService.printThermalReceipt(successInvoice)}
           onPreview={() => openInvoicePreview(successInvoice)}
           onClose={() => setSuccessInvoice(null)}
+          canVoid={can('sales.void')}
+          onVoid={() => handleVoidInvoice(successInvoice)}
+        />
+      )}
+
+      {isOverrideOpen && (
+        <ManagerOverrideModal
+          onConfirm={handleManagerOverride}
+          onClose={() => { setIsOverrideOpen(false); setPendingVoid(null); }}
+        />
+      )}
+
+      {isPinLoginOpen && (
+        <PinLoginModal
+          onConfirm={handlePinLogin}
+          onClose={() => setIsPinLoginOpen(false)}
         />
       )}
 
@@ -1785,6 +2072,8 @@ export const PosView: React.FC = () => {
           onActualClosingCashChange={(value) => setClosingCash(Math.max(0, Number(value) || 0))}
           onNotesChange={setClosingNotes}
           onConfirm={handleCloseShift}
+          hideExpected={settings?.blindCloseShift === true && currentUser?.role !== 'ADMIN'}
+          onPrintZReport={printZReport}
           onClose={() => {
             setIsCloseShiftModalOpen(false);
             setClosingCash(expectedClosingCash);

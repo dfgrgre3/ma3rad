@@ -15,6 +15,7 @@ import { SCHEMA_PART_14 } from './schema/part-14';
 import { SCHEMA_PART_15 } from './schema/part-15';
 import { SCHEMA_PART_16 } from './schema/part-16';
 import { SCHEMA_PART_17 } from './schema/part-17';
+import { SCHEMA_PART_18 } from './schema/part-18';
 
 export const SCHEMA_SQL = [
   SCHEMA_PART_01,
@@ -33,5 +34,6 @@ export const SCHEMA_SQL = [
   SCHEMA_PART_14,
   SCHEMA_PART_15,
   SCHEMA_PART_16,
-  SCHEMA_PART_17
+  SCHEMA_PART_17,
+  SCHEMA_PART_18,
 ].join('\n');

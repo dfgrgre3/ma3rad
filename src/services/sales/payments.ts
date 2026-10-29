@@ -4,6 +4,7 @@ import { PermissionService } from '../PermissionService';
 import { localDateString } from '../../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../../database/ledger';
 import { round2 } from '../financials';
+import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
 import type { CustomerPayment, PaymentType } from '../../types';
 import type { SalesContext } from './context';
 
@@ -85,6 +86,8 @@ export function recordInvoicePaymentEntry(
     if (shiftId) {
       db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?`, [value, shiftId]);
     }
+
+    new BusinessRecordSyncService(db).capture(db, 'customer_payment', paymentId, 'CREATE');
 
     db.run(
       `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
@@ -174,6 +177,7 @@ export function recordCustomerPaymentAllocationsEntry(
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, allocation.invoiceId, amount]);
       db.run(`UPDATE sales_invoices SET paid_amount=?,remaining_amount=?,payment_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
         [newPaid, remaining, remaining <= 0 ? 'PAID' : 'PARTIAL', allocation.invoiceId]);
+      new BusinessRecordSyncService(db).capture(db, 'customer_payment', paymentId, 'CREATE');
       receipts.push(receiptNumber); total = round2(total + amount);
     }
     db.run(`UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [total, customerId]);

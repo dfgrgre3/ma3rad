@@ -136,6 +136,19 @@ test('module activation lifecycle is persisted, audited and dependency-guarded',
     () => ModuleRegistryService.setEnabledModules(['inventory'], admin),
     /تتبع المخزون/
   );
+
+  const switchedToInventoryBusiness = ModuleRegistryService.setEnabledModules(
+    ['sales', 'customers', 'inventory', 'finance', 'reports'],
+    admin,
+    'change business activity',
+    { trackInventory: true }
+  );
+  assert.equal(switchedToInventoryBusiness.enabled.includes('inventory'), true);
+  db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
+    'businessProfileConfig',
+    JSON.stringify({ businessType: 'ceramics', trackInventory: true }),
+  ]);
+  assert.equal(ModuleRegistryService.getEnabledModuleIds().includes('inventory'), true);
 });
 
 test('module settings use registry defaults, validation and permissions', async () => {

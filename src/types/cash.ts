@@ -162,6 +162,7 @@ export interface SystemSettings {
   discountApprovalThresholdPercent?: number;
   requireApprovalForStockAdjustments?: boolean;
   requireApprovalForPriceChanges?: boolean;
+  blindCloseShift?: boolean;
   defaultDeliveryFee?: number;
   installmentGraceDays?: number;
   sessionTimeoutMinutes?: number;

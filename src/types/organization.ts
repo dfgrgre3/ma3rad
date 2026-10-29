@@ -4,11 +4,15 @@ export interface Branch {
   name: string;
   address?: string | null;
   phone?: string | null;
+  city?: string | null;
   managerId?: string | null;
+  managerName?: string | null;
+  deviceType?: string | null;
+  activationCode?: string | null;
+  notes?: string | null;
   isDefault: boolean;
   isActive: boolean;
   createdAt: string;
-  managerName?: string | null;
   companyId?: string | null;
   companyName?: string | null;
 }
@@ -67,10 +71,16 @@ export interface UserBranch {
 
 export interface CreateBranchDTO {
   name: string;
-  code: string;
+  code?: string;
   address?: string;
   phone?: string;
+  city?: string;
   managerId?: string;
+  managerName?: string;
+  deviceType?: string;
+  deviceName?: string;
+  permissions?: string[];
+  notes?: string;
   isDefault?: boolean;
   companyId?: string;
 }

@@ -8,6 +8,7 @@ import { postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { InventoryServicePart10 } from './InventoryServicePart10';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export class InventoryServicePart11 extends InventoryServicePart10 {
 public rejectTransfer(transferId: string, reason: string): void {
@@ -74,6 +75,8 @@ public rejectTransfer(transferId: string, reason: string): void {
         SET status = 'REJECTED', rejection_reason = ?
         WHERE id = ?
       `, [reason, transferId]);
+
+      new BusinessRecordSyncService(txDb).capture(txDb, 'stock_transfer', transferId, 'UPDATE');
     });
   }
 }

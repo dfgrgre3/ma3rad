@@ -23,6 +23,7 @@ function parseJson<T>(raw: string | undefined, fallback: T): T {
 export class NavigationService {
   private static readonly routePermissions: Array<[string, string]> = [
     ['/admin/data-deletion', 'admin.data.delete'],
+    ['/admin/sync-conflicts', 'admin.view'],
     ['/data-import/types', 'settings.view'],
     ['/finance/debts', 'finance.debts.view'],
     ['/crm', 'crm.view'],

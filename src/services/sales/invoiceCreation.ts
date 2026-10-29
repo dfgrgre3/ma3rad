@@ -10,7 +10,8 @@ import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
 import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../financials';
 import { ModuleRegistryService } from '../ModuleRegistryService';
-import type { SalesInvoice } from '../../types';
+import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
+import type { SalesInvoice, PaymentType } from '../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from './types';
 
@@ -358,6 +359,16 @@ function insertInvoiceItems(
   }
 }
 
+function resolvePayments(dto: CreateSaleDTO): { method: PaymentType; amount: number; reference?: string }[] {
+  if (dto.payments && dto.payments.length > 0) {
+    return dto.payments.filter((p) => p.amount > 0);
+  }
+  if (dto.paidAmount > 0) {
+    return [{ method: dto.paymentType, amount: dto.paidAmount }];
+  }
+  return [];
+}
+
 function updateCustomerAndCash(
   sqliteDb: any,
   dto: CreateSaleDTO,
@@ -372,15 +383,25 @@ function updateCustomerAndCash(
     WHERE id = ?
   `, [totals.totalAmount, totals.remainingAmount, dto.customerId]);
 
-  if (totals.paidAmount <= 0) return;
-  if (dto.paymentType === 'CASH') {
-    sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [totals.paidAmount, cashRegisterId]);
+  const payments = resolvePayments(dto);
+  const totalPaid = payments.reduce((s, p) => s + p.amount, 0);
+  if (totalPaid <= 0) return;
+
+  // Cash portion goes to the cash register drawer.
+  const cashPortion = payments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
+  if (cashPortion > 0) {
+    sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [cashPortion, cashRegisterId]);
   }
+
   if (!dto.shiftId) return;
 
-  const col = dto.paymentType === 'CASH' ? 'total_sales_cash'
-    : dto.paymentType === 'CARD' ? 'total_sales_card' : 'total_sales_transfer';
-  sqliteDb.run(`UPDATE cash_shifts SET ${col} = ${col} + ? WHERE id = ?`, [totals.paidAmount, dto.shiftId]);
+  // Aggregate per method into the shift buckets.
+  const cashTotal = payments.filter((p) => p.method === 'CASH').reduce((s, p) => s + p.amount, 0);
+  const cardTotal = payments.filter((p) => p.method === 'CARD').reduce((s, p) => s + p.amount, 0);
+  const transferTotal = payments.filter((p) => p.method === 'BANK_TRANSFER' || p.method === 'CHEQUE').reduce((s, p) => s + p.amount, 0);
+  if (cashTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_cash = total_sales_cash + ? WHERE id = ?`, [cashTotal, dto.shiftId]);
+  if (cardTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_card = total_sales_card + ? WHERE id = ?`, [cardTotal, dto.shiftId]);
+  if (transferTotal > 0) sqliteDb.run(`UPDATE cash_shifts SET total_sales_transfer = total_sales_transfer + ? WHERE id = ?`, [transferTotal, dto.shiftId]);
 }
 
 function buildLedgerEntries(
@@ -389,12 +410,14 @@ function buildLedgerEntries(
   inventoryCost: number,
   serviceCost = 0
 ): any[] {
+  const payments = resolvePayments(dto);
+  const paymentLines = payments.map((p) => ({
+    accountCode: paymentAccountCode(p.method),
+    debit: round2(p.amount),
+    credit: 0,
+  }));
   return [
-    ...(totals.paidAmount > 0 ? [{
-      accountCode: paymentAccountCode(dto.paymentType),
-      debit: totals.paidAmount,
-      credit: 0,
-    }] : []),
+    ...paymentLines,
     ...(totals.remainingAmount > 0 ? [{
       accountCode: '1103',
       debit: totals.remainingAmount,
@@ -473,6 +496,10 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
     const invoiceNumber = sqliteDb.nextNumber('INV');
     const today = localDateString();
+
+    const payments = resolvePayments(dto);
+    const distinctMethods = new Set(payments.map((p) => p.method));
+    const storedPaymentType = distinctMethods.size > 1 ? 'MIXED' : (payments[0]?.method || dto.paymentType);
     const dueDate = getDueDate(today, dto.customerId, sqliteDb, totals.remainingAmount);
 
     sqliteDb.run(`
@@ -486,12 +513,20 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       invoiceId, invoiceNumber, today, dueDate, dto.customerId, dto.warehouseId, branchId, companyId, dto.shiftId || null,
       dto.orderId || null, dto.projectId || null,
       totals.subtotal, dto.discountPercentage || 0, totals.discountAmount, dto.taxPercentage || 0, totals.taxAmount,
-      totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, dto.paymentType,
+      totals.shippingCost, totals.totalAmount, totals.paidAmount, totals.remainingAmount, storedPaymentType,
       totals.paymentStatus, financialTotals.totalCost, financialTotals.grossProfit, dto.notes || null, actor.id
     ]);
 
     insertInvoiceItems(sqliteDb, dto, preparedItems, invoiceId, invoiceNumber, actor, costingMethod);
     updateCustomerAndCash(sqliteDb, dto, totals, cashRegisterId);
+
+    // Persist split-payment breakdown (one row per method).
+    for (const p of payments) {
+      sqliteDb.run(
+        `INSERT INTO sales_invoice_payments (id, invoice_id, method, amount, reference) VALUES (?, ?, ?, ?, ?)`,
+        [`sip_${uuidv4().substring(0, 8)}`, invoiceId, p.method, round2(p.amount), p.reference || null]
+      );
+    }
 
     const inventoryCost = trackInventory
       ? round2(preparedItems.filter((item) => item.tracksStock).reduce((sum, item) => sum + item.totalCost, 0))
@@ -509,6 +544,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     });
 
     insertAuditLog(sqliteDb, actor, invoiceId, invoiceNumber, totals);
+    new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_invoice', invoiceId, 'CREATE');
     return ctx.getInvoiceById(invoiceId)!;
   });
 }

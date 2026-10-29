@@ -14,6 +14,7 @@ import type { DatabaseManager } from '../../database/db';
 import type { InvoiceWithItems, SalesContext } from './context';
 import type { ReturnRequestItem } from './types';
 import { ModuleRegistryService } from '../ModuleRegistryService';
+import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
 
 type ReturnOptions = {
   registerId?: string;
@@ -159,7 +160,9 @@ function createReturnInTransaction(
   postReturnLedger(sqliteDb, params, returnId, returnNumber, totalReturnAmount, impact, returnedCost, returnedServiceCost);
   updateShiftRefunds(sqliteDb, options.shiftId, impact.cashRefund);
   updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnAmount);
+  new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_invoice', invoiceId, 'UPDATE');
   insertReturnAuditLog(sqliteDb, params, returnId, returnNumber, totalReturnAmount, impact.cashRefund);
+  new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_return', returnId, 'CREATE');
 
   return {
     id: returnId,

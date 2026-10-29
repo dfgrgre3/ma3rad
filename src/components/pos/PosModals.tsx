@@ -30,7 +30,11 @@ export const SuccessInvoiceModal: React.FC<{
   onPrintThermal: () => void;
   onPreview: () => void;
   onClose: () => void;
-}> = ({ invoice, onPrintThermal, onPreview, onClose }) => (
+  onVoid?: () => void;
+  canVoid?: boolean;
+}> = ({ invoice, onPrintThermal, onPreview, onClose, onVoid, canVoid }) => {
+  const changeDue = Math.max(0, (invoice.paidAmount || 0) - (invoice.totalAmount || 0));
+  return (
   <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full text-center space-y-4">
       <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto">
@@ -40,6 +44,12 @@ export const SuccessInvoiceModal: React.FC<{
       <div className="text-xs text-slate-500 space-y-1">
         <p>رقم الفاتورة: <strong className="font-mono text-slate-800">{invoice.invoiceNumber}</strong></p>
         <p>الإجمالي: <strong className="text-sky-600">{CeramicMath.formatCurrency(invoice.totalAmount)}</strong></p>
+        {invoice.paidAmount > 0 && (
+          <p>المدفوع: <strong className="text-slate-700">{CeramicMath.formatCurrency(invoice.paidAmount)}</strong></p>
+        )}
+        {changeDue > 0 && (
+          <p>الباقي للعميل: <strong className="text-emerald-600">{CeramicMath.formatCurrency(changeDue)}</strong></p>
+        )}
         {invoice.remainingAmount > 0 && (
           <p>المتبقي: <strong className="text-amber-600">{CeramicMath.formatCurrency(invoice.remainingAmount)}</strong></p>
         )}
@@ -66,9 +76,18 @@ export const SuccessInvoiceModal: React.FC<{
           إغلاق
         </button>
       </div>
+      {canVoid && onVoid && (
+        <button
+          onClick={onVoid}
+          className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5"
+        >
+          <Trash2 className="w-4 h-4" /> إلغاء هذه الفاتورة
+        </button>
+      )}
     </div>
   </div>
-);
+  );
+};
 
 export const HeldOrdersModal: React.FC<{
   orders: HeldOrder[];
@@ -194,19 +213,23 @@ export const CloseShiftModal: React.FC<{
   expectedClosingCash: number;
   actualClosingCash: number;
   notes: string;
+  hideExpected?: boolean;
   onActualClosingCashChange: (value: number) => void;
   onNotesChange: (value: string) => void;
   onConfirm: () => void;
   onClose: () => void;
+  onPrintZReport?: () => void;
 }> = ({
   shift,
   expectedClosingCash,
   actualClosingCash,
   notes,
+  hideExpected,
   onActualClosingCashChange,
   onNotesChange,
   onConfirm,
   onClose,
+  onPrintZReport,
 }) => {
   const cashDifference = Number((actualClosingCash - expectedClosingCash).toFixed(2));
   const cashDifferenceTone = cashDifference === 0 ? 'text-emerald-700' : cashDifference > 0 ? 'text-sky-700' : 'text-rose-700';
@@ -220,7 +243,7 @@ export const CloseShiftModal: React.FC<{
           <div className="flex justify-between"><span className="text-slate-500">مبيعات نقدية</span><strong>{CeramicMath.formatCurrency(shift.totalSalesCash)}</strong></div>
           <div className="flex justify-between"><span className="text-slate-500">تحصيلات العملاء</span><strong>{CeramicMath.formatCurrency(shift.totalCustomerPayments)}</strong></div>
           <div className="flex justify-between"><span className="text-slate-500">مصروفات / مرتجعات</span><strong>{CeramicMath.formatCurrency((shift.totalExpenses || 0) + (shift.totalRefunds || 0))}</strong></div>
-          <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold">النقد المتوقع بالصندوق</span><strong className="text-emerald-700">{CeramicMath.formatCurrency(expectedClosingCash)}</strong></div>
+          <div className="flex justify-between border-t border-slate-200 pt-2 text-base"><span className="font-bold">النقد المتوقع بالصندوق</span><strong className="text-emerald-700">{hideExpected ? '—' : CeramicMath.formatCurrency(expectedClosingCash)}</strong></div>
         </div>
         <Field label="النقد الفعلي بعد العد" id="close-shift-actual-cash">
           <input
@@ -233,13 +256,111 @@ export const CloseShiftModal: React.FC<{
             className={inputCls}
           />
         </Field>
-        <div className={`rounded-xl px-3 py-2 text-sm font-bold ${cashDifferenceTone} bg-emerald-50`}>فرق الصندوق المحسوب: {CeramicMath.formatCurrency(cashDifference)}</div>
+        {!hideExpected && <div className={`rounded-xl px-3 py-2 text-sm font-bold ${cashDifferenceTone} bg-emerald-50`}>فرق الصندوق المحسوب: {CeramicMath.formatCurrency(cashDifference)}</div>}
         <Field label="ملاحظات الإقفال" id="close-shift-notes">
           <textarea rows={2} value={notes} onChange={(e) => onNotesChange(e.target.value)} placeholder="سبب العجز أو الزيادة، إن وجد..." className={inputCls} />
         </Field>
         <button onClick={onConfirm} className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl">تأكيد الرصيد المحسوب وإغلاق الوردية</button>
+        {onPrintZReport && (
+          <button onClick={onPrintZReport} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5">
+            <Printer className="w-4 h-4" /> طباعة تقرير Z (ملخص الوردية)
+          </button>
+        )}
       </div>
     </Modal>
+  );
+};
+
+export const ManagerOverrideModal: React.FC<{
+  onConfirm: (username: string, password: string) => Promise<boolean>;
+  onClose: () => void;
+}> = ({ onConfirm, onClose }) => {
+  const [username, setUsername] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const submit = async () => {
+    if (!username.trim() || !password) { setError('يرجى إدخال اسم المستخدم وكلمة المرور'); return; }
+    setLoading(true); setError(null);
+    const ok = await onConfirm(username.trim(), password);
+    setLoading(false);
+    if (!ok) setError('اسم المستخدم أو كلمة المرور غير صحيحة، أو لا تملك الصلاحية.');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full space-y-4">
+        <h3 className="text-lg font-black text-slate-900 text-center">اعتماد مدير</h3>
+        <p className="text-xs text-slate-500 text-center">أدخل بيانات مدير (مستخدم يملك صلاحية إلغاء الفاتورة)</p>
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="اسم المستخدم"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-500"
+            autoFocus
+          />
+          <input
+            type="password"
+            placeholder="كلمة المرور"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-sm text-slate-900 focus:outline-none focus:border-sky-500"
+          />
+        </div>
+        {error && <p className="text-xs text-rose-600 text-center">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onClose} className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">إلغاء</button>
+          <button onClick={submit} disabled={loading} className="py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs disabled:opacity-50">{loading ? 'جاري...' : 'تأكيد'}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const PinLoginModal: React.FC<{
+  onConfirm: (pin: string) => Promise<boolean>;
+  onClose: () => void;
+}> = ({ onConfirm, onClose }) => {
+  const [pin, setPin] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const submit = async () => {
+    if (!pin.trim()) { setError('يرجى إدخال رمز PIN'); return; }
+    setLoading(true); setError(null);
+    const ok = await onConfirm(pin.trim());
+    setLoading(false);
+    if (!ok) setError('رمز PIN غير صحيح.');
+    else setPin('');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-xs w-full space-y-4">
+        <h3 className="text-lg font-black text-slate-900 text-center">تبديل المستخدم (PIN)</h3>
+        <p className="text-xs text-slate-500 text-center">أدخل رمز PIN (4-8 أرقام)</p>
+        <input
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          placeholder="••••"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+          className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-center text-2xl tracking-widest text-slate-900 focus:outline-none focus:border-sky-500"
+          autoFocus
+        />
+        {error && <p className="text-xs text-rose-600 text-center">{error}</p>}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onClose} className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">إلغاء</button>
+          <button onClick={submit} disabled={loading} className="py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs disabled:opacity-50">{loading ? '...' : 'تأكيد'}</button>
+        </div>
+      </div>
+    </div>
   );
 };
 

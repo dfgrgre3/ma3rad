@@ -8,6 +8,7 @@ import { postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { InventoryServicePart08 } from './InventoryServicePart08';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export class InventoryServicePart09 extends InventoryServicePart08 {
 public dispatchTransfer(transferId: string): void {
@@ -91,6 +92,8 @@ public dispatchTransfer(transferId: string): void {
         SET status = 'IN_TRANSIT', total_shipped_m2 = ?, dispatched_by = ?, dispatched_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `, [totalShipped, actor.id, transferId]);
+
+      new BusinessRecordSyncService(txDb).capture(txDb, 'stock_transfer', transferId, 'UPDATE');
     });
   }
 }

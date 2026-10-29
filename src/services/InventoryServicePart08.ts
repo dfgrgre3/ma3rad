@@ -8,6 +8,7 @@ import { postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { InventoryServicePart07 } from './InventoryServicePart07';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export class InventoryServicePart08 extends InventoryServicePart07 {
 public getTransferItems(transferId: string): any[] {
@@ -116,6 +117,8 @@ public createTransferRequest(input: {
           pi.quantityM2, pi.boxesCount, pi.unitCost, pi.itemCost, pi.notes
         ]);
       }
+
+      new BusinessRecordSyncService(txDb).capture(txDb, 'stock_transfer', transferId, 'CREATE');
 
       return transferId;
     });

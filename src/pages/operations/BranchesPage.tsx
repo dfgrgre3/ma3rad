@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Building2, Plus, Search, MapPin, Users, Phone, Loader2, X, Power } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Building2, Plus, Search, MapPin, Users, Phone, Loader2, X, Power, Smartphone, ShieldCheck } from 'lucide-react';
 import { OperationsService, Branch } from '../../services/OperationsService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 
+const permissionOptions = ['مدير الفرع', 'المبيعات', 'المخزون', 'المالية', 'إدارة'] as const;
+
 export const BranchesPage: React.FC = () => {
-  const service = new OperationsService();
+  const service = useMemo(() => new OperationsService(), []);
   const canManage = PermissionService.can(AuthService.getCurrentUser(), 'branches.manage');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [search, setSearch] = useState('');
@@ -13,7 +15,17 @@ export const BranchesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', address: '', city: '' });
+  const [createdActivation, setCreatedActivation] = useState<{ branchName: string; activationCode: string; deviceType: string } | null>(null);
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    city: '',
+    deviceType: 'WINDOWS',
+    deviceName: '',
+    managerName: '',
+    permissions: ['مدير الفرع', 'المبيعات'] as string[],
+  });
 
   const load = () => {
     setLoading(true);
@@ -28,9 +40,26 @@ export const BranchesPage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      service.createBranch(form);
+      const created = service.createBranch({
+        ...form,
+        permissions: form.permissions,
+      });
+      setCreatedActivation({
+        branchName: created.name,
+        activationCode: created.activationCode || 'N/A',
+        deviceType: created.deviceType || form.deviceType,
+      });
       setModalOpen(false);
-      setForm({ name: '', phone: '', address: '', city: '' });
+      setForm({
+        name: '',
+        phone: '',
+        address: '',
+        city: '',
+        deviceType: 'WINDOWS',
+        deviceName: '',
+        managerName: '',
+        permissions: ['مدير الفرع', 'المبيعات'],
+      });
       load();
     } catch (err: any) { alert(err?.message || 'تعذر إضافة الفرع.'); }
     finally { setSaving(false); }
@@ -38,6 +67,15 @@ export const BranchesPage: React.FC = () => {
 
   const toggle = (b: Branch) => {
     try { service.toggleBranch(b.id, !b.isActive); load(); } catch (e: any) { alert(e?.message); }
+  };
+
+  const togglePermission = (permission: string) => {
+    setForm((current) => ({
+      ...current,
+      permissions: current.permissions.includes(permission)
+        ? current.permissions.filter((p) => p !== permission)
+        : [...current.permissions, permission],
+    }));
   };
 
   return (
@@ -66,6 +104,16 @@ export const BranchesPage: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto p-4">
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        {createdActivation && (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <div className="flex items-center gap-2 font-extrabold mb-2"><ShieldCheck className="w-4 h-4" /> تم إنشاء الفرع بنجاح</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              <div><span className="text-emerald-700">الفرع:</span> {createdActivation.branchName}</div>
+              <div><span className="text-emerald-700">نوع الجهاز:</span> {createdActivation.deviceType}</div>
+              <div><span className="text-emerald-700">رمز التفعيل:</span> <span className="font-mono font-bold">{createdActivation.activationCode}</span></div>
+            </div>
+          </div>
+        )}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-sky-500" /></div> : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {branches.map((b) => (
@@ -80,6 +128,9 @@ export const BranchesPage: React.FC = () => {
                     <div className="flex items-start gap-1.5"><MapPin className="w-4 h-4 shrink-0 mt-0.5" /><span>{b.address || '—'}{b.city ? `, ${b.city}` : ''}</span></div>
                     <div className="flex items-center gap-1.5"><Phone className="w-4 h-4" />{b.phone ? <a href={`tel:${b.phone}`} className="hover:text-sky-600">{b.phone}</a> : '—'}</div>
                     <div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>{b.warehousesCount || 0} مخزن تابع</span></div>
+                    {b.deviceType && (
+                      <div className="flex items-center gap-1.5"><Smartphone className="w-4 h-4" /><span>نوع الجهاز: {b.deviceType}</span></div>
+                    )}
                   </div>
                 </div>
                 {canManage && (
@@ -98,21 +149,46 @@ export const BranchesPage: React.FC = () => {
 
       {modalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-extrabold text-slate-900">إضافة فرع جديد</h3>
               <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
             </div>
-            <form onSubmit={handleCreate} className="space-y-3 text-xs">
-              <div><label className="font-bold text-slate-700 block mb-1">اسم الفرع *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" /></div>
-              <div className="grid grid-cols-2 gap-2">
+            <form onSubmit={handleCreate} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2"><label className="font-bold text-slate-700 block mb-1">اسم الفرع *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">الهاتف</label><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">المدينة</label><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+                <div className="md:col-span-2"><label className="font-bold text-slate-700 block mb-1">العنوان</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+                <div><label className="font-bold text-slate-700 block mb-1">نوع الجهاز</label><select value={form.deviceType} onChange={(e) => setForm({ ...form, deviceType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                  <option value="WINDOWS">Windows</option>
+                  <option value="MAC">Mac</option>
+                  <option value="LINUX">Linux</option>
+                  <option value="ANDROID">Android</option>
+                  <option value="IOS">iOS</option>
+                  <option value="OTHER">آخر</option>
+                </select></div>
+                <div><label className="font-bold text-slate-700 block mb-1">اسم الجهاز</label><input value={form.deviceName} onChange={(e) => setForm({ ...form, deviceName: e.target.value })} placeholder="Head Office PC" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+                <div className="md:col-span-2"><label className="font-bold text-slate-700 block mb-1">اسم المدير / المسؤول</label><input value={form.managerName} onChange={(e) => setForm({ ...form, managerName: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               </div>
-              <div><label className="font-bold text-slate-700 block mb-1">العنوان</label><input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-2">صلاحيات الفرع</label>
+                <div className="flex flex-wrap gap-2">
+                  {permissionOptions.map((permission) => {
+                    const checked = form.permissions.includes(permission);
+                    return (
+                      <button type="button" key={permission} onClick={() => togglePermission(permission)} className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition ${checked ? 'bg-sky-600 text-white border-sky-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                        {permission}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
-                <button type="submit" disabled={saving} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إضافة</button>
+                <button type="submit" disabled={saving} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء الفرع</button>
               </div>
             </form>
           </div>

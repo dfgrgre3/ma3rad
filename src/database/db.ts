@@ -733,6 +733,59 @@ export class DatabaseManager {
     return this.exportSnapshot();
   }
 
+  public readImportTablesBinary(bytes: Uint8Array): Array<{
+    name: string;
+    columns: string[];
+    rows: Array<Record<string, unknown>>;
+  }> {
+    if (!this.SQL) throw new Error('SQL engine not loaded');
+    let candidate: Database | undefined;
+    try {
+      const importedDatabase = new this.SQL.Database(bytes) as Database;
+      candidate = importedDatabase;
+      const integrity = importedDatabase.exec('PRAGMA integrity_check')[0]?.values[0]?.[0];
+      if (integrity !== 'ok') throw new Error('ملف النسخة الاحتياطية تالف أو غير مكتمل.');
+
+      const requiredTables = ['users', 'products', 'system_settings', 'sales_invoices'];
+      const availableTables = new Set(
+        (importedDatabase.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")[0]?.values || [])
+          .map((row: unknown[]) => String(row[0]))
+      );
+      if (!requiredTables.every((table) => availableTables.has(table))) {
+        throw new Error('الملف لا يحتوي على نسخة احتياطية صالحة للنظام.');
+      }
+
+      let totalRows = 0;
+      let totalCells = 0;
+      const sheets = [...availableTables]
+        .filter((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+        .sort()
+        .map((name) => {
+          const columns = (importedDatabase.exec(`PRAGMA table_info("${name}")`)[0]?.values || [])
+            .map((column: unknown[]) => String(column[1]));
+          const statement = importedDatabase.prepare(`SELECT * FROM "${name}"`);
+          const rows: Array<Record<string, unknown>> = [];
+          try {
+            while (statement.step()) {
+              const row = statement.getAsObject() as Record<string, unknown>;
+              rows.push(row);
+              totalRows++;
+              totalCells += columns.length;
+              if (totalRows > 1_000_000 || totalCells > 5_000_000) {
+                throw new Error('حجم بيانات النسخة يتجاوز الحد المسموح للدمج.');
+              }
+            }
+          } finally {
+            statement.free();
+          }
+          return { name, columns, rows };
+        });
+      return sheets;
+    } finally {
+      candidate?.close();
+    }
+  }
+
   private exportSnapshot(): Uint8Array {
     const db = this.getDatabase();
     const snapshot = db.export();

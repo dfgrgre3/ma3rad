@@ -307,6 +307,37 @@ export class AuthService {
     return user;
   }
 
+  public static loginByPin(pin: string): User {
+    const db = DatabaseManager.getInstance();
+    const rows = db.query<any>(`SELECT * FROM users WHERE is_active = 1 AND pin_code IS NOT NULL`);
+    let matched: any = null;
+    for (const row of rows) {
+      try {
+        if (bcrypt.compareSync(pin, row.pinCode)) { matched = row; break; }
+      } catch { /* ignore */ }
+    }
+    if (!matched) {
+      AuthService.recordLogin(null, 'pin', false, 'WRONG_PIN');
+      throw new Error('رمز PIN غير صحيح.');
+    }
+    const user: User = {
+      id: matched.id,
+      username: matched.username,
+      fullName: matched.fullName,
+      role: matched.role,
+      phone: matched.phone,
+      isActive: Boolean(matched.isActive),
+      mustChangePassword: false,
+      createdAt: matched.createdAt,
+      updatedAt: matched.updatedAt
+    };
+    AuthService.setCurrentUser(user);
+    AuthService.recordLogin(user.id, matched.username, true);
+    AuthService.startSession(user.id);
+    try { localStorage.setItem(SESSION_KEY, user.id); } catch { /* ignore */ }
+    return user;
+  }
+
   public static login(username: string, passwordAttempt: string): User {
     const db = DatabaseManager.getInstance();
     const rows = db.query<any>(`SELECT * FROM users WHERE username = ? AND is_active = 1`, [username]);

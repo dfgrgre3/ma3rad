@@ -19,6 +19,27 @@ declare global {
         set?: (username: string, password: string) => Promise<{ ok: boolean }>;
         clear?: () => Promise<{ ok: boolean }>;
       };
+      sync?: {
+        status?: () => Promise<{
+          clientConfigured: boolean;
+          clientIdentity: { tenantId: string; branchId: string; deviceId: string; canManagePolicies?: boolean } | null;
+          server: {
+            serverEnabled: boolean;
+            serverListening: boolean;
+            host?: string | null;
+            port?: number | null;
+            journalEvents?: number;
+          };
+          error: string | null;
+        }>;
+        runSyncNow?: () => Promise<void>;
+        pushEvents?: (events: import('../sync/types').SyncEvent[]) => Promise<import('../sync/types').SyncPushResult>;
+        pullEvents?: (
+          scope: string,
+          cursor: string | null,
+          limit: number
+        ) => Promise<import('../sync/types').SyncPullResult>;
+      };
       app?: {
         info?: () => Promise<{ version: string; packaged: boolean; dataDir: string; backupDir: string }>;
         openFolder?: (target?: 'data' | 'backups') => Promise<{ ok: boolean; path?: string; error?: string }>;

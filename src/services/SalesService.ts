@@ -149,6 +149,49 @@ export class SalesService {
     return createSaleReturn(this.context(), invoiceId, returnItems, refundCash, performedBy, options);
   }
 
+  /**
+   * Exchange (swap): return some items from an invoice (refunded to customer balance)
+   * and sell new items in the same operation. The returned value becomes credit that
+   * offsets the new purchase, so the customer's balance nets automatically.
+   */
+  public exchangeSale(
+    invoiceId: string,
+    returnItems: ReturnRequestItem[],
+    newItems: CreateSaleDTO['items'],
+    performedBy = 'usr_admin',
+    options: {
+      warehouseId?: string;
+      shiftId?: string;
+      notes?: string;
+    } = {}
+  ): { return: SalesReturn; invoice: SalesInvoice } {
+    ModuleRegistryService.assertModuleEnabled('sales');
+    const ctx = this.context();
+    const inv = ctx.getInvoiceById(invoiceId);
+    if (!inv) throw new Error('الفاتورة الأصلية غير موجودة.');
+    const warehouseId = options.warehouseId || inv.warehouseId;
+
+    // 1. Return selected items, refunding to customer balance (credit).
+    const ret = createSaleReturn(ctx, invoiceId, returnItems, false, performedBy, {
+      refundMethod: 'BALANCE',
+      shiftId: options.shiftId,
+    });
+
+    // 2. Create a new sale for the replacement items on credit.
+    const newInvoice = createSalesInvoice(ctx, {
+      customerId: inv.customerId,
+      warehouseId,
+      shiftId: options.shiftId,
+      items: newItems,
+      paidAmount: 0,
+      paymentType: 'CREDIT',
+      notes: options.notes || `استبدال من فاتورة ${inv.invoiceNumber}`,
+      performedBy,
+    });
+
+    return { return: ret, invoice: newInvoice };
+  }
+
   /** Void a completed sales invoice with full reversal (brief §67/§220). */
   public voidInvoice(invoiceId: string, reason: string): SalesInvoice {
     return voidSalesInvoice(this.context(), invoiceId, reason);

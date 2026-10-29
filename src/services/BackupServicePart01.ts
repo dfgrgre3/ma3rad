@@ -146,7 +146,33 @@ public async restoreBackupFromFile(file: File): Promise<{
     };
   }
 
-public async createLocalSnapshot(label = 'manual', actor?: { id: string; fullName: string }): Promise<{ ok: boolean; path?: string; error?: string }> {
+  public async readBackupDataForImport(file: File): Promise<Array<{
+      name: string;
+      columns: string[];
+      rows: Array<Record<string, unknown>>;
+    }>> {
+      this.require();
+      if (!file.name.toLocaleLowerCase().endsWith('.ceramisys-backup')) {
+        throw new Error('اختر نسخة مشفرة بامتداد ‎.ceramisys-backup‎.');
+      }
+      if (!file.size || file.size > 100 * 1024 * 1024) {
+        throw new Error('حجم ملف النسخة فارغ أو يتجاوز الحد المسموح (100 ميجابايت).');
+      }
+      const encryptedBytes = new Uint8Array(await file.arrayBuffer());
+      if (!isEncryptedBackup(encryptedBytes)) {
+        throw new Error('محتوى الملف ليس نسخة مشفرة صالحة بامتداد ‎.ceramisys-backup‎.');
+      }
+      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
+      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
+      const bytes = await decryptExternalBackup(encryptedBytes, password);
+      const inspection = this.verifyBackupFile(bytes);
+      if (!inspection.valid) {
+        throw new Error(`الملف تالف أو غير صالح للاستيراد: ${inspection.error || inspection.integrity}`);
+      }
+      return this.db.readImportTablesBinary(bytes);
+    }
+
+  public async createLocalSnapshot(label = 'manual', actor?: { id: string; fullName: string }): Promise<{ ok: boolean; path?: string; error?: string }> {
     const api = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
     if (!api?.backup) return { ok: false, error: 'النسخ التلقائي متاح داخل تطبيق سطح المكتب فقط' };
 

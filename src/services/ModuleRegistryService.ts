@@ -106,8 +106,13 @@ export class ModuleRegistryService {
     });
   }
 
-  public static validate(ids: string[]): { enabled: string[]; errors: string[]; warnings: string[] } {
-    return validateModuleSelection(ids, { trackInventory: ModuleRegistryService.isInventoryTracked() });
+  public static validate(
+    ids: string[],
+    options: { trackInventory?: boolean } = {}
+  ): { enabled: string[]; errors: string[]; warnings: string[] } {
+    return validateModuleSelection(ids, {
+      trackInventory: options.trackInventory ?? ModuleRegistryService.isInventoryTracked(),
+    });
   }
 
   /** Add every transitive dependency to a requested selection (used by the UI toggle). */
@@ -170,7 +175,12 @@ export class ModuleRegistryService {
    * - Records an append-only activation log and an audit entry per change.
    * - Disabling a module hides its screens but never deletes its data.
    */
-  public static setEnabledModules(ids: string[], actor?: User | null, reason?: string): ModuleChangeResult {
+  public static setEnabledModules(
+    ids: string[],
+    actor?: User | null,
+    reason?: string,
+    options: { trackInventory?: boolean } = {}
+  ): ModuleChangeResult {
     const user = actor ?? AuthService.getCurrentUser();
     PermissionService.require(user, 'modules.manage');
 
@@ -186,7 +196,7 @@ export class ModuleRegistryService {
       }
     }
 
-    const validation = ModuleRegistryService.validate(ids);
+    const validation = ModuleRegistryService.validate(ids, options);
     if (validation.errors.length > 0) {
       throw new Error(validation.errors.join(' '));
     }

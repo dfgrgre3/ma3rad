@@ -15,6 +15,8 @@ export interface Branch {
   city?: string | null;
   managerId?: string | null;
   managerName?: string;
+  deviceType?: string | null;
+  activationCode?: string | null;
   isMain: boolean;
   isActive: boolean;
   warehousesCount?: number;
@@ -108,9 +110,12 @@ export class OperationsService {
     PermissionService.require(actor, 'branches.view');
     const scope = this.branchAccess.sqlScope('b.id', undefined, actor);
     let sql = `
-      SELECT b.*, u.full_name AS manager_name,
+      SELECT b.*, u.full_name AS manager_name, sb.device_type AS deviceType, sb.activation_code AS activationCode,
         (SELECT COUNT(*) FROM warehouses w WHERE w.branch_id = b.id AND w.is_active = 1) AS warehouses_count
-      FROM branches b LEFT JOIN users u ON u.id = b.manager_id WHERE ${scope.clause}`;
+      FROM branches b
+      LEFT JOIN users u ON u.id = b.manager_id
+      LEFT JOIN sync_branches sb ON sb.branch_id = b.id
+      WHERE ${scope.clause}`;
     const params: any[] = [...scope.params];
     if (search.trim()) {
       sql += ` AND (b.name LIKE ? OR b.code LIKE ? OR b.address LIKE ? OR b.city LIKE ?)`;
@@ -122,23 +127,53 @@ export class OperationsService {
       ...b,
       isMain: Boolean(b.isMain),
       isActive: Boolean(b.isActive),
+      deviceType: b.deviceType ?? null,
+      activationCode: b.activationCode ?? null,
     }));
   }
 
-  public createBranch(input: { name: string; phone?: string; address?: string; city?: string }): Branch {
+  public createBranch(input: {
+    name: string;
+    phone?: string;
+    address?: string;
+    city?: string;
+    deviceType?: string;
+    deviceName?: string;
+    managerName?: string;
+    permissions?: string[];
+    notes?: string;
+  }): Branch {
     ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('branches.manage');
     PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
-    if (!input.name.trim()) throw new Error('اسم الفرع مطلوب.');
+    const trimmedName = input.name?.trim();
+    if (!trimmedName) throw new Error('اسم الفرع مطلوب.');
     const id = `br_${uuidv4().substring(0, 8)}`;
+    const deviceType = (input.deviceType || 'WINDOWS').trim().toUpperCase();
+    const permissionList = Array.isArray(input.permissions) ? input.permissions.filter(Boolean).map((p) => String(p).trim()).filter(Boolean) : [];
+    const notesPayload = {
+      deviceType,
+      deviceName: input.deviceName?.trim() || null,
+      managerName: input.managerName?.trim() || null,
+      permissions: permissionList,
+      createdFrom: 'branch-onboarding',
+    };
+    const activationCode = `BR-${uuidv4().slice(0, 8).toUpperCase()}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('BR');
+      const notes = input.notes || JSON.stringify(notesPayload);
       db.run(
-        `INSERT INTO branches (id, code, name, phone, address, city, is_main, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
-        [id, code, input.name.trim(), input.phone || null, input.address || null, input.city || null]
+        `INSERT INTO branches (id, code, name, phone, address, city, is_main, is_active, notes)
+         VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?)`,
+        [id, code, trimmedName, input.phone || null, input.address || null, input.city || null, notes]
       );
-      return this.getBranches().find((b) => b.id === id)!;
+      db.run(
+        `INSERT OR REPLACE INTO sync_branches (branch_id, tenant_id, name, status, is_verified, verified_at, authorized_by, device_type, activation_code, last_contact_at, last_sync_at, updated_at)
+         VALUES (?, ?, ?, 'ACTIVE', 1, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [id, null, trimmedName, new Date().toISOString(), AuthService.getCurrentUser()?.id || null, deviceType, activationCode]
+      );
+      const branch = this.getBranches().find((b) => b.id === id)!;
+      return { ...branch, deviceType, activationCode, notes } as Branch;
     });
   }
 

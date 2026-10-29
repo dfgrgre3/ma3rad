@@ -128,7 +128,7 @@ test('FIFO sales post layer cost and a sales return restores the original lot', 
   InventoryCostingService.addLayer(db,{productId,warehouseId:'wh_main',sourceType:'TEST',sourceId:'lot2',date:'2026-02-01',quantity:5,unitCost:20});
   db.run(`INSERT OR REPLACE INTO system_settings (key,value) VALUES ('costingMethod','FIFO')`);
   const cashBefore = q(`SELECT current_balance AS balance FROM cash_registers WHERE id='cr_main'`)[0].balance;
-  const customer = new CustomerService().createCustomer({name:'FIFO test customer',phone:'0199000001',customerType:'RETAIL',creditLimit:0});
+  const customer = new CustomerService().createCustomer({code:'',name:'FIFO test customer',phone:'0199000001',customerType:'RETAIL',creditLimit:0});
   const sales = new SalesService();
   const invoice = sales.createSale({customerId:customer.id,warehouseId:'wh_main',items:[{
     productId,soldBy:'M2',quantityM2:7,boxesCount:5,piecesCount:20,unitPrice:100,

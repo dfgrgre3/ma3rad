@@ -1,4 +1,5 @@
-﻿const { createCipheriv, createDecipheriv, randomBytes } = require('node:crypto');
+const { createCipheriv, createDecipheriv, randomBytes } = require('node:crypto');
+const backupStrategyService = require('./backupStrategyService');
 
 const DB_MAGIC = Buffer.from('CERAMISYS-DB\0v1\0', 'utf8');
 const DB_KEY_FILE = 'database-key.enc';
@@ -229,7 +230,20 @@ function registerDatabaseHandlers({
       const safeLabel = String(label || 'manual').replace(/[^a-zA-Z0-9_-]/g, '-');
       const target = path.join(BACKUP_DIR, `ceramisys_${safeLabel}_${stamp}.sqlite.enc`);
       await atomicCreate(fs, target, protectedBytes);
-      return { ok: true, path: target, bytes: protectedBytes.length };
+
+      // تطبيق استراتيجية 3-2-1
+      const strategy = await backupStrategyService.apply321Strategy({
+        BACKUP_DIR,
+        DATA_DIR,
+        APP_DATA_DIR
+      }, label === 'daily' ? 'daily' : 'full');
+
+      return {
+        ok: true,
+        path: target,
+        bytes: protectedBytes.length,
+        strategy
+      };
     } catch (error) {
       console.error('Failed to create encrypted database backup:', error);
       return { ok: false, error: error.message || String(error) };
@@ -266,6 +280,43 @@ function registerDatabaseHandlers({
       return { path: DB_FILE, exists: false, bytes: 0, backupDir: BACKUP_DIR, error: String(error) };
     }
   });
+
+ipcMain.handle('db:analyze-backup-strategy', async (event) => {
+    validateIpcSender(event);
+    try {
+      ensureDirs();
+      const strategy = await backupStrategyService.analyzeBackupStrategy({ BACKUP_DIR });
+      return { ok: true, ...strategy };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
+ipcMain.handle('db:backup-stats', async (event) => {
+    validateIpcSender(event);
+    try {
+      ensureDirs();
+      const stats = await backupStrategyService.getBackupStrategyStats({ BACKUP_DIR });
+      return { ok: true, ...stats };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
+ipcMain.handle('db:cleanup-backups', async (event, retention = {}) => {
+    validateIpcSender(event);
+    try {
+      ensureDirs();
+      const count = await backupStrategyService.cleanupOldBackups(
+        { BACKUP_DIR },
+        { daily: retention.daily || 7, weekly: retention.weekly || 4, monthly: retention.monthly || 12 }
+      );
+      return { ok: true, deleted: count };
+    } catch (error) {
+      return { ok: false, error: error.message };
+    }
+  });
+
 
   ipcMain.handle('credentials:get', async (event) => {
     validateIpcSender(event);

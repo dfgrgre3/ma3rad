@@ -14,7 +14,7 @@ const fmtDate = (value?: string | null) => {
 };
 
 export const SecurityCenterPage: React.FC = () => {
-  const service = useMemo(() => new SecurityService(), []);
+  const service = useMemo(() => SecurityService.getInstance(), []);
   const toast = useToast();
   const [overview, setOverview] = useState<SecurityOverview | null>(null);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -177,7 +177,7 @@ export const SecurityCenterPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {history.map((record) => (
                     <tr key={record.id} className="hover:bg-slate-50/70">
-                      <td className="px-3 py-2.5 font-semibold">{record.userName || record.username}</td>
+                      <td className="px-3 py-2.5 font-semibold">{record.username}</td>
                       <td className="px-3 py-2.5">
                         <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${record.succeeded ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
                           {record.succeeded ? 'ناجح' : 'فاشل'}
