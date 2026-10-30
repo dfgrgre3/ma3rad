@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('ceramisys', {
     status: () => ipcRenderer.invoke('sync:status'),
     pushEvents: (events) => ipcRenderer.invoke('sync:push', events),
     pullEvents: (scope, cursor, limit) => ipcRenderer.invoke('sync:pull', scope, cursor, limit),
+    getClientConfig: () => ipcRenderer.invoke('sync:client-config:get'),
+    saveClientConfig: (config) => ipcRenderer.invoke('sync:client-config:save', config),
+    clearClientConfig: () => ipcRenderer.invoke('sync:client-config:clear'),
   },
   app: {
     info: () => ipcRenderer.invoke('app:info'),

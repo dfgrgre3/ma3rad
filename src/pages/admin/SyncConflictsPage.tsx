@@ -12,6 +12,7 @@ import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService'
 import { BranchRegistry } from '../../sync/BranchRegistry';
 import { DeviceRegistry } from '../../sync/DeviceRegistry';
 import { useToast } from '../../components/ui/Toast';
+import { SyncClientSettings } from './SyncClientSettings';
 
 const entityLabels: Record<string, string> = {
   category: 'تصنيف',
@@ -330,6 +331,8 @@ export const SyncConflictsPage: React.FC = () => {
           <p>هوية مزامنة هذا الجهاز غير مهيأة حاليًا. ستظهر التعارضات بعد إعداد اتصال الفرع وتشغيل المزامنة.</p>
         </div>
       )}
+
+      <SyncClientSettings />
 
       <section className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-4 grid gap-4 lg:grid-cols-2">

@@ -10,6 +10,10 @@ const { registerDocumentHandlers } = require('./documentHandlers');
 const { isAllowedAppUrl, isAllowedIpcSender } = require('./security');
 const { installGracefulClose } = require('./gracefulShutdown');
 const { createHttpSyncClient, createSyncRelay } = require('./syncRelay');
+const {
+  loadSyncClientConfig,
+  registerSyncClientConfigHandlers,
+} = require('./syncClientConfig');
 
 // Keep application data in the OS-standard roaming profile. This is always
 // writable, even when the app itself is installed under Program Files.
@@ -52,8 +56,11 @@ function validateIpcSender(event) {
 const MAX_DB_SIZE = 500 * 1024 * 1024; // 500MB
 const MAX_PRINT_DATA = 10 * 1024 * 1024; // 10MB for print data
 let syncClient = null;
+let activeSyncClientConfig = null;
+let syncClientConfigSource = 'none';
 let syncRelay = null;
 let syncStartupError = null;
+let restartAfterGracefulClose = false;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -129,6 +136,14 @@ function createWindow() {
     ipcMain,
     dialog,
     validateIpcSender,
+    onApprovedClose: () => {
+      if (!restartAfterGracefulClose) return;
+      restartAfterGracefulClose = false;
+      app.relaunch();
+    },
+    onCancelledClose: () => {
+      restartAfterGracefulClose = false;
+    },
   });
 
   if (!app.isPackaged) {
@@ -150,11 +165,29 @@ registerDatabaseHandlers({
 registerAppHandlers({
   ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
   appDataDir: APP_DATA_DIR, DATA_DIR, BACKUP_DIR, ensureDirs,
+  requestGracefulRestart: () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (!win) {
+      app.relaunch();
+      app.quit();
+      return;
+    }
+    restartAfterGracefulClose = true;
+    win.close();
+  },
 });
 registerDocumentHandlers({
   ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, appDataDir: APP_DATA_DIR,
 });
 registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR, MAX_PRINT_DATA });
+registerSyncClientConfigHandlers({
+  ipcMain,
+  validateIpcSender,
+  appDataDir: APP_DATA_DIR,
+  fs,
+  path,
+  safeStorage,
+});
 
 async function loadOrCreateSyncJournalKey() {
   if (!(await safeStorage.isAsyncEncryptionAvailable())) {
@@ -186,7 +219,7 @@ async function loadOrCreateSyncJournalKey() {
 }
 
 async function initializeSync() {
-  const clientConfig = {
+  const environmentConfig = {
     url: process.env.CERAMISYS_SYNC_URL,
     token: process.env.CERAMISYS_SYNC_TOKEN,
     tenantId: process.env.CERAMISYS_SYNC_TENANT_ID,
@@ -195,18 +228,30 @@ async function initializeSync() {
     canManagePolicies: process.env.CERAMISYS_SYNC_POLICY_AUTHORITY === 'true',
   };
   const requiredClientConfig = [
-    clientConfig.url,
-    clientConfig.token,
-    clientConfig.tenantId,
-    clientConfig.branchId,
-    clientConfig.deviceId,
+    environmentConfig.url,
+    environmentConfig.token,
+    environmentConfig.tenantId,
+    environmentConfig.branchId,
+    environmentConfig.deviceId,
   ];
   const configuredClientFields = requiredClientConfig.filter(Boolean).length;
-  if (configuredClientFields > 0) {
+  const storedConfig = await loadSyncClientConfig({
+    appDataDir: APP_DATA_DIR,
+    fs,
+    path,
+    safeStorage,
+  });
+  if (storedConfig) {
+    activeSyncClientConfig = storedConfig;
+    syncClientConfigSource = 'secure-storage';
+    syncClient = createHttpSyncClient(activeSyncClientConfig);
+  } else if (configuredClientFields > 0) {
     if (configuredClientFields !== requiredClientConfig.length) {
       throw new Error('All CERAMISYS_SYNC_* client settings must be provided together.');
     }
-    syncClient = createHttpSyncClient(clientConfig);
+    activeSyncClientConfig = environmentConfig;
+    syncClientConfigSource = 'environment';
+    syncClient = createHttpSyncClient(activeSyncClientConfig);
   }
 
   const configuredClients = process.env.CERAMISYS_SYNC_CLIENTS;
@@ -238,11 +283,20 @@ ipcMain.handle('sync:status', async (event) => {
   return {
     clientConfigured: Boolean(syncClient),
     clientIdentity: syncClient ? {
-      tenantId: process.env.CERAMISYS_SYNC_TENANT_ID,
-      branchId: process.env.CERAMISYS_SYNC_BRANCH_ID,
-      deviceId: process.env.CERAMISYS_SYNC_DEVICE_ID,
-      canManagePolicies: process.env.CERAMISYS_SYNC_POLICY_AUTHORITY === 'true',
+      tenantId: activeSyncClientConfig.tenantId,
+      branchId: activeSyncClientConfig.branchId,
+      deviceId: activeSyncClientConfig.deviceId,
+      canManagePolicies: activeSyncClientConfig.canManagePolicies,
     } : null,
+    clientConfig: syncClient ? {
+      url: activeSyncClientConfig.url,
+      tenantId: activeSyncClientConfig.tenantId,
+      branchId: activeSyncClientConfig.branchId,
+      deviceId: activeSyncClientConfig.deviceId,
+      canManagePolicies: activeSyncClientConfig.canManagePolicies,
+      tokenConfigured: true,
+    } : null,
+    clientConfigSource: syncClientConfigSource,
     server: syncRelay?.status() ?? { serverEnabled: false, serverListening: false },
     error: syncStartupError,
   };

@@ -17,7 +17,7 @@ function hasSignature(bytes, signature) {
 
 function registerAppHandlers({
   ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
-  appDataDir, DATA_DIR, BACKUP_DIR, ensureDirs,
+  appDataDir, DATA_DIR, BACKUP_DIR, ensureDirs, requestGracefulRestart,
 }) {
   ipcMain.handle('db:encrypt-xlsx-backup', async (event, bytes, password) => {
     validateIpcSender(event);
@@ -67,12 +67,12 @@ function registerAppHandlers({
     };
   });
 
-  // Full application restart. The renderer flushes the SQLite snapshot to disk
-  // before calling this, so a relaunch never loses the newest writes.
   ipcMain.handle('app:relaunch', async (event) => {
     validateIpcSender(event);
-    app.relaunch();
-    app.exit(0);
+    if (typeof requestGracefulRestart !== 'function') {
+      throw new Error('Graceful application restart is unavailable.');
+    }
+    requestGracefulRestart();
     return { ok: true };
   });
 

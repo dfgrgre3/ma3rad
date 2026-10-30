@@ -360,6 +360,34 @@ test('industry profiles materialize typed product fields and selection options',
   }
 });
 
+test('profile defaults do not rewrite manually configured product attributes', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  manager.run(
+    `INSERT INTO attributes (id, code, name, data_type, is_filterable, sort_order)
+     VALUES (?, ?, ?, 'TEXT', 1, 0)`,
+    ['attr_manual_profile', 'MANUAL_PROFILE_FIELD', 'حقل النشاط المخصص'],
+  );
+
+  const result = BusinessProfileService.ensureProfileAttributeDefinitions([{
+    code: 'MANAGED_PROFILE_FIELD',
+    name: 'حقل النشاط المخصص',
+    dataType: 'SELECT',
+    options: ['اختيار'],
+  }]);
+
+  assert.deepEqual(result, { created: [], existing: ['حقل النشاط المخصص'] });
+  const stored = manager.query<{ code: string; dataType: string }>(
+    'SELECT code, data_type AS dataType FROM attributes WHERE id = ?',
+    ['attr_manual_profile'],
+  )[0];
+  assert.deepEqual(stored, { code: 'MANUAL_PROFILE_FIELD', dataType: 'TEXT' });
+  assert.equal(
+    manager.query('SELECT id FROM attribute_options WHERE attribute_id = ?', ['attr_manual_profile']).length,
+    0,
+  );
+});
+
 test('business configuration is restored from SQLite settings', async () => {
   const manager = DatabaseManager.getInstance();
   await manager.initialize();

@@ -5,6 +5,7 @@ const http = require('node:http');
 const https = require('node:https');
 const path = require('node:path');
 const { Pool } = require('pg');
+const { createPeerReplication, normalizePeers } = require('./peerReplication');
 const {
   MAX_BATCH_SIZE,
   constantTimeEqual,
@@ -105,6 +106,7 @@ function makePoolFromEnvironment() {
 function createSyncServer({
   pool,
   clients,
+  peers = [],
   host = '127.0.0.1',
   port = 47821,
   tlsCertPath,
@@ -125,8 +127,22 @@ function createSyncServer({
   }
 
   const identities = normalizeClients(clients);
+  const syncPeers = normalizePeers(peers, identities);
   const failedAuth = new Map();
   let server = null;
+  let initialization;
+
+  function initialize() {
+    if (!initialization) {
+      initialization = fs.readFile(schemaPath, 'utf8')
+        .then((schema) => pool.query(schema))
+        .catch((error) => {
+          initialization = null;
+          throw error;
+        });
+    }
+    return initialization;
+  }
 
   function isRateLimited(request) {
     const now = Date.now();
@@ -159,11 +175,11 @@ function createSyncServer({
     return identities.find((identity) => constantTimeEqual(supplied, identity.token)) ?? null;
   }
 
-  async function persistEvent(identity, event) {
+  async function persistEvent(identity, event, { replicated = false } = {}) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      if (event.entityType !== 'sync_policy') {
+      if (!replicated && event.entityType !== 'sync_policy') {
         const policyResult = await client.query(
           `SELECT enabled, outbound_enabled AS "outboundEnabled", data_scope AS "dataScope"
            FROM sync_entity_policies
@@ -200,7 +216,7 @@ function createSyncServer({
                   entity_id AS "entityId", operation_type AS "operationType",
                   entity_version AS "entityVersion", schema_version AS "schemaVersion",
                   data_scope AS "dataScope", payload,
-                  EXTRACT(EPOCH FROM created_at) AS "createdAtEpoch"
+                  to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
            FROM sync_events WHERE tenant_id = $1 AND event_id = $2`,
           [identity.tenantId, event.eventId]
         );
@@ -210,7 +226,7 @@ function createSyncServer({
             existing.operationType !== event.operationType || existing.entityVersion !== event.entityVersion ||
             existing.schemaVersion !== event.schemaVersion || existing.dataScope !== event.dataScope ||
             stableJson(existing.payload) !== stableJson(event.payload) ||
-            Math.abs(Number(existing.createdAtEpoch) * 1000 - Date.parse(event.createdAt)) >= 1000) {
+            Date.parse(existing.createdAt) !== Date.parse(event.createdAt)) {
           throw new SyncRequestError(`Event ID collision: ${event.eventId}`, 409);
         }
       }
@@ -247,12 +263,45 @@ function createSyncServer({
     }
   }
 
-  async function pullEvents(identity, cursorValue, limitValue) {
+  async function pullEvents(identity, cursorValue, limitValue, { originBranchOnly = false } = {}) {
     const cursor = readCursor(cursorValue);
     const limit = Number(limitValue);
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
       throw new SyncRequestError('limit must be an integer between 1 and 100');
     }
+    if (originBranchOnly) {
+      const result = await pool.query(
+        `SELECT sequence::text AS sequence, event_id AS "eventId", tenant_id AS "tenantId",
+                branch_id AS "branchId", device_id AS "deviceId", entity_type AS "entityType",
+                entity_id AS "entityId", operation_type AS "operationType",
+                entity_version AS "entityVersion", schema_version AS "schemaVersion",
+                data_scope AS "dataScope", payload,
+                to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+         FROM sync_events
+         WHERE tenant_id = $1 AND sequence > $2::bigint
+           AND branch_id = $3 AND device_id <> $4
+         ORDER BY sequence ASC LIMIT $5`,
+        [identity.tenantId, cursor.toString(), identity.branchId, identity.deviceId, limit + 1]
+      );
+      const hasMore = result.rows.length > limit;
+      const rows = hasMore ? result.rows.slice(0, limit) : result.rows;
+      let nextCursor;
+      if (hasMore && rows.length) {
+        nextCursor = rows[rows.length - 1].sequence;
+      } else {
+        const maxResult = await pool.query(
+          `SELECT COALESCE(MAX(sequence), $3::bigint)::text AS cursor
+           FROM sync_events WHERE tenant_id = $1 AND branch_id = $2`,
+          [identity.tenantId, identity.branchId, cursor.toString()]
+        );
+        nextCursor = maxResult.rows[0].cursor;
+      }
+      return {
+        events: rows.map(({ sequence: _sequence, ...event }) => event),
+        nextCursor,
+      };
+    }
+
     const visibility = identity.canReadAllBranches
       ? `(data_scope = 'TENANT' OR data_scope = 'BRANCH')`
       : `(data_scope = 'TENANT' OR branch_id = $3)`;
@@ -319,7 +368,17 @@ function createSyncServer({
     }
     failedAuth.delete(request.socket.remoteAddress || 'unknown');
 
-    if (request.method === 'POST' && url.pathname === '/sync/push') {
+    if (request.method === 'POST' && url.pathname === '/sync/push' && identity.canServePeerSync) {
+      throw new SyncRequestError('Peer credentials cannot publish desktop events', 403);
+    }
+
+    const isReplicationPush = request.method === 'POST' && url.pathname === '/sync/replicate/push';
+    if (request.method === 'POST' &&
+        (url.pathname === '/sync/push' || isReplicationPush)) {
+      if (isReplicationPush &&
+          (!identity.canServePeerSync || identity.canReplicateBranches.length === 0)) {
+        throw new SyncRequestError('Peer replication is not authorized for this device', 403);
+      }
       if (!String(request.headers['content-type'] || '').toLowerCase().startsWith('application/json')) {
         sendJson(response, 415, { error: 'Content-Type must be application/json' });
         return;
@@ -333,10 +392,10 @@ function createSyncServer({
       const batchIds = new Set();
       for (const inputEvent of input.events) {
         try {
-          const event = validateEvent(inputEvent, identity);
+          const event = validateEvent(inputEvent, identity, { allowReplication: isReplicationPush });
           if (batchIds.has(event.eventId)) throw new SyncRequestError('Duplicate event ID in request batch');
           batchIds.add(event.eventId);
-          await persistEvent(identity, event);
+          await persistEvent(identity, event, { replicated: isReplicationPush });
           acknowledged.push(event.eventId);
         } catch (error) {
           if (error.code) console.error('PostgreSQL sync event write failed:', error);
@@ -360,28 +419,55 @@ function createSyncServer({
       sendJson(response, 200, result);
       return;
     }
+    if (request.method === 'GET' && url.pathname === '/sync/replicate/pull') {
+      if (!identity.canServePeerSync) {
+        throw new SyncRequestError('Peer replication is not authorized for this device', 403);
+      }
+      if (url.searchParams.get('scope') !== identity.tenantId) {
+        throw new SyncRequestError('Requested scope is not authorized', 403);
+      }
+      const result = await pullEvents(
+        identity,
+        url.searchParams.get('cursor'),
+        url.searchParams.get('limit') ?? '100',
+        { originBranchOnly: true }
+      );
+      sendJson(response, 200, result);
+      return;
+    }
     sendJson(response, 404, { error: 'Not found' });
   }
 
+  const handler = (request, response) => {
+    void initialize().then(() => handleRequest(request, response)).catch((error) => {
+      if (!response.headersSent) {
+        const statusCode = error.statusCode || (error instanceof SyncRequestError ? 400 : 500);
+        if (statusCode === 500) console.error('Synchronization request failed:', error);
+        sendJson(response, statusCode, {
+          error: statusCode === 500 ? 'Synchronization service error' : error.message,
+        });
+      } else {
+        response.destroy(error);
+      }
+    });
+  };
+
+  const peerReplication = createPeerReplication({
+    pool,
+    peers: syncPeers,
+    applyEvent: async (peer, inputEvent) => {
+      const event = validateEvent(inputEvent, peer.identity, { allowReplication: true });
+      await persistEvent(peer.identity, event, { replicated: true });
+    },
+  });
+
   return {
+    handler,
+    peerReplication,
     async start() {
       if (server) return server.address();
       if (identities.length === 0) throw new Error('At least one sync client must be configured');
-      const schema = await fs.readFile(schemaPath, 'utf8');
-      await pool.query(schema);
-      const handler = (request, response) => {
-        void handleRequest(request, response).catch((error) => {
-          if (!response.headersSent) {
-            const statusCode = error.statusCode || (error instanceof SyncRequestError ? 400 : 500);
-            if (statusCode === 500) console.error('Synchronization request failed:', error);
-            sendJson(response, statusCode, {
-              error: statusCode === 500 ? 'Synchronization service error' : error.message,
-            });
-          } else {
-            response.destroy(error);
-          }
-        });
-      };
+      await initialize();
       if (tlsCertPath && tlsKeyPath) {
         server = https.createServer({
           cert: await fs.readFile(tlsCertPath),
@@ -407,9 +493,11 @@ function createSyncServer({
         server.once('listening', onListening);
         server.listen(port, host);
       });
+      peerReplication.start();
       return server.address();
     },
     async close() {
+      await peerReplication.stop();
       if (!server) return;
       const activeServer = server;
       server = null;
@@ -427,10 +515,19 @@ async function main() {
   } catch (error) {
     throw new Error(`CERAMISYS_SYNC_CLIENTS is missing or invalid: ${error.message}`);
   }
+  let peers = [];
+  if (process.env.CERAMISYS_SYNC_PEERS) {
+    try {
+      peers = JSON.parse(process.env.CERAMISYS_SYNC_PEERS);
+    } catch (error) {
+      throw new Error(`CERAMISYS_SYNC_PEERS is not valid JSON: ${error.message}`);
+    }
+  }
   const pool = makePoolFromEnvironment();
   const service = createSyncServer({
     pool,
     clients,
+    peers,
     host: process.env.CERAMISYS_SYNC_HOST || '127.0.0.1',
     port: process.env.CERAMISYS_SYNC_PORT ? Number(process.env.CERAMISYS_SYNC_PORT) : 47821,
     tlsCertPath: process.env.CERAMISYS_SYNC_TLS_CERT
@@ -442,6 +539,7 @@ async function main() {
   });
   const address = await service.start();
   console.info(`PostgreSQL synchronization server listening on ${address.address}:${address.port}`);
+  if (peers.length > 0) console.info(`Peer synchronization enabled for ${peers.length} branch(es).`);
 
   let shuttingDown = false;
   const shutdown = async (signal) => {
@@ -468,4 +566,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createSyncServer, readCursor, sendJson };
+module.exports = { createSyncServer, makePoolFromEnvironment, readCursor, sendJson };

@@ -32,3 +32,11 @@ CREATE TABLE IF NOT EXISTS sync_entity_policies (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (tenant_id, entity_type)
 );
+
+CREATE TABLE IF NOT EXISTS sync_peer_cursors (
+  tenant_id TEXT NOT NULL,
+  peer_id TEXT NOT NULL,
+  cursor BIGINT NOT NULL DEFAULT 0 CHECK (cursor >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (tenant_id, peer_id)
+);

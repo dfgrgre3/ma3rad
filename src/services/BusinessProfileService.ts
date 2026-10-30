@@ -124,7 +124,9 @@ export class BusinessProfileService {
               [code, definition.dataType, definition.unit || null, byName.id],
             );
             BusinessProfileService.addProfileAttributeOptions(tx, byName.id, definition.options || []);
-          } else if (byName.dataType === definition.dataType && !hasOptions) {
+          } else if (byName.code === BusinessProfileService.codeFor(name)
+            && byName.dataType === definition.dataType
+            && !hasOptions) {
             BusinessProfileService.addProfileAttributeOptions(tx, byName.id, definition.options || []);
           }
           existing.push(name);

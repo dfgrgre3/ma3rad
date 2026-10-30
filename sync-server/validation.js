@@ -57,16 +57,26 @@ function validatePayload(payload) {
   return JSON.parse(encoded);
 }
 
-function validateEvent(input, identity) {
+function validateEvent(input, identity, { allowReplication = false } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Event must be an object');
   for (const key of ['eventId', 'branchId', 'entityType', 'entityId', 'createdAt']) {
     if (typeof input[key] !== 'string' || !input[key].trim() || input[key].length > 256) {
       throw new Error(`${key} must be a non-empty string of at most 256 characters`);
     }
   }
-  if (input.branchId !== identity.branchId) throw new Error('Event branch does not match the authenticated device');
+  const replicationAuthorized = allowReplication &&
+    identity.canReplicateBranches.includes(input.branchId);
+  if (input.branchId !== identity.branchId && !replicationAuthorized) {
+    throw new Error('Event branch does not match the authenticated device');
+  }
   if (input.tenantId && input.tenantId !== identity.tenantId) throw new Error('Event tenant does not match the authenticated device');
-  if (input.deviceId && input.deviceId !== identity.deviceId) throw new Error('Event device does not match the authenticated device');
+  if (input.deviceId !== undefined &&
+      (typeof input.deviceId !== 'string' || !input.deviceId.trim() || input.deviceId.length > 256)) {
+    throw new Error('Event device must be a non-empty string of at most 256 characters');
+  }
+  if (input.deviceId && !allowReplication && input.deviceId !== identity.deviceId) {
+    throw new Error('Event device does not match the authenticated device');
+  }
   if (!VALID_OPERATIONS.has(input.operationType)) throw new Error('Invalid event operation');
   if (!Number.isSafeInteger(input.entityVersion) || input.entityVersion < 1) throw new Error('Invalid entity version');
   if (!Number.isSafeInteger(input.schemaVersion) || input.schemaVersion < 1) throw new Error('Invalid schema version');
@@ -78,7 +88,9 @@ function validateEvent(input, identity) {
   const payload = validatePayload(input.payload);
   if (input.entityType === 'sync_policy') {
     const policy = payload?.policy;
-    if (!identity.canManageSyncPolicies || input.operationType !== 'UPSERT' ||
+    const policyAuthorized = identity.canManageSyncPolicies ||
+      (replicationAuthorized && identity.canReplicatePolicies);
+    if (!policyAuthorized || input.operationType !== 'UPSERT' ||
         dataScope !== 'TENANT' || !policy || typeof policy !== 'object' ||
         Array.isArray(policy) || !POLICY_CONTROLLED_ENTITIES.has(policy.entityType) ||
         input.entityId !== policy.entityType || typeof policy.enabled !== 'boolean' ||
@@ -90,8 +102,8 @@ function validateEvent(input, identity) {
   return {
     eventId: input.eventId,
     tenantId: identity.tenantId,
-    branchId: identity.branchId,
-    deviceId: identity.deviceId,
+    branchId: allowReplication ? input.branchId : identity.branchId,
+    deviceId: allowReplication ? (input.deviceId || identity.deviceId) : identity.deviceId,
     entityType: input.entityType,
     entityId: input.entityId,
     operationType: input.operationType,
@@ -123,6 +135,27 @@ function normalizeClients(clients) {
     }
     seenTokens.add(client.token);
     seenDevices.add(deviceKey);
+    const canReplicateBranches = client.canReplicateBranches === undefined
+      ? []
+      : client.canReplicateBranches;
+    if (!Array.isArray(canReplicateBranches) ||
+        canReplicateBranches.some((branchId) =>
+          typeof branchId !== 'string' || !branchId.trim() || branchId.length > 256) ||
+        new Set(canReplicateBranches).size !== canReplicateBranches.length) {
+      throw new TypeError('canReplicateBranches must be an array of unique non-empty branch IDs');
+    }
+    if (client.canServePeerSync === true && canReplicateBranches.length === 0) {
+      throw new TypeError('Peer synchronization credentials must authorize at least one source branch');
+    }
+    if (client.canServePeerSync === true && client.canReadAllBranches === true) {
+      throw new TypeError('Peer synchronization credentials must not read all tenant branches');
+    }
+    if (canReplicateBranches.includes(client.branchId)) {
+      throw new TypeError('Peer synchronization credentials cannot replicate their own branch');
+    }
+    if (client.canReplicatePolicies === true && client.canServePeerSync !== true) {
+      throw new TypeError('Only peer synchronization credentials can replicate sync policies');
+    }
     return {
       token: client.token,
       tenantId: client.tenantId,
@@ -130,6 +163,9 @@ function normalizeClients(clients) {
       deviceId: client.deviceId,
       canReadAllBranches: client.canReadAllBranches === true,
       canManageSyncPolicies: client.canManageSyncPolicies === true,
+      canServePeerSync: client.canServePeerSync === true,
+      canReplicateBranches: [...canReplicateBranches],
+      canReplicatePolicies: client.canReplicatePolicies === true,
     };
   });
 }

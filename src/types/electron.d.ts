@@ -32,8 +32,41 @@ declare global {
             port?: number | null;
             journalEvents?: number;
           };
+          clientConfig: {
+            url: string;
+            tenantId: string;
+            branchId: string;
+            deviceId: string;
+            canManagePolicies: boolean;
+            tokenConfigured: boolean;
+          } | null;
+          clientConfigSource: 'secure-storage' | 'environment' | 'none';
           error: string | null;
         }>;
+        getClientConfig?: () => Promise<{
+          url: string;
+          tenantId: string;
+          branchId: string;
+          deviceId: string;
+          canManagePolicies: boolean;
+          tokenConfigured: boolean;
+        } | null>;
+        saveClientConfig?: (config: {
+          url: string;
+          token: string;
+          tenantId: string;
+          branchId: string;
+          deviceId: string;
+          canManagePolicies: boolean;
+        }) => Promise<{
+          url: string;
+          tenantId: string;
+          branchId: string;
+          deviceId: string;
+          canManagePolicies: boolean;
+          tokenConfigured: boolean;
+        }>;
+        clearClientConfig?: () => Promise<{ ok: boolean }>;
         runSyncNow?: () => Promise<void>;
         pushEvents?: (events: import('../sync/types').SyncEvent[]) => Promise<import('../sync/types').SyncPushResult>;
         pullEvents?: (

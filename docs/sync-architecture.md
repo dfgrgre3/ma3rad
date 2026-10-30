@@ -8,10 +8,11 @@ relay and HTTPS-only inter-site client are now available in the Electron main
 process. The relay uses a separate append-only, AES-GCM-encrypted journal; it
 never exposes or opens the business database file.
 
-An optional PostgreSQL-backed event relay is also available in `sync-server/`
-for a customer-managed VPN server. It implements the same push/pull protocol
-with durable event and policy tables. It does not change the local SQLite
-databases into a central ERP database or add new domain handlers.
+The PostgreSQL event service in `sync-server/` can run independently at each
+branch. Branch desktops connect to their local server over the LAN, and the
+two servers replicate only their own branch-origin events over a direct
+WireGuard tunnel. Each server keeps its own event database; there is no cloud
+relay, shared operational database, or new domain handler.
 
 This is a partial multi-branch synchronization implementation, not a
 production-wide ERP sync. Transactional outbox capture and inbound handlers
@@ -22,18 +23,21 @@ local invoices, cash movements, customer balances, inventory movements, or
 ledger entries. Detailed payment references, purchasing, inventory, employee,
 settings, and attachment data are not synchronized.
 
-## Target decisions
+## Chosen deployment topology
 
-- Support both one-device branches and a local-server/multiple-client branch.
-- Use a customer-operated WireGuard VPN for inter-site traffic where a
-  reachable route exists; do not assume it solves NAT/CGNAT or add a hosted
-  relay.
-- Define authority and conflict handling per entity before enabling sync.
+- Keep each desktop's operational SQLite database local to that device.
+- Run one PostgreSQL event server per branch; do not expose its PostgreSQL
+  port to LAN or WAN clients.
+- Point branch desktops to their own branch server over HTTPS on the LAN.
+- Replicate only branch-origin events directly between servers over
+  WireGuard, using distinct peer tokens, branch allowlists, and durable
+  per-peer cursors.
+- Use exactly one authorized head-office device for sync-policy authority.
 
-The business database remains renderer-owned. The new relay is a distinct
-service boundary that persists only validated sync events; it does not apply
-business writes. This avoids exposing the database, but does not replace the
-future need for transactionally integrated domain handlers.
+The event servers persist validated synchronization events only. They neither
+open desktop business databases nor apply business writes. This topology
+reduces database exposure but does not provide immediate cross-device shared
+database visibility or replace the need for domain-specific sync handlers.
 
 ## Layers
 
@@ -43,8 +47,9 @@ future need for transactionally integrated domain handlers.
 3. Local persistence — `sql.js` SQLite database, with migrations and Electron file persistence.
 4. Sync schema — outbox, inbox, cursor, registries, tombstones, and audit tables.
 5. Sync classes — `src/sync/*`; an Electron IPC transport delegates network access to the main process.
-6. Electron — persists the database, runs the optional relay/client, and blocks renderer network requests.
-7. Packaging — existing Electron Builder/NSIS configuration; clean-machine sync setup has not been tested.
+6. Branch event server — PostgreSQL-backed sync API with direct peer replication and a durable cursor per remote branch.
+7. Electron — persists each desktop database, runs the configured HTTPS client, and blocks renderer network requests.
+8. Packaging — existing Electron Builder/NSIS configuration; clean-machine sync setup has not been tested.
 
 ## Database tables
 
@@ -61,6 +66,7 @@ future need for transactionally integrated domain handlers.
 - `sync_entity_policies` — administrator settings for supported entity types, direction, and visibility scope.
 - `sync_remote_records` — immutable received sales-document event history.
 - `sync_remote_entities` — latest sales report snapshot per source branch and document.
+- `sync_peer_cursors` — per-branch-server progress for fetching events from each configured peer.
 
 ## Implemented foundation (`src/sync`)
 
@@ -141,13 +147,18 @@ Health is logged, not presented in an administration screen.
   events and the next durable sequence cursor.
 - `GET /health` — unauthenticated liveness only; it exposes no tenant data.
 
-The relay authenticates bearer tokens using constant-time comparisons, binds
-each token to one tenant, branch, and device, limits failed authentication
-attempts, and requires TLS for non-loopback listeners. `TENANT` events are
-visible within their tenant; `BRANCH` events are visible only to devices in
-their source branch and authorized head-office devices. The relay does not
-provide user-level permission checks, token enrollment UI, token rotation, or
-revocation.
+The service authenticates bearer tokens using constant-time comparisons,
+binds each token to one tenant, branch, and device, limits failed
+authentication attempts, and requires TLS for non-loopback listeners.
+`TENANT` events are visible within their tenant; `BRANCH` events are visible
+only to devices in their source branch and authorized head-office devices.
+Peer credentials can only replicate an explicitly allowlisted source branch.
+Only the peer credential for the designated policy-authority branch may also
+set `canReplicatePolicies: true`.
+The `/sync/replicate/pull` endpoint returns events originating at the
+authenticated server's own branch, and peer cursors advance only after
+successful local persistence. The service does not provide user-level
+permission checks, token enrollment UI, token rotation, or revocation.
 
 ## Local configuration
 
@@ -159,15 +170,18 @@ after changing them). A branch client needs all of:
 - `CERAMISYS_SYNC_TENANT_ID`, `CERAMISYS_SYNC_BRANCH_ID`,
   `CERAMISYS_SYNC_DEVICE_ID` — stable assigned identities.
 
-An instance that hosts the relay additionally sets
-`CERAMISYS_SYNC_CLIENTS` to a JSON array of authorized device entries with
-`token`, `tenantId`, `branchId`, `deviceId`, and optional
-`canReadAllBranches: true` for head-office readers or
-`canManageSyncPolicies: true` for the single policy-authority device. It may set
-`CERAMISYS_SYNC_HOST` (defaults to `127.0.0.1`), `CERAMISYS_SYNC_PORT`
-(defaults to `47821`), `CERAMISYS_SYNC_TLS_CERT`, and
-`CERAMISYS_SYNC_TLS_KEY`. The relay journal is written under the app's local
-data directory and must be included in an operator-managed backup plan.
+Each branch's `sync-server` uses `CERAMISYS_SYNC_CLIENTS` for desktop and peer
+credentials. A peer entry must include `canServePeerSync: true` and a
+`canReplicateBranches` list containing only the remote branch it is permitted
+to send. `CERAMISYS_SYNC_PEERS` configures the remote server URL, remote-issued
+token, tenant/branch identity, and matching local peer device ID. Configure
+the server's LAN and WireGuard addresses separately in Docker Compose. See
+`sync-server-deployment.md` for the reciprocal two-server configuration.
+
+The Electron-embedded relay remains an optional single-process alternative;
+the PostgreSQL peer deployment is the selected multi-device branch topology.
+The deployment uses a separate PostgreSQL database at each branch and must
+back up each volume. Keep `.env` and all bearer tokens out of source control.
 
 These settings are an interim deployment mechanism; there is no in-app branch
 setup, pairing, token issuance, or certificate management screen yet. Never
@@ -200,24 +214,27 @@ dead-letter reprocessing and operational alerts are not connected to a UI.
 ## Network connectivity
 
 Renderer networking remains blocked. Only the Electron main process makes
-outbound sync requests. The relay binds to loopback by default; a LAN listener
-requires explicit configuration and TLS certificate/key files. WireGuard can
-protect inter-site routes without a paid relay but cannot create reachability
-through CGNAT by itself. Public addressing, router configuration, or a
-customer-operated reachable endpoint may still be required.
+outbound sync requests. Desktop-to-server traffic uses the branch LAN address;
+server-to-server traffic uses the WireGuard address. Docker publishes TCP
+47821 on only those configured LAN/WireGuard interfaces, while PostgreSQL
+remains on a private container network. Direct WireGuard still requires
+reachable UDP endpoints, router configuration, and appropriate host
+firewalling; different home ISPs are fine, but CGNAT or blocked inbound UDP
+can prevent a direct-only topology.
 
 ## Windows integration
 
 Electron has a single-instance lock and the existing installer bundles the
-runtime. The optional relay is hosted by the running desktop process, not
-installed as a Windows service; the app must remain open on the relay machine.
-The worker is stopped and awaited before the renderer flushes its database on
-graceful close.
+runtime. Desktop sync clients communicate with the branch server; the
+PostgreSQL sync service is a separate always-on branch host and should not be
+hosted by an employee desktop. The worker is stopped and awaited before the
+renderer flushes its database on graceful close.
 
 ## Backup & restore
 
-Outbox, inbox, and cursor tables are in the business SQLite database. The relay
-journal is a separate encrypted file and needs explicit local backup coverage.
+Outbox, inbox, and desktop pull cursors are in each business SQLite database.
+Each branch PostgreSQL database stores its own event journal and
+`sync_peer_cursors`; back up and restore each independently.
 A tested cross-device restore/reconciliation procedure is not implemented;
 restoring an old database can also restore stale cursors, and the OS-protected
 journal key is device-bound.

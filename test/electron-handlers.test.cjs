@@ -21,6 +21,7 @@ async function createHandlers(fsImpl = fs) {
     handle: (name, handler) => handlers.set(name, handler),
   };
   const validateIpcSender = () => true;
+  let restartRequested = 0;
   const ensureDirs = () => {
     fsSync.mkdirSync(dataDir, { recursive: true });
     fsSync.mkdirSync(backupDir, { recursive: true });
@@ -51,7 +52,7 @@ async function createHandlers(fsImpl = fs) {
     ipcMain, validateIpcSender, app, path, fs,
     shell: { openPath: async () => '' },
     dialog: {}, BrowserWindow: {}, appDataDir, DATA_DIR: dataDir, BACKUP_DIR: backupDir,
-    ensureDirs,
+    ensureDirs, requestGracefulRestart: () => { restartRequested++; },
   });
   registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_PRINT_DATA: 1 });
 
@@ -62,6 +63,7 @@ async function createHandlers(fsImpl = fs) {
     dbFile,
     handlers,
     event: { senderFrame: { url: 'file:///index.html' } },
+    getRestartRequested: () => restartRequested,
   };
 }
 
@@ -177,6 +179,16 @@ test('registered app and printing handlers receive their directory and size depe
       }),
       { ok: false, error: 'حجم بيانات الطباعة يتجاوز الحد المسموح به' },
     );
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('application relaunch requests graceful shutdown', async () => {
+  const context = await createHandlers();
+  try {
+    assert.deepEqual(await context.handlers.get('app:relaunch')(context.event), { ok: true });
+    assert.equal(context.getRestartRequested(), 1);
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }

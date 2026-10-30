@@ -46,11 +46,20 @@ test('successful save closes normally without force-destroying the window', asyn
   win.webContents.send = (_channel, request) =>
     ipcMain.emit('app:close-ready', { sender: win.webContents }, { ...request, ok: true });
   const dialog = { showMessageBox: async () => { throw new Error('dialog should not be shown'); } };
-  installGracefulClose({ win, ipcMain, dialog, validateIpcSender: () => {}, timeoutMs: 100 });
+  let approvedCloseCount = 0;
+  installGracefulClose({
+    win,
+    ipcMain,
+    dialog,
+    validateIpcSender: () => {},
+    timeoutMs: 100,
+    onApprovedClose: () => { approvedCloseCount++; },
+  });
 
   triggerClose(win);
   await waitFor(() => win.destroyed);
   assert.equal(ipcMain.listenerCount('app:close-ready'), 0);
+  assert.equal(approvedCloseCount, 1);
 });
 
 test('save failure can be retried and only closes after a successful confirmation', async () => {
@@ -83,16 +92,25 @@ test('save timeout leaves the window open when the user cancels closing', async 
   const win = createWindow();
   const ipcMain = new EventEmitter();
   let dialogShown = false;
+  let cancelledCloseCount = 0;
   const dialog = { showMessageBox: async (_window, options) => {
     assert.deepEqual(options.buttons, ['إعادة المحاولة', 'إلغاء الإغلاق', 'إغلاق قسري']);
     dialogShown = true;
     return { response: 1 };
   } };
-  installGracefulClose({ win, ipcMain, dialog, validateIpcSender: () => {}, timeoutMs: 10 });
+  installGracefulClose({
+    win,
+    ipcMain,
+    dialog,
+    validateIpcSender: () => {},
+    timeoutMs: 10,
+    onCancelledClose: () => { cancelledCloseCount++; },
+  });
 
   triggerClose(win);
   await waitFor(() => dialogShown);
   assert.equal(win.destroyed, false);
+  assert.equal(cancelledCloseCount, 1);
 });
 
 test('a late response from a slow disk write cannot authorize a later close attempt', async () => {

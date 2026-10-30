@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "vite"
+    },
+    "sync-server": {
+      "root": "sync-server",
+      "runtime": "node",
+      "entrypoint": "vercel.js",
+      "functions": {
+        "vercel.js": {
+          "includeFiles": "schema.sql"
+        }
+      }
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/sync/(.*)",
+      "destination": {
+        "service": "sync-server"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}

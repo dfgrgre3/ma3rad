@@ -46,7 +46,15 @@ function waitForRendererSave({ win, ipcMain, validateIpcSender, timeoutMs, reque
   });
 }
 
-function installGracefulClose({ win, ipcMain, dialog, validateIpcSender, timeoutMs = CLOSE_TIMEOUT_MS }) {
+function installGracefulClose({
+  win,
+  ipcMain,
+  dialog,
+  validateIpcSender,
+  timeoutMs = CLOSE_TIMEOUT_MS,
+  onApprovedClose = () => {},
+  onCancelledClose = () => {},
+}) {
   let closeApproved = false;
   let closeFlowRunning = false;
   let nextRequestId = 0;
@@ -66,6 +74,7 @@ function installGracefulClose({ win, ipcMain, dialog, validateIpcSender, timeout
         if (result.ok) {
           closeApproved = true;
           closeFlowRunning = false;
+          onApprovedClose();
           win.close();
           return;
         }
@@ -85,16 +94,19 @@ function installGracefulClose({ win, ipcMain, dialog, validateIpcSender, timeout
         if (choice.response === 2 && !win.isDestroyed()) {
           closeApproved = true;
           closeFlowRunning = false;
+          onApprovedClose();
           win.destroy();
           return;
         }
 
+        onCancelledClose();
         closeFlowRunning = false;
         return;
       }
       closeFlowRunning = false;
     })().catch((error) => {
       console.error('Graceful shutdown error:', error);
+      onCancelledClose();
       closeFlowRunning = false;
     });
   };
