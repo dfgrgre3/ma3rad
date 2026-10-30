@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   SlidersHorizontal, Users, ShieldCheck, Settings as SettingsIcon, ListTree,
   Database, ScrollText, LayoutDashboard, ArrowLeft, CheckCircle2, AlertTriangle,
@@ -30,7 +31,7 @@ const TABS: TabDef[] = [
   { id: 'overview', label: 'نظرة عامة', icon: LayoutDashboard, perm: 'admin.view' },
   { id: 'users', label: 'المستخدمون', icon: Users, perm: 'users.view' },
   { id: 'roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck, perm: 'roles.manage' },
-  { id: 'settings', label: 'الإعدادات', icon: SettingsIcon, perm: 'settings.view' },
+  // settings merged into /settings hub
   { id: 'navigation', label: 'القوائم', icon: ListTree, perm: 'admin.navigation' },
   { id: 'data', label: 'البيانات', icon: Database, perm: 'admin.data' },
   { id: 'audit', label: 'سجل التدقيق', icon: ScrollText, perm: 'audit.view' },
@@ -45,15 +46,22 @@ const COUNT_QUERIES: { key: string; label: string; table: string; icon: React.El
   { key: 'audit', label: 'سجلات التدقيق', table: 'audit_logs', icon: Activity, color: 'text-violet-600' },
 ];
 
-export const AdminPage: React.FC = () => {
+interface AdminPageProps {
+  initialTab?: TabId;
+}
+
+export const AdminPage: React.FC<AdminPageProps> = ({ initialTab }) => {
   const can = usePermission();
   const user = AuthService.getCurrentUser();
-  const [tab, setTab] = useState<TabId>('overview');
+  const [searchParams] = useSearchParams();
+  const requested = searchParams.get('tab') as TabId | null;
+  const resolvedInitial = initialTab ?? (requested && ['overview','users','roles','navigation','data','audit'].includes(requested) ? requested : 'overview');
+  const [tab, setTab] = useState<TabId>(resolvedInitial);
 
   const allowedTabs = useMemo(() => TABS.filter((item) => can(item.perm)), [can]);
   const activeTab = allowedTabs.some((item) => item.id === tab) ? tab : (allowedTabs[0]?.id ?? 'overview');
 
-  const canAccess = can('admin.view') || can('settings.view');
+  const canAccess = allowedTabs.length > 0;
 
   if (!canAccess) {
     return (
@@ -110,7 +118,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'overview' && <Overview onNavigate={setTab} />}
         {activeTab === 'users' && <AdminUsersTab />}
         {activeTab === 'roles' && <AdminRolesTab />}
-        {activeTab === 'settings' && <AdminSettingsTab />}
+        {activeTab === 'settings' && <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">تم نقل الإعدادات إلى <a href="#/settings" className="font-bold text-sky-600">صفحة الإعدادات</a>.</div>}
         {activeTab === 'navigation' && <AdminNavigationTab />}
         {activeTab === 'data' && <AdminDataTab />}
         {activeTab === 'audit' && (
@@ -209,7 +217,11 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({ onNavigate }
             <div className="grid grid-cols-2 gap-2">
               <Quick label="إضافة مستخدم" to="users" icon={Users} onClick={onNavigate} />
               <Quick label="مصفوفة الصلاحيات" to="roles" icon={ShieldCheck} onClick={onNavigate} />
-              <Quick label="الهوية والمظهر" to="settings" icon={SettingsIcon} onClick={onNavigate} />
+              <button onClick={() => { window.location.hash = '#/settings'; }} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                <SettingsIcon className="h-4 w-4 text-sky-500" />
+                <span className="flex-1 text-right">الهوية والمظهر</span>
+                <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
+              </button>
               <Quick label="محرر القوائم" to="navigation" icon={ListTree} onClick={onNavigate} />
             </div>
           </div>

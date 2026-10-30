@@ -97,13 +97,7 @@ export class FinancialStatementsService {
   }
 
   public getBranchScopeWarning(): string | null {
-    if (this.branchAccess.getAccessibleBranchIds() === null) return null;
-    const count = Number(this.db.query<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM journal_entries WHERE branch_id IS NULL'
-    )[0]?.count || 0);
-    return count
-      ? `تم استبعاد ${count} قيد محاسبي غير منسوب إلى فرع؛ راجعها بصلاحية مركزية قبل الاعتماد على الإجماليات.`
-      : null;
+    return 'تعرض هذه القوائم بيانات الفرع النشط فقط؛ القيود غير المرتبطة بفرع لا تدخل في الإجماليات.';
   }
 
   public getReconciliation(): ReconciliationCheck[] {
@@ -150,53 +144,66 @@ export class FinancialStatementsService {
       status: unbalancedEntries === 0 ? 'MATCH' : 'DIFFERENCE',
       detail: `${unbalancedEntries} قيد غير متوازن من ${Number(integrity?.entries || 0)} قيد مرحل` });
 
-    const allowedBranches = this.branchAccess.getAccessibleBranchIds();
-    const cached = allowedBranches === null ? this.db.query<{ mismatches: number; maxDifference: number }>(`
-      SELECT COALESCE(SUM(CASE WHEN ABS(ROUND(a.balance - COALESCE(x.balance, 0), 2)) > 0 THEN 1 ELSE 0 END), 0) AS mismatches,
-             COALESCE(MAX(ABS(ROUND(a.balance - COALESCE(x.balance, 0), 2))), 0) AS maxDifference
-      FROM chart_of_accounts a
-      LEFT JOIN (
-        SELECT l.account_id, SUM(l.debit - l.credit) AS balance
-        FROM journal_entry_lines l JOIN journal_entries e ON e.id = l.entry_id
-        WHERE e.is_posted = 1 GROUP BY l.account_id
-      ) x ON x.account_id = a.id
-    `)[0] : undefined;
-    if (cached) {
-      add('cached', 'أرصدة دليل الحسابات المخزنة', 0, Number(cached.maxDifference || 0),
-        `${Number(cached.mismatches || 0)} حساب يحتاج إلى تحديث رصيده المخزن`);
-    }
+    const invoiceScope = this.branchAccess.sqlScope('si.branch_id');
+    const invoiceCompanyScope = this.branchAccess.companyScope('si.company_id');
+    const customerBalance = Number(this.db.query<{ balance: number }>(`
+      SELECT COALESCE(SUM(si.remaining_amount), 0) AS balance
+      FROM sales_invoices si
+      WHERE si.invoice_status != 'VOID'
+        AND (${invoiceScope.clause}) AND (${invoiceCompanyScope.clause})
+    `, [...invoiceScope.params, ...invoiceCompanyScope.params])[0]?.balance || 0);
+    add('customers', 'ذمم العملاء مقابل الأستاذ العام', accountBalance('1103', 'DEBIT'), customerBalance,
+      'أرصدة فواتير البيع غير المسددة في الفرع النشط.');
 
-    if (allowedBranches === null) {
-      const customers = this.db.query<{ balance: number }>('SELECT COALESCE(SUM(current_balance), 0) AS balance FROM customers')[0]?.balance || 0;
-      add('customers', 'ذمم العملاء مقابل الأستاذ العام', accountBalance('1103', 'DEBIT'), Number(customers),
-        'مقارنة حساب العملاء 1103 بإجمالي الأرصدة الحالية في سجل العملاء');
+    const purchaseScope = this.branchAccess.sqlScope('pi.branch_id');
+    const purchaseCompanyScope = this.branchAccess.companyScope('pi.company_id');
+    const supplierBalance = Number(this.db.query<{ balance: number }>(`
+      SELECT COALESCE(SUM(pi.remaining_amount), 0) AS balance
+      FROM purchase_invoices pi
+      WHERE (${purchaseScope.clause}) AND (${purchaseCompanyScope.clause})
+    `, [...purchaseScope.params, ...purchaseCompanyScope.params])[0]?.balance || 0);
+    add('suppliers', 'ذمم الموردين مقابل الأستاذ العام', accountBalance('2101', 'CREDIT'), supplierBalance,
+      'أرصدة فواتير الشراء غير المسددة في الفرع النشط.');
 
-      const suppliers = this.db.query<{ balance: number }>('SELECT COALESCE(SUM(current_balance), 0) AS balance FROM suppliers')[0]?.balance || 0;
-      add('suppliers', 'ذمم الموردين مقابل الأستاذ العام', accountBalance('2101', 'CREDIT'), Number(suppliers),
-        'مقارنة حساب الموردين 2101 بإجمالي الأرصدة الحالية في سجل الموردين');
-    }
-
-    const inventory = allowedBranches === null ? this.db.query<{ value: number; estimatedLayers: number }>(`
-      SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS value,
-             COALESCE(SUM(CASE WHEN is_estimated = 1 AND quantity_remaining > 0.009 THEN 1 ELSE 0 END), 0) AS estimatedLayers
-      FROM inventory_cost_layers WHERE quantity_remaining > 0.009
-    `)[0] : undefined;
+    const warehouseScope = this.branchAccess.sqlScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
+    );
+    const inventory = this.db.query<{ value: number; estimatedLayers: number }>(`
+      SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value,
+             COALESCE(SUM(CASE WHEN icl.is_estimated = 1 AND icl.quantity_remaining > 0.009 THEN 1 ELSE 0 END), 0) AS estimatedLayers
+      FROM inventory_cost_layers icl
+      JOIN warehouses w ON w.id = icl.warehouse_id
+      WHERE icl.quantity_remaining > 0.009 AND ${warehouseScope.clause}
+    `, warehouseScope.params)[0];
     const costingMethod = this.db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='costingMethod'`)[0]?.value || 'AVERAGE_COST';
     const ledgerValue = accountBalance('1104', 'DEBIT');
 
-    if (inventory && costingMethod === 'FIFO') {
+    if (costingMethod === 'FIFO') {
       const inventoryValue = Number(inventory.value || 0);
       add('inventory', 'قيمة المخزون حسب طبقات التكلفة (FIFO)', ledgerValue, inventoryValue,
         `${Number(inventory.estimatedLayers || 0)} طبقة تكلفة متبقية تقديرية؛ قد تفسر جزءًا من الفرق`);
-    } else if (inventory) {
+    } else {
       // For AVERAGE_COST, compare ledger with calculated value from stock * cost_price
       const stockValue = this.db.query<{ value: number }>(`
         SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
         FROM warehouse_stock ws
+        JOIN warehouses w ON w.id = ws.warehouse_id
         JOIN products p ON p.id = ws.product_id
-      `)[0]?.value || 0;
+        WHERE ${warehouseScope.clause}
+      `, warehouseScope.params)[0]?.value || 0;
       add('inventory', 'قيمة المخزون حسب التكلفة المتوسطة (Stock × Cost Price)', ledgerValue, Number(stockValue),
         'الفرق بسبب طريقة التكلفة المتوسطة المرجحة');
+    }
+
+    const bankScope = this.branchAccess.sqlScope('ba.branch_id');
+    const bankAccounts = this.db.query<{ count: number; balance: number }>(`
+      SELECT COUNT(*) AS count, COALESCE(SUM(ba.current_balance), 0) AS balance
+      FROM bank_accounts ba WHERE ${bankScope.clause}
+    `, bankScope.params)[0];
+    if (Number(bankAccounts?.count || 0)) {
+      add('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102', 'DEBIT'), Number(bankAccounts.balance || 0),
+        'أرصدة الحسابات البنكية المرتبطة بالفرع النشط.');
     }
 
     return checks;

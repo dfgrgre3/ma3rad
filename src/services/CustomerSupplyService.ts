@@ -105,23 +105,9 @@ export class CustomerSupplyService {
       WHERE r.status IN ('OPEN', 'PARTIAL', 'READY') AND ${companyScope.clause}
     `;
 
-    const accessibleBranches = this.branchAccess.getAccessibleBranchIds(actor);
-    if (accessibleBranches !== null) {
-      if (!accessibleBranches.length) {
-        sql += ` AND 1 = 0`;
-      } else {
-        const branchParams = accessibleBranches.map(() => '?');
-        const branchList = branchParams.join(', ');
-        sql += ` AND (
-          w.branch_id IN (${branchList})
-          OR EXISTS (
-            SELECT 1 FROM branch_warehouses bw
-            WHERE bw.warehouse_id = w.id AND bw.branch_id IN (${branchList})
-          )
-        )`;
-        params.push(...accessibleBranches, ...accessibleBranches);
-      }
-    }
+    const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
+    sql += ` AND ${branchScope.clause}`;
+    params.push(...branchScope.params);
 
     if (filters.customerId) {
       sql += ` AND r.customer_id = ?`;

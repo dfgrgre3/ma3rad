@@ -31,6 +31,7 @@ test('financial statements screen filters cash flow and ledger and exports the b
   const { FinancialStatementsPage } = await import('../src/pages/reports/FinancialStatementsPage.tsx');
   const { AuthService } = await import('../src/services/AuthService.ts');
   const { PermissionService } = await import('../src/services/PermissionService.ts');
+  const { BranchAccessService } = await import('../src/services/BranchAccessService.ts');
   const manager = DatabaseManager.getInstance();
   await manager.initialize();
   await PermissionService.seed();
@@ -46,6 +47,7 @@ test('financial statements screen filters cash flow and ledger and exports the b
       referenceType: 'TEST_FINANCIAL_STATEMENT_UI',
       referenceId: 'ui_cash_flow_ledger_filter',
       createdBy: actorId,
+      branchId: new BranchAccessService().getCurrentBranchId(),
       lines: [
         { accountCode: '1101', debit: 987.65, credit: 0 },
         { accountCode: '4101', debit: 0, credit: 987.65 },
@@ -94,7 +96,7 @@ test('financial statements screen filters cash flow and ledger and exports the b
 
     fireEvent.click(screen.getByRole('button', { name: 'الميزانية العمومية' }));
     await screen.findByText('إجمالي الأصول');
-    const exportButton = screen.getByRole('button', { name: 'تصدير إلى Excel' });
+    const exportButton = screen.getByRole('button', { name: 'تصدير إلى جدول بيانات' });
     assert.equal((exportButton as HTMLButtonElement).disabled, false);
     fireEvent.click(exportButton);
     assert.match(exportDownload, /^balance-sheet-\d{4}-\d{2}-\d{2}\.xlsx$/);

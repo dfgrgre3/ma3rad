@@ -10,6 +10,11 @@ export interface BranchSqlScope {
 
 export class BranchAccessService {
   private db = DatabaseManager.getInstance();
+  private static currentBranchByUser = new Map<string, string>();
+
+  private branchStorageKey(user: User): string {
+    return `ceramisys_current_branch_${user.id}`;
+  }
 
   private actor(): User {
     return AuthService.requireAuth();
@@ -35,6 +40,57 @@ export class BranchAccessService {
     ).map(row => row.branchId);
   }
 
+  public getSelectableBranches(user = this.actor()): Array<{ id: string; name: string; code: string; isMain: boolean }> {
+    const allowed = this.getAccessibleBranchIds(user);
+    const scope = allowed === null
+      ? { clause: '1 = 1', params: [] as string[] }
+      : allowed.length
+        ? { clause: `id IN (${allowed.map(() => '?').join(', ')})`, params: allowed }
+        : { clause: '1 = 0', params: [] as string[] };
+    return this.db.query<any>(
+      `SELECT id, name, code, is_main AS isMain FROM branches
+       WHERE is_active = 1 AND ${scope.clause}
+       ORDER BY is_main DESC, name ASC`,
+      scope.params
+    ).map((branch) => ({ ...branch, isMain: Boolean(branch.isMain) }));
+  }
+
+  public getCurrentBranchId(user = this.actor()): string {
+    const branches = this.getSelectableBranches(user);
+    if (!branches.length) throw new Error('لا يوجد فرع نشط متاح للمستخدم الحالي.');
+
+    let storedId = BranchAccessService.currentBranchByUser.get(user.id);
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        storedId = sessionStorage.getItem(this.branchStorageKey(user)) || storedId;
+      }
+    } catch (error) {
+      throw new Error(`تعذر قراءة الفرع النشط: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    const selected = storedId ? branches.find((branch) => branch.id === storedId) : undefined;
+    const currentId = selected?.id || branches[0].id;
+    if (currentId !== storedId) this.persistCurrentBranchId(currentId, user);
+    return currentId;
+  }
+
+  public setCurrentBranchId(branchId: string, user = this.actor()): void {
+    const branch = this.getSelectableBranches(user).find((item) => item.id === branchId);
+    if (!branch) throw new Error('الفرع المحدد غير نشط أو خارج نطاق صلاحيتك.');
+    this.persistCurrentBranchId(branchId, user);
+  }
+
+  private persistCurrentBranchId(branchId: string, user: User): void {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(this.branchStorageKey(user), branchId);
+      }
+    } catch (error) {
+      throw new Error(`تعذر حفظ الفرع النشط: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    BranchAccessService.currentBranchByUser.set(user.id, branchId);
+  }
+
   /** Company ids reachable through the user's branches. `null` means unrestricted (central access). */
   public getAccessibleCompanyIds(user = this.actor()): string[] | null {
     const branchIds = this.getAccessibleBranchIds(user);
@@ -49,10 +105,12 @@ export class BranchAccessService {
   }
 
   public companyScope(column = 'company_id', user = this.actor()): { clause: string; params: string[] } {
-    const allowed = this.getAccessibleCompanyIds(user);
-    if (allowed === null) return { clause: '1 = 1', params: [] };
-    if (!allowed.length) return { clause: '1 = 0', params: [] };
-    return { clause: `${column} IN (${allowed.map(() => '?').join(', ')})`, params: allowed };
+    const companyId = this.db.query<{ companyId: string | null }>(
+      'SELECT company_id AS companyId FROM branches WHERE id = ? AND is_active = 1',
+      [this.getCurrentBranchId(user)]
+    )[0]?.companyId;
+    if (!companyId) return { clause: '1 = 0', params: [] };
+    return { clause: `${column} = ?`, params: [companyId] };
   }
 
   public hasCompanyAccess(companyId: string, user = this.actor()): boolean {
@@ -68,14 +126,24 @@ export class BranchAccessService {
   }
 
   public hasBranchAccess(branchId: string, user = this.actor()): boolean {
+    return this.hasBranchAuthorization(branchId, user) && this.getCurrentBranchId(user) === branchId;
+  }
+
+  public hasBranchAuthorization(branchId: string, user = this.actor()): boolean {
     const allowed = this.getAccessibleBranchIds(user);
-    if (allowed === null) return true;
-    return allowed.includes(branchId);
+    return allowed === null || allowed.includes(branchId);
+  }
+
+  public requireBranchAuthorization(branchId: string, user = this.actor()): void {
+    if (!this.hasBranchAuthorization(branchId, user)) {
+      throw new Error('ليس لديك صلاحية الوصول إلى بيانات هذا الفرع.');
+    }
   }
 
   public requireBranchAccess(branchId: string, user = this.actor()): void {
-    if (!this.hasBranchAccess(branchId, user)) {
-      throw new Error('ليس لديك صلاحية الوصول إلى بيانات هذا الفرع.');
+    this.requireBranchAuthorization(branchId, user);
+    if (this.getCurrentBranchId(user) !== branchId) {
+      throw new Error('الفرع المحدد ليس هو الفرع النشط الحالي. بدّل إلى الفرع المطلوب أولًا.');
     }
   }
 
@@ -125,16 +193,7 @@ export class BranchAccessService {
   }
 
   public getDefaultAccessibleBranchId(user = this.actor()): string {
-    const allowed = this.getAccessibleBranchIds(user);
-    const defaultBranch = this.db.query<{ id: string }>(
-      `SELECT id FROM branches WHERE is_main = 1 AND is_active = 1
-       ${allowed === null ? '' : `AND id IN (${allowed.map(() => '?').join(', ') || "''"})`}
-       ORDER BY id LIMIT 1`,
-      allowed ?? []
-    )[0]?.id;
-    if (defaultBranch) return defaultBranch;
-    if (allowed?.length) return allowed[0];
-    throw new Error('لا يوجد فرع متاح للمستخدم الحالي.');
+    return this.getCurrentBranchId(user);
   }
 
   public requireWarehouseAccess(warehouseId: string, user = this.actor()): string {
@@ -153,10 +212,9 @@ export class BranchAccessService {
       ).map(row => row.branchId);
     if (!branchIds.length) throw new Error('المخزن غير مرتبط بفرع.');
 
-    const allowed = this.getAccessibleBranchIds(user);
-    const branchId = allowed === null ? branchIds[0] : branchIds.find(id => allowed.includes(id));
-    if (!branchId) throw new Error('ليس لديك صلاحية الوصول إلى المخزن المحدد.');
-    return branchId;
+    const currentBranchId = this.getCurrentBranchId(user);
+    if (!branchIds.includes(currentBranchId)) throw new Error('المخزن لا يتبع الفرع النشط الحالي.');
+    return currentBranchId;
   }
 
   /**
@@ -200,19 +258,35 @@ export class BranchAccessService {
     );
   }
 
-  public sqlScope(branchExpression: string, fallbackBranchExpression?: string, user = this.actor()): BranchSqlScope {
-    const allowed = this.getAccessibleBranchIds(user);
-    if (allowed === null) return { clause: '1 = 1', params: [] };
-    if (!allowed.length) return { clause: '1 = 0', params: [] };
+  public sqlScope(
+    branchExpression: string,
+    fallbackBranchExpression?: string,
+    user = this.actor(),
+    includeAllAuthorizedBranches = false
+  ): BranchSqlScope {
+    if (includeAllAuthorizedBranches) {
+      const allowed = this.getAccessibleBranchIds(user);
+      if (allowed === null) return { clause: '1 = 1', params: [] };
+      if (!allowed.length) return { clause: '1 = 0', params: [] };
+      const placeholders = allowed.map(() => '?').join(', ');
+      const direct = `${branchExpression} IN (${placeholders})`;
+      const fallback = fallbackBranchExpression
+        ? ` OR (${branchExpression} IS NULL AND ${fallbackBranchExpression} IN (${placeholders}))`
+        : '';
+      return {
+        clause: `(${direct}${fallback})`,
+        params: fallback ? [...allowed, ...allowed] : [...allowed],
+      };
+    }
 
-    const placeholders = allowed.map(() => '?').join(', ');
-    const direct = `${branchExpression} IN (${placeholders})`;
+    const currentBranchId = this.getCurrentBranchId(user);
+    const direct = `${branchExpression} = ?`;
     const fallback = fallbackBranchExpression
-      ? ` OR (${branchExpression} IS NULL AND ${fallbackBranchExpression} IN (${placeholders}))`
+      ? ` OR (${branchExpression} IS NULL AND ${fallbackBranchExpression} = ?)`
       : '';
     return {
       clause: `(${direct}${fallback})`,
-      params: fallback ? [...allowed, ...allowed] : [...allowed],
+      params: fallback ? [currentBranchId, currentBranchId] : [currentBranchId],
     };
   }
 }

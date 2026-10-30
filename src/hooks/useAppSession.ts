@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { AuthService } from '../services/AuthService';
 import { SettingsService } from '../services/SettingsService';
+import { AppConfigService } from '../services/AppConfigService';
+
 import type { User } from '../types';
 
 export function useAppSession(
@@ -8,6 +10,21 @@ export function useAppSession(
   currentUser: User | null,
   onSessionExpired: () => void
 ) {
+  // Keep the configuration engine aware of the signed-in user, branch and device.
+  useEffect(() => {
+    if (!dbReady) return;
+    if (!currentUser) {
+      AppConfigService.setActiveContext(null);
+      return;
+    }
+    const settings = SettingsService.getSettings();
+    AppConfigService.setActiveContext({
+      userId: currentUser.id,
+      branchId: settings.defaultBranchId || 'br_main',
+      activityId: SettingsService.getValue('businessType') || 'ceramics',
+    });
+  }, [dbReady, currentUser?.id]);
+
   // Idle timeout
   useEffect(() => {
     if (!currentUser) return;
@@ -18,7 +35,10 @@ export function useAppSession(
 
     const timer = window.setInterval(() => {
       let limitMinutes = 480;
-      try { limitMinutes = SettingsService.getSettings().sessionTimeoutMinutes ?? 480; } catch { /* ignore */ }
+      try {
+        const configured = SettingsService.getSettings().sessionTimeoutMinutes ?? 480;
+        limitMinutes = AppConfigService.getPolicyNumber('security.sessionTimeoutMinutes', configured);
+      } catch { /* ignore */ }
       if (!limitMinutes || limitMinutes <= 0) return;
       if (Date.now() - lastActivity >= limitMinutes * 60_000) {
         AuthService.logout();

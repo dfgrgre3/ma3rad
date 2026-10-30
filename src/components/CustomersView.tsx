@@ -8,7 +8,7 @@ import { Customer } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 import { usePermission } from '../hooks/usePermission';
-
+import { ConfiguredActionButton } from './config/ConfiguredActionButton';
 const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
   <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs border-slate-200">
     <span className="text-slate-500">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
@@ -148,7 +148,11 @@ export const CustomersView: React.FC = () => {
           <p className="text-xs text-slate-500">متابعة مديونيات العملاء، تحصيل الدفعات، وكشوف الحساب التفصيلية</p>
         </div>
 
-        {canCreate && <button
+        <ConfiguredActionButton
+          actionId="customers.create"
+          fallbackLabel={`إضافة ${customerSingularLabel} جديد`}
+          icon={<Plus className="w-4 h-4" />}
+          className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm"
           onClick={() => {
             setFormData({
               name: '',
@@ -165,11 +169,7 @@ export const CustomersView: React.FC = () => {
             });
             setIsAddModalOpen(true);
           }}
-          className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>إضافة {customerSingularLabel} جديد</span>
-        </button>}
+        />
       </div>
 
       {/* Search */}

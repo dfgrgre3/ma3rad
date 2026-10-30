@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History,
+  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History, Download,
 } from 'lucide-react';
 import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
@@ -23,6 +23,7 @@ import {
 import { ModuleRegistryService } from '../../services/ModuleRegistryService';
 import { BusinessProfileService } from '../../services/BusinessProfileService';
 import { CompaniesPanel } from '../../components/CompaniesPanel';
+import { BackupPage } from '../settings/BackupPage';
 import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../../config/moduleRegistry';
 import {
   BUSINESS_TERMINOLOGY,
@@ -41,23 +42,28 @@ const inputCls =
   'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
 const labelCls = 'mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300';
 
-type Tab = 'general' | 'business' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security';
+type Tab = 'general' | 'business' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security' | 'backup';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'general', label: 'عام والمعرض', icon: Store },
-  { id: 'business', label: 'النشاط والوحدات', icon: Boxes },
+  { id: 'general', label: 'الإعدادات العامة', icon: Store },
+  { id: 'business', label: 'إعدادات النشاط', icon: Boxes },
   { id: 'branding', label: 'الهوية والمظهر', icon: Palette },
   { id: 'invoice', label: 'الفواتير والطباعة', icon: ReceiptText },
   { id: 'inventory', label: 'المخزون والتكلفة', icon: Boxes },
   { id: 'operations', label: 'التشغيل والموافقات', icon: Truck },
-  { id: 'security', label: 'الأمان والنسخ', icon: ShieldCheck },
+  { id: 'security', label: 'الأمان', icon: ShieldCheck },
+  { id: 'backup', label: 'النسخ والاستعادة', icon: Download },
 ];
 
-export const AdminSettingsTab: React.FC = () => {
+interface AdminSettingsTabProps {
+  initialTab?: Tab;
+}
+
+export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }) => {
   const toast = useToast();
   const can = usePermission();
   const readOnly = !can('settings.update');
-  const [tab, setTab] = useState<Tab>('general');
+  const [tab, setTab] = useState<Tab>(initialTab && ['general','business','branding','invoice','inventory','operations','security','backup'].includes(initialTab) ? initialTab : 'general');
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
   const [businessProfile, setBusinessProfile] = useState(readBusinessProfile);
   const [businessConfig, setBusinessConfig] = useState(readBusinessConfiguration);
@@ -922,6 +928,12 @@ export const AdminSettingsTab: React.FC = () => {
             <Field label="فاصل النسخ الاحتياطي التلقائي (ساعات)">
               <input type="number" min={1} value={settings.autoBackupIntervalHours} onChange={(e) => set('autoBackupIntervalHours', Number(e.target.value))} className={inputCls} />
             </Field>
+          </div>
+        )}
+
+        {tab === 'backup' && (
+          <div className="md:col-span-2">
+            <BackupPage />
           </div>
         )}
 

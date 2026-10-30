@@ -6,6 +6,7 @@ import { ProductService } from '../../services/ProductService';
 import { OperationsService } from '../../services/OperationsService';
 import { CustomerService } from '../../services/CustomerService';
 import { useToast } from '../../components/ui/Toast';
+import { useSearchParams } from 'react-router-dom';
 import { Product, Customer } from '../../types';
 import { PrintService } from '../../services/PrintService';
 import { getProductUnitLabel } from '../../utils/productUnits';
@@ -32,7 +33,9 @@ export const ReservationsDepositPage: React.FC = () => {
   const orderService = useMemo(() => new OrderService(), []);
   const printService = useMemo(() => new PrintService(), []);
 
-  const [activeTab, setActiveTab] = useState<ReservationTab>('orders');
+  const [searchParams] = useSearchParams();
+  const initialTab: ReservationTab = searchParams.get('tab') === 'reservations' ? 'reservations' : 'orders';
+  const [activeTab, setActiveTab] = useState<ReservationTab>(initialTab);
   const [loading, setLoading] = useState(true);
 
   // Data states

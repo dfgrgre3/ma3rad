@@ -12,7 +12,7 @@ export class BranchService {
   public getAllBranches(): Branch[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'branches.view');
-    const scope = this.access.sqlScope('b.id', undefined, actor);
+    const scope = this.access.sqlScope('b.id', undefined, actor, true);
     return this.db.query<any>(`
       SELECT b.*, b.is_main AS is_default, u.full_name as managerName, c.name as companyName
       FROM branches b
@@ -20,7 +20,7 @@ export class BranchService {
       LEFT JOIN companies c ON c.id = b.company_id
       WHERE ${scope.clause}
       ORDER BY b.name ASC
-    `, scope.params) as Branch[];
+    `, scope.params).map((row) => this.mapBranch(row));
   }
 
   public getBranchById(id: string): Branch | null {
@@ -34,7 +34,7 @@ export class BranchService {
       LEFT JOIN companies c ON c.id = b.company_id
       WHERE b.id = ?
     `, [id]);
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? this.mapBranch(rows[0]) : null;
   }
 
   public getDefaultBranch(): Branch | null {
@@ -48,7 +48,7 @@ export class BranchService {
       WHERE b.is_main = 1 AND b.is_active = 1 AND ${scope.clause}
       LIMIT 1
     `, scope.params);
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? this.mapBranch(rows[0]) : null;
   }
 
   public createBranch(dto: CreateBranchDTO): Branch {
@@ -111,15 +111,44 @@ export class BranchService {
     PermissionService.require(actor, 'branches.update');
     const existing = this.getBranchById(id);
     if (!existing) throw new Error('الفرع غير موجود.');
-    if (updates.isDefault) {
-      this.db.run('UPDATE branches SET is_main = 0 WHERE is_main = 1');
+    if (updates.name !== undefined && updates.name.trim().length < 2) {
+      throw new Error('اسم الفرع مطلوب (حرفان على الأقل).');
+    }
+    if (updates.code !== undefined && !updates.code.trim()) {
+      throw new Error('كود الفرع مطلوب.');
+    }
+    if (updates.name !== undefined && this.db.query(
+      'SELECT id FROM branches WHERE name = ? AND id <> ?',
+      [updates.name.trim(), id]
+    ).length) {
+      throw new Error('اسم الفرع مستخدم بالفعل.');
+    }
+    if (updates.code !== undefined && this.db.query(
+      'SELECT id FROM branches WHERE code = ? AND id <> ?',
+      [updates.code.trim(), id]
+    ).length) {
+      throw new Error('كود الفرع مستخدم بالفعل.');
+    }
+    if (updates.isDefault === false && existing.isDefault) {
+      throw new Error('عيّن فرعًا افتراضيًا آخر قبل إلغاء الافتراضي الحالي.');
+    }
+    if (updates.managerId) {
+      const manager = this.db.query<{ id: string }>(
+        'SELECT id FROM users WHERE id = ? AND is_active = 1',
+        [updates.managerId]
+      )[0];
+      if (!manager && updates.managerId !== existing.managerId) {
+        throw new Error('المسؤول المحدد غير موجود أو غير نشط.');
+      }
     }
     const fields: string[] = [];
     const params: any[] = [];
-    if (updates.name !== undefined) { fields.push('name = ?'); params.push(updates.name); }
-    if (updates.code !== undefined) { fields.push('code = ?'); params.push(updates.code); }
+    if (updates.name !== undefined) { fields.push('name = ?'); params.push(updates.name.trim()); }
+    if (updates.code !== undefined) { fields.push('code = ?'); params.push(updates.code.trim()); }
     if (updates.address !== undefined) { fields.push('address = ?'); params.push(updates.address); }
     if (updates.phone !== undefined) { fields.push('phone = ?'); params.push(updates.phone); }
+    if (updates.city !== undefined) { fields.push('city = ?'); params.push(updates.city); }
+    if (updates.notes !== undefined) { fields.push('notes = ?'); params.push(updates.notes); }
     if (updates.managerId !== undefined) { fields.push('manager_id = ?'); params.push(updates.managerId); }
     if (updates.companyId !== undefined) {
       const company = this.db.query<{ isActive: number }>(
@@ -136,9 +165,43 @@ export class BranchService {
     if (fields.length > 0) {
       fields.push('updated_at = CURRENT_TIMESTAMP');
       params.push(id);
-      this.db.run(`UPDATE branches SET ${fields.join(', ')} WHERE id = ?`, params);
+      this.db.executeTransaction((sqliteDb) => {
+        if (updates.isDefault) {
+          sqliteDb.run('UPDATE branches SET is_main = 0 WHERE is_main = 1');
+        }
+        sqliteDb.run(`UPDATE branches SET ${fields.join(', ')} WHERE id = ?`, params);
+        if (updates.managerId) {
+          sqliteDb.run(
+            'INSERT OR IGNORE INTO users_branches (user_id, branch_id) VALUES (?, ?)',
+            [updates.managerId, id]
+          );
+        }
+        if (updates.name !== undefined) {
+          sqliteDb.run(
+            'UPDATE sync_branches SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE branch_id = ?',
+            [updates.name.trim(), id]
+          );
+        }
+      });
     }
     return this.getBranchRow(id)!;
+  }
+
+  public setBranchActive(id: string, isActive: boolean): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'branches.update');
+    this.access.requireBranchAuthorization(id, actor);
+    const branch = this.getBranchRow(id);
+    if (!branch) throw new Error('الفرع غير موجود.');
+    if (!isActive) this.access.requireBranchAccess(id, actor);
+    if (!isActive && branch.isDefault) throw new Error('لا يمكن تعطيل الفرع الافتراضي؛ عيّن فرعًا افتراضيًا آخر أولًا.');
+    this.db.executeTransaction((sqliteDb) => {
+      sqliteDb.run('UPDATE branches SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [isActive ? 1 : 0, id]);
+      sqliteDb.run(
+        `UPDATE sync_branches SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE branch_id = ?`,
+        [isActive ? 'ACTIVE' : 'DISABLED', id]
+      );
+    });
   }
 
   public deleteBranch(id: string): void {
@@ -172,6 +235,71 @@ export class BranchService {
       WHERE bw.branch_id = ?
       ORDER BY bw.is_primary DESC, w.name ASC
     `, [branchId]);
+  }
+
+  public getBranchUserAssignments(branchId: string): Array<{
+    id: string;
+    username: string;
+    fullName: string;
+    role: string;
+    branchScope: 'ASSIGNED' | 'ALL';
+    isAssigned: boolean;
+  }> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'branches.manage_users');
+    this.access.requireBranchAccess(branchId, actor);
+    return this.db.query<any>(`
+      SELECT u.id, u.username, u.full_name AS fullName, u.role,
+             u.branch_scope AS branchScope,
+             CASE WHEN ub.user_id IS NULL THEN 0 ELSE 1 END AS isAssigned
+      FROM users u
+      LEFT JOIN users_branches ub ON ub.user_id = u.id AND ub.branch_id = ?
+      WHERE u.is_active = 1 AND u.role <> 'ADMIN'
+      ORDER BY u.full_name, u.username
+    `, [branchId]).map((row) => ({ ...row, isAssigned: Boolean(row.isAssigned) }));
+  }
+
+  public updateBranchUserAssignments(branchId: string, userIds: string[]): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'branches.manage_users');
+    this.access.requireBranchAccess(branchId, actor);
+    if (!this.getBranchRow(branchId)) throw new Error('الفرع غير موجود.');
+
+    const selectedIds = [...new Set(userIds)];
+    for (const userId of selectedIds) {
+      const target = this.db.query<{ role: string }>(
+        'SELECT role FROM users WHERE id = ? AND is_active = 1',
+        [userId]
+      )[0];
+      if (!target || target.role === 'ADMIN') {
+        throw new Error('أحد المستخدمين المحددين غير موجود أو غير صالح للإسناد.');
+      }
+    }
+
+    const currentIds = this.db.query<{ userId: string; branchScope: string; otherAssignments: number }>(
+      `SELECT u.id AS userId, u.branch_scope AS branchScope,
+              (SELECT COUNT(*) FROM users_branches other
+               WHERE other.user_id = u.id AND other.branch_id <> ?) AS otherAssignments
+       FROM users u JOIN users_branches current ON current.user_id = u.id
+       WHERE current.branch_id = ? AND u.is_active = 1 AND u.role <> 'ADMIN'`,
+      [branchId, branchId]
+    );
+    const selected = new Set(selectedIds);
+    for (const user of currentIds) {
+      if (user.branchScope === 'ASSIGNED' && !selected.has(user.userId) && Number(user.otherAssignments) === 0) {
+        throw new Error('لا يمكن إزالة آخر فرع مسند لمستخدم بنطاق وصول مقيّد.');
+      }
+    }
+
+    this.db.executeTransaction((sqliteDb) => {
+      sqliteDb.run('DELETE FROM users_branches WHERE branch_id = ?', [branchId]);
+      for (const userId of selectedIds) {
+        sqliteDb.run(
+          'INSERT INTO users_branches (user_id, branch_id) VALUES (?, ?)',
+          [userId, branchId]
+        );
+      }
+    });
   }
 
   public assignWarehouseToBranch(branchId: string, warehouseId: string, isPrimary = false): BranchWarehouse {
@@ -398,7 +526,15 @@ export class BranchService {
       LEFT JOIN companies c ON c.id = b.company_id
       WHERE b.id = ?
     `, [id]);
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? this.mapBranch(rows[0]) : null;
+  }
+
+  private mapBranch(row: Record<string, any>): Branch {
+    return {
+      ...row,
+      isDefault: Boolean(row.isDefault),
+      isActive: Boolean(row.isActive),
+    } as Branch;
   }
 
   private hasBranchesOutsideScope(userId: string, allowedBranchIds: string[]): boolean {

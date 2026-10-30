@@ -140,12 +140,10 @@ export class DocumentService {
   }
 
   private branchScope(alias: string, actor: User): { clause: string; params: string[] } {
-    const branches = this.access.getAccessibleBranchIds(actor);
-    if (branches === null) return { clause: '1 = 1', params: [] };
-    if (!branches.length) return { clause: `${alias}.branch_id IS NULL`, params: [] };
+    const selected = this.access.sqlScope(`${alias}.branch_id`, undefined, actor);
     return {
-      clause: `(${alias}.branch_id IS NULL OR ${alias}.branch_id IN (${branches.map(() => '?').join(', ')}))`,
-      params: branches,
+      clause: `(${alias}.branch_id IS NULL OR ${selected.clause})`,
+      params: selected.params,
     };
   }
 

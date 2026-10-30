@@ -13,4 +13,4 @@ export { performanceMonitor } from './performanceMonitor';
 export type { PerformanceMetrics, Alert } from './performanceMonitor';
 export { systemHealth } from './systemHealthService';
 export type { HealthScore, HealthAlert, HealthMetrics, SystemHealthReport } from './systemHealthService';
-export type { BackupInfo, BackupStats, BackupStatus, SecurityConfig, SecurityMetrics, LogEntry, ActiveSession, LoginRecord, SecurityOverview } from './types';
+export { CentralLicenseService } from './CentralLicenseService';

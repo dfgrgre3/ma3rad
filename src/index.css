@@ -101,9 +101,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .ui-card {
-  border: 1px solid var(--cerami-border);
+  border: none;
   border-radius: 2px;
-  background: var(--cerami-surface);
+  background: transparent;
 }
 .ui-input {
   min-height: 2rem;
@@ -336,12 +336,39 @@ pre, code { overflow-wrap: anywhere; }
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16) !important;
 }
 
-/* ── Motion: no decorative movement ───────────────────────────────────────── */
-.win-app :is(.animate-pulse, .animate-bounce) { animation: none !important; }
+/* Flatten decorative card-like containers (shadow + padding/overflow) to bare content. */
+.win-app [class*="shadow-sm"][class*="p-3"],
+.win-app [class*="shadow-sm"][class*="p-4"],
+.win-app [class*="shadow-sm"][class*="p-5"],
+.win-app [class*="shadow-sm"][class*="p-6"],
+.win-app [class*="shadow-xs"][class*="p-3"],
+.win-app [class*="shadow-xs"][class*="p-4"],
+.win-app [class*="shadow-xs"][class*="p-5"],
+.win-app [class*="shadow-xs"][class*="p-6"],
+.win-app [class*="shadow-md"][class*="p-3"],
+.win-app [class*="shadow-md"][class*="p-4"],
+.win-app [class*="shadow-md"][class*="p-5"],
+.win-app [class*="shadow-md"][class*="p-6"],
+.win-app [class*="shadow-sm"][class*="overflow-hidden"],
+.win-app [class*="shadow-xs"][class*="overflow-hidden"],
+.win-app [class*="shadow-md"][class*="overflow-hidden"] {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ── Motion: no decorative movement (all transitions/animations disabled) ─── */
+.win-app *, .win-auth * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+.win-app :is(.animate-pulse, .animate-bounce, .animate-spin, .animate-ping) { animation: none !important; }
 .win-app [class*="hover:scale"]:hover,
 .win-app [class*="hover:-translate"]:hover,
 .win-app [class*="active:scale"]:active,
-.win-app [class*="group-hover:scale"] { transform: none !important; }
+.win-app [class*="group-hover:scale"],
+.win-app :hover,
+.win-app :active,
+.win-app :focus,
+.win-app :focus-visible,
+.win-app [class*="group-hover"] { transform: none !important; }
 .win-app [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 
 /* Decorative gradients are flattened to the accent (dark text stays legible). */
@@ -438,8 +465,8 @@ pre, code { overflow-wrap: anywhere; }
 
 /* ── Cards, tables and page furniture ─────────────────────────────────────── */
 .win-card {
-  background: var(--win-surface);
-  border: 1px solid var(--win-border);
+  background: transparent;
+  border: none;
   border-radius: var(--win-radius);
 }
 .win-page-head {

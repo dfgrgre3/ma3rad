@@ -8,6 +8,9 @@ import { PermissionService } from '../services/PermissionService';
 import { NavigationService } from '../services/NavigationService';
 import { CalculatorPanel } from '../components/CalculatorPanel';
 import { NotesPanel } from '../components/NotesPanel';
+import { AppConfigRuntime } from '../components/config/AppConfigRuntime';
+import { ConfigSection } from '../components/config/ConfigSection';
+import { ConfigText } from '../components/config/ConfigText';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   getPersistedScrollPosition,
@@ -112,6 +115,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
   return (
     <LayoutContext.Provider value={{ currentUser }}>
+      <AppConfigRuntime />
       <div className="app-shell win-app flex h-screen w-full min-w-0 flex-col overflow-hidden bg-[#f3f3f3] text-[#1b1b1b] dark:bg-[#1f1f1f] dark:text-[#f0f0f0]" dir="rtl">
         {/* ── Top bar ──────────────────────────────────────────────────────────── */}
         <Header
@@ -135,17 +139,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           )}
 
           {/* ── Page content ────────────────────────────────────────────────────── */}
-          <main ref={mainRef} className="app-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
+          <main ref={mainRef} data-app-config-scope className="app-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
             {isAllowed ? <Outlet /> : <Navigate to={fallbackPath ?? '/not-found'} replace />}
           </main>
         </div>
 
         {/* ── Status bar ───────────────────────────────────────────────────────── */}
-        <footer className="win-statusbar flex h-6 shrink-0 items-center gap-3 px-3">
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#107c10]" />
-            قاعدة البيانات متصلة
-          </span>
+        <ConfigSection id="statusbar" title="شريط الحالة السفلي">
+          <footer className="win-statusbar flex h-6 shrink-0 items-center gap-3 px-3">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#107c10]" />
+              <ConfigText k="shell.status.database" fallback="قاعدة البيانات متصلة" />
+            </span>
           <span className="hidden text-[#767676] dark:text-[#a6a6a6] sm:inline">
             {new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
           </span>
@@ -170,9 +175,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             </button>
             <span aria-hidden="true" className="h-3 w-px bg-[#c8c8c8] dark:bg-[#4a4a4a]" />
             {currentUser && <span className="truncate">{currentUser.fullName}</span>}
-            <span className="hidden sm:inline">سيراميسيس</span>
+            <span className="hidden sm:inline">
+              <ConfigText k="shell.brand.name" fallback="سيراميسيس" />
+            </span>
           </span>
-        </footer>
+          </footer>
+        </ConfigSection>
         {mobileSidebarOpen && (
           <div className="fixed inset-0 z-[95] lg:hidden" dir="rtl">
             <button

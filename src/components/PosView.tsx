@@ -21,6 +21,7 @@ import { LoyaltyService } from '../services/LoyaltyService';
 import { PrintService } from '../services/PrintService';
 import { PricingService } from '../services/PricingService';
 import { ApprovalService } from '../services/ApprovalService';
+import { AppConfigService } from '../services/AppConfigService';
 import { PermissionService } from '../services/PermissionService';
 import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, SystemSettings, ToneMixingConflict } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
@@ -955,7 +956,8 @@ export const PosView: React.FC = () => {
     }
     if (totalDiscount > 0) {
       const discountPercent = lineSubtotal > 0 ? (totalDiscount / lineSubtotal) * 100 : 0;
-      const threshold = settings?.discountApprovalThresholdPercent ?? 10;
+      const configuredThreshold = settings?.discountApprovalThresholdPercent ?? 10;
+      const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', configuredThreshold);
       if (discountPercent > threshold && !can('sales.approve')) {
         try {
           const request = new ApprovalService().createRequest({

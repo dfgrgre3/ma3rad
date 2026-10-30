@@ -213,8 +213,9 @@ test('inventory reads stay inside the company even when the warehouse branch mat
 
   asUser(admin);
   const adminWarehouses = new InventoryService().getAllWarehouses().map((row) => row.id);
-  assert.ok(adminWarehouses.includes('wh_scope_leak'));
-  assert.ok(adminWarehouses.includes('wh_scope_beta'));
+  assert.ok(adminWarehouses.includes('wh_main'));
+  assert.ok(!adminWarehouses.includes('wh_scope_leak'));
+  assert.ok(!adminWarehouses.includes('wh_scope_beta'));
 });
 
 test('accounting reports and journal entries are scoped by the owning company', async () => {
@@ -263,8 +264,8 @@ test('accounting reports and journal entries are scoped by the owning company', 
 
   asUser(admin);
   const adminPnl = new AccountingService().getProfitAndLossReport();
-  assert.equal(adminPnl.revenue, 450, 'central access sees all companies');
-  assert.equal(new FinancialStatementsService().getGeneralLedger(revenueAccount.id).closing, -450);
+  assert.equal(adminPnl.revenue, 100, 'central access still uses the selected branch');
+  assert.equal(new FinancialStatementsService().getGeneralLedger(revenueAccount.id).closing, -100);
 
   // The enterprise P&L and the journal browser must apply the same scope.
   asUser(limitedUser());
@@ -277,9 +278,9 @@ test('accounting reports and journal entries are scoped by the owning company', 
   assert.throws(() => extras.getJournalLines(betaEntry), /نطاق صلاحيتك/);
 
   asUser(admin);
-  assert.equal(enterprise.getMultiDimensionalPnL({}).revenue, 450);
-  assert.equal(extras.getJournalEntries().length, 3);
-  assert.equal(extras.getJournalLines(betaEntry).length, 2);
+  assert.equal(enterprise.getMultiDimensionalPnL({}).revenue, 100);
+  assert.deepEqual(extras.getJournalEntries().map((entry) => entry.id), [mainEntry]);
+  assert.throws(() => extras.getJournalLines(betaEntry), /نطاق صلاحيتك/);
 });
 
 test('transaction documents are blocked by company ownership even when branch access matches', async () => {
@@ -314,11 +315,11 @@ test('transaction documents are blocked by company ownership even when branch ac
 
   asUser(admin);
 
-  // Central access keeps full visibility.
+  // Central users must select a branch to see its operational records.
   const adminSales = new SalesService();
   const adminInvoiceIds = adminSales.getAllInvoices().map((row) => row.id);
-  assert.ok(adminInvoiceIds.includes('inv_scope_leak'));
-  assert.ok(adminInvoiceIds.includes('inv_scope_beta'));
-  assert.ok(new PurchaseService().getAllPurchases().map((row) => row.id).includes('pi_scope_beta'));
+  assert.ok(adminInvoiceIds.includes('inv_scope_main'));
+  assert.ok(!adminInvoiceIds.includes('inv_scope_leak'));
+  assert.ok(!adminInvoiceIds.includes('inv_scope_beta'));
+  assert.deepEqual(new PurchaseService().getAllPurchases().map((row) => row.id), ['pi_scope_main']);
 });
-

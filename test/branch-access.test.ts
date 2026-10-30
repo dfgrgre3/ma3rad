@@ -10,6 +10,7 @@ import { ApprovalService } from '../src/services/ApprovalService.ts';
 import { PurchaseRequestService } from '../src/services/PurchaseRequestService.ts';
 import { CashierService } from '../src/services/CashierService.ts';
 import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
+import { OperationsService } from '../src/services/OperationsService.ts';
 import type { User } from '../src/types/identity.ts';
 
 test('branch access enforces assigned and explicit central scopes in service queries', async () => {
@@ -68,11 +69,12 @@ test('branch access enforces assigned and explicit central scopes in service que
   access.requireBranchAccess('br_scope_a');
   assert.throws(() => access.requireBranchAccess('br_scope_b'), /ليس لديك صلاحية الوصول/);
   assert.equal(access.requireWarehouseAccess('wh_scope_a'), 'br_scope_a');
-  assert.throws(() => access.requireWarehouseAccess('wh_scope_b'), /ليس لديك صلاحية الوصول/);
+  assert.throws(() => access.requireWarehouseAccess('wh_scope_b'), /ليس لديك صلاحية الوصول|الفرع النشط/);
   assert.equal(access.requireRegisterAccess('cr_scope_a'), 'br_scope_a');
   assert.throws(() => access.requireRegisterAccess('cr_scope_b'), /ليس لديك صلاحية الوصول/);
   assert.throws(() => access.requireRegisterAccess('cr_scope_a', user, 'br_scope_b'), /خزينة تابعة لفرع المعاملة/);
   assert.deepEqual(new CashierService().getAllRegisters().map(register => register.id), ['cr_scope_a']);
+  assert.deepEqual(new OperationsService().getBranches('', true).map(branch => branch.id), ['br_scope_a']);
   db.run(
     `INSERT INTO expenses (id, category, amount, register_id, branch_id, payment_type, date, description, performed_by)
      VALUES ('exp_scope_a', 'Test', 10, 'cr_scope_a', 'br_scope_a', 'CASH', '2026-01-01', 'A expense', 'usr_scope'),
@@ -138,6 +140,9 @@ test('branch access enforces assigned and explicit central scopes in service que
   );
   PermissionService.invalidate(user);
   assert.equal(access.getAccessibleBranchIds(), null);
+  assert.throws(() => access.requireBranchAccess('br_scope_b'), /الفرع النشط الحالي/);
+  assert.throws(() => access.requireWarehouseAccess('wh_scope_b'), /الفرع النشط الحالي/);
+  access.setCurrentBranchId('br_scope_b');
   access.requireBranchAccess('br_scope_b');
   assert.equal(access.requireWarehouseAccess('wh_scope_b'), 'br_scope_b');
 
@@ -210,4 +215,106 @@ test('migration assigns existing local users a safe branch and keeps admins cent
   assert.equal(createdScope.branchScope, 'ASSIGNED');
   assert.ok(createdScope.branchId);
   AuthService.logout();
+});
+
+test('branch onboarding, assignment, editing, and lifecycle stay integrated', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  db.run(
+    `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active, branch_scope)
+     VALUES ('usr_branch_management_admin', 'branch-management-admin', 'test', 'Branch Management Admin', 'ADMIN', 1, 'ALL'),
+            ('usr_branch_manager', 'branch-manager', 'test', 'Branch Manager', 'MANAGER', 1, 'ASSIGNED')`
+  );
+  const admin: User = {
+    id: 'usr_branch_management_admin',
+    username: 'branch-management-admin',
+    fullName: 'Branch Management Admin',
+    role: 'ADMIN',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  AuthService.setCurrentUser(admin);
+  PermissionService.invalidate(admin);
+
+  const operations = new OperationsService();
+  const branch = operations.createBranch({
+    name: 'Branch Lifecycle Test',
+    phone: '01000000000',
+    address: 'Main Road',
+    city: 'Cairo',
+    companyId: 'cmp_main',
+    managerId: 'usr_branch_manager',
+    deviceType: 'WINDOWS',
+  });
+  assert.match(branch.code, /^BR-/);
+  assert.equal(branch.companyId, 'cmp_main');
+  assert.equal(branch.managerId, 'usr_branch_manager');
+  assert.ok(branch.activationCode);
+  assert.equal(
+    db.query<{ branchId: string }>(
+      'SELECT branch_id AS branchId FROM users_branches WHERE user_id = ? AND branch_id = ?',
+      ['usr_branch_manager', branch.id]
+    ).length,
+    1
+  );
+  assert.equal(
+    Number(db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM cash_registers WHERE branch_id = ? AND is_active = 1',
+      [branch.id]
+    )[0].count),
+    1
+  );
+
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(branch.id, admin);
+  assert.deepEqual(operations.getBranches().map((row) => row.id), [branch.id]);
+  assert.ok(access.getSelectableBranches(admin).some((row) => row.id === 'br_main'));
+
+  const branchService = new BranchService();
+  branchService.updateBranch(branch.id, {
+    name: 'Branch Lifecycle Updated',
+    code: `${branch.code}-EDIT`,
+    city: 'Giza',
+  });
+  assert.equal(branchService.getBranchById(branch.id)?.name, 'Branch Lifecycle Updated');
+  assert.equal(
+    db.query<{ name: string }>('SELECT name FROM sync_branches WHERE branch_id = ?', [branch.id])[0].name,
+    'Branch Lifecycle Updated'
+  );
+
+  branchService.updateBranch(branch.id, { isDefault: true });
+  assert.throws(() => branchService.updateBranch(branch.id, { isDefault: false }), /فرعًا افتراضيًا آخر/);
+  assert.throws(() => operations.toggleBranch(branch.id, false), /لا يمكن تعطيل الفرع الافتراضي/);
+  access.setCurrentBranchId('br_main', admin);
+  branchService.updateBranch('br_main', { isDefault: true });
+  access.setCurrentBranchId(branch.id, admin);
+  assert.equal(branchService.getBranchById(branch.id)?.isDefault, false);
+
+  branchService.updateBranchUserAssignments(branch.id, ['usr_branch_manager']);
+  assert.equal(
+    branchService.getBranchUserAssignments(branch.id).find((user) => user.id === 'usr_branch_manager')?.isAssigned,
+    true
+  );
+  assert.throws(
+    () => branchService.updateBranchUserAssignments(branch.id, []),
+    /آخر فرع مسند/
+  );
+
+  operations.toggleBranch(branch.id, false);
+  assert.equal(
+    Number(db.query<{ isActive: number }>(
+      'SELECT is_active AS isActive FROM branches WHERE id = ?',
+      [branch.id]
+    )[0].isActive),
+    0
+  );
+  assert.ok(operations.getBranches('', true).some((row) => row.id === branch.id && !row.isActive));
+  assert.equal(db.query<{ status: string }>(
+    'SELECT status FROM sync_branches WHERE branch_id = ?',
+    [branch.id]
+  )[0].status, 'DISABLED');
+  operations.toggleBranch(branch.id, true);
+  assert.equal(branchService.getBranchById(branch.id)?.isActive, true);
 });

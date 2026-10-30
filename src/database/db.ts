@@ -68,6 +68,7 @@ function snakeToCamelKeys<T extends Record<string, unknown>>(row: T): T {
 
 export class DatabaseManager {
   private static instance: DatabaseManager;
+  private static numberFormatter: ((prefix: string, seq: number, date: Date) => string) | null = null;
   private db: Database | null = null;
   private databaseFacade: Database | null = null;
   private databaseFacadeTarget: Database | null = null;
@@ -100,6 +101,17 @@ export class DatabaseManager {
       DatabaseManager.instance = new DatabaseManager();
     }
     return DatabaseManager.instance;
+  }
+
+  /**
+   * Installed by `AppConfigService` so administrator-defined numbering
+   * templates apply to every existing `nextNumber()` caller without touching
+   * the individual document services.
+   */
+  public static setNumberFormatter(
+    formatter: ((prefix: string, seq: number, date: Date) => string) | null,
+  ): void {
+    DatabaseManager.numberFormatter = formatter;
   }
 
   public initialize(): Promise<Database> {
@@ -679,6 +691,8 @@ export class DatabaseManager {
     const next = (row?.value ?? 0) + 1;
     this.run('UPDATE sequence_counters SET value = ? WHERE name = ?', [next, prefix]);
     const year = new Date().getFullYear();
+    const custom = DatabaseManager.numberFormatter?.(prefix, next, new Date());
+    if (custom) return custom;
     return `${prefix}-${year}-${String(next).padStart(6, '0')}`;
   }
 

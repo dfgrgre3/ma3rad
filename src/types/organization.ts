@@ -75,7 +75,7 @@ export interface CreateBranchDTO {
   address?: string;
   phone?: string;
   city?: string;
-  managerId?: string;
+  managerId?: string | null;
   managerName?: string;
   deviceType?: string;
   deviceName?: string;

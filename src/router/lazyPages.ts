@@ -3,7 +3,7 @@ import { lazy } from 'react';
 // Dashboard & Tools
 export const DashboardView = lazy(() => import('../components/DashboardView').then(m => ({ default: m.DashboardView })));
 export const ExecutiveDashboard = lazy(() => import('../pages/dashboard/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
-export const QuickToolsPage = lazy(() => import('../pages/tools/QuickToolsPage').then(m => ({ default: m.QuickToolsPage })));
+
 
 // Sales & POS
 export const PosView = lazy(() => import('../components/PosView').then(m => ({ default: m.PosView })));
@@ -42,7 +42,7 @@ export const StockTransfersView = lazy(() => import('../components/StockTransfer
 export const InventoryCountPage = lazy(() => import('../pages/inventory/InventoryCountPage').then(m => ({ default: m.InventoryCountPage })));
 export const InventoryValuationPage = lazy(() => import('../pages/inventory/InventoryValuationPage').then(m => ({ default: m.InventoryValuationPage })));
 export const InventoryAdjustmentsPage = lazy(() => import('../pages/inventory/InventoryAdjustmentsPage').then(m => ({ default: m.InventoryAdjustmentsPage })));
-export const ReservationsPage = lazy(() => import('../pages/inventory/ReservationsPage').then(m => ({ default: m.ReservationsPage })));
+
 export const ReorderPlanningPage = lazy(() => import('../pages/inventory/ReorderPlanningPage').then(m => ({ default: m.ReorderPlanningPage })));
 export const WarehouseLocationsPage = lazy(() => import('../pages/inventory/WarehouseLocationsPage').then(m => ({ default: m.WarehouseLocationsPage })));
 export const DamageQuarantinePage = lazy(() => import('../pages/inventory/DamageQuarantinePage').then(m => ({ default: m.DamageQuarantinePage })));
@@ -109,6 +109,7 @@ export const FixedAssetsPage = lazy(() => import('../pages/finance/FixedAssetsPa
 export const ProjectsPage = lazy(() => import('../pages/projects/ProjectsPage').then(m => ({ default: m.ProjectsPage })));
 export const ProjectDetailPage = lazy(() => import('../pages/projects/ProjectDetailPage').then(m => ({ default: m.ProjectDetailPage })));
 export const ReportsView = lazy(() => import('../components/ReportsView').then(m => ({ default: m.ReportsView })));
+export const ReportsHubPage = lazy(() => import('../pages/reports/ReportsHubPage').then(m => ({ default: m.ReportsHubPage })));
 export const TaxReportPage = lazy(() => import('../pages/reports/TaxReportPage').then(m => ({ default: m.TaxReportPage })));
 export const ProfitLossPage = lazy(() => import('../pages/reports/ProfitLossPage').then(m => ({ default: m.ProfitLossPage })));
 export const FinancialStatementsPage = lazy(() => import('../pages/reports/FinancialStatementsPage').then(m => ({ default: m.FinancialStatementsPage })));
@@ -128,8 +129,12 @@ export const DataDeletionPage = lazy(() => import('../pages/admin/DataDeletionPa
 
 // Settings & Fallback
 export const DynamicDataPage = lazy(() => import('../pages/settings/DynamicDataPage').then(m => ({ default: m.DynamicDataPage })));
+export const AppConfigurationView = lazy(() => import('../pages/settings/AppConfigurationPage').then(m => ({ default: m.AppConfigurationPage })));
+export const ConfigurationStudioView = lazy(() => import('../pages/settings/ConfigurationStudioPage').then(m => ({ default: m.ConfigurationStudioPage })));
 export const DataImportPage = lazy(() => import('../pages/settings/DataImportPage').then(m => ({ default: m.DataImportPage })));
 export const SettingsView = lazy(() => import('../components/SettingsView').then(m => ({ default: m.SettingsView })));
+export const SettingsHubPage = lazy(() => import('../pages/settings/SettingsHubPage').then(m => ({ default: m.SettingsHubPage })));
+export const CentralActivationView = lazy(() => import('../components/CentralActivationView').then(m => ({ default: m.CentralActivationView })));
 export const UsersView = lazy(() => import('../components/UsersView').then(m => ({ default: m.UsersView })));
 export const BackupPage = lazy(() => import('../pages/settings/BackupPage').then(m => ({ default: m.BackupPage })));
 export const SystemHealthPage = lazy(() => import('../pages/settings/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));

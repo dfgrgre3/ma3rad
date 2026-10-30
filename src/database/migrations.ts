@@ -14,6 +14,7 @@ import { MIGRATION_PART_10 } from './migrations/part10';
 import { MIGRATION_PART_11 } from './migrations/part11';
 import { MIGRATION_PART_12 } from './migrations/part12';
 import { MIGRATION_PART_13 } from './migrations/part13';
+import { MIGRATION_PART_14 } from './migrations/part14';
 import { MIGRATION_ENTERPRISE } from './migrations/enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './migrationSupport';
 
@@ -34,6 +35,7 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_11,
   MIGRATION_PART_12,
   MIGRATION_PART_13,
+  MIGRATION_PART_14,
   MIGRATION_ENTERPRISE,
   {
     id: '050_cash_shift_auto_close',
@@ -2116,6 +2118,17 @@ export const MIGRATIONS: Migration[] = [
         CREATE UNIQUE INDEX IF NOT EXISTS idx_restaurant_order_items_production
           ON restaurant_order_items(production_order_id)
           WHERE production_order_id IS NOT NULL;
+      `);
+    },
+  },
+  {
+    id: '100_branch_scoped_financial_closures',
+    description: 'Associate financial reconciliation closures with the active branch',
+    up: (db: Database) => {
+      addColumn(db, 'sales_financial_reconciliations', 'branch_id', 'TEXT');
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_sales_financial_reconciliations_branch_period
+          ON sales_financial_reconciliations(branch_id, date_from, date_to, closed_at DESC);
       `);
     },
   },

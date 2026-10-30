@@ -3,6 +3,7 @@ import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
 import { SettingsService } from './services/SettingsService';
+import { AppConfigService } from './services/AppConfigService';
 import { shouldShowFirstRunSetup } from './config/setupLifecycle';
 import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
 import { AppRouter } from './router';
@@ -36,6 +37,17 @@ export const App: React.FC = () => {
   }, []);
 
   useAppSession(dbReady, currentUser, () => setCurrentUser(null));
+
+  // Numbering templates are resolved by the configuration engine; installing
+  // the formatter keeps every existing nextNumber() caller compatible.
+  useEffect(() => {
+    if (!dbReady) return;
+    try {
+      AppConfigService.installNumbering();
+    } catch {
+      // A database created before migration 101 keeps the built-in format.
+    }
+  }, [dbReady]);
 
   useEffect(() => {
     if (!currentUser) return;

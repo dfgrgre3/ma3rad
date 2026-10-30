@@ -459,10 +459,10 @@ export class SecurityService {
       WHERE u.is_active = 1 AND lh.succeeded = 0
       GROUP BY u.id
       HAVING COUNT(*) >= (
-        SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts' LIMIT 1
+        COALESCE((SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'maxFailedLoginAttempts' LIMIT 1), 5)
       )
     `);
-    const lockedAccounts = lockedAccountsRow[0]?.count ?? 0;
+    const lockedAccounts = lockedAccountsRow.length;
 
     // نجاح/فشل في آخر 24 ساعة
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -490,7 +490,7 @@ export class SecurityService {
 
     // آخر نسخة احتياطية
     const lastBackupRow = db.query<{ timestamp: string }>(`
-      SELECT MAX(created_at) AS timestamp FROM audit_logs WHERE action = 'backup'
+      SELECT MAX(created_at) AS timestamp FROM backup_history WHERE status = 'SUCCESS'
     `);
     const lastBackupAt = lastBackupRow[0]?.timestamp || undefined;
 
@@ -528,34 +528,18 @@ export class SecurityService {
       ORDER BY s.last_seen_at DESC
     `, [currentSessionId ?? '']);
 
-    // تجميع الجلسات لكل مستخدم
-    const sessionsMap = new Map<string, ActiveSession>();
-    for (const row of sessionsRow) {
-      if (!sessionsMap.has(row.userId)) {
-        sessionsMap.set(row.userId, {
-          id: row.id,
-          userId: row.userId,
-          userName: row.userName,
-          username: row.username,
-          role: row.role,
-          deviceLabel: row.deviceLabel,
-          lastSeenAt: row.lastSeenAt,
-          startedAt: row.startedAt,
-          isCurrent: row.isCurrent === 1
-        });
-      } else {
-        // إذا كان هناك أكثر من جلسة للمستخدم، نحفظها كقائمة
-        // هذا يحتاج لتطوير لاحق، لكن للآن نضعها كما هي
-        sessionsMap.set(row.userId, {
-          ...sessionsMap.get(row.userId)!,
-          id: row.id,
-          lastSeenAt: row.lastSeenAt,
-          isCurrent: row.isCurrent === 1
-        });
-      }
-    }
-
-    return Array.from(sessionsMap.values());
+    // إرجاع كل الجلسات النشطة (بما فيها جلسات متعددة لنفس المستخدم)
+    return sessionsRow.map((row) => ({
+      id: row.id,
+      userId: row.userId,
+      userName: row.userName,
+      username: row.username,
+      role: row.role,
+      deviceLabel: row.deviceLabel,
+      lastSeenAt: row.lastSeenAt,
+      startedAt: row.startedAt,
+      isCurrent: row.isCurrent === 1,
+    }));
   }
 
   getLoginHistory({ search = '', onlyFailed = false, limit = 150 }: { search?: string; onlyFailed?: boolean; limit?: number } = {}): LoginRecord[] {
@@ -642,3 +626,6 @@ export class SecurityService {
 }
 
 export const securityService = SecurityService.getInstance();
+
+
+

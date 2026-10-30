@@ -88,6 +88,8 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'النسخ الاحتياطي', to: '/backup', icon: Download, perm: 'settings.backup' },
       { label: 'صحة النظام', to: '/system-health', icon: Cpu, perm: 'settings.view' },
       { label: 'الإعدادات', to: '/settings', icon: Settings, perm: 'settings.view' },
+      { label: 'محرك التكوين الديناميكي', to: '/settings/app-configuration', icon: SlidersHorizontal, perm: 'settings.view' },
+      { label: 'استوديو التكوين', to: '/settings/configuration-studio', icon: SlidersHorizontal, perm: 'settings.view' },
     ],
   }
 ];

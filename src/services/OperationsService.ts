@@ -5,6 +5,7 @@ import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 import { BranchAccessService } from './BranchAccessService';
 import { ModuleRegistryService } from './ModuleRegistryService';
+import { BranchService } from './BranchService';
 
 export interface Branch {
   id: string;
@@ -15,6 +16,9 @@ export interface Branch {
   city?: string | null;
   managerId?: string | null;
   managerName?: string;
+  companyId?: string | null;
+  companyName?: string | null;
+  companyCurrency?: string | null;
   deviceType?: string | null;
   activationCode?: string | null;
   isMain: boolean;
@@ -105,16 +109,18 @@ export class OperationsService {
   }
 
   // ── Branches ───────────────────────────────────────────────────────────────
-  public getBranches(search = ''): Branch[] {
+  public getBranches(search = '', includeAllAuthorizedBranches = false): Branch[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'branches.view');
-    const scope = this.branchAccess.sqlScope('b.id', undefined, actor);
+    const scope = this.branchAccess.sqlScope('b.id', undefined, actor, includeAllAuthorizedBranches);
     let sql = `
       SELECT b.*, u.full_name AS manager_name, sb.device_type AS deviceType, sb.activation_code AS activationCode,
+        c.name AS company_name, c.currency AS company_currency,
         (SELECT COUNT(*) FROM warehouses w WHERE w.branch_id = b.id AND w.is_active = 1) AS warehouses_count
       FROM branches b
       LEFT JOIN users u ON u.id = b.manager_id
       LEFT JOIN sync_branches sb ON sb.branch_id = b.id
+      LEFT JOIN companies c ON c.id = b.company_id
       WHERE ${scope.clause}`;
     const params: any[] = [...scope.params];
     if (search.trim()) {
@@ -139,18 +145,50 @@ export class OperationsService {
     city?: string;
     deviceType?: string;
     deviceName?: string;
+    managerId?: string;
     managerName?: string;
     permissions?: string[];
     notes?: string;
+    companyId?: string;
+    isDefault?: boolean;
   }): Branch {
     ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('branches.manage');
+    PermissionService.require(AuthService.getCurrentUser(), 'branches.create');
     PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
     const trimmedName = input.name?.trim();
     if (!trimmedName) throw new Error('اسم الفرع مطلوب.');
     const id = `br_${uuidv4().substring(0, 8)}`;
     const deviceType = (input.deviceType || 'WINDOWS').trim().toUpperCase();
     const permissionList = Array.isArray(input.permissions) ? input.permissions.filter(Boolean).map((p) => String(p).trim()).filter(Boolean) : [];
+    const actor = AuthService.requireAuth();
+    const accessibleBranchIds = this.branchAccess.getAccessibleBranchIds(actor);
+    const companyId = input.companyId || (accessibleBranchIds === null
+      ? this.db.query<{ companyId: string }>(
+        'SELECT company_id AS companyId FROM branches WHERE is_main = 1 AND company_id IS NOT NULL LIMIT 1'
+      )[0]?.companyId
+      : accessibleBranchIds.length
+        ? this.db.query<{ companyId: string }>(
+          `SELECT company_id AS companyId FROM branches
+           WHERE id IN (${accessibleBranchIds.map(() => '?').join(', ')})
+             AND company_id IS NOT NULL
+           ORDER BY is_main DESC, id ASC LIMIT 1`,
+          accessibleBranchIds
+        )[0]?.companyId
+        : undefined);
+    if (!companyId) throw new Error('تعذر تحديد الشركة المالكة للفرع الجديد.');
+    const company = this.db.query<{ isActive: number }>(
+      'SELECT is_active AS isActive FROM companies WHERE id = ?',
+      [companyId]
+    )[0];
+    if (!company || Number(company.isActive) !== 1) throw new Error('الشركة المحددة غير موجودة أو غير نشطة.');
+    this.branchAccess.requireCompanyAccess(companyId, actor);
+    if (input.managerId && !this.db.query(
+      'SELECT id FROM users WHERE id = ? AND is_active = 1',
+      [input.managerId]
+    ).length) {
+      throw new Error('المسؤول المحدد غير موجود أو غير نشط.');
+    }
     const notesPayload = {
       deviceType,
       deviceName: input.deviceName?.trim() || null,
@@ -162,26 +200,56 @@ export class OperationsService {
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('BR');
       const notes = input.notes || JSON.stringify(notesPayload);
+      if (input.isDefault) {
+        db.run('UPDATE branches SET is_main = 0 WHERE is_main = 1');
+      }
       db.run(
-        `INSERT INTO branches (id, code, name, phone, address, city, is_main, is_active, notes)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?)`,
-        [id, code, trimmedName, input.phone || null, input.address || null, input.city || null, notes]
+        `INSERT INTO branches
+           (id, code, name, phone, address, city, manager_id, company_id, is_main, is_active, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+        [
+          id, code, trimmedName, input.phone?.trim() || null, input.address?.trim() || null,
+          input.city?.trim() || null, input.managerId || null, companyId, input.isDefault ? 1 : 0, notes,
+        ]
+      );
+      if (input.managerId) {
+        db.run(
+          'INSERT OR IGNORE INTO users_branches (user_id, branch_id) VALUES (?, ?)',
+          [input.managerId, id]
+        );
+      }
+      db.run(
+        `INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id)
+         VALUES (?, ?, 0, 1, 1, ?)`,
+        [`cr_${id}`, `الخزينة الرئيسية - ${code}`, id]
       );
       db.run(
         `INSERT OR REPLACE INTO sync_branches (branch_id, tenant_id, name, status, is_verified, verified_at, authorized_by, device_type, activation_code, last_contact_at, last_sync_at, updated_at)
          VALUES (?, ?, ?, 'ACTIVE', 1, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
         [id, null, trimmedName, new Date().toISOString(), AuthService.getCurrentUser()?.id || null, deviceType, activationCode]
       );
-      const branch = this.getBranches().find((b) => b.id === id)!;
-      return { ...branch, deviceType, activationCode, notes } as Branch;
+      const branch = db.query<Branch>(`
+        SELECT b.*, u.full_name AS manager_name, c.name AS company_name, c.currency AS company_currency
+        FROM branches b
+        LEFT JOIN users u ON u.id = b.manager_id
+        LEFT JOIN companies c ON c.id = b.company_id
+        WHERE b.id = ?
+      `, [id])[0];
+      if (!branch) throw new Error('تعذر قراءة بيانات الفرع بعد إنشائه.');
+      return {
+        ...branch,
+        isMain: Boolean(branch.isMain),
+        isActive: Boolean(branch.isActive),
+        deviceType,
+        activationCode,
+        notes,
+      };
     });
   }
 
   public toggleBranch(id: string, active: boolean): void {
     ModuleRegistryService.assertModuleEnabled('operations');
-    this.requireManage('branches.manage');
-    PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
-    this.db.run(`UPDATE branches SET is_active = ? WHERE id = ?`, [active ? 1 : 0, id]);
+    new BranchService().setBranchActive(id, active);
   }
 
   // ── Warehouses ─────────────────────────────────────────────────────────────

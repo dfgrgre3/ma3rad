@@ -97,11 +97,11 @@ test('financial statements only include assigned-branch ledger entries', async (
     const ledger = service.getGeneralLedger(cashAccount.id, '2037-05-14', '2037-05-14');
     assert.equal(ledger.lines.length, 1);
     assert.equal(ledger.lines[0].debit, 100);
-    assert.match(service.getBranchScopeWarning() || '', /1 قيد محاسبي غير منسوب/);
+    assert.match(service.getBranchScopeWarning() || '', /الفرع النشط فقط/);
 
     const reconciliation = new SalesFinancialReconciliationService();
     const checks = reconciliation.getReconciliation('2037-05-14', '2037-05-14');
-    assert.equal(checks.length, 5);
+    assert.equal(checks.length, 6);
     assert.equal(checks.find(check => check.key === 'cash')?.ledger, 100);
     assert.equal(reconciliation.getLatestClosure('2037-05-14', '2037-05-14'), null);
     assert.throws(

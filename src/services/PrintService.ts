@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import type { SalesInvoice, SystemSettings } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
+import { AppConfigService } from './AppConfigService';
 import { EscPosService } from './EscPosService';
 import { SettingsService } from './SettingsService';
 
@@ -13,11 +14,26 @@ export class PrintService {
   }
 
   /**
+   * Reads an administrator override for a printed document title or footer.
+   * Falls back to the hard-coded default when the configuration is empty or
+   * unavailable (e.g. before the database is initialized).
+   */
+  private printOverride(key: string, fallback: string): string {
+    try {
+      return AppConfigService.getPrintTemplate(key, fallback) || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  /**
    * Returns the printable A4 invoice document as a standalone HTML string.
    * Used both by the print action and by the in-app document preview modal.
    */
   public getInvoiceHtml(invoice: SalesInvoice & { items: any[] }, autoPrint = false): string {
     const settings = this.getSettings();
+    const documentTitle = this.printOverride('sales.invoice.a4', 'فاتورة مبيعات عادية');
+    const documentFooter = this.printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
 
     const itemsHtml = invoice.items.map((item, idx) => `
       <tr style="border-bottom: 1px solid #e2e8f0; text-align: center;">
@@ -39,7 +55,7 @@ export class PrintService {
       <html lang="ar" dir="rtl">
         <head>
           <meta charset="utf-8">
-          <title>فاتورة مبيعات ${this.esc(invoice.invoiceNumber)}</title>
+          <title>${this.esc(documentTitle)} ${this.esc(invoice.invoiceNumber)}</title>
           <style>
             body { font-family: 'Cairo', system-ui, sans-serif; margin: 0; padding: 20px; color: #0f172a; font-size: 13px; line-height: 1.5; }
             .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 15px; }
@@ -66,7 +82,7 @@ export class PrintService {
               ${settings.taxNumber ? `<div>الرقم الضريبي: ${this.esc(settings.taxNumber)}</div>` : ''}
             </div>
             <div style="text-align: left;">
-              <div class="badge">فاتورة مبيعات عادية</div>
+              <div class="badge">${this.esc(documentTitle)}</div>
               <div style="font-size: 10px; color: #64748b; margin-top: 4px;">مستند غير معتمد إلكترونياً</div>
               <div style="font-size: 14px; font-weight: 700; margin-top: 6px;">رقم: ${this.esc(invoice.invoiceNumber)}</div>
               <div>التاريخ: ${this.esc(invoice.date)}</div>
@@ -112,7 +128,7 @@ export class PrintService {
           </div>
 
           <div class="footer">
-            ${this.esc(settings.receiptFooter)}
+            ${this.esc(documentFooter)}
           </div>
 
           ${autoPrint ? `<script>
@@ -142,6 +158,8 @@ export class PrintService {
    */
   public async printThermalReceipt(invoice: SalesInvoice & { items: any[] }): Promise<void> {
     const settings = this.getSettings();
+    const receiptTitle = this.printOverride('sales.invoice.receipt', 'إيصال بيع');
+    const receiptFooter = this.printOverride('sales.invoice.receipt.footer', settings.receiptFooter || '');
 
     if (await this.printThermalReceiptDirect(invoice, settings)) return;
 
@@ -193,7 +211,7 @@ export class PrintService {
           <div class="center muted">${this.esc(settings.tagline || '')}</div>
           <div class="center muted">${this.esc(settings.address || '')}${settings.phone ? ' | ت: ' + this.esc(settings.phone) : ''}</div>
           <div class="divider"></div>
-          <div class="meta-row"><span>إيصال بيع</span><span>${this.esc(invoice.invoiceNumber)}</span></div>
+          <div class="meta-row"><span>${this.esc(receiptTitle)}</span><span>${this.esc(invoice.invoiceNumber)}</span></div>
           <div class="meta-row"><span>التاريخ</span><span>${this.esc(invoice.date)}</span></div>
           <div class="meta-row"><span>العميل</span><span>${this.esc(invoice.customerName || 'عميل نقدي')}</span></div>
           <div class="meta-row"><span>المخزن</span><span>${this.esc(invoice.warehouseName || '-')}</span></div>
@@ -208,7 +226,7 @@ export class PrintService {
           <div class="totals-row"><span>المدفوع</span><span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
           <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : invoice.paymentType === 'CARD' ? 'بطاقة' : invoice.paymentType === 'BANK_TRANSFER' ? 'تحويل بنكي' : invoice.paymentType === 'CHEQUE' ? 'شيك' : invoice.paymentType === 'MIXED' ? 'دفع مختلط' : 'آجل'}</span></div>
           ${invoice.remainingAmount > 0 ? `<div class="totals-row"><span>المتبقي (آجل)</span><span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
-          <div class="footer">${this.esc(settings.receiptFooter || '')}</div>
+          <div class="footer">${this.esc(receiptFooter || '')}</div>
           <script>
             window.onload = function() {
               window.print();
@@ -312,6 +330,8 @@ export class PrintService {
 
   public printQuotation(quotation: any): void {
     const settings = this.getSettings();
+    const quotationTitle = this.printOverride('quotation.a4', 'عرض سعر / مقايسة');
+    const quotationFooter = this.printOverride('quotation.a4.footer', settings.receiptFooter || '');
     const items = (quotation.items || []).map((item: any, i: number) => `
       <tr>
         <td>${i + 1}</td>
@@ -327,7 +347,7 @@ export class PrintService {
       : quotation.status === 'CANCELLED' ? 'ملغي' : 'بانتظار الموافقة';
 
     this.openDocument(`عرض سعر ${quotation.quotationNumber}`, `
-      ${this.header(settings, 'عرض سعر / مقايسة', quotation.quotationNumber, quotation.date, `صالح لغاية: ${this.esc(quotation.validUntil)}`)}
+      ${this.header(settings, quotationTitle, quotation.quotationNumber, quotation.date, `صالح لغاية: ${this.esc(quotation.validUntil)}`)}
       <div class="meta">
         <div><b>العميل:</b> ${this.esc(quotation.customerName || 'عميل نقدي')}</div>
         <div><b>الهاتف:</b> ${this.esc(quotation.customerPhone || '-')}</div>
@@ -346,7 +366,7 @@ export class PrintService {
       </div>
       ${quotation.notes ? `<div class="notes"><b>ملاحظات وشروط:</b>\n${this.esc(quotation.notes)}</div>` : ''}
       <div class="sign"><div>توقيع العميل بالقبول</div><div>إدارة المبيعات</div></div>
-      <div class="footer">${this.esc(settings.receiptFooter)}</div>
+      <div class="footer">${this.esc(quotationFooter)}</div>
     `);
   }
 

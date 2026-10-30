@@ -56,13 +56,7 @@ export class AccountingService {
   }
 
   public getBranchScopeWarning(): string | null {
-    if (this.branchAccess.getAccessibleBranchIds() === null) return null;
-    const count = Number(this.db.query<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM journal_entries WHERE branch_id IS NULL'
-    )[0]?.count || 0);
-    return count
-      ? `تم استبعاد ${count} قيد محاسبي غير منسوب إلى فرع؛ راجعها بصلاحية مركزية قبل الاعتماد على الإجماليات.`
-      : null;
+    return 'تعرض هذه المؤشرات بيانات الفرع النشط فقط؛ القيود غير المرتبطة بفرع لا تدخل في الإجماليات.';
   }
 
   public getDashboardMetrics(): DashboardMetrics {

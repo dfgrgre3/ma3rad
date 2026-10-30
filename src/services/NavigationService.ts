@@ -5,6 +5,7 @@ import { AuthService } from './AuthService';
 import type { User } from '../types';
 import { resolveBusinessTerm, type BusinessTermKey } from '../config/businessTerminology';
 import { TerminologyService } from './TerminologyService';
+import { AppConfigService } from './AppConfigService';
 
 export interface NavOverrides {
   hidden: string[];
@@ -117,17 +118,24 @@ export class NavigationService {
       const rank = new Map(order.map((path, index) => [path, index]));
       const items = group.items
         .filter((item) => !hiddenSet.has(item.to))
-        .map((item) => ({
-          ...item,
-          label: labels[item.to] || (NavigationService.pathTerms[item.to]
-            ? term(NavigationService.pathTerms[item.to]!)
-            : item.label),
-        }))
+        .map((item) => {
+          const page = AppConfigService.getPage(item.to);
+          return {
+            ...item,
+            label: labels[item.to] || page.label || (NavigationService.pathTerms[item.to]
+              ? term(NavigationService.pathTerms[item.to]!)
+              : item.label),
+            __enabled: page.enabled,
+            __order: page.order,
+          };
+        })
+        .filter((item) => item.__enabled)
         .sort((a, b) => {
-          const ra = rank.has(a.to) ? rank.get(a.to)! : 9999;
-          const rb = rank.has(b.to) ? rank.get(b.to)! : 9999;
+          const ra = a.__order ?? (rank.has(a.to) ? rank.get(a.to)! : 9999);
+          const rb = b.__order ?? (rank.has(b.to) ? rank.get(b.to)! : 9999);
           return ra - rb;
-        });
+        })
+        .map(({ __enabled, __order, ...item }) => item);
       return {
         ...group,
         label: labels[`group:${group.id}`]

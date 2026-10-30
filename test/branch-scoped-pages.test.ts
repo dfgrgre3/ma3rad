@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
 import { AnalyticsService } from '../src/services/AnalyticsService.ts';
@@ -54,7 +55,8 @@ test('inventory, report and party pages only expose data from accessible branche
   db.run(
     `INSERT OR IGNORE INTO user_permissions (user_id, permission_code, effect)
      VALUES ('usr_page_scope', 'suppliers.view', 'GRANT'),
-            ('usr_page_scope', 'purchases.view', 'GRANT')`
+           ('usr_page_scope', 'finance.debts.view', 'GRANT'),
+           ('usr_page_scope', 'purchases.view', 'GRANT')`
   );
   db.run(
     `INSERT OR IGNORE INTO customers (id, code, name, phone) VALUES
@@ -171,27 +173,29 @@ test('inventory, report and party pages only expose data from accessible branche
   const priceHistory = new ProcurementService().getProductPriceHistory('prod_page');
   assert.deepEqual(priceHistory.map(row => row.invoiceNumber), ['PAGE-PI-A']);
 
-  // Central users keep full visibility.
+  // Central users explicitly switch branches; operational reports stay branch-scoped.
   const admin = db.query<User & { branchScope: string }>(
     "SELECT id, username, full_name AS fullName, role, is_active AS isActive FROM users WHERE role = 'ADMIN' LIMIT 1"
   )[0];
   AuthService.setCurrentUser(admin);
-  assert.equal(loadInventoryKpi().totalValue, 1500);
-  assert.equal(new AnalyticsService().getSalesAnalytics(today, today).totalSales, 1400);
-  assert.deepEqual(
-    loadBranchAdjustments().map(row => row.id).sort((a, b) => a.localeCompare(b)),
-    ['adj_page_a', 'adj_page_b']
-  );
-  assert.equal(loadPurchaseKpi(today, today).totalPurchases, 500);
-  assert.deepEqual(
-    loadBranchCountSessions().map(row => row.id).sort((a, b) => a.localeCompare(b)),
-    ['cnt_page_a', 'cnt_page_b']
-  );
-  assert.deepEqual(
-    new SupplierService().getInvoicesWithAllocations('sup_page').map(row => row.id).sort((a, b) => a.localeCompare(b)),
-    ['pi_page_a', 'pi_page_b']
-  );
-  assert.equal(new ProcurementService().getSupplierScorecard('sup_page').totalOrders, 2);
+  const branchAccess = new BranchAccessService();
+  branchAccess.setCurrentBranchId('br_page_a', admin);
+  assert.equal(loadInventoryKpi().totalValue, 1000);
+  assert.equal(new AnalyticsService().getSalesAnalytics(today, today).totalSales, 500);
+  assert.deepEqual(loadBranchAdjustments().map(row => row.id), ['adj_page_a']);
+  assert.equal(loadPurchaseKpi(today, today).totalPurchases, 200);
+  assert.deepEqual(loadBranchCountSessions().map(row => row.id), ['cnt_page_a']);
+  assert.deepEqual(new SupplierService().getInvoicesWithAllocations('sup_page').map(row => row.id), ['pi_page_a']);
+  assert.equal(new ProcurementService().getSupplierScorecard('sup_page').totalOrders, 1);
+
+  branchAccess.setCurrentBranchId('br_page_b', admin);
+  assert.equal(loadInventoryKpi().totalValue, 500);
+  assert.equal(new AnalyticsService().getSalesAnalytics(today, today).totalSales, 900);
+  assert.deepEqual(loadBranchAdjustments().map(row => row.id), ['adj_page_b']);
+  assert.equal(loadPurchaseKpi(today, today).totalPurchases, 300);
+  assert.deepEqual(loadBranchCountSessions().map(row => row.id), ['cnt_page_b']);
+  assert.deepEqual(new SupplierService().getInvoicesWithAllocations('sup_page').map(row => row.id), ['pi_page_b']);
+  assert.equal(new ProcurementService().getSupplierScorecard('sup_page').totalOrders, 1);
 
   db.run("DELETE FROM purchase_invoices WHERE id IN ('pi_page_a', 'pi_page_b')");
   db.run("DELETE FROM purchase_orders WHERE id IN ('po_page_a', 'po_page_b')");

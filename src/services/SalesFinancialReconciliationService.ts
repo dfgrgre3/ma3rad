@@ -41,13 +41,7 @@ export class SalesFinancialReconciliationService {
   }
 
   public getBranchScopeWarning(): string | null {
-    if (this.canUseCentralClosure()) return null;
-    const count = Number(this.db.query<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM journal_entries WHERE branch_id IS NULL'
-    )[0]?.count || 0);
-    return count
-      ? `تم استبعاد ${count} قيد محاسبي غير منسوب إلى فرع من فحوصات الأستاذ العام.`
-      : null;
+    return 'تعرض هذه المصالحة بيانات الفرع النشط فقط؛ القيود غير المرتبطة بفرع لا تدخل في المقارنة.';
   }
 
   private validatePeriod(dateFrom: string, dateTo: string): void {
@@ -179,16 +173,11 @@ export class SalesFinancialReconciliationService {
       JOIN chart_of_accounts a ON a.id = l.account_id
       WHERE e.is_posted = 1 AND a.code = ? AND ${ledgerScope.clause}
     `, [code, ...ledgerScope.params])[0]?.balance || 0);
-    const allowedBranches = this.branchAccess.getAccessibleBranchIds();
-    const customerBalance = allowedBranches === null
-      ? Number(this.db.query<{ balance: number }>(
-        'SELECT COALESCE(SUM(current_balance), 0) AS balance FROM customers'
-      )[0]?.balance || 0)
-      : Number(this.db.query<{ balance: number }>(`
-          SELECT COALESCE(SUM(si.remaining_amount), 0) AS balance
-          FROM sales_invoices si
-          WHERE si.invoice_status != 'VOID' AND ${invoiceScope.clause}
-        `, invoiceScope.params)[0]?.balance || 0);
+    const customerBalance = Number(this.db.query<{ balance: number }>(`
+      SELECT COALESCE(SUM(si.remaining_amount), 0) AS balance
+      FROM sales_invoices si
+      WHERE si.invoice_status != 'VOID' AND ${invoiceScope.clause}
+    `, invoiceScope.params)[0]?.balance || 0);
     const inventoryValue = Number(this.db.query<{ value: number }>(`
       SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
       FROM inventory_cost_layers icl
@@ -227,13 +216,13 @@ export class SalesFinancialReconciliationService {
       this.addCheck('cash', 'أرصدة الخزائن مقابل الأستاذ العام', accountBalance('1101'), cashRegisters,
         'مقارنة حساب الصندوق 1101 بإجمالي أرصدة الخزائن المسجلة.'),
     ];
-    if (allowedBranches === null) {
-      const bankAccounts = Number(this.db.query<{ balance: number }>(
-        'SELECT COALESCE(SUM(current_balance), 0) AS balance FROM bank_accounts'
-      )[0]?.balance || 0);
-      checks.push(this.addCheck('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102'), bankAccounts,
-        'مقارنة حساب البنوك 1102 بإجمالي أرصدة الحسابات البنكية المسجلة.'));
-    }
+    const bankScope = this.branchAccess.sqlScope('ba.branch_id');
+    const bankAccounts = this.db.query<{ count: number; balance: number }>(`
+      SELECT COUNT(*) AS count, COALESCE(SUM(ba.current_balance), 0) AS balance
+      FROM bank_accounts ba WHERE ${bankScope.clause}
+    `, bankScope.params)[0];
+    checks.push(this.addCheck('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102'), Number(bankAccounts?.balance || 0),
+      'مقارنة حساب البنوك 1102 بإجمالي أرصدة الحسابات البنكية المرتبطة بالفرع النشط.'));
     return checks;
   }
 
@@ -241,6 +230,7 @@ export class SalesFinancialReconciliationService {
     this.validatePeriod(dateFrom, dateTo);
     PermissionService.require(AuthService.requireAuth(), 'finance.view');
     if (!this.canUseCentralClosure()) return null;
+    const branchId = this.branchAccess.getCurrentBranchId();
     const row = this.db.query<{
       id: string;
       dateFrom: string;
@@ -254,10 +244,10 @@ export class SalesFinancialReconciliationService {
         r.notes, u.full_name AS closedBy, r.closed_at AS closedAt
       FROM sales_financial_reconciliations r
       LEFT JOIN users u ON u.id = r.closed_by
-      WHERE r.date_from = ? AND r.date_to = ?
+      WHERE r.branch_id = ? AND r.date_from = ? AND r.date_to = ?
       ORDER BY r.closed_at DESC
       LIMIT 1
-    `, [dateFrom, dateTo])[0];
+    `, [branchId, dateFrom, dateTo])[0];
     if (!row) return null;
     return {
       id: row.id,
@@ -295,13 +285,14 @@ export class SalesFinancialReconciliationService {
       .join('\n') || 'تمت مراجعة الفروقات ولم تُسجل فروقات قائمة.';
     const id = `sfr_${uuidv4().slice(0, 12)}`;
     const closedAt = new Date().toISOString();
+    const branchId = this.branchAccess.getCurrentBranchId(actor);
 
     this.db.executeTransaction((db) => {
       db.run(`
         INSERT INTO sales_financial_reconciliations
-          (id, date_from, date_to, checks_json, notes, closed_by, closed_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [id, dateFrom, dateTo, JSON.stringify(checks), notes, actor.id, closedAt]);
+          (id, branch_id, date_from, date_to, checks_json, notes, closed_by, closed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [id, branchId, dateFrom, dateTo, JSON.stringify(checks), notes, actor.id, closedAt]);
       db.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
         VALUES (?, ?, ?, ?, 'FINANCE', ?, ?)

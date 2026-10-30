@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Menu, Moon, Search, Sun } from 'lucide-react';
+import { Bell, Building2, Menu, Moon, Search, Sun } from 'lucide-react';
 import type { User } from '../types';
 import { NavigationService } from '../services/NavigationService';
+import { BranchAccessService } from '../services/BranchAccessService';
+import { PermissionService } from '../services/PermissionService';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProfileMenu } from './ui/ProfileMenu';
 import { GlobalSearch } from './GlobalSearch';
 import { HeaderNav } from './HeaderNav';
+import { useToast } from './ui/Toast';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -69,6 +72,10 @@ export const Header: React.FC<HeaderProps> = ({
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const { settings, resolvedMode, toggleMode } = useTheme();
+  const toast = useToast();
+  const branchAccess = useMemo(() => new BranchAccessService(), []);
+  const [branches, setBranches] = useState<Array<{ id: string; name: string; code: string }>>([]);
+  const [activeBranchId, setActiveBranchId] = useState('');
   const isTopNav = navigationLayout === 'header';
 
   const page = useMemo(() => resolvePageTitle(location.pathname), [location.pathname]);
@@ -83,6 +90,31 @@ export const Header: React.FC<HeaderProps> = ({
     window.addEventListener('keydown', handleSearchShortcut);
     return () => window.removeEventListener('keydown', handleSearchShortcut);
   }, []);
+
+  useEffect(() => {
+    if (!currentUser || !PermissionService.can(currentUser, 'branches.view')) {
+      setBranches([]);
+      setActiveBranchId('');
+      return;
+    }
+    try {
+      const available = branchAccess.getSelectableBranches(currentUser);
+      setBranches(available);
+      setActiveBranchId(branchAccess.getCurrentBranchId(currentUser));
+    } catch (error) {
+      toast.error('تعذر تحديد الفرع النشط', error instanceof Error ? error.message : String(error));
+    }
+  }, [branchAccess, currentUser?.id, toast]);
+
+  const switchBranch = (branchId: string) => {
+    if (!branchId || branchId === activeBranchId) return;
+    try {
+      branchAccess.setCurrentBranchId(branchId, currentUser || undefined);
+      window.location.reload();
+    } catch (error) {
+      toast.error('تعذر التبديل بين الفروع', error instanceof Error ? error.message : String(error));
+    }
+  };
 
   const brandName = settings.brandName || 'سيراميسيس';
   const shortName = settings.brandShortName === 'C' ? 'س' : settings.brandShortName || 'س';
@@ -132,6 +164,25 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Actions */}
       <div className="mr-auto flex shrink-0 items-center gap-1">
+        {branches.length > 0 && (
+          <label className="flex h-8 max-w-48 items-center gap-1.5 rounded-[2px] border border-[#a6a6a6] bg-white px-2 text-[#4d4d4d] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] sm:max-w-60">
+            <Building2 className="h-3.5 w-3.5 shrink-0 text-[#0078d4]" />
+            <span className="hidden text-[10px] text-[#767676] lg:inline">الفرع</span>
+            <select
+              value={activeBranchId}
+              onChange={(event) => switchBranch(event.target.value)}
+              className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent py-1 text-[11px] font-semibold text-inherit outline-none"
+              aria-label="الفرع النشط"
+              title="تبديل الفرع النشط"
+            >
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id} className="bg-white text-slate-900">
+                  {branch.name} · {branch.code}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}

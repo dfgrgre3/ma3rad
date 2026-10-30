@@ -1,4 +1,5 @@
 import React from 'react';
+import { Navigate } from 'react-router-dom';
 import * as P from './lazyPages';
 
 export interface RouteDef {
@@ -10,7 +11,7 @@ export const appRoutes: RouteDef[] = [
   // Dashboard & Tools
   { path: 'dashboard', element: <P.DashboardView /> },
   { path: 'dashboard/executive', element: <P.ExecutiveDashboard /> },
-  { path: 'tools', element: <P.QuickToolsPage /> },
+  { path: 'tools', element: <Navigate to="/dashboard" replace /> },
 
   // Sales & POS
   { path: 'sales/analytics', element: <P.SalesAnalyticsPage /> },
@@ -48,7 +49,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'inventory/counts', element: <P.InventoryCountPage /> },
   { path: 'inventory/valuation', element: <P.InventoryValuationPage /> },
   { path: 'inventory/adjustments', element: <P.InventoryAdjustmentsPage /> },
-  { path: 'inventory/reservations', element: <P.ReservationsPage /> },
+  { path: 'inventory/reservations', element: <Navigate to="/sales/reservations?tab=reservations" replace /> },
   { path: 'inventory/reorder-planning', element: <P.ReorderPlanningPage /> },
   { path: 'inventory/locations', element: <P.WarehouseLocationsPage /> },
   { path: 'inventory/damage-quarantine', element: <P.DamageQuarantinePage /> },
@@ -117,7 +118,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'hr/dashboard', element: <P.HrDashboardPage /> },
 
   // Reports
-  { path: 'reports', element: <P.ReportsView /> },
+  { path: 'reports', element: <P.ReportsHubPage /> },
   { path: 'reports/tax', element: <P.TaxReportPage /> },
   { path: 'reports/profit-loss', element: <P.ProfitLossPage /> },
   { path: 'reports/statements', element: <P.FinancialStatementsPage /> },
@@ -139,7 +140,10 @@ export const appRoutes: RouteDef[] = [
   // Settings
   { path: 'data-import/types', element: <P.DynamicDataPage /> },
   { path: 'data-import', element: <P.DataImportPage /> },
-  { path: 'settings', element: <P.SettingsView /> },
+  { path: 'settings', element: <P.SettingsHubPage /> },
+  { path: 'settings/app-configuration', element: <Navigate to="/settings?tab=appConfig" replace /> },
+  { path: 'settings/configuration-studio', element: <Navigate to="/settings?tab=configStudio" replace /> },
+  { path: 'central-activation', element: <P.CentralActivationView /> },
   { path: 'users', element: <P.UsersView /> },
   { path: 'backup', element: <P.BackupPage /> },
   { path: 'system-health', element: <P.SystemHealthPage /> },
