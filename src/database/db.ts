@@ -4,7 +4,56 @@ import bcrypt from 'bcryptjs';
 import { AppError, toAppError } from '../errors/appError';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
+const DB_IDB_NAME = 'ceramisys_database';
+const DB_IDB_STORE = 'snapshots';
+const DB_IDB_KEY = 'main';
 type DatabaseFileApi = NonNullable<NonNullable<Window['ceramisys']>['db']>;
+
+function openDatabaseStorage(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_IDB_NAME, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(DB_IDB_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('Could not open browser database storage'));
+  });
+}
+
+async function readBrowserSnapshot(): Promise<Uint8Array | null> {
+  if (typeof indexedDB !== 'undefined') {
+    const db = await openDatabaseStorage();
+    try {
+      const value = await new Promise<unknown>((resolve, reject) => {
+        const request = db.transaction(DB_IDB_STORE, 'readonly').objectStore(DB_IDB_STORE).get(DB_IDB_KEY);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const stored = toUint8Array(value);
+      if (stored) return stored;
+    } finally { db.close(); }
+  }
+  return null;
+}
+
+async function writeBrowserSnapshot(bytes: Uint8Array, key = DB_IDB_KEY): Promise<void> {
+  if (typeof indexedDB !== 'undefined') {
+    const db = await openDatabaseStorage();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(DB_IDB_STORE, 'readwrite');
+        transaction.objectStore(DB_IDB_STORE).put(bytes, key);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error || new Error('Browser database storage write aborted'));
+      });
+    } finally { db.close(); }
+    return;
+  }
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(key === DB_IDB_KEY ? DB_STORAGE_KEY : key, bytesToBase64(bytes));
+    return;
+  }
+  throw new Error('No browser database storage is available');
+}
 
 function persistenceErrorMessage(error: unknown, fallbackCode: string): string {
   const seen = new Set<unknown>();
@@ -89,7 +138,7 @@ export class DatabaseManager {
   private lastPersistErrorCode: string | null = null;
   private initializedSuccessfully = false;
   private initializationPromise: Promise<Database> | null = null;
-  private storageBackend: 'file' | 'localStorage' | 'none' = 'none';
+  private storageBackend: 'file' | 'indexedDB' | 'localStorage' | 'none' = 'none';
   private migratedLegacyStorage = false;
   private forceFreshAfterRecovery = false;
   private debounceSaveTimer: any = null;
@@ -195,7 +244,7 @@ export class DatabaseManager {
 
     const candidate = this.unwrapSqlJsInitializer(await this.loadSqlJsModule());
     try {
-      // @ts-ignore - Vite resolves this wasm asset URL at build time.
+      // @ts-expect-error - Vite resolves this wasm asset URL at build time.
       wasmUrl = (await import('sql.js/dist/sql-wasm-browser.wasm?url')).default;
     } catch {
       wasmUrl = undefined;
@@ -206,7 +255,7 @@ export class DatabaseManager {
 
   private async loadSqlJsModule(): Promise<any> {
     try {
-      // @ts-ignore - sql.js does not declare its distributable entry points.
+      // @ts-expect-error - sql.js does not declare its distributable entry points.
       return await import('sql.js/dist/sql-wasm-browser.js');
     } catch {
       // Fallback for runtimes whose ESM bundler cannot import the browser distribution.
@@ -251,6 +300,22 @@ export class DatabaseManager {
       }
     }
 
+    if (!this.forceFreshAfterRecovery && savedBytes === null && typeof indexedDB !== 'undefined') {
+      try {
+        savedBytes = await readBrowserSnapshot();
+        if (savedBytes) this.storageBackend = 'indexedDB';
+        else if (typeof localStorage !== 'undefined') {
+          const legacy = localStorage.getItem(DB_STORAGE_KEY);
+          if (legacy) {
+            savedBytes = base64ToBytes(legacy);
+            this.migratedLegacyStorage = true;
+          }
+        }
+      } catch (error) {
+        throw await this.databaseRecoveryError(error);
+      }
+    }
+
     if (!this.forceFreshAfterRecovery && savedBytes === null && typeof localStorage !== 'undefined') {
       const legacy = localStorage.getItem(DB_STORAGE_KEY);
       if (legacy) {
@@ -291,7 +356,7 @@ export class DatabaseManager {
 
   private selectStorageBackend(fileApi: DatabaseFileApi | undefined): void {
     if (!this.storageBackend || this.storageBackend === 'none') {
-      this.storageBackend = fileApi?.save ? 'file' : (typeof localStorage !== 'undefined' ? 'localStorage' : 'none');
+      this.storageBackend = fileApi?.save ? 'file' : (typeof indexedDB !== 'undefined' ? 'indexedDB' : (typeof localStorage !== 'undefined' ? 'localStorage' : 'none'));
     }
   }
 
@@ -310,11 +375,8 @@ export class DatabaseManager {
         if (loadedFromFile && fileApi?.backup) {
           const backup = await fileApi.backup('before-gross-profit-policy');
           if (!backup?.ok || !backup.path) throw new Error(backup?.error || 'لم يتم إنشاء نسخة احتياطية.');
-        } else if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(
-            `${DB_STORAGE_KEY}_before_gross_profit_${Date.now()}`,
-            bytesToBase64(savedBytes)
-          );
+        } else if (typeof indexedDB !== 'undefined' || typeof localStorage !== 'undefined') {
+          await writeBrowserSnapshot(savedBytes, `before_gross_profit_${Date.now()}`);
         } else {
           throw new Error('لا يتوفر وسيط لإنشاء نسخة احتياطية قبل الترحيل.');
         }
@@ -571,9 +633,13 @@ export class DatabaseManager {
   private async persistSnapshot(snapshot: Uint8Array): Promise<void> {
     try {
       if (await this.persistToFile(snapshot)) return;
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(DB_STORAGE_KEY, bytesToBase64(snapshot));
-        this.storageBackend = 'localStorage';
+      if (typeof indexedDB !== 'undefined' || typeof localStorage !== 'undefined') {
+        await writeBrowserSnapshot(snapshot);
+        this.storageBackend = typeof indexedDB !== 'undefined' ? 'indexedDB' : 'localStorage';
+        if (this.migratedLegacyStorage && typeof localStorage !== 'undefined' && typeof indexedDB !== 'undefined') {
+          try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* keep the migrated copy if cleanup is blocked */ }
+          this.migratedLegacyStorage = false;
+        }
         this.lastPersistError = null;
         this.lastPersistErrorCode = null;
       } else {
@@ -613,9 +679,10 @@ export class DatabaseManager {
       this.debounceSaveTimer = null;
       this.saveToStorage();
     }
-    do {
-      await this.persistQueue;
-    } while (this.isPersisting || this.pendingSnapshot);
+    while (this.isPersisting || this.pendingSnapshot) {
+      const queue = this.persistQueue;
+      await queue;
+    }
     if (this.lastPersistError) {
       throw new AppError(`تعذر حفظ تغييرات قاعدة البيانات: ${this.lastPersistError}`, 'DATABASE_PERSIST_FAILED', true, {
         cause: new AppError(this.lastPersistError, this.lastPersistErrorCode || 'DATABASE_SAVE_FAILED', true),
@@ -623,7 +690,7 @@ export class DatabaseManager {
     }
   }
 
-  public getStorageBackend(): 'file' | 'localStorage' | 'none' {
+  public getStorageBackend(): 'file' | 'indexedDB' | 'localStorage' | 'none' {
     return this.storageBackend;
   }
 

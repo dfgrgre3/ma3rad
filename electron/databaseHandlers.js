@@ -122,7 +122,7 @@ function describeError(error) {
 }
 
 function registerDatabaseHandlers({
-  ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
+  ipcMain, validateIpcSender, path, fs, fsSync, safeStorage,
   APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
 }) {

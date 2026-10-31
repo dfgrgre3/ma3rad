@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { ProductService } from '../src/services/ProductService.ts';
 import { ManufacturingService } from '../src/services/ManufacturingService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
@@ -108,7 +109,10 @@ test('work centers are branch scoped', async () => {
   });
 
   const mainCenter = service.createWorkCenter({ code: 'WC-MAIN', name: 'Main line', branchId: 'br_main' });
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(betaBranch.id, admin);
   const betaCenter = service.createWorkCenter({ code: 'WC-BETA', name: 'Beta line', branchId: betaBranch.id });
+  access.setCurrentBranchId('br_main', admin);
 
   asManager();
   const visible = service.getWorkCenters();

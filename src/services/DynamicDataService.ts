@@ -12,7 +12,7 @@ export interface DynamicEntity { id: string; name: string; nameKey: string; desc
 export interface DynamicRecord { id: string; entityTypeId: string; values: Record<string, unknown>; searchText: string; sourceBatchId?: string; createdAt: string; updatedAt: string }
 export interface DynamicImportResult { entity: DynamicEntity; entities?: DynamicEntity[]; batchId: string; imported: number; skipped: number; errors: Array<{ row: number; message: string }> }
 
-const clean = (s: string) => s.normalize('NFKC').trim().toLocaleLowerCase().replace(/[\s_\-]+/g, ' ');
+const clean = (s: string) => s.normalize('NFKC').trim().toLocaleLowerCase().replace(/[\s_-]+/g, ' ');
 const fieldKey = (s: string) => clean(s).replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '') || 'field';
 const id = (prefix: string) => `${prefix}_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
 const contentHash = (buffer: ArrayBuffer): string => { const bytes=new Uint8Array(buffer);let h=2166136261;for(const b of bytes){h^=b;h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0'); };

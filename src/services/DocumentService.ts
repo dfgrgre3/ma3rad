@@ -54,7 +54,8 @@ function requireText(value: unknown, label: string, min = 1, max = 200): string 
   if (text.length < min || text.length > max) {
     throw new Error(`${label} مطلوب (${min} إلى ${max} حرفًا).`);
   }
-  if (/[\u0000-\u001f]/.test(text)) throw new Error(`${label} يحتوي على رموز غير صالحة.`);
+  // eslint-disable-next-line no-control-regex
+   if (/[\u0000-\u001f]/.test(text)) throw new Error(`${label} يحتوي على رموز غير صالحة.`);
   return text;
 }
 
@@ -63,6 +64,7 @@ function optionalText(value: unknown, label: string, max = 2000): string | null 
   if (typeof value !== 'string') throw new Error(`${label} غير صالح.`);
   const text = value.trim();
   if (text.length > max) throw new Error(`${label} يتجاوز الحد المسموح (${max} حرفًا).`);
+  // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text)) {
     throw new Error(`${label} يحتوي على رموز غير صالحة.`);
   }

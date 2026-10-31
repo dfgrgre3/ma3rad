@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { ProjectService } from '../src/services/ProjectService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
 import type { User } from '../src/types/identity.ts';
@@ -271,10 +272,13 @@ test('project controls are isolated by branch and blocked when the module is dis
     companyId: 'cmp_main',
   });
   const mainProject = createProject(service, 'Main controls project');
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(betaBranch.id, admin);
   const betaProject = createProject(service, 'Beta controls project', betaBranch.id);
-  service.createTask({ projectId: mainProject, title: 'Main task' });
   service.createTask({ projectId: betaProject, title: 'Beta task' });
   service.addBudgetLine({ projectId: betaProject, category: 'Beta materials', plannedAmount: 100 });
+  access.setCurrentBranchId('br_main', admin);
+  service.createTask({ projectId: mainProject, title: 'Main task' });
 
   asLimited();
   assert.ok(service.getTasks(mainProject).every((task) => task.title === 'Main task'));

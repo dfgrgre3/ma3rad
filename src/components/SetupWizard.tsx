@@ -35,9 +35,11 @@ import { getModuleDefinition, validateModuleSelection, withModuleDependencies } 
 import { ModuleRegistryService } from '../services/ModuleRegistryService';
 import { BusinessProfileService } from '../services/BusinessProfileService';
 import { ConfigurationVersionService } from '../services/ConfigurationVersionService';
+import { auditLogger } from '../services/auditLogger';
+import type { User } from '../types';
 
 interface SetupWizardProps {
-  onComplete: () => void;
+  onComplete: (configuredAdmin?: User) => void;
 }
 
 type SetupForm = {
@@ -61,6 +63,9 @@ type SetupForm = {
   fiscalYearStartMonth: string;
   lowStockThreshold: string;
   discountThreshold: string;
+  adminUsername: string;
+  adminFullName: string;
+  adminPhone: string;
   isTaxInclusive: boolean;
   enableNegativeStock: boolean;
   costingMethod: string;
@@ -71,6 +76,16 @@ interface SetupDraft {
   step: number;
   form: Record<string, unknown>;
   businessConfig?: unknown;
+  options: SetupOptions;
+}
+
+interface SetupOptions {
+  company: boolean;
+  branch: boolean;
+  users: boolean;
+  modules: boolean;
+  accounting: boolean;
+  inventory: boolean;
 }
 
 type SystemCheckResult = {
@@ -87,6 +102,36 @@ interface SetupSystemChecks {
 
 const SETUP_DRAFT_KEY = 'setup_draft';
 const CHECKING_RESULT: SystemCheckResult = { state: 'checking', detail: 'جارٍ الفحص...' };
+const DEFAULT_SETUP_OPTIONS: SetupOptions = {
+  company: true,
+  branch: true,
+  users: true,
+  modules: true,
+  accounting: true,
+  inventory: true,
+};
+type DefaultAdminState = {
+  required: boolean;
+  userId: string;
+  username: string;
+  fullName: string;
+  phone: string;
+  error?: string;
+};
+
+function parseSetupOptions(value: unknown): SetupOptions {
+  const saved = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Partial<SetupOptions>
+    : {};
+  return {
+    company: typeof saved.company === 'boolean' ? saved.company : true,
+    branch: typeof saved.branch === 'boolean' ? saved.branch : true,
+    users: typeof saved.users === 'boolean' ? saved.users : true,
+    modules: typeof saved.modules === 'boolean' ? saved.modules : true,
+    accounting: typeof saved.accounting === 'boolean' ? saved.accounting : true,
+    inventory: typeof saved.inventory === 'boolean' ? saved.inventory : true,
+  };
+}
 
 function readSetupDraft(): SetupDraft | null {
   try {
@@ -103,6 +148,7 @@ function readSetupDraft(): SetupDraft | null {
       step: Number.isInteger(draft.step) ? Math.min(Math.max(Number(draft.step), 0), STEPS.length - 1) : 0,
       form: draft.form as Record<string, unknown>,
       businessConfig: draft.businessConfig,
+      options: parseSetupOptions(draft.options),
     };
   } catch (error) {
     console.warn('Could not restore the saved setup draft:', error);
@@ -119,10 +165,15 @@ function mergeSetupDraft(defaults: SetupForm, draft: SetupDraft | null): SetupFo
     'warehouseName', 'warehouseLocation', 'businessTypeLabel', 'phone', 'address',
     'taxNumber', 'commercialRecord', 'currency', 'taxPercentage',
     'fiscalYearStartMonth', 'lowStockThreshold', 'discountThreshold',
+    'adminUsername', 'adminFullName', 'adminPhone',
   ] as const;
   for (const key of stringKeys) {
     const value = form[key];
-    if (typeof value === 'string' && value.length <= 2000) result[key] = value;
+    const maxLength = key === 'adminUsername' ? 50
+      : key === 'adminFullName' ? 100
+        : key === 'adminPhone' ? 30
+          : 2000;
+    if (typeof value === 'string' && value.length <= maxLength) result[key] = value;
   }
   if (typeof form.businessType === 'string'
     && BUSINESS_TYPES.some((type) => type.id === form.businessType)) {
@@ -146,17 +197,43 @@ function mergeSetupDraft(defaults: SetupForm, draft: SetupDraft | null): SetupFo
 }
 
 /** Detect whether the built-in admin account still uses the default password. */
-function readDefaultAdminState(): { required: boolean; userId: string } {
+function readDefaultAdminState(): DefaultAdminState {
+  const defaults = {
+    required: false,
+    userId: '',
+    username: 'admin',
+    fullName: 'مدير النظام',
+    phone: '',
+  };
   try {
-    if (AuthService.getCurrentUser()?.role !== 'ADMIN') return { required: false, userId: '' };
-    const admin = DatabaseManager.getInstance().query<any>(
-      `SELECT id, password_hash AS passwordHash FROM users WHERE username = 'admin' LIMIT 1`
-    )[0];
-    if (admin && bcrypt.compareSync('admin123', admin.passwordHash)) {
-      return { required: true, userId: admin.id };
+    if (AuthService.getCurrentUser()?.role !== 'ADMIN') {
+      return { ...defaults, error: 'سجّل الدخول بحساب مدير النظام لإكمال إعداد المنشأة.' };
     }
-  } catch { /* ignore */ }
-  return { required: false, userId: '' };
+    const admin = DatabaseManager.getInstance().query<{
+      id: string;
+      passwordHash: string;
+      username: string;
+      fullName: string;
+      phone: string | null;
+    }>(
+      `SELECT id, password_hash AS passwordHash, username, full_name AS fullName, phone
+       FROM users WHERE username = 'admin' LIMIT 1`
+    )[0];
+    if (!admin) throw new Error('تعذر العثور على حساب المدير الأساسي.');
+    return {
+      required: bcrypt.compareSync('admin123', admin.passwordHash),
+      userId: admin.id,
+      username: admin.username,
+      fullName: admin.fullName,
+      phone: admin.phone || '',
+    };
+  } catch (error) {
+    console.error('Could not inspect the initial administrator account:', error);
+    return {
+      ...defaults,
+      error: error instanceof Error ? error.message : 'تعذر التحقق من حساب المدير الأساسي.',
+    };
+  }
 }
 
 const CURRENCIES = [
@@ -183,9 +260,11 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   const draftSaveVersion = useRef(0);
   const [step, setStep] = useState(() => draft?.step ?? 0);
+  const [options, setOptions] = useState<SetupOptions>(() => draft?.options ?? DEFAULT_SETUP_OPTIONS);
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [security, setSecurity] = useState(readDefaultAdminState);
   const [activitySearch, setActivitySearch] = useState('');
   const [activityFamily, setActivityFamily] = useState('all');
@@ -246,6 +325,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       fiscalYearStartMonth: String(company?.fiscalYearStartMonth ?? 1),
       lowStockThreshold: String(current?.lowStockAlertThresholdM2 ?? 20),
       discountThreshold: String(current?.discountApprovalThresholdPercent ?? 10),
+      adminUsername: security.username,
+      adminFullName: security.fullName,
+      adminPhone: security.phone,
       isTaxInclusive: current?.isTaxInclusive ?? false,
       enableNegativeStock: current?.enableNegativeStock ?? false,
       costingMethod: current?.costingMethod ?? 'AVERAGE_COST',
@@ -344,7 +426,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         const db = DatabaseManager.getInstance();
         db.run(
           'INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)',
-          [SETUP_DRAFT_KEY, JSON.stringify({ version: 1, step, form, businessConfig })],
+          [SETUP_DRAFT_KEY, JSON.stringify({ version: 1, step, form, businessConfig, options })],
         );
         void db.flush().then(() => {
           if (draftSaveVersion.current === version) setDraftSaveError(null);
@@ -362,7 +444,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [step, form, businessConfig, saving]);
+  }, [step, form, businessConfig, options, saving]);
 
   const currencySymbol = useMemo(
     () => CURRENCIES.find((c) => c.code === form.currency)?.symbol || form.currencySymbol,
@@ -381,6 +463,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
 
   const set = (key: keyof typeof form, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+  const toggleSetupOption = (key: keyof SetupOptions) =>
+    setOptions((current) => ({ ...current, [key]: !current[key] }));
 
   const selectBusinessType = (businessType: string) => {
     if (businessType === form.businessType) return;
@@ -389,7 +473,10 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       businessType,
       enabledModules: getProfileModuleIds(businessType),
     }));
-    setBusinessConfig(getDefaultBusinessConfiguration(businessType));
+    const defaults = getDefaultBusinessConfiguration(businessType);
+    setBusinessConfig(options.inventory
+      ? defaults
+      : { ...defaults, trackInventory: businessConfig.trackInventory });
   };
 
   const toggleAdditionalActivity = (activityId: string, enabled: boolean) => {
@@ -402,7 +489,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       businessModel: current.businessModel === 'mixed' || defaults.businessModel === 'mixed'
         ? 'mixed'
         : current.businessModel,
-      trackInventory: current.trackInventory || defaults.trackInventory,
+      trackInventory: options.inventory
+        ? current.trackInventory || defaults.trackInventory
+        : current.trackInventory,
       units: [...new Set([...current.units, ...defaults.units])],
       customUnits: [...new Set([...current.customUnits, ...defaults.customUnits])],
       productAttributes: [...new Set([...current.productAttributes, ...defaults.productAttributes])],
@@ -438,9 +527,36 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       : withModuleDependencies([...prev.enabledModules, id]),
   }));
 
+  const adminProfileError = security.required
+    ? !options.users
+      ? null
+      : form.adminUsername.trim().length < 3 || form.adminUsername.trim().length > 50 || /\s/.test(form.adminUsername.trim())
+      ? 'اسم المستخدم يجب أن يتكون من 3 إلى 50 حرفًا دون مسافات.'
+      : form.adminFullName.trim().length < 2 || form.adminFullName.trim().length > 100
+        ? 'الاسم المعروض يجب أن يتكون من حرفين إلى 100 حرف.'
+        : form.adminPhone.trim().length > 30
+          ? 'رقم الهاتف لا يمكن أن يتجاوز 30 حرفًا.'
+          : null
+    : null;
+  const passwordPolicyError = (() => {
+    if (!security.required || !newPassword) return null;
+    try {
+      AuthService.validatePasswordPolicy(newPassword, options.users ? form.adminUsername.trim() : security.username);
+    } catch (error) {
+      return error instanceof Error ? error.message : 'كلمة المرور غير مطابقة لسياسة الأمان.';
+    }
+    if (confirmPassword && newPassword !== confirmPassword) return 'كلمتا المرور غير متطابقتين.';
+    return null;
+  })();
+  const passwordValid = !security.required
+    || (Boolean(newPassword) && Boolean(confirmPassword) && !passwordPolicyError);
   const canContinue = step === 0
-    ? form.showroomName.trim().length >= 2
-    : step !== 1 || (form.branchName.trim().length >= 2 && form.warehouseName.trim().length >= 2);
+    ? !options.company || form.showroomName.trim().length >= 2
+    : step === 1
+      ? !options.branch || (form.branchName.trim().length >= 2 && form.warehouseName.trim().length >= 2)
+      : step === 3
+        ? !security.error && (!options.users || !adminProfileError) && passwordValid
+        : true;
 
   // The default password may have been changed from the forced-password modal
   // (or another window) after this wizard mounted, so re-check before deciding
@@ -460,9 +576,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     stepHeadingRef.current?.focus({ preventScroll: true });
   }, [step]);
 
-  const passwordValid = !security.required
-    || (newPassword.length >= 8 && newPassword === confirmPassword);
-
   const finish = async () => {
     if (systemChecks.database.state !== 'ready') {
       setStep(0);
@@ -474,58 +587,90 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       toast.error('تعذر التحقق من التخزين المحلي', systemChecks.storage.detail);
       return;
     }
-    if (form.showroomName.trim().length < 2) {
+    if (options.company && form.showroomName.trim().length < 2) {
       setStep(0);
       toast.error('اسم المعرض مطلوب (حرفان على الأقل)');
       return;
     }
-    if (form.branchName.trim().length < 2 || form.warehouseName.trim().length < 2) {
+    if (options.branch && (form.branchName.trim().length < 2 || form.warehouseName.trim().length < 2)) {
       setStep(1);
       toast.error('اسم الفرع والمخزن مطلوب (حرفان على الأقل لكل منهما)');
       return;
     }
-    if (form.businessType === 'custom' && form.businessTypeLabel.trim().length < 2) {
+    if (options.modules && form.businessType === 'custom' && form.businessTypeLabel.trim().length < 2) {
       setStep(2);
       toast.error('اكتب اسم النشاط التجاري (حرفان على الأقل)');
       return;
     }
+    const savedBusinessType = SettingsService.getValue('businessType') || 'ceramics';
+    const savedBusinessConfig = parseBusinessConfiguration(
+      SettingsService.getValue('businessProfileConfig'),
+      savedBusinessType,
+    );
+    const businessTypeToSave = options.modules ? form.businessType : savedBusinessType;
+    const businessConfigToSave = options.modules || options.inventory
+      ? {
+        ...(options.modules ? businessConfig : savedBusinessConfig),
+        trackInventory: options.inventory ? businessConfig.trackInventory : savedBusinessConfig.trackInventory,
+        businessType: businessTypeToSave,
+      }
+      : savedBusinessConfig;
     const taxPercentage = Number(form.taxPercentage);
     const fiscalYearStartMonth = Number(form.fiscalYearStartMonth);
     const lowStockThreshold = Number(form.lowStockThreshold);
     const discountThreshold = Number(form.discountThreshold);
-    if (![taxPercentage, fiscalYearStartMonth, lowStockThreshold, discountThreshold].every(Number.isFinite)
-      || taxPercentage < 0 || taxPercentage > 100
+    const invalidAccounting = options.accounting && (
+      !Number.isFinite(taxPercentage) || taxPercentage < 0 || taxPercentage > 100
       || !Number.isInteger(fiscalYearStartMonth) || fiscalYearStartMonth < 1 || fiscalYearStartMonth > 12
-      || lowStockThreshold < 0
-      || discountThreshold < 0 || discountThreshold > 100) {
+      || !Number.isFinite(discountThreshold) || discountThreshold < 0 || discountThreshold > 100
+    );
+    const invalidInventory = options.inventory
+      && (!Number.isFinite(lowStockThreshold) || lowStockThreshold < 0);
+    if (invalidAccounting || invalidInventory) {
       setStep(3);
       toast.error('راجع شهر بداية السنة المالية ونسبة الضريبة وحدود المخزون والخصم');
       return;
     }
     const activeSecurity = readDefaultAdminState();
     if (activeSecurity.required !== security.required) setSecurity(activeSecurity);
-    const requiresPassword = activeSecurity.required;
-    if (requiresPassword && !(newPassword.length >= 8 && newPassword === confirmPassword)) {
+    if (activeSecurity.error) {
+      setSecurity(activeSecurity);
       setStep(3);
-      toast.error('يجب تغيير كلمة مرور المسؤول الافتراضية (8 أحرف على الأقل)');
+      toast.error('تعذر التحقق من حساب المدير', activeSecurity.error);
       return;
     }
-    if (businessConfig.units.length + businessConfig.customUnits.length === 0) {
+    const requiresPassword = activeSecurity.required;
+    if (requiresPassword && adminProfileError) {
+      setStep(3);
+      toast.error('راجع بيانات حساب المدير', adminProfileError);
+      return;
+    }
+    if (requiresPassword && !passwordValid) {
+      setStep(3);
+      setSecurity(activeSecurity);
+      toast.error('راجع كلمة المرور', passwordPolicyError || 'أدخل كلمة مرور جديدة وتأكيدًا مطابقًا.');
+      return;
+    }
+    if (options.modules && businessConfig.units.length + businessConfig.customUnits.length === 0) {
       setStep(2);
       toast.error('اختر وحدة قياس واحدة على الأقل قبل المتابعة');
       return;
     }
-    const moduleValidation = validateModuleSelection(form.enabledModules, {
-      trackInventory: businessConfig.trackInventory,
-    });
-    if (moduleValidation.errors.length > 0) {
+    const moduleValidation = options.modules
+      ? validateModuleSelection(form.enabledModules, { trackInventory: businessConfigToSave.trackInventory })
+      : null;
+    if (moduleValidation && moduleValidation.errors.length > 0) {
       setStep(2);
       toast.error('راجع الوحدات المفعّلة', moduleValidation.errors.join(' '));
       return;
     }
+    const expectedShowroomName = options.company
+      ? form.showroomName.trim()
+      : SettingsService.getValue('showroomName') || '';
     setSaving(true);
     let db: DatabaseManager | null = null;
     let completionMarkerAttempted = false;
+    let updatedAdmin: ReturnType<typeof AuthService.getCurrentUser> = null;
     try {
       const setupDatabase = DatabaseManager.getInstance();
       db = setupDatabase;
@@ -550,70 +695,84 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
 
       setupDatabase.executeTransaction(() => {
         if (requiresPassword) {
-          const current = AuthService.getCurrentUser();
-          // Changing the signed-in admin's own password keeps this session active;
-          // resetPassword is reserved for other accounts.
-          if (current && current.id === activeSecurity.userId) {
-            new AuthService().changeOwnPassword(current.id, 'admin123', newPassword);
-          } else {
-            new AuthService().resetPassword(activeSecurity.userId, newPassword);
-          }
+          updatedAdmin = new AuthService().completeFirstRunAdminSetup(activeSecurity.userId, {
+            username: options.users ? form.adminUsername : activeSecurity.username,
+            fullName: options.users ? form.adminFullName : activeSecurity.fullName,
+            phone: options.users ? form.adminPhone : activeSecurity.phone,
+            password: newPassword,
+          });
         }
 
         SettingsService.update({
-          showroomName: form.showroomName.trim(),
-          businessType: form.businessType,
-          businessProfileConfig: serializeBusinessConfiguration({
-            ...businessConfig,
+          ...(options.company ? {
+            showroomName: form.showroomName.trim(),
+            phone: form.phone.trim(),
+            address: form.address.trim(),
+            taxNumber: form.taxNumber.trim(),
+            commercialRecord: form.commercialRecord.trim(),
+            currency: form.currency,
+            currencySymbol,
+          } : {}),
+          ...(options.modules ? {
             businessType: form.businessType,
-          }),
-          businessTypeLabel: form.businessType === 'custom'
+            businessTypeLabel: form.businessType === 'custom'
             ? form.businessTypeLabel.trim()
             : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || '',
-          phone: form.phone.trim(),
-          address: form.address.trim(),
-          taxNumber: form.taxNumber.trim(),
-          commercialRecord: form.commercialRecord.trim(),
-          currency: form.currency,
-          currencySymbol,
-          defaultTaxPercentage: taxPercentage,
-          isTaxInclusive: form.isTaxInclusive,
-          enableNegativeStock: form.enableNegativeStock,
-          costingMethod: form.costingMethod,
-          lowStockAlertThresholdM2: lowStockThreshold,
-          discountApprovalThresholdPercent: discountThreshold,
+          } : {}),
+          ...(options.modules || options.inventory ? {
+            businessProfileConfig: serializeBusinessConfiguration(businessConfigToSave),
+          } : {}),
+          ...(options.accounting ? {
+            defaultTaxPercentage: taxPercentage,
+            isTaxInclusive: form.isTaxInclusive,
+            discountApprovalThresholdPercent: discountThreshold,
+          } : {}),
+          ...(options.inventory ? {
+            enableNegativeStock: form.enableNegativeStock,
+            costingMethod: form.costingMethod,
+            lowStockAlertThresholdM2: lowStockThreshold,
+          } : {}),
           defaultBranchId: branch.id,
         });
-        new CompanyService().updateCompany(branch.companyId, {
-          name: form.showroomName.trim(),
-          legalName: form.legalName.trim() || form.showroomName.trim(),
-          taxNumber: form.taxNumber.trim(),
-          commercialRecord: form.commercialRecord.trim(),
-          currency: form.currency,
-          fiscalYearStartMonth,
-        });
-        new BranchService().updateBranch(branch.id, {
-          name: form.branchName.trim(),
-          address: form.branchAddress.trim(),
-          phone: form.branchPhone.trim(),
-          companyId: branch.companyId,
-          isDefault: true,
-        });
-        setupDatabase.run(
-          'UPDATE warehouses SET name = ?, location = ? WHERE id = ?',
-          [form.warehouseName.trim(), form.warehouseLocation.trim() || null, warehouse.id]
-        );
-        ModuleRegistryService.setEnabledModules(moduleValidation.enabled, AuthService.getCurrentUser(), 'إعداد أولي');
-        BusinessProfileService.applyFromSettings();
+        if (options.company || options.accounting) {
+          new CompanyService().updateCompany(branch.companyId, {
+            ...(options.company ? {
+              name: form.showroomName.trim(),
+              legalName: form.legalName.trim() || form.showroomName.trim(),
+              taxNumber: form.taxNumber.trim(),
+              commercialRecord: form.commercialRecord.trim(),
+              currency: form.currency,
+            } : {}),
+            ...(options.accounting ? { fiscalYearStartMonth } : {}),
+          });
+        }
+        if (options.branch) {
+          new BranchService().updateBranch(branch.id, {
+            name: form.branchName.trim(),
+            address: form.branchAddress.trim(),
+            phone: form.branchPhone.trim(),
+            companyId: branch.companyId,
+            isDefault: true,
+          });
+          setupDatabase.run(
+            'UPDATE warehouses SET name = ?, location = ? WHERE id = ?',
+            [form.warehouseName.trim(), form.warehouseLocation.trim() || null, warehouse.id]
+          );
+        }
+        if (options.modules && moduleValidation) {
+          ModuleRegistryService.setEnabledModules(moduleValidation.enabled, AuthService.getCurrentUser(), 'إعداد أولي');
+          BusinessProfileService.applyFromSettings();
+        }
       });
 
+      if (updatedAdmin) AuthService.setCurrentUser(updatedAdmin);
       await setupDatabase.flush();
       const firstSaveStatus = setupDatabase.getPersistenceStatus();
       if (firstSaveStatus.status !== 'saved' && firstSaveStatus.status !== 'unencrypted') {
         throw new Error(firstSaveStatus.error || 'لم يتم تأكيد حفظ إعدادات المنشأة على وسيط التخزين.');
       }
-      if (SettingsService.getValue('businessType') !== form.businessType
-        || SettingsService.getValue('showroomName') !== form.showroomName.trim()) {
+      if (SettingsService.getValue('businessType') !== businessTypeToSave
+        || SettingsService.getValue('showroomName') !== expectedShowroomName) {
         throw new Error('تعذر التحقق من إعدادات النشاط بعد حفظها. لم يتم إنهاء الإعداد.');
       }
 
@@ -631,8 +790,28 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         throw new Error('تعذر التحقق من تسجيل اكتمال الإعداد.');
       }
       ConfigurationVersionService.recordCurrent('الإعداد الأولي', AuthService.getCurrentUser());
+      auditLogger.log(
+        AuthService.getCurrentUser()?.id || 'system',
+        'first-run-setup',
+        'client-setup-completed',
+        'company',
+        branch.companyId,
+        'اكتملت تهيئة المنشأة الجديدة',
+        {
+          configuredSections: Object.entries(options)
+            .filter(([, enabled]) => enabled)
+            .map(([section]) => section),
+          skippedSections: Object.entries(options)
+            .filter(([, enabled]) => !enabled)
+            .map(([section]) => section),
+          dataImport: 'deferred',
+        },
+        true,
+        undefined,
+        'medium',
+      );
       toast.success('تم إعداد النظام بنجاح، مرحبًا بك في CeramiSys');
-      onComplete();
+      onComplete(updatedAdmin ?? undefined);
     } catch (e: any) {
       let message = e?.message || 'تعذر حفظ إعدادات النظام';
       if (db && completionMarkerAttempted) {
@@ -640,7 +819,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
           db.run('DELETE FROM system_settings WHERE key = ?', ['setup_completed']);
           db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
             SETUP_DRAFT_KEY,
-            JSON.stringify({ version: 1, step, form, businessConfig }),
+            JSON.stringify({ version: 1, step, form, businessConfig, options }),
           ]);
           await db.flush();
         } catch (rollbackError) {
@@ -663,6 +842,25 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     ['النسخ الاحتياطي', systemChecks.backup],
   ];
   const systemChecksRunning = visibleSystemChecks.some(([, result]) => result.state === 'checking');
+  const setupOptionControl = (key: keyof SetupOptions, title: string, description: string) => (
+    <label
+      htmlFor={`setup-option-${key}`}
+      className="flex cursor-pointer items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3 text-slate-800 dark:border-sky-800 dark:bg-sky-950/30 dark:text-slate-100"
+    >
+      <input
+        id={`setup-option-${key}`}
+        type="checkbox"
+        checked={options[key]}
+        onChange={() => toggleSetupOption(key)}
+        disabled={saving}
+        className="mt-0.5 h-4 w-4 shrink-0 accent-sky-600"
+      />
+      <span>
+        <span className="block text-xs font-bold">{title}</span>
+        <span className="mt-1 block text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">{description}</span>
+      </span>
+    </label>
+  );
 
   return (
     <div
@@ -779,6 +977,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   </p>
                 )}
               </section>
+              {setupOptionControl('company', 'تهيئة بيانات المنشأة الآن', 'يمكنك تخطيها والاحتفاظ بالبيانات الحالية أو استكمالها لاحقًا من الإعدادات.')}
+              <fieldset disabled={!options.company} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
               <div>
                 <label htmlFor="setup-showroom-name" className={labelClass}>اسم المعرض / الشركة *</label>
                 <input
@@ -787,6 +987,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   onChange={(e) => set('showroomName', e.target.value)}
                   className={inputClass}
                   placeholder="مثال: معرض النور للسيراميك"
+                  disabled={!options.company}
                 />
               </div>
               <div>
@@ -797,12 +998,13 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   onChange={(e) => set('legalName', e.target.value)}
                   className={inputClass}
                   placeholder="يُستخدم في المستندات الرسمية"
+                  disabled={!options.company}
                 />
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="setup-phone" className={labelClass}>رقم الهاتف</label>
-                  <input id="setup-phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputClass} placeholder="01000000000" />
+                  <input id="setup-phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} className={inputClass} placeholder="01000000000" disabled={!options.company} />
                 </div>
                 <div>
                   <label htmlFor="setup-currency" className={labelClass}>العملة</label>
@@ -814,6 +1016,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                       setForm((prev) => ({ ...prev, currency: e.target.value, currencySymbol: next?.symbol || prev.currencySymbol }));
                     }}
                     className={inputClass}
+                    disabled={!options.company}
                   >
                     {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
                   </select>
@@ -821,19 +1024,20 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </div>
               <div>
                 <label htmlFor="setup-address" className={labelClass}>العنوان</label>
-                <input id="setup-address" value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} placeholder="المدينة - الشارع" />
+                <input id="setup-address" value={form.address} onChange={(e) => set('address', e.target.value)} className={inputClass} placeholder="المدينة - الشارع" disabled={!options.company} />
               </div>
               <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">بيانات التسجيل الاختيارية</p>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="setup-tax-number" className={labelClass}>الرقم الضريبي</label>
-                  <input id="setup-tax-number" value={form.taxNumber} onChange={(e) => set('taxNumber', e.target.value)} className={inputClass} />
+                  <input id="setup-tax-number" value={form.taxNumber} onChange={(e) => set('taxNumber', e.target.value)} className={inputClass} disabled={!options.company} />
                 </div>
                 <div>
                   <label htmlFor="setup-commercial-record" className={labelClass}>السجل التجاري</label>
-                  <input id="setup-commercial-record" value={form.commercialRecord} onChange={(e) => set('commercialRecord', e.target.value)} className={inputClass} />
+                  <input id="setup-commercial-record" value={form.commercialRecord} onChange={(e) => set('commercialRecord', e.target.value)} className={inputClass} disabled={!options.company} />
                 </div>
               </div>
+              </fieldset>
             </div>
           )}
 
@@ -846,28 +1050,31 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">ستُربط المبيعات والمخزون بالفرع والمخزن الافتراضيين، ويمكن إضافة مواقع أخرى لاحقًا.</p>
                 </div>
               </div>
+              {setupOptionControl('branch', 'تخصيص الفرع والمخزن الآن', 'يمكن تخطي تعديل أسمائهما وبياناتهما؛ يظل الفرع والمخزن الافتراضيان الموجودان مطلوبين لتشغيل النظام.')}
+              <fieldset disabled={!options.branch} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
               <div>
                 <label htmlFor="setup-branch-name" className={labelClass}>اسم الفرع الرئيسي *</label>
-                <input id="setup-branch-name" value={form.branchName} onChange={(e) => set('branchName', e.target.value)} className={inputClass} placeholder="مثال: الفرع الرئيسي" />
+                <input id="setup-branch-name" value={form.branchName} onChange={(e) => set('branchName', e.target.value)} className={inputClass} placeholder="مثال: الفرع الرئيسي" disabled={!options.branch} />
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="setup-branch-phone" className={labelClass}>هاتف الفرع</label>
-                  <input id="setup-branch-phone" value={form.branchPhone} onChange={(e) => set('branchPhone', e.target.value)} className={inputClass} />
+                  <input id="setup-branch-phone" value={form.branchPhone} onChange={(e) => set('branchPhone', e.target.value)} className={inputClass} disabled={!options.branch} />
                 </div>
                 <div>
                   <label htmlFor="setup-warehouse-name" className={labelClass}>اسم المخزن الرئيسي *</label>
-                  <input id="setup-warehouse-name" value={form.warehouseName} onChange={(e) => set('warehouseName', e.target.value)} className={inputClass} placeholder="مثال: المخزن الرئيسي" />
+                  <input id="setup-warehouse-name" value={form.warehouseName} onChange={(e) => set('warehouseName', e.target.value)} className={inputClass} placeholder="مثال: المخزن الرئيسي" disabled={!options.branch} />
                 </div>
               </div>
               <div>
                 <label htmlFor="setup-branch-address" className={labelClass}>عنوان الفرع</label>
-                <input id="setup-branch-address" value={form.branchAddress} onChange={(e) => set('branchAddress', e.target.value)} className={inputClass} />
+                <input id="setup-branch-address" value={form.branchAddress} onChange={(e) => set('branchAddress', e.target.value)} className={inputClass} disabled={!options.branch} />
               </div>
               <div>
                 <label htmlFor="setup-warehouse-location" className={labelClass}>موقع المخزن داخل المعرض</label>
-                <input id="setup-warehouse-location" value={form.warehouseLocation} onChange={(e) => set('warehouseLocation', e.target.value)} className={inputClass} placeholder="مثال: صالة العرض أو المخزن الخلفي" />
+                <input id="setup-warehouse-location" value={form.warehouseLocation} onChange={(e) => set('warehouseLocation', e.target.value)} className={inputClass} placeholder="مثال: صالة العرض أو المخزن الخلفي" disabled={!options.branch} />
               </div>
+              </fieldset>
             </div>
           )}
 
@@ -877,6 +1084,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 <Boxes className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" />
                 <div><h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">خصص النظام حسب طبيعة عملك</h2><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">تُحفظ هذه الخيارات محليًا ويمكن تعديلها لاحقًا من إعدادات النشاط.</p></div>
               </div>
+              {setupOptionControl('modules', 'تهيئة النشاط والوحدات الآن', 'يمكنك تخطيها والاحتفاظ بالنشاط والوحدات الحالية، ثم تغييرها لاحقًا من إعدادات النشاط.')}
+              <fieldset disabled={!options.modules} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_14rem]">
                 <input
                   type="search"
@@ -971,10 +1180,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                     <option value="mixed">منتجات وخدمات</option>
                   </select>
                 </div>
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  <label htmlFor="setup-track-inventory" className="cursor-pointer">إدارة المخزون</label>
-                  <input id="setup-track-inventory" type="checkbox" checked={businessConfig.trackInventory} onChange={(e) => setInventoryEnabled(e.target.checked)} className="h-4 w-4 accent-sky-600" />
-                </div>
               </div>
               <div>
                 <h3 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-200">وحدات المنتجات والخدمات</h3>
@@ -1017,11 +1222,14 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                   );
                 })}
               </div></div>
+              </fieldset>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-4">
+              {setupOptionControl('accounting', 'تهيئة الإعدادات المالية الآن', 'يمكنك الاحتفاظ بالإعدادات المالية الحالية أو تعديلها لاحقًا.')}
+              <fieldset disabled={!options.accounting} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
               <div>
                 <label htmlFor="setup-fiscal-year-start-month" className={labelClass}>شهر بداية السنة المالية</label>
                 <select
@@ -1034,7 +1242,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                     .map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
                 <div>
                   <label htmlFor="setup-default-tax" className={labelClass}>نسبة ضريبة القيمة المضافة الافتراضية %</label>
                   <div className="relative">
@@ -1047,16 +1255,6 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                       className={`${inputClass} pl-9`}
                     />
                   </div>
-                </div>
-                <div>
-                  <label htmlFor="setup-low-stock-threshold" className={labelClass}>حد التنبيه للمخزون المنخفض (بوحدة الصنف)</label>
-                  <input
-                    id="setup-low-stock-threshold"
-                    type="number" min="0" step="0.5"
-                    value={form.lowStockThreshold}
-                    onChange={(e) => set('lowStockThreshold', e.target.value)}
-                    className={inputClass}
-                  />
                 </div>
               </div>
               <div>
@@ -1073,16 +1271,34 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
                   <label htmlFor="setup-is-tax-inclusive" className="cursor-pointer">الأسعار شاملة الضريبة</label>
                   <input id="setup-is-tax-inclusive" type="checkbox" checked={form.isTaxInclusive} onChange={(e) => setForm((prev) => ({ ...prev, isTaxInclusive: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
+                </div>
+              </div>
+              </fieldset>
+
+              {setupOptionControl('inventory', 'تهيئة المخزون الآن', 'يمكنك تخطي إعداد تتبع المخزون وطريقة التكلفة والتنبيهات، وتغييرها لاحقًا.')}
+              <fieldset disabled={!options.inventory} className="m-0 min-w-0 space-y-4 border-0 p-0 disabled:opacity-60">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  <label htmlFor="setup-track-inventory" className="cursor-pointer">تفعيل إدارة المخزون</label>
+                  <input id="setup-track-inventory" type="checkbox" checked={businessConfig.trackInventory} onChange={(e) => setInventoryEnabled(e.target.checked)} className="h-4 w-4 accent-sky-600" />
+                </div>
+                <div>
+                  <label htmlFor="setup-low-stock-threshold" className={labelClass}>حد التنبيه للمخزون المنخفض (بوحدة الصنف)</label>
+                  <input
+                    id="setup-low-stock-threshold"
+                    type="number" min="0" step="0.5"
+                    value={form.lowStockThreshold}
+                    onChange={(e) => set('lowStockThreshold', e.target.value)}
+                    className={inputClass}
+                  />
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
                   <label htmlFor="setup-enable-negative-stock" className="cursor-pointer">السماح بالبيع من رصيد سالب</label>
                   <input id="setup-enable-negative-stock" type="checkbox" checked={form.enableNegativeStock} onChange={(e) => setForm((prev) => ({ ...prev, enableNegativeStock: e.target.checked }))} className="h-4 w-4 accent-sky-600" />
                 </div>
-              </div>
               <div>
                 <label htmlFor="setup-costing-method" className={labelClass}>طريقة احتساب تكلفة المخزون</label>
                 <select id="setup-costing-method" value={form.costingMethod} onChange={(e) => setForm((prev) => ({ ...prev, costingMethod: e.target.value as 'AVERAGE_COST' | 'FIFO' }))} className={inputClass}>
@@ -1091,44 +1307,106 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 </select>
                 <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">طريقة التكلفة تؤثر على تقييم المخزون والأرباح.</p>
               </div>
+              </fieldset>
 
+              {security.required && setupOptionControl('users', 'تخصيص بيانات المدير الآن', 'يمكنك الاحتفاظ باسم الدخول والاسم الحاليين؛ تغيير كلمة المرور الافتراضية يظل إلزاميًا لحماية النظام.')}
+              {security.error && (
+                <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+                  لا يمكن إكمال تهيئة حساب المدير: {security.error}
+                </p>
+              )}
               {security.required && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-700/60 dark:bg-amber-950/30">
                   <div className="flex items-center gap-2 mb-3">
                     <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <h3 className="text-xs font-bold text-amber-800 dark:text-amber-300">تأمين حساب المسؤول</h3>
+                    <h3 className="text-xs font-bold text-amber-800 dark:text-amber-300">تهيئة حساب المدير الأول</h3>
                   </div>
                   <p className="text-[11px] text-amber-700 mb-3 dark:text-amber-200/80">
-                    لا يزال حساب admin يستخدم كلمة المرور الافتراضية. اختر كلمة مرور جديدة للمتابعة.
+                    تغيير بيانات الملف الشخصي اختياري؛ تغيير كلمة المرور الافتراضية إلى كلمة قوية إلزامي قبل بدء الاستخدام.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="setup-admin-password" className={labelClass}>كلمة المرور الجديدة</label>
+                      <label htmlFor="setup-admin-username" className={labelClass}>اسم المستخدم *</label>
                       <input
-                        id="setup-admin-password"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
+                        id="setup-admin-username"
+                        value={form.adminUsername}
+                        onChange={(e) => set('adminUsername', e.target.value)}
                         className={inputClass}
-                        placeholder="8 أحرف على الأقل"
+                        autoComplete="username"
+                        maxLength={50}
+                        disabled={!options.users}
                       />
+                    </div>
+                    <div>
+                      <label htmlFor="setup-admin-full-name" className={labelClass}>الاسم المعروض *</label>
+                      <input
+                        id="setup-admin-full-name"
+                        value={form.adminFullName}
+                        onChange={(e) => set('adminFullName', e.target.value)}
+                        className={inputClass}
+                        autoComplete="name"
+                        maxLength={100}
+                        disabled={!options.users}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label htmlFor="setup-admin-phone" className={labelClass}>هاتف المدير (اختياري)</label>
+                      <input
+                        id="setup-admin-phone"
+                        type="tel"
+                        value={form.adminPhone}
+                        onChange={(e) => set('adminPhone', e.target.value)}
+                        className={inputClass}
+                        autoComplete="tel"
+                        maxLength={30}
+                        disabled={!options.users}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="setup-admin-password" className={labelClass}>كلمة المرور الجديدة</label>
+                      <span className="relative block">
+                        <input
+                          id="setup-admin-password"
+                          type={passwordVisible ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className={`${inputClass} pl-10`}
+                          placeholder="8 أحرف على الأقل"
+                          autoComplete="new-password"
+                          maxLength={128}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPasswordVisible((visible) => !visible)}
+                          aria-label={passwordVisible ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                          aria-pressed={passwordVisible}
+                          className="absolute left-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                        >
+                          {passwordVisible ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                        </button>
+                      </span>
                     </div>
                     <div>
                       <label htmlFor="setup-admin-password-confirmation" className={labelClass}>تأكيد كلمة المرور</label>
                       <input
                         id="setup-admin-password-confirmation"
-                        type="password"
+                        type={passwordVisible ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         className={inputClass}
+                        autoComplete="new-password"
+                        maxLength={128}
                       />
                     </div>
                   </div>
-                  {newPassword && newPassword.length < 8 && (
-                    <p className="text-[11px] text-rose-600 mt-2">كلمة المرور قصيرة جدًا.</p>
+                  <p className="text-[11px] text-slate-600 mt-2 dark:text-slate-300">
+                    يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل، وأحرف وأرقام، وألا تطابق اسم المستخدم أو تكون كلمة المرور الافتراضية.
+                  </p>
+                  {adminProfileError && (
+                    <p role="alert" className="text-[11px] text-rose-600 mt-2">{adminProfileError}</p>
                   )}
-                  {confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-[11px] text-rose-600 mt-2">كلمتا المرور غير متطابقتين.</p>
+                  {passwordPolicyError && (
+                    <p role="alert" className="text-[11px] text-rose-600 mt-2">{passwordPolicyError}</p>
                   )}
                 </div>
               )}
@@ -1144,24 +1422,28 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               <p className="text-center text-xs text-slate-500 dark:text-slate-400">راجع الملخص ثم اضغط «بدء الاستخدام».</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                 {[
-                  ['المعرض', form.showroomName || '—'],
-                  ['الاسم القانوني', form.legalName || form.showroomName || '—'],
-                  ['الفرع الافتراضي', form.branchName || '—'],
-                  ['المخزن الافتراضي', form.warehouseName || '—'],
-                  ['نوع النشاط', form.businessType === 'custom' ? form.businessTypeLabel || 'نشاط مخصص' : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || 'معرض متعدد الأنشطة'],
-                  ['الأنشطة الفرعية', businessConfig.additionalActivityIds
+                  ['المعرض', options.company ? form.showroomName || '—' : 'تم تخطيها'],
+                  ['الاسم القانوني', options.company ? form.legalName || form.showroomName || '—' : 'تم تخطيها'],
+                  ...(security.required ? [
+                    ['مدير النظام', options.users ? form.adminFullName || '—' : security.fullName],
+                    ['اسم دخول المدير', options.users ? form.adminUsername || '—' : security.username],
+                  ] : []),
+                  ['الفرع الافتراضي', options.branch ? form.branchName || '—' : 'تم تخطي تعديل الاسم'],
+                  ['المخزن الافتراضي', options.branch ? form.warehouseName || '—' : 'تم تخطي تعديل الاسم'],
+                  ['نوع النشاط', options.modules ? (form.businessType === 'custom' ? form.businessTypeLabel || 'نشاط مخصص' : BUSINESS_TYPES.find((type) => type.id === form.businessType)?.label || 'معرض متعدد الأنشطة') : 'تم تخطيها'],
+                  ['الأنشطة الفرعية', options.modules ? businessConfig.additionalActivityIds
                     .map((id) => BUSINESS_TYPES.find((type) => type.id === id)?.label || id)
-                    .join('، ') || 'لا توجد'],
-                  ['الوحدات المفعلة', `${form.enabledModules.length} وحدات`],
-                  ['نموذج العمل', businessConfig.businessModel === 'services' ? 'خدمات' : businessConfig.businessModel === 'mixed' ? 'منتجات وخدمات' : 'منتجات'],
-                  ['إدارة المخزون', businessConfig.trackInventory ? 'مفعلة' : 'معطلة'],
-                  ['وحدات القياس', `${businessConfig.units.length + businessConfig.customUnits.length} وحدات`],
-                  ['الهاتف', form.phone || '—'],
-                  ['العملة', `${form.currency} (${currencySymbol})`],
-                  ['بداية السنة المالية', ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'][Number(form.fiscalYearStartMonth) - 1] || 'يناير'],
-                  ['الضريبة الافتراضية', `${form.taxPercentage || 0}%`],
-                  ['تنبيه المخزون', `${form.lowStockThreshold || 0} بوحدة الصنف`],
-                  ['حد اعتماد الخصم', `${form.discountThreshold || 0}%`],
+                    .join('، ') || 'لا توجد' : 'تم تخطيها'],
+                  ['الوحدات المفعلة', options.modules ? `${form.enabledModules.length} وحدات` : 'تم تخطيها'],
+                  ['نموذج العمل', options.modules ? (businessConfig.businessModel === 'services' ? 'خدمات' : businessConfig.businessModel === 'mixed' ? 'منتجات وخدمات' : 'منتجات') : 'تم تخطيه'],
+                  ['إدارة المخزون', options.inventory ? (businessConfig.trackInventory ? 'مفعلة' : 'معطلة') : 'تم تخطي الإعداد'],
+                  ['وحدات القياس', options.modules ? `${businessConfig.units.length + businessConfig.customUnits.length} وحدات` : 'تم تخطيها'],
+                  ['الهاتف', options.company ? form.phone || '—' : 'تم تخطيها'],
+                  ['العملة', options.company ? `${form.currency} (${currencySymbol})` : 'تم تخطيها'],
+                  ['بداية السنة المالية', options.accounting ? (['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'][Number(form.fiscalYearStartMonth) - 1] || 'يناير') : 'تم تخطيها'],
+                  ['الضريبة الافتراضية', options.accounting ? `${form.taxPercentage || 0}%` : 'تم تخطيها'],
+                  ['تنبيه المخزون', options.inventory ? `${form.lowStockThreshold || 0} بوحدة الصنف` : 'تم تخطيه'],
+                  ['حد اعتماد الخصم', options.accounting ? `${form.discountThreshold || 0}%` : 'تم تخطيه'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/50">
                     <span className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">{label}</span>
@@ -1171,7 +1453,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </div>
               <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 text-xs leading-relaxed text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
                 <p className="font-bold">البيانات والحسابات</p>
-                <p className="mt-1">سيُجهّز دليل الحسابات الافتراضي مع الشركة والفرع والمخزن. يمكنك بعد الدخول استيراد الأصناف والعملاء والموردين من صفحة استيراد البيانات، ثم إدخال الأرصدة الافتتاحية من شاشاتها المخصصة.</p>
+                <p className="mt-1">سيُجهّز دليل الحسابات الافتراضي. استيراد الأصناف والعملاء والموردين اختياري ويمكن تنفيذه بعد الدخول من صفحة استيراد البيانات، ثم إدخال الأرصدة الافتتاحية من شاشاتها المخصصة.</p>
               </div>
             </div>
           )}

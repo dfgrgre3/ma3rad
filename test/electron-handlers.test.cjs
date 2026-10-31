@@ -156,6 +156,24 @@ test('a failed database write does not replace the last complete database file',
   }
 });
 
+test('automatic database backups complete when applying the backup strategy', async () => {
+  const context = await createHandlers();
+  try {
+    const { handlers, event, backupDir } = context;
+    const saved = await handlers.get('db:save')(event, new Uint8Array([1, 2, 3]));
+    assert.equal(saved.ok, true);
+    await fs.writeFile(path.join(backupDir, 'ceramisys_corrupt_test.sqlite.enc'), 'recovery');
+
+    const backup = await handlers.get('db:backup')(event, 'auto');
+
+    assert.equal(backup.ok, true, backup.error);
+    assert.ok(backup.path.startsWith(backupDir));
+    assert.equal(fsSync.existsSync(backup.path), true);
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
 test('registered app and printing handlers receive their directory and size dependencies', async () => {
   const context = await createHandlers();
   try {

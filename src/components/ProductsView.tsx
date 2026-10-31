@@ -30,6 +30,9 @@ import {
   type FormState, type OpeningStockRow, type TabId, type VariantDraft,
 } from './products/productFormModel';
 import { Field, ListPagination, StatCard } from './products/ProductUi';
+import { ProductFormModal } from './products/ProductFormModal';
+import { ProductsTable } from './products/ProductsTable';
+import { ProductsCards } from './products/ProductsCards';
 
 
 
@@ -1072,623 +1075,117 @@ export const ProductsView: React.FC = () => {
         ) : products.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"><Package className="h-9 w-9 text-slate-300" /><p className="text-sm font-bold text-slate-700">لا توجد أصناف مطابقة</p><p className="text-xs text-slate-500">جرّب تعديل البحث أو أضف صنفًا جديدًا إلى الدليل.</p></div>
         ) : viewMode === 'table' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                <tr>
-                  {(canExportProducts || canDeleteProduct) && <th className="p-3.5 text-center"><input aria-label="تحديد كل أصناف الصفحة" type="checkbox" checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))} onChange={togglePageSelection} className="rounded border-slate-300 text-sky-600" /></th>}
-                  <th className="p-3.5">الصنف</th>
-                  <th className="p-3.5">الباركود / الكود</th>
-                  <th className="p-3.5">النوع والماركة</th>
-                  {hasCeramicRows && <th className="p-3.5">المقاس والفرز</th>}
-                  <th className="p-3.5">التحويل</th>
-                  {canViewCosts && <th className="p-3.5">التكلفة</th>}
-                  {canViewPricing && <th className="p-3.5">سعر الوحدة</th>}
-                  {hasCeramicRows && canViewPricing && <th className="p-3.5">سعر الكرتونة</th>}
-                  <th className="p-3.5 text-center">المخزون</th>
-                  <th className="p-3.5 text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {products.map((p) => {
-                  const stock = stockOf(p);
-                  return (
-                    <tr key={p.id} className={`hover:bg-slate-50 transition ${p.isActive ? '' : 'opacity-60'}`}>
-                      {(canExportProducts || canDeleteProduct) && <td className="p-3.5 text-center"><input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="rounded border-slate-300 text-sky-600" /></td>}
-                      <td className="p-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-                            {p.imagePath ? <img src={p.imagePath} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="w-4 h-4" /></div>}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-900">{p.name}</div>
-                            <div className="text-[10px] text-slate-500">{p.color || '—'} | {p.finish || '—'} {!p.isActive && <span className="text-rose-500 font-bold">(موقوف)</span>}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3.5 font-mono">
-                        <div className="font-bold text-slate-900">{p.barcode}</div>
-                        <div className="text-[10px] text-slate-500">{p.sku}</div>
-                      </td>
-                      <td className="p-3.5">
-                        <div className="font-bold text-slate-700">{p.categoryName || '—'}</div>
-                        <div className="text-[10px] text-slate-500">{p.brandName || '—'}</div>
-                      </td>
-                      {hasCeramicRows && (
-                      <td className="p-3.5">
-                        <span className="font-bold text-slate-700">{p.productType === 'GENERAL' ? '—' : p.size}</span>
-                        {p.productType !== 'GENERAL' && (
-                        <div className="text-[10px]">
-                          <span className={`font-extrabold ${p.grade === 'GRADE_1' ? 'text-sky-600' : 'text-amber-600'}`}>{gradeLabel(p.grade)}</span>
-                        </div>
-                        )}
-                      </td>
-                      )}
-                      <td className="p-3.5 font-semibold text-slate-700">
-                        {p.productType === 'GENERAL' ? <div>وحدة المخزون: {getProductUnitLabel(p)}</div> : <>
-                          <div>{p.metersPerBox} {p.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
-                          <div className="text-[10px] text-slate-500">{p.piecesPerBox} قطعة / كرتونة</div>
-                        </>}
-                      </td>
-                      {canViewCosts && <td className="p-3.5 font-mono text-slate-600">{CeramicMath.formatCurrency(p.costPrice)}</td>}
-                      {canViewPricing && <td className="p-3.5 font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</td>}
-                      {hasCeramicRows && canViewPricing && (
-                        <td className="p-3.5 font-bold text-slate-900">{p.productType === 'GENERAL' ? '—' : CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
-                      )}
-                      <td className="p-3.5 text-center">
-                        <span className={`inline-block px-2 py-1 rounded-lg font-black text-[11px] ${stockTone(p)}`}>
-                          {p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : <>
-                            {CeramicMath.formatM2(stock.m2)}
-                            <span className="mx-1 text-slate-400">|</span>
-                            {round(stock.boxes)} كرتونة
-                            <span className="mx-1 text-slate-400">|</span>
-                            {Math.round(stock.pieces)} قطعة
-                          </>}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => navigate(`/products/${p.id}`)} className="p-1.5 rounded-lg text-slate-500 hover:bg-sky-50 hover:text-sky-600 transition" title="عرض التفاصيل"><Eye className="w-4 h-4" /></button>
-                          {canAdjustInventory && <button onClick={() => openStockModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition" title="إضافة كمية للمخزون"><PackagePlus className="w-4 h-4" /></button>}
-                          {canUpdateProduct && <button onClick={() => handleOpenEditModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition" title="تعديل"><Edit className="w-4 h-4" /></button>}
-                          {canCreateProduct && <button onClick={() => handleDuplicate(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition" title="نسخ الصنف"><Copy className="w-4 h-4" /></button>}
-                          {canExportProducts && <button onClick={() => navigate('/products/barcodes')} className="p-1.5 rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-600 transition" title="طباعة باركود"><Barcode className="w-4 h-4" /></button>}
-                          {canDeleteProduct && <button onClick={() => handleToggleActive(p)} className={`p-1.5 rounded-lg transition ${p.isActive ? 'text-slate-500 hover:bg-amber-50 hover:text-amber-600' : 'text-emerald-600 hover:bg-emerald-50'}`} title={p.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'}><Power className="w-4 h-4" /></button>}
-                          {canDeleteProduct && <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="حذف"><Trash2 className="w-4 h-4" /></button>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ProductsTable
+            products={products}
+            selectedProductIds={selectedProductIds}
+            hasCeramicRows={hasCeramicRows}
+            canViewCosts={canViewCosts}
+            canViewPricing={canViewPricing}
+            canExportProducts={canExportProducts}
+            canDeleteProduct={canDeleteProduct}
+            canUpdateProduct={canUpdateProduct}
+            canCreateProduct={canCreateProduct}
+            canAdjustInventory={canAdjustInventory}
+            stockOf={stockOf}
+            stockTone={stockTone}
+            onTogglePageSelection={togglePageSelection}
+            onToggleProductSelection={toggleProductSelection}
+            onOpenDetails={(product) => navigate(`/products/${product.id}`)}
+            onOpenStock={openStockModal}
+            onOpenEdit={handleOpenEditModal}
+            onDuplicate={handleDuplicate}
+            onOpenBarcodes={() => navigate('/products/barcodes')}
+            onToggleActive={handleToggleActive}
+            onDelete={handleDeleteProduct}
+          />
         ) : (
-          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {products.map((p) => {
-              const stock = stockOf(p);
-              return (
-                <div key={p.id} className={`flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md ${p.isActive ? '' : 'opacity-60'}`}>
-                  <div className="relative h-36 bg-slate-100">
-                    {p.imagePath ? <img src={p.imagePath} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-10 w-10" /></div>}
-                    <span className={`absolute right-2 top-2 rounded-lg px-2 py-1 text-[10px] font-black ${stockTone(p)}`}>{p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : CeramicMath.formatM2(stock.m2)}</span>
-                    {(canExportProducts || canDeleteProduct) && <input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => toggleProductSelection(p.id)} className="absolute left-2 top-2 h-4 w-4 rounded border-slate-300 text-sky-600" />}
-                    {!p.isActive && <span className="absolute left-2 top-2 rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-black text-white">موقوف</span>}
-                  </div>
-                  <div className="flex-1 space-y-2 p-3.5">
-                    <div>
-                      <h3 className="truncate text-sm font-extrabold text-slate-900">{p.name}</h3>
-                      <p className="text-[10px] text-slate-500">{p.categoryName || '—'} | {p.brandName || '—'}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
-                      {p.productType === 'GENERAL' ? <span className="rounded-md bg-sky-50 px-2 py-0.5 text-sky-700">وحدة الصنف: {getProductUnitLabel(p)}</span> : <>
-                        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">{p.size}</span>
-                        <span className="rounded-md bg-amber-50 px-2 py-0.5 text-amber-700">{gradeLabel(p.grade)}</span>
-                        <span className="rounded-md bg-sky-50 px-2 py-0.5 text-sky-700">{p.piecesPerBox} قطعة / {p.metersPerBox} م²</span>
-                      </>}
-                    </div>
-                    <div className={`grid gap-2 text-center ${canViewCosts && canViewPricing ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                      {canViewPricing && <div className="rounded-lg border border-slate-200 py-1.5">
-                        <div className="text-[9px] font-bold text-slate-400">سعر {getProductUnitLabel(p)}</div>
-                        <div className="text-xs font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</div>
-                      </div>}
-                      {p.productType === 'GENERAL' ? (
-                        canViewCosts && <div className="rounded-lg border border-slate-200 py-1.5">
-                          <div className="text-[9px] font-bold text-slate-400">التكلفة للوحدة</div>
-                          <div className="text-xs font-black text-slate-800">{CeramicMath.formatCurrency(p.costPrice)}</div>
-                        </div>
-                      ) : canViewPricing && <div className="rounded-lg border border-slate-200 py-1.5">
-                        <div className="text-[9px] font-bold text-slate-400">سعر الكرتونة</div>
-                        <div className="text-xs font-black text-slate-800">{CeramicMath.formatCurrency(p.sellingPriceBox || p.sellingPriceM2 * p.metersPerBox)}</div>
-                      </div>}
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
-                      {p.productType === 'GENERAL'
-                        ? <span>حد الطلب: {p.minStockLevel} {getProductUnitLabel(p)}</span>
-                        : <>
-                          <span>كراتين: {round(stock.boxes)}</span>
-                          <span>قطع: {Math.round(stock.pieces)}</span>
-                          <span>حد الطلب: {p.minStockLevel} م²</span>
-                        </>}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
-                    <div className="flex items-center gap-0.5">
-                      <button onClick={() => navigate(`/products/${p.id}`)} className="p-1.5 rounded-lg text-slate-500 hover:bg-white" title="تفاصيل"><Eye className="w-3.5 h-3.5" /></button>
-                      {canAdjustInventory && <button onClick={() => openStockModal(p)} className="p-1.5 rounded-lg text-emerald-600 hover:bg-white" title="إضافة كمية"><PackagePlus className="w-3.5 h-3.5" /></button>}
-                      {canUpdateProduct && <button onClick={() => handleOpenEditModal(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-white" title="تعديل"><Edit className="w-3.5 h-3.5" /></button>}
-                      {canCreateProduct && <button onClick={() => handleDuplicate(p)} className="p-1.5 rounded-lg text-indigo-600 hover:bg-white" title="نسخ"><Copy className="w-3.5 h-3.5" /></button>}
-                      {canDeleteProduct && <button onClick={() => handleToggleActive(p)} className="p-1.5 rounded-lg text-amber-600 hover:bg-white" title={p.isActive ? 'إيقاف' : 'تفعيل'}><Power className="w-3.5 h-3.5" /></button>}
-                    </div>
-                    {canDeleteProduct && <button onClick={() => handleDeleteProduct(p.id)} className="p-1.5 rounded-lg text-rose-500 hover:bg-white" title="حذف"><Trash2 className="w-3.5 h-3.5" /></button>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <ProductsCards
+            products={products}
+            selectedProductIds={selectedProductIds}
+            canViewCosts={canViewCosts}
+            canViewPricing={canViewPricing}
+            canExportProducts={canExportProducts}
+            canDeleteProduct={canDeleteProduct}
+            canUpdateProduct={canUpdateProduct}
+            canCreateProduct={canCreateProduct}
+            canAdjustInventory={canAdjustInventory}
+            stockOf={stockOf}
+            stockTone={stockTone}
+            onToggleProductSelection={toggleProductSelection}
+            onOpenDetails={(product) => navigate(`/products/${product.id}`)}
+            onOpenStock={openStockModal}
+            onOpenEdit={handleOpenEditModal}
+            onDuplicate={handleDuplicate}
+            onToggleActive={handleToggleActive}
+            onDelete={handleDeleteProduct}
+          />
         )}
         {!isLoading && !loadError && totalItems > 0 && <ListPagination page={page} totalPages={totalPages} totalItems={totalItems} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
       </div>
 
       {/* ADD / EDIT PRODUCT MODAL */}
-      {isModalOpen && (editingProduct ? canUpdateProduct : canCreateProduct) && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="my-6 w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600"><Package className="w-5 h-5" /></div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-900">{editingProduct ? `تعديل ${productSingularLabel}` : `إضافة ${productSingularLabel} جديد`}</h3>
-                  <p className="text-[11px] text-slate-500">{editingProduct ? editingProduct.name : 'أكمل بيانات النوع والعدد والكمية والمترات والتسعير والمخزون'}</p>
-                </div>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-            </div>
-
-            <div className="flex flex-wrap gap-1 border-b border-slate-100 px-4 pt-3">
-              {tabs.map((tab) => (
-                <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 rounded-t-xl px-3.5 py-2 text-xs font-bold transition ${activeTab === tab.id ? 'bg-sky-50 text-sky-700 border-b-2 border-sky-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-                  {tab.icon}{tab.label}
-                </button>
-              ))}
-            </div>
-
-            <form onSubmit={handleSaveProduct} className="space-y-5 p-6 text-xs">
-              {activeTab === 'basic' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <div className="md:col-span-3 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <Field label="نوع الصنف">
-                          <select value={formData.productType} onChange={(e) => setFormData({ ...formData, productType: e.target.value as FormState['productType'] })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                            <option value="CERAMIC">سيراميك / بورسلين</option>
-                            <option value="GENERAL">صنف عام (مواد تشطيب وغيرها)</option>
-                          </select>
-                        </Field>
-                        <Field label={`اسم ${productSingularLabel}`} required>
-                          <input required placeholder="مثال: سيراميك رويال 60×60 رمادي" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500" />
-                        </Field>
-                        <Field label="الباركود" required>
-                          <input required value={formData.barcode} onChange={(e) => setFormData({ ...formData, barcode: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-sky-500" />
-                        </Field>
-                        <Field label="كود الصنف (SKU)" required>
-                          <div className="flex gap-2">
-                            <input required value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-sky-500" />
-                            <button type="button" onClick={() => setFormData({ ...formData, sku: `TILE-${Date.now().toString().slice(-6)}` })} className="rounded-xl border border-slate-200 px-2.5 text-slate-600 hover:bg-slate-100" title="توليد كود"><Calculator className="w-4 h-4" /></button>
-                          </div>
-                        </Field>
-                        {formData.productType === 'CERAMIC' && <Field label="الفرز والدرجة">
-                          <select value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value as CeramicGrade })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                            {GRADES.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-                          </select>
-                        </Field>}
-                        <Field label="نوع المنتج (التصنيف)" required>
-                          {showNewCategory ? (
-                            <div className="flex gap-2">
-                              <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="اسم النوع الجديد" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
-                              {canCreateCategory && <button type="button" onClick={handleAddCategory} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>}
-                              <button type="button" onClick={() => setShowNewCategory(false)} className="rounded-xl border border-slate-200 px-2 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex gap-2">
-                              <select value={formData.categoryId} onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })} className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500">
-                                <option value="">— اختر النوع —</option>
-                                {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name} ({cat.productCount})</option>)}
-                              </select>
-                              {canCreateCategory && <button type="button" onClick={() => setShowNewCategory(true)} className="rounded-xl border border-dashed border-sky-300 px-2.5 text-sky-600 hover:bg-sky-50" title="إضافة نوع"><Plus className="w-4 h-4" /></button>}
-                            </div>
-                          )}
-                        </Field>
-                        <Field label="الماركة / المصنع" required={formData.productType === 'CERAMIC'}>
-                          {showNewBrand ? (
-                            <div className="flex gap-2">
-                              <input value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="اسم الماركة الجديدة" className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-sky-300 font-bold focus:outline-none" />
-                              {canCreateBrand && <button type="button" onClick={handleAddBrand} className="rounded-xl bg-sky-600 px-3 font-bold text-white hover:bg-sky-700">حفظ</button>}
-                              <button type="button" onClick={() => setShowNewBrand(false)} className="rounded-xl border border-slate-200 px-2 text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex gap-2">
-                              <select value={formData.brandId} onChange={(e) => setFormData({ ...formData, brandId: e.target.value })} className="flex-1 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold focus:outline-none focus:ring-2 focus:ring-sky-500">
-                                <option value="">— اختر الماركة —</option>
-                                {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name} ({brand.productCount})</option>)}
-                              </select>
-                              {canCreateBrand && <button type="button" onClick={() => setShowNewBrand(true)} className="rounded-xl border border-dashed border-sky-300 px-2.5 text-sky-600 hover:bg-sky-50" title="إضافة ماركة"><Plus className="w-4 h-4" /></button>}
-                            </div>
-                          )}
-                        </Field>
-                        {formData.productType === 'CERAMIC' && <Field label="الاستخدام / السطح">
-                          <select value={formData.surfaceLocation} onChange={(e) => setFormData({ ...formData, surfaceLocation: e.target.value as FormState['surfaceLocation'] })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-                            {SURFACES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                          </select>
-                        </Field>}
-                      </div>
-                      <Field label="ملاحظات">
-                        <input value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="ملاحظات إضافية عن الصنف" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                      </Field>
-                    </div>
-                    <div className="space-y-2">
-                      <label htmlFor="product-image-upload" className="block font-bold text-slate-700">صورة الصنف</label>
-                      <button type="button" onClick={() => imageInputRef.current?.click()} className="flex h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400 hover:border-sky-400 hover:text-sky-500">
-                        <ImagePlus className="w-7 h-7" />
-                        <span className="text-[10px] font-bold">اضغط لإضافة صور</span>
-                      </button>
-                      <input id="product-image-upload" ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleImageFiles(e.target.files)} />
-                      {(existingImages.length > 0 || pendingImages.length > 0) && (
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {existingImages.map((img) => (
-                            <div key={img.id} className="relative overflow-hidden rounded-lg border border-slate-200">
-                              <img src={img.filePath} alt={img.caption || ''} className="h-14 w-full object-cover" />
-                              <button type="button" onClick={() => removeExistingImage(img)} className="absolute left-0.5 top-0.5 rounded bg-rose-600 p-0.5 text-white"><X className="w-3 h-3" /></button>
-                              {img.isPrimary && <span className="absolute bottom-0.5 right-0.5 rounded bg-emerald-600 px-1 text-[8px] font-bold text-white">رئيسية</span>}
-                            </div>
-                          ))}
-                          {pendingImages.map((src, i) => (
-                            <div key={`pending-${i}`} className="relative overflow-hidden rounded-lg border border-slate-200">
-                              <img src={src} alt="" className="h-14 w-full object-cover" />
-                              <button type="button" onClick={() => setPendingImages((prev) => prev.filter((_, idx) => idx !== i))} className="absolute left-0.5 top-0.5 rounded bg-rose-600 p-0.5 text-white"><X className="w-3 h-3" /></button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-                    <SlidersHorizontal className="w-4 h-4" />
-                    تابع التبويبات لإدخال المقاس والعدد والكمية والمترات والتسعير والمخزون الافتتاحي والمتغيرات.
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'units' && (
-                <div className="space-y-4">
-                  {formData.productType === 'GENERAL' ? (
-                    <section className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
-                      <div className="flex items-center gap-1.5 text-sm font-extrabold text-sky-800"><Ruler className="w-4 h-4" /> وحدة الصنف العام</div>
-                      <p className="text-xs text-slate-600">اختر الوحدة التي ستُسجل بها الكميات في المخزون والفواتير.</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field label="وحدة المخزون والبيع">
-                          <select value={formData.baseUnit} onChange={(e) => setFormData({ ...formData, baseUnit: e.target.value as UnitType, sellUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
-                            {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-                          </select>
-                        </Field>
-                        {formData.baseUnit === ('CUSTOM' as UnitType) && <Field label="اسم الوحدة" required>
-                          <>
-                            <input
-                              required
-                              list="business-custom-units"
-                              value={formData.customUnit}
-                              onChange={(e) => setFormData({ ...formData, customUnit: e.target.value })}
-                              placeholder="اختر من وحدات النشاط أو اكتب وحدة جديدة"
-                              className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold"
-                            />
-                            <datalist id="business-custom-units">
-                              {businessConfig.customUnits.map((unit) => <option key={unit} value={unit} />)}
-                            </datalist>
-                          </>
-                        </Field>}
-                        <Field label={`سعر البيع / ${unitLabel}`}>
-                          <input type="number" min="0" step="0.01" value={formData.sellingPriceM2} onChange={(e) => setFormData({ ...formData, sellingPriceM2: Number.parseFloat(e.target.value) || 0, sellingPriceBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
-                        </Field>
-                      </div>
-                    </section>
-                  ) : <>
-                  <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                    <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Ruler className="w-4 h-4 text-sky-600" /> المقاس والمواصفات</div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Field label="المقاس (سم)" hint={autoMeters !== null ? `المساحة المحسوبة: ${autoMeters} م²/كرتونة` : 'أدخل الطول والعرض بالسنتيمتر'}>
-                        <div className="flex items-center gap-2">
-                          <input type="number" min="0" step="any" aria-label="الطول بالسنتيمتر" value={(formData.size || '').split(/[x×*]/i)[0] || ''} onChange={(e) => updateSizeDimension(0, e.target.value)} placeholder="60" className="w-full min-w-0 px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
-                          <span className="text-slate-400">×</span>
-                          <input type="number" min="0" step="any" aria-label="العرض بالسنتيمتر" value={(formData.size || '').split(/[x×*]/i)[1] || ''} onChange={(e) => updateSizeDimension(1, e.target.value)} placeholder="120" className="w-full min-w-0 px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
-                        </div>
-                      </Field>
-                      <Field label="السمك (مم)">
-                        <input type="number" step="0.1" value={formData.thickness} onChange={(e) => setFormData({ ...formData, thickness: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
-                      </Field>
-                      <Field label="اللون">
-                        <input value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder="رمادي رخامي" className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
-                      </Field>
-                      <Field label="التون">
-                        <select value={formData.tone} onChange={(e) => setFormData({ ...formData, tone: e.target.value })} className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold">
-                          <option value="">— اختر التون —</option>
-                          {Array.from({ length: 20 }, (_, index) => `T${index + 1}`).map((tone) => (
-                            <option key={tone} value={tone}>{tone}</option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="التشطيب">
-                        <input value={formData.finish} onChange={(e) => setFormData({ ...formData, finish: e.target.value })} placeholder="لامع / مطفي" className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
-                      </Field>
-                    </div>
-                  </section>
-
-                  <section className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
-                    <div className="flex items-center gap-1.5 text-sm font-extrabold text-sky-800"><Layers className="w-4 h-4" /> الوحدات والعدد والمترات</div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Field label="وحدة الأساس">
-                        <select value={formData.baseUnit} onChange={(e) => setFormData({ ...formData, baseUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
-                          {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="وحدة البيع">
-                        <select value={formData.sellUnit} onChange={(e) => setFormData({ ...formData, sellUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
-                          {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-                        </select>
-                      </Field>
-                      <Field label={`المترات / ${unitLabel} بالكرتونة`}>
-                        <input type="number" step="0.001" value={formData.metersPerBox} onChange={(e) => handleMetersPerBoxChange(Number.parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
-                      </Field>
-                      <Field label="عدد القطع بالكرتونة">
-                        <input type="number" min="1" step="1" value={formData.piecesPerBox} onChange={(e) => handlePiecesPerBoxChange(Number.parseInt(e.target.value, 10) || 1)} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
-                      </Field>
-                      <Field label="وزن الكرتونة (كجم)">
-                        <input type="number" step="0.01" value={formData.weightPerBox} onChange={(e) => setFormData({ ...formData, weightPerBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
-                      </Field>
-                      <div className="md:col-span-3 grid grid-cols-3 gap-3">
-                        <div className="rounded-xl border border-sky-200 bg-white px-3 py-2">
-                          <div className="text-[10px] font-bold text-slate-500">مساحة القطعة</div>
-                          <div className="font-black text-sky-700">{round(areaPerPiece, 4)} م²</div>
-                        </div>
-                        <div className="rounded-xl border border-sky-200 bg-white px-3 py-2">
-                          <div className="text-[10px] font-bold text-slate-500">تكلفة القطعة</div>
-                          <div className="font-black text-sky-700">{CeramicMath.formatCurrency(costPerPiece)}</div>
-                        </div>
-                        <div className="rounded-xl border border-sky-200 bg-white px-3 py-2">
-                          <div className="text-[10px] font-bold text-slate-500">قطع / متر</div>
-                          <div className="font-black text-sky-700">{areaPerPiece > 0 ? round(1 / areaPerPiece, 2) : 0}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                  </>}
-                </div>
-              )}
-
-              {activeTab === 'pricing' && canManagePricing && (
-                <section className="space-y-3">
-                  <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Banknote className="w-4 h-4 text-emerald-600" /> التسعير</div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <Field label={`سعر الشراء / التكلفة (${unitLabel})`}>
-                      <input type="number" step="0.01" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                    </Field>
-                    <Field label={`سعر البيع (${unitLabel})`}>
-                      <input type="number" step="0.01" value={formData.sellingPriceM2} onChange={(e) => { const price = Number.parseFloat(e.target.value) || 0; setFormData({ ...formData, sellingPriceM2: price, sellingPriceBox: round(price * formData.metersPerBox) }); }} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold text-sky-600" />
-                    </Field>
-                    {formData.productType === 'CERAMIC' && <Field label="سعر الكرتونة">
-                      <input type="number" step="0.01" value={formData.sellingPriceBox} onChange={(e) => setFormData({ ...formData, sellingPriceBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                    </Field>}
-                    <Field label={`سعر الجملة (${unitLabel})`}>
-                      <input type="number" step="0.01" value={formData.wholesalePriceM2} onChange={(e) => setFormData({ ...formData, wholesalePriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                    </Field>
-                    <Field label={`الحد الأدنى لسعر البيع (${unitLabel})`}>
-                      <input type="number" step="0.01" value={formData.minSellingPriceM2} onChange={(e) => setFormData({ ...formData, minSellingPriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                    </Field>
-                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-                      <div>
-                        <div className="text-[10px] font-bold text-emerald-700">ربح الوحدة</div>
-                        <div className="font-black text-emerald-700">{CeramicMath.formatCurrency(profitPerMeter)}</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] font-bold text-emerald-700">هامش الربح</div>
-                        <div className="font-black text-emerald-700">{round(profitMargin, 1)}%</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                    <Field label={`حد الطلب الأدنى (${unitLabel})`}>
-                      <input type="number" step="0.01" value={formData.minStockLevel} onChange={(e) => setFormData({ ...formData, minStockLevel: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                    </Field>
-                    <Field label="الحد الأقصى للمخزون">
-                      <input type="number" step="0.01" value={formData.maxStockLevel} onChange={(e) => setFormData({ ...formData, maxStockLevel: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
-                    </Field>
-                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2">
-                      <div className="text-[10px] font-bold text-sky-700">قيمة المخزون الافتتاحي</div>
-                      <div className="font-black text-sky-700">{CeramicMath.formatCurrency(stockValue)}</div>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {activeTab === 'stock' && (
-                <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-sm font-extrabold text-amber-800"><Boxes className="w-4 h-4" /> المخزون الافتتاحي (عدد / كمية / مترات)</div>
-                    {!editingProduct && <button type="button" onClick={addOpeningRow} disabled={openingRows.length >= warehouses.length} className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-bold text-amber-700 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50">+ مخزن آخر</button>}
-                  </div>
-
-                  {editingProduct ? (
-                    <div className="space-y-2">
-                      {editStock.length === 0 ? (
-                        <p className="rounded-xl border border-amber-200 bg-white px-3 py-3 text-[11px] text-slate-500">لا يوجد رصيد مسجل. استخدم زر "إضافة كمية للمخزون" من قائمة الأصناف.</p>
-                      ) : editStock.map((row, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-xl border border-amber-200 bg-white px-3 py-2 text-[11px] font-bold">
-                          <span className="text-slate-600">{row.warehouseName}</span>
-                          <span className="text-amber-700">{CeramicMath.formatM2(row.quantityM2)}</span>
-                        </div>
-                      ))}
-                      <p className="text-[10px] text-amber-700">لتعديل الرصيد استخدم زر إضافة كمية (PackagePlus) بجانب الصنف في القائمة.</p>
-                    </div>
-                  ) : (
-                    <>
-                      {openingRows.map((row, index) => (
-                        <div key={index} className={`grid grid-cols-2 items-end gap-2 rounded-xl border border-amber-200 bg-white p-3 ${formData.productType === 'CERAMIC' ? 'md:grid-cols-5' : 'md:grid-cols-3'}`}>
-                          <Field label="المخزن">
-                            <select value={row.warehouseId} onChange={(e) => setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, warehouseId: e.target.value } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold">
-                              {warehouses.filter((w) => w.id === row.warehouseId || !openingRows.some((other, otherIndex) => otherIndex !== index && other.warehouseId === w.id)).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                            </select>
-                          </Field>
-                          {formData.productType === 'CERAMIC' && <Field label="عدد الكراتين">
-                            <input type="number" min="0" step="0.01" value={row.boxes} onChange={(e) => setOpeningBy(index, 'boxes', Number.parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
-                          </Field>}
-                          {formData.productType === 'CERAMIC' && <Field label="عدد القطع">
-                            <input type="number" min="0" step="1" value={row.pieces} onChange={(e) => setOpeningBy(index, 'pieces', Number.parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
-                          </Field>}
-                          <Field label={`الكمية (${unitLabel})`}>
-                            <input type="number" min="0" step="0.001" value={row.meters} onChange={(e) => formData.productType === 'CERAMIC' ? setOpeningBy(index, 'meters', Number.parseFloat(e.target.value) || 0) : setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, meters: Math.max(0, Number.parseFloat(e.target.value) || 0) } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold" />
-                          </Field>
-                          <button type="button" onClick={() => removeOpeningRow(index)} className="rounded-xl border border-rose-200 px-2 py-2 text-rose-500 hover:bg-rose-50" title="حذف السطر"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      ))}
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-[11px]">
-                        <span className="font-bold text-slate-600">قيمة المخزون الافتتاحي: <span className="text-amber-700">{CeramicMath.formatCurrency(stockValue)}</span></span>
-                        {formData.productType === 'CERAMIC' && <span className="font-bold text-slate-600">إجمالي الكراتين: <span className="text-amber-700">{round(openingRows.reduce((s, r) => s + r.boxes, 0), 3)}</span> · القطع: <span className="text-amber-700">{Math.round(openingRows.reduce((s, r) => s + r.pieces, 0))}</span></span>}
-                        <span className="font-bold text-slate-600">إجمالي المترات: <span className="text-amber-700">{round(openingRows.reduce((s, r) => s + r.meters, 0), 3)} {unitLabel}</span></span>
-                      </div>
-                    </>
-                  )}
-                </section>
-              )}
-
-              {activeTab === 'extras' && (
-                <div className="space-y-5">
-                  {formData.productType === 'CERAMIC' && (
-                  <section className="space-y-3 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-sm font-extrabold text-indigo-800"><GitBranch className="w-4 h-4" /> متغيرات الصنف (خصائص الصنف)</div>
-                      <button type="button" onClick={addVariantDraft} className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100">+ إضافة متغير</button>
-                    </div>
-                    {variants.length === 0 ? (
-                      <p className="rounded-xl border border-indigo-200 bg-white px-3 py-3 text-[11px] text-slate-500">لا توجد متغيرات. أضف متغيرات لتتبع الألوان والمقاسات المختلفة بنفس الصنف.</p>
-                    ) : variants.map((v, index) => (
-                      <div key={index} className="grid grid-cols-2 items-end gap-2 rounded-xl border border-indigo-200 bg-white p-3 md:grid-cols-7">
-                        <Field label="اسم المتغير"><input value={v.variantName} onChange={(e) => updateVariantDraft(index, { variantName: e.target.value })} placeholder="رمادي 60x60" className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-bold" /></Field>
-                        <Field label="SKU"><input value={v.sku} onChange={(e) => updateVariantDraft(index, { sku: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-mono" /></Field>
-                        <Field label="الباركود"><input value={v.barcode} onChange={(e) => updateVariantDraft(index, { barcode: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-mono" /></Field>
-                        <Field label="اللون"><input value={v.color} onChange={(e) => updateVariantDraft(index, { color: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200" /></Field>
-                        <Field label="المقاس"><input value={v.size} onChange={(e) => updateVariantDraft(index, { size: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200" /></Field>
-                        <Field label="الفرز">
-                          <select value={v.grade} onChange={(e) => updateVariantDraft(index, { grade: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-bold">
-                            {GRADES.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-                          </select>
-                        </Field>
-                        <div className="flex items-end gap-1">
-                          <Field label="سعر المتر"><input type="number" value={v.sellingPriceM2} onChange={(e) => updateVariantDraft(index, { sellingPriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200" /></Field>
-                          <button type="button" onClick={() => removeVariantDraft(index)} className="mb-0.5 rounded-lg border border-rose-200 p-2 text-rose-500 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                    ))}
-                  </section>
-                  )}
-
-                  <section className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
-                    <div className="flex items-center gap-1.5 text-sm font-extrabold text-violet-800"><SlidersHorizontal className="w-4 h-4" /> خصائص ومواصفات إضافية</div>
-                    {attributes.filter((attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId).length === 0 ? (
-                      <p className="rounded-xl border border-violet-200 bg-white px-3 py-3 text-[11px] text-slate-500">لا توجد خصائص معرّفة. يمكنك إدارتها من صفحة خصائص المنتجات.</p>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                        {attributes
-                          .filter((attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId)
-                          .map((attr) => {
-                            const value = attributeValues[attr.id] || '';
-                            const options = attr.values;
-                            const update = (next: string) => setAttributeValues((previous) => ({
-                              ...previous,
-                              [attr.id]: next,
-                            }));
-                            const commonClass = 'w-full px-3 py-2 bg-white rounded-xl border border-violet-200 font-bold';
-                            let control: React.ReactNode;
-
-                            if (attr.dataType === 'BOOLEAN') {
-                              control = (
-                                <select value={value} onChange={(event) => update(event.target.value)} className={commonClass}>
-                                  <option value="">— بدون —</option>
-                                  <option value="true">نعم</option>
-                                  <option value="false">لا</option>
-                                </select>
-                              );
-                            } else if (attr.dataType === 'MULTI_SELECT' && options.length > 0) {
-                              let selected: string[] = [];
-                              try {
-                                const parsed: unknown = value ? JSON.parse(value) : [];
-                                if (Array.isArray(parsed)) selected = parsed.filter((item): item is string => typeof item === 'string');
-                              } catch {
-                                selected = value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
-                              }
-                              control = (
-                                <select
-                                  multiple
-                                  value={selected}
-                                  onChange={(event) => update(JSON.stringify(
-                                    Array.from(event.currentTarget.selectedOptions, (option) => option.value),
-                                  ))}
-                                  className={`${commonClass} min-h-24`}
-                                >
-                                  {options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}
-                                </select>
-                              );
-                            } else if (attr.dataType === 'SELECT' && options.length > 0) {
-                              control = (
-                                <select value={value} onChange={(event) => update(event.target.value)} className={commonClass}>
-                                  <option value="">— بدون —</option>
-                                  {options.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}
-                                </select>
-                              );
-                            } else {
-                              const inputType = attr.dataType === 'NUMBER'
-                                ? 'number'
-                                : attr.dataType === 'DATE'
-                                  ? 'date'
-                                  : 'text';
-                              control = (
-                                <input
-                                  type={inputType}
-                                  step={inputType === 'number' ? 'any' : undefined}
-                                  value={value}
-                                  onChange={(event) => update(event.target.value)}
-                                  className={commonClass}
-                                />
-                              );
-                            }
-
-                            return (
-                              <Field key={attr.id} label={`${attr.name}${attr.isRequired ? ' *' : ''}${attr.unit ? ` (${attr.unit})` : ''}`}>
-                                {control}
-                              </Field>
-                            );
-                          })}
-                      </div>
-                    )}
-                  </section>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                  {formData.categoryId && formData.brandId ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500" /> : <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
-                  <span>{formData.categoryId && formData.brandId ? 'النوع والماركة محددان جاهزان للحفظ' : 'يجب تحديد النوع والماركة قبل الحفظ'}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200">إلغاء</button>
-                  <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-6 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-black rounded-xl shadow-lg shadow-sky-600/30">
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    {editingProduct ? 'حفظ التعديلات' : 'حفظ الصنف'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ProductFormModal
+        open={isModalOpen}
+        canCreate={canCreateProduct}
+        canUpdate={canUpdateProduct}
+        editingProduct={editingProduct}
+        productSingularLabel={productSingularLabel}
+        onClose={() => setIsModalOpen(false)}
+        tabs={tabs}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onSubmit={handleSaveProduct}
+        formData={formData}
+        setFormData={setFormData}
+        canCreateCategory={canCreateCategory}
+        showNewCategory={showNewCategory}
+        setShowNewCategory={setShowNewCategory}
+        newCategory={newCategory}
+        setNewCategory={setNewCategory}
+        onAddCategory={handleAddCategory}
+        canCreateBrand={canCreateBrand}
+        showNewBrand={showNewBrand}
+        setShowNewBrand={setShowNewBrand}
+        newBrand={newBrand}
+        setNewBrand={setNewBrand}
+        onAddBrand={handleAddBrand}
+        imageInputRef={imageInputRef}
+        onImageFiles={handleImageFiles}
+        existingImages={existingImages}
+        onRemoveExistingImage={removeExistingImage}
+        pendingImages={pendingImages}
+        setPendingImages={setPendingImages}
+        categories={categories}
+        brands={brands}
+        profileUnitOptions={profileUnitOptions}
+        businessConfig={businessConfig}
+        unitLabel={unitLabel}
+        autoMeters={autoMeters}
+        onUpdateSizeDimension={updateSizeDimension}
+        onMetersPerBoxChange={handleMetersPerBoxChange}
+        onPiecesPerBoxChange={handlePiecesPerBoxChange}
+        areaPerPiece={areaPerPiece}
+        costPerPiece={costPerPiece}
+        canManagePricing={canManagePricing}
+        profitPerMeter={profitPerMeter}
+        profitMargin={profitMargin}
+        stockValue={stockValue}
+        onAddOpeningRow={addOpeningRow}
+        openingRows={openingRows}
+        warehouses={warehouses}
+        editStock={editStock}
+        setOpeningRows={setOpeningRows}
+        onSetOpeningBy={setOpeningBy}
+        onRemoveOpeningRow={removeOpeningRow}
+        variants={variants}
+        onAddVariantDraft={addVariantDraft}
+        onUpdateVariantDraft={updateVariantDraft}
+        onRemoveVariantDraft={removeVariantDraft}
+        attributes={attributes}
+        attributeValues={attributeValues}
+        setAttributeValues={setAttributeValues}
+        isSaving={isSaving}
+      />
 
       {/* STOCK MODAL */}
       {stockProduct && canAdjustInventory && (

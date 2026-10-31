@@ -53,9 +53,9 @@ test('dashboard sales and gross profit reconcile invoice returns and same-period
     [`${id}_product`, `${id}_product`, `${id}_product`]);
 
   db.run(`INSERT INTO sales_invoices
-    (id,invoice_number,date,customer_id,warehouse_id,subtotal,discount_amount,tax_amount,total_amount,
+    (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
      paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
-    VALUES (?, ?, ?, ?, 'wh_main', 200, 0, 0, 200, 0, 200, 'CREDIT', 'UNPAID', 'COMPLETED', 80, 120, 'usr_admin')`,
+    VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 200, 0, 0, 200, 0, 200, 'CREDIT', 'UNPAID', 'COMPLETED', 80, 120, 'usr_admin')`,
     [`${id}_current`, `${id}_current`, today, customerId]);
   db.run(`INSERT INTO sales_returns
     (id,return_number,original_invoice_id,original_invoice_number,customer_id,warehouse_id,date,total_amount,
@@ -67,9 +67,9 @@ test('dashboard sales and gross profit reconcile invoice returns and same-period
     VALUES (?, ?, ?, 'test', 'GRADE_1', 1, 1, 100, 80, 100)`,
     [`${id}_item`, `${id}_return`, `${id}_product`]);
   db.run(`INSERT INTO sales_invoices
-    (id,invoice_number,date,customer_id,warehouse_id,subtotal,discount_amount,tax_amount,total_amount,
+    (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
      paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
-    VALUES (?, ?, ?, ?, 'wh_main', 100, 0, 0, 100, 0, 100, 'CREDIT', 'UNPAID', 'COMPLETED', 40, 60, 'usr_admin')`,
+    VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 100, 0, 0, 100, 0, 100, 'CREDIT', 'UNPAID', 'COMPLETED', 40, 60, 'usr_admin')`,
     [`${id}_previous`, `${id}_previous`, previousMonthDate, customerId]);
   const after = new AccountingService().getDashboardMetrics();
 
@@ -248,6 +248,7 @@ test('profit and loss reconciles merchandise gross profit with invoices and sepa
       referenceType: 'TEST_PROFIT_POLICY',
       referenceId: 'profit_policy_reconciliation',
       createdBy: 'usr_admin',
+      branchId: 'br_main',
       lines: [
         { accountCode: '1101', debit: 115, credit: 0 },
         { accountCode: '5101', debit: 60, credit: 0 },
@@ -429,6 +430,7 @@ test('financial statements use posted ledger balances as of the requested date',
       referenceType: 'TEST_FINANCIAL_STATEMENT',
       referenceId: 'as_of_ledger_posting',
       createdBy: actorId,
+      branchId: 'br_main',
       lines: [
         { accountCode: '1101', debit: 321.45, credit: 0 },
         { accountCode: '4101', debit: 0, credit: 321.45 },

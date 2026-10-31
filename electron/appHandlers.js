@@ -16,7 +16,7 @@ function hasSignature(bytes, signature) {
 }
 
 function registerAppHandlers({
-  ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
+  ipcMain, validateIpcSender, app, fs, shell, dialog, BrowserWindow,
   appDataDir, DATA_DIR, BACKUP_DIR, ensureDirs, requestGracefulRestart,
 }) {
   ipcMain.handle('db:encrypt-xlsx-backup', async (event, bytes, password) => {

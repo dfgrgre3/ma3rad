@@ -14,3 +14,5 @@ export type { PerformanceMetrics, Alert } from './performanceMonitor';
 export { systemHealth } from './systemHealthService';
 export type { HealthScore, HealthAlert, HealthMetrics, SystemHealthReport } from './systemHealthService';
 export { CentralLicenseService } from './CentralLicenseService';
+export { CentralTelemetryService } from './CentralTelemetryService';
+export type { ReleaseInfo } from './CentralTelemetryService';

@@ -45,7 +45,7 @@ export const ENTITY_META: Record<Exclude<ImportEntity, 'dynamic'>, { label: stri
   warehouses: { label: 'المخازن', permission: 'warehouses.manage', fields: [ { key: 'name', label: 'اسم المخزن', aliases: ['name','warehouse','warehouse name','اسم المخزن','المخزن','الاسم'], required: true }, { key: 'location', label: 'الموقع', aliases: ['location','الموقع','العنوان'] } ] },
 };
 
-const cleanHeader = (value: string) => value.trim().toLocaleLowerCase().replace(/[\s_\-]+/g, ' ');
+const cleanHeader = (value: string) => value.trim().toLocaleLowerCase().replace(/[\s_-]+/g, ' ');
 const text = (value: unknown) => String(value ?? '').trim();
 const number = (value: unknown) => { const n = Number(String(value ?? '').replace(/[,٬]/g, '').replace(/[٫]/g, '.')); return Number.isFinite(n) ? n : NaN; };
 const truthy = (v: unknown) => ['1','true','yes','نعم','ذكر'].includes(text(v).toLowerCase());

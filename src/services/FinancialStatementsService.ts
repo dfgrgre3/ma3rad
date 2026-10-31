@@ -144,26 +144,41 @@ export class FinancialStatementsService {
       status: unbalancedEntries === 0 ? 'MATCH' : 'DIFFERENCE',
       detail: `${unbalancedEntries} قيد غير متوازن من ${Number(integrity?.entries || 0)} قيد مرحل` });
 
-    const invoiceScope = this.branchAccess.sqlScope('si.branch_id');
-    const invoiceCompanyScope = this.branchAccess.companyScope('si.company_id');
-    const customerBalance = Number(this.db.query<{ balance: number }>(`
-      SELECT COALESCE(SUM(si.remaining_amount), 0) AS balance
-      FROM sales_invoices si
-      WHERE si.invoice_status != 'VOID'
-        AND (${invoiceScope.clause}) AND (${invoiceCompanyScope.clause})
-    `, [...invoiceScope.params, ...invoiceCompanyScope.params])[0]?.balance || 0);
-    add('customers', 'ذمم العملاء مقابل الأستاذ العام', accountBalance('1103', 'DEBIT'), customerBalance,
-      'أرصدة فواتير البيع غير المسددة في الفرع النشط.');
+    const cachedAccounts = this.db.query<{ ledger: number; cached: number }>(`
+      WITH scoped_accounts AS (
+        SELECT DISTINCT l.account_id
+        FROM journal_entry_lines l
+        JOIN journal_entries e ON e.id = l.entry_id
+        WHERE e.is_posted = 1 AND ${scope.clause}
+      )
+      SELECT COALESCE(SUM(l.debit - l.credit), 0) AS ledger,
+             COALESCE((
+               SELECT SUM(ca.balance)
+               FROM chart_of_accounts ca
+               JOIN scoped_accounts sa ON sa.account_id = ca.id
+             ), 0) AS cached
+      FROM journal_entry_lines l
+      JOIN journal_entries e ON e.id = l.entry_id
+      WHERE e.is_posted = 1 AND ${scope.clause}
+    `, scope.params)[0];
+    const cachedLedger = Number(cachedAccounts?.ledger || 0);
+    const cachedSource = Number(cachedAccounts?.cached || 0);
+    add('cached', 'إتساق الرصيد المخزن في الحسابات مع القيود المرحّلة', cachedLedger, cachedSource,
+      'مقارنة الرصيد المخبأ لكل حساب بالقيود المرحّلة في النطاق الحالي.');
 
-    const purchaseScope = this.branchAccess.sqlScope('pi.branch_id');
-    const purchaseCompanyScope = this.branchAccess.companyScope('pi.company_id');
+    const customerBalance = Number(this.db.query<{ balance: number }>(`
+      SELECT COALESCE(SUM(current_balance), 0) AS balance
+      FROM customers
+    `)[0]?.balance || 0);
+    add('customers', 'ذمم العملاء مقابل الأستاذ العام', accountBalance('1103', 'DEBIT'), customerBalance,
+      'أرصدة العملاء الحالية في النظام.');
+
     const supplierBalance = Number(this.db.query<{ balance: number }>(`
-      SELECT COALESCE(SUM(pi.remaining_amount), 0) AS balance
-      FROM purchase_invoices pi
-      WHERE (${purchaseScope.clause}) AND (${purchaseCompanyScope.clause})
-    `, [...purchaseScope.params, ...purchaseCompanyScope.params])[0]?.balance || 0);
+      SELECT COALESCE(SUM(current_balance), 0) AS balance
+      FROM suppliers
+    `)[0]?.balance || 0);
     add('suppliers', 'ذمم الموردين مقابل الأستاذ العام', accountBalance('2101', 'CREDIT'), supplierBalance,
-      'أرصدة فواتير الشراء غير المسددة في الفرع النشط.');
+      'أرصدة الموردين الحالية في النظام.');
 
     const warehouseScope = this.branchAccess.sqlScope(
       'w.branch_id',
@@ -486,7 +501,7 @@ export class FinancialStatementsService {
               WHERE cpa.sales_invoice_id = si.id AND cp.date <= ?), 0)
           - COALESCE((SELECT SUM(sr.remaining_to_balance) FROM sales_returns sr
               WHERE sr.original_invoice_id = si.id AND sr.date <= ?), 0) > 0.009
-    `, [date, date, date, date, date, ...agingScope.params], date);
+    `, [date, date, date, ...agingScope.params, date, date], date);
   }
 
   public getSupplierAging(asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {
@@ -520,7 +535,7 @@ export class FinancialStatementsService {
               WHERE spa.purchase_invoice_id = pi.id AND sp.date <= ?), 0)
           - COALESCE((SELECT SUM(pr.remaining_to_balance) FROM purchase_returns pr
               WHERE pr.original_purchase_id = pi.id AND pr.date <= ?), 0) > 0.009
-    `, [date, date, date, date, date, ...agingScope.params], date);
+    `, [date, date, date, ...agingScope.params, date, date], date);
   }
 
   private buildAging(sql: string, params: any[], asOf?: string): { rows: AgingRow[]; bucket: AgingBucket } {

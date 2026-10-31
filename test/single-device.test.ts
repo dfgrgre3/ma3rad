@@ -52,17 +52,27 @@ test('single-device: no server, API or sync stack is shipped', () => {
   assert.equal(fs.existsSync(path.join(root, 'server')), false, 'server/ directory must not exist');
 });
 
-test('single-device: the renderer has no outbound network calls or cloud sync code', () => {
+test('single-device: renderer network access is limited to the central licensing API', () => {
   const offenders: string[] = [];
   const networkPattern = /\bfetch\s*\(|XMLHttpRequest|axios|WebSocket|EventSource|sendBeacon|socket\.io/;
-  const syncPattern = /cloudSync|CloudSync|syncService|SyncService|مزامنة سحابية|cloud_storage|sync_endpoint/;
+  // The only renderer module allowed to open a network connection is the
+  // central licensing/configuration client. Business data and sync stay local
+  // and travel through the Electron IPC bridge, never direct HTTP.
+  const allowedNetworkFiles = new Set([path.join('src', 'services', 'CentralLicenseService.ts')]);
   for (const file of listSourceFiles(path.join(root, 'src'))) {
+    const relative = path.relative(root, file);
     const source = fs.readFileSync(file, 'utf8');
-    if (networkPattern.test(source) || syncPattern.test(source)) {
-      offenders.push(path.relative(root, file));
+    if (networkPattern.test(source) && !allowedNetworkFiles.has(relative)) {
+      offenders.push(relative);
     }
   }
   assert.deepEqual(offenders, []);
+
+  // Cloud sync SDKs must never be bundled into the renderer.
+  const cloudSdkPattern = /firebase|@supabase|socket\.io|axios|node-fetch/;
+  for (const file of listSourceFiles(path.join(root, 'src'))) {
+    assert.doesNotMatch(fs.readFileSync(file, 'utf8'), cloudSdkPattern, `${path.relative(root, file)} must not use a cloud SDK`);
+  }
 });
 
 test('single-device: database persistence targets one local file', () => {

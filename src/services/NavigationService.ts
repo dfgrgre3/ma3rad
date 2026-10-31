@@ -1,4 +1,5 @@
 import { NAV_GROUPS, NAV_STORAGE_KEYS, type NavGroupDef } from '../config/navigation';
+import { getModulePathOwner } from '../config/moduleRegistry';
 import { SettingsService } from './SettingsService';
 import { PermissionService } from './PermissionService';
 import { AuthService } from './AuthService';
@@ -6,6 +7,7 @@ import type { User } from '../types';
 import { resolveBusinessTerm, type BusinessTermKey } from '../config/businessTerminology';
 import { TerminologyService } from './TerminologyService';
 import { AppConfigService } from './AppConfigService';
+import { CentralLicenseService } from './CentralLicenseService';
 
 export interface NavOverrides {
   hidden: string[];
@@ -87,13 +89,32 @@ export class NavigationService {
   }
 
   public static getAccessibleGroups(user: User | null): NavGroupDef[] {
+    const centralCfg = CentralLicenseService.getCachedConfig();
+    const centralHidden: string[] = Array.isArray(centralCfg?.config?.hiddenMenus)
+      ? centralCfg!.config.hiddenMenus
+      : [];
+    const isCentralHidden = (path: string) =>
+      centralHidden.some((h) => path === h || path.startsWith(String(h).replace(/\/$/, '') + '/'));
+    const centralAllowed: string[] | null = Array.isArray(centralCfg?.config?.allowedModules)
+      ? (centralCfg!.config.allowedModules as string[])
+      : null;
+    const isModuleAllowed = (path: string) => {
+      if (!centralAllowed) return true;
+      const owner = getModulePathOwner(path);
+      if (!owner) return true;
+      return centralAllowed.includes(owner);
+    };
+
+
     return NavigationService.getGroups()
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) =>
-          [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])]
-            .every((permission) => PermissionService.can(user, permission))
-        ),
+        items: group.items.filter((item) => {
+          if (isCentralHidden(item.to)) return false;
+          if (!isModuleAllowed(item.to)) return false;
+          return [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])]
+            .every((permission) => PermissionService.can(user, permission));
+        }),
       }))
       .filter((group) => group.items.length > 0);
   }

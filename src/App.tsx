@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
+import { CentralLicenseService } from './services/CentralLicenseService';
+import { CentralTelemetryService } from './services/CentralTelemetryService';
+import type { ReleaseInfo } from './services/CentralTelemetryService';
 import { SettingsService } from './services/SettingsService';
 import { AppConfigService } from './services/AppConfigService';
 import { shouldShowFirstRunSetup } from './config/setupLifecycle';
 import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
 import { AppRouter } from './router';
 import { LoginPage } from './pages/auth/LoginPage';
+import { FirstRunActivationPage } from './pages/auth/FirstRunActivationPage';
 import { SetupWizard } from './components/SetupWizard';
 import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -24,6 +28,60 @@ export const App: React.FC = () => {
   } = useAppStartup();
 
   const [showSetup, setShowSetup] = useState(false);
+  const [activationComplete, setActivationComplete] = useState(
+    () => CentralLicenseService.hasCompletedFirstRunActivation()
+  );
+  const [licenseBlocked, setLicenseBlocked] = useState(false);
+  const [licenseRetrying, setLicenseRetrying] = useState(false);
+  const [availableUpdate, setAvailableUpdate] = useState<ReleaseInfo | null>(null);
+
+  const checkLicense = useCallback(async () => {
+    if (!activationComplete) return;
+    setLicenseRetrying(true);
+    try {
+      const valid = await CentralLicenseService.validate();
+      setLicenseBlocked(!valid);
+    } finally {
+      setLicenseRetrying(false);
+    }
+  }, [activationComplete]);
+
+  // Revalidate at startup and periodically, but never block the local UI while
+  // a request is in flight. A rejected/expired license closes the app.
+  useEffect(() => {
+    if (!activationComplete) return;
+    void checkLicense();
+    const timer = setInterval(() => void checkLicense(), 6 * 60 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [activationComplete, checkLicense]);
+
+  // Periodically refresh central config (modules/limits/hidden menus)
+  useEffect(() => {
+    if (!activationComplete) return;
+    const refresh = () => { void CentralLicenseService.fetchConfig(); };
+    refresh();
+    const timer = setInterval(refresh, 60 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [activationComplete]);
+
+  // Check for published updates on startup
+  useEffect(() => {
+    if (!activationComplete) return;
+    let cancelled = false;
+    (async () => {
+      const upd = await CentralTelemetryService.checkForUpdates('1.1.3');
+      if (!cancelled) setAvailableUpdate(upd);
+    })();
+    return () => { cancelled = true; };
+  }, [activationComplete]);
+
+  // Periodic central heartbeat (device liveness)
+  useEffect(() => {
+    if (!activationComplete) return;
+    void CentralLicenseService.heartbeat();
+    const timer = setInterval(() => void CentralLicenseService.heartbeat(), 30 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [activationComplete]);
 
   // تهيئة الخدمات الأمنية ومؤقتات المراقبة
   useEffect(() => {
@@ -93,6 +151,52 @@ export const App: React.FC = () => {
     }
   }, [currentUser?.id]);
 
+  if (!activationComplete) {
+    return (
+      <FirstRunActivationPage
+        onSuccess={() => {
+          setLicenseBlocked(false);
+          setActivationComplete(true);
+        }}
+      />
+    );
+  }
+
+  if (licenseBlocked) {
+    return (
+      <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
+        <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-white p-8 text-center shadow-2xl">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-2xl font-black text-rose-700">!</div>
+          <h1 className="text-xl font-black text-slate-900">تعذر التحقق من الترخيص</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            انتهت فترة العمل دون اتصال أو رفض الخادم صلاحية هذا الجهاز. تحقق من الاتصال ثم أعد المحاولة،
+            أو أعد تفعيل الجهاز برمز جديد.
+          </p>
+          <div className="mt-6 flex flex-col gap-3">
+            <button
+              onClick={() => void checkLicense()}
+              disabled={licenseRetrying}
+              className="rounded-xl bg-sky-700 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:bg-sky-800 disabled:opacity-60"
+            >
+              {licenseRetrying ? 'جارٍ التحقق...' : 'إعادة المحاولة'}
+            </button>
+            <button
+              onClick={() => {
+                CentralLicenseService.clearActivation();
+                setLicenseBlocked(false);
+                setActivationComplete(false);
+              }}
+              disabled={licenseRetrying}
+              className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              إعادة التفعيل برمز جديد
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   if (!dbReady) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 text-slate-900 select-none px-4">
@@ -132,11 +236,20 @@ export const App: React.FC = () => {
           {!showSetup && currentUser?.mustChangePassword && (
             <ForcePasswordChangeModal user={currentUser} onSuccess={(u) => setCurrentUser(u)} />
           )}
+          {availableUpdate && (
+            <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-2xl bg-sky-600 px-4 py-3 text-sm font-bold text-white shadow-2xl">
+              <div>تحديث متاح: v{availableUpdate.version}</div>
+              {availableUpdate.download_url && (
+                <a href={availableUpdate.download_url} target="_blank" rel="noreferrer" className="mt-1 inline-block underline">تحميل التحديث</a>
+              )}
+              <button onClick={() => setAvailableUpdate(null)} className="ml-2 text-xs opacity-80">إغلاق</button>
+            </div>
+          )}
           {showSetup ? (
             <SetupWizard
-              onComplete={() => {
+              onComplete={(configuredAdmin) => {
                 setShowSetup(false);
-                setCurrentUser((c) => (c ? { ...c, mustChangePassword: false } : c));
+                setCurrentUser((current) => configuredAdmin ?? (current ? { ...current, mustChangePassword: false } : current));
               }}
             />
           ) : (

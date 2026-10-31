@@ -57,13 +57,18 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 interface AdminSettingsTabProps {
   initialTab?: Tab;
+  onTabChange?: (tab: Tab) => void;
 }
 
-export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }) => {
+export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, onTabChange }) => {
   const toast = useToast();
   const can = usePermission();
   const readOnly = !can('settings.update');
   const [tab, setTab] = useState<Tab>(initialTab && ['general','business','branding','invoice','inventory','operations','security','backup'].includes(initialTab) ? initialTab : 'general');
+  const changeTab = (next: Tab) => {
+    setTab(next);
+    onTabChange?.(next);
+  };
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
   const [businessProfile, setBusinessProfile] = useState(readBusinessProfile);
   const [businessConfig, setBusinessConfig] = useState(readBusinessConfiguration);
@@ -77,6 +82,10 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }
   const [configurationVersions, setConfigurationVersions] = useState<ActivityConfigurationVersion[]>([]);
   const [configurationHistoryError, setConfigurationHistoryError] = useState<string | null>(null);
   const [compareVersionIds, setCompareVersionIds] = useState<[string, string]>(['', '']);
+
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     setSettings(SettingsService.getSettings());
@@ -110,7 +119,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }
       const customName = businessProfile.customName.trim();
       if (businessProfile.type === 'custom' && customName.length < 2) {
         toast.error('اكتب اسم النشاط التجاري (حرفان على الأقل).');
-        setTab('business');
+        changeTab('business');
         return;
       }
       const businessTypeLabel = businessProfile.type === 'custom'
@@ -121,7 +130,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }
       });
       if (moduleValidation.errors.length > 0) {
         toast.error('تعذر تفعيل الوحدات', moduleValidation.errors.join(' '));
-        setTab('business');
+        changeTab('business');
         return;
       }
       const enabledModules = moduleValidation.enabled;
@@ -131,7 +140,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }
         const blocker = ModuleRegistryService.getDeactivationBlocker(removed, enabledModules);
         if (blocker) {
           toast.error('لا يمكن تعطيل وحدة مستخدمة', blocker);
-          setTab('business');
+          changeTab('business');
           return;
         }
       }
@@ -262,7 +271,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }
     setBusinessConfig(snapshot.configuration);
     setTerminologyOverrides(snapshot.terminologyOverrides);
     setDirty(true);
-    setTab('business');
+    changeTab('business');
     toast.info(`تم تحميل الإصدار ${version.version} للمراجعة. لن تُطبّق التغييرات حتى تضغط «حفظ التغييرات».`);
   };
 
@@ -325,7 +334,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab }
           return (
             <button
               key={item.id}
-              onClick={() => setTab(item.id)}
+              onClick={() => changeTab(item.id)}
               className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                 active
                   ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'

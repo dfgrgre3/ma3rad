@@ -55,7 +55,7 @@ test('reference balances reconcile to the ledger and detect customer, supplier, 
     if (lines.length) postLedgerEntry(db, {
       date: localDateString(), description: 'Reference data integrity opening balances',
       referenceType: 'TEST_DATA_INTEGRITY_BASELINE', referenceId: 'reference-opening-balances',
-      createdBy: actor.id, lines,
+      createdBy: actor.id, branchId: 'br_main', lines,
     });
 
     const checks = statements.getReconciliation();

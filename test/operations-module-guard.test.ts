@@ -63,7 +63,7 @@ test('deactivating the operations module blocks new operational records without 
 
   // History stays readable after deactivation.
   assert.equal(operations.getDrivers().some((row) => row.id === driver.id), true);
-  assert.equal(operations.getBranches().some((row) => row.id === branch.id), true);
+  assert.equal(operations.getBranches('', true).some((row) => row.id === branch.id), true);
   assert.equal(
     Number(db.query<{ count: number }>('SELECT COUNT(*) AS count FROM drivers')[0].count),
     1
@@ -73,4 +73,20 @@ test('deactivating the operations module blocks new operational records without 
   assert.equal(ModuleRegistryService.isModuleEnabled('operations'), true);
   const reactivated = operations.createDriver({ fullName: 'Reactivated Driver', phone: '01222222222' });
   assert.ok(reactivated.id);
+});
+
+test('delivery customer selector reads customers without an unsupported active column', async () => {
+  const db = await boot();
+  const companyId = db.query<{ companyId: string }>(
+    'SELECT company_id AS companyId FROM branches WHERE is_main = 1 LIMIT 1'
+  )[0]?.companyId;
+  assert.ok(companyId);
+  db.run(
+    `INSERT OR REPLACE INTO customers (id, code, name, phone, company_id)
+     VALUES ('cust_delivery_active_column_regression', 'DELIVERY-TEST', 'Delivery Test Customer', '', ?)`,
+    [companyId]
+  );
+
+  const customers = new OperationsService().getCustomersForSelect();
+  assert.ok(customers.some((customer) => customer.id === 'cust_delivery_active_column_regression'));
 });

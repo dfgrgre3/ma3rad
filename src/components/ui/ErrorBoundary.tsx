@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertOctagon, RefreshCw } from 'lucide-react';
 import { toAppError } from '../../errors/appError';
+import { CentralTelemetryService } from '../../services';
 
 interface State {
   error: Error | null;
@@ -15,6 +16,15 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     console.error('Unhandled UI error', error, info);
+    try {
+      CentralTelemetryService.reportError({
+        title: error?.name || 'UI render error',
+        description: error?.message || '',
+        stackTrace: (error?.stack || '') + '\n' + (info?.componentStack || ''),
+        issueType: 'error',
+        severity: 'high',
+      });
+    } catch { /* ignore */ }
   }
 
   private reset = () => {

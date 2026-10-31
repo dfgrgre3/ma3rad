@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Archive, CalendarClock, CheckCircle2, ClipboardList, Download, FileText,
-  Loader2, LockKeyhole, Paperclip, Plus, RefreshCw, Search, ShieldCheck,
-  Sparkles, X, XCircle,
+  CalendarClock, CheckCircle2, Download, FileText,
+  Loader2, LockKeyhole, Plus, RefreshCw, Search, ShieldCheck,
 } from 'lucide-react';
 import { DocumentService } from '../../services/DocumentService';
 import { usePermission } from '../../hooks/usePermission';
@@ -20,50 +19,13 @@ import type {
   EnterpriseDocument,
   EnterpriseDocumentVersion,
 } from '../../types';
+import { CONFIDENTIALITY_LABEL, CONTRACT_STATUS_LABEL, DOC_STATUS_LABEL, SummaryCard, inputCls } from './documentsShared';
+import type { ContractDraft, DocumentDraft, VersionDraft } from './documentsShared';
+import { ContractsTable, DocumentsTable } from './DocumentsTables';
+import { DocumentsDialogs } from './DocumentsDialogs';
 
 type Mode = 'documents' | 'contracts';
 
-const inputCls =
-  'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
-const labelCls = 'font-bold text-slate-700 dark:text-slate-300 block mb-1';
-
-const DOC_STATUS_LABEL: Record<DocumentStatus, string> = {
-  DRAFT: 'مسودة',
-  ACTIVE: 'نشط',
-  ARCHIVED: 'مؤرشف',
-};
-const DOC_STATUS_STYLE: Record<DocumentStatus, string> = {
-  DRAFT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
-  ARCHIVED: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
-};
-const CONFIDENTIALITY_LABEL: Record<DocumentConfidentiality, string> = {
-  INTERNAL: 'داخلي',
-  RESTRICTED: 'مقيد',
-  CONFIDENTIAL: 'سري',
-};
-const CONTRACT_STATUS_LABEL: Record<ContractEffectiveStatus, string> = {
-  DRAFT: 'مسودة',
-  SCHEDULED: 'مجدول',
-  ACTIVE: 'ساري',
-  EXPIRING: 'قارب الانتهاء',
-  EXPIRED: 'منتهي',
-  TERMINATED: 'مفسوخ',
-};
-const CONTRACT_STATUS_STYLE: Record<ContractEffectiveStatus, string> = {
-  DRAFT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
-  SCHEDULED: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30',
-  ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30',
-  EXPIRING: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30',
-  EXPIRED: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30',
-  TERMINATED: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
-};
-const PARTY_LABEL: Record<ContractPartyType, string> = {
-  CUSTOMER: 'عميل',
-  SUPPLIER: 'مورد',
-  EMPLOYEE: 'موظف',
-  OTHER: 'أخرى',
-};
 
 const emptySummary: DocumentModuleSummary = {
   documents: 0,
@@ -121,7 +83,7 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
 
   const [createOpen, setCreateOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [docDraft, setDocDraft] = useState({
+  const [docDraft, setDocDraft] = useState<DocumentDraft>({
     companyId: '',
     title: '',
     category: 'GENERAL',
@@ -133,7 +95,7 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
   const [selected, setSelected] = useState<EnterpriseDocument | null>(null);
   const [events, setEvents] = useState<Array<{ id: string; action: string; actorName: string | null; details: string | null; createdAt: string }>>([]);
   const [versionOpen, setVersionOpen] = useState(false);
-  const [versionDraft, setVersionDraft] = useState({
+  const [versionDraft, setVersionDraft] = useState<VersionDraft>({
     fileName: '',
     mimeType: '',
     fileSize: null as number | null,
@@ -143,7 +105,7 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
   });
 
   const [contractOpen, setContractOpen] = useState(false);
-  const [contractDraft, setContractDraft] = useState({
+  const [contractDraft, setContractDraft] = useState<ContractDraft>({
     companyId: '',
     title: '',
     partyType: 'OTHER' as ContractPartyType,
@@ -537,309 +499,45 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
         {loading ? (
           <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
         ) : tab === 'documents' ? (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500">
-                <tr>
-                  <th className="text-right p-3 font-bold">الرقم</th>
-                  <th className="text-right p-3 font-bold">العنوان</th>
-                  <th className="text-right p-3 font-bold">التصنيف</th>
-                  <th className="text-right p-3 font-bold">الشركة</th>
-                  <th className="text-right p-3 font-bold">السرية</th>
-                  <th className="text-right p-3 font-bold">الإصدار</th>
-                  <th className="text-right p-3 font-bold">الانتهاء</th>
-                  <th className="text-right p-3 font-bold">الحالة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {documents.map((document) => (
-                  <tr key={document.id} onClick={() => openDocument(document)} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer">
-                    <td className="p-3 font-mono text-[11px]">{document.documentNumber}</td>
-                    <td className="p-3 font-bold">{document.title}</td>
-                    <td className="p-3 text-slate-500">{document.category}</td>
-                    <td className="p-3 text-slate-500">{document.companyName}</td>
-                    <td className="p-3"><span className="inline-flex items-center gap-1"><LockKeyhole className="w-3 h-3" />{CONFIDENTIALITY_LABEL[document.confidentiality]}</span></td>
-                    <td className="p-3 font-mono">v{document.currentVersion}</td>
-                    <td className="p-3 text-slate-500">{document.expiresAt || '—'}</td>
-                    <td className="p-3"><span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${DOC_STATUS_STYLE[document.status]}`}>{DOC_STATUS_LABEL[document.status]}</span></td>
-                  </tr>
-                ))}
-                {documents.length === 0 && <tr><td colSpan={8} className="p-12 text-center text-slate-500">لا توجد مستندات مطابقة.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <DocumentsTable documents={documents} onOpen={openDocument} />
         ) : (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500">
-                <tr>
-                  <th className="text-right p-3 font-bold">رقم العقد</th>
-                  <th className="text-right p-3 font-bold">العنوان</th>
-                  <th className="text-right p-3 font-bold">الطرف</th>
-                  <th className="text-right p-3 font-bold">الفترة</th>
-                  <th className="text-right p-3 font-bold">القيمة</th>
-                  <th className="text-right p-3 font-bold">الحالة</th>
-                  <th className="text-right p-3 font-bold">إجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contracts.map((contract) => (
-                  <tr key={contract.id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="p-3 font-mono text-[11px]">{contract.contractNumber}</td>
-                    <td className="p-3 font-bold">
-                      {contract.title}
-                      {contract.documentTitle && <div className="text-[10px] text-slate-400 font-normal flex items-center gap-1 mt-0.5"><Paperclip className="w-3 h-3" />{contract.documentTitle}</div>}
-                    </td>
-                    <td className="p-3">{contract.partyName}<div className="text-[10px] text-slate-400">{PARTY_LABEL[contract.partyType]}</div></td>
-                    <td className="p-3 text-slate-500">{contract.startDate} → {contract.endDate}</td>
-                    <td className="p-3 font-mono">{contract.value.toLocaleString()} {contract.currency}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${CONTRACT_STATUS_STYLE[contract.effectiveStatus]}`}>
-                        {CONTRACT_STATUS_LABEL[contract.effectiveStatus]}
-                      </span>
-                      {contract.effectiveStatus === 'EXPIRING' && contract.daysToExpiry !== null && (
-                        <div className="text-[10px] text-orange-500 mt-1">{contract.daysToExpiry} يوم</div>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-wrap gap-1">
-                        {contract.status === 'DRAFT' && can('contracts.update') && (
-                          <button onClick={() => activateContract(contract)} className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">تفعيل</button>
-                        )}
-                        {contract.status !== 'TERMINATED' && can('contracts.update') && (
-                          <button onClick={() => renewContract(contract)} className="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold">تجديد</button>
-                        )}
-                        {contract.status === 'ACTIVE' && can('contracts.terminate') && (
-                          <button onClick={() => terminateContract(contract)} className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">فسخ</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {contracts.length === 0 && <tr><td colSpan={7} className="p-12 text-center text-slate-500">لا توجد عقود مطابقة.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <ContractsTable
+            contracts={contracts}
+            can={can}
+            onActivate={activateContract}
+            onRenew={renewContract}
+            onTerminate={terminateContract}
+          />
         )}
       </div>
 
-      {/* Create document */}
-      {createOpen && (
-        <Modal title="مستند جديد" onClose={() => setCreateOpen(false)}>
-          <form onSubmit={submitDocument} className="space-y-3 text-xs">
-            <div>
-              <label className={labelCls}>الشركة *</label>
-              <select required value={docDraft.companyId} onChange={(e) => setDocDraft({ ...docDraft, companyId: e.target.value })} className={inputCls}>
-                <option value="">اختر الشركة</option>
-                {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
-              </select>
-            </div>
-            <div><label className={labelCls}>عنوان المستند *</label><input required value={docDraft.title} onChange={(e) => setDocDraft({ ...docDraft, title: e.target.value })} className={inputCls} /></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className={labelCls}>التصنيف</label><input value={docDraft.category} onChange={(e) => setDocDraft({ ...docDraft, category: e.target.value })} className={inputCls} placeholder="GENERAL" /></div>
-              <div>
-                <label className={labelCls}>درجة السرية</label>
-                <select value={docDraft.confidentiality} onChange={(e) => setDocDraft({ ...docDraft, confidentiality: e.target.value as DocumentConfidentiality })} className={inputCls}>
-                  {Object.entries(CONFIDENTIALITY_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </div>
-            </div>
-            <div><label className={labelCls}>تاريخ الانتهاء</label><input type="date" value={docDraft.expiresAt} onChange={(e) => setDocDraft({ ...docDraft, expiresAt: e.target.value })} className={inputCls} /></div>
-            <div><label className={labelCls}>الوصف</label><textarea rows={3} value={docDraft.description} onChange={(e) => setDocDraft({ ...docDraft, description: e.target.value })} className={inputCls} /></div>
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 font-bold rounded-xl">إلغاء</button>
-              <button type="submit" disabled={saving} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء</button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Document details */}
-      {selected && (
-        <Modal title={`${selected.documentNumber} — ${selected.title}`} onClose={() => setSelected(null)} wide>
-          <div className="space-y-4 text-xs">
-            <div className="flex flex-wrap gap-2">
-              <span className={`px-2 py-0.5 rounded-full border font-bold ${DOC_STATUS_STYLE[selected.status]}`}>{DOC_STATUS_LABEL[selected.status]}</span>
-              <span className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">{CONFIDENTIALITY_LABEL[selected.confidentiality]}</span>
-              <span className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">{selected.companyName}</span>
-              {selected.expiresAt && <span className="px-2 py-0.5 rounded-full border border-amber-200 text-amber-700">ينتهي {selected.expiresAt}</span>}
-            </div>
-            {selected.description && <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{selected.description}</p>}
-            <div className="flex flex-wrap gap-2">
-              {selected.status === 'DRAFT' && can('documents.update') && (
-                <button onClick={() => changeStatus(selected, 'ACTIVE')} className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> تفعيل المستند</button>
-              )}
-              {selected.status !== 'ARCHIVED' && can('documents.archive') && (
-                <button onClick={() => changeStatus(selected, 'ARCHIVED')} className="px-3 py-1.5 rounded-xl bg-slate-700 text-white font-bold flex items-center gap-1"><Archive className="w-3.5 h-3.5" /> أرشفة</button>
-              )}
-              {selected.status === 'ARCHIVED' && can('documents.archive') && (
-                <button onClick={() => changeStatus(selected, 'ACTIVE')} className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5" /> استعادة</button>
-              )}
-              {selected.status !== 'ARCHIVED' && can('documents.update') && (
-                <button onClick={() => { setVersionDraft({ fileName: '', mimeType: '', fileSize: null, checksum: '', storageName: '', notes: '' }); setVersionOpen(true); }} className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> إضافة إصدار</button>
-              )}
-            </div>
-
-            <div>
-              <h4 className="font-black mb-2">الإصدارات ({selected.versions?.length || 0})</h4>
-              <div className="border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800">
-                {(selected.versions || []).map((version) => (
-                  <div key={version.id} className="p-3 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-bold">v{version.versionNumber} — {version.fileName}</div>
-                      <div className="text-[10px] text-slate-400">
-                        {version.fileSize !== null ? `${Math.max(1, Math.round(version.fileSize / 1024))} KB` : 'بدون ملف مرفق'}
-                        {version.checksum ? ` • ${version.checksum.slice(0, 12)}…` : ''}
-                        {version.createdByName ? ` • ${version.createdByName}` : ''}
-                      </div>
-                      {version.notes && <div className="text-[11px] text-slate-500 mt-1">{version.notes}</div>}
-                    </div>
-                    {version.storageName && window.ceramisys?.documents?.openFile && (
-                      <button
-                        onClick={() => window.ceramisys?.documents?.openFile?.(version.storageName!)}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-bold text-[10px] flex items-center gap-1 shrink-0"
-                      >
-                        <Paperclip className="w-3 h-3" /> فتح
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {(selected.versions || []).length === 0 && <div className="p-6 text-center text-slate-400">لا توجد إصدارات بعد.</div>}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-black mb-2">سجل الأحداث</h4>
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {events.map((event) => (
-                  <div key={event.id} className="flex items-center justify-between gap-2 text-[11px] border-b border-slate-100 dark:border-slate-800 py-1.5">
-                    <span className="font-bold">{event.action}</span>
-                    <span className="text-slate-400">{event.actorName || 'النظام'} • {new Date(event.createdAt).toLocaleString()}</span>
-                  </div>
-                ))}
-                {events.length === 0 && <div className="text-slate-400">لا توجد أحداث مسجلة.</div>}
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Add version */}
-      {versionOpen && selected && (
-        <Modal title={`إصدار جديد — ${selected.documentNumber}`} onClose={() => setVersionOpen(false)}>
-          <form onSubmit={submitVersion} className="space-y-3 text-xs">
-            <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-              <div>
-                <div className="font-bold">ملف المستند</div>
-                <div className="text-[10px] text-slate-400">{versionDraft.fileName || 'لم يتم اختيار ملف بعد'}</div>
-              </div>
-              <button type="button" onClick={attachFile} className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold flex items-center gap-1">
-                <Paperclip className="w-3.5 h-3.5" /> اختيار ملف
-              </button>
-            </div>
-            {!window.ceramisys?.documents?.importFile && (
-              <p className="text-[10px] text-amber-600">إرفاق الملفات متاح داخل تطبيق سطح المكتب. يمكنك تسجيل نسخة ببياناتها فقط.</p>
-            )}
-            <div><label className={labelCls}>اسم الملف / وصف النسخة *</label><input required value={versionDraft.fileName} onChange={(e) => setVersionDraft({ ...versionDraft, fileName: e.target.value })} className={inputCls} /></div>
-            <div><label className={labelCls}>ملاحظات</label><textarea rows={2} value={versionDraft.notes} onChange={(e) => setVersionDraft({ ...versionDraft, notes: e.target.value })} className={inputCls} /></div>
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <button type="button" onClick={() => setVersionOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 font-bold rounded-xl">إلغاء</button>
-              <button type="submit" disabled={saving} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إضافة</button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Create contract */}
-      {contractOpen && (
-        <Modal title="عقد جديد" onClose={() => setContractOpen(false)} wide>
-          <form onSubmit={submitContract} className="space-y-3 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label className={labelCls}>الشركة *</label>
-                <select required value={contractDraft.companyId} onChange={(e) => setContractDraft({ ...contractDraft, companyId: e.target.value })} className={inputCls}>
-                  <option value="">اختر الشركة</option>
-                  {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
-                </select>
-              </div>
-              <div><label className={labelCls}>عنوان العقد *</label><input required value={contractDraft.title} onChange={(e) => setContractDraft({ ...contractDraft, title: e.target.value })} className={inputCls} /></div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label className={labelCls}>نوع الطرف</label>
-                <select value={contractDraft.partyType} onChange={(e) => setContractDraft({ ...contractDraft, partyType: e.target.value as ContractPartyType })} className={inputCls}>
-                  {Object.entries(PARTY_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </div>
-              <div><label className={labelCls}>اسم الطرف *</label><input required value={contractDraft.partyName} onChange={(e) => setContractDraft({ ...contractDraft, partyName: e.target.value })} className={inputCls} /></div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div><label className={labelCls}>البداية *</label><input required type="date" value={contractDraft.startDate} onChange={(e) => setContractDraft({ ...contractDraft, startDate: e.target.value })} className={inputCls} /></div>
-              <div><label className={labelCls}>النهاية *</label><input required type="date" value={contractDraft.endDate} onChange={(e) => setContractDraft({ ...contractDraft, endDate: e.target.value })} className={inputCls} /></div>
-              <div><label className={labelCls}>القيمة</label><input type="number" min="0" step="0.01" value={contractDraft.value} onChange={(e) => setContractDraft({ ...contractDraft, value: e.target.value })} className={inputCls} /></div>
-              <div><label className={labelCls}>العملة</label><input maxLength={3} value={contractDraft.currency} onChange={(e) => setContractDraft({ ...contractDraft, currency: e.target.value.toUpperCase() })} className={inputCls} /></div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div><label className={labelCls}>تنبيه قبل الانتهاء (أيام)</label><input type="number" min="0" max="3650" value={contractDraft.renewalNoticeDays} onChange={(e) => setContractDraft({ ...contractDraft, renewalNoticeDays: e.target.value })} className={inputCls} /></div>
-              <div>
-                <label className={labelCls}>مستند مرتبط</label>
-                <select value={contractDraft.documentId} onChange={(e) => setContractDraft({ ...contractDraft, documentId: e.target.value })} className={inputCls}>
-                  <option value="">بدون</option>
-                  {documents.filter((document) => document.companyId === contractDraft.companyId).map((document) => (
-                    <option key={document.id} value={document.id}>{document.documentNumber} — {document.title}</option>
-                  ))}
-                </select>
-              </div>
-              <label className="flex items-center gap-2 pt-5 font-bold text-slate-700 dark:text-slate-300">
-                <input type="checkbox" checked={contractDraft.autoRenew} onChange={(e) => setContractDraft({ ...contractDraft, autoRenew: e.target.checked })} />
-                تجديد تلقائي
-              </label>
-            </div>
-            <div><label className={labelCls}>ملاحظات</label><textarea rows={2} value={contractDraft.notes} onChange={(e) => setContractDraft({ ...contractDraft, notes: e.target.value })} className={inputCls} /></div>
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-              <button type="button" onClick={() => setContractOpen(false)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 font-bold rounded-xl">إلغاء</button>
-              <button type="submit" disabled={saving} className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إنشاء</button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      <DocumentsDialogs
+        can={can}
+        saving={saving}
+        companies={companies}
+        documents={documents}
+        createOpen={createOpen}
+        setCreateOpen={setCreateOpen}
+        docDraft={docDraft}
+        setDocDraft={setDocDraft}
+        submitDocument={submitDocument}
+        selected={selected}
+        setSelected={setSelected}
+        events={events}
+        onChangeStatus={changeStatus}
+        versionOpen={versionOpen}
+        setVersionOpen={setVersionOpen}
+        versionDraft={versionDraft}
+        setVersionDraft={setVersionDraft}
+        attachFile={attachFile}
+        submitVersion={submitVersion}
+        contractOpen={contractOpen}
+        setContractOpen={setContractOpen}
+        contractDraft={contractDraft}
+        setContractDraft={setContractDraft}
+        submitContract={submitContract}
+      />
     </div>
   );
 };
 
-const SummaryCard: React.FC<{
-  label: string;
-  value: number;
-  hint: string;
-  icon: React.ElementType;
-  tone?: 'amber' | 'emerald' | 'rose' | 'indigo';
-}> = ({ label, value, hint, icon: Icon, tone = 'indigo' }) => {
-  const tones: Record<string, string> = {
-    indigo: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 dark:text-indigo-300',
-    amber: 'text-amber-600 bg-amber-50 dark:bg-amber-500/10 dark:text-amber-300',
-    emerald: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-300',
-    rose: 'text-rose-600 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-300',
-  };
-  return (
-    <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${tones[tone]}`}><Icon className="w-4 h-4" /></div>
-      <div>
-        <div className="text-[10px] font-bold text-slate-500">{label}</div>
-        <div className="text-lg font-black leading-tight">{value}</div>
-        <div className="text-[10px] text-slate-400">{hint}</div>
-      </div>
-    </div>
-  );
-};
-
-const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }> = ({ title, onClose, children, wide }) => (
-  <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-md'} p-6 max-h-[90vh] overflow-y-auto`}>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-extrabold">{title}</h3>
-        <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="w-4 h-4" /></button>
-      </div>
-      {children}
-    </div>
-  </div>
-);

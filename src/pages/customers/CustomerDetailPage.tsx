@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Users, ShoppingCart, FileText, Package2, CreditCard,
+  Users, ShoppingCart, FileText, Package2, ClipboardList, CreditCard,
   RotateCcw as RotateCcl, Banknote, Boxes, Activity,
   Clock, Phone, MapPin, AlertTriangle, Loader2, Tag, Plus, Trash2,
 } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
 import { CustomerService } from '../../services/CustomerService';
+import { CustomerSupplyService, type CustomerSupplyRequest } from '../../services/CustomerSupplyService';
 import { PricingService } from '../../services/PricingService';
 import { ProductService } from '../../services/ProductService';
 import { BranchAccessService } from '../../services/BranchAccessService';
@@ -16,7 +17,7 @@ import { format, isValid } from 'date-fns';
 import { Customer, Product } from '../../types';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/useBusinessTerm';
 
-type Tab = 'overview' | 'sales' | 'quotations' | 'orders' | 'payments' | 'returns' | 'debts' | 'projects' | 'activities' | 'timeline' | 'prices';
+type Tab = 'overview' | 'sales' | 'quotations' | 'orders' | 'needs' | 'payments' | 'returns' | 'debts' | 'projects' | 'activities' | 'timeline' | 'prices';
 
 type CustomerDetailRow = {
   id?: string;
@@ -30,6 +31,10 @@ type CustomerDetailRow = {
   kind?: string | null;
   notes?: string | null;
   name?: string | null;
+  scheduledAt?: string | null;
+  completedAt?: string | null;
+  assignedTo?: string | null;
+  createdBy?: string | null;
 };
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -37,6 +42,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'sales', label: 'المبيعات', icon: ShoppingCart },
   { id: 'quotations', label: 'عروض الأسعار', icon: FileText },
   { id: 'orders', label: 'الطلبات', icon: Package2 },
+  { id: 'needs', label: 'الاحتياجات والمنتجات المطلوبة', icon: ClipboardList },
   { id: 'payments', label: 'المدفوعات', icon: CreditCard },
   { id: 'returns', label: 'المرتجعات', icon: RotateCcl },
   { id: 'debts', label: 'الديون', icon: Banknote },
@@ -50,6 +56,7 @@ const TAB_PERMISSIONS: Partial<Record<Tab, string>> = {
   sales: 'sales.view',
   quotations: 'quotations.view',
   orders: 'orders.view',
+  needs: 'sales.view',
   payments: 'finance.debts.view',
   returns: 'returns.view',
   debts: 'finance.debts.view',
@@ -96,6 +103,8 @@ export const CustomerDetailPage: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [lists, setLists] = useState<Record<string, CustomerDetailRow[]>>({});
+  const [supplyRequests, setSupplyRequests] = useState<CustomerSupplyRequest[]>([]);
+  const [supplyRequestsError, setSupplyRequestsError] = useState<string | null>(null);
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Array<{ id: string; productId: string; productName: string; priceM2: number; validFrom?: string | null; validTo?: string | null }>>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -139,6 +148,8 @@ export const CustomerDetailPage: React.FC = () => {
     if (!id) {
       setCustomer(null);
       setLists({});
+      setSupplyRequests([]);
+      setSupplyRequestsError(null);
       setLoadError('معرّف العميل غير صالح');
       setLoading(false);
       return;
@@ -148,6 +159,8 @@ export const CustomerDetailPage: React.FC = () => {
     setLoadError(null);
     setCustomer(null);
     setLists({});
+    setSupplyRequests([]);
+    setSupplyRequestsError(null);
     try {
       const db = DatabaseManager.getInstance();
       const branchAccess = new BranchAccessService();
@@ -174,6 +187,14 @@ export const CustomerDetailPage: React.FC = () => {
       setCustomer(new CustomerService().getCustomerById(id));
       const availableLists: Record<string, CustomerDetailRow[]> = {};
       if (can('sales.view')) {
+        try {
+          setSupplyRequests(new CustomerSupplyService().getOpenRequests({ customerId: id }));
+        } catch (error) {
+          console.error(error);
+          setSupplyRequestsError(error instanceof Error ? error.message : 'تعذر تحميل احتياجات العميل');
+        }
+      }
+      if (can('sales.view')) {
         const debtColumns = can('finance.debts.view')
           ? 'si.paid_amount AS paid, si.remaining_amount AS remaining, si.payment_status AS status'
           : 'NULL AS paid, NULL AS remaining, NULL AS status';
@@ -199,8 +220,15 @@ export const CustomerDetailPage: React.FC = () => {
       if (can('projects.view')) availableLists.projects = db.query<CustomerDetailRow>(`SELECT pr.code AS n1, pr.name, pr.contract_value AS amount, pr.status
           FROM projects pr WHERE pr.customer_id = ? AND ${projectClause}
           ORDER BY pr.created_at DESC`, [id, ...projectScope.params]);
-      if (can('crm.view')) availableLists.activities = db.query<CustomerDetailRow>(`SELECT subject AS n1, activity_type AS kind, status, created_at AS date,
-          COALESCE(body, '') AS notes FROM crm_activities WHERE customer_id = ? ORDER BY created_at DESC`, [id]);
+      if (can('crm.view')) availableLists.activities = db.query<CustomerDetailRow>(`SELECT activity.subject AS n1, activity.activity_type AS kind,
+          activity.status, activity.created_at AS date, COALESCE(activity.body, '') AS notes, activity.outcome AS extra,
+          activity.scheduled_at AS scheduledAt, activity.completed_at AS completedAt,
+          COALESCE(assignee.full_name, activity.assigned_to) AS assignedTo,
+          COALESCE(creator.full_name, activity.created_by) AS createdBy
+          FROM crm_activities activity
+          LEFT JOIN users assignee ON assignee.id = activity.assigned_to
+          LEFT JOIN users creator ON creator.id = activity.created_by
+          WHERE activity.customer_id = ? ORDER BY activity.created_at DESC`, [id]);
       if (can('finance.debts.view')) availableLists.debts = db.query<CustomerDetailRow>(`SELECT si.invoice_number AS n1, si.date, si.total_amount AS amount,
           si.paid_amount AS paid, si.remaining_amount AS remaining, si.payment_status AS status
           FROM sales_invoices si
@@ -360,13 +388,17 @@ export const CustomerDetailPage: React.FC = () => {
               <dl className="space-y-3">
                 {[
                   { label: 'الاسم', value: customer.name },
+                  { label: 'كود الحساب', value: customer.code },
+                  { label: 'نوع العميل', value: customer.customerType },
                   { label: 'الهاتف', value: customer.phone },
                   { label: 'هاتف إضافي', value: customer.phone2 },
                   { label: 'العنوان', value: customer.address },
                   { label: 'المدينة', value: customer.city },
                   { label: 'الرقم القومي', value: customer.nationalId },
                   ...(can('finance.debts.view') ? [{ label: 'حد الائتمان', value: customer.creditLimit ? fmt(customer.creditLimit) : 'غير محدد' }] : []),
+                  { label: 'مدة السداد بالأيام', value: customer.paymentTermsDays ?? 0 },
                   { label: 'تاريخ التسجيل', value: date(customer.createdAt) },
+                  { label: 'آخر تحديث للبيانات', value: date(customer.updatedAt) },
                   { label: 'ملاحظات', value: customer.notes },
                 ].filter((r) => r.value).map((row) => (
                   <div key={row.label} className="flex justify-between py-1.5 border-b border-slate-100 last:border-0">
@@ -396,6 +428,12 @@ export const CustomerDetailPage: React.FC = () => {
                 ))}
               </div>
             </div>}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 md:col-span-2">
+              <h3 className="text-sm font-bold text-slate-900 mb-2">حساب الدخول وكلمة المرور</h3>
+              <p className="text-xs leading-6 text-slate-600">
+                هذا سجل عميل وبيانات تعاملات، وليس حساب مستخدم للبرنامج. لا يخزّن النظام اسم دخول أو كلمة مرور مرتبطة بهذا العميل، لذلك لا توجد كلمة مرور لعرضها أو استعادتها.
+              </p>
+            </div>
           </div>
         )}
 
@@ -433,6 +471,48 @@ export const CustomerDetailPage: React.FC = () => {
             rows={L('orders').map((r) => [<span className="font-mono text-sky-600">{r.n1}</span>, date(r.date), <b>{fmt(r.amount)}</b>, date(r.extra), r.status])} />
         )}
 
+        {tab === 'needs' && can('sales.view') && (
+          <div className="space-y-4">
+            {supplyRequestsError && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{supplyRequestsError}</div>}
+            {supplyRequests.length === 0 && !supplyRequestsError ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">لا توجد منتجات أو احتياجات توريد مسجلة لهذا العميل.</div>
+            ) : supplyRequests.map((request) => (
+              <section key={request.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">طلب {request.invoiceNumber || request.id}</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {date(request.createdAt)} · التسليم المتوقع: {date(request.expectedDeliveryDate)}
+                      {request.warehouseName ? ` · ${request.warehouseName}` : ''}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                    request.status === 'READY' ? 'bg-emerald-50 text-emerald-700' :
+                    request.status === 'PARTIAL' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'
+                  }`}>
+                    {request.status === 'READY' ? 'متوفر بالكامل' : request.status === 'PARTIAL' ? 'متوفر جزئيًا' : 'قيد التوريد'}
+                  </span>
+                </header>
+                <DataTable
+                  headers={['المنتج المطلوب', 'المقاس', 'الكمية المطلوبة', 'المتوفر', 'المتبقي', 'سعر الوحدة', 'الإجمالي', 'الحالة']}
+                  empty="لا توجد منتجات ضمن هذا الطلب"
+                  rows={request.items.map((item) => [
+                    <div className="font-semibold">{item.productName}<div className="text-[10px] text-slate-500">{item.productSku || ''}</div></div>,
+                    item.size || '—',
+                    `${item.quantityRequested} ${item.unit}`,
+                    `${item.quantityReceived} ${item.unit}`,
+                    `${item.quantityRemaining} ${item.unit}`,
+                    fmt(item.unitPrice),
+                    fmt(item.totalPrice),
+                    item.status === 'READY' ? 'متوفر' : item.status === 'PARTIAL' ? 'جزئي' : 'مطلوب',
+                  ])}
+                />
+                {request.notes && <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-600">ملاحظات الطلب: {request.notes}</p>}
+              </section>
+            ))}
+          </div>
+        )}
+
         {tab === 'payments' && can('finance.debts.view') && (
           <DataTable headers={['رقم الإيصال', 'التاريخ', 'المبلغ', 'طريقة الدفع', 'ملاحظات']} empty="لا توجد مدفوعات"
             rows={L('payments').map((r) => [<span className="font-mono text-sky-600">{r.n1}</span>, date(r.date), <b className="text-emerald-600">{fmt(r.amount)}</b>, r.kind, r.notes || '—'])} />
@@ -454,8 +534,8 @@ export const CustomerDetailPage: React.FC = () => {
         )}
 
         {tab === 'activities' && can('crm.view') && (
-          <DataTable headers={['الموضوع', 'النوع', 'الحالة', 'التاريخ', 'التفاصيل']} empty="لا توجد أنشطة"
-            rows={L('activities').map((r) => [r.n1, r.kind, r.status, date(r.date), r.notes || '—'])} />
+          <DataTable headers={['الموضوع', 'النوع', 'الحالة', 'التاريخ', 'تفاصيل التفاعل', 'النتيجة', 'المسؤول', 'موعد المتابعة', 'تاريخ الإكمال']} empty="لا توجد أنشطة"
+            rows={L('activities').map((r) => [r.n1, r.kind, r.status, date(r.date), r.notes || '—', r.extra || '—', r.assignedTo || r.createdBy || '—', date(r.scheduledAt), date(r.completedAt)])} />
         )}
 
         {tab === 'timeline' && can('audit.view') && (

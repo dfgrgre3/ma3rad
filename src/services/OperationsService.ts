@@ -394,8 +394,10 @@ export class OperationsService {
   public getCustomersForSelect(): Array<{ id: string; name: string; phone?: string | null; address?: string | null; city?: string | null }> {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.view');
+    const scope = this.branchAccess.companyScope('company_id', actor);
     return this.db.query(
-      `SELECT id, name, phone, address, city FROM customers WHERE is_active = 1 ORDER BY name`
+      `SELECT id, name, phone, address, city FROM customers WHERE ${scope.clause} ORDER BY name`,
+      scope.params
     );
   }
 

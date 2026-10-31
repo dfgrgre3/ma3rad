@@ -5,6 +5,7 @@ import { postLedgerEntry } from '../../../database/ledger';
 import { localDateString } from '../../../utils/date';
 import { InventoryCostingService } from '../../../services/InventoryCostingService';
 import { PermissionService } from '../../../services/PermissionService';
+import { AuditService } from '../../../services/AuditService';
 import { getStockQuantityLabel } from '../../../utils/productUnits';
 import { branchAccess } from './branchAccess';
 import type { CountItem, CountSession, CountType } from './types';
@@ -19,6 +20,11 @@ export interface StartCountSessionInput {
 
 export function startCountSession(input: StartCountSessionInput): void {
   const { warehouseId: selectedWarehouseId, countType, selectedProductIds, isBlindCount, notes } = input;
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'inventory.count');
+  branchAccess.requireWarehouseAccess(selectedWarehouseId, actor);
+  if (!['FULL', 'PARTIAL', 'SPOT', 'PERIODIC', 'SURPRISE', 'BLIND'].includes(countType)) throw new Error('Invalid count type.');
+  if (countType !== 'FULL' && selectedProductIds.length === 0) throw new Error('Select at least one product for a partial count.');
   const db = DatabaseManager.getInstance();
   db.executeTransaction((txDb) => {
     const countId = `cnt_${uuidv4().substring(0, 8)}`;
@@ -37,7 +43,7 @@ export function startCountSession(input: StartCountSessionInput): void {
       LEFT JOIN warehouse_stock ws ON p.id = ws.product_id AND ws.warehouse_id = ?
       WHERE p.is_active = 1
     `;
-    const selectedIds = countType === 'FULL' ? [] : selectedProductIds;
+    const selectedIds = countType === 'FULL' ? [] : [...new Set(selectedProductIds)];
     const products = txDb.query<any>(countType === 'FULL'
       ? productsSql
       : productsSql.replace('WHERE p.is_active = 1', `WHERE p.is_active = 1 AND p.id IN (${selectedIds.map(() => '?').join(',')})`),
@@ -55,7 +61,7 @@ export function startCountSession(input: StartCountSessionInput): void {
         total_items, items_with_variance, total_variance_value, notes, created_by, created_at
       ) VALUES (?, ?, ?, ?, ?, 'COUNTING', ?, 'PENDING', ?, 0, 0, ?, ?, CURRENT_TIMESTAMP)
     `, [
-      countId, countNum, selectedWarehouseId, today, countType, (isBlindCount || countType === 'BLIND') ? 1 : 0, products.length, notes.trim() || null, AuthService.requireAuth().id
+      countId, countNum, selectedWarehouseId, today, countType, (isBlindCount || countType === 'BLIND') ? 1 : 0, products.length, notes.trim() || null, actor.id
     ]);
 
     // 3. Insert items into stock_count_items
@@ -85,7 +91,14 @@ export function saveCountDraft(activeSession: CountSession, sessionItems: CountI
   branchAccess.requireWarehouseAccess(sessionRow.warehouseId, actor);
   if (activeSession.status !== 'COUNTING') throw new Error('لا يمكن تعديل جلسة جرد غير مفتوحة.');
   db.executeTransaction((txDb) => {
+    const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
+    if (!current || current.status !== 'COUNTING') throw new Error('Session is no longer open. Reload it before saving.');
+    const members = new Set(txDb.query<{ id: string }>('SELECT id FROM stock_count_items WHERE count_id = ?', [activeSession.id]).map(row => row.id));
     for (const item of sessionItems) {
+      if (!members.has(item.id)) throw new Error('A product does not belong to this count session.');
+      if (item.countedQuantityM2 !== null && (!Number.isFinite(item.countedQuantityM2) || item.countedQuantityM2 < 0)) throw new Error(`Invalid counted quantity for ${item.productName}.`);
+      const canonical = txDb.query<{ systemQuantityM2: number; unitCost: number }>('SELECT system_quantity_m2 AS systemQuantityM2, unit_cost AS unitCost FROM stock_count_items WHERE id = ? AND count_id = ?', [item.id, activeSession.id])[0];
+      const variance = item.countedQuantityM2 === null ? 0 : Number((item.countedQuantityM2 - canonical.systemQuantityM2).toFixed(3));
       txDb.run(`
         UPDATE stock_count_items
         SET counted_quantity_m2 = ?, variance_m2 = ?, variance_value = ?,
@@ -93,7 +106,7 @@ export function saveCountDraft(activeSession: CountSession, sessionItems: CountI
             counted_at = CASE WHEN ? IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END
         WHERE id = ? AND count_id = ?
       `, [
-        item.countedQuantityM2, item.varianceM2, item.varianceValue,
+        item.countedQuantityM2, variance, Number((variance * canonical.unitCost).toFixed(2)),
         item.discrepancyReason || null, item.notes || null,
         item.countedQuantityM2 === null ? null : actor.id,
         item.countedQuantityM2, item.id, activeSession.id
@@ -241,11 +254,29 @@ function postCountItems(
     [activeSession.id]
   ).map(row => row.id));
   const totals: CountVarianceTotals = { varianceCount: 0, totalVarianceVal: 0 };
-
-  for (const item of sessionItems) {
+  const submitted = new Map(sessionItems.map(item => [item.id, item]));
+  const canonicalItems = txDb.query<CountItem>(`
+    SELECT id, product_id AS productId, product_name AS productName,
+      system_quantity_m2 AS systemQuantityM2, counted_quantity_m2 AS countedQuantityM2,
+      variance_m2 AS varianceM2, unit_cost AS unitCost, variance_value AS varianceValue,
+      COALESCE(discrepancy_reason, '') AS discrepancyReason, COALESCE(notes, '') AS notes
+    FROM stock_count_items WHERE count_id = ?`, [activeSession.id]);
+  for (const item of canonicalItems) {
+    const submittedItem = submitted.get(item.id);
+    if (submittedItem) item.countedQuantityM2 = submittedItem.countedQuantityM2;
     if (item.countedQuantityM2 === null) continue;
 
     validateCountItemMembership(item, sessionItemIds);
+    if (!Number.isFinite(item.countedQuantityM2) || item.countedQuantityM2 < 0) throw new Error(`Invalid counted quantity for ${item.productName}.`);
+    item.varianceM2 = Number((item.countedQuantityM2 - item.systemQuantityM2).toFixed(3));
+    item.varianceValue = Number((item.varianceM2 * item.unitCost).toFixed(2));
+    if (submittedItem) {
+      item.discrepancyReason = submittedItem.discrepancyReason;
+      item.notes = submittedItem.notes;
+    }
+    if (item.varianceM2 !== 0 && !item.discrepancyReason?.trim()) {
+      throw new Error(`Choose a discrepancy reason for ${item.productName} before posting.`);
+    }
     const { reservedM2, metersPerBox } = getCountStockInfo(txDb, item, warehouseId);
     validateCountedQuantity(item, reservedM2);
     updateCountItem(txDb, item, actorId, activeSession.id);
@@ -258,34 +289,45 @@ function postCountItems(
   return totals;
 }
 
-export function postCountSession(activeSession: CountSession, sessionItems: CountItem[]): boolean {
-  if (activeSession.status === 'POSTED' || activeSession.status === 'CANCELLED') return false;
-
-  // Check if all items are counted
-  const uncounted = sessionItems.some(i => i.countedQuantityM2 === null);
-  if (uncounted) {
-    if (!confirm('بعض الأصناف لم يتم إدخال جردها بعد. الأصناف غير المجرودة لن يتأثر مخزونها. هل تريد المتابعة وترحيل الجرد الحالي؟')) {
-      return false;
+export function submitCountSession(activeSession: CountSession, sessionItems: CountItem[]): void {
+  if (sessionItems.some(item => item.countedQuantityM2 === null)) throw new Error('أكمل عد جميع الأصناف قبل إرسال الجرد للمراجعة.');
+  for (const item of sessionItems) {
+    if (item.countedQuantityM2 !== null && Number(item.countedQuantityM2) !== item.systemQuantityM2 && !item.discrepancyReason?.trim()) {
+      throw new Error(`حدد سبب الفرق للصنف ${item.productName}.`);
     }
   }
-
+  saveCountDraft(activeSession, sessionItems);
   const db = DatabaseManager.getInstance();
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'inventory.count');
-  const sessionRow = db.query<{ warehouseId: string }>(
-    'SELECT warehouse_id AS warehouseId FROM stock_counts WHERE id = ?',
+  db.executeTransaction(txDb => {
+    const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
+    if (!current || current.status !== 'COUNTING') throw new Error('الجلسة ليست قيد العد.');
+    txDb.run("UPDATE stock_counts SET status = 'REVIEW', approval_status = 'PENDING', rejection_reason = NULL WHERE id = ? AND status = 'COUNTING'", [activeSession.id]);
+  });
+  new AuditService().log({ userId: actor.id, userName: actor.fullName, action: 'SUBMIT_FOR_REVIEW', module: 'INVENTORY_COUNT', recordId: activeSession.id, newValues: JSON.stringify({ status: 'REVIEW' }) });
+}
+
+export function approveCountSession(activeSession: CountSession): boolean {
+  if (activeSession.status === 'POSTED' || activeSession.status === 'CANCELLED') return false;
+  const db = DatabaseManager.getInstance();
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'inventory.count.approve');
+  const sessionRow = db.query<{ warehouseId: string; createdBy: string }>(
+    'SELECT warehouse_id AS warehouseId, created_by AS createdBy FROM stock_counts WHERE id = ?',
     [activeSession.id]
   )[0];
   if (!sessionRow) throw new Error('جلسة الجرد غير موجودة.');
   branchAccess.requireWarehouseAccess(sessionRow.warehouseId, actor);
+  if (sessionRow.createdBy === actor.id) throw new Error('لا يمكن لمنشئ الجرد اعتماده.');
   const countWarehouseId = sessionRow.warehouseId;
   db.executeTransaction((txDb) => {
     const currentSession = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
-    if (!currentSession || currentSession.status !== 'COUNTING') {
+    if (!currentSession || currentSession.status !== 'REVIEW') {
       throw new Error('تم ترحيل الجلسة أو إغلاقها بالفعل. أعد تحميل البيانات قبل المتابعة.');
     }
     const { varianceCount, totalVarianceVal } = postCountItems(
-      txDb, activeSession, sessionItems, actor.id, countWarehouseId
+      txDb, activeSession, [], actor.id, countWarehouseId
     );
 
     // 6. Close session status
@@ -297,6 +339,45 @@ export function postCountSession(activeSession: CountSession, sessionItems: Coun
       WHERE id = ?
     `, [actor.id, actor.id, varianceCount, totalVarianceVal, activeSession.id]);
   });
+  new AuditService().log({ userId: actor.id, userName: actor.fullName, action: 'APPROVE_AND_POST', module: 'INVENTORY_COUNT', recordId: activeSession.id, newValues: JSON.stringify({ status: 'POSTED' }) });
 
   return true;
+}
+
+export function rejectCountSession(activeSession: CountSession, reason: string): void {
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'inventory.count.approve');
+  const db = DatabaseManager.getInstance();
+  const session = db.query<{ warehouseId: string; status: string; createdBy: string }>(
+    'SELECT warehouse_id AS warehouseId, status, created_by AS createdBy FROM stock_counts WHERE id = ?', [activeSession.id]
+  )[0];
+  if (!session) throw new Error('جلسة الجرد غير موجودة.');
+  branchAccess.requireWarehouseAccess(session.warehouseId, actor);
+  if (session.status !== 'REVIEW') throw new Error('الجلسة ليست بانتظار المراجعة.');
+  if (session.createdBy === actor.id) throw new Error('لا يمكن لمنشئ الجرد مراجعته.');
+  const cleanReason = reason.trim();
+  if (!cleanReason) throw new Error('سبب الرفض مطلوب.');
+  db.executeTransaction(txDb => {
+    const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
+    if (!current || current.status !== 'REVIEW') throw new Error('تم تحديث حالة الجلسة؛ أعد تحميلها.');
+    txDb.run("UPDATE stock_counts SET status = 'COUNTING', approval_status = 'REJECTED', rejection_reason = ? WHERE id = ? AND status = 'REVIEW'", [cleanReason, activeSession.id]);
+  });
+  new AuditService().log({ userId: actor.id, userName: actor.fullName, action: 'REJECT', module: 'INVENTORY_COUNT', recordId: activeSession.id, newValues: JSON.stringify({ status: 'COUNTING', reason: cleanReason }) });
+}
+
+export function cancelCountSession(activeSession: CountSession): void {
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'inventory.count');
+  const db = DatabaseManager.getInstance();
+  const session = db.query<{ warehouseId: string; status: string }>(
+    'SELECT warehouse_id AS warehouseId, status FROM stock_counts WHERE id = ?', [activeSession.id]
+  )[0];
+  if (!session) throw new Error('Count session not found.');
+  branchAccess.requireWarehouseAccess(session.warehouseId, actor);
+  if (session.status !== 'COUNTING') throw new Error('Only an open count session can be cancelled.');
+  db.executeTransaction(txDb => {
+    const latest = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
+    if (!latest || latest.status !== 'COUNTING') throw new Error('The session status changed. Reload and try again.');
+    txDb.run("UPDATE stock_counts SET status = 'CANCELLED' WHERE id = ? AND status = 'COUNTING'", [activeSession.id]);
+  });
 }

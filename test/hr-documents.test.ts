@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { EmployeeDocumentService } from '../src/services/EmployeeDocumentService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
@@ -89,18 +90,25 @@ let employeeSequence = 0;
 
 function createEmployee(branchId?: string): string {
   const sequence = ++employeeSequence;
-  return EmployeeService.create({
-    name: `Doc Employee ${sequence}`,
-    phone: `0140000${sequence}`,
-    location: 'Main',
-    role: 'Sales',
-    email: '',
-    baseSalary: 5000,
-    salaryType: 'MONTHLY',
-    status: 'ACTIVE',
-    joinedDate: '2025-01-01',
-    branchId,
-  }).id;
+  const access = new BranchAccessService();
+  const previousBranch = access.getCurrentBranchId(admin);
+  if (branchId) access.setCurrentBranchId(branchId, admin);
+  try {
+    return EmployeeService.create({
+      name: `Doc Employee ${sequence}`,
+      phone: `0140000${sequence}`,
+      location: 'Main',
+      role: 'Sales',
+      email: '',
+      baseSalary: 5000,
+      salaryType: 'MONTHLY',
+      status: 'ACTIVE',
+      joinedDate: '2025-01-01',
+      branchId,
+    }).id;
+  } finally {
+    if (branchId) access.setCurrentBranchId(previousBranch, admin);
+  }
 }
 
 function isoOffset(days: number): string {
@@ -180,7 +188,10 @@ test('employee documents are branch scoped', async () => {
   const betaEmployee = createEmployee(betaBranch.id);
 
   const mainDocument = service.createDocument({ employeeId: mainEmployee, title: 'Main document' });
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(betaBranch.id, admin);
   const betaDocument = service.createDocument({ employeeId: betaEmployee, title: 'Beta document' });
+  access.setCurrentBranchId('br_main', admin);
 
   asManager();
   const visible = service.getDocuments();

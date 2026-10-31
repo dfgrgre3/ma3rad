@@ -135,10 +135,10 @@ export const ReportsView: React.FC = () => {
       {/* Quick access to advanced report pages */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {([
-          { label: 'تقارير المبيعات المتقدمة', desc: 'حسب الفئة والمنتج والعميل والمندوب', icon: ShoppingCart, color: 'from-teal-500 to-cyan-600', href: '#/reports/sales' },
-          { label: 'تقارير المشتريات والمخزون', desc: 'الموردون وقيمة المخزون', icon: Truck, color: 'from-orange-500 to-amber-600', href: '#/reports/purchases' },
-          { label: 'القوائم المالية', desc: 'الميزانية وأعمار الذمم والتدفق', icon: PieChart, color: 'from-violet-500 to-purple-600', href: '#/reports/statements' },
-          { label: 'الأرباح والخسائر', desc: 'قائمة الدخل وتحليل الهامش', icon: BarChart3, color: 'from-emerald-500 to-green-600', href: '#/reports/profit-loss' },
+          { label: 'تقارير المبيعات المتقدمة', desc: 'حسب الفئة والمنتج والعميل والمندوب', icon: ShoppingCart, color: 'from-teal-500 to-cyan-600', href: '#/reports?tab=sales' },
+          { label: 'تقارير المشتريات والمخزون', desc: 'الموردون وقيمة المخزون', icon: Truck, color: 'from-orange-500 to-amber-600', href: '#/reports?tab=purchases' },
+          { label: 'القوائم المالية', desc: 'الميزانية وأعمار الذمم والتدفق', icon: PieChart, color: 'from-violet-500 to-purple-600', href: '#/reports?tab=finance' },
+          { label: 'الأرباح والخسائر', desc: 'قائمة الدخل وتحليل الهامش', icon: BarChart3, color: 'from-emerald-500 to-green-600', href: '#/reports?tab=profitLoss' },
         ] as const).map(card => {
           const Icon = card.icon;
           return (

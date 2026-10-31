@@ -1,14 +1,15 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart3, ShoppingCart, Truck, Package, CreditCard, PieChart, FileText } from 'lucide-react';
+import { BarChart3, ShoppingCart, Truck, CreditCard, PieChart, FileText, TrendingUp } from 'lucide-react';
 import { ReportsView } from '../../components/ReportsView';
 import { SalesReportsPage } from './SalesReportsPage';
 import { PurchaseInventoryReportPage } from './PurchaseInventoryReportPage';
 import { PosReportsPage } from './PosReportsPage';
 import { FinancialStatementsPage } from './FinancialStatementsPage';
 import { TaxReportPage } from './TaxReportPage';
+import { ProfitLossPage } from './ProfitLossPage';
 
-type TabId = 'overview' | 'sales' | 'purchases' | 'pos' | 'finance' | 'tax';
+type TabId = 'overview' | 'sales' | 'purchases' | 'pos' | 'finance' | 'profitLoss' | 'tax';
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
   { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
@@ -16,23 +17,27 @@ const TABS: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
   { id: 'purchases', label: 'المشتريات والمخزون', icon: Truck },
   { id: 'pos', label: 'نقطة البيع', icon: CreditCard },
   { id: 'finance', label: 'المالية', icon: PieChart },
+  { id: 'profitLoss', label: 'الأرباح والخسائر', icon: TrendingUp },
   { id: 'tax', label: 'الضرائب', icon: FileText },
 ];
 
+const isValidTab = (value: string | null): value is TabId =>
+  value !== null && TABS.some((item) => item.id === value);
+
 export const ReportsHubPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requested = searchParams.get('tab') as TabId | null;
-  const initial = requested && TABS.some((t) => t.id === requested) ? requested : 'overview';
-  const [tab, setTab] = React.useState<TabId>(initial);
+  const requested = searchParams.get('tab');
+  const tab: TabId = isValidTab(requested) ? requested : 'overview';
 
   React.useEffect(() => {
-    if (requested && TABS.some((t) => t.id === requested) && requested !== tab) {
-      setTab(requested);
+    if (!isValidTab(requested)) {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'overview');
+      setSearchParams(next, { replace: true });
     }
-  }, [requested]);
+  }, [requested, searchParams, setSearchParams]);
 
   const selectTab = (id: TabId) => {
-    setTab(id);
     const next = new URLSearchParams(searchParams);
     next.set('tab', id);
     setSearchParams(next, { replace: true });
@@ -77,6 +82,7 @@ export const ReportsHubPage: React.FC = () => {
           {tab === 'purchases' && <PurchaseInventoryReportPage />}
           {tab === 'pos' && <PosReportsPage />}
           {tab === 'finance' && <FinancialStatementsPage />}
+          {tab === 'profitLoss' && <ProfitLossPage />}
           {tab === 'tax' && <TaxReportPage />}
         </div>
       </div>

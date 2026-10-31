@@ -27,7 +27,7 @@ export const CountSessionsToolbar: React.FC<CountSessionsToolbarProps> = ({
         />
       </div>
       <select value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700">
-        <option value="ALL">{'\u0643\u0644 \u0627\u0644\u062d\u0627\u0644\u0627\u062a'}</option><option value="COUNTING">{'\u0642\u064a\u062f \u0627\u0644\u062c\u0631\u062f'}</option><option value="POSTED">{'\u0645\u0631\u062d\u0644'}</option><option value="CANCELLED">{'\u0645\u0644\u063a\u0649'}</option>
+        <option value="ALL">{'\u0643\u0644 \u0627\u0644\u062d\u0627\u0644\u0627\u062a'}</option><option value="COUNTING">{'\u0642\u064a\u062f \u0627\u0644\u062c\u0631\u062f'}</option><option value="REVIEW">{'\u0628\u0627\u0646\u062a\u0638\u0627\u0631 \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629'}</option><option value="POSTED">{'\u0645\u0631\u062d\u0644'}</option><option value="CANCELLED">{'\u0645\u0644\u063a\u0649'}</option>
       </select>
     </div>
   );

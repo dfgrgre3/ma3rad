@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Users, Plus, Search, DollarSign, FileText, 
   Printer, ArrowUpRight, ArrowDownRight, Phone, MapPin
@@ -220,7 +221,14 @@ export const CustomersView: React.FC = () => {
                     >
                       <td className="p-3.5 font-mono font-bold text-slate-500">{c.code}</td>
                       <td className="p-3.5 font-bold text-slate-900">
-                        <div>{c.name}</div>
+                        <Link
+                          to={`/customers/${encodeURIComponent(c.id)}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="hover:text-sky-700 hover:underline"
+                          aria-label={`فتح ملف العميل ${c.name}`}
+                        >
+                          {c.name}
+                        </Link>
                         {c.address && <div className="text-[10px] text-slate-500 font-normal">{c.address}</div>}
                       </td>
                       <td className="p-3.5 font-mono text-slate-600 ">{c.phone}</td>

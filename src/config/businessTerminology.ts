@@ -112,11 +112,8 @@ export function validateBusinessTermOverrides(value: unknown): BusinessTermOverr
   const normalized: BusinessTermOverrides = {};
   const seenValues = new Map<string, BusinessTermKey>();
 
-  for (const language of Object.keys(input)) {
-    if (language !== 'ar' && language !== 'en') {
-      throw new Error(`لغة مصطلحات غير مدعومة: ${language}.`);
-    }
-  }
+  // Ignore saved overrides for any non-Arabic language (notably legacy 'en')
+  // so existing installations migrate to Arabic-only labels without errors.
 
   const rawArabicDictionary = input.ar;
   if (rawArabicDictionary !== undefined) {

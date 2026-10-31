@@ -4,6 +4,19 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
+import { twoFactorAuth } from './twoFactorAuth';
+
+/** Raised when the password was correct but a second factor is required. */
+export class TwoFactorRequiredError extends Error {
+  readonly code = 'TWO_FACTOR_REQUIRED';
+  readonly username: string;
+
+  constructor(username: string) {
+    super('أدخل رمز التحقق الثنائي لإكمال تسجيل الدخول.');
+    this.name = 'TwoFactorRequiredError';
+    this.username = username;
+  }
+}
 
 // Use sessionStorage instead of localStorage for session data (cleared on tab close)
 const SESSION_KEY = 'ceramisys_session_user_id';
@@ -320,6 +333,11 @@ export class AuthService {
       AuthService.recordLogin(null, 'pin', false, 'WRONG_PIN');
       throw new Error('رمز PIN غير صحيح.');
     }
+    if (twoFactorAuth.isEnabled(matched.id)) {
+      // A 4-6 digit PIN must never bypass a second factor.
+      AuthService.recordLogin(matched.id, matched.username, false, 'TWO_FACTOR_REQUIRED');
+      throw new Error('هذا الحساب محمي بالتحقق الثنائي. سجّل الدخول بكلمة المرور ورمز التحقق.');
+    }
     const user: User = {
       id: matched.id,
       username: matched.username,
@@ -338,7 +356,7 @@ export class AuthService {
     return user;
   }
 
-  public static login(username: string, passwordAttempt: string): User {
+  public static login(username: string, passwordAttempt: string, twoFactorCode?: string): User {
     const db = DatabaseManager.getInstance();
     const rows = db.query<any>(`SELECT * FROM users WHERE username = ? AND is_active = 1`, [username]);
     if (rows.length === 0) {
@@ -371,6 +389,29 @@ export class AuthService {
     }
 
     const isDefaultAdmin = userRecord.username === 'admin' && bcrypt.compareSync('admin123', userRecord.passwordHash);
+
+    // Second factor is checked only after the password succeeds, so a missing or
+    // wrong code never reveals whether a username exists.
+    if (twoFactorAuth.isEnabled(userRecord.id)) {
+      const code = String(twoFactorCode ?? '').trim();
+      if (!code) {
+        throw new TwoFactorRequiredError(username);
+      }
+      if (!twoFactorAuth.verify2FASync(userRecord.id, code, 'totp')) {
+        AuthService.recordLogin(userRecord.id, username, false, 'TWO_FACTOR_FAILED');
+        const updated = AuthService.getLoginGuardStatus(username);
+        if (updated.isLocked) {
+          throw new Error('رمز التحقق الثنائي غير صحيح. تم إيقاف المحاولات مؤقتًا.');
+        }
+        if (updated.remainingAttempts != null) {
+          throw new Error(
+            `رمز التحقق الثنائي غير صحيح. المحاولات المتبقية قبل الإيقاف المؤقت: ${updated.remainingAttempts}.`
+          );
+        }
+        throw new Error('رمز التحقق الثنائي غير صحيح.');
+      }
+    }
+
     const user: User = {
       id: userRecord.id,
       username: userRecord.username,
@@ -570,13 +611,84 @@ export class AuthService {
     currentUser.mustChangePassword = false;
   }
 
+  public completeFirstRunAdminSetup(
+    userId: string,
+    account: { username: string; fullName: string; phone: string; password: string }
+  ): User {
+    const currentUser = AuthService.requireAuth();
+    if (currentUser.id !== userId || currentUser.role !== 'ADMIN') {
+      throw new Error('يجب تسجيل الدخول بحساب المدير الأساسي لإكمال تهيئته.');
+    }
+
+    const username = account.username.trim();
+    const fullName = account.fullName.trim();
+    const phone = account.phone.trim();
+    if (username.length < 3 || username.length > 50 || /\s/.test(username)) {
+      throw new Error('اسم المستخدم يجب أن يتكون من 3 إلى 50 حرفًا دون مسافات.');
+    }
+    if (fullName.length < 2 || fullName.length > 100) {
+      throw new Error('الاسم المعروض يجب أن يتكون من حرفين إلى 100 حرف.');
+    }
+    if (phone.length > 30) {
+      throw new Error('رقم الهاتف لا يمكن أن يتجاوز 30 حرفًا.');
+    }
+
+    const admin = this.db.query<{ username: string; passwordHash: string }>(
+      'SELECT username, password_hash AS passwordHash FROM users WHERE id = ?',
+      [userId]
+    )[0];
+    if (!admin || admin.username !== 'admin' || !bcrypt.compareSync('admin123', admin.passwordHash)) {
+      throw new Error('حساب المدير لم يعد يستخدم بيانات الدخول الافتراضية.');
+    }
+    if (this.db.query(
+      'SELECT id FROM users WHERE lower(username) = lower(?) AND id <> ? LIMIT 1',
+      [username, userId]
+    ).length > 0) {
+      throw new Error('اسم المستخدم مسجل مسبقًا.');
+    }
+    AuthService.validatePasswordPolicy(account.password, username);
+
+    const updatedAt = new Date().toISOString();
+    const passwordHash = bcrypt.hashSync(account.password, bcrypt.genSaltSync(10));
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `UPDATE users
+         SET username = ?, full_name = ?, phone = ?, password_hash = ?, updated_at = ?
+         WHERE id = ?`,
+        [username, fullName, phone || null, passwordHash, updatedAt, userId]
+      );
+      const currentSessionId = AuthService.currentSessionId || '';
+      this.db.run(
+        `UPDATE user_sessions SET is_active = 0, ended_at = ?, end_reason = 'REVOKED'
+         WHERE user_id = ? AND id != ? AND is_active = 1`,
+        [updatedAt, userId, currentSessionId]
+      );
+      this.audit(currentUser, 'إكمال تهيئة حساب المدير الأول', 'USERS', userId, {
+        username: admin.username,
+        fullName: currentUser.fullName,
+        phone: currentUser.phone,
+      }, { username, fullName, phone: phone || null });
+    });
+
+    return {
+      ...currentUser,
+      username,
+      fullName,
+      phone: phone || undefined,
+      mustChangePassword: false,
+      updatedAt,
+    };
+  }
+
   public deleteUser(id: string, actor?: User | null): void {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'users.delete');
     if (id === subject.id) throw new Error('لا يمكنك حذف حسابك الحالي.');
     const existing = this.getUserRecordById(id)?.user;
     if (!existing) throw new Error('المستخدم غير موجود.');
-    if (existing.username === 'admin') throw new Error('لا يمكن حذف حساب المدير الأساسي.');
+    if (existing.id === 'usr_admin' || existing.username === 'admin') {
+      throw new Error('لا يمكن حذف حساب المدير الأساسي.');
+    }
     this.db.executeTransaction(() => {
       this.db.run('DELETE FROM user_permissions WHERE user_id = ?', [id]);
       this.db.run('DELETE FROM users WHERE id = ?', [id]);

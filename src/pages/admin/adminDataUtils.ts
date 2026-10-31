@@ -15,7 +15,7 @@ export function downloadExcel(fileName: string, sheets: ExportSheet[]): void {
   const usedNames = new Set<string>();
 
   for (const sheet of sheets) {
-    const baseName = sheet.name.replace(/[\\/?*:\[\]]/g, '_').replace(/^'+|'+$/g, '').slice(0, 31) || 'Sheet';
+    const baseName = sheet.name.replace(/[\\/?*:[\]]/g, '_').replace(/^'+|'+$/g, '').slice(0, 31) || 'Sheet';
     let name = baseName;
     let suffix = 1;
     while (usedNames.has(name.toLowerCase())) {

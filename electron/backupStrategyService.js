@@ -28,6 +28,7 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
       weekly: [],
       monthly: [],
       external: [],
+      recovery: [],
       oldest: null,
       newest: null
     };
@@ -43,7 +44,7 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
         size: stat.size,
         timestamp: date.toISOString(),
         readTimestamp: date,
-        type: 'unknown',
+        type: 'local',
         isRecent: false,
         isOldest: false,
         isNewest: false
@@ -109,7 +110,7 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
  * - استخدام وسيطين تخزين: القرص المحلي + USB (اختياري)
  * - نسخة خارجية: (اختياري) مخزنة خارج الموقع
  */
-async function apply321Strategy({ BACKUP_DIR, DATA_DIR, APP_DATA_DIR }, backupType = 'full') {
+async function apply321Strategy({ BACKUP_DIR }, backupType = 'full') {
   const strategy = {
     correctType: backupType,
     actions: [],
@@ -152,10 +153,9 @@ async function checkExternalDrive() {
   try {
     // томаيز في ويندوز
     // يوجد طريق لفحص الأقراص الخارجية المتاحة
-    const fs = require('fs');
     const result = await new Promise((resolve) => {
       // هذا يتم تنفيذها على Windows
-      execFile('powershell', ['-Command', 'Get-Volume | Where-Object {$_.DriveType -eq "Removable"} | Select-Object –ExpandProperty DriveLetter'], (error, stdout, stderr) => {
+      execFile('powershell', ['-Command', 'Get-Volume | Where-Object {$_.DriveType -eq "Removable"} | Select-Object –ExpandProperty DriveLetter'], (error, stdout) => {
         if (error) {
           resolve(null);
           return;

@@ -1,4 +1,3 @@
-import { DatabaseManager } from '../database/db';
 import type { Warehouse, WarehouseStock, InventoryTransaction, InventoryTransactionType, UnitType } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
@@ -7,76 +6,20 @@ import { localDateString } from '../utils/date';
 import { postLedgerEntry } from '../database/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { getProductUnitLabel } from '../utils/productUnits';
-import { InventoryServicePart04 } from './InventoryServicePart04';
+import { InventoryWarehouseLocationService } from './InventoryWarehouseLocationService';
 
-export class InventoryServicePart05 extends InventoryServicePart04 {
-public updateWarehouseLocation(id: string, input: {
-    zone?: string;
-    aisle?: string;
-    shelf?: string;
-    bin?: string;
-    barcode?: string;
-    maxCapacityM2?: number;
-    notes?: string;
-  }): void {
-    this.assertInventoryModuleEnabled();
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
-
-    const existing = this.db.query<any>(`SELECT * FROM warehouse_locations WHERE id = ?`, [id])[0];
-    if (!existing) throw new Error('الموقع غير موجود.');
-
-    if (input.barcode && input.barcode !== existing.barcode) {
-      const dup = this.db.query<any>(`SELECT id FROM warehouse_locations WHERE barcode = ? AND id != ?`, [input.barcode, id])[0];
-      if (dup) throw new Error('الباركود مستخدم لموقع آخر.');
-    }
-
-    this.db.run(`
-      UPDATE warehouse_locations
-      SET zone = COALESCE(?, zone),
-          aisle = COALESCE(?, aisle),
-          shelf = COALESCE(?, shelf),
-          bin = COALESCE(?, bin),
-          barcode = COALESCE(?, barcode),
-          max_capacity_m2 = COALESCE(?, max_capacity_m2),
-          notes = COALESCE(?, notes)
-      WHERE id = ?
-    `, [
-      input.zone?.toUpperCase() ?? null,
-      input.aisle?.toUpperCase() ?? null,
-      input.shelf?.toUpperCase() ?? null,
-      input.bin?.toUpperCase() ?? null,
-      input.barcode ?? null,
-      input.maxCapacityM2 ?? null,
-      input.notes ?? null,
-      id
-    ]);
-  }
-
-public deleteWarehouseLocation(id: string): void {
-    this.assertInventoryModuleEnabled();
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
-
-    const occupied = this.db.query<any>(`SELECT SUM(quantity_m2) as qty FROM product_location_stock WHERE location_id = ?`, [id])[0];
-    if (occupied && Number(occupied.qty) > 0) {
-      throw new Error('لا يمكن حذف موقع تخزين يحتوي على بضائع مسجلة به. انقل المخزون لموقع آخر أولاً.');
-    }
-
-    this.db.run(`UPDATE warehouse_locations SET is_active = 0 WHERE id = ?`, [id]);
-  }
-
+export class InventoryServicePart05 extends InventoryWarehouseLocationService {
 public assignProductLocation(locationId: string, productId: string, quantityM2: number): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
-    if (quantityM2 < 0) throw new Error('الكمية يجب ألا تكون سالبة.');
+    if (quantityM2 < 0) throw new Error('الكمية لا يمكن أن تكون سالبة.');
 
     const location = this.db.query<any>(`SELECT * FROM warehouse_locations WHERE id = ?`, [locationId])[0];
-    if (!location) throw new Error('موقع التخزين غير موجود.');
+    if (!location) throw new Error('الموقع غير موجود.');
 
     const prod = this.db.query<any>(`SELECT name FROM products WHERE id = ?`, [productId])[0];
-    if (!prod) throw new Error('الصنف غير موجود.');
+    if (!prod) throw new Error('المنتج غير موجود.');
 
     this.db.executeTransaction((txDb) => {
       const existing = txDb.query<any>(`SELECT id FROM product_location_stock WHERE location_id = ? AND product_id = ?`, [locationId, productId])[0];

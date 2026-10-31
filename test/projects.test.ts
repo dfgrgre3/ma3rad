@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { ProjectService } from '../src/services/ProjectService.ts';
 import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
@@ -137,11 +138,14 @@ test('project branch scope prevents cross-branch reads and writes', async () => 
   });
 
   const mainProject = service.createProject({ name: 'Main project', customerId });
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(betaBranch.id, admin);
   const betaProject = service.createProject({
     name: 'Beta project',
     customerId,
     branchId: betaBranch.id,
   });
+  access.setCurrentBranchId('br_main', admin);
 
   asLimited();
   const visible = service.getProjects();

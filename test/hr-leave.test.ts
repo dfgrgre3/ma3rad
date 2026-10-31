@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { LeaveService } from '../src/services/LeaveService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
@@ -64,18 +65,25 @@ let employeeSequence = 0;
 
 function createEmployee(branchId?: string): string {
   const sequence = ++employeeSequence;
-  return EmployeeService.create({
-    name: `Leave Employee ${sequence}`,
-    phone: `0110000${sequence}`,
-    location: 'Main',
-    role: 'Sales',
-    email: '',
-    baseSalary: 5000,
-    salaryType: 'MONTHLY',
-    status: 'ACTIVE',
-    joinedDate: '2026-01-01',
-    branchId,
-  }).id;
+  const access = new BranchAccessService();
+  const previousBranch = access.getCurrentBranchId(admin);
+  if (branchId) access.setCurrentBranchId(branchId, admin);
+  try {
+    return EmployeeService.create({
+      name: `Leave Employee ${sequence}`,
+      phone: `0110000${sequence}`,
+      location: 'Main',
+      role: 'Sales',
+      email: '',
+      baseSalary: 5000,
+      salaryType: 'MONTHLY',
+      status: 'ACTIVE',
+      joinedDate: '2026-01-01',
+      branchId,
+    }).id;
+  } finally {
+    if (branchId) access.setCurrentBranchId(previousBranch, admin);
+  }
 }
 
 test('leave requests follow pending, approved and overlap rules', async () => {
@@ -146,7 +154,10 @@ test('leave requests are isolated by branch', async () => {
   const betaEmployee = createEmployee(betaBranch.id);
 
   const mainRequest = service.requestLeave({ employeeId: mainEmployee, startDate: '2026-05-01', endDate: '2026-05-02' });
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(betaBranch.id, admin);
   const betaRequest = service.requestLeave({ employeeId: betaEmployee, startDate: '2026-05-01', endDate: '2026-05-02' });
+  access.setCurrentBranchId('br_main', admin);
 
   asLimited();
   const visible = service.getRequests();

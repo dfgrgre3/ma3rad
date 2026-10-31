@@ -1,16 +1,14 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Settings as SettingsIcon, SlidersHorizontal, Sparkles, Building2 } from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { AdminSettingsTab } from '../admin/AdminSettingsTab';
 import { AppConfigurationPage } from './AppConfigurationPage';
 import { ConfigurationStudioPage } from './ConfigurationStudioPage';
-import { usePermission } from '../../hooks/usePermission';
 
 const ADMIN_TABS = ['general', 'business', 'branding', 'invoice', 'inventory', 'operations', 'security', 'backup'];
 
 export const SettingsHubPage: React.FC = () => {
-  const can = usePermission();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get('tab');
 
   if (requested === 'appConfig') {
@@ -21,6 +19,11 @@ export const SettingsHubPage: React.FC = () => {
   }
 
   const initial = requested && ADMIN_TABS.includes(requested) ? (requested as any) : 'general';
+  const handleAdminTabChange = (tab: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', tab);
+    setSearchParams(next);
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-slate-100 dark:bg-slate-950 p-4 lg:p-6" dir="rtl">
@@ -36,7 +39,7 @@ export const SettingsHubPage: React.FC = () => {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
-          <AdminSettingsTab initialTab={initial} />
+          <AdminSettingsTab initialTab={initial} onTabChange={handleAdminTabChange} />
         </div>
       </div>
     </div>

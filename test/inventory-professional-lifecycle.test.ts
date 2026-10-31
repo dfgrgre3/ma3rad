@@ -5,6 +5,8 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { InventoryService } from '../src/services/InventoryService.ts';
+import { approveCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/pages/inventory/inventory-count/countSessionService.ts';
+import { loadBranchCountSessions, loadCountSessionItems } from '../src/pages/inventory/inventory-count/countSessionData.ts';
 
 function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
   return DatabaseManager.getInstance().query<T>(sql, params)[0];
@@ -327,4 +329,31 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   assert.ok(reconLogs.length > 0, 'Reconciliation audit history must be logged');
   const myLog = reconLogs.find((l: any) => l.warehouseId === whSource);
   assert.ok(myLog, 'Reconciliation log must exist for the test warehouse');
+
+  // 9. Stocktake review requires a different authorized reviewer.
+  new AuthService().createUser({ username: 'inventory_reviewer_test', password: 'reviewer-pass-123', fullName: 'Inventory Reviewer', role: 'MANAGER' });
+  startCountSession({ warehouseId: whSource, countType: 'PARTIAL', selectedProductIds: [prodId], isBlindCount: false, notes: 'approval workflow test' });
+  const reviewSession = loadBranchCountSessions().find((session) => session.warehouseId === whSource && session.status === 'COUNTING');
+  assert.ok(reviewSession, 'Count session should be created');
+  const reviewItems = loadCountSessionItems(reviewSession!);
+  reviewItems[0].countedQuantityM2 = reviewItems[0].systemQuantityM2;
+  submitCountSession(reviewSession!, reviewItems);
+  assert.equal(queryOne<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [reviewSession!.id])?.status, 'REVIEW');
+  assert.throws(() => approveCountSession(reviewSession!), 'Creator cannot approve their own count');
+  AuthService.login('inventory_reviewer_test', 'reviewer-pass-123');
+  approveCountSession(reviewSession!);
+  assert.equal(queryOne<{ status: string; approvalStatus: string }>('SELECT status, approval_status AS approvalStatus FROM stock_counts WHERE id = ?', [reviewSession!.id])?.status, 'POSTED');
+  assert.equal(queryOne<{ approvalStatus: string }>('SELECT approval_status AS approvalStatus FROM stock_counts WHERE id = ?', [reviewSession!.id])?.approvalStatus, 'APPROVED');
+  startCountSession({ warehouseId: whSource, countType: 'PARTIAL', selectedProductIds: [prodId], isBlindCount: false, notes: 'rejection workflow test' });
+  const rejectedSession = loadBranchCountSessions().find((session) => session.warehouseId === whSource && session.status === 'COUNTING');
+  assert.ok(rejectedSession, 'Second count session should be created');
+  const rejectedItems = loadCountSessionItems(rejectedSession!);
+  rejectedItems[0].countedQuantityM2 = rejectedItems[0].systemQuantityM2;
+  submitCountSession(rejectedSession!, rejectedItems);
+  AuthService.login('admin', 'admin123');
+  rejectCountSession(rejectedSession!, 'Recount required');
+  const rejectedState = queryOne<{ status: string; approvalStatus: string; rejectionReason: string }>('SELECT status, approval_status AS approvalStatus, rejection_reason AS rejectionReason FROM stock_counts WHERE id = ?', [rejectedSession!.id]);
+  assert.equal(rejectedState?.status, 'COUNTING');
+  assert.equal(rejectedState?.approvalStatus, 'REJECTED');
+  assert.equal(rejectedState?.rejectionReason, 'Recount required');
 });

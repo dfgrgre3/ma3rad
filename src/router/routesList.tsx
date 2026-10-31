@@ -14,15 +14,15 @@ export const appRoutes: RouteDef[] = [
   { path: 'tools', element: <Navigate to="/dashboard" replace /> },
 
   // Sales & POS
-  { path: 'sales/analytics', element: <P.SalesAnalyticsPage /> },
+  { path: 'sales/analytics', element: <Navigate to="/sales?tab=analytics" replace /> },
   { path: 'sales/cycle', element: <P.InvoiceCyclePage /> },
   { path: 'sales/statement', element: <P.CustomerStatementPage /> },
   { path: 'sales/reservations', element: <P.ReservationsDepositPage /> },
   { path: 'sales/after-sales', element: <P.AfterSalesPage /> },
   { path: 'restaurant', element: <P.RestaurantPage /> },
   { path: 'pos', element: <P.PosView /> },
-  { path: 'sales', element: <P.SalesView /> },
-  { path: 'daily/sales', element: <P.TodaySalesPage /> },
+  { path: 'sales', element: <P.SalesHubPage /> },
+  { path: 'daily/sales', element: <Navigate to="/sales?tab=daily" replace /> },
   { path: 'daily/purchases', element: <P.TodayPurchasesPage /> },
   { path: 'daily/expenses', element: <P.TodayExpensesPage /> },
   { path: 'daily/debts', element: <P.TodayDebtsPage /> },
@@ -119,12 +119,12 @@ export const appRoutes: RouteDef[] = [
 
   // Reports
   { path: 'reports', element: <P.ReportsHubPage /> },
-  { path: 'reports/tax', element: <P.TaxReportPage /> },
-  { path: 'reports/profit-loss', element: <P.ProfitLossPage /> },
-  { path: 'reports/statements', element: <P.FinancialStatementsPage /> },
-  { path: 'reports/sales', element: <P.SalesReportsPage /> },
-  { path: 'reports/pos', element: <P.PosReportsPage /> },
-  { path: 'reports/purchases', element: <P.PurchaseInventoryReportPage /> },
+  { path: 'reports/tax', element: <Navigate to="/reports?tab=tax" replace /> },
+  { path: 'reports/profit-loss', element: <Navigate to="/reports?tab=profitLoss" replace /> },
+  { path: 'reports/statements', element: <Navigate to="/reports?tab=finance" replace /> },
+  { path: 'reports/sales', element: <Navigate to="/reports?tab=sales" replace /> },
+  { path: 'reports/pos', element: <Navigate to="/reports?tab=pos" replace /> },
+  { path: 'reports/purchases', element: <Navigate to="/reports?tab=purchases" replace /> },
 
   // Approvals, Documents & Security
   { path: 'approvals', element: <P.ApprovalsPage /> },

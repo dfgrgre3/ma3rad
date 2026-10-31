@@ -149,8 +149,15 @@ export function useAppStartup() {
       });
     }
     const onBeforeUnload = () => { void DatabaseManager.getInstance().flush(); };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') void DatabaseManager.getInstance().flush();
+    };
     window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   return {

@@ -80,7 +80,7 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_
         if (settled) return;
         settled = true;
         socket.destroy();
-        err ? reject(err) : resolve();
+        if (err) reject(err); else resolve();
       };
       socket.setTimeout(10000, () => done(new Error('انتهت مهلة الاتصال بالطابعة')));
       socket.on('error', (err) => done(err));
@@ -191,7 +191,7 @@ function registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_
       await new Promise((resolve, reject) => {
         // -o raw sends the bytes untouched (ESC/POS passthrough).
         execFile(CUPS_LP, ['-d', printerName, '-o', 'raw', tempFile], { timeout: 15000 }, (err) => {
-          err ? reject(err) : resolve();
+          if (err) reject(err); else resolve();
         });
       });
       return { ok: true };

@@ -321,6 +321,18 @@ ipcMain.handle('sync:pull', async (event, scope, cursor, limit) => {
 // connection can never stall the UI or leak data. The Vite dev server is the
 // only permitted HTTP(S) target, and only while running unpackaged.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+// The central licensing/configuration API is the only outbound surface a
+// packaged renderer may reach. Keep in sync with CentralLicenseService.
+const CENTRAL_API_PATHS = [
+  '/api/v1/licensing/',
+  '/api/v1/configuration/',
+  '/api/v1/telemetry/',
+  '/api/v1/releases',
+];
+function isCentralApiRequest(url) {
+  return (url.protocol === 'http:' || url.protocol === 'https:')
+    && CENTRAL_API_PATHS.some((prefix) => url.pathname.startsWith(prefix));
+}
 
 function installOfflineNetworkGuard(ses) {
   ses.webRequest.onBeforeRequest((details, callback) => {
@@ -328,7 +340,8 @@ function installOfflineNetworkGuard(ses) {
       const url = new URL(details.url);
       if (url.protocol === 'http:' || url.protocol === 'https:') {
         const isDevServer = !app.isPackaged && LOOPBACK_HOSTS.has(url.hostname);
-        if (!isDevServer) {
+        const isCentralApi = isCentralApiRequest(url);
+        if (!isDevServer && !isCentralApi) {
           console.warn(`Offline guard: blocked outbound request to ${url.origin}${url.pathname}`);
           callback({ cancel: true });
           return;

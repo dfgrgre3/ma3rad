@@ -2,6 +2,7 @@ import React from 'react';
 import { CheckCircle2, ClipboardList, Search, X } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/productUnits';
 import { fmtCountCurrency } from './helpers';
+import { exportToExcel, exportToPdf } from '../../../utils/export';
 import type { CountItem, CountSession, VisibleCountItem } from './types';
 
 interface SessionCountModalProps {
@@ -17,6 +18,10 @@ interface SessionCountModalProps {
   onNoteChange: (index: number, value: string) => void;
   onSaveDraft: () => void;
   onPost: () => void;
+  canApprove: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+  onCancelSession: () => void;
   onClose: () => void;
 }
 
@@ -53,7 +58,7 @@ const CountItemRow: React.FC<CountItemRowProps> = ({
   onNoteChange,
 }) => {
   const blindCounting = isBlindCounting(session);
-  const isPosted = session.status === 'POSTED';
+  const isPosted = session.status !== 'COUNTING';
   const isCounted = item.countedQuantityM2 !== null;
   const hasVariance = item.varianceM2 !== 0 && isCounted;
 
@@ -150,6 +155,10 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
   onNoteChange,
   onSaveDraft,
   onPost,
+  canApprove,
+  onApprove,
+  onReject,
+  onCancelSession,
   onClose,
 }) => {
   return (
@@ -162,12 +171,19 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
               جلسة الجرد: {session.code} ({session.warehouse})
             </h3>
           </div>
+          <div className="flex gap-2">
+            {session.status === 'POSTED' && <>
+              <button onClick={() => exportToExcel({ title: `Inventory count ${session.code}`, subtitle: `${session.warehouse} · ${session.startDate}`, fileName: `count-${session.code}`, columns: [{ key: 'product', label: 'Product' }, { key: 'system', label: 'System quantity' }, { key: 'counted', label: 'Counted quantity' }, { key: 'variance', label: 'Variance' }, { key: 'reason', label: 'Reason' }, { key: 'notes', label: 'Notes' }], rows: items.map(item => ({ product: item.productName, system: item.systemQuantityM2, counted: item.countedQuantityM2, variance: item.varianceM2, reason: item.discrepancyReason, notes: item.notes })), permission: 'inventory.export' })} className="rounded-lg border px-3 py-1 text-xs">Excel</button>
+              <button onClick={() => exportToPdf({ title: `Inventory count ${session.code}`, subtitle: `${session.warehouse} · ${session.startDate}`, fileName: `count-${session.code}`, columns: [{ key: 'product', label: 'Product' }, { key: 'system', label: 'System quantity' }, { key: 'counted', label: 'Counted quantity' }, { key: 'variance', label: 'Variance' }, { key: 'reason', label: 'Reason' }, { key: 'notes', label: 'Notes' }], rows: items.map(item => ({ product: item.productName, system: item.systemQuantityM2, counted: item.countedQuantityM2, variance: item.varianceM2, reason: item.discrepancyReason, notes: item.notes })), permission: 'inventory.export' })} className="rounded-lg border px-3 py-1 text-xs">PDF / Print</button>
+            </>}
+          </div>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-900 transition">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-6 flex-1 overflow-y-auto space-y-4">
+          {session.rejectionReason && session.status === 'COUNTING' && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>سبب الرفض السابق:</strong> {session.rejectionReason}</div>}
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-slate-900">{countedItems}/{items.length}</div><div className="text-[11px] text-slate-500">أصناف تم جردها</div></div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-amber-600">{Math.max(0, items.length - countedItems)}</div><div className="text-[11px] text-slate-500">أصناف متبقية</div></div>
@@ -209,7 +225,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
 
         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-between shrink-0">
           <div>
-            {session.status !== 'POSTED' && (
+            {session.status === 'COUNTING' && (
               <button
                 onClick={onSaveDraft}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition border border-slate-300"
@@ -217,6 +233,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                 حفظ كمسودة
               </button>
             )}
+            {session.status === 'COUNTING' && <button onClick={onCancelSession} className="mr-2 px-4 py-2 text-rose-600 rounded-xl text-xs font-bold border border-rose-200">إلغاء الجلسة</button>}
           </div>
           <div className="flex gap-2">
             <button
@@ -225,7 +242,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
             >
               إغلاق
             </button>
-            {session.status !== 'POSTED' && (
+            {session.status === 'COUNTING' && (
               <button
                 onClick={onPost}
                 className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
@@ -234,6 +251,10 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                 اعتماد وترحيل فروقات الجرد
               </button>
             )}
+            {session.status === 'REVIEW' && canApprove && <>
+              <button onClick={onReject} className="px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-xs font-bold border border-rose-200">رفض وإعادة للعد</button>
+              <button onClick={onApprove} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">اعتماد وترحيل الفروقات</button>
+            </>}
           </div>
         </div>
       </div>

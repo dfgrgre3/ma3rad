@@ -3,7 +3,7 @@ import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { branchAccess } from './inventory-count/branchAccess';
 import { loadBranchCountSessions, loadCountProducts, loadCountSessionItems, loadCountWarehouses } from './inventory-count/countSessionData';
-import { postCountSession, saveCountDraft, startCountSession } from './inventory-count/countSessionService';
+import { approveCountSession, cancelCountSession, rejectCountSession, saveCountDraft, startCountSession, submitCountSession } from './inventory-count/countSessionService';
 import { countCountedItems, countVarianceItems, filterCountSessions, getVisibleCountItems } from './inventory-count/helpers';
 import { InventoryCountHeader } from './inventory-count/InventoryCountHeader';
 import { CountSessionsToolbar } from './inventory-count/CountSessionsToolbar';
@@ -175,12 +175,43 @@ export const InventoryCountPage: React.FC = () => {
   const handlePostSession = () => {
     if (!activeSession) return;
     try {
-      if (!postCountSession(activeSession, sessionItems)) return;
+      submitCountSession(activeSession, sessionItems);
       setShowSessionModal(false);
       loadSessions();
     } catch (e: any) {
       console.error(e);
       alert('فشل ترحيل الجرد: ' + e.message);
+    }
+  };
+
+  const handleApproveSession = () => {
+    if (!activeSession) return;
+    try {
+      approveCountSession(activeSession);
+      setShowSessionModal(false);
+      loadSessions();
+    } catch (error: any) { alert(error?.message || 'تعذر اعتماد الجرد.'); }
+  };
+
+  const handleRejectSession = () => {
+    if (!activeSession) return;
+    const reason = prompt('اكتب سبب رفض الجرد وإعادته للعد:');
+    if (!reason) return;
+    try {
+      rejectCountSession(activeSession, reason);
+      setShowSessionModal(false);
+      loadSessions();
+    } catch (error: any) { alert(error?.message || 'تعذر رفض الجرد.'); }
+  };
+
+  const handleCancelSession = () => {
+    if (!activeSession || !confirm('هل تريد إلغاء جلسة الجرد؟ لن يتم تعديل أرصدة المخزون.')) return;
+    try {
+      cancelCountSession(activeSession);
+      setShowSessionModal(false);
+      loadSessions();
+    } catch (error: any) {
+      alert(error?.message || 'تعذر إلغاء جلسة الجرد.');
     }
   };
 
@@ -263,6 +294,10 @@ export const InventoryCountPage: React.FC = () => {
           onNoteChange={handleItemNoteChange}
           onSaveDraft={handleSaveDraft}
           onPost={handlePostSession}
+          canApprove={PermissionService.can(AuthService.getCurrentUser(), 'inventory.count.approve')}
+          onApprove={handleApproveSession}
+          onReject={handleRejectSession}
+          onCancelSession={handleCancelSession}
           onClose={() => setShowSessionModal(false)}
         />
       )}

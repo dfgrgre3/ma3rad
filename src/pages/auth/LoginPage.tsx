@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   User as UserIcon,
 } from 'lucide-react';
-import { AuthService, type LoginGuardStatus } from '../../services/AuthService';
+import { AuthService, TwoFactorRequiredError, type LoginGuardStatus } from '../../services/AuthService';
 import type { User } from '../../types';
 import { LoginBrandPanel } from './LoginBrandPanel';
 
@@ -38,9 +38,12 @@ function formatCountdown(ms: number): string {
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const twoFactorRef = useRef<HTMLInputElement>(null);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [rememberOnDevice, setRememberOnDevice] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
@@ -100,6 +103,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     }
   }, [guard.isLocked, lockedRemainingMs, username]);
 
+  // Changing the credentials invalidates any pending second-factor challenge.
+  useEffect(() => {
+    setTwoFactorRequired(false);
+    setTwoFactorCode('');
+  }, [username, password]);
+
+  useEffect(() => {
+    if (twoFactorRequired) twoFactorRef.current?.focus();
+  }, [twoFactorRequired]);
+
   const clearFieldError = (field: keyof FieldErrors) => {
     setFieldErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
     setError(null);
@@ -133,14 +146,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading || guard.isLocked) return;
-    if (!validate()) return;
+    if (twoFactorRequired) {
+      if (!twoFactorCode.trim()) {
+        setError('أدخل رمز التحقق الثنائي.');
+        twoFactorRef.current?.focus();
+        return;
+      }
+    } else if (!validate()) {
+      return;
+    }
 
     setError(null);
     setLoading(true);
     const normalizedUsername = username.trim();
 
     try {
-      const user = AuthService.login(normalizedUsername, password);
+      const user = AuthService.login(
+        normalizedUsername,
+        password,
+        twoFactorRequired ? twoFactorCode : undefined
+      );
       const credentialStore = window.ceramisys?.credentials;
 
       if (rememberOnDevice && credentialStore?.set) {
@@ -159,8 +184,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
         }
       }
 
+      setTwoFactorRequired(false);
+      setTwoFactorCode('');
       onSuccess(user);
     } catch (err: any) {
+      if (err instanceof TwoFactorRequiredError || err?.code === 'TWO_FACTOR_REQUIRED') {
+        // Password accepted; ask for the one-time code without reporting an error.
+        setTwoFactorRequired(true);
+        setTwoFactorCode('');
+        setError(null);
+        return;
+      }
+
       const message = err?.message || 'تعذر تسجيل الدخول.';
       setError(message);
 
@@ -273,7 +308,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
-                    disabled={loading}
+                    disabled={loading || twoFactorRequired}
                     value={username}
                     onChange={(e) => {
                       setUsername(e.target.value);
@@ -294,6 +329,56 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 )}
               </div>
 
+              {twoFactorRequired && (
+                <div>
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="mb-3 flex items-start gap-2 border border-[#b6d7f0] border-r-[3px] border-r-[#0078d4] bg-[#eff6fc] px-3 py-2 text-[11.5px] text-[#005a9e] dark:border-[#2a4a63] dark:bg-[#22313d] dark:text-[#9fc9ea]"
+                  >
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>أدخل رمز التحقق المكوّن من 6 أرقام من تطبيق المصادقة، أو رمز استرداد.</span>
+                  </div>
+                  <label
+                    htmlFor="two-factor-code"
+                    className="mb-1 block text-[11.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]"
+                  >
+                    رمز التحقق الثنائي
+                  </label>
+                  <input
+                    ref={twoFactorRef}
+                    id="two-factor-code"
+                    type="text"
+                    dir="ltr"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={20}
+                    disabled={loading}
+                    value={twoFactorCode}
+                    onChange={(e) => {
+                      setTwoFactorCode(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="000000"
+                    className="win-input w-full px-2 text-center font-mono text-[15px] tracking-[0.3em] disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTwoFactorRequired(false);
+                      setTwoFactorCode('');
+                      setError(null);
+                      passwordRef.current?.focus();
+                    }}
+                    disabled={loading}
+                    className="mt-2 text-[11px] font-semibold text-[#005a9e] underline-offset-2 hover:underline disabled:opacity-50 dark:text-[#6cb8e8]"
+                  >
+                    العودة إلى بيانات الدخول
+                  </button>
+                </div>
+              )}
+
+              {!twoFactorRequired && (
               <div>
                 <label
                   htmlFor="password"
@@ -351,7 +436,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   </p>
                 )}
               </div>
+              )}
 
+              {!twoFactorRequired && (
               <label className="flex items-start gap-2 text-[11.5px] font-medium text-[#4d4d4d] dark:text-[#c8c8c8]">
                 <input
                   type="checkbox"
@@ -367,6 +454,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   </span>
                 </span>
               </label>
+              )}
 
               <button
                 type="submit"
@@ -375,7 +463,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 className="win-btn win-btn--primary flex w-full items-center justify-center gap-2"
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ShieldCheck className="h-4 w-4" aria-hidden="true" />}
-                {loading ? 'جارٍ تسجيل الدخول...' : 'دخول النظام'}
+                {loading ? 'جارٍ تسجيل الدخول...' : twoFactorRequired ? 'تحقق ودخول' : 'دخول النظام'}
               </button>
 
               <p className="text-center text-[10px] text-[#767676] dark:text-[#a6a6a6]">

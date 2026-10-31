@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { ContractService } from '../src/services/ContractService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
@@ -89,18 +90,25 @@ let employeeSequence = 0;
 
 function createEmployee(branchId?: string): string {
   const sequence = ++employeeSequence;
-  return EmployeeService.create({
-    name: `Contract Employee ${sequence}`,
-    phone: `0130000${sequence}`,
-    location: 'Main',
-    role: 'Sales',
-    email: '',
-    baseSalary: 6000,
-    salaryType: 'MONTHLY',
-    status: 'ACTIVE',
-    joinedDate: '2025-01-01',
-    branchId,
-  }).id;
+  const access = new BranchAccessService();
+  const previousBranch = access.getCurrentBranchId(admin);
+  if (branchId) access.setCurrentBranchId(branchId, admin);
+  try {
+    return EmployeeService.create({
+      name: `Contract Employee ${sequence}`,
+      phone: `0130000${sequence}`,
+      location: 'Main',
+      role: 'Sales',
+      email: '',
+      baseSalary: 6000,
+      salaryType: 'MONTHLY',
+      status: 'ACTIVE',
+      joinedDate: '2025-01-01',
+      branchId,
+    }).id;
+  } finally {
+    if (branchId) access.setCurrentBranchId(previousBranch, admin);
+  }
 }
 
 function isoOffset(days: number): string {
@@ -241,7 +249,10 @@ test('contracts are branch scoped for reads and lifecycle actions', async () => 
   const betaEmployee = createEmployee(betaBranch.id);
 
   const mainContract = draft(service, mainEmployee);
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(betaBranch.id, admin);
   const betaContract = draft(service, betaEmployee);
+  access.setCurrentBranchId('br_main', admin);
 
   asManager();
   const visible = service.getContracts();

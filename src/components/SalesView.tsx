@@ -17,6 +17,8 @@ import { CeramicMath } from '../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
 import { exportToExcel, buildExportHtml } from '../utils/export';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { SalesModals } from './sales/SalesModals';
+import { StatCard, IconButton, Modal, InfoBox, SummaryRow } from './sales/SalesUi';
 import { localDateString } from '../utils/date';
 import { buildWhatsAppUrl, openExternalShare } from '../utils/externalLinks';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
@@ -569,352 +571,47 @@ export const SalesView: React.FC = () => {
         )}
       </div>
 
-      {/* ── Invoice Details ─────────────────────────────────────────────────── */}
-      {selected && (
-        <Modal onClose={() => setSelected(null)} wide>
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-emerald-600" /> فاتورة {selected.invoiceNumber}
-              </h3>
-              <p className="text-[11px] text-slate-500 mt-1">
-                {selected.date} • {selected.warehouseName} • أنشأها {selected.createdByName || '—'}
-              </p>
-            </div>
-            <button onClick={() => setSelected(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-            <InfoBox label="العميل" value={selected.customerName || 'عميل نقدي'} sub={selected.customerPhone} />
-            <InfoBox label="طريقة الدفع" value={paymentTypeLabel[selected.paymentType] || selected.paymentType} sub={canViewDebts ? paymentStatusLabel[selected.paymentStatus] : undefined} />
-            <InfoBox label="حالة الفاتورة" value={selected.invoiceStatus === 'VOID' ? 'ملغاة' : 'مكتملة'} sub={`${selected.items.length} بند`} />
-          </div>
-
-          <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-            <table className="w-full text-right text-[11px] min-w-[700px]">
-              <thead className="bg-slate-50 text-slate-500 font-bold">
-                <tr>
-                  <th className="px-3 py-2">الصنف</th>
-                  <th className="px-3 py-2">المقاس / الفرز</th>
-                  <th className="px-3 py-2">الكمية</th>
-                  <th className="px-3 py-2">الكراتين</th>
-                  <th className="px-3 py-2">سعر الوحدة</th>
-                  <th className="px-3 py-2">الخصم</th>
-                  <th className="px-3 py-2">الإجمالي</th>
-                  <th className="px-3 py-2">الربح</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {selected.items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-3 py-2 font-bold text-slate-800">{item.productName}</td>
-                    <td className="px-3 py-2 text-slate-500">{item.productType === 'GENERAL' ? getProductUnitLabel(item) : `${item.size} • ${item.productGrade}`}</td>
-                    <td className="px-3 py-2 font-mono">{formatProductQuantity(item.quantityM2, item)}</td>
-                    <td className="px-3 py-2 font-mono">{item.productType === 'GENERAL' ? '—' : item.boxesCount}</td>
-                    <td className="px-3 py-2 font-mono">{fmt(item.unitPrice)}</td>
-                    <td className="px-3 py-2 font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</td>
-                    <td className="px-3 py-2 font-bold text-slate-900">{fmt(item.totalPrice)}</td>
-                    <td className={`px-3 py-2 font-bold ${item.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmt(item.profit)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div className="text-[11px] font-black text-slate-600 mb-2">الملخص المالي</div>
-                <SummaryRow label="المجموع الفرعي" value={selected.subtotal} />
-                <SummaryRow label="خصم الفاتورة" value={-selected.discountAmount} tone={selected.discountAmount ? 'text-rose-600' : ''} />
-                <SummaryRow label="الضريبة" value={selected.taxAmount} />
-                <SummaryRow label="المشال والنقل" value={selected.shippingCost} />
-                <div className="border-t border-slate-300 mt-1 pt-2">
-                  <SummaryRow label="إجمالي الفاتورة" value={selected.totalAmount} strong />
-                  {canViewDebts && <SummaryRow label="المدفوع" value={selected.paidAmount} tone="text-emerald-600" />}
-                  {canViewDebts && <SummaryRow label="المتبقي" value={selected.remainingAmount} tone="text-amber-600" />}
-                  {canViewReturns && (selected.returnedAmount || 0) > 0 && <SummaryRow label="المرتجع" value={selected.returnedAmount || 0} tone="text-rose-600" />}
-                </div>
-              </div>
-              {selected.notes && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800">
-                  <b>ملاحظات:</b> {selected.notes}
-                </div>
-              )}
-            </div>
-
-            {canViewDebts && <div>
-              <div className="text-[11px] font-black text-slate-600 mb-2 flex items-center gap-1.5">
-                <CreditCard className="w-3.5 h-3.5" /> تحصيلات الفاتورة ({payments.length})
-              </div>
-              <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-44 overflow-y-auto">
-                {payments.length === 0 ? (
-                  <div className="p-4 text-center text-[11px] text-slate-400">لا توجد تحصيلات لاحقة مسجلة على هذه الفاتورة.</div>
-                ) : payments.map((p) => (
-                  <div key={p.id} className="p-2.5 flex items-center justify-between text-[11px]">
-                    <div>
-                      <div className="font-bold text-slate-700 font-mono">{p.receiptNumber}</div>
-                      <div className="text-slate-400">{p.date} • {paymentTypeLabel[p.paymentType] || p.paymentType}</div>
-                    </div>
-                    <span className="font-black text-emerald-600">{fmt(p.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
-            <button onClick={() => openInvoicePreview(selected)} className="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
-              <Eye className="w-3.5 h-3.5" /> معاينة الفاتورة
-            </button>
-            <button onClick={() => printService.printInvoice(selected)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
-              <Printer className="w-3.5 h-3.5" /> طباعة A4
-            </button>
-            <button onClick={() => printService.printThermalReceipt(selected)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
-              <Receipt className="w-3.5 h-3.5" /> إيصال حراري
-            </button>
-            {canViewCustomerStatement && <button onClick={() => openStatement(selected.customerId)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
-              <FileBarChart className="w-3.5 h-3.5" /> كشف حساب العميل
-            </button>}
-            {selected.invoiceStatus !== 'VOID' && canRefund && (
-              <button onClick={() => goToReturn(selected.id)} className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
-                <RotateCcw className="w-3.5 h-3.5" /> مرتجع مبيعات
-              </button>
-            )}
-            {selected.invoiceStatus !== 'VOID' && selected.remainingAmount > 0 && canCollect && (
-              <button onClick={() => openPayment(selected)} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5" /> تحصيل دفعة
-              </button>
-            )}
-            {selected.invoiceStatus !== 'VOID' && canVoid && (
-              <button onClick={() => openVoid(selected)} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
-                <Ban className="w-3.5 h-3.5" /> إلغاء الفاتورة
-              </button>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Void modal ──────────────────────────────────────────────────────── */}
-      {voidTarget && (
-        <Modal onClose={() => setVoidTarget(null)}>
-          <form onSubmit={submitVoid} className="space-y-4">
-            <div className="flex items-center gap-2 text-rose-600">
-              <AlertTriangle className="w-5 h-5" />
-              <h3 className="text-base font-black">إلغاء الفاتورة {voidTarget.invoiceNumber}</h3>
-            </div>
-            <p className="text-xs text-slate-500">
-              سيتم إرجاع كميات الفاتورة إلى المخزن وعكس أثرها المالي على حساب العميل والخزينة. لا يمكن التراجع عن هذا الإجراء.
-            </p>
-            <div>
-              <label htmlFor="sales-void-reason" className="block text-xs font-bold text-slate-700 mb-1">سبب الإلغاء *</label>
-              <textarea id="sales-void-reason" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} rows={3} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" placeholder="مثال: خطأ في إدخال الفاتورة / إلغاء الاتفاق مع العميل" />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setVoidTarget(null)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">رجوع</button>
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} تأكيد الإلغاء
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* ── Payment modal ───────────────────────────────────────────────────── */}
-      {payTarget && (
-        <Modal onClose={() => setPayTarget(null)}>
-          <form onSubmit={submitPayment} className="space-y-4">
-            <div className="flex items-center gap-2 text-sky-600">
-              <Wallet className="w-5 h-5" />
-              <h3 className="text-base font-black">تحصيل دفعة على الفاتورة {payTarget.invoiceNumber}</h3>
-            </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex items-center justify-between">
-              <span className="text-slate-500">المتبقي على الفاتورة</span>
-              <span className="font-black text-amber-600">{fmt(payTarget.remainingAmount)}</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="sales-payment-amount" className="block text-xs font-bold text-slate-700 mb-1">المبلغ المحصل *</label>
-                <input id="sales-payment-amount" type="number" min={0.01} max={payTarget.remainingAmount} step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono" />
-              </div>
-              <div>
-                <label htmlFor="sales-payment-type" className="block text-xs font-bold text-slate-700 mb-1">طريقة الدفع</label>
-                <select id="sales-payment-type" value={payType} onChange={(e) => setPayType(e.target.value as PaymentType)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold">
-                  <option value="CASH">نقدي</option>
-                  <option value="CARD">بطاقة</option>
-                  <option value="BANK_TRANSFER">تحويل بنكي</option>
-                  <option value="CHEQUE">شيك</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="sales-payment-notes" className="block text-xs font-bold text-slate-700 mb-1">ملاحظات</label>
-              <input id="sales-payment-notes" value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" placeholder="اختياري" />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setPayTarget(null)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">إلغاء</button>
-              <button type="submit" disabled={saving} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-2">
-                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} تسجيل التحصيل
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* ── In-app document preview ────────────────────────────────────────── */}
-      {docPreview && (
-        <DocumentPreviewModal
-          title={docPreview.title}
-          subtitle={docPreview.subtitle}
-          fileName={docPreview.fileName}
-          html={docPreview.html}
-          onClose={() => setDocPreview(null)}
-          onDownloadExcel={docPreview.excel}
-          onWhatsApp={docPreview.whatsapp}
-        />
-      )}
-
-      {/* ── Customer statement ─────────────────────────────────────────────── */}
-      {statement && (
-        <Modal onClose={() => setStatement(null)} wide>
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                <FileBarChart className="w-5 h-5 text-emerald-600" /> كشف حساب {statement.customer.name}
-              </h3>
-              <p className="text-[11px] text-slate-500 mt-1">
-                {statement.customer.phone} • الحد الائتماني {fmt(statement.customer.creditLimit)} • الرصيد الحالي{' '}
-                <span className={(statement.customer.currentBalance || 0) > 0 ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
-                  {fmt(statement.customer.currentBalance || 0)}
-                </span>
-              </p>
-            </div>
-            <button onClick={() => setStatement(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
-          </div>
-          <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
-            <table className="w-full text-right text-[11px] min-w-[680px]">
-              <thead className="bg-slate-50 text-slate-500 font-bold">
-                <tr>
-                  <th className="px-3 py-2">التاريخ</th>
-                  <th className="px-3 py-2">المستند</th>
-                  <th className="px-3 py-2">البيان</th>
-                  <th className="px-3 py-2">مدين</th>
-                  <th className="px-3 py-2">دائن</th>
-                  <th className="px-3 py-2">الرصيد</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {statement.transactions.map((tx) => (
-                  <tr key={`${tx.type}-${tx.id}`}>
-                    <td className="px-3 py-2 font-mono text-slate-500">{tx.date}</td>
-                    <td className="px-3 py-2 font-mono font-bold text-slate-700">{tx.docNumber}</td>
-                    <td className="px-3 py-2 text-slate-600">{tx.description}</td>
-                    <td className="px-3 py-2 font-mono text-rose-600">{tx.debit ? fmt(tx.debit) : '—'}</td>
-                    <td className="px-3 py-2 font-mono text-emerald-600">{tx.credit ? fmt(tx.credit) : '—'}</td>
-                    <td className="px-3 py-2 font-mono font-bold text-slate-800">{fmt(tx.balanceAfter)}</td>
-                  </tr>
-                ))}
-                {statement.transactions.length === 0 && (
-                  <tr><td colSpan={6} className="py-10 text-center text-slate-400">لا توجد حركات على حساب العميل.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            {canExportCustomers && <button
-              onClick={() => {
-                const options = statementExportOptions(statement);
-                setDocPreview({
-                  title: 'معاينة كشف الحساب',
-                  subtitle: options.subtitle,
-                  fileName: options.fileName,
-                  html: buildExportHtml(options),
-                  excel: () => exportToExcel(options),
-                });
-              }}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"
-            >
-              <FileDown className="w-3.5 h-3.5" /> معاينة وتصدير
-            </button>}
-            <button onClick={() => setStatement(null)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold">إغلاق</button>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-// ─── Small presentational helpers ─────────────────────────────────────────────
-
-const StatCard: React.FC<{ label: string; value: string; icon: React.ElementType; tone: string }> = ({ label, value, icon: Icon, tone }) => (
-  <div className={`rounded-xl border px-3 py-2.5 ${tone}`}>
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] font-bold opacity-80">{label}</span>
-      <Icon className="w-4 h-4 opacity-70" />
-    </div>
-    <div className="text-sm font-black mt-1 truncate">{value}</div>
-  </div>
-);
-
-const IconButton: React.FC<{ title: string; onClick: () => void; children: React.ReactNode; tone?: string }> = ({ title, onClick, children, tone }) => (
-  <button title={title} onClick={onClick} className={`p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition ${tone || ''}`}>
-    {children}
-  </button>
-);
-
-const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; wide?: boolean }> = ({ children, onClose, wide }) => {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
-    };
-
-    const previousFocus = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      previousFocus?.focus();
-    };
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        aria-label="إغلاق النافذة"
-        onClick={onClose}
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+      <SalesModals
+        selected={selected}
+        setSelected={setSelected}
+        payments={payments}
+        voidTarget={voidTarget}
+        setVoidTarget={setVoidTarget}
+        voidReason={voidReason}
+        setVoidReason={setVoidReason}
+        submitVoid={submitVoid}
+        payTarget={payTarget}
+        setPayTarget={setPayTarget}
+        payAmount={payAmount}
+        setPayAmount={setPayAmount}
+        payType={payType}
+        setPayType={setPayType}
+        payNotes={payNotes}
+        setPayNotes={setPayNotes}
+        submitPayment={submitPayment}
+        docPreview={docPreview}
+        setDocPreview={setDocPreview}
+        statement={statement}
+        setStatement={setStatement}
+        statementExportOptions={statementExportOptions}
+        canViewDebts={canViewDebts}
+        canViewReturns={canViewReturns}
+        canViewCustomerStatement={canViewCustomerStatement}
+        canRefund={canRefund}
+        canCollect={canCollect}
+        canVoid={canVoid}
+        canExportCustomers={canExportCustomers}
+        saving={saving}
+        printInvoice={(invoice) => printService.printInvoice(invoice)}
+        printThermalReceipt={(invoice) => printService.printThermalReceipt(invoice)}
+        openInvoicePreview={openInvoicePreview}
+        openStatement={openStatement}
+        goToReturn={goToReturn}
+        openPayment={openPayment}
+        openVoid={openVoid}
+        buildExportHtml={buildExportHtml}
+        exportToExcel={exportToExcel}
       />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="نافذة حوارية"
-        tabIndex={-1}
-        className={`relative z-10 w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] p-6`}
-      >
-        {children}
-      </div>
     </div>
   );
 };
-
-const InfoBox: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
-  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-    <div className="text-[10px] font-bold text-slate-400">{label}</div>
-    <div className="text-xs font-black text-slate-800 mt-0.5">{value}</div>
-    {sub && <div className="text-[10px] text-slate-500 font-mono mt-0.5">{sub}</div>}
-  </div>
-);
-
-const SummaryRow: React.FC<{ label: string; value: number; strong?: boolean; tone?: string }> = ({ label, value, strong, tone }) => (
-  <div className={`flex items-center justify-between py-0.5 text-[11px] ${strong ? 'font-black text-slate-900 text-xs' : 'text-slate-600'}`}>
-    <span>{label}</span>
-    <span className={`font-mono ${tone || ''}`}>{fmt(value)}</span>
-  </div>
-);

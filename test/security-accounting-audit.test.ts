@@ -52,6 +52,72 @@ test('3.4: enforce default password change, password policy, and session invalid
   ]);
 });
 
+test('first-run setup securely customizes the built-in administrator account', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const auth = new AuthService();
+
+  assert.throws(
+    () => auth.completeFirstRunAdminSetup(admin.id, {
+      username: 'owner',
+      fullName: 'مدير جديد',
+      phone: '',
+      password: 'short',
+    }),
+    /8 أحرف على الأقل/
+  );
+  assert.equal(db.query<{ username: string }>(
+    'SELECT username FROM users WHERE id = ?',
+    [admin.id]
+  )[0]?.username, 'admin', 'Invalid onboarding credentials must not update the administrator');
+
+  const updatedAdmin = auth.completeFirstRunAdminSetup(admin.id, {
+    username: 'owner',
+    fullName: 'مدير جديد',
+    phone: '01000000000',
+    password: 'NewOwnerPass2026!',
+  });
+  assert.equal(updatedAdmin.username, 'owner');
+  assert.equal(updatedAdmin.fullName, 'مدير جديد');
+  assert.equal(updatedAdmin.mustChangePassword, false);
+
+  AuthService.setCurrentUser(updatedAdmin);
+  AuthService.logout();
+  const loggedIn = AuthService.login('owner', 'NewOwnerPass2026!');
+  assert.equal(loggedIn.username, 'owner');
+  assert.equal(loggedIn.fullName, 'مدير جديد');
+  assert.equal(loggedIn.mustChangePassword, false);
+
+  AuthService.logout();
+  AuthService.login('owner', 'NewOwnerPass2026!');
+  const peerAdmin = auth.createUser({
+    username: 'setup_peer_admin',
+    password: 'PeerAdminPass2026!',
+    fullName: 'مدير تجريبي',
+    role: 'ADMIN',
+  });
+  AuthService.logout();
+  AuthService.login(peerAdmin.username, 'PeerAdminPass2026!');
+  assert.throws(
+    () => auth.deleteUser(admin.id),
+    /لا يمكن حذف حساب المدير الأساسي/,
+    'Renaming the built-in administrator must not make it deletable'
+  );
+  AuthService.logout();
+  AuthService.login('owner', 'NewOwnerPass2026!');
+  auth.deleteUser(peerAdmin.id);
+  AuthService.logout();
+
+  db.run('UPDATE users SET username = ?, full_name = ?, phone = NULL, password_hash = ? WHERE id = ?', [
+    'admin',
+    'مدير النظام',
+    (await import('bcryptjs')).default.hashSync('admin123', 10),
+    admin.id,
+  ]);
+});
+
 test('3.5: dashboard metrics date upper-bounding and accurate overdue debt aging', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

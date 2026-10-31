@@ -37,6 +37,31 @@ interface DatabaseStats {
   avg_access_time_ms: number;
 }
 
+function safeUserAgent(): string {
+  try {
+    if (typeof window !== 'undefined' && window.navigator && typeof window.navigator.userAgent === 'string') {
+      return window.navigator.userAgent;
+    }
+  } catch {
+    // ignore
+  }
+  return 'unknown';
+}
+
+const SENSITIVE_KEY_PATTERN = /password|passwd|token|secret|credential|pin|api[_-]?key/i;
+
+function redactValue(value: unknown, depth = 0): unknown {
+  if (depth > 6) return '[truncated]';
+  if (Array.isArray(value)) return value.map((item) => redactValue(item, depth + 1));
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = SENSITIVE_KEY_PATTERN.test(key) ? '[REDACTED]' : redactValue(nested, depth + 1);
+    }
+    return out;
+  }
+  return value;
+}
 class AuditLoggerService {
   private static instance: AuditLoggerService;
   private logs: AuditLog[] = [];
@@ -116,9 +141,9 @@ class AuditLoggerService {
       entityType,
       entityId,
       description,
-      changes,
+      changes: redactValue(changes) as AuditLog['changes'],
       ipAddress: '127.0.0.1',  // محلي فقط
-      userAgent: window.navigator.userAgent,
+      userAgent: safeUserAgent(),
       success,
       error,
       severity
@@ -175,7 +200,7 @@ class AuditLoggerService {
       description,
       changes: null,
       ipAddress: event.ip_address,
-      userAgent: window.navigator.userAgent,
+      userAgent: safeUserAgent(),
       success: outcome === 'success',
       severity: this.getSeverityForEvent(eventType, outcome),
       error: outcome === 'failure' ? `حدث: ${eventType}` : undefined

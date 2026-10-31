@@ -654,7 +654,7 @@ export class ProjectService {
     const status = patch.status ?? existing.status;
     const progress = status === 'DONE'
       ? 100
-      : patch.progress ?? Number(existing.progress) ?? 0;
+      : patch.progress ?? Number(existing.progress);
     const completedAt = status === 'DONE'
       ? existing.completedAt || new Date().toISOString()
       : null;

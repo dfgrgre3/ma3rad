@@ -156,8 +156,10 @@ class PerformanceMonitorService {
     }
 
     // إشعار للنظام
-    const event = new CustomEvent('performance-alert', { detail: alert });
-    window.dispatchEvent(event);
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      const event = new CustomEvent('performance-alert', { detail: alert });
+      window.dispatchEvent(event);
+    }
   }
 
   getMetrics(limit?: number): PerformanceMetrics[] {

@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { ManufacturingService } from '../src/services/ManufacturingService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
 import type { User } from '../src/types/identity.ts';
@@ -63,8 +64,11 @@ test('maintenance records are branch scoped', async () => {
   asAdmin();
   const service = new ManufacturingService();
   const beta = new BranchService().createBranch({ name: 'Mnt Beta', code: 'MNT-BETA', companyId: 'cmp_main' });
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(beta.id, admin);
   const rec = service.createMaintenance({ equipmentName: 'Lathe', branchId: beta.id });
   assert.equal(rec.branchId, beta.id);
+  access.setCurrentBranchId('br_main', admin);
 
   asManager();
   const visible = service.getMaintenanceRecords();

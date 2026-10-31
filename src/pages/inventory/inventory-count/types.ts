@@ -11,6 +11,7 @@ export interface CountSession {
   countType?: string;
   isBlind?: boolean;
   approvalStatus?: string;
+  rejectionReason?: string;
   startDate: string;
   countedBy: string;
   itemsCount: number;

@@ -47,6 +47,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'inventory.adjust', name: 'تسوية المخزون', module: 'INVENTORY' },
   { code: 'inventory.transfer', name: 'تحويل بين المخازن', module: 'INVENTORY' },
   { code: 'inventory.count', name: 'جرد المخزون', module: 'INVENTORY' },
+  { code: 'inventory.count.approve', name: 'اعتماد جرد المخزون', module: 'INVENTORY' },
   { code: 'inventory.export', name: 'تصدير بيانات المخزون', module: 'INVENTORY' },
 
   // Sales
@@ -447,6 +448,7 @@ export class PermissionService {
     }
     if (roleCode === 'MANAGER') {
       PermissionService.reconcileManagerPermissions(db, defaults);
+      PermissionService.backfillInventoryCountApproval(db);
     }
     PermissionService.backfillExportPermissions(db, roleCode);
   }
@@ -471,12 +473,22 @@ export class PermissionService {
   }
 
   private static ensureAdminDataPermissions(db: DatabaseManager): void {
-    for (const permission of ['admin.data.export', 'admin.data.delete']) {
+    for (const permission of ['admin.data.export', 'admin.data.delete', 'inventory.count.approve']) {
       db.run(
         'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
         ['ADMIN', permission]
       );
     }
+  }
+
+  private static backfillInventoryCountApproval(db: DatabaseManager): void {
+    const markerKey = 'rbac.inventoryCountApprovalBackfill.v1';
+    if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
+    const qualified = ['inventory.count', 'inventory.adjust', 'approvals.view'].every((permission) =>
+      db.query('SELECT 1 FROM role_permissions WHERE role_code = ? AND permission_code = ?', ['MANAGER', permission]).length > 0
+    );
+    if (qualified) db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', ['MANAGER', 'inventory.count.approve']);
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
   }
 
   private static reconcileManagerPermissions(db: DatabaseManager, defaults: string[]): void {

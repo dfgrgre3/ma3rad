@@ -15,6 +15,7 @@ export function loadBranchCountSessions(): CountSession[] {
       sc.count_type as countType,
       COALESCE(sc.is_blind, 0) as isBlind,
       COALESCE(sc.approval_status, 'PENDING') as approvalStatus,
+      COALESCE(sc.rejection_reason, '') as rejectionReason,
       sc.date as startDate,
       COALESCE(u.full_name, 'النظام') as countedBy,
       sc.total_items as itemsCount,

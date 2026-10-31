@@ -18,7 +18,9 @@ const CSP_BY_COMMAND = {
   // HMR needs a websocket connection and the inline refresh preamble.
   serve: [...CSP_COMMON, "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'", "connect-src 'self' blob: ws: http://localhost:*"].join('; '),
   // sql.js needs 'wasm-unsafe-eval'; no inline scripts are emitted by the build.
-  build: [...CSP_COMMON, "script-src 'self' 'wasm-unsafe-eval'", "connect-src 'self' blob:"].join('; '),
+  // External connections are limited to the central licensing/configuration API
+  // (enforced again by the Electron network guard) plus local loopback servers.
+  build: [...CSP_COMMON, "script-src 'self' 'wasm-unsafe-eval'", "connect-src 'self' blob: https: http://localhost:* http://127.0.0.1:*"].join('; '),
 } as const;
 
 function appCspPlugin(): Plugin {
@@ -68,6 +70,8 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined;
           if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
           if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+          if (id.includes('xlsx')) return 'vendor-xlsx';
+          if (id.includes('jspdf')) return 'vendor-pdf';
           if (id.includes('sql.js')) return 'vendor-sqlite';
           return undefined;
         },

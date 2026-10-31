@@ -13,8 +13,12 @@ export const CentralActivationView: React.FC = () => {
   }, []);
 
   const handleSaveUrl = () => {
-    CentralLicenseService.setServerUrl(serverUrl);
-    setStatus('Server URL saved.');
+    try {
+      CentralLicenseService.setServerUrl(serverUrl);
+      setStatus('Server URL saved.');
+    } catch (e: any) {
+      setStatus('Could not save server URL: ' + (e?.message || e));
+    }
   };
 
   const handleActivate = async () => {

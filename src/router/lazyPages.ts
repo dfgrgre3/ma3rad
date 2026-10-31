@@ -10,6 +10,7 @@ export const PosView = lazy(() => import('../components/PosView').then(m => ({ d
 export const RestaurantPage = lazy(() => import('../pages/restaurant/RestaurantPage').then(m => ({ default: m.RestaurantPage })));
 export const SalesView = lazy(() => import('../components/SalesView').then(m => ({ default: m.SalesView })));
 export const SalesAnalyticsPage = lazy(() => import('../pages/sales/SalesAnalyticsPage').then(m => ({ default: m.SalesAnalyticsPage })));
+export const SalesHubPage = lazy(() => import('../pages/sales/SalesHubPage').then(m => ({ default: m.SalesHubPage })));
 export const InvoiceCyclePage = lazy(() => import('../pages/sales/InvoiceCyclePage').then(m => ({ default: m.InvoiceCyclePage })));
 export const CustomerStatementPage = lazy(() => import('../pages/sales/CustomerStatementPage').then(m => ({ default: m.CustomerStatementPage })));
 export const ReservationsDepositPage = lazy(() => import('../pages/sales/ReservationsDepositPage').then(m => ({ default: m.ReservationsDepositPage })));

@@ -2132,6 +2132,29 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '101_user_two_factor_auth',
+    description: 'Per-user TOTP/HOTP secrets and hashed recovery codes',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS user_2fa (
+          user_id TEXT PRIMARY KEY,
+          secret TEXT NOT NULL,
+          algorithm TEXT NOT NULL DEFAULT 'TOTP',
+          period INTEGER NOT NULL DEFAULT 30,
+          counter INTEGER NOT NULL DEFAULT 0,
+          enabled INTEGER NOT NULL DEFAULT 0,
+          recovery_codes TEXT NOT NULL DEFAULT '[]',
+          hardware_token_id TEXT,
+          setup_date TEXT,
+          last_used_counter INTEGER,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+      `);
+    },
+  },
 ].flat();
 
 export interface MigrationReport {

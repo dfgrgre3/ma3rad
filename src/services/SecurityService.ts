@@ -426,7 +426,7 @@ export class SecurityService {
   // CORNERWORK
   async validateBackupIntegrity(backupBytes: Uint8Array): Promise<boolean> {
     try {
-      const { isEncryptedBackup } = require('./backupEncryption');
+      const { isEncryptedBackup } = await import('./backupEncryption');
       if (!isEncryptedBackup(backupBytes)) return false;
 
       // Verifikation ist hier noch nicht implementiert

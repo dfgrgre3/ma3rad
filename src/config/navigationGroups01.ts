@@ -27,7 +27,6 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
     icon: CalendarDays,
     color: 'text-blue-600',
     items: [
-      { label: 'مبيعات اليوم', to: '/daily/sales', icon: Receipt, perm: 'sales.view' },
       { label: 'مشتريات اليوم', to: '/daily/purchases', icon: ShoppingBag, perm: 'purchases.view' },
       { label: 'منصرف اليوم', to: '/daily/expenses', icon: TrendingDown, perm: 'cashier.expense' },
       { label: 'ديون اليوم', to: '/daily/debts', icon: Banknote, perm: 'finance.debts.view' },
@@ -42,8 +41,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
     items: [
       { label: 'نقطة البيع (POS)', to: '/pos', icon: ShoppingCart, highlight: true, perm: 'sales.create' },
       { label: 'إدارة المطعم', to: '/restaurant', icon: Utensils, perm: 'orders.view' },
-      { label: 'فواتير المبيعات', to: '/sales', icon: Receipt, perm: 'sales.view' },
-      { label: 'تحليلات المبيعات', to: '/sales/analytics', icon: TrendingUp, perm: 'sales.view' },
+      { label: 'مركز المبيعات', to: '/sales', icon: Receipt, perm: 'sales.view' },
       { label: 'دورة الفاتورة الشاملة', to: '/sales/cycle', icon: Workflow, perm: 'sales.view' },
       { label: 'كشف حساب العميل', to: '/sales/statement', icon: UserRound, perms: ['customers.view', 'sales.view', 'finance.debts.view'] },
       { label: 'الحجوزات والعربونات', to: '/sales/reservations', icon: BookmarkPlus, perm: 'sales.view' },
@@ -106,7 +104,16 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'Pipeline المبيعات', to: '/crm/pipeline', icon: Workflow, perm: 'crm.view' },
       { label: 'الأنشطة والمتابعة', to: '/crm/activities', icon: Activity, perm: 'crm.view' },
       { label: 'الحملات التسويقية', to: '/crm/campaigns', icon: Star, perm: 'crm.view' },
-      { label: 'المشاريع', to: '/projects', icon: Boxes, perm: 'projects.view' },
+    ],
+  },
+{
+    id: 'projects',
+    label: 'المشاريع',
+    icon: Boxes,
+    color: 'text-indigo-600',
+    perm: 'projects.view',
+    items: [
+      { label: 'إدارة المشاريع', to: '/projects', icon: Boxes, perm: 'projects.view' },
     ],
   },
 {

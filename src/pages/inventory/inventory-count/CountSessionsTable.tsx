@@ -62,6 +62,10 @@ export const CountSessionsTable: React.FC<CountSessionsTableProps> = ({ loading,
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1 w-fit">
                     <CheckCircle2 className="w-3 h-3" /> مطابق ومرحل
                   </span>
+                ) : session.status === 'REVIEW' ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-sky-50 text-sky-700 border border-sky-200">بانتظار المراجعة</span>
+                ) : session.status === 'CANCELLED' ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-500 border border-slate-200">ملغى</span>
                 ) : (
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1 w-fit animate-pulse">
                     قيد الجرد والتعبئة

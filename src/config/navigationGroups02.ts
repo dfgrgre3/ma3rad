@@ -1,12 +1,12 @@
 import {
   LayoutDashboard, TrendingUp, ShoppingCart, Receipt, FileText, Package2,
-  RotateCcw as RotateCcl, Layers, BookOpen, ArrowLeftRight, ScanLine, Scale,
-  Wrench, Package, FolderTree, Tags, Ruler, Percent, Star, Barcode, Users,
+  RotateCcw as RotateCcl, Layers, BookOpen, ArrowLeftRight, ScanLine,
+  Wrench, Package, FolderTree, Tags, Ruler, Star, Barcode, Users,
   UserRound, Workflow, Activity, Boxes, Handshake, ClipboardList, ClipboardCheck, ShoppingBag,
   Undo2, Wallet, TrendingDown, Banknote, CalendarDays, Building2, Warehouse, PackageCheck,
   HardHat, Truck, Car, BarChart3, CheckSquare, Bell, ShieldCheck, Settings,
   Download, Cpu, SlidersHorizontal, BadgeDollarSign, BookmarkPlus, FileSpreadsheet, MessageCircle,
-  Trash2, ShieldAlert, PieChart, CreditCard, Lock, Target, Award, FileSignature, Factory, RefreshCw,
+  Trash2, ShieldAlert, CreditCard, Lock, Target, Award, FileSignature, Factory, RefreshCw,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { NavGroupDef } from './navigationTypes';
@@ -44,9 +44,6 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     perm: 'reports.view',
     items: [
       { label: 'مركز التقارير', to: '/reports', icon: BarChart3, perm: 'reports.view' },
-      { label: 'القوائم المالية', to: '/reports/statements', icon: Scale, perm: 'reports.view' },
-      { label: 'الأرباح والخسائر', to: '/reports/profit-loss', icon: PieChart, perm: 'reports.view' },
-      { label: 'ضريبة القيمة المضافة', to: '/reports/tax', icon: Percent, perm: 'reports.view' },
     ],
   },
 {

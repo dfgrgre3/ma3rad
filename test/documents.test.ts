@@ -6,6 +6,7 @@ import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { CompanyService } from '../src/services/CompanyService.ts';
 import { BranchService } from '../src/services/BranchService.ts';
+import { BranchAccessService } from '../src/services/BranchAccessService.ts';
 import { DocumentService } from '../src/services/DocumentService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
 import type { User } from '../src/types/identity.ts';
@@ -177,6 +178,10 @@ test('documents and contracts are isolated between companies and branches', asyn
 
   const service = new DocumentService();
   const mainDoc = service.createDocument({ companyId: 'cmp_main', title: 'Main company policy' });
+
+  // Beta records are created while the beta branch is active.
+  const access = new BranchAccessService();
+  access.setCurrentBranchId(betaBranch.id, admin);
   const betaDoc = service.createDocument({ companyId: beta.id, branchId: betaBranch.id, title: 'Beta secret policy' });
   const betaContract = service.createContract({
     companyId: beta.id,
@@ -187,6 +192,7 @@ test('documents and contracts are isolated between companies and branches', asyn
     value: 5000,
     currency: 'USD',
   });
+  access.setCurrentBranchId('br_main', admin);
 
   db.run(
     `INSERT OR IGNORE INTO user_permissions (user_id, permission_code, effect)

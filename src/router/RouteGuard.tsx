@@ -5,6 +5,7 @@ import { AppConfigService } from '../services/AppConfigService';
 import { ConfigText } from '../components/config/ConfigText';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from '../config/businessProfiles';
 import { withModuleDependencies } from '../config/moduleRegistry';
+import { CentralLicenseService } from '../services/CentralLicenseService';
 
 export const PageLoader: React.FC = () => (
   <div className="flex-1 flex items-center justify-center h-full">
@@ -27,6 +28,19 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
   const modules = withModuleDependencies(parseEnabledModules(SettingsService.getValue('enabledModules'), businessType));
   const businessConfig = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
   const moduleId = getBusinessModuleForPath(pathname);
+
+  // Central license/config gating (best-effort, cached)
+  const centralCfg = CentralLicenseService.getCachedConfig();
+  const allowedModules = centralCfg?.config?.allowedModules;
+  const hiddenMenus: string[] = Array.isArray(centralCfg?.config?.hiddenMenus) ? centralCfg.config.hiddenMenus : [];
+  const isHidden = hiddenMenus.some(h => pathname === h || pathname.startsWith(h.replace(/\/$/, '') + '/'));
+
+  if (isHidden) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (allowedModules && Array.isArray(allowedModules) && moduleId && !allowedModules.includes(moduleId)) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   if (!AppConfigService.isPageEnabled(pathname)) {
     return <Navigate to="/dashboard" replace />;
