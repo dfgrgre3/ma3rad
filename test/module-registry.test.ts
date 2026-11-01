@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
+import { NavigationService } from '../src/services/NavigationService.ts';
 import {
   MODULE_REGISTRY,
   getModulePathOwner,
@@ -101,9 +102,11 @@ test('module activation lifecycle is persisted, audited and dependency-guarded',
   assert.equal(log[0].action, 'DEACTIVATED');
   assert.equal(log[0].reason, 'not used by this company');
 
-  // Navigation visibility follows the module selection.
-  const hidden = JSON.parse(require_settings(db, 'nav.hidden')) as string[];
-  assert.equal(hidden.includes('/approvals'), true);
+  // Module state filters its routes without copying them into manual nav prefs.
+  assert.equal(ModuleRegistryService.isModuleEnabled('approvals'), false);
+  const manualHidden = JSON.parse(require_settings(db, 'nav.hidden.manual')) as string[];
+  assert.equal(manualHidden.includes('/approvals'), false);
+  assert.equal(NavigationService.getAccessibleGroups(admin).some(group => group.items.some(item => item.to === '/approvals')), false);
 
   // Dependencies block removal even when the dependent module is still enabled.
   assert.throws(
@@ -149,6 +152,26 @@ test('module activation lifecycle is persisted, audited and dependency-guarded',
     JSON.stringify({ businessType: 'ceramics', trackInventory: true }),
   ]);
   assert.equal(ModuleRegistryService.getEnabledModuleIds().includes('inventory'), true);
+});
+
+test('module nav state migrates old combined settings and preserves manual hides on active modules', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const admin = AuthService.login('admin', 'admin123');
+  const enabled = ['sales', 'customers', 'finance', 'reports'];
+  db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', ['enabledModules', JSON.stringify(enabled)]);
+  db.run('DELETE FROM system_settings WHERE key = ?', ['nav.hidden.manual']);
+  db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [
+    'nav.hidden', JSON.stringify(['/inventory', '/sales']),
+  ]);
+
+  // The old inventory hide came from its disabled module; /sales was a manual hide.
+  assert.deepEqual(NavigationService.getOverrides().hidden, ['/sales']);
+  assert.equal(NavigationService.getAccessibleGroups(admin).some(group => group.items.some(item => item.to === '/inventory')), false);
+
+  ModuleRegistryService.setEnabledModules(enabled, admin, 'upgrade legacy navigation settings');
+  assert.deepEqual(JSON.parse(require_settings(db, 'nav.hidden.manual')), ['/sales']);
+  assert.equal(NavigationService.getAccessibleGroups(admin).some(group => group.items.some(item => item.to === '/sales')), false);
 });
 
 test('module settings use registry defaults, validation and permissions', async () => {

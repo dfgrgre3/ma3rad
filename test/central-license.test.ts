@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CentralLicenseService } from '../src/services/CentralLicenseService.ts';
 
-const realFetch = globalThis.fetch;
+const root = globalThis as any;
+const previousCentralRequest = root.window?.ceramisys?.central?.request;
 
 function resetLicense(storage: Storage = globalThis.localStorage): void {
   storage.removeItem('central_device_credential');
@@ -11,8 +12,18 @@ function resetLicense(storage: Storage = globalThis.localStorage): void {
   storage.removeItem('central_first_run_activated');
 }
 
-function fakeFetch(handler: () => Promise<any> | any): void {
-  (globalThis as any).fetch = async () => handler();
+function fakeCentralRequest(handler: () => Promise<any> | any): void {
+  root.window.ceramisys = root.window.ceramisys || {};
+  root.window.ceramisys.central = root.window.ceramisys.central || {};
+  root.window.ceramisys.central.request = async () => {
+    const response = await handler();
+    return { ok: response.ok, status: response.status, body: await response.json() };
+  };
+}
+
+function restoreCentralRequest(): void {
+  if (previousCentralRequest) root.window.ceramisys.central.request = previousCentralRequest;
+  else delete root.window.ceramisys?.central?.request;
 }
 
 test('activation gate requires the device credential, not a leftover UI flag', () => {
@@ -33,11 +44,11 @@ test('license validation fails closed without a credential or after a definitive
 
   CentralLicenseService.setServerUrl('https://license.example.com');
   CentralLicenseService.setCredential('cred-123');
-  fakeFetch(() => ({ ok: false, status: 401, json: async () => ({}) }));
+  fakeCentralRequest(() => ({ ok: false, status: 401, json: async () => ({}) }));
   try {
     assert.equal(await CentralLicenseService.validate(), false);
   } finally {
-    (globalThis as any).fetch = realFetch;
+    restoreCentralRequest();
   }
 });
 
@@ -46,15 +57,15 @@ test('license validation succeeds and tolerates a temporary outage only within t
   CentralLicenseService.setServerUrl('https://license.example.com');
   CentralLicenseService.setCredential('cred-123');
 
-  fakeFetch(() => ({ ok: true, status: 200, json: async () => ({}) }));
+  fakeCentralRequest(() => ({ ok: true, status: 200, json: async () => ({}) }));
   assert.equal(await CentralLicenseService.validate(), true);
-  (globalThis as any).fetch = realFetch;
+  restoreCentralRequest();
 
-  fakeFetch(() => { throw new Error('offline'); });
+  fakeCentralRequest(() => { throw new Error('offline'); });
   try {
     assert.equal(await CentralLicenseService.validate(), true, 'still inside the grace window');
   } finally {
-    (globalThis as any).fetch = realFetch;
+    restoreCentralRequest();
   }
 });
 
@@ -64,11 +75,11 @@ test('license validation fails closed once the offline grace window expires', as
   CentralLicenseService.setCredential('cred-123');
   globalThis.localStorage.setItem('central_last_validated_at', String(Date.now() - 15 * 24 * 60 * 60 * 1000));
 
-  fakeFetch(() => { throw new Error('offline'); });
+  fakeCentralRequest(() => { throw new Error('offline'); });
   try {
     assert.equal(await CentralLicenseService.validate(), false);
   } finally {
-    (globalThis as any).fetch = realFetch;
+    restoreCentralRequest();
   }
 });
 
@@ -82,4 +93,29 @@ test('signed configuration cannot be accepted when its signature is unverifiable
   }).then((valid) => {
     assert.equal(valid, false);
   });
+});
+
+test('fetchConfig does not cache configuration whose signature cannot be verified', async () => {
+  resetLicense();
+  CentralLicenseService.setServerUrl('https://license.example.com');
+  globalThis.localStorage.removeItem('central_cached_config');
+  const paths: string[] = [];
+  root.window.ceramisys.central.request = async (request: { path: string }) => {
+    paths.push(request.path);
+    return {
+      ok: true,
+      status: 200,
+      body: request.path.endsWith('/current')
+        ? { schemaVersion: 1, configurationVersion: 9, config: { modules: [] }, signature: 'invalid' }
+        : { publicKey: 'invalid' },
+    };
+  };
+
+  try {
+    assert.equal(await CentralLicenseService.fetchConfig(), null);
+    assert.equal(globalThis.localStorage.getItem('central_cached_config'), null);
+    assert.deepEqual(paths, ['/api/v1/configuration/current', '/api/v1/configuration/public-key']);
+  } finally {
+    restoreCentralRequest();
+  }
 });

@@ -10,7 +10,7 @@ export interface RouteDef {
 export const appRoutes: RouteDef[] = [
   // Dashboard & Tools
   { path: 'dashboard', element: <P.DashboardView /> },
-  { path: 'dashboard/executive', element: <P.ExecutiveDashboard /> },
+  { path: 'dashboard/executive', element: <Navigate to="/dashboard?sec=executive" replace /> },
   { path: 'tools', element: <Navigate to="/dashboard" replace /> },
 
   // Sales & POS
@@ -72,6 +72,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'crm/campaigns', element: <P.CampaignsPage /> },
 
   // Purchasing
+  { path: 'purchases/workflow', element: <P.PurchasingWorkflowPage /> },
   { path: 'suppliers', element: <P.SuppliersView /> },
   { path: 'suppliers/:id', element: <P.SupplierDetailPage /> },
   { path: 'purchases', element: <P.PurchasesView /> },
@@ -87,8 +88,10 @@ export const appRoutes: RouteDef[] = [
   // Finance
   { path: 'cashboxes', element: <P.CashierView /> },
   { path: 'finance', element: <P.FinanceOverviewPage /> },
-  { path: 'finance/other-receivables', element: <P.OtherReceivablesPage /> },
-  { path: 'finance/installments', element: <P.InstallmentsPage /> },
+  { path: 'finance/receivables', element: <P.ReceivablesHubPage /> },
+  { path: 'finance/debts', element: <Navigate to="/finance/receivables?tab=debts" replace /> },
+  { path: 'finance/other-receivables', element: <Navigate to="/finance/receivables?tab=other" replace /> },
+  { path: 'finance/installments', element: <Navigate to="/finance/receivables?tab=installments" replace /> },
   { path: 'finance/expenses', element: <P.ExpensesPage /> },
   { path: 'finance/accounts', element: <P.ChartOfAccountsPage /> },
   { path: 'finance/journal', element: <P.JournalEntriesPage /> },
@@ -144,8 +147,8 @@ export const appRoutes: RouteDef[] = [
   { path: 'settings/app-configuration', element: <Navigate to="/settings?tab=appConfig" replace /> },
   { path: 'settings/configuration-studio', element: <Navigate to="/settings?tab=configStudio" replace /> },
   { path: 'central-activation', element: <P.CentralActivationView /> },
-  { path: 'users', element: <P.UsersView /> },
-  { path: 'backup', element: <P.BackupPage /> },
+  { path: 'users', element: <Navigate to="/admin?tab=users" replace /> },
+  { path: 'backup', element: <Navigate to="/settings?tab=backup" replace /> },
   { path: 'system-health', element: <P.SystemHealthPage /> },
   { path: '*', element: <P.NotFoundPage /> },
 ];

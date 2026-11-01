@@ -30,9 +30,8 @@ export function GlobalSearch({ open, onClose, currentUser }: GlobalSearchProps) 
 
   const { results, error } = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
-    const pageResults: SearchResult[] = NavigationService.getAccessibleGroups(currentUser).flatMap((group) =>
+    const pageResults: SearchResult[] = NavigationService.getNavigationGroups(currentUser).flatMap((group) =>
       group.items
-        .filter((item) => !item.perm || PermissionService.can(currentUser, item.perm))
         .map((item) => ({
           label: item.label,
           meta: group.label,

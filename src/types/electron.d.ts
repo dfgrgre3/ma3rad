@@ -21,6 +21,15 @@ declare global {
         set?: (username: string, password: string) => Promise<{ ok: boolean }>;
         clear?: () => Promise<{ ok: boolean }>;
       };
+      central?: {
+        request?: (request: {
+          serverUrl: string;
+          path: string;
+          method?: 'GET' | 'POST';
+          headers?: Record<string, string>;
+          body?: string;
+        }) => Promise<{ ok: boolean; status: number; body: unknown }>;
+      };
       sync?: {
         status?: () => Promise<{
           clientConfigured: boolean;

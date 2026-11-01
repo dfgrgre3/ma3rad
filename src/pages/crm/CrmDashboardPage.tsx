@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { CrmService, Lead, LeadStage } from '../../services/CrmService';
 import { DatabaseManager } from '../../database/db';
 import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 
 const db = DatabaseManager.getInstance();
 
@@ -326,6 +327,7 @@ export const CrmDashboardPage: React.FC = () => {
   const load = () => {
     setLoading(true);
     try {
+      PermissionService.require(AuthService.requireAuth(), 'crm.view', '/crm/dashboard');
       setStats(buildStats(service));
       setError(null);
     } catch (e: any) {

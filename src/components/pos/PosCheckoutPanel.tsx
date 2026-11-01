@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import type { Customer, PaymentType } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
-import type { AppliedPromotion } from '../../services/PromotionService';
+import type { AppliedPromotion } from '../../services/PricingService';
 import { CentralLimitGuard } from '../ui/CentralLimitGuard';
 
 const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);

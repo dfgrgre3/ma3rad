@@ -18,6 +18,7 @@ import {
   getActivityModuleIds,
   getBusinessModuleForPath,
   getBusinessProfile,
+  getBusinessProfileCapabilities,
   getDefaultBusinessConfiguration,
   getManagedBusinessPaths,
   getProfileModuleIds,
@@ -33,7 +34,11 @@ import {
 import { NavigationService } from '../src/services/NavigationService.ts';
 import { TerminologyService } from '../src/services/TerminologyService.ts';
 import { validateModuleSelection } from '../src/config/moduleRegistry.ts';
-import { shouldShowFirstRunSetup } from '../src/config/setupLifecycle.ts';
+import {
+  shouldShowFirstRunSetup,
+  BYPASS_FIRST_RUN_SETUP,
+  OPEN_ALL_PAGES,
+} from '../src/config/setupLifecycle.ts';
 
 test('custom business profiles start with every ERP module enabled', () => {
   assert.deepEqual(getProfileModuleIds('custom'), BUSINESS_MODULES.map((module) => module.id));
@@ -60,6 +65,12 @@ test('first-run setup is limited to genuinely unconfigured databases', () => {
     hasBusinessData: false,
     hasLegacyConfiguration: true,
   }), false);
+});
+
+test('local mode skips first-run activation and exposes every navigation page', () => {
+  assert.equal(BYPASS_FIRST_RUN_SETUP, true);
+  assert.equal(OPEN_ALL_PAGES, true);
+  assert.deepEqual(NavigationService.getNavigationGroups(null), NAV_GROUPS);
 });
 
 test('all catalog activities resolve to validated shared profile templates', () => {
@@ -139,6 +150,22 @@ test('all catalog activities resolve to validated shared profile templates', () 
       [],
     );
   }
+});
+
+test('business activity capability summaries distinguish configured profiles from implemented workflows', () => {
+  for (const profile of BUSINESS_PROFILES) {
+    const capabilities = getBusinessProfileCapabilities(profile.id);
+    assert.deepEqual(capabilities.map((item) => item.id), [
+      'profileDefaults', 'industrySpecificWorkflows', 'industrySpecificReports',
+      'industrySpecificDocumentTemplates', 'typedCustomFieldStorage',
+    ]);
+    assert.equal(capabilities[0].status, 'implemented');
+    assert.equal(capabilities[2].status, 'not-implemented', `${profile.id} reports`);
+    assert.equal(capabilities[3].status, 'not-implemented', `${profile.id} templates`);
+  }
+  assert.equal(getBusinessProfileCapabilities('food')[1].status, 'not-implemented');
+  assert.equal(getBusinessProfileCapabilities('manufacturing')[1].status, 'partial');
+  assert.equal(getBusinessProfileCapabilities('restaurant')[1].status, 'partial');
 });
 
 test('industry profiles provide useful item attributes where their catalog needs them', () => {

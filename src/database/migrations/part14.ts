@@ -107,4 +107,67 @@ export const MIGRATION_PART_14: Migration[] = [
       `);
     },
   },
+  {
+    id: '103_inventory_count_type_options',
+    description: 'Allow every supported stock count type in the stock count table',
+    disableForeignKeys: true,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE stock_counts_type_upgrade (
+          id TEXT PRIMARY KEY,
+          count_number TEXT UNIQUE NOT NULL,
+          warehouse_id TEXT NOT NULL,
+          date TEXT NOT NULL,
+          count_type TEXT DEFAULT 'FULL'
+            CHECK(count_type IN ('FULL', 'PARTIAL', 'SPOT', 'PERIODIC', 'SURPRISE', 'BLIND')),
+          status TEXT DEFAULT 'DRAFT'
+            CHECK(status IN ('DRAFT', 'COUNTING', 'REVIEW', 'POSTED', 'CANCELLED')),
+          total_items INTEGER DEFAULT 0,
+          items_with_variance INTEGER DEFAULT 0,
+          total_variance_value REAL DEFAULT 0,
+          posted_at TEXT,
+          posted_by TEXT,
+          notes TEXT,
+          created_by TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          is_blind INTEGER DEFAULT 0,
+          approval_status TEXT DEFAULT 'PENDING',
+          approved_by TEXT,
+          approved_at TEXT,
+          rejection_reason TEXT,
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY (posted_by) REFERENCES users(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        INSERT INTO stock_counts_type_upgrade (
+          id, count_number, warehouse_id, date, count_type, status, total_items,
+          items_with_variance, total_variance_value, posted_at, posted_by, notes,
+          created_by, created_at, is_blind, approval_status, approved_by, approved_at,
+          rejection_reason
+        )
+        SELECT
+          id, count_number, warehouse_id, date, count_type, status, total_items,
+          items_with_variance, total_variance_value, posted_at, posted_by, notes,
+          created_by, created_at, is_blind, approval_status, approved_by, approved_at,
+          rejection_reason
+        FROM stock_counts;
+
+        DROP TABLE stock_counts;
+        ALTER TABLE stock_counts_type_upgrade RENAME TO stock_counts;
+        CREATE INDEX IF NOT EXISTS idx_counts_status ON stock_counts(status);
+      `);
+    },
+  },
+  {
+    id: '104_receivables_company_scope',
+    description: 'Scope other receivables and related records to a legal company',
+    up: (db) => {
+      try { db.exec("ALTER TABLE receivables ADD COLUMN company_id TEXT NOT NULL DEFAULT 'cmp_main'"); } catch { /* already present */ }
+      db.exec(`
+        UPDATE receivables SET company_id = 'cmp_main' WHERE company_id IS NULL OR company_id = '';
+        CREATE INDEX IF NOT EXISTS idx_receivables_company_status_due ON receivables(company_id, status, due_date);
+      `);
+    },
+  },
 ];

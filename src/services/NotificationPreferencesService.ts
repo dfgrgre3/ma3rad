@@ -1,58 +1,53 @@
 import { DatabaseManager } from '../database/db';
 import type { NotificationPreference, UpdateNotificationPreferencesDTO } from '../types';
 import { AuthService } from './AuthService';
-import { PermissionService } from './PermissionService';
+import { v4 as uuidv4 } from 'uuid';
 
 export class NotificationPreferencesService {
   private db = DatabaseManager.getInstance();
 
-  public getPreferences(userId: string): NotificationPreference | null {
-    const rows = this.db.query<NotificationPreference>(
+  /** Preferences are self-service; callers cannot read another user's settings. */
+  public getPreferences(): NotificationPreference | null {
+    const actor = AuthService.requireAuth();
+    const row = this.db.query<any>(
       'SELECT * FROM notification_preferences WHERE user_id = ?',
-      [userId]
-    );
-    return rows.length > 0 ? rows[0] : null;
+      [actor.id]
+    )[0];
+    if (!row) return null;
+    return {
+      ...row,
+      emailEnabled: Boolean(row.emailEnabled),
+      pushEnabled: Boolean(row.pushEnabled),
+      lowStockAlerts: Boolean(row.lowStockAlerts),
+      paymentDueAlerts: Boolean(row.paymentDueAlerts),
+      systemAlerts: Boolean(row.systemAlerts),
+    };
   }
 
-  public createOrUpdatePreferences(userId: string, dto: UpdateNotificationPreferencesDTO): NotificationPreference {
+  public updatePreferences(dto: UpdateNotificationPreferencesDTO): NotificationPreference {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'settings.update');
-
-    const existing = this.getPreferences(userId);
-    const now = new Date().toISOString();
-
-    const boolVal = (v: boolean | undefined): number => (v === undefined ? 1 : v ? 1 : 0);
-
-    if (existing) {
-      const fields: string[] = [];
-      const params: any[] = [];
-      if (dto.emailEnabled !== undefined) { fields.push('email_enabled = ?'); params.push(boolVal(dto.emailEnabled)); }
-      if (dto.pushEnabled !== undefined) { fields.push('push_enabled = ?'); params.push(boolVal(dto.pushEnabled)); }
-      if (dto.lowStockAlerts !== undefined) { fields.push('low_stock_alerts = ?'); params.push(boolVal(dto.lowStockAlerts)); }
-      if (dto.paymentDueAlerts !== undefined) { fields.push('payment_due_alerts = ?'); params.push(boolVal(dto.paymentDueAlerts)); }
-      if (dto.systemAlerts !== undefined) { fields.push('system_alerts = ?'); params.push(boolVal(dto.systemAlerts)); }
-
-      if (fields.length > 0) {
-        fields.push('updated_at = CURRENT_TIMESTAMP');
-        params.push(userId);
-        this.db.run(`UPDATE notification_preferences SET ${fields.join(', ')} WHERE user_id = ?`, params);
-      }
-    } else {
-      const id = `np_${Date.now().toString().slice(-6)}`;
-      this.db.run(`
-        INSERT INTO notification_preferences (id, user_id, email_enabled, push_enabled, low_stock_alerts, payment_due_alerts, system_alerts)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [
-        id, userId,
-        boolVal(dto.emailEnabled),
-        boolVal(dto.pushEnabled),
-        boolVal(dto.lowStockAlerts),
-        boolVal(dto.paymentDueAlerts),
-        boolVal(dto.systemAlerts),
-      ]);
-    }
-
-    return this.getPreferences(userId)!;
+    const current = this.getPreferences() || this.getDefaultPreferences();
+    const next = { ...current, ...dto };
+    this.db.run(`
+      INSERT INTO notification_preferences
+        (id, user_id, email_enabled, push_enabled, low_stock_alerts, payment_due_alerts, system_alerts)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        email_enabled = excluded.email_enabled,
+        push_enabled = excluded.push_enabled,
+        low_stock_alerts = excluded.low_stock_alerts,
+        payment_due_alerts = excluded.payment_due_alerts,
+        system_alerts = excluded.system_alerts
+    `, [
+      `np_${uuidv4().slice(0, 12)}`,
+      actor.id,
+      next.emailEnabled ? 1 : 0,
+      next.pushEnabled ? 1 : 0,
+      next.lowStockAlerts ? 1 : 0,
+      next.paymentDueAlerts ? 1 : 0,
+      next.systemAlerts ? 1 : 0,
+    ]);
+    return this.getPreferences()!;
   }
 
   public getDefaultPreferences(): UpdateNotificationPreferencesDTO {

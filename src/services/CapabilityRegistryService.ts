@@ -6,6 +6,7 @@ import {
   withCapabilityDependencies,
   validateCapabilitySelection,
   getCapabilityPathOwner,
+  isKnownScreen,
   getManagedCapabilityPaths,
   getHiddenCapabilityPaths,
   type CapabilityDefinition,
@@ -47,10 +48,6 @@ export interface CapabilityChangeResult {
  */
 export class CapabilityRegistryService extends ModuleRegistryService {
   public static getCapabilityDefinitions(): CapabilityDefinition[] {
-    return CAPABILITY_CATALOG;
-  }
-
-  public static getCapabilities(): CapabilityDefinition[] {
     return CAPABILITY_CATALOG;
   }
 
@@ -112,23 +109,15 @@ export class CapabilityRegistryService extends ModuleRegistryService {
     return getCapabilityPathOwner(pathname);
   }
 
-  public static getCapabilityScreenOwner(pathname: string): string | undefined {
-    return getCapabilityPathOwner(pathname);
+  public static isKnownScreen(pathname: string): boolean {
+    return isKnownScreen(pathname);
   }
 
   public static getManagedCapabilityPaths(): Set<string> {
     return getManagedCapabilityPaths();
   }
 
-  public static getManagedCapabilityScreens(): Set<string> {
-    return getManagedCapabilityPaths();
-  }
-
   public static getHiddenCapabilityPaths(enabledCapabilityIds: string[]): string[] {
-    return getHiddenCapabilityPaths(enabledCapabilityIds);
-  }
-
-  public static getHiddenCapabilityScreens(enabledCapabilityIds: string[]): string[] {
     return getHiddenCapabilityPaths(enabledCapabilityIds);
   }
 
@@ -164,12 +153,4 @@ export class CapabilityRegistryService extends ModuleRegistryService {
   }
 }
 
-export { CapabilityRegistryService as CapabilityCatalog };
-export { CapabilityRegistryService as Capabilities };
-export { CapabilityRegistryService as Capability };
-export { CapabilityRegistryService as CapabilityRegistry };
-export { CapabilityRegistryService as CapabilityService };
-export { CapabilityRegistryService as CapabilitiesService };
-export { CapabilityRegistryService as CapabilityCatalogService };
-export { CapabilityRegistryService as CapabilityManager };
 // Alias service names are provided by dedicated files in this directory.

@@ -179,6 +179,19 @@ test('company scope hides master data owned by another company', async () => {
   asUser(admin);
 });
 
+test('other receivables are centrally shared inside their company and isolated from other companies', async () => {
+  const { db, betaId } = await boot();
+  db.run(`INSERT OR REPLACE INTO receivables (id, company_id, title, created_by)
+    VALUES ('rec_scope_main', 'cmp_main', 'Main company claim', 'usr_scope_admin'),
+           ('rec_scope_beta', ?, 'Beta company claim', 'usr_scope_admin')`, [betaId]);
+
+  const limited = limitedUser();
+  asUser(limited);
+  const scope = new BranchAccessService().companyScope('r.company_id', limited);
+  const rows = db.query<{ id: string }>(`SELECT r.id FROM receivables r WHERE ${scope.clause}`, scope.params);
+  assert.deepEqual(rows.map((row) => row.id), ['rec_scope_main']);
+});
+
 test('rows created without company_id inherit the main company instead of disappearing', async () => {
   await boot();
   const db = DatabaseManager.getInstance();

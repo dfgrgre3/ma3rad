@@ -67,7 +67,9 @@ test('route guards use the same permissions as navigation entries', async () => 
   const protectedRoutes: Array<[string, string]> = [
     ['/sales/cycle', 'sales.view'],
     ['/purchases/returns', 'purchases.return'],
-    ['/finance/installments', 'finance.installments.view'],
+    // Legacy path redirects to the shared receivables hub; the selected tab
+    // applies its own finer-grained permission inside that hub.
+    ['/finance/installments', 'finance.view'],
     ['/finance/expenses', 'cashier.expense'],
     ['/admin/data-deletion', 'admin.data.delete'],
     ['/products/prod-1', 'products.view'],

@@ -11,6 +11,7 @@ import { ProfileMenu } from './ui/ProfileMenu';
 import { GlobalSearch } from './GlobalSearch';
 import { HeaderNav } from './HeaderNav';
 import { useToast } from './ui/Toast';
+import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 
 interface HeaderProps {
   currentUser: User | null;
@@ -40,10 +41,10 @@ const EXTRA_TITLES: Record<string, string> = {
 
 /** Resolve the current page title from the navigation structure. */
 export function resolvePageTitle(pathname: string): { title: string; group: string } {
-  const isHidden = (path: string) => !CentralFeaturePermissionService.isPageVisible(path);
+  const isHidden = (path: string) => !OPEN_ALL_PAGES && !CentralFeaturePermissionService.isPageVisible(path);
 
   let best: { title: string; group: string; length: number } | null = null;
-  for (const group of NavigationService.getGroups()) {
+  for (const group of NavigationService.getNavigationGroups(null)) {
     for (const item of group.items) {
       if (isHidden(item.to)) continue;
       const matches = pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`));
@@ -168,13 +169,13 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Actions */}
       <div className="mr-auto flex shrink-0 flex-wrap items-center gap-1">
         {branches.length > 0 && (
-          <label className="flex h-8 max-w-48 items-center gap-1.5 rounded-[2px] border border-[#a6a6a6] bg-white px-2 text-[#4d4d4d] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] sm:max-w-60">
+          <label className="flex h-7 w-[116px] max-w-[38vw] items-center gap-1 rounded-[2px] border border-[#a6a6a6] bg-white px-1 text-[#4d4d4d] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] sm:h-8 sm:w-auto sm:max-w-60 sm:gap-1.5 sm:px-2">
             <Building2 className="h-3.5 w-3.5 shrink-0 text-[#0078d4]" />
             <span className="hidden text-[10px] text-[#767676] lg:inline">الفرع</span>
             <select
               value={activeBranchId}
               onChange={(event) => switchBranch(event.target.value)}
-              className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent py-1 text-[11px] font-semibold text-inherit outline-none"
+              className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent py-1 text-[10px] font-semibold text-inherit outline-none sm:text-[11px]"
               aria-label="الفرع النشط"
               title="تبديل الفرع النشط"
             >
@@ -204,7 +205,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={toggleMode}
-          className="win-btn win-btn--ghost !min-h-8 !px-2"
+          className="win-btn win-btn--ghost hidden !min-h-8 !px-2 sm:flex"
           title={resolvedMode === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
           aria-label={resolvedMode === 'dark' ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'}
         >
@@ -214,7 +215,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={() => navigate('/notifications')}
-          className="win-btn win-btn--ghost relative !min-h-8 !px-2"
+          className="win-btn win-btn--ghost relative hidden !min-h-8 !px-2 sm:flex"
           title={unreadNotifications ? `لديك ${unreadNotifications} إشعار غير مقروء` : 'الإشعارات'}
           aria-label="الإشعارات"
         >
@@ -226,7 +227,13 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </button>
 
-        {currentUser && <ProfileMenu currentUser={currentUser} onLogout={onLogout} />}
+        {currentUser && (
+          <ProfileMenu
+            currentUser={currentUser}
+            unreadNotifications={unreadNotifications}
+            onLogout={onLogout}
+          />
+        )}
       </div>
 
       <GlobalSearch

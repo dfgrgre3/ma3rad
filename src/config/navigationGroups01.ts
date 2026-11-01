@@ -53,7 +53,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
   },
 {
     id: 'inventory',
-    label: 'المخزون',
+    label: 'مركز المخزون',
     icon: Layers,
     color: 'text-violet-600',
     perm: 'inventory.view',
@@ -75,7 +75,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
   },
 {
     id: 'products',
-    label: 'المنتجات',
+    label: 'كتالوج المنتجات',
     icon: Package,
     color: 'text-amber-600',
     perm: 'products.view',
@@ -118,11 +118,12 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
   },
 {
     id: 'purchasing',
-    label: 'المشتريات',
+    label: 'مركز المشتريات',
     icon: ShoppingBag,
     color: 'text-orange-600',
     perm: 'purchases.view',
     items: [
+      { label: 'مراحل دورة الشراء', to: '/purchases/workflow', icon: Workflow, perm: 'purchases.view' },
       { label: 'الموردون', to: '/suppliers', icon: Handshake, perm: 'suppliers.view' },
       { label: 'طلبات الشراء', to: '/purchases/requests', icon: ClipboardList, perm: 'purchases.view' },
       { label: 'عروض أسعار الموردين', to: '/purchases/quotations', icon: FileSpreadsheet, perm: 'purchases.view' },
@@ -154,8 +155,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'توقع التدفقات النقدية', to: '/finance/cash-forecast', icon: BarChart3, perm: 'finance.view' },
       { label: 'الدفع الإلكتروني والتسويات', to: '/finance/epayment-settlements', icon: CreditCard, perm: 'finance.view' },
       { label: 'الأصول الثابتة', to: '/finance/assets', icon: Building2, perm: 'finance.view' },
-      { label: 'المستحقات الأخرى', to: '/finance/other-receivables', icon: ClipboardList, perm: 'finance.debts.view' },
-      { label: 'الأقساط', to: '/finance/installments', icon: CalendarDays, perm: 'finance.installments.view' },
+      { label: 'مركز الذمم والتحصيل', to: '/finance/receivables', icon: ClipboardList, perm: 'finance.debts.view' },
     ],
   }
 ];

@@ -22,7 +22,7 @@ export const ReturnsPage = lazy(() => import('../pages/sales/ReturnsPage').then(
 // Daily Operations
 export const TodaySalesPage = lazy(() => import('../pages/daily/DailyPage').then(m => ({ default: m.TodaySalesPage })));
 export const TodayPurchasesPage = lazy(() => import('../pages/daily/DailyPage').then(m => ({ default: m.TodayPurchasesPage })));
-export const TodayExpensesPage = lazy(() => import('../pages/daily/DailyPage').then(m => ({ default: m.TodayExpensesPage })));
+export const TodayExpensesPage = lazy(() => import('../pages/finance/ExpensesPage').then(m => ({ default: m.TodayExpensesPage })));
 export const TodayDebtsPage = lazy(() => import('../pages/daily/DailyPage').then(m => ({ default: m.TodayDebtsPage })));
 
 // Products & Pricing
@@ -89,11 +89,14 @@ export const IncomingProductsPage = lazy(() => import('../pages/purchasing/Incom
 export const PurchaseReturnsPage = lazy(() => import('../pages/purchasing/PurchaseReturnsPage').then(m => ({ default: m.PurchaseReturnsPage })));
 export const SupplierClaimsPage = lazy(() => import('../pages/purchasing/SupplierClaimsPage').then(m => ({ default: m.SupplierClaimsPage })));
 export const SupplierStatementPage = lazy(() => import('../pages/purchasing/SupplierStatementPage').then(m => ({ default: m.SupplierStatementPage })));
+export const PurchasingWorkflowPage = lazy(() => import('../pages/purchasing/PurchasingWorkflowPage').then(m => ({ default: m.PurchasingWorkflowPage })));
 
 // Finance
 export const CashierView = lazy(() => import('../components/CashierView').then(m => ({ default: m.CashierView })));
 export const FinanceOverviewPage = lazy(() => import('../pages/finance/FinanceOverviewPage').then(m => ({ default: m.FinanceOverviewPage })));
+export const ReceivablesHubPage = lazy(() => import('../pages/finance/ReceivablesHubPage').then(m => ({ default: m.ReceivablesHubPage })));
 export const OtherReceivablesPage = lazy(() => import('../pages/finance/OtherReceivablesPage').then(m => ({ default: m.OtherReceivablesPage })));
+export const DebtsDashboardPage = lazy(() => import('../pages/finance/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
 export const InstallmentsPage = lazy(() => import('../pages/finance/InstallmentsPage').then(m => ({ default: m.InstallmentsPage })));
 export const ExpensesPage = lazy(() => import('../pages/finance/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 export const ChartOfAccountsPage = lazy(() => import('../pages/finance/ChartOfAccountsPage').then(m => ({ default: m.ChartOfAccountsPage })));
@@ -133,7 +136,6 @@ export const DynamicDataPage = lazy(() => import('../pages/settings/DynamicDataP
 export const AppConfigurationView = lazy(() => import('../pages/settings/AppConfigurationPage').then(m => ({ default: m.AppConfigurationPage })));
 export const ConfigurationStudioView = lazy(() => import('../pages/settings/ConfigurationStudioPage').then(m => ({ default: m.ConfigurationStudioPage })));
 export const DataImportPage = lazy(() => import('../pages/settings/DataImportPage').then(m => ({ default: m.DataImportPage })));
-export const SettingsView = lazy(() => import('../components/SettingsView').then(m => ({ default: m.SettingsView })));
 export const SettingsHubPage = lazy(() => import('../pages/settings/SettingsHubPage').then(m => ({ default: m.SettingsHubPage })));
 export const CentralActivationView = lazy(() => import('../components/CentralActivationView').then(m => ({ default: m.CentralActivationView })));
 export const UsersView = lazy(() => import('../components/UsersView').then(m => ({ default: m.UsersView })));

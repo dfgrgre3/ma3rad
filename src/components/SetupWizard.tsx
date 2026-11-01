@@ -17,13 +17,13 @@ import { AuthService } from '../services/AuthService';
 import { CompanyService } from '../services/CompanyService';
 import { BranchService } from '../services/BranchService';
 import { useToast } from './ui/Toast';
+import { BusinessProfileSupportNotice } from './business/BusinessProfileSupportNotice';
 import {
   BUSINESS_UNITS,
   BUSINESS_MODULES,
   BUSINESS_ACTIVITY_FAMILY_OPTIONS,
   BUSINESS_TYPES,
   getActivityModuleIds,
-  getBusinessProfile,
   getDefaultBusinessConfiguration,
   getProfileModuleIds,
   parseBusinessConfiguration,
@@ -1154,11 +1154,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                     .join('، ')}
                 </p>
               )}
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                {getBusinessProfile(form.businessType).support.industrySpecificWorkflows === 'implemented'
-                  ? 'ملف النشاط يفعّل إعدادات ومسارات متخصصة مدعومة.'
-                  : 'ملف النشاط يضبط الوحدات والوحدات القياسية وخصائص المنتجات فقط؛ الوظائف المتخصصة غير المعلنة كمدعومة لا تُفعّل تلقائيًا.'}
-              </p>
+              <BusinessProfileSupportNotice businessType={form.businessType} />
               {form.businessType === 'custom' && (
                 <div>
                   <label htmlFor="setup-business-type-label" className={labelClass}>اسم النشاط التجاري *</label>

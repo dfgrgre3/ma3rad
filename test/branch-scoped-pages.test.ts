@@ -8,6 +8,11 @@ import { PermissionService } from '../src/services/PermissionService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
 import { AnalyticsService } from '../src/services/AnalyticsService.ts';
 import { ProcurementService } from '../src/services/ProcurementService.ts';
+import { runExecutiveQueries } from '../src/pages/dashboard/executive/useExecutiveQueries.ts';
+import { queryFinanceOverviewMetrics } from '../src/services/DashboardQueryScopeService.ts';
+import { DebtService } from '../src/services/DebtService.ts';
+import { InventoryValuationService } from '../src/services/InventoryValuationService.ts';
+import { InstallmentService } from '../src/services/InstallmentService.ts';
 import { loadReport } from '../src/pages/reports/SalesReportsPage.tsx';
 import { loadPurchaseKpi, loadInventoryKpi } from '../src/pages/reports/PurchaseInventoryReportPage.tsx';
 import { loadBranchAdjustments } from '../src/pages/inventory/InventoryAdjustmentsPage.tsx';
@@ -42,8 +47,8 @@ test('inventory, report and party pages only expose data from accessible branche
   );
   db.run(
     `INSERT OR IGNORE INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id)
-     VALUES ('cr_page_a', 'Page Register A', 0, 1, 1, 'br_page_a'),
-            ('cr_page_b', 'Page Register B', 0, 1, 1, 'br_page_b')`
+     VALUES ('cr_page_a', 'Page Register A', 100, 1, 1, 'br_page_a'),
+            ('cr_page_b', 'Page Register B', 900, 1, 1, 'br_page_b')`
   );
   db.run(
     `INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role, is_active, branch_scope)
@@ -56,7 +61,10 @@ test('inventory, report and party pages only expose data from accessible branche
     `INSERT OR IGNORE INTO user_permissions (user_id, permission_code, effect)
      VALUES ('usr_page_scope', 'suppliers.view', 'GRANT'),
            ('usr_page_scope', 'finance.debts.view', 'GRANT'),
-           ('usr_page_scope', 'purchases.view', 'GRANT')`
+           ('usr_page_scope', 'purchases.view', 'GRANT'),
+           ('usr_page_scope', 'sales.view', 'GRANT'),
+           ('usr_page_scope', 'finance.view', 'GRANT'),
+           ('usr_page_scope', 'finance.installments.view', 'GRANT')`
   );
   db.run(
     `INSERT OR IGNORE INTO customers (id, code, name, phone) VALUES
@@ -71,9 +79,9 @@ test('inventory, report and party pages only expose data from accessible branche
   const today = localDateString();
   db.run(
     `INSERT INTO sales_invoices (id, invoice_number, date, customer_id, warehouse_id, branch_id,
-       subtotal, discount_amount, total_amount, created_by)
-     VALUES ('si_page_a', 'PAGE-SI-A', ?, 'cust_page_a', 'wh_page_a', 'br_page_a', 500, 0, 500, 'usr_page_scope'),
-            ('si_page_b', 'PAGE-SI-B', ?, 'cust_page_b', 'wh_page_b', 'br_page_b', 900, 0, 900, 'usr_page_scope')`,
+       subtotal, discount_amount, total_amount, created_by, remaining_amount)
+     VALUES ('si_page_a', 'PAGE-SI-A', ?, 'cust_page_a', 'wh_page_a', 'br_page_a', 500, 0, 500, 'usr_page_scope', 50),
+            ('si_page_b', 'PAGE-SI-B', ?, 'cust_page_b', 'wh_page_b', 'br_page_b', 900, 0, 900, 'usr_page_scope', 90)`,
     [today, today]
   );
   db.run(
@@ -102,9 +110,9 @@ test('inventory, report and party pages only expose data from accessible branche
   );
   db.run(
     `INSERT INTO purchase_invoices (id, invoice_number, date, supplier_id, warehouse_id, branch_id,
-       subtotal, total_amount, created_by)
-     VALUES ('pi_page_a', 'PAGE-PI-A', ?, 'sup_page', 'wh_page_a', 'br_page_a', 200, 200, 'usr_page_scope'),
-            ('pi_page_b', 'PAGE-PI-B', ?, 'sup_page', 'wh_page_b', 'br_page_b', 300, 300, 'usr_page_scope')`,
+       subtotal, total_amount, created_by, remaining_amount)
+     VALUES ('pi_page_a', 'PAGE-PI-A', ?, 'sup_page', 'wh_page_a', 'br_page_a', 200, 200, 'usr_page_scope', 20),
+            ('pi_page_b', 'PAGE-PI-B', ?, 'sup_page', 'wh_page_b', 'br_page_b', 300, 300, 'usr_page_scope', 30)`,
     [today, today]
   );
   db.run(
@@ -125,8 +133,50 @@ test('inventory, report and party pages only expose data from accessible branche
      VALUES ('sp_page_a', 'PAGE-SP-A', 'sup_page', 50, 'CASH', ?, 'cr_page_a', 'br_page_a', 'usr_page_scope')`,
     [today]
   );
+  db.run(
+    `INSERT INTO expenses (id, category, amount, register_id, date, description, performed_by, branch_id)
+     VALUES ('exp_page_a', 'Page A', 40, 'cr_page_a', ?, 'Page A expense', 'usr_page_scope', 'br_page_a'),
+            ('exp_page_b', 'Page B', 90, 'cr_page_b', ?, 'Page B expense', 'usr_page_scope', 'br_page_b')`,
+    [today, today]
+  );
+  db.run(
+    `INSERT INTO installment_plans (id, plan_number, customer_id, invoice_id, total_amount, financed_amount,
+       installments_count, installment_amount, start_date, remaining_amount, created_by, branch_id)
+     VALUES ('plan_page_a', 'PAGE-PLAN-A', 'cust_page_a', 'si_page_a', 50, 50, 1, 50, ?, 50, 'usr_page_scope', 'br_page_a'),
+            ('plan_page_b', 'PAGE-PLAN-B', 'cust_page_b', 'si_page_b', 90, 90, 1, 90, ?, 90, 'usr_page_scope', 'br_page_b')`,
+    [today, today]
+  );
+  db.run(
+    `INSERT INTO installments (id, plan_id, sequence_number, due_date, amount, remaining_amount)
+     VALUES ('inst_page_a', 'plan_page_a', 1, ?, 50, 50), ('inst_page_b', 'plan_page_b', 1, ?, 90, 90)`,
+    [today, today]
+  );
 
   AuthService.setCurrentUser(assignedUser);
+
+  const executive = runExecutiveQueries(today, today)!;
+  assert.equal(executive.total, 500, 'executive sales KPI excludes branch B');
+  assert.equal(executive.totalPurchases, 200, 'executive purchasing KPI excludes branch B');
+  assert.equal(executive.totalDebt, 50, 'executive receivables exclude branch B');
+  assert.equal(executive.branchDataList.length, 1, 'branch comparison does not reveal another branch');
+  assert.ok(executive.recentInvoicesData.every(invoice => invoice.id === 'si_page_a'));
+  assert.ok(executive.lowStockData.every(item => item.warehouse === 'Page Warehouse A'));
+  const finance = queryFinanceOverviewMetrics(db.getDatabase()!, today, today, assignedUser);
+  assert.equal(finance.totalRevenue, 500, 'finance dashboard revenue excludes branch B');
+  assert.equal(finance.cashBalance, 100, 'finance dashboard cash excludes branch B');
+  assert.equal(finance.totalExpenses, 40, 'finance dashboard expenses exclude branch B');
+  assert.equal(finance.totalReceivables, 50, 'finance dashboard receivables exclude branch B');
+  assert.equal(finance.totalPayables, 20, 'finance dashboard payables exclude branch B');
+  assert.deepEqual(new DebtService().getTotals(), { receivable: 50, payable: 20, net: 30 });
+  assert.ok(new DebtService().getDebts().every((debt) => debt.amount === 50 || debt.amount === 20));
+  const valuation = new InventoryValuationService();
+  assert.deepEqual(valuation.getByWarehouse().map((warehouse) => warehouse.name), ['Page Warehouse A']);
+  assert.equal(valuation.getKpi().totalValue, 1000);
+  const installments = new InstallmentService().getPageData();
+  assert.deepEqual(installments.invoiceRows.map((row) => row[0]), ['si_page_a']);
+  assert.deepEqual(installments.planRows.map((row) => row[0]), ['plan_page_a']);
+  assert.deepEqual(installments.installmentRows.map((row) => row[0]), ['inst_page_a']);
+  assert.equal(finance.inventoryValue, 1000, 'finance dashboard inventory excludes branch B');
 
   const salesRows = loadReport('by_customer', today, today) as Array<{ label: string; revenue: number }>;
   assert.deepEqual(salesRows.map(row => row.label), ['Page Customer A']);
@@ -200,6 +250,9 @@ test('inventory, report and party pages only expose data from accessible branche
   db.run("DELETE FROM purchase_invoices WHERE id IN ('pi_page_a', 'pi_page_b')");
   db.run("DELETE FROM purchase_orders WHERE id IN ('po_page_a', 'po_page_b')");
   db.run("DELETE FROM supplier_payments WHERE id = 'sp_page_a'");
+  db.run("DELETE FROM expenses WHERE id IN ('exp_page_a', 'exp_page_b')");
+  db.run("DELETE FROM installments WHERE id IN ('inst_page_a', 'inst_page_b')");
+  db.run("DELETE FROM installment_plans WHERE id IN ('plan_page_a', 'plan_page_b')");
   db.run("DELETE FROM sales_invoices WHERE id IN ('si_page_a', 'si_page_b')");
   db.run("DELETE FROM stock_adjustments WHERE id IN ('adj_page_a', 'adj_page_b')");
   db.run("DELETE FROM stock_counts WHERE id IN ('cnt_page_a', 'cnt_page_b')");

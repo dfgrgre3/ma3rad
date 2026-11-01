@@ -11,7 +11,7 @@ protected db = DatabaseManager.getInstance();
 /** كل دوال القراءة في CRM تتطلب صلاحية العرض، كي لا تُعرض البيانات عند دمج
  *  الشاشات داخل لوحة المعلومات دون فحص صلاحية المسار الأب. */
 protected requireView(): void {
-  PermissionService.require(AuthService.requireAuth(), 'crm.view');
+  PermissionService.require(AuthService.requireAuth(), 'crm.view', '/crm/dashboard');
 }
 
 public getLeads(search = '', stage?: string): Lead[] {

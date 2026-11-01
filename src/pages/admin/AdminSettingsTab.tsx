@@ -6,6 +6,7 @@ import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
+import { BusinessProfileSupportNotice } from '../../components/business/BusinessProfileSupportNotice';
 import type { SystemSettings } from '../../types';
 import {
   BUSINESS_MODULES,
@@ -13,7 +14,6 @@ import {
   BUSINESS_TYPES,
   BUSINESS_UNITS,
   getActivityModuleIds,
-  getBusinessProfile,
   getDefaultBusinessConfiguration,
   parseBusinessConfiguration,
   parseEnabledModules,
@@ -451,11 +451,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                 })}
               </div>
             )}
-            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-              {getBusinessProfile(businessProfile.type).support.industrySpecificWorkflows === 'implemented'
-                ? 'ملف النشاط يفعّل إعدادات ومسارات متخصصة مدعومة.'
-                : 'ملف النشاط يضبط الإعدادات الافتراضية والوحدات والخصائص والوحدات المفعّلة؛ راجع ملف JSON لمعرفة الوظائف المتخصصة غير المنفذة.'}
-            </p>
+            <BusinessProfileSupportNotice businessType={businessProfile.type} />
             {businessProfile.type === 'custom' && (
               <Field label="اسم النشاط التجاري *">
                 <input

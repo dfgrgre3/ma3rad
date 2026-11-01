@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronLeft, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Moon, PanelRightClose, PanelRightOpen, Sun } from 'lucide-react';
 import type { User } from '../types';
 import { NavigationService } from '../services/NavigationService';
 import { useTheme } from '../contexts/ThemeContext';
@@ -23,7 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
 }) => {
   const location = useLocation();
-  const { settings } = useTheme();
+  const { settings, resolvedMode, toggleMode } = useTheme();
   const isCollapsed = mobile ? false : collapsed;
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
@@ -36,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   const visibleGroups = useMemo(
-    () => NavigationService.getAccessibleGroups(currentUser),
+    () => NavigationService.getNavigationGroups(currentUser),
     [currentUser, settings]
   );
 
@@ -150,6 +150,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="shrink-0 border-t border-[#d9d9d9] px-2 py-1.5 dark:border-[#3d3d3d]">
+        {mobile && (
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="win-btn win-btn--ghost flex w-full !justify-start !px-2 text-[12px] sm:hidden"
+            title={resolvedMode === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
+            aria-label={resolvedMode === 'dark' ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'}
+          >
+            {resolvedMode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <span>{resolvedMode === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}</span>
+          </button>
+        )}
         {!mobile && onToggleCollapsed && (
           <button
             type="button"

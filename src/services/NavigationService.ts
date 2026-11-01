@@ -1,5 +1,6 @@
 import { NAV_GROUPS, NAV_STORAGE_KEYS, type NavGroupDef } from '../config/navigation';
 import { getModulePathOwner } from '../config/moduleRegistry';
+import { ModuleRegistryService } from './ModuleRegistryService';
 import { SettingsService } from './SettingsService';
 import { PermissionService } from './PermissionService';
 import { AuthService } from './AuthService';
@@ -9,6 +10,7 @@ import { TerminologyService } from './TerminologyService';
 import { AppConfigService } from './AppConfigService';
 import { CentralLicenseService } from './CentralLicenseService';
 import { CentralFeaturePermissionService } from './CentralFeaturePermissionService';
+import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 
 export interface NavOverrides {
   hidden: string[];
@@ -77,8 +79,17 @@ export class NavigationService {
   }
 
   public static getOverrides(): NavOverrides {
+    const manualHiddenRaw = SettingsService.getValue(NAV_STORAGE_KEYS.hidden);
+    const legacyHidden = parseJson<string[]>(SettingsService.getValue('nav.hidden'), []);
+    const enabledModules = ModuleRegistryService.getEnabledModuleIds();
+    const hidden = manualHiddenRaw !== undefined
+      ? parseJson<string[]>(manualHiddenRaw, [])
+      : legacyHidden.filter((path) => {
+          const owner = getModulePathOwner(path);
+          return !owner || enabledModules.includes(owner);
+        });
     return {
-      hidden: parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.hidden), []),
+      hidden,
       labels: parseJson<Record<string, string>>(SettingsService.getValue(NAV_STORAGE_KEYS.labels), {}),
       groupsOrder: parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.groupsOrder), []),
       itemsOrder: parseJson<Record<string, string[]>>(SettingsService.getValue(NAV_STORAGE_KEYS.itemsOrder), {}),
@@ -98,6 +109,8 @@ export class NavigationService {
       ? (centralCfg!.config.allowedModules as string[])
       : null;
     const isModuleAllowed = (path: string) => {
+      const localOwner = getModulePathOwner(path);
+      if (localOwner && !ModuleRegistryService.isModuleEnabled(localOwner)) return false;
       if (!centralAllowed) return true;
       const owner = getModulePathOwner(path);
       if (!owner) return true;
@@ -116,6 +129,10 @@ export class NavigationService {
         }),
       }))
       .filter((group) => group.items.length > 0);
+  }
+
+  public static getNavigationGroups(user: User | null): NavGroupDef[] {
+    return OPEN_ALL_PAGES ? NAV_GROUPS : NavigationService.getAccessibleGroups(user);
   }
 
   public static getFirstAccessiblePath(user: User | null): string | null {

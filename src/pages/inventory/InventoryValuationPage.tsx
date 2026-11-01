@@ -1,16 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Scale, Download, TrendingUp, DollarSign, Layers, PieChart } from 'lucide-react';
-import { DatabaseManager } from '../../database/db';
-import { getProductUnitLabel } from '../../utils/productUnits';
-
-interface WarehouseValuation {
-  id: string;
-  name: string;
-  itemsCount: number;
-  quantitiesByUnit: { unitLabel: string; quantity: number }[];
-  costValue: number;
-  retailValue: number;
-}
+import { InventoryValuationService, type WarehouseValuation } from '../../services/InventoryValuationService';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
+import { exportToExcel } from '../../utils/export';
 
 export const InventoryValuationPage: React.FC = () => {
   const [data, setData] = useState<WarehouseValuation[]>([]);
@@ -21,49 +14,8 @@ export const InventoryValuationPage: React.FC = () => {
   }, []);
 
   const loadValuation = () => {
-    const db = DatabaseManager.getInstance();
     try {
-      const sql = `
-        SELECT 
-          w.id,
-          w.name,
-          COALESCE(COUNT(DISTINCT ws.product_id), 0) as items_count,
-          COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) as cost_value,
-          COALESCE(SUM(ws.quantity_m2 * p.selling_price_m2), 0) as retail_value
-        FROM warehouses w
-        LEFT JOIN warehouse_stock ws ON w.id = ws.warehouse_id
-        LEFT JOIN products p ON ws.product_id = p.id AND p.is_active = 1
-        WHERE w.is_active = 1
-        GROUP BY w.id, w.name
-        ORDER BY w.name
-      `;
-      const rows = db.query<any>(sql);
-      const quantityRows = db.query<any>(`
-        SELECT ws.warehouse_id AS warehouseId, p.product_type AS productType,
-          p.base_unit AS baseUnit, p.custom_unit AS customUnit, SUM(ws.quantity_m2) AS quantity
-        FROM warehouse_stock ws
-        JOIN products p ON p.id = ws.product_id
-        WHERE p.is_active = 1
-        GROUP BY ws.warehouse_id, p.product_type, p.base_unit, p.custom_unit
-      `);
-      const quantitiesByWarehouse = new Map<string, { unitLabel: string; quantity: number }[]>();
-      for (const row of quantityRows) {
-        const quantities = quantitiesByWarehouse.get(row.warehouseId) || [];
-        quantities.push({
-          unitLabel: getProductUnitLabel(row),
-          quantity: Number(row.quantity) || 0,
-        });
-        quantitiesByWarehouse.set(row.warehouseId, quantities);
-      }
-      const mapped: WarehouseValuation[] = rows.map(r => ({
-        id: r.id,
-        name: r.name,
-        itemsCount: r.itemsCount || 0,
-        quantitiesByUnit: quantitiesByWarehouse.get(r.id) || [],
-        costValue: r.costValue || 0,
-        retailValue: r.retailValue || 0
-      }));
-      setData(mapped);
+      setData(new InventoryValuationService().getByWarehouse());
     } catch (e) {
       console.error('Error fetching inventory valuation:', e);
     } finally {
@@ -76,6 +28,28 @@ export const InventoryValuationPage: React.FC = () => {
   const totalCost = data.reduce((s, w) => s + w.costValue, 0);
   const totalRetail = data.reduce((s, w) => s + w.retailValue, 0);
   const potentialProfit = totalRetail - totalCost;
+  const canExport = PermissionService.can(AuthService.getCurrentUser(), 'inventory.export');
+  const exportReport = () => exportToExcel({
+    title: 'Inventory valuation by warehouse',
+    columns: [
+      { key: 'warehouse', label: 'Warehouse' },
+      { key: 'items', label: 'Items' },
+      { key: 'quantities', label: 'Quantities by unit' },
+      { key: 'costValue', label: 'Current stock value at cost' },
+      { key: 'retailValue', label: 'Current stock value at retail' },
+      { key: 'potentialMargin', label: 'Potential margin' },
+    ],
+    rows: data.map((warehouse) => ({
+      warehouse: warehouse.name,
+      items: warehouse.itemsCount,
+      quantities: warehouse.quantitiesByUnit.map(({ unitLabel, quantity }) => `${quantity} ${unitLabel}`).join(', '),
+      costValue: warehouse.costValue,
+      retailValue: warehouse.retailValue,
+      potentialMargin: warehouse.retailValue - warehouse.costValue,
+    })),
+    fileName: 'inventory-valuation',
+    permission: 'inventory.export',
+  });
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -90,17 +64,17 @@ export const InventoryValuationPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">حساب القيمة المالية الحالية للبضائع المتاحة بسعر التكلفة وسعر البيع</p>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shrink-0">
+        {canExport && <button onClick={exportReport} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-semibold transition shrink-0">
           <Download className="w-4 h-4" />
           تصدير التقرير المالي في جدول بيانات
-        </button>
+        </button>}
       </div>
 
       {/* Summary Cards */}
       <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0 bg-white border-b border-slate-200">
         <div className="bg-white border border-slate-200 rounded-xl p-5 flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-500 font-bold mb-1">إجمالي قيمة التكلفة (COGS)</div>
+            <div className="text-xs text-slate-500 font-bold mb-1">إجمالي قيمة المخزون بالتكلفة</div>
             <div className="text-xl font-black text-slate-900">{fmt(totalCost)}</div>
           </div>
           <div className="w-10 h-10 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">

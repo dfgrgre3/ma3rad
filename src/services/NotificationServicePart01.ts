@@ -6,6 +6,26 @@ import type { Notification, NotificationType } from './notificationTypes';
 export abstract class NotificationServicePart01 {
 protected db = DatabaseManager.getInstance();
 
+  private preferencesFor(userId?: string): { lowStockAlerts: boolean; paymentDueAlerts: boolean; systemAlerts: boolean } | null {
+    if (!userId) return null;
+    const row = this.db.query<any>(
+      'SELECT low_stock_alerts, payment_due_alerts, system_alerts FROM notification_preferences WHERE user_id = ?',
+      [userId]
+    )[0];
+    return row ? {
+      lowStockAlerts: Boolean(row.lowStockAlerts),
+      paymentDueAlerts: Boolean(row.paymentDueAlerts),
+      systemAlerts: Boolean(row.systemAlerts),
+    } : { lowStockAlerts: true, paymentDueAlerts: true, systemAlerts: true };
+  }
+
+  private isNotificationEnabled(type: NotificationType, preferences: { lowStockAlerts: boolean; paymentDueAlerts: boolean; systemAlerts: boolean } | null): boolean {
+    if (!preferences) return true;
+    if (type === 'LOW_STOCK' || type === 'STOCK_ALERT') return preferences.lowStockAlerts;
+    if (type === 'PAYMENT_DUE') return preferences.paymentDueAlerts;
+    return preferences.systemAlerts;
+  }
+
 public getNotifications(userId?: string, unreadOnly = false): Notification[] {
     let sql = 'SELECT * FROM notifications WHERE 1=1';
     const params: any[] = [];
@@ -20,14 +40,15 @@ public getNotifications(userId?: string, unreadOnly = false): Notification[] {
 
     sql += ' ORDER BY created_at DESC LIMIT 100';
 
+    const preferences = this.preferencesFor(userId);
     return this.db.query<Notification>(sql, params).map(r => ({
       ...r,
       isRead: Boolean(r.isRead)
-    }));
+    })).filter((notification) => this.isNotificationEnabled(notification.type, preferences));
   }
 
 public getUnreadCount(userId?: string): number {
-    let sql = 'SELECT COUNT(*) as cnt FROM notifications WHERE is_read = 0';
+    let sql = 'SELECT type, COUNT(*) as cnt FROM notifications WHERE is_read = 0';
     const params: any[] = [];
 
     if (userId) {
@@ -35,8 +56,12 @@ public getUnreadCount(userId?: string): number {
       params.push(userId);
     }
 
+    sql += ' GROUP BY type';
+    const preferences = this.preferencesFor(userId);
     const result = this.db.query<any>(sql, params);
-    return result[0]?.cnt || 0;
+    return result.reduce((total, row) => this.isNotificationEnabled(row.type as NotificationType, preferences)
+      ? total + Number(row.cnt || 0)
+      : total, 0);
   }
 
 public markAsRead(notificationId: string): void {

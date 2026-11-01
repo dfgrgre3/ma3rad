@@ -2155,6 +2155,69 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '102_canonical_pricing_promotions',
+    description: 'Map legacy promotion fields to the pricing service fields used by POS.',
+    up: (db: Database) => {
+      db.exec(`
+        UPDATE promotions
+        SET promotion_type = CASE UPPER(type)
+              WHEN 'PERCENT' THEN 'PERCENTAGE'
+              WHEN 'PERCENTAGE' THEN 'PERCENTAGE'
+              WHEN 'AMOUNT' THEN 'FIXED_AMOUNT'
+              WHEN 'FIXED_AMOUNT' THEN 'FIXED_AMOUNT'
+              WHEN 'BOGO' THEN 'BUY_X_GET_Y'
+              WHEN 'BUY_X_GET_Y' THEN 'BUY_X_GET_Y'
+              WHEN 'BUNDLE' THEN 'BUNDLE_PRICE'
+              WHEN 'BUNDLE_PRICE' THEN 'BUNDLE_PRICE'
+              WHEN 'COUPON' THEN CASE WHEN COALESCE(value, 0) > 100 THEN 'FIXED_AMOUNT' ELSE 'PERCENTAGE' END
+              ELSE promotion_type
+            END,
+            discount_percentage = CASE
+              WHEN UPPER(type) IN ('PERCENT', 'PERCENTAGE') THEN COALESCE(value, discount_percentage)
+              WHEN UPPER(type) = 'COUPON' AND COALESCE(value, 0) <= 100 THEN COALESCE(value, discount_percentage)
+              ELSE discount_percentage
+            END,
+            discount_amount = CASE
+              WHEN UPPER(type) IN ('AMOUNT', 'FIXED_AMOUNT', 'BUNDLE', 'BUNDLE_PRICE') THEN COALESCE(value, discount_amount)
+              WHEN UPPER(type) = 'COUPON' AND COALESCE(value, 0) > 100 THEN COALESCE(value, discount_amount)
+              ELSE discount_amount
+            END,
+            buy_quantity = COALESCE(buy_qty, buy_quantity),
+            get_quantity = COALESCE(get_qty, get_quantity),
+            min_order_amount = COALESCE(min_amount, min_order_amount),
+            starts_at = COALESCE(start_date, starts_at),
+            ends_at = COALESCE(end_date, ends_at)
+        WHERE type IS NOT NULL;
+      `);
+      const legacyTargets = db.exec(
+        'SELECT id, product_ids, category_ids FROM promotions WHERE product_ids IS NOT NULL OR category_ids IS NOT NULL'
+      )[0]?.values ?? [];
+      legacyTargets.forEach((row, rowIndex) => {
+        const promotionId = String(row[0]);
+        for (const [column, targetType] of [[row[1], 'PRODUCT'], [row[2], 'CATEGORY']] as const) {
+          if (typeof column !== 'string') continue;
+          try {
+            const ids: unknown = JSON.parse(column);
+            if (!Array.isArray(ids)) continue;
+            ids.filter((id): id is string => typeof id === 'string' && id.length > 0).forEach((targetId, index) => {
+              db.run(
+                'INSERT OR IGNORE INTO promotion_targets (id, promotion_id, target_type, target_id) VALUES (?, ?, ?, ?)',
+                [`migration_${rowIndex}_${targetType}_${index}`, promotionId, targetType, targetId]
+              );
+            });
+            db.run('UPDATE promotions SET applies_to = ? WHERE id = ? AND applies_to = \'ALL\'',
+              [targetType === 'PRODUCT' ? 'PRODUCTS' : 'CATEGORIES', promotionId]);
+          } catch {
+            // Preserve its intended scope with no targets, so malformed legacy
+            // JSON cannot accidentally turn a targeted offer into an all-items offer.
+            db.run('UPDATE promotions SET applies_to = ? WHERE id = ? AND applies_to = \'ALL\'',
+              [targetType === 'PRODUCT' ? 'PRODUCTS' : 'CATEGORIES', promotionId]);
+          }
+        }
+      });
+    },
+  },
 ].flat();
 
 export interface MigrationReport {

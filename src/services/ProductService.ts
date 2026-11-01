@@ -424,6 +424,7 @@ export class ProductService {
   }
 
   public getProductStockSummary(productId: string): { totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] } {
+    const scope = this.branchAccess.warehouseBranchScope('w', undefined, AuthService.requireAuth());
     const rows = this.db.query<WarehouseStock>(`
       SELECT ws.*, w.name as warehouseName,
              p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
@@ -432,8 +433,8 @@ export class ProductService {
       FROM warehouse_stock ws
       JOIN warehouses w ON ws.warehouse_id = w.id
       JOIN products p ON ws.product_id = p.id
-      WHERE ws.product_id = ?
-    `, [productId]);
+      WHERE ws.product_id = ? AND ${scope.clause}
+    `, [productId, ...scope.params]);
 
     let totalM2 = 0;
     let totalBoxes = 0;

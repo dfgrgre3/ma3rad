@@ -5,6 +5,7 @@ import { AppConfigService } from '../services/AppConfigService';
 import { ConfigText } from '../components/config/ConfigText';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from '../config/businessProfiles';
 import { withModuleDependencies } from '../config/moduleRegistry';
+import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 import { CentralLicenseService } from '../services/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../services/CentralFeaturePermissionService';
 
@@ -37,6 +38,11 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
   useEffect(() => {
     CentralFeaturePermissionService.setCurrentPath(pathname);
   }, [pathname]);
+
+  // وضع التشغيل المحلي: فتح كل الصفحات دون أي بوابة (وحدات/مظهر/قيود مركزية).
+  if (OPEN_ALL_PAGES) {
+    return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+  }
 
   // Central license/config gating (best-effort, cached)
   const centralCfg = CentralLicenseService.getCachedConfig();

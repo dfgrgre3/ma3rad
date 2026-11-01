@@ -2,10 +2,11 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/db.ts';
+import { runMigrations } from '../src/database/migrations.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { InventoryService } from '../src/services/InventoryService.ts';
-import { approveCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/pages/inventory/inventory-count/countSessionService.ts';
+import { approveCountSession, cancelCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/pages/inventory/inventory-count/countSessionService.ts';
 import { loadBranchCountSessions, loadCountSessionItems } from '../src/pages/inventory/inventory-count/countSessionData.ts';
 
 function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
@@ -356,4 +357,35 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   assert.equal(rejectedState?.status, 'COUNTING');
   assert.equal(rejectedState?.approvalStatus, 'REJECTED');
   assert.equal(rejectedState?.rejectionReason, 'Recount required');
+
+  AuthService.login('admin', 'admin123');
+  for (const countType of ['FULL', 'PARTIAL', 'SPOT', 'PERIODIC', 'SURPRISE', 'BLIND'] as const) {
+    const notes = `supported count type: ${countType}`;
+    startCountSession({
+      warehouseId: whSource,
+      countType,
+      selectedProductIds: [prodId],
+      isBlindCount: false,
+      notes,
+    });
+    const created = queryOne<{ id: string; countType: string; isBlind: number }>(
+      'SELECT id, count_type AS countType, is_blind AS isBlind FROM stock_counts WHERE notes = ?',
+      [notes]
+    );
+    assert.equal(created?.countType, countType);
+    assert.equal(Boolean(created?.isBlind), countType === 'BLIND');
+    const session = loadBranchCountSessions().find((item) => item.id === created?.id);
+    assert.ok(session);
+    cancelCountSession(session!);
+  }
+
+  db.run("DELETE FROM schema_migrations WHERE id = '103_inventory_count_type_options'");
+  const migrationReport = runMigrations(db.getDatabase());
+  assert.ok(migrationReport.applied.includes('103_inventory_count_type_options'));
+  assert.equal(
+    queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM stock_count_items')?.count,
+    queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM stock_counts')?.count,
+    'the count table rebuild must preserve count items and their parent references'
+  );
+  assert.deepEqual(db.getDatabase().exec('PRAGMA foreign_key_check')[0]?.values ?? [], []);
 });

@@ -9,7 +9,7 @@ import { CentralTelemetryService } from './services/CentralTelemetryService';
 import type { ReleaseInfo } from './services/CentralTelemetryService';
 import { SettingsService } from './services/SettingsService';
 import { AppConfigService } from './services/AppConfigService';
-import { shouldShowFirstRunSetup } from './config/setupLifecycle';
+import { shouldShowFirstRunSetup, BYPASS_FIRST_RUN_SETUP } from './config/setupLifecycle';
 import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
 import { AppRouter } from './router';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -30,15 +30,18 @@ export const App: React.FC = () => {
   } = useAppStartup();
 
   const [showSetup, setShowSetup] = useState(false);
+  // وضع التشغيل المحلي: تخطي «التهيئة لمرة واحدة» (تفعيل سيراميسيس) بالكامل.
   const [activationComplete, setActivationComplete] = useState(
-    () => CentralLicenseService.hasCompletedFirstRunActivation()
+    () => BYPASS_FIRST_RUN_SETUP || CentralLicenseService.hasCompletedFirstRunActivation()
   );
   const [licenseBlocked, setLicenseBlocked] = useState(false);
+  // في وضع التشغيل المحلي نوقف كل تفاعل مع المنصة المركزية (ترخيص/تكوين/تحديثات).
+  const centralActive = activationComplete && !BYPASS_FIRST_RUN_SETUP;
   const [licenseRetrying, setLicenseRetrying] = useState(false);
   const [availableUpdate, setAvailableUpdate] = useState<ReleaseInfo | null>(null);
 
   const checkLicense = useCallback(async () => {
-    if (!activationComplete) return;
+    if (!centralActive) return;
     setLicenseRetrying(true);
     try {
       const valid = await CentralLicenseService.validate();
@@ -46,26 +49,26 @@ export const App: React.FC = () => {
     } finally {
       setLicenseRetrying(false);
     }
-  }, [activationComplete]);
+  }, [centralActive]);
 
   // Revalidate at startup and periodically, but never block the local UI while
   // a request is in flight. A rejected/expired license closes the app.
   useEffect(() => {
-    if (!activationComplete) return;
+    if (!centralActive) return;
     void checkLicense();
     const timer = setInterval(() => void checkLicense(), 6 * 60 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [activationComplete, checkLicense]);
+  }, [centralActive, checkLicense]);
 
   const [centralConfigTick, setCentralConfigTick] = useState(CentralLicenseService.getConfigRevision());
 
   // Apply any cached central config on startup
   useEffect(() => {
-    if (!activationComplete) return;
+    if (!centralActive) return;
     CentralConfigApplier.apply();
-  }, [activationComplete]);
+  }, [centralActive]);
   useEffect(() => {
-    if (!activationComplete || !dbReady) return;
+    if (!centralActive || !dbReady) return;
     const refreshConfig = async () => {
       const cfg = await CentralLicenseService.fetchConfig();
       if (cfg) {
@@ -106,26 +109,26 @@ export const App: React.FC = () => {
       window.removeEventListener('focus', onFocusOrVisible);
       document.removeEventListener('visibilitychange', onFocusOrVisible);
     };
-  }, [activationComplete, dbReady]);
+  }, [centralActive, dbReady]);
 
   // Check for published updates on startup
   useEffect(() => {
-    if (!activationComplete) return;
+    if (!centralActive) return;
     let cancelled = false;
     (async () => {
       const upd = await CentralTelemetryService.checkForUpdates('1.1.3');
       if (!cancelled) setAvailableUpdate(upd);
     })();
     return () => { cancelled = true; };
-  }, [activationComplete]);
+  }, [centralActive]);
 
   // Periodic central heartbeat (device liveness)
   useEffect(() => {
-    if (!activationComplete) return;
+    if (!centralActive) return;
     void CentralLicenseService.heartbeat();
     const timer = setInterval(() => void CentralLicenseService.heartbeat(), 30 * 60 * 1000);
     return () => clearInterval(timer);
-  }, [activationComplete]);
+  }, [centralActive]);
 
   // تهيئة الخدمات الأمنية ومؤقتات المراقبة
   useEffect(() => {
@@ -183,7 +186,7 @@ export const App: React.FC = () => {
         (key === 'showroomName' && value.trim().length > 0)
         || (key !== 'showroomName' && value.trim().length > 0 && value.trim() !== '{}')
       );
-      setShowSetup(shouldShowFirstRunSetup({
+      setShowSetup(BYPASS_FIRST_RUN_SETUP ? false : shouldShowFirstRunSetup({
         completed: SettingsService.getValue('setup_completed') === '1',
         hasBusinessData,
         hasLegacyConfiguration,
@@ -277,7 +280,7 @@ export const App: React.FC = () => {
     <ThemeProvider ready={dbReady}>
       <ToastProvider>
         <ErrorBoundary>
-          {!showSetup && currentUser?.mustChangePassword && (
+          {!BYPASS_FIRST_RUN_SETUP && !showSetup && currentUser?.mustChangePassword && (
             <ForcePasswordChangeModal user={currentUser} onSuccess={(u) => setCurrentUser(u)} />
           )}
           {availableUpdate && (

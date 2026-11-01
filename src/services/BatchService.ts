@@ -15,6 +15,7 @@ import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import type { ProductBatch, ToneMixingConflict } from '../types';
 
 export type { ProductBatch, ToneMixingConflict };
@@ -34,6 +35,7 @@ export interface CreateBatchDTO {
 }
 
 export class BatchService {
+  private branchAccess = new BranchAccessService();
   private db = DatabaseManager.getInstance();
 
   // ─── Permissions ────────────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ export class BatchService {
 
   /** كل الدفعات لصنف معين (مع خيار تصفية بالمخزن) */
   public getBatchesForProduct(productId: string, warehouseId?: string): ProductBatch[] {
+    const scope = this.branchAccess.warehouseBranchScope('w', undefined, AuthService.requireAuth());
     let sql = `
       SELECT
         pb.id,
@@ -69,9 +72,9 @@ export class BatchService {
       FROM product_batches pb
       LEFT JOIN warehouses w ON w.id = pb.warehouse_id
       LEFT JOIN suppliers  s ON s.id = pb.supplier_id
-      WHERE pb.product_id = ?
+      WHERE pb.product_id = ? AND ${scope.clause}
     `;
-    const params: unknown[] = [productId];
+    const params: unknown[] = [productId, ...scope.params];
     if (warehouseId) {
       sql += ` AND pb.warehouse_id = ?`;
       params.push(warehouseId);
@@ -82,6 +85,7 @@ export class BatchService {
 
   /** دفعة واحدة بمعرفها */
   public getBatchById(id: string): ProductBatch | null {
+    const scope = this.branchAccess.warehouseBranchScope('w', undefined, AuthService.requireAuth());
     const rows = this.db.query<ProductBatch>(
       `SELECT
          pb.id,
@@ -104,21 +108,22 @@ export class BatchService {
        FROM product_batches pb
        LEFT JOIN warehouses w ON w.id = pb.warehouse_id
        LEFT JOIN suppliers  s ON s.id = pb.supplier_id
-       WHERE pb.id = ?`,
-      [id]
+       WHERE pb.id = ? AND ${scope.clause}`,
+      [id, ...scope.params]
     );
     return rows[0] ?? null;
   }
 
   /** إجمالي الرصيد المتبقي من كل الدفعات (م²) */
   public getTotalRemainingM2(productId: string, warehouseId?: string): number {
+    const scope = this.branchAccess.warehouseBranchScope('w', undefined, AuthService.requireAuth());
     let sql = `
-      SELECT COALESCE(SUM(quantity_remaining_m2), 0) AS total
-      FROM product_batches
-      WHERE product_id = ?
+      SELECT COALESCE(SUM(pb.quantity_remaining_m2), 0) AS total
+      FROM product_batches pb JOIN warehouses w ON w.id = pb.warehouse_id
+      WHERE pb.product_id = ? AND ${scope.clause}
     `;
-    const params: unknown[] = [productId];
-    if (warehouseId) { sql += ` AND warehouse_id = ?`; params.push(warehouseId); }
+    const params: unknown[] = [productId, ...scope.params];
+    if (warehouseId) { sql += ` AND pb.warehouse_id = ?`; params.push(warehouseId); }
     return Number(this.db.query<{ total: number }>(sql, params)[0]?.total ?? 0);
   }
 
@@ -188,6 +193,9 @@ export class BatchService {
     }>
   ): void {
     this.requireWrite(updates.costPrice !== undefined);
+    const existing = this.getBatchById(id);
+    if (!existing) throw new Error('Batch not found in the active branch.');
+    this.branchAccess.requireWarehouseAccess(existing.warehouseId, AuthService.requireAuth());
     const fields: string[] = [];
     const values: unknown[] = [];
 

@@ -5,6 +5,7 @@ import { DatabaseManager } from '../../database/db';
 import { ProductService } from '../../services/ProductService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { BranchAccessService } from '../../services/BranchAccessService';
 import { usePermission } from '../../hooks/usePermission';
 import { Product } from '../../types';
 import { getProductUnitLabel } from '../../utils/productUnits';
@@ -32,6 +33,7 @@ export const ProductDetailPage: React.FC = () => {
   const db = DatabaseManager.getInstance();
   const productService = new ProductService();
   const currentUser = AuthService.getCurrentUser();
+  const branchAccess = new BranchAccessService();
   const can = usePermission(currentUser);
   const canEdit = PermissionService.can(currentUser, 'products.update');
   const canViewCosts = can('finance.view');
@@ -56,6 +58,9 @@ export const ProductDetailPage: React.FC = () => {
       const p = productService.getProductById(id);
       setProduct(p);
       if (p) {
+        const actor = AuthService.requireAuth();
+        const salesScope = branchAccess.sqlScope('si.branch_id', undefined, actor);
+        const purchaseScope = branchAccess.sqlScope('pi.branch_id', undefined, actor);
         if (can('inventory.view')) {
           const s = productService.getProductStockSummary(id);
           setStock({ totalM2: s.totalM2, totalBoxes: s.totalBoxes, totalPieces: s.totalPieces, rows: s.byWarehouse });
@@ -69,8 +74,8 @@ export const ProductDetailPage: React.FC = () => {
            FROM sales_invoice_items sii
            JOIN sales_invoices si ON si.id = sii.invoice_id
            LEFT JOIN customers cu ON cu.id = si.customer_id
-           WHERE sii.product_id = ? AND si.invoice_status != 'VOID'
-           ORDER BY si.date DESC, si.created_at DESC LIMIT 15`, [id]
+           WHERE sii.product_id = ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}
+           ORDER BY si.date DESC, si.created_at DESC LIMIT 15`, [id, ...salesScope.params]
         ) : []);
 
         setPurchases(can('purchases.view') ? db.query(
@@ -79,8 +84,8 @@ export const ProductDetailPage: React.FC = () => {
            FROM purchase_invoice_items pii
            JOIN purchase_invoices pi ON pi.id = pii.invoice_id
            LEFT JOIN suppliers s ON s.id = pi.supplier_id
-           WHERE pii.product_id = ?
-           ORDER BY pi.date DESC, pi.created_at DESC LIMIT 15`, [id]
+           WHERE pii.product_id = ? AND ${purchaseScope.clause}
+           ORDER BY pi.date DESC, pi.created_at DESC LIMIT 15`, [id, ...purchaseScope.params]
         ) : []);
 
         setActivity(can('audit.view') ? db.query(

@@ -12,7 +12,7 @@ import { AppConfigService } from '../../services/AppConfigService';
 import { DatabaseManager } from '../../database/db';
 import { CONFIGURATION_SCOPE_LABELS, CONFIGURATION_SCOPE_PRECEDENCE } from '../../config/configurationScopes';
 import { ACTION_REGISTRY } from '../../config/actionRegistry';
-import { FEATURE_REGISTRY } from '../../services/FeatureService';
+import { FEATURE_REGISTRY } from '../../config/featureRegistry';
 
 type TabId = 'actions' | 'features' | 'scopes' | 'diagnostics';
 

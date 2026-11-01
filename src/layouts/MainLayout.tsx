@@ -12,6 +12,7 @@ import { AppConfigRuntime } from '../components/config/AppConfigRuntime';
 import { ConfigSection } from '../components/config/ConfigSection';
 import { ConfigText } from '../components/config/ConfigText';
 import { useTheme } from '../contexts/ThemeContext';
+import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 import {
   getPersistedScrollPosition,
   saveNavigationLocation,
@@ -46,7 +47,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const required = NavigationService.getRequiredPermissions(location.pathname);
-  const isAllowed = !required || required.every((permission) => PermissionService.can(currentUser, permission));
+  const isAllowed = OPEN_ALL_PAGES
+    || !required
+    || required.every((permission) => PermissionService.can(currentUser, permission));
   const fallbackPath = isAllowed ? null : NavigationService.getFirstAccessiblePath(currentUser) ?? '/not-found';
   const persistedLocation = `${location.pathname}${location.search}${location.hash}`;
 

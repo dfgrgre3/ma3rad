@@ -3,6 +3,8 @@ import { Palette, Plus, X, Trash2, Loader2 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/db';
 import { BatchService } from '../../../services/BatchService';
 import { ProductBatch } from '../../../types';
+import { AuthService } from '../../../services/AuthService';
+import { BranchAccessService } from '../../../services/BranchAccessService';
 
 interface BatchesTabProps {
   productId: string;
@@ -14,6 +16,7 @@ interface BatchesTabProps {
 export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canViewCosts, canUpdatePricing }) => {
   const batchService = new BatchService();
   const db = DatabaseManager.getInstance();
+  const branchAccess = new BranchAccessService();
   const [batches, setBatches] = useState<ProductBatch[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({
@@ -33,7 +36,8 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
   const load = () => {
     try {
       setBatches(batchService.getBatchesForProduct(productId));
-      setWarehouses(db.query<{ id: string; name: string }>(`SELECT id, name FROM warehouses WHERE is_active = 1 ORDER BY name`));
+      const scope = branchAccess.warehouseBranchScope('w', undefined, AuthService.requireAuth());
+      setWarehouses(db.query<{ id: string; name: string }>(`SELECT w.id, w.name FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} ORDER BY w.name`, scope.params));
     } catch (e) { console.error(e); }
   };
 

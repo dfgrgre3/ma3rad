@@ -274,6 +274,32 @@ export const getBusinessProfile = (businessType: string): BusinessProfile =>
   || PROFILE_BY_ID.get(businessType)
   || PROFILE_BY_ID.get('general')!;
 
+export type BusinessCapabilityStatus = 'implemented' | 'partial' | 'not-implemented';
+
+export interface BusinessProfileCapability {
+  id: string;
+  label: string;
+  status: BusinessCapabilityStatus;
+}
+
+function capabilityStatus(value: string | boolean | undefined): BusinessCapabilityStatus {
+  if (value === true || value === 'implemented' || (typeof value === 'string' && value.startsWith('implemented-'))) return 'implemented';
+  if (typeof value === 'string' && value !== 'not-implemented'
+    && (value.includes('partially-implemented') || (value.includes('-implemented;') && value.includes('not-implemented')))) return 'partial';
+  return 'not-implemented';
+}
+
+export function getBusinessProfileCapabilities(businessType: string): BusinessProfileCapability[] {
+  const support = getBusinessProfile(businessType).support;
+  return [
+    { id: 'profileDefaults', label: 'الإعدادات الافتراضية للنشاط', status: capabilityStatus(support.profileDefaults) },
+    { id: 'industrySpecificWorkflows', label: 'سير العمل القطاعي', status: capabilityStatus(support.industrySpecificWorkflows) },
+    { id: 'industrySpecificReports', label: 'التقارير القطاعية', status: capabilityStatus(support.industrySpecificReports) },
+    { id: 'industrySpecificDocumentTemplates', label: 'قوالب المستندات القطاعية', status: capabilityStatus(support.industrySpecificDocumentTemplates) },
+    { id: 'typedCustomFieldStorage', label: 'تخزين الحقول المخصصة بأنواع بيانات', status: capabilityStatus(support.typedCustomFieldStorage) },
+  ];
+}
+
 export const getBusinessProfileTemplateId = (businessType: string): string =>
   ACTIVITY_BY_ID.get(businessType)?.profileId
   || (PROFILE_BY_ID.has(businessType) ? businessType : 'general');

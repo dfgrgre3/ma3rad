@@ -4,6 +4,7 @@
 
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BYPASS_FIRST_RUN_SETUP } from '../config/setupLifecycle';
 
 const STORAGE_KEY = 'central_device_credential';
 const SERVER_KEY = 'central_server_url';
@@ -21,9 +22,18 @@ export const CENTRAL_CONFIG_CHANGED_EVENT = 'central-config-changed';
 export interface CentralActivationResult {
   deviceCredential?: string;
   tenantId?: string;
+  localAccount?: { username: string; fullName?: string; role?: string; phone?: string } | null;
   message?: string;
   error?: string;
   [key: string]: unknown;
+}
+
+/** بيانات تفعيل الجهاز: الحساب وكلمة المرور والهاتف المُنشأة من لوحة الإدارة + مفتاح الترخيص. */
+export interface CentralActivationCredentials {
+  activationCode: string;
+  account: string;
+  password: string;
+  phone: string;
 }
 
 export interface CentralConfig {
@@ -89,6 +99,22 @@ export class CentralLicenseService {
     }
   }
 
+  private static async request(
+    path: string,
+    init: { method?: 'GET' | 'POST'; headers?: Record<string, string>; body?: string } = {}
+  ): Promise<{ ok: boolean; status: number; json: () => Promise<any> }> {
+    const bridge = typeof window !== 'undefined' ? window.ceramisys?.central?.request : undefined;
+    if (!bridge) throw new Error('Central API is available only through the secured Electron bridge.');
+    const result = await bridge({
+      serverUrl: this.getSecureServerUrl(),
+      path,
+      method: init.method || 'GET',
+      headers: init.headers,
+      body: init.body,
+    });
+    return { ok: result.ok, status: result.status, json: async () => result.body };
+  }
+
   static getCredential(): string {
     try { return localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
   }
@@ -103,17 +129,29 @@ export class CentralLicenseService {
     } catch { return 'dev_unknown'; }
   }
 
-  static async activate(activationCode: string, deviceName?: string): Promise<CentralActivationResult> {
-    // تفعيل الجهاز عملية إدارية حسّاسة: لا تكفي معرفة المسار، بل تُشترط صلاحية
-    // صريحة على مستوى الخدمة أيضاً (والمسار محميّ بـ admin.license.manage).
-    PermissionService.require(AuthService.getCurrentUser(), 'admin.license.manage');
+  static async activate(credentials: CentralActivationCredentials, deviceName?: string): Promise<CentralActivationResult> {
+    PermissionService.require(AuthService.requireAuth(), 'admin.license.manage', '/central-activation');
+    return this.performActivation(credentials, deviceName);
+  }
+
+  static async activateFirstRun(credentials: CentralActivationCredentials, deviceName?: string): Promise<CentralActivationResult> {
+    if (AuthService.getCurrentUser() || this.getCredential()) {
+      throw new Error('Initial activation is available only before a device account is activated.');
+    }
+    return this.performActivation(credentials, deviceName);
+  }
+
+  private static async performActivation(credentials: CentralActivationCredentials, deviceName?: string): Promise<CentralActivationResult> {
     const base = this.getSecureServerUrl();
     if (!base) throw new Error('Central server URL not configured');
-    const res = await fetch(base + '/api/v1/licensing/activate', {
+    const res = await this.request('/api/v1/licensing/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        activationCode,
+        activationCode: credentials.activationCode,
+        account: credentials.account,
+        password: credentials.password,
+        phone: credentials.phone,
         deviceId: this.getDeviceId(),
         deviceName: deviceName || navigator.userAgent.slice(0, 40),
         os: navigator.platform,
@@ -184,19 +222,11 @@ export class CentralLicenseService {
     };
 
     try {
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timeout = controller ? setTimeout(() => controller.abort(), 8000) : null;
-      let res: Response;
-      try {
-        res = await fetch(base + '/api/v1/licensing/validate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId: this.getDeviceId(), deviceCredential: cred }),
-          ...(controller ? { signal: controller.signal } : {}),
-        });
-      } finally {
-        if (timeout) clearTimeout(timeout);
-      }
+      const res = await this.request('/api/v1/licensing/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId: this.getDeviceId(), deviceCredential: cred }),
+      });
       if (res.ok) {
         this.markValidated();
         return true;
@@ -217,7 +247,7 @@ export class CentralLicenseService {
     const cred = this.getCredential();
     if (!base || !cred) return;
     try {
-      await fetch(base + '/api/v1/licensing/heartbeat', {
+      await this.request('/api/v1/licensing/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceId: this.getDeviceId(), deviceCredential: cred, appVersion: '1.1.3' }),
@@ -236,7 +266,7 @@ export class CentralLicenseService {
     if (!base || !credential) return null;
     try {
       // رمز الجهاز يُرسل في الترويسات فقط ولا يظهر في عنوان URL (سجلات/وسطاء).
-      const res = await fetch(base + '/api/v1/configuration/establishment', {
+      const res = await this.request('/api/v1/configuration/establishment', {
         headers: { 'X-Device-Id': deviceId, 'X-Device-Credential': credential },
       });
       if (!res.ok) return null;
@@ -261,7 +291,7 @@ export class CentralLicenseService {
     const base = this.getSecureServerUrl();
     if (!base) return;
     try {
-      await fetch(base + '/api/v1/telemetry/errors', {
+      await this.request('/api/v1/telemetry/errors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -285,7 +315,7 @@ export class CentralLicenseService {
     if (!base) return [];
     try {
       const cred = this.getCredential();
-      const res = await fetch(base + '/api/v1/releases', {
+      const res = await this.request('/api/v1/releases', {
         headers: cred ? { 'X-Device-Id': this.getDeviceId(), 'X-Device-Credential': cred } : {},
       });
       if (!res.ok) return [];
@@ -298,7 +328,7 @@ export class CentralLicenseService {
     const base = this.getSecureServerUrl();
     if (!base) return null;
     try {
-      const res = await fetch(base + '/api/v1/configuration/public-key');
+      const res = await this.request('/api/v1/configuration/public-key');
       if (!res.ok) return null;
       const data = await res.json();
       return data.publicKey || null;
@@ -336,7 +366,7 @@ export class CentralLicenseService {
     try {
       // رمز الجهاز يُرسل في الترويسات فقط ولا يظهر في عنوان URL (سجلات/وسطاء).
       const deviceId = this.getDeviceId();
-      const res = await fetch(base + '/api/v1/configuration/current', {
+      const res = await this.request('/api/v1/configuration/current', {
         headers: { 'X-Device-Id': deviceId, ...(cred ? { 'X-Device-Credential': cred } : {}) },
       });
       if (!res.ok) return null;
@@ -359,6 +389,8 @@ export class CentralLicenseService {
   }
 
   static getCachedConfig(): CentralConfig | null {
+    // وضع التشغيل المحلي: لا نُطبّق أي تكوين مركزي قديم مخزَّن (قوائم/وحدات/صلاحيات).
+    if (BYPASS_FIRST_RUN_SETUP) return null;
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
       return raw ? JSON.parse(raw) : null;

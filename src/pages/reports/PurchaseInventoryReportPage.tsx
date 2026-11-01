@@ -13,6 +13,7 @@ import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import { BranchAccessService } from '../../services/BranchAccessService';
+import { InventoryValuationService } from '../../services/InventoryValuationService';
 
 const db = DatabaseManager.getInstance();
 const branchAccess = new BranchAccessService();
@@ -101,51 +102,7 @@ export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
 }
 
 export function loadInventoryKpi(): InventoryKpi {
-  const scope = branchAccess.warehouseBranchScope('w');
-  const summary = db.query<any>(`
-    SELECT 
-      COUNT(DISTINCT ws.product_id) AS skus,
-      COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value,
-      SUM(CASE WHEN ws.quantity_m2 <= p.min_stock_level AND p.min_stock_level > 0 THEN 1 ELSE 0 END) AS low_stock,
-      SUM(CASE WHEN ws.quantity_m2 <= 0 THEN 1 ELSE 0 END) AS zero_stock
-    FROM warehouse_stock ws
-    JOIN warehouses w ON w.id = ws.warehouse_id
-    JOIN products p ON p.id = ws.product_id
-    WHERE p.is_active = 1 AND ${scope.clause}
-  `, scope.params)[0] || {};
-
-  const topValueItems = db.query<any>(`
-    SELECT p.name, COALESCE(SUM(ws.quantity_m2), 0) AS qty,
-      COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value,
-      p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
-    FROM warehouse_stock ws
-    JOIN warehouses w ON w.id = ws.warehouse_id
-    JOIN products p ON p.id = ws.product_id
-    WHERE ws.quantity_m2 > 0 AND ${scope.clause}
-    GROUP BY p.id
-    ORDER BY value DESC LIMIT 10
-  `, scope.params).map(r => ({ name: r.name, value: Number(r.value), qty: Number(r.qty), productType: r.productType, baseUnit: r.baseUnit, customUnit: r.customUnit }));
-
-  const categoryBreakdown = db.query<any>(`
-    SELECT COALESCE(c.name, 'غير مصنف') AS category,
-      COUNT(DISTINCT p.id) AS items,
-      COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS value
-    FROM warehouse_stock ws
-    JOIN warehouses w ON w.id = ws.warehouse_id
-    JOIN products p ON p.id = ws.product_id
-    LEFT JOIN categories c ON c.id = p.category_id
-    WHERE ${scope.clause}
-    GROUP BY c.id ORDER BY value DESC LIMIT 8
-  `, scope.params).map(r => ({ category: r.category, items: Number(r.items), value: Number(r.value) }));
-
-  return {
-    totalValue: Number(summary.value || 0),
-    totalSkus: Number(summary.skus || 0),
-    lowStockCount: Number(summary.low_stock || 0),
-    zeroStockCount: Number(summary.zero_stock || 0),
-    topValueItems,
-    categoryBreakdown,
-  };
+  return new InventoryValuationService().getKpi();
 }
 
 function StatCard({ label, value, sub, icon: Icon, color, bg }: {

@@ -19,6 +19,39 @@ export class InstallmentService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
 
+  /** Read models used by the installment page share the same active-branch
+   * boundary as installment mutations. */
+  getPageData(): { invoiceRows: any[][]; planRows: any[][]; installmentRows: any[][] } {
+    const actor = AuthService.requireAuth();
+    if (!PermissionService.can(actor, 'finance.installments.view')
+      && !PermissionService.can(actor, 'finance.installments.manage')) {
+      throw new Error('Not authorized to view installments.');
+    }
+    const invoiceScope = this.branchAccess.sqlScope('si.branch_id', undefined, actor);
+    const planScope = this.branchAccess.sqlScope('ip.branch_id', undefined, actor);
+    const db = this.db.getDatabase();
+    const invoiceRows = db.exec(
+      `SELECT si.id,si.invoice_number,si.customer_id,si.remaining_amount FROM sales_invoices si
+       WHERE si.invoice_status!='VOID' AND si.remaining_amount>0.009 AND ${invoiceScope.clause}
+       ORDER BY si.date DESC,si.created_at DESC`, invoiceScope.params
+    )[0]?.values || [];
+    const planRows = db.exec(`
+      SELECT ip.id, ip.plan_number, ip.customer_id, c.name as customer_name,
+        ip.total_amount, ip.down_payment, ip.financed_amount, ip.installments_count,
+        ip.installment_amount, ip.paid_amount, ip.remaining_amount, ip.status, ip.start_date
+      FROM installment_plans ip LEFT JOIN customers c ON ip.customer_id = c.id
+      WHERE ${planScope.clause} ORDER BY ip.created_at DESC
+    `, planScope.params)[0]?.values || [];
+    const installmentRows = db.exec(`
+      SELECT i.id, i.plan_id, ip.plan_number, i.sequence_number, ip.installments_count,
+        ip.customer_id, c.name, c.phone, i.amount, i.paid_amount, i.due_date, i.paid_at, i.status
+      FROM installments i JOIN installment_plans ip ON i.plan_id = ip.id
+      LEFT JOIN customers c ON ip.customer_id = c.id
+      WHERE ip.status != 'CANCELLED' AND ${planScope.clause} ORDER BY i.due_date ASC
+    `, planScope.params)[0]?.values || [];
+    return { invoiceRows, planRows, installmentRows };
+  }
+
   createPlan(input: { customerId: string; invoiceId: string; totalAmount: number; downPayment: number; installmentsCount: number; startDate: string }) {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'finance.installments.manage');

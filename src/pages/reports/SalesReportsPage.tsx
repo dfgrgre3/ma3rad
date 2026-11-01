@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  BarChart3, TrendingUp, TrendingDown, Download, CalendarDays, Users,
-  Package, MapPin, Award, Loader2, AlertCircle, RefreshCw, Filter,
-  ShoppingCart, Percent, DollarSign, ArrowUpRight, ArrowDownRight, Star, Scale,
+  BarChart3, Download, CalendarDays, Users,
+  Package, MapPin, Award, Loader2, AlertCircle, RefreshCw, Star, Scale,
 } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
 import { AuthService } from '../../services/AuthService';
@@ -24,10 +23,11 @@ const yearStart = () => `${new Date().getFullYear()}-01-01`;
 interface SalesRow { label: string; revenue: number; cost: number; profit: number; count: number; margin: number; customers?: number }
 interface DailyRow { date: string; revenue: number; invoiceCount: number; returnCount: number }
 
-export type ReportType = 'by_category' | 'by_product' | 'by_customer' | 'by_city' | 'by_user' | 'daily';
+export type ReportType = 'by_category' | 'by_brand' | 'by_product' | 'by_customer' | 'by_city' | 'by_user' | 'daily';
 
 const REPORT_TYPES: { id: ReportType; label: string; icon: React.ElementType; color: string }[] = [
   { id: 'by_category',  label: 'حسب الفئة',      icon: BarChart3,    color: 'sky' },
+  { id: 'by_brand',     label: 'حسب العلامة التجارية', icon: Star, color: 'amber' },
   { id: 'by_product',   label: 'حسب المنتج',      icon: Package,      color: 'violet' },
   { id: 'by_customer',  label: 'حسب العميل',      icon: Users,        color: 'emerald' },
   { id: 'by_city',      label: 'حسب المنطقة',     icon: MapPin,       color: 'amber' },
@@ -87,19 +87,21 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
     })) as DailyRow[];
   }
 
-  if (type === 'by_category') {
+  if (type === 'by_category' || type === 'by_brand') {
+    const groupColumn = type === 'by_brand' ? 'brand_id' : 'category_id';
+    const emptyLabel = type === 'by_brand' ? 'علامة غير محددة' : 'غير مصنف';
     const rows = db.query<any>(`
       WITH activity AS (
-        SELECT c.id AS groupId, COALESCE(c.name, 'غير مصنف') AS label, si.id AS invoiceId,
+        SELECT g.id AS groupId, COALESCE(g.name, '${emptyLabel}') AS label, si.id AS invoiceId,
           sii.total_price - CASE WHEN si.subtotal > 0 THEN si.discount_amount * sii.total_price / si.subtotal ELSE 0 END AS revenue,
           sii.total_cost AS cost
         FROM sales_invoices si
         JOIN sales_invoice_items sii ON sii.invoice_id = si.id
         JOIN products p ON p.id = sii.product_id
-        LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN ${type === 'by_brand' ? 'brands' : 'categories'} g ON g.id = p.${groupColumn}
         WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
         UNION ALL
-        SELECT c.id AS groupId, COALESCE(c.name, 'غير مصنف') AS label, NULL AS invoiceId,
+        SELECT g.id AS groupId, COALESCE(g.name, '${emptyLabel}') AS label, NULL AS invoiceId,
           -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
             THEN ROUND(
               sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2
@@ -111,7 +113,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
         JOIN sales_return_items sri ON sri.return_id = sr.id
         JOIN products p ON p.id = sri.product_id
-        LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN ${type === 'by_brand' ? 'brands' : 'categories'} g ON g.id = p.${groupColumn}
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       )
       SELECT label, COALESCE(SUM(revenue), 0) AS revenue, COALESCE(SUM(cost), 0) AS cost,

@@ -25,7 +25,7 @@ export class AnalyticsService {
 
   public getSalesAnalytics(dateFrom: string, dateTo: string): SalesAnalytics {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.view');
+    PermissionService.require(actor, 'sales.view', '/sales');
 
     const scope = this.branchAccess.sqlScope(
       'si.branch_id',

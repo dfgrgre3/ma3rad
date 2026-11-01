@@ -1,6 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 
 export interface DebtRow {
@@ -22,6 +23,7 @@ export interface DebtRow {
 
 export class DebtService {
   private db = DatabaseManager.getInstance();
+  private branches = new BranchAccessService();
 
   private requireView(): void {
     PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
@@ -29,29 +31,34 @@ export class DebtService {
 
   public getDebts(search = ''): DebtRow[] {
     this.requireView();
+    const actor = AuthService.requireAuth();
+    const invoiceScope = this.branches.sqlScope('si.branch_id', undefined, actor);
+    const paymentScope = this.branches.sqlScope('cp.branch_id', undefined, actor);
+    const purchaseScope = this.branches.sqlScope('pi.branch_id', undefined, actor);
     const term = `%${search.trim()}%`;
     const customers = this.db.query<DebtRow>(
-      `SELECT c.id,c.name,c.phone,CASE WHEN COALESCE(inv.invoiceRemaining,0)>0.009 THEN inv.invoiceRemaining ELSE c.current_balance END AS amount,c.credit_limit AS creditLimit,c.updated_at AS updatedAt,
+      `SELECT c.id,c.name,c.phone,inv.invoiceRemaining AS amount,c.credit_limit AS creditLimit,c.updated_at AS updatedAt,
          COALESCE(inv.invoiceCount,0) AS invoiceCount,COALESCE(inv.invoiceRemaining,0) AS invoiceRemaining,
          COALESCE(inv.paidFromInvoices,0) AS paidFromInvoices,inv.oldestDueDate,
          CASE WHEN inv.oldestDueDate < date('now','localtime') THEN CAST(julianday(date('now','localtime'))-julianday(inv.oldestDueDate) AS INTEGER) ELSE 0 END AS daysOverdue,
-         (SELECT MAX(date) FROM customer_payments cp WHERE cp.customer_id=c.id) AS lastPaymentDate
+         (SELECT MAX(cp.date) FROM customer_payments cp WHERE cp.customer_id=c.id AND ${paymentScope.clause}) AS lastPaymentDate
        FROM customers c LEFT JOIN (
-         SELECT customer_id,COUNT(*) AS invoiceCount,SUM(total_amount) AS invoiceTotal,
-           SUM(paid_amount) AS paidFromInvoices,SUM(remaining_amount) AS invoiceRemaining,
-           MIN(CASE WHEN remaining_amount>0.009 AND due_date IS NOT NULL THEN due_date END) AS oldestDueDate
-         FROM sales_invoices WHERE invoice_status <> 'VOID' GROUP BY customer_id
+         SELECT si.customer_id,COUNT(*) AS invoiceCount,SUM(si.total_amount) AS invoiceTotal,
+           SUM(si.paid_amount) AS paidFromInvoices,SUM(si.remaining_amount) AS invoiceRemaining,
+           MIN(CASE WHEN si.remaining_amount>0.009 AND si.due_date IS NOT NULL THEN si.due_date END) AS oldestDueDate
+         FROM sales_invoices si WHERE si.invoice_status <> 'VOID' AND ${invoiceScope.clause} GROUP BY si.customer_id
        ) inv ON inv.customer_id=c.id
-       WHERE c.current_balance > 0.009 OR COALESCE(inv.invoiceRemaining,0)>0.009
-       ${search.trim() ? `AND (c.name LIKE ? OR c.phone LIKE ? OR c.code LIKE ? OR EXISTS (SELECT 1 FROM sales_invoices si WHERE si.customer_id=c.id AND si.invoice_number LIKE ?))` : ''}
-       ORDER BY c.current_balance DESC`,
-      search.trim() ? [term,term,term,term] : []
+       WHERE COALESCE(inv.invoiceRemaining,0)>0.009
+       ${search.trim() ? `AND (c.name LIKE ? OR c.phone LIKE ? OR c.code LIKE ? OR EXISTS (SELECT 1 FROM sales_invoices sx WHERE sx.customer_id=c.id AND sx.invoice_number LIKE ? AND ${this.branches.sqlScope('sx.branch_id', undefined, actor).clause}))` : ''}
+       ORDER BY inv.invoiceRemaining DESC`,
+      [...paymentScope.params, ...invoiceScope.params, ...(search.trim() ? [term,term,term,term, ...this.branches.sqlScope('sx.branch_id', undefined, actor).params] : [])]
     ).map((c) => ({ ...c, type: 'CUSTOMER_RECEIVABLE' as const, overdue: Boolean(c.oldestDueDate && c.oldestDueDate < localDateString()) }));
 
     const suppliers = this.db.query<DebtRow>(
-      `SELECT id, name, phone, current_balance AS amount, 0 AS creditLimit, updated_at AS updatedAt
-       FROM suppliers WHERE current_balance > 0.009 ${search.trim() ? 'AND (name LIKE ? OR phone LIKE ? OR code LIKE ?)' : ''} ORDER BY current_balance DESC`,
-      search.trim() ? [term,term,term] : []
+      `SELECT s.id,s.name,s.phone,inv.amount,s.updated_at AS updatedAt,0 AS creditLimit
+       FROM suppliers s JOIN (SELECT pi.supplier_id,SUM(pi.remaining_amount) AS amount FROM purchase_invoices pi WHERE ${purchaseScope.clause} GROUP BY pi.supplier_id) inv ON inv.supplier_id=s.id
+       WHERE inv.amount > 0.009 ${search.trim() ? 'AND (s.name LIKE ? OR s.phone LIKE ? OR s.code LIKE ?)' : ''} ORDER BY inv.amount DESC`,
+      [...purchaseScope.params, ...(search.trim() ? [term,term,term] : [])]
     ).map((s) => ({ ...s, type: 'SUPPLIER_PAYABLE' as const, overdue: false }));
 
     return [...customers, ...suppliers].map((d) => ({
@@ -62,13 +69,16 @@ export class DebtService {
 
   public getTotals(): { receivable: number; payable: number; net: number } {
     this.requireView();
+    const actor = AuthService.requireAuth();
+    const invoiceScope = this.branches.sqlScope('si.branch_id', undefined, actor);
+    const purchaseScope = this.branches.sqlScope('pi.branch_id', undefined, actor);
     const receivable = Number(this.db.query<{ v: number }>(
-      `SELECT COALESCE(SUM(CASE WHEN COALESCE(inv.invoiceRemaining,0)>0.009 THEN inv.invoiceRemaining ELSE c.current_balance END),0) AS v
-       FROM customers c LEFT JOIN (SELECT customer_id,SUM(remaining_amount) AS invoiceRemaining FROM sales_invoices WHERE invoice_status <> 'VOID' GROUP BY customer_id) inv ON inv.customer_id=c.id
-       WHERE c.current_balance > 0.009 OR COALESCE(inv.invoiceRemaining,0)>0.009`
+      `SELECT COALESCE(SUM(si.remaining_amount),0) AS v FROM sales_invoices si WHERE si.invoice_status <> 'VOID' AND si.remaining_amount > 0.009 AND ${invoiceScope.clause}`,
+      invoiceScope.params
     )[0]?.v || 0);
     const payable = Number(this.db.query<{ v: number }>(
-      `SELECT COALESCE(SUM(current_balance), 0) AS v FROM suppliers WHERE current_balance > 0`
+      `SELECT COALESCE(SUM(pi.remaining_amount),0) AS v FROM purchase_invoices pi WHERE pi.remaining_amount > 0.009 AND ${purchaseScope.clause}`,
+      purchaseScope.params
     )[0]?.v || 0);
     return { receivable, payable, net: receivable - payable };
   }

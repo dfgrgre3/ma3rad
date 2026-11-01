@@ -26,7 +26,6 @@ export const AppRouter: React.FC<AppRouterProps> = ({ currentUser, onLogout }) =
         index
         element={<Navigate to={getPersistedLocation(currentUser.id) ?? '/dashboard'} replace />}
       />
-      <Route path="finance/debts" element={<Navigate to="/finance/other-receivables" replace />} />
       <Route path="crm" element={<Navigate to="/crm/dashboard" replace />} />
 
       {appRoutes.map((r) => (

@@ -1,6 +1,7 @@
 export const SCHEMA_PART_08 = String.raw`
 CREATE TABLE IF NOT EXISTS receivables (
   id TEXT PRIMARY KEY,
+  company_id TEXT NOT NULL DEFAULT 'cmp_main',
   title TEXT NOT NULL,
   type TEXT NOT NULL DEFAULT 'OTHER',
   responsible_name TEXT,

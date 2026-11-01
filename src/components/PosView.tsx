@@ -16,10 +16,9 @@ import { AuthService } from '../services/AuthService';
 import { BatchService } from '../services/BatchService';
 import { CashierService } from '../services/CashierService';
 import { HeldOrderService } from '../services/HeldOrderService';
-import { PromotionService, AppliedPromotion } from '../services/PromotionService';
 import { LoyaltyService } from '../services/LoyaltyService';
 import { PrintService } from '../services/PrintService';
-import { PricingService } from '../services/PricingService';
+import { PricingService, type AppliedPromotion } from '../services/PricingService';
 import { ApprovalService } from '../services/ApprovalService';
 import { AppConfigService } from '../services/AppConfigService';
 import { PermissionService } from '../services/PermissionService';
@@ -143,7 +142,6 @@ export const PosView: React.FC = () => {
   const batchService  = useMemo(() => new BatchService(), []);
   const cashierService = useMemo(() => new CashierService(), []);
   const heldOrderService = useMemo(() => new HeldOrderService(), []);
-  const promotionService = useMemo(() => new PromotionService(), []);
   const loyaltyService = useMemo(() => new LoyaltyService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const pricingService = useMemo(() => new PricingService(), []);
@@ -952,7 +950,7 @@ export const PosView: React.FC = () => {
       setSuccessInvoice(invoice);
       // Record promotion usage
       if (appliedPromotion) {
-        try { promotionService.recordUsage(appliedPromotion.promotionId, invoice.id, couponCode || undefined, appliedPromotion.discountAmount); } catch { /* ignore */ }
+        try { pricingService.recordPromotionUsage(appliedPromotion.promotionId, invoice.id, couponCode || undefined, appliedPromotion.discountAmount); } catch { /* ignore */ }
       }
       // Earn loyalty points (1 point per 10 currency units of total)
       if (selectedCustomer?.id) {
@@ -1048,11 +1046,12 @@ export const PosView: React.FC = () => {
     const cartItems = cart.map((item) => ({
       productId: item.product.id,
       categoryId: (item.product as any).categoryId,
+      brandId: (item.product as any).brandId,
       qty: item.quantityM2,
       unitPrice: item.unitPrice,
       amount: item.quantityM2 * item.unitPrice,
     }));
-    const applied = promotionService.evaluate(cartItems, couponCode || undefined);
+    const applied = pricingService.evaluatePromotions(cartItems, couponCode || undefined);
     if (applied) {
       setAppliedPromotion(applied);
       setPromotionDiscount(applied.discountAmount);
@@ -1060,7 +1059,7 @@ export const PosView: React.FC = () => {
       setAppliedPromotion(null);
       setPromotionDiscount(0);
     }
-  }, [cart, couponCode, promotionService]);
+  }, [cart, couponCode, pricingService]);
 
   const doVoidInvoice = useCallback(async (invoice: any, reason: string) => {
     try {

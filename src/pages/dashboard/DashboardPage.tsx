@@ -28,8 +28,9 @@ const HrDashboardPage = lazy(() => import('../hr/HrDashboardPage').then(m => ({ 
  * كل قسم داخل لوحة المعلومات يخضع لصلاحية مجاله ووحدته، لا لصلاحية المسار
  * الأب (dashboard.view) وحدها. القسم بلا مدخل يبقى على dashboard.view فقط.
  */
-const SECTION_ACCESS: Partial<Record<SectionId, { permission?: string; moduleId?: string; path?: string }>> = {
-  executive: { permission: 'finance.view', moduleId: 'finance', path: '/finance' },
+const PULSE_ACCESS = ['sales.view', 'purchases.view', 'finance.view', 'customers.view', 'inventory.view'];
+const SECTION_ACCESS: Partial<Record<SectionId, { permission?: string; permissions?: string[]; scopes?: Record<string, string>; moduleId?: string; path?: string }>> = {
+  executive: { permissions: ['sales.view', 'purchases.view', 'finance.view'], scopes: { 'sales.view': '/sales', 'purchases.view': '/purchases', 'finance.view': '/finance' }, moduleId: 'finance', path: '/finance' },
   sales: { permission: 'sales.view', moduleId: 'sales', path: '/sales' },
   purchases: { permission: 'purchases.view', moduleId: 'purchasing', path: '/purchases' },
   debts: { permission: 'finance.debts.view', moduleId: 'finance', path: '/finance' },
@@ -51,10 +52,13 @@ export const DashboardPage: React.FC = () => {
   const currentUser = AuthService.getCurrentUser();
   // القسم مسموح فقط إذا تحققت صلاحية مجاله ووحدته الفعّالة وقواعد المنصة المركزية.
   const canViewSection = (id: SectionId) => {
-    if (id === 'all' || id === 'pulse') return true;
-    const access = SECTION_ACCESS[id];
+    if (id === 'all') return true;
+    const pulseScopes = { 'sales.view': '/sales', 'purchases.view': '/purchases', 'finance.view': '/finance', 'customers.view': '/customers', 'inventory.view': '/inventory' };
+    const access: { permission?: string; permissions?: string[]; scopes?: Record<string, string>; moduleId?: string; path?: string } | undefined =
+      id === 'pulse' ? { permissions: PULSE_ACCESS, scopes: pulseScopes } : SECTION_ACCESS[id];
     if (!access) return true;
-    if (access.permission && !PermissionService.can(currentUser, access.permission)) return false;
+    if (access.permission && !PermissionService.can(currentUser, access.permission, access.path)) return false;
+    if (access.permissions?.some((permission) => !PermissionService.can(currentUser, permission, access.scopes?.[permission] ?? access.path))) return false;
     if (access.moduleId && !ModuleRegistryService.isModuleEnabled(access.moduleId)) return false;
     if (access.path && !CentralFeaturePermissionService.isPageVisible(access.path)) return false;
     return true;
@@ -68,7 +72,8 @@ export const DashboardPage: React.FC = () => {
     return canViewSection(section.id);
   });
   // قد يشير الرابط إلى قسم غير مسموح؛ نعود إلى ملخص اليوم.
-  const effectiveTab: SectionId = canViewSection(activeTab) ? activeTab : 'pulse';
+  const fallbackSection = visibleSections.find((section) => section.id !== 'all' && canViewSection(section.id))?.id ?? 'pulse';
+  const effectiveTab: SectionId = canViewSection(activeTab) ? activeTab : fallbackSection;
   // التبويب الشامل يعرض أقسامه فقط إذا كانت مسموحة، منعًا لتجاوز صلاحياتها.
   const showSection = (id: SectionId) => effectiveTab === id || (effectiveTab === 'all' && canViewSection(id));
 
@@ -104,7 +109,12 @@ export const DashboardPage: React.FC = () => {
 
         <DashboardSectionNav activeTab={effectiveTab} onSelectSection={selectSection} sections={visibleSections} />
 
-        {(effectiveTab === 'pulse' || isOverview) && (
+        {(effectiveTab === 'pulse' || isOverview) && !canViewSection('pulse') && (
+          <SectionCard id="sec-pulse" title="ملخص لوحة المعلومات" subtitle="تتطلب المؤشرات صلاحيات المجالات التي تعرض بياناتها." icon={LayoutDashboard} iconBg="bg-slate-100" iconColor="text-slate-600">
+            <p className="p-4 text-sm text-slate-600">لا توجد صلاحية كافية لعرض مؤشرات المبيعات والمشتريات والمالية والعملاء والمخزون.</p>
+          </SectionCard>
+        )}
+        {(effectiveTab === 'pulse' || isOverview) && canViewSection('pulse') && (
           <>
             <QuickActions />
             <SectionCard

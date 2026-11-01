@@ -40,7 +40,7 @@ npm run electron:dev
 | --- | --- |
 | `VITE_DEV_SERVER_URL` | عنوان خادم Vite أثناء التطوير |
 | `CENTRAL_API_URL` | عنوان منصة الإدارة/الترخيص المركزية (HTTPS إلزامي) |
-| `CERAMISYS_DATA_DIR` | تجاوز مجلد بيانات التطبيق (اختياري) |
+| `CERAMISYS_USER_DATA_DIR` | تجاوز مجلد بيانات التطبيق (اختياري) |
 
 ---
 
@@ -100,7 +100,7 @@ scripts/            سكربتات مساعدة للبناء والصيانة
 
 - ملف القاعدة: `%APPDATA%\CeramiSysERP\data\ceramisys.sqlite`
 - النسخ الاحتياطية: `%APPDATA%\CeramiSysERP\backups`
-- الهجرات معرّفة في `src/database/migrations/` بأرقام متسلسلة (حتى `102`)،
+- الهجرات معرّفة في `src/database/migrations/` بأرقام متسلسلة (حتى `103`)،
   وتُطبَّق تلقائياً عند الإقلاع مع تسجيل النتيجة.
 - `DatabaseManager.query` يحوّل أسماء الأعمدة من `snake_case` إلى `camelCase`
   عند القراءة؛ استخدم `camelCase` في نتائج الاستعلامات.
@@ -187,3 +187,5 @@ npm run electron:dist:linux
 4. لا تُعدّل ملفات الهجرات المنشورة؛ أضف هجرة جديدة برقم أحدث.
 
 الترخيص: تجاري — جميع الحقوق محفوظة.
+
+Electron validates CENTRAL_API_URL at startup and permits HTTPS requests only to that exact origin and the documented central API paths. It must be an HTTPS origin without credentials, a path, query, or fragment; invalid or missing values disable central API requests. CERAMISYS_USER_DATA_DIR must be an absolute path.

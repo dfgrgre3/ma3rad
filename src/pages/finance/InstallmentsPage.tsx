@@ -85,39 +85,36 @@ export const InstallmentsPage: React.FC = () => {
     if (!db) return;
 
     try {
-      const allCusts = customerService.getAllCustomers();
-      setCustomers(allCusts);
-      if (allCusts.length > 0 && !selectedCustomerId) {
-        setSelectedCustomerId(allCusts[0].id);
-      }
-      const invoiceRes = db.exec(`SELECT id,invoice_number,customer_id,remaining_amount FROM sales_invoices WHERE invoice_status!='VOID' AND remaining_amount>0.009 ORDER BY date DESC,created_at DESC`);
-      const invoiceOptions: InstallmentInvoiceOption[] = (invoiceRes[0]?.values || []).map((r: any[]) => ({
+      const { invoiceRows, planRows, installmentRows } = installmentService.getPageData();
+      const invoiceOptions: InstallmentInvoiceOption[] = invoiceRows.map((r: any[]) => ({
         id: String(r[0]), invoiceNumber: String(r[1]), customerId: String(r[2]), remainingAmount: Number(r[3] || 0),
       }));
       setOpenInvoices(invoiceOptions);
-      if (!selectedInvoiceId) {
-        const firstCustomerId = selectedCustomerId || allCusts[0]?.id || '';
-        const firstInvoice = invoiceOptions.find((invoice) => invoice.customerId === firstCustomerId);
+
+      // Check if plans exist
+      const visibleCustomerIds = new Set<string>([
+        ...invoiceOptions.map((invoice) => invoice.customerId),
+        ...planRows.map((row: any[]) => String(row[2])),
+      ]);
+      const scopedCustomers = [...visibleCustomerIds]
+        .map((customerId) => customerService.getCustomerById(customerId))
+        .filter((customer): customer is Customer => !!customer);
+      setCustomers(scopedCustomers);
+      const selectedCustomerIsVisible = scopedCustomers.some((customer) => customer.id === selectedCustomerId);
+      const initialCustomerId = selectedCustomerIsVisible ? selectedCustomerId : (scopedCustomers[0]?.id || '');
+      if (initialCustomerId && initialCustomerId !== selectedCustomerId) setSelectedCustomerId(initialCustomerId);
+      const selectedInvoiceIsVisible = invoiceOptions.some((invoice) => invoice.id === selectedInvoiceId);
+      if (!selectedInvoiceIsVisible) {
+        const firstInvoice = invoiceOptions.find((invoice) => invoice.customerId === initialCustomerId);
         if (firstInvoice) {
-          setSelectedCustomerId(firstCustomerId);
           setSelectedInvoiceId(firstInvoice.id);
           setTotalFinanced(firstInvoice.remainingAmount);
           setDownPayment(0);
-        }
+        } else setSelectedInvoiceId('');
       }
 
-      // Check if plans exist
-      const plansRes = db.exec(`
-        SELECT ip.id, ip.plan_number, ip.customer_id, c.name as customer_name,
-               ip.total_amount, ip.down_payment, ip.financed_amount, ip.installments_count,
-               ip.installment_amount, ip.paid_amount, ip.remaining_amount, ip.status, ip.start_date
-        FROM installment_plans ip
-        LEFT JOIN customers c ON ip.customer_id = c.id
-        ORDER BY ip.created_at DESC
-      `);
-
-      if (plansRes.length > 0 && plansRes[0].values.length > 0) {
-        const pRows: InstallmentPlanRecord[] = plansRes[0].values.map((r: any[]) => ({
+      if (planRows.length > 0) {
+        const pRows: InstallmentPlanRecord[] = planRows.map((r: any[]) => ({
           id: String(r[0]),
           planNumber: String(r[1]),
           customerId: String(r[2]),
@@ -135,18 +132,8 @@ export const InstallmentsPage: React.FC = () => {
         setPlans(pRows);
 
         // Load all installments
-        const instRes = db.exec(`
-          SELECT i.id, i.plan_id, ip.plan_number, i.sequence_number, ip.installments_count,
-                 ip.customer_id, c.name, c.phone, i.amount, i.paid_amount, i.due_date, i.paid_at, i.status
-          FROM installments i
-          JOIN installment_plans ip ON i.plan_id = ip.id
-          LEFT JOIN customers c ON ip.customer_id = c.id
-          WHERE ip.status != 'CANCELLED'
-          ORDER BY i.due_date ASC
-        `);
-
-        if (instRes.length > 0 && instRes[0].values.length > 0) {
-          const iRows: InstallmentRow[] = instRes[0].values.map((r: any[]) => {
+        if (installmentRows.length > 0) {
+          const iRows: InstallmentRow[] = installmentRows.map((r: any[]) => {
             const dueDate = String(r[10]);
             let status = String(r[12] || 'UPCOMING');
             const isPaid = status === 'PAID';
@@ -170,7 +157,10 @@ export const InstallmentsPage: React.FC = () => {
             };
           });
           setInstallments(iRows);
-        }
+        } else setInstallments([]);
+      } else {
+        setPlans([]);
+        setInstallments([]);
       }
     } catch (e) {
       console.error('Error loading installments', e);

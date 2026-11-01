@@ -29,7 +29,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ currentUser }) => {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const visibleGroups = useMemo(
-    () => NavigationService.getAccessibleGroups(currentUser),
+    () => NavigationService.getNavigationGroups(currentUser),
     // `settings` is part of the dependency list because navigation overrides are
     // stored in system settings and must refresh when they change.
     // eslint-disable-next-line react-hooks/exhaustive-deps

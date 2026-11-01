@@ -128,6 +128,11 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'finance.close', name: 'إقفال المصالحات المالية', module: 'FINANCE' },
   { code: 'finance.reopen', name: 'إعادة فتح فترة مالية مقفلة', module: 'FINANCE' },
   { code: 'finance.debts.view', name: 'عرض الديون والذمم', module: 'FINANCE' },
+  { code: 'finance.receivables.view', name: 'عرض المطالبات الأخرى', module: 'FINANCE' },
+  { code: 'finance.receivables.create', name: 'إضافة مطالبة أخرى', module: 'FINANCE' },
+  { code: 'finance.receivables.update', name: 'تعديل مطالبة أخرى', module: 'FINANCE' },
+  { code: 'finance.receivables.delete', name: 'إلغاء مطالبة أخرى', module: 'FINANCE' },
+  { code: 'finance.receivables.export', name: 'تصدير المطالبات الأخرى', module: 'FINANCE' },
   { code: 'finance.installments.view', name: 'عرض الأقساط', module: 'FINANCE' },
   { code: 'finance.installments.manage', name: 'إدارة الأقساط', module: 'FINANCE' },
   { code: 'finance.export', name: 'تصدير التقارير المالية', module: 'FINANCE' },
@@ -302,6 +307,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'suppliers.view', 'suppliers.payment', 'suppliers.export',
     'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
     'finance.view', 'finance.approve', 'finance.close', 'finance.debts.view', 'finance.export',
+    'finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export',
     'finance.installments.view', 'finance.installments.manage',
     'reports.view', 'reports.export',
     'crm.view', 'projects.view', 'pricing.view', 'promotions.view',
@@ -372,6 +378,12 @@ const EXPORT_PERMISSION_SOURCES: Record<string, string> = {
   'documents.export': 'documents.view',
   'contracts.export': 'contracts.view',
   'audit.export': 'audit.view',
+};
+
+const RECEIVABLE_PERMISSION_BACKFILL: Record<string, string[]> = {
+  ADMIN: ['finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.delete', 'finance.receivables.export'],
+  MANAGER: ['finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export'],
+  ACCOUNTANT: ['finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export'],
 };
 
 const ROLE_NAMES: Record<string, string> = {  ADMIN: 'مدير النظام',
@@ -453,6 +465,16 @@ export class PermissionService {
       PermissionService.backfillInventoryCountApproval(db);
     }
     PermissionService.backfillExportPermissions(db, roleCode);
+    PermissionService.backfillReceivablesPermissions(db, roleCode);
+  }
+
+  private static backfillReceivablesPermissions(db: DatabaseManager, roleCode: string): void {
+    const markerKey = `rbac.receivablesPermissions.v1.${roleCode}`;
+    if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
+    for (const permission of RECEIVABLE_PERMISSION_BACKFILL[roleCode] || []) {
+      db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, permission]);
+    }
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
   }
 
   private static backfillExportPermissions(db: DatabaseManager, roleCode: string): void {
@@ -719,11 +741,11 @@ export class PermissionService {
     return Array.from(PermissionService.loadSets(user).grants).sort(compareAlphabetically);
   }
 
-  public static can(user: User | null, required: string): boolean {
+  public static can(user: User | null, required: string, scope?: string): boolean {
     if (!user) return false;
     // القيود المنشورة من منصة الإدارة المركزية تتقدّم على صلاحيات الأدوار،
     // فتُخفى الأزرار/الإجراءات تلقائياً في كل واجهة تعتمد على هذه الطبقة.
-    if (!CentralFeaturePermissionService.allowsPermission(required)) return false;
+    if (!CentralFeaturePermissionService.allowsPermission(required, scope)) return false;
     return PermissionService.hasRoleGrant(user, required);
   }
 
@@ -744,29 +766,29 @@ export class PermissionService {
     return grants.has(`${mod}.*`) || grants.has('*');
   }
 
-  public static canAny(user: User | null, required: string[]): boolean {
-    return required.some((code) => PermissionService.can(user, code));
+  public static canAny(user: User | null, required: string[], scope?: string): boolean {
+    return required.some((code) => PermissionService.can(user, code, scope));
   }
 
   /** Server-side (service-layer) enforcement — never trust the UI. */
-  public static require(user: User | null, required: string): void {
-    if (!user || !PermissionService.hasRoleGrant(user, required)) {
+  public static require(user: User | null, required: string, scope?: string): void {
+    if (!user || !PermissionService.can(user, required, scope)) {
       PermissionService.audit(
         user,
         'محاولة وصول مرفوضة',
         'SECURITY',
         `perm:${required}`,
         null,
-        { required, path: typeof window !== 'undefined' ? window.location.hash : '' }
+        { required, path: scope ?? CentralFeaturePermissionService.getCurrentPath() }
       );
       throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${required}).`);
     }
   }
 
   /** Require any one of several permission codes (least-privilege alternatives). */
-  public static requireAny(user: User | null, required: string[]): void {
+  public static requireAny(user: User | null, required: string[], scope?: string): void {
     if (required.length === 0) throw new Error('لم تُحدد صلاحية مطلوبة.');
-    if (!PermissionService.canAny(user, required)) {
+    if (!PermissionService.canAny(user, required, scope)) {
       const codes = required.join(' أو ');
       PermissionService.audit(
         user,
@@ -774,7 +796,7 @@ export class PermissionService {
         'SECURITY',
         `perm:${codes}`,
         null,
-        { required: codes, path: typeof window !== 'undefined' ? window.location.hash : '' }
+        { required: codes, path: scope ?? CentralFeaturePermissionService.getCurrentPath() }
       );
       throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${codes}).`);
     }

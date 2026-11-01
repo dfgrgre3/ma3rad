@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('ceramisys', {
     set: (username, password) => ipcRenderer.invoke('credentials:set', { username, password }),
     clear: () => ipcRenderer.invoke('credentials:clear'),
   },
+  central: {
+    request: (request) => ipcRenderer.invoke('central:request', request),
+  },
   sync: {
     status: () => ipcRenderer.invoke('sync:status'),
     pushEvents: (events) => ipcRenderer.invoke('sync:push', events),

@@ -1,24 +1,49 @@
-import React from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { BarChart3, ShoppingCart, Truck, CreditCard, PieChart, FileText, TrendingUp } from 'lucide-react';
-import { ReportsView } from '../../components/ReportsView';
-import { SalesReportsPage } from './SalesReportsPage';
-import { PurchaseInventoryReportPage } from './PurchaseInventoryReportPage';
-import { PosReportsPage } from './PosReportsPage';
-import { FinancialStatementsPage } from './FinancialStatementsPage';
-import { TaxReportPage } from './TaxReportPage';
-import { ProfitLossPage } from './ProfitLossPage';
+import React, { Suspense, lazy } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  BarChart3,
+  ShoppingCart,
+  Truck,
+  CreditCard,
+  PieChart,
+  FileText,
+  TrendingUp,
+  ArrowLeft,
+} from "lucide-react";
+const SalesReportsPage = lazy(() =>
+  import("./SalesReportsPage").then((m) => ({ default: m.SalesReportsPage })),
+);
+const PurchaseInventoryReportPage = lazy(() =>
+  import("./PurchaseInventoryReportPage").then((m) => ({
+    default: m.PurchaseInventoryReportPage,
+  })),
+);
+const PosReportsPage = lazy(() =>
+  import("./PosReportsPage").then((m) => ({ default: m.PosReportsPage })),
+);
+const FinancialStatementsPage = lazy(() =>
+  import("./FinancialStatementsPage").then((m) => ({
+    default: m.FinancialStatementsPage,
+  })),
+);
+const TaxReportPage = lazy(() =>
+  import("./TaxReportPage").then((m) => ({ default: m.TaxReportPage })),
+);
+const ProfitLossPage = lazy(() =>
+  import("./ProfitLossPage").then((m) => ({ default: m.ProfitLossPage })),
+);
 
-type TabId = 'overview' | 'sales' | 'purchases' | 'pos' | 'finance' | 'profitLoss' | 'tax';
+type TabId =
+  "overview" | "sales" | "purchases" | "pos" | "finance" | "profitLoss" | "tax";
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
-  { id: 'overview', label: 'نظرة عامة', icon: BarChart3 },
-  { id: 'sales', label: 'المبيعات', icon: ShoppingCart },
-  { id: 'purchases', label: 'المشتريات والمخزون', icon: Truck },
-  { id: 'pos', label: 'نقطة البيع', icon: CreditCard },
-  { id: 'finance', label: 'المالية', icon: PieChart },
-  { id: 'profitLoss', label: 'الأرباح والخسائر', icon: TrendingUp },
-  { id: 'tax', label: 'الضرائب', icon: FileText },
+  { id: "overview", label: "نظرة عامة", icon: BarChart3 },
+  { id: "sales", label: "المبيعات", icon: ShoppingCart },
+  { id: "purchases", label: "المشتريات والمخزون", icon: Truck },
+  { id: "pos", label: "نقطة البيع", icon: CreditCard },
+  { id: "finance", label: "المالية", icon: PieChart },
+  { id: "profitLoss", label: "الأرباح والخسائر", icon: TrendingUp },
+  { id: "tax", label: "الضرائب", icon: FileText },
 ];
 
 const isValidTab = (value: string | null): value is TabId =>
@@ -26,33 +51,40 @@ const isValidTab = (value: string | null): value is TabId =>
 
 export const ReportsHubPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requested = searchParams.get('tab');
-  const tab: TabId = isValidTab(requested) ? requested : 'overview';
+  const requested = searchParams.get("tab");
+  const tab: TabId = isValidTab(requested) ? requested : "overview";
 
   React.useEffect(() => {
     if (!isValidTab(requested)) {
       const next = new URLSearchParams(searchParams);
-      next.set('tab', 'overview');
+      next.set("tab", "overview");
       setSearchParams(next, { replace: true });
     }
   }, [requested, searchParams, setSearchParams]);
 
   const selectTab = (id: TabId) => {
     const next = new URLSearchParams(searchParams);
-    next.set('tab', id);
+    next.set("tab", id);
     setSearchParams(next, { replace: true });
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-100 dark:bg-slate-950 p-4 lg:p-6" dir="rtl">
+    <div
+      className="h-full overflow-y-auto bg-slate-100 dark:bg-slate-950 p-4 lg:p-6"
+      dir="rtl"
+    >
       <div className="mx-auto max-w-7xl space-y-5">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-600 text-white shadow-lg shadow-teal-500/25">
             <BarChart3 className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">مركز التقارير والتحليلات</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">المبيعات، المشتريات، المخزون، نقطة البيع، المالية، والضرائب</p>
+            <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">
+              مركز التقارير والتحليلات
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              المبيعات، المشتريات، المخزون، نقطة البيع، المالية، والضرائب
+            </p>
           </div>
         </div>
 
@@ -66,8 +98,8 @@ export const ReportsHubPage: React.FC = () => {
                 onClick={() => selectTab(item.id)}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
                   isActive
-                    ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20'
-                    : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                    ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`}
               >
                 <Icon className="h-4 w-4" /> {item.label}
@@ -77,13 +109,47 @@ export const ReportsHubPage: React.FC = () => {
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
-          {tab === 'overview' && <ReportsView />}
-          {tab === 'sales' && <SalesReportsPage />}
-          {tab === 'purchases' && <PurchaseInventoryReportPage />}
-          {tab === 'pos' && <PosReportsPage />}
-          {tab === 'finance' && <FinancialStatementsPage />}
-          {tab === 'profitLoss' && <ProfitLossPage />}
-          {tab === 'tax' && <TaxReportPage />}
+          {tab === "overview" ? (
+            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {TABS.filter((item) => item.id !== "overview").map(
+                ({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => selectTab(id)}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 p-4 text-right transition hover:border-teal-400 hover:bg-teal-50/40 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="rounded-lg bg-teal-50 p-2 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span>
+                        <b className="block text-sm">{label}</b>
+                        <small className="text-slate-500">
+                          فتح التقارير المتخصصة
+                        </small>
+                      </span>
+                    </span>
+                    <ArrowLeft className="h-4 w-4 text-slate-400" />
+                  </button>
+                ),
+              )}
+            </div>
+          ) : (
+            <Suspense
+              fallback={
+                <div className="p-10 text-center text-sm text-slate-500">
+                  جارٍ تحميل التقرير…
+                </div>
+              }
+            >
+              {tab === "sales" && <SalesReportsPage />}
+              {tab === "purchases" && <PurchaseInventoryReportPage />}
+              {tab === "pos" && <PosReportsPage />}
+              {tab === "finance" && <FinancialStatementsPage />}
+              {tab === "profitLoss" && <ProfitLossPage />}
+              {tab === "tax" && <TaxReportPage />}
+            </Suspense>
+          )}
         </div>
       </div>
     </div>

@@ -120,7 +120,7 @@ test('central usage limits parse tolerant values and enforce at the service laye
   clearCentralConfig();
 });
 
-test('central feature permissions hide UI actions without breaking service-layer role checks', async () => {
+test('central feature permissions are enforced by both UI and service-layer checks', async () => {
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
@@ -132,8 +132,8 @@ test('central feature permissions hide UI actions without breaking service-layer
 
   // UI-level check honors the central restriction…
   assert.equal(PermissionService.can(admin, 'sales.create'), false);
-  // …while background/service work still relies on the role grant only.
-  assert.doesNotThrow(() => PermissionService.require(admin, 'sales.create'));
+  // The service layer applies the same central restriction as the UI.
+  assert.throws(() => PermissionService.require(admin, 'sales.create'));
 
   clearCentralConfig();
   CentralFeaturePermissionService.setCurrentPath('');

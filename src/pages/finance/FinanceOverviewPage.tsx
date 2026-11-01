@@ -8,6 +8,8 @@ import {
   Tooltip, ResponsiveContainer
 } from 'recharts';
 import { DatabaseManager } from '../../database/db';
+import { AuthService } from '../../services/AuthService';
+import { queryFinanceOverviewMetrics } from '../../services/DashboardQueryScopeService';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 interface Metrics {
@@ -45,46 +47,9 @@ export const FinanceOverviewPage: React.FC = () => {
         from: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
         to: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
       };
-
-      const revRow = db.exec(
-        `SELECT COALESCE(SUM(subtotal - discount_amount + shipping_cost),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
-        [thisMonth.from, thisMonth.to]
-      );
-      const expRow = db.exec(
-        `SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN ? AND ?`,
-        [thisMonth.from, thisMonth.to]
-      );
-      const receivRow = db.exec(`SELECT COALESCE(SUM(current_balance),0) FROM customers WHERE current_balance > 0`);
-      const payRow = db.exec(`SELECT COALESCE(SUM(current_balance),0) FROM suppliers WHERE current_balance > 0`);
-      const cashRow = db.exec(`SELECT COALESCE(SUM(current_balance),0) FROM cash_registers WHERE is_active = 1`);
-      const invValRow = db.exec(`
-        SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0)
-        FROM warehouse_stock ws
-        JOIN products p ON ws.product_id = p.id
-      `);
-
-      const rev = Number(revRow[0]?.values[0]?.[0] || 0);
-      const exp = Number(expRow[0]?.values[0]?.[0] || 0);
-      const grossProfitRow = db.exec(
-        `SELECT COALESCE(SUM(gross_profit),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
-        [thisMonth.from, thisMonth.to]
-      );
-      const grossProfit = Number(grossProfitRow[0]?.values[0]?.[0] || 0);
-      const shippingRevenueRow = db.exec(
-        `SELECT COALESCE(SUM(shipping_cost),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`,
-        [thisMonth.from, thisMonth.to]
-      );
-      const shippingRevenue = Number(shippingRevenueRow[0]?.values[0]?.[0] || 0);
-
-      setMetrics({
-        totalRevenue: rev,
-        totalExpenses: exp,
-        netProfit: grossProfit + shippingRevenue - exp,
-        totalReceivables: Number(receivRow[0]?.values[0]?.[0] || 0),
-        totalPayables: Number(payRow[0]?.values[0]?.[0] || 0),
-        cashBalance: Number(cashRow[0]?.values[0]?.[0] || 0),
-        inventoryValue: Number(invValRow[0]?.values[0]?.[0] || 0),
-      });
+      const actor = AuthService.requireAuth();
+      const monthMetrics = queryFinanceOverviewMetrics(db, thisMonth.from, thisMonth.to, actor);
+      setMetrics(monthMetrics);
 
       const sixMonths: { month: string; revenue: number; expenses: number }[] = [];
       for (let i = 5; i >= 0; i--) {
@@ -92,12 +57,11 @@ export const FinanceOverviewPage: React.FC = () => {
         d.setMonth(d.getMonth() - i);
         const from = format(startOfMonth(d), 'yyyy-MM-dd');
         const to = format(endOfMonth(d), 'yyyy-MM-dd');
-        const rRow = db.exec(`SELECT COALESCE(SUM(total_amount),0) FROM sales_invoices WHERE date BETWEEN ? AND ? AND invoice_status != 'VOID'`, [from, to]);
-        const eRow = db.exec(`SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN ? AND ?`, [from, to]);
+        const monthly = queryFinanceOverviewMetrics(db, from, to, actor);
         sixMonths.push({
           month: format(d, 'MMM'),
-          revenue: Number(rRow[0]?.values[0]?.[0] || 0),
-          expenses: Number(eRow[0]?.values[0]?.[0] || 0),
+          revenue: monthly.totalRevenue,
+          expenses: monthly.totalExpenses,
         });
       }
       setMonthlyData(sixMonths);

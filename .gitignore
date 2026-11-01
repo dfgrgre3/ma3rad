@@ -2,7 +2,9 @@
 node_modules/
 # Build output
 dist/
-build/
+build/*
+!build/icon.ico
+!build/installer.nsh
 /release/
 *.tsbuildinfo
 

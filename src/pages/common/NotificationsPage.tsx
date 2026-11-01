@@ -1,23 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { UpdateNotificationPreferencesDTO } from '../../types';
 import { 
   Bell, BellOff, Check, CheckCheck, Trash2, 
   AlertTriangle, Package, DollarSign, Clock, Settings, UserRoundX, ExternalLink
 } from 'lucide-react';
 import { NotificationService, Notification, NotificationType } from '../../services/NotificationService';
+import { NotificationPreferencesService } from '../../services/NotificationPreferencesService';
+import { AuthService } from '../../services/AuthService';
 
 export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferences, setPreferences] = useState<UpdateNotificationPreferencesDTO>({});
+  const [preferencesSaved, setPreferencesSaved] = useState(false);
 
   const notificationService = new NotificationService();
+  const preferencesService = new NotificationPreferencesService();
+  const preferenceOptions: Array<{ key: keyof UpdateNotificationPreferencesDTO; label: string }> = [
+    { key: 'lowStockAlerts', label: 'تنبيهات المخزون المنخفض والنافد' },
+    { key: 'paymentDueAlerts', label: 'تنبيهات الدفعات المستحقة' },
+    { key: 'systemAlerts', label: 'التنبيهات العامة وأحداث النظام' },
+    { key: 'emailEnabled', label: 'تفضيل قناة البريد الإلكتروني' },
+    { key: 'pushEnabled', label: 'تفضيل إشعارات Push' },
+  ];
 
   const loadData = () => {
     try {
-      const notifs = notificationService.getNotifications(undefined, filter === 'unread');
-      const count = notificationService.getUnreadCount();
+      const userId = AuthService.requireAuth().id;
+      const notifs = notificationService.getNotifications(userId, filter === 'unread');
+      const count = notificationService.getUnreadCount(userId);
       setNotifications(notifs);
       setUnreadCount(count);
     } catch (e) {
@@ -28,6 +43,24 @@ export const NotificationsPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [filter]);
+
+  useEffect(() => {
+    try {
+      setPreferences({ ...preferencesService.getDefaultPreferences(), ...preferencesService.getPreferences() });
+    } catch (error) {
+      console.error(error);
+    }
+  }, []);
+
+  const savePreferences = () => {
+    try {
+      setPreferences(preferencesService.updatePreferences(preferences));
+      setPreferencesSaved(true);
+      window.setTimeout(() => setPreferencesSaved(false), 2500);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   const handleMarkAsRead = (id: string) => {
     notificationService.markAsRead(id);
@@ -134,8 +167,42 @@ export const NotificationsPage: React.FC = () => {
               قراءة الكل
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setPreferencesOpen((open) => !open)}
+            className="px-4 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl flex items-center gap-2 text-sm transition"
+            aria-expanded={preferencesOpen}
+          >
+            <Settings className="w-4 h-4" /> تفضيلات الإشعارات
+          </button>
         </div>
       </div>
+
+      {preferencesOpen && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" aria-label="تفضيلات الإشعارات الشخصية">
+          <div className="mb-4">
+            <h3 className="text-sm font-black text-slate-900">تفضيلات حسابك</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">تتحكم أنواع التنبيهات في ظهورها داخل التطبيق. خيارات البريد وPush محفوظة كتفضيلات، لكن قنوات الإرسال غير مفعلة حاليًا.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {preferenceOptions.map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={Boolean(preferences[key])}
+                  onChange={(event) => setPreferences((current) => ({ ...current, [key]: event.target.checked }))}
+                  className="h-4 w-4 accent-sky-600"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center justify-end gap-3">
+            {preferencesSaved && <span className="text-xs font-bold text-emerald-700">تم حفظ التفضيلات</span>}
+            <button type="button" onClick={savePreferences} className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-black text-white hover:bg-sky-700">حفظ التفضيلات</button>
+          </div>
+        </section>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">

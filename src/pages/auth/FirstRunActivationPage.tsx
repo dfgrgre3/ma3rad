@@ -1,31 +1,17 @@
 import React, { useState } from 'react';
-import { AlertCircle, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, KeyRound, Loader2, Lock, Phone, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { CentralLicenseService } from '../../services/CentralLicenseService';
 import { CentralConfigApplier } from '../../services/CentralConfigApplier';
+import { AuthService } from '../../services/AuthService';
 
 interface FirstRunActivationPageProps {
   onSuccess: () => void;
 }
 
-function validateServerUrl(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value.trim());
-  } catch {
-    throw new Error('أدخل رابط خادم ترخيص صحيحًا.');
-  }
-
-  const isLocalhost = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalhost))
-    || url.username || url.password || url.pathname !== '/' || url.search || url.hash) {
-    throw new Error('استخدم رابط HTTPS لخادم الترخيص، أو HTTP للاختبار المحلي فقط.');
-  }
-
-  return url.origin;
-}
-
 export const FirstRunActivationPage: React.FC<FirstRunActivationPageProps> = ({ onSuccess }) => {
-  const [serverUrl, setServerUrl] = useState(CentralLicenseService.getServerUrl());
+  const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,14 +23,36 @@ export const FirstRunActivationPage: React.FC<FirstRunActivationPageProps> = ({ 
     setError(null);
     setLoading(true);
     try {
-      const normalizedUrl = validateServerUrl(serverUrl);
+      const cleanAccount = account.trim();
+      const cleanPhone = phone.trim();
       const code = activationCode.trim();
-      if (!code) throw new Error('أدخل رمز التفعيل.');
+      if (!cleanAccount) throw new Error('أدخل اسم الحساب.');
+      if (!password) throw new Error('أدخل كلمة المرور.');
+      if (!cleanPhone) throw new Error('أدخل رقم الهاتف.');
+      if (!code) throw new Error('أدخل مفتاح الترخيص.');
 
-      CentralLicenseService.setServerUrl(normalizedUrl);
-      const result = await CentralLicenseService.activate(code);
+      const result = await CentralLicenseService.activateFirstRun({
+        activationCode: code,
+        account: cleanAccount,
+        password,
+        phone: cleanPhone,
+      });
       if (!result.deviceCredential || CentralLicenseService.getCredential() !== result.deviceCredential) {
-        throw new Error('الرمز لم يمنح هذا الجهاز صلاحية فتح البرنامج.');
+        throw new Error('بيانات الحساب لم تمنح هذا الجهاز صلاحية فتح البرنامج.');
+      }
+
+      // إنشاء الحساب محلياً ليتمكن العميل من تسجيل الدخول بنفس بيانات الحساب المركزي.
+      try {
+        const local = result.localAccount;
+        AuthService.provisionCentralAccount({
+          username: local?.username || cleanAccount,
+          password,
+          fullName: local?.fullName,
+          phone: local?.phone || cleanPhone,
+          role: local?.role,
+        });
+      } catch (provisionError) {
+        console.error('Could not provision the local account after activation:', provisionError);
       }
 
       CentralLicenseService.markFirstRunActivationComplete();
@@ -54,7 +62,7 @@ export const FirstRunActivationPage: React.FC<FirstRunActivationPageProps> = ({ 
       } catch { /* ignore */ }
       onSuccess();
     } catch (activationError) {
-      setError(activationError instanceof Error ? activationError.message : 'تعذر التحقق من رمز التفعيل.');
+      setError(activationError instanceof Error ? activationError.message : 'تعذر التحقق من بيانات التفعيل.');
     } finally {
       setLoading(false);
     }
@@ -70,39 +78,73 @@ export const FirstRunActivationPage: React.FC<FirstRunActivationPageProps> = ({ 
           <p className="text-sm font-bold text-sky-100">تهيئة لمرة واحدة</p>
           <h1 className="mt-1 text-2xl font-black">تفعيل سيراميسيس</h1>
           <p className="mt-2 text-sm leading-6 text-sky-100">
-            أدخل رمز التفعيل المخصص لك لفتح البرنامج على هذا الجهاز.
+            أدخل بيانات حساب العميل الذي أنشأه مسؤول النظام ومفتاح الترخيص لفتح البرنامج على هذا الجهاز.
           </p>
         </div>
 
         <form onSubmit={(event) => void handleSubmit(event)} className="space-y-5 p-8">
           <label className="block space-y-2 text-sm font-bold text-slate-700">
-            <span>رابط خادم الترخيص</span>
-            <input
-              type="url"
-              dir="ltr"
-              value={serverUrl}
-              onChange={(event) => setServerUrl(event.target.value)}
-              placeholder="https://license.example.com"
-              autoComplete="url"
-              disabled={loading}
-              className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-left text-sm font-normal text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
-            />
-            <span className="block text-xs font-normal leading-5 text-slate-500">
-              أدخل عنوان الخادم الذي أصدر رمز التفعيل. يقبل HTTP للاختبار على هذا الجهاز فقط.
+            <span>اسم الحساب</span>
+            <span className="relative block">
+              <UserIcon size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                dir="ltr"
+                value={account}
+                onChange={(event) => setAccount(event.target.value)}
+                placeholder="account"
+                autoComplete="username"
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 pl-11 text-left text-sm font-normal text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
+              />
             </span>
           </label>
 
           <label className="block space-y-2 text-sm font-bold text-slate-700">
-            <span>رمز التفعيل</span>
+            <span>كلمة المرور</span>
             <span className="relative block">
-              <KeyRound size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="password"
                 dir="ltr"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 pl-11 text-left text-sm font-normal text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
+              />
+            </span>
+          </label>
+
+          <label className="block space-y-2 text-sm font-bold text-slate-700">
+            <span>رقم الهاتف</span>
+            <span className="relative block">
+              <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="tel"
+                dir="ltr"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="01xxxxxxxxx"
+                autoComplete="tel"
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 pl-11 text-left text-sm font-normal text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
+              />
+            </span>
+          </label>
+
+          <label className="block space-y-2 text-sm font-bold text-slate-700">
+            <span>مفتاح الترخيص</span>
+            <span className="relative block">
+              <KeyRound size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                dir="ltr"
                 value={activationCode}
                 onChange={(event) => setActivationCode(event.target.value)}
-                placeholder="أدخل رمز العميل"
-                autoComplete="one-time-code"
+                placeholder="EDAR-XXXX-XXXX-XXXX"
+                autoComplete="off"
                 disabled={loading}
                 className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 pl-11 text-left text-sm font-normal text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 disabled:opacity-60"
               />
@@ -122,7 +164,7 @@ export const FirstRunActivationPage: React.FC<FirstRunActivationPageProps> = ({ 
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-700 px-5 py-3.5 text-sm font-black text-white shadow-lg shadow-sky-900/20 transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
-            {loading ? 'جارٍ التحقق من الرمز...' : 'تحقق وانتقل لتسجيل الدخول'}
+            {loading ? 'جارٍ التحقق من البيانات...' : 'تحقق وانتقل لتسجيل الدخول'}
           </button>
           <p className="text-center text-xs leading-5 text-slate-500">
             بعد نجاح التفعيل لن تظهر هذه الصفحة مجددًا على هذا الجهاز.

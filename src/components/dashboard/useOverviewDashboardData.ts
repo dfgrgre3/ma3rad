@@ -58,6 +58,12 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
     setRefreshing(true);
     setPurchasesLoading(true);
     try {
+      const actor = AuthService.requireAuth();
+      PermissionService.require(actor, 'sales.view', '/sales');
+      PermissionService.require(actor, 'purchases.view', '/purchases');
+      PermissionService.require(actor, 'finance.view', '/finance');
+      PermissionService.require(actor, 'customers.view', '/customers');
+      PermissionService.require(actor, 'inventory.view', '/inventory');
       const data = accountingService.getDashboardMetrics();
       const trend = accountingService.getSalesTrendLast7Days();
       const top = accountingService.getTopSellingProducts(5);

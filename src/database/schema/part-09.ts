@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS stock_counts (
   count_number TEXT UNIQUE NOT NULL,
   warehouse_id TEXT NOT NULL,
   date TEXT NOT NULL,
-  count_type TEXT DEFAULT 'FULL' CHECK(count_type IN ('FULL', 'PARTIAL', 'SPOT')),
+  count_type TEXT DEFAULT 'FULL'
+    CHECK(count_type IN ('FULL', 'PARTIAL', 'SPOT', 'PERIODIC', 'SURPRISE', 'BLIND')),
   status TEXT DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'COUNTING', 'REVIEW', 'POSTED', 'CANCELLED')),
   total_items INTEGER DEFAULT 0,
   items_with_variance INTEGER DEFAULT 0,

@@ -10,16 +10,34 @@ const { registerDocumentHandlers } = require('./documentHandlers');
 const { isAllowedAppUrl, isAllowedIpcSender } = require('./security');
 const { installGracefulClose } = require('./gracefulShutdown');
 const { createHttpSyncClient, createSyncRelay } = require('./syncRelay');
+const { resolveCentralRequest, sanitizeCentralHeaders } = require('./centralApi');
 const {
   loadSyncClientConfig,
   registerSyncClientConfigHandlers,
 } = require('./syncClientConfig');
 
+// Load the documented local .env file for development launches. Explicit
+// process environment values take precedence; packaged deployments can set the
+// same variables in the process environment.
+try {
+  const envFile = fsSync.readFileSync(path.join(__dirname, '..', '.env'), 'utf8');
+  for (const line of envFile.split(/\r?\n/)) {
+    const match = line.match(/^\s*(CENTRAL_API_URL|CERAMISYS_USER_DATA_DIR|VITE_DEV_SERVER_URL)\s*=\s*(.*?)\s*$/);
+    if (!match || process.env[match[1]]) continue;
+    const value = match[2].replace(/^(['"])(.*)\1$/, '$2');
+    process.env[match[1]] = value;
+  }
+} catch { /* .env is optional */ }
+
 // Keep application data in the OS-standard roaming profile. This is always
 // writable, even when the app itself is installed under Program Files.
 // End-to-end tests point CERAMISYS_USER_DATA_DIR at a throwaway folder so a
 // test run never touches a real installation's data.
-const APP_DATA_DIR = process.env.CERAMISYS_USER_DATA_DIR
+const configuredDataDir = process.env.CERAMISYS_USER_DATA_DIR;
+if (configuredDataDir && !path.isAbsolute(configuredDataDir)) {
+  console.warn('CERAMISYS_USER_DATA_DIR must be an absolute path; using the OS application data directory.');
+}
+const APP_DATA_DIR = configuredDataDir && path.isAbsolute(configuredDataDir)
   ? path.resolve(process.env.CERAMISYS_USER_DATA_DIR)
   : path.join(app.getPath('appData'), 'CeramiSysERP');
 app.setPath('userData', APP_DATA_DIR);
@@ -321,18 +339,49 @@ ipcMain.handle('sync:pull', async (event, scope, cursor, limit) => {
 // connection can never stall the UI or leak data. The Vite dev server is the
 // only permitted HTTP(S) target, and only while running unpackaged.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
-// The central licensing/configuration API is the only outbound surface a
-// packaged renderer may reach. Keep in sync with CentralLicenseService.
-const CENTRAL_API_PATHS = [
-  '/api/v1/licensing/',
-  '/api/v1/configuration/',
-  '/api/v1/telemetry/',
-  '/api/v1/releases',
-];
-function isCentralApiRequest(url) {
-  return (url.protocol === 'http:' || url.protocol === 'https:')
-    && CENTRAL_API_PATHS.some((prefix) => url.pathname.startsWith(prefix));
-}
+// Configure this at build/runtime with CENTRAL_API_URL. The renderer cannot
+// expand its own network allowlist by changing localStorage.
+const CENTRAL_API_URL = (() => {
+  try {
+    const url = new URL(process.env.CENTRAL_API_URL || '');
+    const localDevelopmentUrl = !app.isPackaged && url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if ((url.protocol !== 'https:' && !localDevelopmentUrl) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) return null;
+    return url;
+  } catch { return null; }
+})();
+
+ipcMain.handle('central:request', async (event, request) => {
+  validateIpcSender(event);
+  if (!CENTRAL_API_URL) throw new Error('Central API is not configured for this application build.');
+  const target = resolveCentralRequest(CENTRAL_API_URL.origin, request, !app.isPackaged);
+  const method = String(request.method || 'GET').toUpperCase();
+  const headers = sanitizeCentralHeaders(request.headers);
+  if (method === 'GET' && request.body !== undefined) throw new Error('GET requests cannot include a body.');
+  if (request.body !== undefined && (typeof request.body !== 'string' || Buffer.byteLength(request.body, 'utf8') > 256 * 1024)) {
+    throw new Error('Central API request body is invalid or too large.');
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(target, {
+      method,
+      headers,
+      ...(request.body === undefined ? {} : { body: request.body }),
+      signal: controller.signal,
+      redirect: 'error',
+    });
+    const text = await response.text();
+    if (Buffer.byteLength(text, 'utf8') > 2 * 1024 * 1024) throw new Error('Central API response is too large.');
+    let body = null;
+    if (text) {
+      try { body = JSON.parse(text); }
+      catch { throw new Error('Central API returned a malformed JSON response.'); }
+    }
+    return { ok: response.ok, status: response.status, body };
+  } finally {
+    clearTimeout(timeout);
+  }
+});
 
 function installOfflineNetworkGuard(ses) {
   ses.webRequest.onBeforeRequest((details, callback) => {
@@ -340,8 +389,7 @@ function installOfflineNetworkGuard(ses) {
       const url = new URL(details.url);
       if (url.protocol === 'http:' || url.protocol === 'https:') {
         const isDevServer = !app.isPackaged && LOOPBACK_HOSTS.has(url.hostname);
-        const isCentralApi = isCentralApiRequest(url);
-        if (!isDevServer && !isCentralApi) {
+        if (!isDevServer) {
           console.warn(`Offline guard: blocked outbound request to ${url.origin}${url.pathname}`);
           callback({ cancel: true });
           return;
@@ -355,6 +403,9 @@ function installOfflineNetworkGuard(ses) {
 }
 
 app.whenReady().then(async () => {
+  if (!CENTRAL_API_URL) {
+    console.warn('CENTRAL_API_URL is unset or invalid; central API network requests are disabled. Set an HTTPS origin without a path, query, or credentials.');
+  }
   ensureDirs();
   installOfflineNetworkGuard(session.defaultSession);
   try {

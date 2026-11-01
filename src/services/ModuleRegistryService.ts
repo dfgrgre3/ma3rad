@@ -7,6 +7,7 @@ import { parseBusinessConfiguration, parseEnabledModules } from '../config/busin
 import {
   MODULE_REGISTRY,
   getModuleDefinition,
+  getModulePathOwner,
   isKnownModule,
   validateModuleSelection,
   withModuleDependencies,
@@ -17,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 // Kept as a literal so the service layer does not import the React navigation tree.
 const NAV_HIDDEN_SETTING_KEY = 'nav.hidden';
+const NAV_MANUAL_HIDDEN_SETTING_KEY = 'nav.hidden.manual';
 const ENABLED_MODULES_SETTING_KEY = 'enabledModules';
 
 export type ModuleActivationAction = 'ACTIVATED' | 'DEACTIVATED';
@@ -211,32 +213,32 @@ export class ModuleRegistryService {
     }
 
     const enabledJson = JSON.stringify(validation.enabled);
-    // Navigation visibility must match the module selection. Preserve other
-    // hidden paths and only add/remove module-owned ones.
-    const modulePaths = new Set(MODULE_REGISTRY.flatMap((module) => module.paths));
-    const hiddenPathList = new Set<string>();
-    for (const module of MODULE_REGISTRY) {
-      if (!validation.enabled.includes(module.id)) {
-        for (const path of module.paths) hiddenPathList.add(path);
-      }
-    }
-    const preservedHidden = (() => {
+    // Manual navigation preferences are stored separately from module state.
+    // Migrate old combined values by discarding paths hidden only because their
+    // owning module was disabled before this save.
+    const manualHidden = (() => {
       try {
-        const raw = SettingsService.getValue(NAV_HIDDEN_SETTING_KEY);
+        const manualRaw = SettingsService.getValue(NAV_MANUAL_HIDDEN_SETTING_KEY);
+        const raw = manualRaw ?? SettingsService.getValue(NAV_HIDDEN_SETTING_KEY);
         const parsed: unknown = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(parsed)) return [] as string[];
-        return parsed.filter((path): path is string => typeof path === 'string' && !modulePaths.has(path));
+        return parsed.filter((path): path is string => {
+          if (typeof path !== 'string') return false;
+          if (manualRaw !== undefined) return true;
+          const owner = getModulePathOwner(path);
+          return !owner || current.includes(owner);
+        });
       } catch {
         return [] as string[];
       }
     })();
-    const hiddenJson = JSON.stringify([...new Set([...preservedHidden, ...hiddenPathList])]);
+    const hiddenJson = JSON.stringify([...new Set(manualHidden)]);
 
     const db = ModuleRegistryService.db();
     const now = new Date().toISOString();
     db.executeTransaction((tx) => {
       tx.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [ENABLED_MODULES_SETTING_KEY, enabledJson]);
-      tx.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [NAV_HIDDEN_SETTING_KEY, hiddenJson]);
+      tx.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [NAV_MANUAL_HIDDEN_SETTING_KEY, hiddenJson]);
       for (const moduleId of [...activated.map((id) => ({ moduleId: id, action: 'ACTIVATED' as const })), ...deactivated.map((id) => ({ moduleId: id, action: 'DEACTIVATED' as const }))]) {
         tx.run(
           `INSERT INTO module_activation_log (id, module_id, action, actor_id, actor_name, reason, created_at)

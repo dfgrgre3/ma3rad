@@ -1,5 +1,7 @@
 import React from 'react';
 import { DatabaseManager } from '../../../database/db';
+import { AuthService } from '../../../services/AuthService';
+import { BranchAccessService } from '../../../services/BranchAccessService';
 
 interface InventoryHistoryProps {
   productId: string;
@@ -7,10 +9,11 @@ interface InventoryHistoryProps {
 }
 
 export const InventoryHistory: React.FC<InventoryHistoryProps> = ({ productId, unitLabel }) => {
+  const scope = new BranchAccessService().warehouseBranchScope('w', undefined, AuthService.requireAuth());
   const rows = DatabaseManager.getInstance().query<{ date: string; type: string; qty: number; warehouseName: string; notes: string }>(
     `SELECT it.created_at AS date, it.type, it.quantity_m2 AS qty, w.name AS warehouseName, COALESCE(it.notes, '') AS notes
-     FROM inventory_transactions it LEFT JOIN warehouses w ON w.id = it.warehouse_id
-     WHERE it.product_id = ? ORDER BY it.created_at DESC LIMIT 50`, [productId]
+     FROM inventory_transactions it JOIN warehouses w ON w.id = it.warehouse_id
+     WHERE it.product_id = ? AND ${scope.clause} ORDER BY it.created_at DESC LIMIT 50`, [productId, ...scope.params]
   );
   if (rows.length === 0) return <div className="text-center text-slate-500 py-8 text-sm">لا توجد حركات مخزون</div>;
   return (

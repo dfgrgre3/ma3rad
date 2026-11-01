@@ -501,6 +501,47 @@ export class AuthService {
     };
   }
 
+  /**
+   * إنشاء/تحديث حساب محلي من بيانات الحساب المركزي بعد نجاح تفعيل الجهاز، ليتمكن
+   * العميل من تسجيل الدخول بنفس بيانات الحساب الذي أنشأه مسؤول النظام.
+   * لا يُطبَّق فحص صلاحيات هنا لأن هذا الحساب يُنشأ قبل أي تسجيل دخول (تهيئة أولى).
+   */
+  public static provisionCentralAccount(params: { username: string; password: string; fullName?: string; phone?: string; role?: string }): void {
+    const username = String(params.username || '').trim();
+    if (!username || !params.password) return;
+
+    const roleMap: Record<string, UserRole> = {
+      admin: 'ADMIN', manager: 'MANAGER', accountant: 'ACCOUNTANT',
+      cashier: 'CASHIER', sales: 'SALES', warehouse: 'WAREHOUSE',
+    };
+    const role: UserRole = roleMap[String(params.role || '').trim().toLowerCase()] || 'ADMIN';
+    const fullName = String(params.fullName || '').trim() || username;
+    const phone = params.phone ? String(params.phone).trim() : null;
+
+    const db = DatabaseManager.getInstance();
+    const hash = bcrypt.hashSync(params.password, bcrypt.genSaltSync(10));
+
+    const existing = db.query<any>('SELECT id FROM users WHERE username = ?', [username])[0];
+    if (existing) {
+      db.run(
+        'UPDATE users SET password_hash = ?, full_name = ?, phone = ?, role = ?, is_active = 1, updated_at = ? WHERE id = ?',
+        [hash, fullName, phone, role, new Date().toISOString(), existing.id]
+      );
+      return;
+    }
+
+    const branchRow = db.query<any>('SELECT id FROM branches ORDER BY is_main DESC, created_at ASC LIMIT 1')[0];
+    const branchId = branchRow?.id || 'br_main';
+    const id = `usr_${uuidv4().substring(0, 8)}`;
+    db.executeTransaction((tx) => {
+      tx.run(`
+        INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id, branch_scope)
+        VALUES (?, ?, ?, ?, ?, ?, NULL, 1, ?, 'ALL')
+      `, [id, username, hash, fullName, role, phone, branchId]);
+      tx.run('INSERT INTO users_branches (user_id, branch_id) VALUES (?, ?)', [id, branchId]);
+    });
+  }
+
   public checkPermission(user: User, requiredRole: UserRole[]): boolean {
     if (user.role === 'ADMIN') return true;
     return requiredRole.includes(user.role);

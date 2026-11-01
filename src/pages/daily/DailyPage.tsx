@@ -824,5 +824,4 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
 
 export const TodaySalesPage: React.FC = () => <DailyPage kind="sales" />;
 export const TodayPurchasesPage: React.FC = () => <PurchasesPage />;
-export const TodayExpensesPage: React.FC = () => <DailyPage kind="expenses" />;
 export const TodayDebtsPage: React.FC = () => <DailyPage kind="debts" />;

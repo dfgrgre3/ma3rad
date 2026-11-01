@@ -1,31 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { CentralLicenseService } from '../services/CentralLicenseService';
 import { CentralConfigApplier } from '../services/CentralConfigApplier';
+import { AuthService } from '../services/AuthService';
+import { PermissionService } from '../services/PermissionService';
 
 export const CentralActivationView: React.FC = () => {
-  const [serverUrl, setServerUrl] = useState(CentralLicenseService.getServerUrl());
+  const [account, setAccount] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [deviceName, setDeviceName] = useState('');
   const [status, setStatus] = useState('');
   const [config, setConfig] = useState<any>(null);
+  const canManageLicense = PermissionService.can(AuthService.getCurrentUser(), 'admin.license.manage', '/central-activation');
 
   useEffect(() => {
-    setConfig(CentralLicenseService.getCachedConfig());
-  }, []);
-
-  const handleSaveUrl = () => {
-    try {
-      CentralLicenseService.setServerUrl(serverUrl);
-      setStatus('Server URL saved.');
-    } catch (e: any) {
-      setStatus('Could not save server URL: ' + (e?.message || e));
-    }
-  };
+    if (canManageLicense) setConfig(CentralLicenseService.getCachedConfig());
+  }, [canManageLicense]);
 
   const handleActivate = async () => {
     try {
       setStatus('Activating...');
-      const res = await CentralLicenseService.activate(activationCode, deviceName);
+      const res = await CentralLicenseService.activate(
+        {
+          activationCode: activationCode.trim(),
+          account: account.trim(),
+          password,
+          phone: phone.trim(),
+        },
+        deviceName.trim() || undefined,
+      );
+      const local = res.localAccount;
+      if (local?.username && password) {
+        try {
+          AuthService.provisionCentralAccount({
+            username: local.username,
+            password,
+            fullName: local.fullName,
+            phone: local.phone || phone.trim(),
+            role: local.role,
+          });
+        } catch (provisionError) {
+          console.error('Could not provision the local account after activation:', provisionError);
+        }
+      }
       setStatus('Activated: ' + (res.tenantId || 'ok'));
       const cfg = await CentralLicenseService.fetchConfig();
       CentralConfigApplier.apply();
@@ -37,6 +55,7 @@ export const CentralActivationView: React.FC = () => {
 
   const handleFetchConfig = async () => {
     try {
+      PermissionService.require(AuthService.requireAuth(), 'admin.license.manage', '/central-activation');
       const cfg = await CentralLicenseService.fetchConfig();
       CentralConfigApplier.apply();
       setConfig(cfg);
@@ -45,6 +64,10 @@ export const CentralActivationView: React.FC = () => {
       setStatus('Fetch failed: ' + (e?.message || e));
     }
   };
+
+  if (!canManageLicense) {
+    return <div className="p-6 text-sm font-bold text-rose-700" role="alert">لا تملك صلاحية إدارة تفعيل الجهاز المركزي.</div>;
+  }
 
   return (
     <div className="p-6 space-y-6 overflow-y-auto h-full">
@@ -55,24 +78,50 @@ export const CentralActivationView: React.FC = () => {
 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4 max-w-2xl">
         <div>
-          <label className="font-bold text-slate-700 block mb-1 text-xs">Central Server URL</label>
+          <label className="font-bold text-slate-700 block mb-1 text-xs">Account</label>
           <input
             type="text"
-            value={serverUrl}
-            onChange={(e) => setServerUrl(e.target.value)}
-            placeholder="http://localhost:4000"
+            dir="ltr"
+            value={account}
+            onChange={(e) => setAccount(e.target.value)}
+            placeholder="account"
+            autoComplete="username"
             className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs"
           />
         </div>
-        <button onClick={handleSaveUrl} className="px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-bold">Save URL</button>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1 text-xs">Password</label>
+          <input
+            type="password"
+            dir="ltr"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+            className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1 text-xs">Phone</label>
+          <input
+            type="tel"
+            dir="ltr"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="01xxxxxxxxx"
+            autoComplete="tel"
+            className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs"
+          />
+        </div>
 
         <div>
           <label className="font-bold text-slate-700 block mb-1 text-xs">Activation Code</label>
           <input
             type="text"
+            dir="ltr"
             value={activationCode}
             onChange={(e) => setActivationCode(e.target.value)}
-            placeholder="XXXX-XXXX-XXXX-XXXX"
+            placeholder="EDAR-XXXX-XXXX-XXXX"
             className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs"
           />
         </div>

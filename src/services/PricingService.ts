@@ -37,6 +37,7 @@ export interface Promotion {
   promotionType: 'PERCENTAGE' | 'FIXED_AMOUNT' | 'BUY_X_GET_Y' | 'BUNDLE_PRICE';
   discountPercentage: number;
   discountAmount: number;
+  bundlePrice: number;
   buyQuantity: number;
   getQuantity: number;
   minOrderAmount: number;
@@ -49,6 +50,22 @@ export interface Promotion {
   notes?: string | null;
   createdAt: string;
   currentlyRunning?: boolean;
+}
+
+export interface AppliedPromotion {
+  promotionId: string;
+  name: string;
+  type: Promotion['promotionType'];
+  discountAmount: number;
+}
+
+export interface PromotionCartItem {
+  productId: string;
+  categoryId?: string | null;
+  brandId?: string | null;
+  qty: number;
+  unitPrice: number;
+  amount: number;
 }
 
 export class PricingService {
@@ -146,6 +163,11 @@ export class PricingService {
   }
 
   public getPromotions(search = ''): Promotion[] {
+    PermissionService.require(AuthService.requireAuth(), 'promotions.view');
+    return this.queryPromotions(search);
+  }
+
+  private queryPromotions(search = ''): Promotion[] {
     let sql = `SELECT * FROM promotions WHERE 1 = 1`;
     const params: any[] = [];
     if (search.trim()) {
@@ -155,8 +177,9 @@ export class PricingService {
     }
     sql += ` ORDER BY starts_at DESC`;
     const today = localDateString();
-    return this.db.query<Promotion>(sql, params).map((p) => ({
+    return this.db.query<any>(sql, params).map((p) => ({
       ...p,
+      bundlePrice: Number(p.discountAmount) || 0,
       isActive: Boolean(p.isActive),
       currentlyRunning: Boolean(p.isActive) && p.startsAt <= today && p.endsAt >= today,
     }));
@@ -164,15 +187,21 @@ export class PricingService {
 
   public createPromotion(input: {
     name: string; promotionType: Promotion['promotionType']; discountPercentage?: number;
-    discountAmount?: number; buyQuantity?: number; getQuantity?: number; minOrderAmount?: number;
+    discountAmount?: number; bundlePrice?: number; buyQuantity?: number; getQuantity?: number; minOrderAmount?: number;
     appliesTo?: Promotion['appliesTo']; startsAt: string; endsAt: string;
-    usageLimit?: number; notes?: string;
+    usageLimit?: number; notes?: string; couponCode?: string; targetIds?: string[];
   }): Promotion {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'promotions.manage');
     if (!input.name.trim()) throw new Error('اسم العرض مطلوب.');
     if (!input.startsAt || !input.endsAt) throw new Error('تواريخ بداية ونهاية العرض مطلوبة.');
     if (input.endsAt < input.startsAt) throw new Error('تاريخ النهاية يجب أن يكون بعد البداية.');
+    if (input.promotionType === 'PERCENTAGE' && (!(Number(input.discountPercentage) > 0) || Number(input.discountPercentage) > 100)) throw new Error('نسبة الخصم يجب أن تكون بين 0 و100.');
+    if (input.promotionType === 'FIXED_AMOUNT' && !(Number(input.discountAmount) > 0)) throw new Error('مبلغ الخصم يجب أن يكون أكبر من صفر.');
+    if (input.promotionType === 'BUY_X_GET_Y' && (!(Number(input.buyQuantity) > 0) || !(Number(input.getQuantity) > 0))) throw new Error('كميتا الشراء والمجاني يجب أن تكونا أكبر من صفر.');
+    if (input.promotionType === 'BUNDLE_PRICE' && (!(Number(input.bundlePrice) > 0) || !(Number(input.buyQuantity) > 0))) throw new Error('سعر الحزمة وعدد وحداتها يجب أن يكونا أكبر من صفر.');
+    const targets = Array.from(new Set((input.targetIds || []).map((targetId) => targetId.trim()).filter(Boolean)));
+    if (input.appliesTo && input.appliesTo !== 'ALL' && targets.length === 0) throw new Error('العناصر المستهدفة مطلوبة.');
 
     const id = `promo_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
@@ -181,28 +210,33 @@ export class PricingService {
         `INSERT INTO promotions (
           id, code, name, promotion_type, discount_percentage, discount_amount,
           buy_quantity, get_quantity, min_order_amount, applies_to, starts_at, ends_at,
-          usage_limit, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          usage_limit, notes, created_by, coupon_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, code, input.name.trim(), input.promotionType, input.discountPercentage || 0,
-          input.discountAmount || 0, input.buyQuantity || 0, input.getQuantity || 0,
+          input.promotionType === 'BUNDLE_PRICE' ? (input.bundlePrice || 0) : (input.discountAmount || 0), input.buyQuantity || 0, input.getQuantity || 0,
           input.minOrderAmount || 0, input.appliesTo || 'ALL', input.startsAt, input.endsAt,
-          input.usageLimit ?? null, input.notes || null, actor.id,
+          input.usageLimit ?? null, input.notes || null, actor.id, input.couponCode?.trim() || null,
         ]
       );
-      return this.getPromotions().find((p) => p.id === id)!;
+      const targetType = input.appliesTo === 'PRODUCTS' ? 'PRODUCT' : input.appliesTo === 'CATEGORIES' ? 'CATEGORY' : 'BRAND';
+      for (const targetId of targets) {
+        db.run('INSERT INTO promotion_targets (id, promotion_id, target_type, target_id) VALUES (?, ?, ?, ?)',
+          [`pt_${uuidv4().substring(0, 8)}`, id, targetType, targetId]);
+      }
+      return this.queryPromotions().find((p) => p.id === id)!;
     });
   }
 
   public togglePromotion(id: string, active: boolean): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'promotions.manage');
     this.db.run(`UPDATE promotions SET is_active = ? WHERE id = ?`, [active ? 1 : 0, id]);
   }
 
   public deletePromotion(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'promotions.manage');
     this.db.run(`DELETE FROM promotions WHERE id = ?`, [id]);
   }
 
@@ -296,70 +330,97 @@ export class PricingService {
   }
 
   public getBestPromotion(product: { productId: string; categoryId?: string | null; brandId?: string | null }, subtotal = 0, quantity = 0): { name: string; discount: number; code: string } | null {
+    const applied = this.evaluatePromotions([{
+      ...product,
+      qty: quantity,
+      unitPrice: quantity > 0 ? subtotal / quantity : 0,
+      amount: subtotal,
+    }]);
+    return applied ? { name: applied.name, discount: applied.discountAmount, code: applied.promotionId } : null;
+  }
+
+  /** Evaluate the same canonical promotions created by the pricing console. */
+  public evaluatePromotions(cart: PromotionCartItem[], couponCode?: string): AppliedPromotion | null {
+    if (!cart.length) return null;
     const today = localDateString();
     const rows = this.db.query<any>(
       `SELECT * FROM promotions
        WHERE is_active = 1 AND starts_at <= ? AND ends_at >= ?
          AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)
          AND (min_order_amount = 0 OR min_order_amount <= ?)
-       ORDER BY discount_percentage DESC, discount_amount DESC`,
-      [today, today, subtotal]
+       ORDER BY discount_percentage DESC, discount_amount DESC, starts_at DESC`,
+      [today, today, cart.reduce((sum, item) => sum + item.amount, 0)]
     );
 
+    let best: AppliedPromotion | null = null;
     for (const promo of rows) {
-      if (!this.promotionAppliesToProduct(promo, product)) continue;
-      const result = this.getPromotionResult(promo, subtotal, quantity);
-      if (result) return result;
+      if (promo.couponCode && String(promo.couponCode).toUpperCase() !== String(couponCode || '').trim().toUpperCase()) continue;
+      const scoped = this.scopedPromotionItems(promo, cart);
+      if (!scoped.length) continue;
+      const subtotal = scoped.reduce((sum, item) => sum + item.amount, 0);
+      let discount = 0;
+      switch (promo.promotionType) {
+        case 'PERCENTAGE':
+          discount = subtotal * Number(promo.discountPercentage || 0) / 100;
+          break;
+        case 'FIXED_AMOUNT':
+          discount = Number(promo.discountAmount || 0);
+          break;
+        case 'BUY_X_GET_Y': {
+          const buy = Number(promo.buyQuantity || 0);
+          const get = Number(promo.getQuantity || 0);
+          if (buy > 0 && get > 0) {
+            let freeQty = Math.floor(scoped.reduce((sum, item) => sum + item.qty, 0) / (buy + get)) * get;
+            for (const item of [...scoped].sort((a, b) => a.unitPrice - b.unitPrice)) {
+              const freeHere = Math.min(Math.max(0, item.qty), freeQty);
+              discount += freeHere * item.unitPrice;
+              freeQty -= freeHere;
+              if (freeQty <= 0) break;
+            }
+          }
+          break;
+        }
+        case 'BUNDLE_PRICE':
+          {
+            const bundleQuantity = Number(promo.buyQuantity || 0);
+            const totalQuantity = scoped.reduce((sum, item) => sum + item.qty, 0);
+            if (bundleQuantity > 0 && totalQuantity >= bundleQuantity) {
+              const bundleCount = Math.floor(totalQuantity / bundleQuantity);
+              const regularBundleTotal = subtotal / totalQuantity * bundleQuantity;
+              discount = Math.max(0, regularBundleTotal - Number(promo.discountAmount || 0)) * bundleCount;
+            }
+          }
+          break;
+      }
+      discount = Math.min(subtotal, Math.max(0, discount));
+      if (discount > 0 && (!best || discount > best.discountAmount)) {
+        best = { promotionId: promo.id, name: promo.name, type: promo.promotionType, discountAmount: Math.round(discount * 100) / 100 };
+      }
     }
-    return null;
+    return best;
   }
 
-  private promotionAppliesToProduct(
-    promo: any,
-    product: { productId: string; categoryId?: string | null; brandId?: string | null }
-  ): boolean {
-    if (promo.applies_to === 'ALL') return true;
-
-    const targetTypes: Record<string, 'PRODUCT' | 'CATEGORY' | 'BRAND'> = {
-      PRODUCTS: 'PRODUCT',
-      CATEGORIES: 'CATEGORY',
-    };
-    const type = targetTypes[promo.applies_to] || 'BRAND';
-    const targetIds = {
-      PRODUCT: product.productId,
-      CATEGORY: product.categoryId,
-      BRAND: product.brandId,
-    };
-    const hit = this.db.query<any>(
-      `SELECT 1 FROM promotion_targets WHERE promotion_id = ? AND target_type = ? AND target_id = ?`,
-      [promo.id, type, targetIds[type] || '']
-    )[0];
-    return Boolean(hit);
+  private scopedPromotionItems(promo: any, cart: PromotionCartItem[]): PromotionCartItem[] {
+    if (promo.appliesTo === 'ALL') return cart;
+    const targetType = promo.appliesTo === 'PRODUCTS' ? 'PRODUCT'
+      : promo.appliesTo === 'CATEGORIES' ? 'CATEGORY' : 'BRAND';
+    const targets = this.db.query<{ targetId: string }>(
+      'SELECT target_id FROM promotion_targets WHERE promotion_id = ? AND target_type = ?',
+      [promo.id, targetType]
+    ).map((row) => row.targetId);
+    if (!targets.length) return [];
+    const targetSet = new Set(targets);
+    return cart.filter((item) => targetSet.has(
+      targetType === 'PRODUCT' ? item.productId : targetType === 'CATEGORY' ? String(item.categoryId || '') : String(item.brandId || '')
+    ));
   }
 
-  private getPromotionResult(
-    promo: any,
-    subtotal: number,
-    quantity: number
-  ): { name: string; discount: number; code: string } | null {
-    if (promo.promotion_type === 'BUY_X_GET_Y') {
-      return this.getBuyXGetYResult(promo, quantity);
-    }
-    if (promo.promotion_type === 'BUNDLE_PRICE') return null;
-
-    const base = subtotal > 0 ? subtotal : 0;
-    const discount = promo.promotion_type === 'PERCENTAGE'
-      ? (base * Number(promo.discount_percentage)) / 100
-      : Number(promo.discount_amount);
-    if (discount <= 0) return null;
-    return { name: promo.name, discount: Math.round(discount * 100) / 100, code: promo.code };
+  public recordPromotionUsage(promotionId: string, invoiceId: string, couponCode: string | undefined, discountAmount: number): void {
+    this.db.executeTransaction((db) => {
+      db.run('INSERT INTO promotion_usage (id, promotion_id, invoice_id, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?)',
+        [`pu_${uuidv4().substring(0, 8)}`, promotionId, invoiceId, couponCode || null, discountAmount]);
+      db.run('UPDATE promotions SET usage_count = usage_count + 1 WHERE id = ?', [promotionId]);
+    });
   }
 
-  private getBuyXGetYResult(promo: any, quantity: number): { name: string; discount: number; code: string } | null {
-    if (quantity <= 0 || promo.buy_quantity <= 0 || promo.get_quantity <= 0) return null;
-
-    const free = Math.floor(quantity / promo.buy_quantity) * promo.get_quantity;
-    if (free <= 0) return null;
-    return { name: `${promo.name} (${free} مجانًا)`, discount: 0, code: promo.code };
-  }
 }

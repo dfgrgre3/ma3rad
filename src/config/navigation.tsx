@@ -6,7 +6,7 @@ import type { NavGroupDef } from './navigationTypes';
 export const NAV_GROUPS: NavGroupDef[] = [...NAV_GROUPS_01, ...NAV_GROUPS_02];
 
 export const NAV_STORAGE_KEYS = {
-  hidden: 'nav.hidden',
+  hidden: 'nav.hidden.manual',
   labels: 'nav.labels',
   groupsOrder: 'nav.groupsOrder',
   itemsOrder: 'nav.itemsOrder',

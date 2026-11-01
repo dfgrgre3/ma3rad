@@ -32,7 +32,7 @@ import {
 } from './moduleRegistry';
 
 import { ACTION_REGISTRY, getActionDefinition, isKnownAction } from './actionRegistry';
-import { FEATURE_REGISTRY } from '../services/FeatureService';
+import { FEATURE_REGISTRY } from './featureRegistry';
 export type CapabilityRequirements = ModuleActivationRules;
 export type CapabilitySettingDefinition = ModuleSettingDefinition;
 export type CapabilitySelectionOptions = ModuleSelectionOptions;
@@ -86,18 +86,14 @@ export const CAPABILITY_CATALOG: CapabilityDefinition[] = MODULE_REGISTRY.map((m
   actions: ACTION_REGISTRY.filter((action) => action.module === module.id).map((action) => action.id),
 }));
 
-// Convenience aliases for the many names callers/tests may use.
-export const CAPABILITY_REGISTRY = CAPABILITY_CATALOG;
-export const CAPABILITIES = CAPABILITY_CATALOG;
-export const CAPABILITY_LIST = CAPABILITY_CATALOG;
-
 const REGISTRY_BY_ID = new Map(CAPABILITY_CATALOG.map((capability) => [capability.id, capability]));
 
 export const getCapabilityDefinition = (id: string): CapabilityDefinition | undefined => REGISTRY_BY_ID.get(id);
-export const getCapability = getCapabilityDefinition;
-export const findCapability = getCapabilityDefinition;
 export const isKnownCapability = (id: string): boolean => REGISTRY_BY_ID.has(id);
-export const isKnownScreen = isKnownCapability; // placeholder kept for compatibility
+
+/** True only for a screen path owned by a registered module. */
+export const isKnownScreen = (pathname: string): boolean =>
+  typeof pathname === 'string' && getModulePathOwner(pathname) !== undefined;
 
 /** All capabilities a set of capabilities transitively depends on. */
 export const getCapabilityDependencyClosure = (ids: string[]): string[] => getModuleDependencyClosure(ids);
@@ -112,14 +108,11 @@ export const validateCapabilitySelection = (
 
 /** Resolve the capability that owns a route/screen path, using the longest matching prefix. */
 export const getCapabilityPathOwner = (pathname: string): string | undefined => getModulePathOwner(pathname);
-export const getCapabilityScreenOwner = getCapabilityPathOwner;
 
 export const getManagedCapabilityPaths = (): Set<string> => getManagedModulePaths();
-export const getManagedCapabilityScreens = getManagedCapabilityPaths;
 
 export const getHiddenCapabilityPaths = (enabledCapabilityIds: string[]): string[] =>
   getHiddenModulePaths(enabledCapabilityIds);
-export const getHiddenCapabilityScreens = getHiddenCapabilityPaths;
 
 // Re-export the underlying module helpers under their original names for callers
 // that still speak in terms of modules.
@@ -132,4 +125,4 @@ export {
 
 export type { ModuleDefinition, ModuleActivationRules, ModuleSettingDefinition };
 export { ACTION_REGISTRY, getActionDefinition, isKnownAction };
-export { FEATURE_REGISTRY } from '../services/FeatureService';
+export { FEATURE_REGISTRY } from './featureRegistry';

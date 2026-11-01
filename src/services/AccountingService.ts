@@ -61,6 +61,12 @@ export class AccountingService {
 
   public getDashboardMetrics(): DashboardMetrics {
     this.requireView('dashboard.view');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'sales.view', '/sales');
+    PermissionService.require(actor, 'purchases.view', '/purchases');
+    PermissionService.require(actor, 'finance.view', '/finance');
+    PermissionService.require(actor, 'customers.view', '/customers');
+    PermissionService.require(actor, 'inventory.view', '/inventory');
     const today = localDateString();
     const monthStart = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`;
     const salesScope = this.branchScope('si.branch_id');
@@ -255,6 +261,7 @@ export class AccountingService {
 
   public getSalesTrendLast7Days(): { date: string; sales: number; profit: number }[] {
     this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     const results: { date: string; sales: number; profit: number }[] = [];
     const now = new Date();
@@ -297,7 +304,7 @@ export class AccountingService {
   }
 
   public getTopSellingProducts(limit = 5): { name: string; quantityM2: number; totalRevenue: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[] {
-    this.requireView('reports.view');
+    this.requireView('sales.view');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -460,7 +467,7 @@ export class AccountingService {
   }
 
   public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
-    this.requireView('reports.view');
+    this.requireView('sales.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
     const params: any[] = [];
     const scope = this.branchScope('si.branch_id');
@@ -600,6 +607,7 @@ export class AccountingService {
     previousMonth: { sales: number; profit: number; invoices: number };
   } {
     this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const now = new Date();
     const today = localDateString();
     const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -655,6 +663,7 @@ export class AccountingService {
 
   public getTopCustomers(limit = 5): { name: string; totalPurchases: number; purchaseCount: number }[] {
     this.requireView('customers.view');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -672,6 +681,7 @@ export class AccountingService {
 
   public getPaymentMethodDistribution(): { method: string; count: number; totalAmount: number }[] {
     this.requireView('finance.view');
+    PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -686,7 +696,7 @@ export class AccountingService {
   }
 
   public getSalesByGrade(): { grade: string; quantityM2: number; totalRevenue: number }[] {
-    this.requireView('reports.view');
+    this.requireView('sales.view');
     const scope = this.branchScope('si.branch_id');
     return this.db.query<any>(`
       SELECT 
@@ -709,6 +719,10 @@ export class AccountingService {
     date: string;
   }[] {
     this.requireView('dashboard.view');
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'sales.view', '/sales');
+    PermissionService.require(actor, 'purchases.view', '/purchases');
+    PermissionService.require(actor, 'inventory.view', '/inventory');
     const salesScope = this.branchScope('si.branch_id');
     const purchaseScope = this.branchScope('pi.branch_id');
     const stockScope = this.branchScope(

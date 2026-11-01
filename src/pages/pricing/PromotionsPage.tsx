@@ -29,8 +29,8 @@ export const PromotionsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const today = localDateString();
   const [form, setForm] = useState({
-    name: '', promotionType: 'PERCENTAGE', discountPercentage: '', discountAmount: '',
-    buyQuantity: '', getQuantity: '', minOrderAmount: '', appliesTo: 'ALL',
+    name: '', promotionType: 'PERCENTAGE', discountPercentage: '', discountAmount: '', bundlePrice: '',
+    buyQuantity: '', getQuantity: '', minOrderAmount: '', appliesTo: 'ALL', targetIds: '', couponCode: '',
     startsAt: today, endsAt: today, usageLimit: '', notes: '',
   });
 
@@ -59,17 +59,20 @@ export const PromotionsPage: React.FC = () => {
         promotionType: form.promotionType as any,
         discountPercentage: Number(form.discountPercentage) || 0,
         discountAmount: Number(form.discountAmount) || 0,
+        bundlePrice: Number(form.bundlePrice) || 0,
         buyQuantity: Number(form.buyQuantity) || 0,
         getQuantity: Number(form.getQuantity) || 0,
         minOrderAmount: Number(form.minOrderAmount) || 0,
         appliesTo: form.appliesTo as any,
+        targetIds: form.targetIds.split(',').map((value) => value.trim()).filter(Boolean),
+        couponCode: form.couponCode.trim() || undefined,
         startsAt: form.startsAt,
         endsAt: form.endsAt,
         usageLimit: form.usageLimit ? Number(form.usageLimit) : undefined,
         notes: form.notes || undefined,
       });
       setModalOpen(false);
-      setForm({ name: '', promotionType: 'PERCENTAGE', discountPercentage: '', discountAmount: '', buyQuantity: '', getQuantity: '', minOrderAmount: '', appliesTo: 'ALL', startsAt: today, endsAt: today, usageLimit: '', notes: '' });
+      setForm({ name: '', promotionType: 'PERCENTAGE', discountPercentage: '', discountAmount: '', bundlePrice: '', buyQuantity: '', getQuantity: '', minOrderAmount: '', appliesTo: 'ALL', targetIds: '', couponCode: '', startsAt: today, endsAt: today, usageLimit: '', notes: '' });
       load();
     } catch (err: any) {
       alert(err?.message || 'تعذر إنشاء العرض.');
@@ -211,6 +214,18 @@ export const PromotionsPage: React.FC = () => {
                     <input type="number" min="0" step="0.01" value={form.discountAmount} onChange={(e) => setForm({ ...form, discountAmount: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
                   </div>
                 )}
+                {form.promotionType === 'BUNDLE_PRICE' && (
+                  <>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">سعر إجمالي الحزمة (ج)</label>
+                      <input type="number" min="0.01" step="0.01" value={form.bundlePrice} onChange={(e) => setForm({ ...form, bundlePrice: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">عدد الوحدات المؤهلة لكل حزمة</label>
+                      <input type="number" min="1" step="1" value={form.buyQuantity} onChange={(e) => setForm({ ...form, buyQuantity: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                    </div>
+                  </>
+                )}
                 {form.promotionType === 'BUY_X_GET_Y' && (
                   <>
                     <div>
@@ -223,6 +238,16 @@ export const PromotionsPage: React.FC = () => {
                     </div>
                   </>
                 )}
+                {form.appliesTo !== 'ALL' && (
+                  <div className="sm:col-span-2">
+                    <label className="font-bold text-slate-700 block mb-1">معرّفات المنتجات أو التصنيفات أو الماركات (افصل بينها بفاصلة)</label>
+                    <input required value={form.targetIds} onChange={(e) => setForm({ ...form, targetIds: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                  </div>
+                )}
+                <div className="sm:col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1">كود قسيمة اختياري</label>
+                  <input value={form.couponCode} onChange={(e) => setForm({ ...form, couponCode: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+                </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">حد أدنى للطلب (ج)</label>
                   <input type="number" min="0" step="0.01" value={form.minOrderAmount} onChange={(e) => setForm({ ...form, minOrderAmount: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />

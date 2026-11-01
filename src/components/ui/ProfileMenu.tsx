@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, KeyRound, LogOut, Power, User as UserIcon, X } from 'lucide-react';
+import { Bell, ChevronDown, KeyRound, LogOut, Power, User as UserIcon, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { User } from '../../types';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
@@ -9,11 +10,17 @@ import { ChangePasswordModal } from './ChangePasswordModal';
 
 interface ProfileMenuProps {
   currentUser: User;
+  unreadNotifications?: number;
   onLogout?: () => void;
 }
 
-export const ProfileMenu: React.FC<ProfileMenuProps> = ({ currentUser, onLogout }) => {
+export const ProfileMenu: React.FC<ProfileMenuProps> = ({
+  currentUser,
+  unreadNotifications = 0,
+  onLogout,
+}) => {
   const toast = useToast();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [current, setCurrent] = useState('');
@@ -113,6 +120,20 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ currentUser, onLogout 
             <div className="truncate text-[12.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">{currentUser.fullName}</div>
             <div className="truncate text-[11px] text-[#767676] dark:text-[#a6a6a6]">@{currentUser.username} · {roleName}</div>
           </div>
+          <button
+            type="button"
+            onClick={() => { setOpen(false); navigate('/notifications'); }}
+            className="win-nav-item relative w-full !mx-0 !text-[12px] sm:hidden"
+            title={unreadNotifications ? `لديك ${unreadNotifications} إشعار غير مقروء` : 'الإشعارات'}
+            aria-label={unreadNotifications ? `الإشعارات، ${unreadNotifications} غير مقروء` : 'الإشعارات'}
+          >
+            <Bell className="win-nav-icon" /> الإشعارات
+            {unreadNotifications > 0 && (
+              <span className="mr-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
+                {unreadNotifications > 99 ? '99+' : unreadNotifications}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => { setOpen(false); setPasswordOpen(true); }}
             className="win-nav-item w-full !mx-0 !text-[12px]"

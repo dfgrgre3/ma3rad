@@ -277,7 +277,11 @@ export class CashierService {
     const actor = AuthService.requireAuth();
     const scope = this.branchAccess.sqlScope('e.branch_id', 'cr.branch_id', actor);
     let sql = `
-      SELECT e.*, e.branch_id AS branchId, u.full_name as performedByName
+      SELECT e.id, e.category, e.amount,
+             e.register_id AS registerId, e.branch_id AS branchId, e.shift_id AS shiftId,
+             e.payment_type AS paymentType, e.date, e.recipient, e.description,
+             e.performed_by AS performedBy, e.created_at AS createdAt,
+             u.full_name AS performedByName
       FROM expenses e
       LEFT JOIN users u ON e.performed_by = u.id
       LEFT JOIN cash_registers cr ON cr.id = e.register_id

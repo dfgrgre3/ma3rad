@@ -17,7 +17,7 @@ const branchAccess = new BranchAccessService();
 
 export const SalesAnalyticsPage: React.FC = () => {
   // الصفحة تُدمج داخل لوحة المعلومات، لذا تفحص صلاحيتها بنفسها لا صلاحية المسار الأب.
-  PermissionService.require(AuthService.requireAuth(), 'sales.view');
+  PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
   const db = DatabaseManager.getInstance();
   const [period, setPeriod] = useState<'today' | '7days' | '30days' | 'all'>('30days');
   const [refresh, setRefresh] = useState(0);

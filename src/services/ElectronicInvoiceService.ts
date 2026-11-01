@@ -10,6 +10,7 @@ export class ElectronicInvoiceService {
   private db = DatabaseManager.getInstance();
 
   public getAllElectronicInvoices(status?: ElectronicInvoiceStatus): ElectronicInvoice[] {
+    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
     let sql = `
       SELECT ei.*, c.name as customerName, u.full_name as createdByName
       FROM electronic_invoices ei
@@ -26,6 +27,11 @@ export class ElectronicInvoiceService {
   }
 
   public getElectronicInvoiceById(id: string): ElectronicInvoice | null {
+    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
+    return this.queryElectronicInvoiceById(id);
+  }
+
+  private queryElectronicInvoiceById(id: string): ElectronicInvoice | null {
     const rows = this.db.query<ElectronicInvoice>(`
       SELECT ei.*, c.name as customerName, u.full_name as createdByName
       FROM electronic_invoices ei
@@ -37,6 +43,11 @@ export class ElectronicInvoiceService {
   }
 
   public getElectronicInvoiceBySalesInvoice(salesInvoiceId: string): ElectronicInvoice | null {
+    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
+    return this.queryElectronicInvoiceBySalesInvoice(salesInvoiceId);
+  }
+
+  private queryElectronicInvoiceBySalesInvoice(salesInvoiceId: string): ElectronicInvoice | null {
     const rows = this.db.query<ElectronicInvoice>(`
       SELECT * FROM electronic_invoices WHERE sales_invoice_id = ?
     `, [salesInvoiceId]);
@@ -53,7 +64,7 @@ export class ElectronicInvoiceService {
     )[0];
     if (!salesInvoice) throw new Error('الفاتورة التجارية غير موجودة.');
 
-    const existing = this.getElectronicInvoiceBySalesInvoice(dto.salesInvoiceId);
+    const existing = this.queryElectronicInvoiceBySalesInvoice(dto.salesInvoiceId);
     if (existing) throw new Error('يوجد فاتورة إلكترونية مرتبطة بهذه الفاتورة التجارية مسبقاً.');
 
     const id = `einv_${uuidv4().substring(0, 8)}`;
@@ -72,7 +83,7 @@ export class ElectronicInvoiceService {
         actor.id, now, now
       ]);
 
-      return this.getElectronicInvoiceById(id)!;
+      return this.queryElectronicInvoiceById(id)!;
     });
   }
 
@@ -92,7 +103,7 @@ export class ElectronicInvoiceService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'electronic_invoices.reject');
 
-    const invoice = this.getElectronicInvoiceById(id);
+    const invoice = this.queryElectronicInvoiceById(id);
     if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة.');
     if (invoice.status !== 'SENT') throw new Error('لا يمكن رفض فاتورة لم تُرسل بعد.');
 
@@ -102,14 +113,14 @@ export class ElectronicInvoiceService {
       WHERE id = ?
     `, [reason, id]);
 
-    return this.getElectronicInvoiceById(id)!;
+    return this.queryElectronicInvoiceById(id)!;
   }
 
   public cancelElectronicInvoice(id: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'electronic_invoices.cancel');
 
-    const invoice = this.getElectronicInvoiceById(id);
+    const invoice = this.queryElectronicInvoiceById(id);
     if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة.');
     if (invoice.status === 'ACCEPTED') throw new Error('لا يمكن إلغاء فاتورة تم قبولها من الهيئة الضريبية.');
 
@@ -119,7 +130,7 @@ export class ElectronicInvoiceService {
       WHERE id = ?
     `, [id]);
 
-    return this.getElectronicInvoiceById(id)!;
+    return this.queryElectronicInvoiceById(id)!;
   }
 
   public getStats(): {
@@ -130,6 +141,7 @@ export class ElectronicInvoiceService {
     rejected: number;
     cancelled: number;
   } {
+    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
     const rows = this.db.query<any>(`
       SELECT status, COUNT(*) as cnt FROM electronic_invoices GROUP BY status
     `);
