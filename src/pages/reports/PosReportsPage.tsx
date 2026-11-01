@@ -36,6 +36,7 @@ export function PosReportsPage() {
   const load = () => {
     setLoading(true);
     try {
+      PermissionService.require(AuthService.requireAuth(), 'reports.view', '/reports');
       const scope = branchAccess.sqlScope('si.branch_id', '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)');
       const sp = scope.params;
 

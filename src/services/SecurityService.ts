@@ -9,6 +9,9 @@ import { twoFactorAuth } from './twoFactorAuth';
 import { performanceMonitor } from './performanceMonitor';
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
+import bcrypt from 'bcryptjs';
+import { decryptExternalBackup, encryptExternalBackup } from './backupEncryption';
 import type { ActiveSession, LoginRecord, SecurityOverview } from './types';
 
 export type { ActiveSession, LoginRecord, SecurityOverview };
@@ -71,27 +74,65 @@ export class SecurityService {
   }
 
   private loadConfig(): void {
-    const saved = localStorage.getItem('security_config');
-    if (saved) {
-      this.config = JSON.parse(saved);
-    } else {
+    const defaults = this.defaultConfig();
+    try {
+      const saved = localStorage.getItem('security_config');
+      if (!saved) {
+        this.config = defaults;
+        this.saveConfig();
+        return;
+      }
+      const parsed: unknown = JSON.parse(saved);
+      if (!this.isValidConfig(parsed)) throw new Error('invalid security configuration schema');
       this.config = {
-        encryptionAlgorithm: 'aes-256-gcm',
-        keyStorage: 'local',
-        backupEncryption: true,
-        auditLogging: true,
-        performanceMonitoring: true,
-        accessControl: 'strict',
-        twoFactorEnabled: false,
-        passwordPolicy: {
-          minLength: 8,
-          requireUppercase: true,
-          requireNumbers: true,
-          requireSpecialChars: true
-        }
+        ...defaults,
+        ...parsed,
+        passwordPolicy: { ...defaults.passwordPolicy, ...parsed.passwordPolicy },
       };
-      this.saveConfig();
+    } catch (error) {
+      console.error('Invalid security_config; restoring defaults.', error);
+      this.config = defaults;
+      try { this.saveConfig(); } catch { /* storage may be unavailable during startup */ }
     }
+  }
+
+  private defaultConfig(): SecurityConfig {
+    return {
+      encryptionAlgorithm: 'aes-256-gcm',
+      keyStorage: 'local',
+      backupEncryption: true,
+      auditLogging: true,
+      performanceMonitoring: true,
+      accessControl: 'strict',
+      twoFactorEnabled: false,
+      passwordPolicy: {
+        minLength: 8,
+        requireUppercase: true,
+        requireNumbers: true,
+        requireSpecialChars: true,
+      },
+    };
+  }
+
+  private isValidConfig(value: unknown): value is Partial<SecurityConfig> & { passwordPolicy: SecurityConfig['passwordPolicy'] } {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Record<string, unknown>;
+    const policy = candidate.passwordPolicy;
+    return (
+      (candidate.encryptionAlgorithm === undefined || candidate.encryptionAlgorithm === 'aes-256-gcm' || candidate.encryptionAlgorithm === 'aes-256-ctr') &&
+      (candidate.keyStorage === undefined || candidate.keyStorage === 'local' || candidate.keyStorage === 'secureEnclave') &&
+      (candidate.accessControl === undefined || candidate.accessControl === 'strict' || candidate.accessControl === 'moderate') &&
+      (candidate.backupEncryption === undefined || typeof candidate.backupEncryption === 'boolean') &&
+      (candidate.auditLogging === undefined || typeof candidate.auditLogging === 'boolean') &&
+      (candidate.performanceMonitoring === undefined || typeof candidate.performanceMonitoring === 'boolean') &&
+      (candidate.twoFactorEnabled === undefined || typeof candidate.twoFactorEnabled === 'boolean') &&
+      !!policy && typeof policy === 'object' &&
+      (policy as Record<string, unknown>).minLength !== undefined &&
+      typeof (policy as Record<string, unknown>).minLength === 'number' &&
+      typeof (policy as Record<string, unknown>).requireUppercase === 'boolean' &&
+      typeof (policy as Record<string, unknown>).requireNumbers === 'boolean' &&
+      typeof (policy as Record<string, unknown>).requireSpecialChars === 'boolean'
+    );
   }
 
   private saveConfig(): void {
@@ -125,7 +166,7 @@ export class SecurityService {
       const keyData = await this.extractKey(key);
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const ciphertext = await crypto.subtle.encrypt(
-        { name: this.config.encryptionAlgorithm, iv: iv.buffer },
+        { name: 'AES-GCM', iv: iv.buffer },
         keyData,
         data.slice(0)
       );
@@ -166,13 +207,13 @@ export class SecurityService {
 
       const keyData = await this.extractKey(key);
       const decrypted = await crypto.subtle.decrypt(
-        { name: this.config.encryptionAlgorithm, iv: iv.buffer },
+        { name: 'AES-GCM', iv: iv.buffer },
         keyData,
         ciphertext
       );
 
       // التحقق من التوقيع
-      const isValid = await this.verifySignature(new Uint8Array(decrypted.slice(0)), signature, key);
+      const isValid = await this.verifySignature(ciphertext, signature, key);
       if (!isValid) {
         throw new Error('التوقيع الرقمي غير صالح');
       }
@@ -191,8 +232,10 @@ export class SecurityService {
   }
 
   private async extractKey(password: string): Promise<CryptoKey> {
-    // Use PBKDF2 to derive key
-    const salt = crypto.getRandomValues(new Uint8Array(16));
+    // This legacy format has no salt field. Use a stable versioned salt so
+    // encrypt/decrypt derive the same key. New backups use backupEncryption.
+    const saltDigest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`SecurityService:v1:${password}`));
+    const salt = new Uint8Array(saltDigest).slice(0, 16);
     const material = await crypto.subtle.importKey(
       'raw',
       new TextEncoder().encode(password),
@@ -210,9 +253,9 @@ export class SecurityService {
   }
 
   private async signData(data: Uint8Array, key: string): Promise<Uint8Array> {
-    const secretKey = await this.extractKey(key);
+    const secretKey = await this.extractSigningKey(key, ['sign']);
     const signature = await crypto.subtle.sign(
-      { name: 'ECDSA', hash: 'SHA-512' },
+      { name: 'HMAC' },
       secretKey,
       data.slice(0)
     );
@@ -220,14 +263,19 @@ export class SecurityService {
   }
 
   private async verifySignature(data: Uint8Array, signature: Uint8Array, key: string): Promise<boolean> {
-    const secretKey = await this.extractKey(key);
+    const secretKey = await this.extractSigningKey(key, ['verify']);
     const result = await crypto.subtle.verify(
-      { name: 'ECDSA', hash: 'SHA-512' },
+      { name: 'HMAC' },
       secretKey,
       signature.slice(0),
       data.slice(0)
     );
     return result;
+  }
+
+  private async extractSigningKey(password: string, usages: KeyUsage[]): Promise<CryptoKey> {
+    const digest = await crypto.subtle.digest('SHA-512', new TextEncoder().encode(`SecurityService:signing:v1:${password}`));
+    return crypto.subtle.importKey('raw', digest, { name: 'HMAC', hash: 'SHA-512' }, false, usages);
   }
 
   async createUserSession(userId: string, username: string, password?: string): Promise<string> {
@@ -266,7 +314,15 @@ export class SecurityService {
     // هذا يتطلب دمج مع نظام المصادقة
     // للآن: تحقق من قاعدة البيانات المحلية
     // سيتم تطويره لاحقاً
-    return true;
+    if (!username || !password) return false;
+    try {
+      const row = DatabaseManager.getInstance().query<{ passwordHash: string }>(
+        'SELECT password_hash AS passwordHash FROM users WHERE username = ? AND is_active = 1', [username]
+      )[0];
+      return Boolean(row?.passwordHash && await bcrypt.compare(password, row.passwordHash));
+    } catch {
+      return false;
+    }
   }
 
   async logout(sessionId: string): Promise<void> {
@@ -283,7 +339,8 @@ export class SecurityService {
       }
       // يجب حاليًا تنفيذ التشفير الفعلي
       // يمكن استخدام encryptBackupWithSignature المتقدم
-      return backupData; // Placeholder
+      if (!password) throw new Error('ØÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ù†Ø³Ø®Ø© Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠØ© Ù…Ø·Ù„ÙˆØ¨Ø©.');
+      return await encryptExternalBackup(backupData, password);
     } catch (error: any) {
       if (this.config.auditLogging) {
         auditLogger.log('system', 'security', 'backup_failure', 'system', 'backup', `فشل النسخ الاحتياطي: ${error?.message}`, null, false, 'high');
@@ -308,7 +365,7 @@ export class SecurityService {
     securityRanking: SecurityMetrics['securityRanking'];
   } {
     return {
-      encryptionEnabled: true,
+      encryptionEnabled: this.config.encryptionAlgorithm === 'aes-256-gcm' || this.config.encryptionAlgorithm === 'aes-256-ctr',
       twoFactorEnabled: this.config.twoFactorEnabled,
       auditLoggingEnabled: this.config.auditLogging,
       performanceMonitoringEnabled: this.config.performanceMonitoring,
@@ -388,10 +445,21 @@ export class SecurityService {
   }
 
   getMetrics(): SecurityMetrics {
+    const db = DatabaseManager.getInstance();
+    const counts = db.query<{ succeeded: number; count: number }>(
+      `SELECT succeeded, COUNT(*) AS count
+       FROM login_history
+       WHERE created_at >= ?
+       GROUP BY succeeded`,
+      [new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()]
+    );
+    const activeUsers = Number(db.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM users WHERE is_active = 1`
+    )[0]?.count ?? 0);
     return {
-      activeUsers: localCache.get('security_metrics_active_users') || 1,
-      failedLogins: 0,
-      successfulLogins: 0,
+      activeUsers,
+      failedLogins: Number(counts.find((row) => Number(row.succeeded) === 0)?.count ?? 0),
+      successfulLogins: Number(counts.find((row) => Number(row.succeeded) === 1)?.count ?? 0),
       encryptionEvents: auditLogger.getLogs({ action: 'encryption' }).length,
       backupEvents: auditLogger.getLogs({ action: 'backup' }).length,
       auditEvents: auditLogger.getLogs().length,
@@ -424,12 +492,10 @@ export class SecurityService {
   }
 
   // CORNERWORK
-  async validateBackupIntegrity(backupBytes: Uint8Array): Promise<boolean> {
+  async validateBackupIntegrity(backupBytes: Uint8Array, password?: string): Promise<boolean> {
     try {
-      const { isEncryptedBackup } = await import('./backupEncryption');
-      if (!isEncryptedBackup(backupBytes)) return false;
-
-      // Verifikation ist hier noch nicht implementiert
+      if (!password) return false;
+      await decryptExternalBackup(backupBytes, password);
       return true;
     } catch (error) {
       console.error('_verification_security_error:', error);
@@ -438,6 +504,7 @@ export class SecurityService {
   }
 
   getOverview(): SecurityOverview {
+    PermissionService.require(AuthService.requireAuth(), 'sessions.view');
     const db = DatabaseManager.getInstance();
 
     // عدد الجلسات النشطة
@@ -453,16 +520,12 @@ export class SecurityService {
     const usersCount = activeUsersRow[0]?.count ?? 0;
 
     // حسابات مقفلة مؤقتًا
-    const lockedAccountsRow = db.query<{ count: number }>(`
-      SELECT COUNT(*) AS count FROM users u
-      JOIN login_history lh ON u.id = lh.user_id
-      WHERE u.is_active = 1 AND lh.succeeded = 0
-      GROUP BY u.id
-      HAVING COUNT(*) >= (
-        COALESCE((SELECT CAST(value AS INTEGER) FROM system_settings WHERE key = 'maxFailedLoginAttempts' LIMIT 1), 5)
-      )
-    `);
-    const lockedAccounts = lockedAccountsRow.length;
+    const activeUsernames = db.query<{ username: string }>(
+      `SELECT username FROM users WHERE is_active = 1`
+    );
+    const lockedAccounts = activeUsernames.filter(({ username }) =>
+      AuthService.getLoginGuardStatus(username).isLocked
+    ).length;
 
     // نجاح/فشل في آخر 24 ساعة
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -507,6 +570,7 @@ export class SecurityService {
   }
 
   getActiveSessions(): ActiveSession[] {
+    PermissionService.require(AuthService.requireAuth(), 'sessions.view');
     const db = DatabaseManager.getInstance();
     const currentUser = AuthService.getCurrentUser();
     const currentSessionId = AuthService.getSessionId();
@@ -543,6 +607,7 @@ export class SecurityService {
   }
 
   getLoginHistory({ search = '', onlyFailed = false, limit = 150 }: { search?: string; onlyFailed?: boolean; limit?: number } = {}): LoginRecord[] {
+    PermissionService.require(AuthService.requireAuth(), 'sessions.view');
     const db = DatabaseManager.getInstance();
 
     let query = `
@@ -594,6 +659,7 @@ export class SecurityService {
   }
 
   revokeSession(sessionId: string): void {
+    PermissionService.require(AuthService.requireAuth(), 'sessions.manage');
     const db = DatabaseManager.getInstance();
     db.run(
       `UPDATE user_sessions SET is_active = 0, ended_at = ?, end_reason = 'REVOKED' WHERE id = ?`,
@@ -603,6 +669,7 @@ export class SecurityService {
   }
 
   revokeUserSessions(userId: string): number {
+    PermissionService.require(AuthService.requireAuth(), 'sessions.manage');
     const db = DatabaseManager.getInstance();
     const activeSessions = Number(db.query<{ count: number }>(
       `SELECT COUNT(*) AS count FROM user_sessions WHERE user_id = ? AND is_active = 1`,

@@ -3,74 +3,27 @@ import {
   Cpu, Activity, CheckCircle2, AlertTriangle, RefreshCw, Database,
   HardDrive, Zap, ShieldCheck, Terminal, Wrench
 } from 'lucide-react';
-import { DatabaseManager } from '../../database/db';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
+import { SystemDiagnosticsService, type SystemDiagnosticsReport } from '../../services/SystemDiagnosticsService';
 
-interface HealthStats {
-  integrityStatus: string;
-  totalTables: number;
-  totalProducts: number;
-  totalInvoices: number;
-  totalTransactions: number;
-  databaseSizeBytes: number;
-  querySpeedMs: number;
-  isConsistent: boolean;
-}
+type HealthStats = SystemDiagnosticsReport;
 
 export const SystemHealthPage: React.FC = () => {
+  const canMaintain = PermissionService.can(AuthService.getCurrentUser(), 'settings.maintenance', '/system-health');
   const [stats, setStats] = useState<HealthStats | null>(null);
   const [isRunningCheck, setIsRunningCheck] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const runHealthAudit = () => {
     setIsRunningCheck(true);
     setActionMessage(null);
-
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) {
-      setIsRunningCheck(false);
-      return;
-    }
-
     try {
-      const startTime = performance.now();
-
-      // PRAGMA integrity_check
-      const integrityRes = db.exec('PRAGMA integrity_check');
-      const integrityStatus = String(integrityRes[0]?.values[0]?.[0] || 'ok');
-
-      // Table count
-      const tablesRes = db.exec("SELECT count(*) FROM sqlite_master WHERE type='table'");
-      const totalTables = Number(tablesRes[0]?.values[0]?.[0] || 0);
-
-      // Records count
-      const prodRes = db.exec('SELECT count(*) FROM products');
-      const totalProducts = Number(prodRes[0]?.values[0]?.[0] || 0);
-
-      const invRes = db.exec('SELECT count(*) FROM sales_invoices');
-      const totalInvoices = Number(invRes[0]?.values[0]?.[0] || 0);
-
-      const txRes = db.exec('SELECT count(*) FROM inventory_transactions');
-      const totalTransactions = Number(txRes[0]?.values[0]?.[0] || 0);
-
-      // Export binary size
-      const binary = db.export();
-      const databaseSizeBytes = binary.byteLength;
-
-      const endTime = performance.now();
-      const querySpeedMs = Math.round(endTime - startTime);
-
-      setStats({
-        integrityStatus,
-        totalTables,
-        totalProducts,
-        totalInvoices,
-        totalTransactions,
-        databaseSizeBytes,
-        querySpeedMs,
-        isConsistent: integrityStatus.toLowerCase() === 'ok',
-      });
+      setErrorMessage(null);
+      setStats(new SystemDiagnosticsService().runDiagnostics());
     } catch (e: any) {
-      console.error(e);
+      setErrorMessage(e?.message || 'تعذر تنفيذ فحوص التشخيص.');
     } finally {
       setIsRunningCheck(false);
     }
@@ -80,12 +33,13 @@ export const SystemHealthPage: React.FC = () => {
     runHealthAudit();
   }, []);
 
+  const integrityCheck = stats?.checks.find((check) => check.key === 'sqlite_integrity');
+  const financialCheck = stats?.checks.find((check) => check.key === 'financial_consistency');
+
   const handleVacuum = () => {
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
+    PermissionService.require(AuthService.requireAuth(), 'settings.maintenance', '/system-health');
     try {
-      db.run('VACUUM');
-      DatabaseManager.getInstance().saveToStorage();
+      new SystemDiagnosticsService().vacuum();
       setActionMessage('تم ضغط قاعدة البيانات وتحرير المساحة غير المستخدمة بنجاح.');
       runHealthAudit();
     } catch (err: any) {
@@ -94,11 +48,9 @@ export const SystemHealthPage: React.FC = () => {
   };
 
   const handleReindex = () => {
-    const db = DatabaseManager.getInstance().getDb();
-    if (!db) return;
+    PermissionService.require(AuthService.requireAuth(), 'settings.maintenance', '/system-health');
     try {
-      db.run('REINDEX');
-      DatabaseManager.getInstance().saveToStorage();
+      new SystemDiagnosticsService().reindex();
       setActionMessage('تمت إعادة بناء الفهارس لتحسين سرعة البحث.');
       runHealthAudit();
     } catch (err: any) {
@@ -138,6 +90,12 @@ export const SystemHealthPage: React.FC = () => {
         </button>
       </div>
 
+      {errorMessage && (
+        <div className="mx-6 mt-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 text-xs">
+          {errorMessage}
+        </div>
+      )}
+
       {actionMessage && (
         <div className="mx-6 mt-4 p-3.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-700 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -158,9 +116,9 @@ export const SystemHealthPage: React.FC = () => {
           <div>
             <div className="text-xs text-slate-500 font-medium">سلامة قاعدة البيانات</div>
             <div className="text-base font-bold text-slate-900 flex items-center gap-2 mt-0.5">
-              <span>{stats?.isConsistent ? 'سليمة 100%' : 'تتطلب فحص'}</span>
+              <span>{integrityCheck?.status === 'PASS' ? 'سليمة' : integrityCheck?.status === 'FAIL' ? 'غير سليمة' : 'غير مفحوصة'}</span>
             </div>
-            <div className="text-[11px] text-emerald-600 mt-0.5">نتيجة الفحص: {stats?.isConsistent ? 'سليمة' : 'غير سليمة'}</div>
+            <div className="text-[11px] text-slate-500 mt-0.5">نتيجة integrity_check: {integrityCheck?.detail || 'لم يُنفذ بعد'}</div>
           </div>
         </div>
 
@@ -186,7 +144,7 @@ export const SystemHealthPage: React.FC = () => {
           <div>
             <div className="text-xs text-slate-500 font-medium">زمن تنفيذ الفحص</div>
             <div className="text-base font-bold text-amber-600 mt-0.5 font-mono">
-              {stats?.querySpeedMs} مللي ثانية
+              {stats?.querySpeedMs ?? '—'} مللي ثانية
             </div>
             <div className="text-[11px] text-slate-500 mt-0.5">أداء فائق واستجابة فورية</div>
           </div>
@@ -228,6 +186,8 @@ export const SystemHealthPage: React.FC = () => {
               </div>
               <button
                 onClick={handleVacuum}
+                disabled={!canMaintain}
+                title={!canMaintain ? 'تحتاج إلى صلاحية صيانة قاعدة البيانات' : undefined}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-teal-600 font-bold rounded-xl text-xs border border-slate-300 shrink-0"
               >
                 ضغط قاعدة البيانات
@@ -243,6 +203,8 @@ export const SystemHealthPage: React.FC = () => {
               </div>
               <button
                 onClick={handleReindex}
+                disabled={!canMaintain}
+                title={!canMaintain ? 'تحتاج إلى صلاحية صيانة قاعدة البيانات' : undefined}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-sky-600 font-bold rounded-xl text-xs border border-slate-300 shrink-0"
               >
                 إعادة بناء الفهارس
@@ -273,9 +235,22 @@ export const SystemHealthPage: React.FC = () => {
             </div>
             <div className="flex justify-between p-2.5 rounded-lg bg-white">
               <span className="text-slate-500">وضع المعاملات المتزامنة:</span>
-              <span className="font-bold text-emerald-600">وضع المعاملات الآمن (مفعّل)</span>
+              <span className="font-bold text-slate-700">الاتساق المحاسبي: {financialCheck?.detail || 'لم يُنفذ بعد'}</span>
             </div>
           </div>
+        </div>
+      </div>
+      <div className="mx-6 mb-6 bg-white border border-slate-200 rounded-2xl p-5">
+        <h2 className="text-sm font-bold text-slate-900 mb-3">سجل نتائج الفحوص السابقة</h2>
+        <div className="space-y-2 text-xs">
+          {(stats?.history || []).slice().reverse().slice(0, 10).map((entry) => (
+            <div key={entry.timestamp} className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <span className="font-mono text-slate-500">{new Date(entry.timestamp).toLocaleString()}</span>
+              <span className={entry.overall === 'PASS' ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>{entry.overall}</span>
+              <span className="text-slate-500">{entry.checks.filter((check) => check.status === 'FAIL').length} فحوص فاشلة</span>
+            </div>
+          ))}
+          {(!stats?.history || stats.history.length === 0) && <div className="text-slate-400">لا توجد نتائج سابقة.</div>}
         </div>
       </div>
     </div>

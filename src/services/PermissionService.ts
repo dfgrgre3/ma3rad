@@ -174,6 +174,10 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'employees.view', name: 'عرض الموظفين', module: 'EMPLOYEES' },
   { code: 'employees.export', name: 'تصدير بيانات الموظفين', module: 'EMPLOYEES' },
   { code: 'employees.manage', name: 'إدارة الموظفين والرواتب', module: 'EMPLOYEES' },
+  { code: 'employees.payroll.view', name: 'عرض بيانات الرواتب والعمولات', module: 'EMPLOYEES' },
+  { code: 'employees.financials.view', name: 'عرض التفاصيل المالية للموظفين', module: 'EMPLOYEES' },
+  { code: 'employees.payroll.manage', name: 'إدارة الرواتب والعمولات', module: 'EMPLOYEES' },
+  { code: 'employees.payroll.approve', name: 'اعتماد وصرف الرواتب', module: 'EMPLOYEES' },
   { code: 'deliveries.view', name: 'عرض التوصيل', module: 'DELIVERIES' },
   { code: 'deliveries.manage', name: 'إدارة التوصيل', module: 'DELIVERIES' },
   { code: 'drivers.view', name: 'عرض السائقين', module: 'DRIVERS' },
@@ -200,12 +204,14 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'users.reset_password', name: 'إعادة تعيين كلمة المرور', module: 'USERS' },
   { code: 'users.permissions', name: 'إدارة صلاحيات المستخدمين', module: 'USERS' },
   { code: 'roles.manage', name: 'إدارة الأدوار', module: 'ROLES' },
+  { code: 'sessions.view', name: 'عرض الجلسات وسجل الدخول', module: 'SESSIONS' },
   { code: 'sessions.manage', name: 'إدارة الجلسات', module: 'SESSIONS' },
 
   // Settings & system
   { code: 'settings.view', name: 'عرض الإعدادات', module: 'SETTINGS' },
   { code: 'settings.update', name: 'تعديل الإعدادات', module: 'SETTINGS' },
   { code: 'settings.backup', name: 'النسخ الاحتياطي والاستعادة', module: 'SETTINGS' },
+  { code: 'settings.maintenance', name: 'صيانة قاعدة البيانات', module: 'SETTINGS' },
   { code: 'audit.view', name: 'عرض سجل التدقيق', module: 'AUDIT' },
   { code: 'audit.export', name: 'تصدير سجل التدقيق', module: 'AUDIT' },
   { code: 'admin.view', name: 'الدخول إلى مركز التحكم', module: 'ADMIN' },
@@ -291,6 +297,7 @@ const MANAGER_RESTRICTED = new Set([
   'users.permissions',
   'settings.update',
   'settings.backup',
+  'settings.maintenance',
   'admin.data',
 ]);
 
@@ -313,7 +320,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'crm.view', 'projects.view', 'pricing.view', 'promotions.view',
     'manufacturing.view',
     'operations.view', 'branches.view', 'warehouses.view',
-    'employees.view', 'employees.export', 'deliveries.view', 'drivers.view', 'vehicles.view',
+    'employees.view', 'employees.export', 'employees.payroll.view', 'employees.financials.view', 'deliveries.view', 'drivers.view', 'vehicles.view',
     'approvals.view', 'approvals.create', 'approvals.approve', 'approvals.reject', 'approvals.cancel',
     'notifications.view', 'audit.view', 'audit.export',
     'documents.view', 'documents.export', 'contracts.view', 'contracts.export',

@@ -10,7 +10,7 @@ import type { Migration } from '../migrationSupport';
  */
 export const MIGRATION_PART_14: Migration[] = [
   {
-    id: '101_dynamic_application_configuration',
+    id: '105_dynamic_application_configuration',
     description: 'Add dynamic application configuration entries, DOM rules and version history',
     up: (db) => {
       db.exec(`
@@ -65,7 +65,7 @@ export const MIGRATION_PART_14: Migration[] = [
     },
   },
   {
-    id: '102_scoped_application_configuration',
+    id: '106_scoped_application_configuration',
     description: 'Add scope-aware configuration overrides, origin tracking and scoped version history',
     up: (db) => {
       db.exec(`
@@ -108,7 +108,7 @@ export const MIGRATION_PART_14: Migration[] = [
     },
   },
   {
-    id: '103_inventory_count_type_options',
+    id: '107_inventory_count_type_options',
     description: 'Allow every supported stock count type in the stock count table',
     disableForeignKeys: true,
     up: (db) => {
@@ -160,7 +160,7 @@ export const MIGRATION_PART_14: Migration[] = [
     },
   },
   {
-    id: '104_receivables_company_scope',
+    id: '108_receivables_company_scope',
     description: 'Scope other receivables and related records to a legal company',
     up: (db) => {
       try { db.exec("ALTER TABLE receivables ADD COLUMN company_id TEXT NOT NULL DEFAULT 'cmp_main'"); } catch { /* already present */ }

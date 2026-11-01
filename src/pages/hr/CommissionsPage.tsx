@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BadgeDollarSign, Calculator, Check, Banknote, X, Loader2, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { CommissionService, CommissionRow, CommissionStats } from '../../services/CommissionService';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 import { useToast } from '../../components/ui/Toast';
 import { exportToExcel } from '../../utils/export';
 
@@ -20,6 +22,9 @@ const statusLabels: Record<string, string> = {
 export const CommissionsPage: React.FC = () => {
   const service = useMemo(() => new CommissionService(), []);
   const toast = useToast();
+  const actor = AuthService.getCurrentUser();
+  const canManagePayroll = PermissionService.canAny(actor, ['employees.payroll.manage', 'employees.manage']);
+  const canApprovePayroll = PermissionService.canAny(actor, ['employees.payroll.approve', 'employees.manage']);
   const [month, setMonth] = useState(currentMonth());
   const [status, setStatus] = useState('ALL');
   const [rows, setRows] = useState<CommissionRow[]>([]);
@@ -73,7 +78,7 @@ export const CommissionsPage: React.FC = () => {
   const exportRows = () => {
     exportToExcel({
       title: 'تقرير العمولات', subtitle: `شهر ${month}`, fileName: `commissions-${month}`,
-      permission: 'employees.export',
+      permission: 'employees.payroll.view',
       columns: [
         { key: 'employeeName', label: 'الموظف' }, { key: 'invoiceNumber', label: 'الفاتورة' },
         { key: 'baseAmount', label: 'أساس العمولة' }, { key: 'percentage', label: 'النسبة %' },
@@ -104,9 +109,9 @@ export const CommissionsPage: React.FC = () => {
             <option value="PAID">مدفوعة</option>
             <option value="CANCELLED">ملغاة</option>
           </select>
-          <button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50">
+          {canManagePayroll && <button onClick={generate} disabled={generating} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50">
             {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} احتساب الشهر
-          </button>
+          </button>}
           <button onClick={() => load()} className="p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-600"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
           <button onClick={exportRows} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold"><FileSpreadsheet className="w-4 h-4" /> جدول بيانات</button>
         </div>
@@ -148,9 +153,9 @@ export const CommissionsPage: React.FC = () => {
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-1">
-                      {row.status === 'PENDING' && <button onClick={() => changeStatus(row, 'APPROVED')} className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50" title="اعتماد"><Check className="w-4 h-4" /></button>}
-                      {row.status === 'APPROVED' && <button onClick={() => changeStatus(row, 'PAID')} className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50" title="صرف"><Banknote className="w-4 h-4" /></button>}
-                      {row.status !== 'PAID' && row.status !== 'CANCELLED' && <button onClick={() => changeStatus(row, 'CANCELLED')} className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50" title="إلغاء"><X className="w-4 h-4" /></button>}
+                      {canApprovePayroll && row.status === 'PENDING' && <button onClick={() => changeStatus(row, 'APPROVED')} className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50" title="اعتماد"><Check className="w-4 h-4" /></button>}
+                      {canApprovePayroll && row.status === 'APPROVED' && <button onClick={() => changeStatus(row, 'PAID')} className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50" title="صرف"><Banknote className="w-4 h-4" /></button>}
+                      {canManagePayroll && row.status !== 'PAID' && row.status !== 'CANCELLED' && <button onClick={() => changeStatus(row, 'CANCELLED')} className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50" title="إلغاء"><X className="w-4 h-4" /></button>}
                     </div>
                   </td>
                 </tr>

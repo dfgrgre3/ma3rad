@@ -2,11 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Wallet, Loader2, Plus, Trash2, Users, Banknote } from 'lucide-react';
 import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, EmployeeFinancials } from '../../services/EmployeeService';
 import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 
 import { TX_LABELS, TX_COLORS, fmt, today } from './payrollDisplay';
 import { PayrollTransactionModal } from './PayrollTransactionModal';
 
 export const PayrollPage: React.FC = () => {
+  const actor = AuthService.getCurrentUser();
+  const canViewPayroll = PermissionService.canAny(actor, ['employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
+  const canViewFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
+  const canManagePayroll = PermissionService.canAny(actor, ['employees.payroll.manage', 'employees.manage']);
+  const canApprovePayroll = PermissionService.canAny(actor, ['employees.payroll.approve', 'employees.manage']);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [financials, setFinancials] = useState<Record<string, EmployeeFinancials>>({});
   const [transactions, setTransactions] = useState<PayrollTransaction[]>([]);
@@ -22,14 +28,14 @@ export const PayrollPage: React.FC = () => {
       const list = EmployeeService.getAll().filter((e) => e.status !== 'SUSPENDED');
       setEmployees(list);
       const map: Record<string, EmployeeFinancials> = {};
-      list.forEach((e) => { map[e.id] = EmployeeService.getEmployeeFinancials(e.id); });
+      if (canViewFinancials) list.forEach((e) => { map[e.id] = EmployeeService.getEmployeeFinancials(e.id); });
       setFinancials(map);
-      setTransactions(EmployeeService.getTransactions().slice(0, 100));
+      setTransactions(canViewPayroll ? EmployeeService.getTransactions().slice(0, 100) : []);
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل بيانات الرواتب.'); }
     finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [canViewFinancials, canViewPayroll]);
 
   const totals = useMemo(() => {
     let salaries = 0, advances = 0, bonuses = 0, deductions = 0, payouts = 0, netDue = 0;
@@ -88,19 +94,19 @@ export const PayrollPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-white border-b border-slate-200">
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
           <div className="text-[10px] font-bold text-slate-500">إجمالي الرواتب الشهرية</div>
-          <div className="text-lg font-black text-slate-900 mt-1">{fmt(totals.salaries)}</div>
+          <div className="text-lg font-black text-slate-900 mt-1">{canViewFinancials ? fmt(totals.salaries) : '—'}</div>
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
           <div className="text-[10px] font-bold text-amber-700">السلف الممنوحة</div>
-          <div className="text-lg font-black text-amber-700 mt-1">{fmt(totals.advances)}</div>
+          <div className="text-lg font-black text-amber-700 mt-1">{canViewFinancials ? fmt(totals.advances) : '—'}</div>
         </div>
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div className="text-[10px] font-bold text-emerald-700">المكافآت</div>
-          <div className="text-lg font-black text-emerald-700 mt-1">{fmt(totals.bonuses)}</div>
+          <div className="text-lg font-black text-emerald-700 mt-1">{canViewFinancials ? fmt(totals.bonuses) : '—'}</div>
         </div>
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
           <div className="text-[10px] font-bold text-sky-700">صافي المستحق للصرف</div>
-          <div className="text-lg font-black text-sky-700 mt-1">{fmt(totals.netDue)}</div>
+          <div className="text-lg font-black text-sky-700 mt-1">{canViewFinancials ? fmt(totals.netDue) : '—'}</div>
         </div>
       </div>
 
@@ -128,19 +134,21 @@ export const PayrollPage: React.FC = () => {
                             <div className="font-bold text-slate-800">{e.name}</div>
                             <div className="text-[10px] text-slate-400">{e.role}</div>
                           </td>
-                          <td className="px-4 py-3 font-mono text-slate-700">{fmt(salary)}</td>
-                          <td className="px-4 py-3 font-mono text-amber-700">{fmt(Number(f.advances))}</td>
-                          <td className="px-4 py-3 font-mono text-emerald-700">{fmt(Number(f.bonuses))}</td>
-                          <td className="px-4 py-3 font-mono text-rose-700">{fmt(Number(f.deductions))}</td>
-                          <td className="px-4 py-3 font-mono text-slate-500">{fmt(Number(f.payouts))}</td>
-                          <td className={`px-4 py-3 font-mono font-black ${Number(f.netDue) >= 0 ? 'text-sky-700' : 'text-rose-700'}`}>{fmt(Number(f.netDue))}</td>
+                          <td className="px-4 py-3 font-mono text-slate-700">{canViewFinancials ? fmt(salary) : '—'}</td>
+                          <td className="px-4 py-3 font-mono text-amber-700">{canViewFinancials ? fmt(Number(f.advances)) : '—'}</td>
+                          <td className="px-4 py-3 font-mono text-emerald-700">{canViewFinancials ? fmt(Number(f.bonuses)) : '—'}</td>
+                          <td className="px-4 py-3 font-mono text-rose-700">{canViewFinancials ? fmt(Number(f.deductions)) : '—'}</td>
+                          <td className="px-4 py-3 font-mono text-slate-500">{canViewFinancials ? fmt(Number(f.payouts)) : '—'}</td>
+                          <td className={`px-4 py-3 font-mono font-black ${Number(f.netDue) >= 0 ? 'text-sky-700' : 'text-rose-700'}`}>{canViewFinancials ? fmt(Number(f.netDue)) : '—'}</td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <button onClick={() => openTx(e, 'SALARY_PAYOUT')} className="text-[10px] px-2 py-1 rounded-lg bg-sky-600 text-white font-bold hover:bg-sky-700">صرف راتب</button>
-                              <button onClick={() => openTx(e, 'ADVANCE')} className="text-[10px] px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-bold hover:bg-amber-100">سلفة</button>
-                              <button onClick={() => openTx(e, 'BONUS')} className="text-[10px] px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold hover:bg-emerald-100">مكافأة</button>
-                              <button onClick={() => openTx(e, 'DEDUCTION')} className="text-[10px] px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold hover:bg-rose-100">خصم</button>
-                            </div>
+                            {canManagePayroll || canApprovePayroll ? <div className="flex items-center gap-1 flex-wrap">
+                              {canApprovePayroll && <button onClick={() => openTx(e, 'SALARY_PAYOUT')} className="text-[10px] px-2 py-1 rounded-lg bg-sky-600 text-white font-bold hover:bg-sky-700">صرف راتب</button>}
+                              {canManagePayroll && <>
+                                <button onClick={() => openTx(e, 'ADVANCE')} className="text-[10px] px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-bold hover:bg-amber-100">سلفة</button>
+                                <button onClick={() => openTx(e, 'BONUS')} className="text-[10px] px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold hover:bg-emerald-100">مكافأة</button>
+                                <button onClick={() => openTx(e, 'DEDUCTION')} className="text-[10px] px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold hover:bg-rose-100">خصم</button>
+                              </>}
+                            </div> : <span className="text-[10px] text-slate-400">عرض فقط</span>}
                           </td>
                         </tr>
                       );
@@ -169,7 +177,7 @@ export const PayrollPage: React.FC = () => {
                         <td className="px-4 py-2.5 font-mono font-bold text-slate-800">{fmt(Number(tx.amount))}</td>
                         <td className="px-4 py-2.5 text-slate-500 font-mono">{tx.date}</td>
                         <td className="px-4 py-2.5 text-slate-400 text-xs max-w-[240px] truncate">{tx.notes || '—'}</td>
-                        <td className="px-4 py-2.5"><button onClick={() => removeTx(tx)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                        <td className="px-4 py-2.5">{canManagePayroll && <button onClick={() => removeTx(tx)} className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
                       </tr>
                     ))}
                     {transactions.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-slate-400">لا توجد حركات رواتب مسجلة</td></tr>}

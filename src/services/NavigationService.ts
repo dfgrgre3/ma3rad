@@ -47,15 +47,18 @@ export class NavigationService {
     '/sales': 'documents.salesInvoices',
   };
 
-  private static readonly routePermissions: Array<[string, string[]]> = [
-    ['/admin/data-deletion', ['admin.data.delete']],
-    ['/admin/sync-conflicts', ['admin.view']],
-    ['/central-activation', ['admin.license.manage']],
-    ['/data-import/types', ['settings.view']],
-    ['/finance/debts', ['finance.debts.view']],
-    ['/crm', ['crm.view']],
-    ['/dashboard/executive', ['dashboard.view']],
-    ['/tools', ['dashboard.view']],
+  private static readonly routePermissions: Array<{ path: string; all?: string[]; any?: string[] }> = [
+    { path: '/admin/data-deletion', all: ['admin.data.delete'] },
+    { path: '/admin/sync-conflicts', all: ['admin.view'] },
+    { path: '/central-activation', all: ['admin.license.manage'] },
+    { path: '/data-import/types', all: ['settings.view'] },
+    { path: '/finance/debts', all: ['finance.debts.view'] },
+    { path: '/finance/receivables', any: ['finance.debts.view', 'finance.receivables.view', 'finance.installments.view', 'finance.installments.manage'] },
+    { path: '/finance/other-receivables', any: ['finance.view', 'finance.receivables.view'] },
+    { path: '/finance/installments', any: ['finance.view', 'finance.installments.view', 'finance.installments.manage'] },
+    { path: '/crm', all: ['crm.view'] },
+    { path: '/dashboard/executive', all: ['dashboard.view'] },
+    { path: '/tools', all: ['dashboard.view'] },
   ];
 
   public static getRequiredPermission(pathname: string): string | null {
@@ -63,19 +66,25 @@ export class NavigationService {
   }
 
   public static getRequiredPermissions(pathname: string): string[] | null {
+    return NavigationService.getRequiredPermissionGroups(pathname)?.all ?? null;
+  }
+
+  public static getRequiredPermissionGroups(pathname: string): { all: string[]; any: string[] } | null {
     const routes = [
       ...NAV_GROUPS.flatMap((group) =>
         group.items.flatMap((item) => {
           const permissions = [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])];
-          return permissions.length ? [[item.to, permissions] as [string, string[]]] : [];
+          return permissions.length || item.anyPerms?.length
+            ? [{ path: item.to, all: permissions, any: item.anyPerms ?? [] }]
+            : [];
         })
       ),
       ...NavigationService.routePermissions,
     ];
     const match = routes
-      .filter(([path]) => pathname === path || pathname.startsWith(`${path}/`))
-      .sort((a, b) => b[0].length - a[0].length)[0];
-    return match?.[1] ?? null;
+      .filter(({ path }) => pathname === path || pathname.startsWith(`${path}/`))
+      .sort((a, b) => b.path.length - a.path.length)[0];
+    return match ? { all: match.all ?? [], any: match.any ?? [] } : null;
   }
 
   public static getOverrides(): NavOverrides {
@@ -124,8 +133,9 @@ export class NavigationService {
         items: group.items.filter((item) => {
           if (isCentralHidden(item.to)) return false;
           if (!isModuleAllowed(item.to)) return false;
-          return [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])]
-            .every((permission) => PermissionService.can(user, permission));
+          const required = [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])];
+          return required.every((permission) => PermissionService.can(user, permission))
+            && (!item.anyPerms?.length || item.anyPerms.some((permission) => PermissionService.can(user, permission)));
         }),
       }))
       .filter((group) => group.items.length > 0);
@@ -221,6 +231,7 @@ export class NavigationService {
         to: item.to,
         perm: item.perm,
         perms: item.perms,
+        anyPerms: item.anyPerms,
       }))
     );
   }

@@ -16,7 +16,7 @@ export class CommissionService {
 
   public getCommissions(filters: { month?: string; status?: string; employeeId?: string } = {}): CommissionRow[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'employees.view');
+    PermissionService.requireAny(actor, ['employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
     const scope = this.branchAccess.sqlScope('c.branch_id', 'e.branch_id', actor);
     let sql = `
       SELECT c.id, c.employee_id AS employeeId, e.full_name AS employeeName,
@@ -37,7 +37,7 @@ export class CommissionService {
   }
 
   public getStats(month?: string): CommissionStats {
-    PermissionService.require(AuthService.requireAuth(), 'employees.view');
+    PermissionService.requireAny(AuthService.requireAuth(), ['employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
     const scope = this.branchAccess.sqlScope('c.branch_id', 'e.branch_id');
     const params: any[] = [];
     const conditions = [scope.clause];
@@ -61,7 +61,7 @@ export class CommissionService {
   }
 
   public getSalesReps(): Array<{ id: string; name: string; percentage: number; monthlyTarget: number }> {
-    PermissionService.require(AuthService.requireAuth(), 'employees.view');
+    PermissionService.requireAny(AuthService.requireAuth(), ['employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
     const scope = this.branchAccess.sqlScope('e.branch_id');
     return this.db.query(
       `SELECT e.id, e.full_name AS name, e.commission_percentage AS percentage, e.monthly_target AS monthlyTarget
@@ -73,7 +73,7 @@ export class CommissionService {
   /** Generates pending commissions for all sales invoices of a month (idempotent). */
   public generateForMonth(month: string): { created: number; skipped: number; amount: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'employees.manage');
+    PermissionService.requireAny(actor, ['employees.payroll.manage', 'employees.manage']);
     if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
     const scope = this.branchAccess.sqlScope('si.branch_id');
 
@@ -130,7 +130,9 @@ export class CommissionService {
 
   public setStatus(id: string, status: 'APPROVED' | 'PAID' | 'CANCELLED'): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'employees.manage');
+    PermissionService.requireAny(actor, status === 'APPROVED' || status === 'PAID'
+      ? ['employees.payroll.approve', 'employees.manage']
+      : ['employees.payroll.manage', 'employees.manage']);
     const row = this.db.query<any>(`
       SELECT c.status, c.commission_amount AS amount, c.employee_id, COALESCE(c.branch_id, e.branch_id) AS branchId
       FROM commissions c JOIN employees e ON e.id = c.employee_id WHERE c.id = ?
@@ -195,7 +197,7 @@ export class CommissionService {
 
   public deleteCommission(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'employees.manage');
+    PermissionService.requireAny(actor, ['employees.payroll.manage', 'employees.manage']);
     const row = this.db.query<any>(`
       SELECT c.status, COALESCE(c.branch_id, e.branch_id) AS branchId
       FROM commissions c JOIN employees e ON e.id = c.employee_id WHERE c.id = ?

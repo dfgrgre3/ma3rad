@@ -6,6 +6,7 @@ import {
 import { SecurityService, ActiveSession, LoginRecord, SecurityOverview } from '../../services/SecurityService';
 import { AuthService } from '../../services/AuthService';
 import { useToast } from '../../components/ui/Toast';
+import { PermissionService } from '../../services/PermissionService';
 
 const fmtDate = (value?: string | null) => {
   if (!value) return '—';
@@ -15,6 +16,7 @@ const fmtDate = (value?: string | null) => {
 
 export const SecurityCenterPage: React.FC = () => {
   const service = useMemo(() => SecurityService.getInstance(), []);
+  const canManageSessions = PermissionService.can(AuthService.getCurrentUser(), 'sessions.manage', '/security');
   const toast = useToast();
   const [overview, setOverview] = useState<SecurityOverview | null>(null);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -132,8 +134,8 @@ export const SecurityCenterPage: React.FC = () => {
                         <td className="px-3 py-2.5 text-xs text-slate-500">{fmtDate(session.lastSeenAt)}</td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1">
-                            <button onClick={() => revoke(session)} className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50" title="إنهاء الجلسة"><LogOut className="w-4 h-4" /></button>
-                            {!session.isCurrent && <button onClick={() => revokeAllForUser(session)} className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-100 border border-slate-200">كل الجلسات</button>}
+                            {canManageSessions && <button onClick={() => revoke(session)} className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50" title="إنهاء الجلسة"><LogOut className="w-4 h-4" /></button>}
+                            {canManageSessions && !session.isCurrent && <button onClick={() => revokeAllForUser(session)} className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-100 border border-slate-200">كل الجلسات</button>}
                           </div>
                         </td>
                       </tr>

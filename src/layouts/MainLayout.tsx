@@ -46,10 +46,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const required = NavigationService.getRequiredPermissions(location.pathname);
+  const required = NavigationService.getRequiredPermissionGroups(location.pathname);
   const isAllowed = OPEN_ALL_PAGES
     || !required
-    || required.every((permission) => PermissionService.can(currentUser, permission));
+    || required.all.every((permission) => PermissionService.can(currentUser, permission))
+      && (!required.any.length || required.any.some((permission) => PermissionService.can(currentUser, permission)));
   const fallbackPath = isAllowed ? null : NavigationService.getFirstAccessiblePath(currentUser) ?? '/not-found';
   const persistedLocation = `${location.pathname}${location.search}${location.hash}`;
 

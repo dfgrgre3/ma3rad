@@ -24,7 +24,8 @@ export class InstallmentService {
   getPageData(): { invoiceRows: any[][]; planRows: any[][]; installmentRows: any[][] } {
     const actor = AuthService.requireAuth();
     if (!PermissionService.can(actor, 'finance.installments.view')
-      && !PermissionService.can(actor, 'finance.installments.manage')) {
+      && !PermissionService.can(actor, 'finance.installments.manage')
+      && !PermissionService.can(actor, 'finance.view')) {
       throw new Error('Not authorized to view installments.');
     }
     const invoiceScope = this.branchAccess.sqlScope('si.branch_id', undefined, actor);

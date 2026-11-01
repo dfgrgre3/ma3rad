@@ -27,14 +27,14 @@ import { StockReservationsTable } from './reservations/StockReservationsTable';
 import { DepositModal } from './reservations/DepositModal';
 import { NewReservationModal } from './reservations/NewReservationModal';
 
-export const ReservationsDepositPage: React.FC = () => {
+export const ReservationsDepositPage: React.FC<{ defaultTab?: ReservationTab }> = ({ defaultTab = 'orders' }) => {
   const toast = useToast();
   const resService = useMemo(() => new ReservationService(), []);
   const orderService = useMemo(() => new OrderService(), []);
   const printService = useMemo(() => new PrintService(), []);
 
   const [searchParams] = useSearchParams();
-  const initialTab: ReservationTab = searchParams.get('tab') === 'reservations' ? 'reservations' : 'orders';
+  const initialTab: ReservationTab = searchParams.get('tab') === 'reservations' ? 'reservations' : defaultTab;
   const [activeTab, setActiveTab] = useState<ReservationTab>(initialTab);
   const [loading, setLoading] = useState(true);
 

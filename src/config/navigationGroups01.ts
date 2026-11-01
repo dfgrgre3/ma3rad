@@ -155,7 +155,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'توقع التدفقات النقدية', to: '/finance/cash-forecast', icon: BarChart3, perm: 'finance.view' },
       { label: 'الدفع الإلكتروني والتسويات', to: '/finance/epayment-settlements', icon: CreditCard, perm: 'finance.view' },
       { label: 'الأصول الثابتة', to: '/finance/assets', icon: Building2, perm: 'finance.view' },
-      { label: 'مركز الذمم والتحصيل', to: '/finance/receivables', icon: ClipboardList, perm: 'finance.debts.view' },
+      { label: 'مركز الذمم والتحصيل', to: '/finance/receivables', icon: ClipboardList, anyPerms: ['finance.view', 'finance.debts.view', 'finance.receivables.view', 'finance.installments.view', 'finance.installments.manage'] },
     ],
   }
 ];

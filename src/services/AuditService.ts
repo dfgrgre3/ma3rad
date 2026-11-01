@@ -1,6 +1,8 @@
 import { DatabaseManager } from '../database/db';
 import { v4 as uuidv4 } from 'uuid';
 import { localDateString } from '../utils/date';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 
 export interface AuditLogEntry {
   id: string;
@@ -70,6 +72,7 @@ export class AuditService {
   }
 
   public getAuditLogs(filters: AuditFilters = {}): { logs: AuditLogEntry[]; total: number } {
+    PermissionService.require(AuthService.requireAuth(), 'audit.view');
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
 
@@ -114,11 +117,13 @@ export class AuditService {
   }
 
   public getAuditLogById(id: string): AuditLogEntry | null {
+    PermissionService.require(AuthService.requireAuth(), 'audit.view');
     const rows = this.db.query<AuditLogEntry>('SELECT * FROM audit_logs WHERE id = ?', [id]);
     return rows.length > 0 ? rows[0] : null;
   }
 
   public getAuditStats(): AuditStats {
+    PermissionService.require(AuthService.requireAuth(), 'audit.view');
     const totalResult = this.db.query<any>('SELECT COUNT(*) as total FROM audit_logs')[0];
     const totalLogs = totalResult?.total || 0;
 
@@ -142,6 +147,7 @@ export class AuditService {
   }
 
   public getModulesList(): string[] {
+    PermissionService.require(AuthService.requireAuth(), 'audit.view');
     const rows = this.db.query<{ module: string }>('SELECT DISTINCT module FROM audit_logs ORDER BY module');
     return rows.map(r => r.module);
   }

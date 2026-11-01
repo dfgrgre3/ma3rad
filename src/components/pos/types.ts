@@ -41,6 +41,15 @@ export interface Toast {
   message: string;
 }
 
+export interface InvoicePreview {
+  title: string;
+  subtitle?: string;
+  fileName: string;
+  html: string;
+  excel?: () => void;
+  whatsapp?: () => void;
+}
+
 export const HELD_STORAGE_KEY = 'ceramisys_pos_held_orders';
 
 export const round2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;

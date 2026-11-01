@@ -135,3 +135,57 @@ test('PIN login never bypasses an enabled second factor', async () => {
     db.run(`UPDATE users SET pin_code = NULL WHERE id = ?`, [userId]);
   }
 });
+
+test('active users cannot share a PIN', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const admin = AuthService.login('admin', 'admin123');
+  const auth = new AuthService();
+  const firstId = 'usr_pin_unique_a';
+  const secondId = 'usr_pin_unique_b';
+
+  try {
+    db.run(`DELETE FROM users WHERE id IN (?, ?)`, [firstId, secondId]);
+    auth.createUser({ username: firstId, password: 'Test1234', fullName: 'PIN A', role: 'CASHIER', pinCode: '9876' }, 'usr_admin', admin);
+    assert.throws(
+      () => auth.createUser({ username: secondId, password: 'Test1234', fullName: 'PIN B', role: 'CASHIER', pinCode: '9876' }, 'usr_admin', admin),
+      /رمز PIN مخصص لمستخدم نشط آخر/
+    );
+  } finally {
+    db.run(`DELETE FROM users WHERE id IN (?, ?)`, [firstId, secondId]);
+    AuthService.logout();
+  }
+});
+
+test('PIN login is rate-limited and cannot bypass a password lock or default-password change', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const adminId = (db.query<{ id: string }>(`SELECT id FROM users WHERE username = 'admin'`)[0]).id;
+  const pinHash = bcrypt.hashSync('2468', 10);
+  const originalLimit = db.query<{ value: string }>(`SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`)[0]?.value;
+
+  try {
+    db.run(`UPDATE system_settings SET value = '2' WHERE key = 'maxFailedLoginAttempts'`);
+    db.run(`DELETE FROM login_history WHERE username_attempted IN (?, ?, ?)`, ['__PIN_LOGIN__', 'PIN:admin', 'admin']);
+    db.run(`UPDATE users SET pin_code = ? WHERE id = ?`, [pinHash, adminId]);
+
+    assert.throws(() => AuthService.loginByPin('0000'), /PIN|إيقاف/);
+    assert.throws(() => AuthService.loginByPin('0000'), /PIN|إيقاف/);
+    assert.throws(() => AuthService.loginByPin('2468'), /إيقاف المحاولات/);
+
+    db.run(`DELETE FROM login_history WHERE username_attempted IN (?, ?, ?)`, ['__PIN_LOGIN__', 'PIN:admin', 'admin']);
+    db.run(`UPDATE system_settings SET value = '1' WHERE key = 'maxFailedLoginAttempts'`);
+    assert.throws(() => AuthService.login('admin', 'wrong-password'));
+    assert.throws(() => AuthService.loginByPin('2468'), /إيقاف المحاولات/);
+
+    db.run(`DELETE FROM login_history WHERE username_attempted IN (?, ?, ?)`, ['__PIN_LOGIN__', 'PIN:admin', 'admin']);
+    const user = AuthService.loginByPin('2468');
+    assert.equal(user.mustChangePassword, true);
+    AuthService.logout();
+  } finally {
+    AuthService.logout();
+    db.run(`UPDATE users SET pin_code = NULL WHERE id = ?`, [adminId]);
+    db.run(`DELETE FROM login_history WHERE username_attempted IN (?, ?, ?)`, ['__PIN_LOGIN__', 'PIN:admin', 'admin']);
+    db.run(`UPDATE system_settings SET value = ? WHERE key = 'maxFailedLoginAttempts'`, [originalLimit ?? '5']);
+  }
+});

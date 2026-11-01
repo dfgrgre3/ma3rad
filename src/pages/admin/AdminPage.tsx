@@ -218,6 +218,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({ initialTab }) => {
 const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
   onNavigate,
 }) => {
+  const can = usePermission();
+  const canViewAudit = can("audit.view");
   const db = useMemo(() => DatabaseManager.getInstance(), []);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [recent, setRecent] = useState<AuditLogEntry[]>([]);
@@ -245,9 +247,13 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
       }
     }
     setCounts(next);
-    try {
-      setRecent(new AuditService().getAuditLogs({ page: 1, pageSize: 8 }).logs);
-    } catch {
+    if (canViewAudit) {
+      try {
+        setRecent(new AuditService().getAuditLogs({ page: 1, pageSize: 8 }).logs);
+      } catch {
+        setRecent([]);
+      }
+    } else {
       setRecent([]);
     }
     try {
@@ -260,7 +266,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
     } catch {
       setStorage(null);
     }
-  }, [db]);
+  }, [db, canViewAudit]);
 
   const fmt = (bytes: number) =>
     bytes < 1024 * 1024
@@ -372,7 +378,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+        {canViewAudit && <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
             <ScrollText className="h-4 w-4 text-violet-500" /> أحدث العمليات
           </h3>
@@ -402,7 +408,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

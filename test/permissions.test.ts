@@ -4,12 +4,15 @@ import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
+import { AuditService } from '../src/services/AuditService.ts';
 import { CashierService } from '../src/services/CashierService.ts';
 import { CustomerService } from '../src/services/CustomerService.ts';
 import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
+import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { PermissionService, ROLE_DEFAULTS } from '../src/services/PermissionService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
+import { SystemDiagnosticsService } from '../src/services/SystemDiagnosticsService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -181,6 +184,50 @@ test('permissions: reverse, expense mutation, and shift closing require their de
   }
 });
 
+test('permissions: system diagnostics require independent maintenance access', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_system_health_guard', name: 'System health guard test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['settings.view'], admin);
+  const limited = makeUser(db, 'usr_system_health_guard_test', role.code);
+  db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync('test-password', 4), limited.id]);
+
+  try {
+    AuthService.logout();
+    AuthService.login(limited.username, 'test-password');
+    assert.throws(() => new SystemDiagnosticsService().runDiagnostics(), /settings\.maintenance/);
+  } finally {
+    AuthService.logout();
+    AuthService.login('admin', 'admin123');
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
+
+test('permissions: audit reads require audit.view inside the service', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_audit_read_guard', name: 'Audit read guard test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['admin.view'], admin);
+  const limited = makeUser(db, 'usr_audit_read_guard_test', role.code);
+  db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync('test-password', 4), limited.id]);
+
+  try {
+    AuthService.logout();
+    AuthService.login(limited.username, 'test-password');
+    assert.throws(() => new AuditService().getAuditLogs({ page: 1, pageSize: 8 }), /audit\.view/);
+  } finally {
+    AuthService.logout();
+    AuthService.login('admin', 'admin123');
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
+
 test('permissions: customer reads and supply requests require their view grants', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
@@ -199,6 +246,31 @@ test('permissions: customer reads and supply requests require their view grants'
     assert.throws(() => customers.getCustomerById('missing'), /customers\.view/);
     assert.throws(() => customers.getCustomerStatement('missing'), /sales\.view/);
     assert.throws(() => new CustomerSupplyService().getOpenRequests(), /sales\.view/);
+  } finally {
+    AuthService.logout();
+    AuthService.login('admin', 'admin123');
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
+
+test('permissions: payroll access is separate from employee directory and financial details', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_payroll_read_split', name: 'Payroll read split test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['employees.view', 'employees.payroll.view', 'branches.access_all'], admin);
+  const limited = makeUser(db, 'usr_payroll_read_split_test', role.code);
+  db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync('test-password', 4), limited.id]);
+  db.run("UPDATE users SET branch_scope = 'ALL' WHERE id = ?", [limited.id]);
+
+  AuthService.logout();
+  AuthService.login(limited.username, 'test-password');
+
+  try {
+    assert.deepEqual(EmployeeService.getTransactions(), []);
+    assert.throws(() => EmployeeService.getEmployeeFinancials('missing'), /employees\.financials\.view/);
   } finally {
     AuthService.logout();
     AuthService.login('admin', 'admin123');
@@ -249,7 +321,7 @@ test('auth: PIN hashes stay private, actor arguments are ignored, and own-passwo
   const auth = new AuthService();
   const created = auth.createUser({
     username: 'pin_hash_test',
-    password: 'test-password',
+    password: 'TestPass123',
     fullName: 'PIN hash test',
     role: 'CASHIER',
     pinCode: '2468',
@@ -270,7 +342,7 @@ test('auth: PIN hashes stay private, actor arguments are ignored, and own-passwo
   assert.throws(
     () => auth.createUser({
       username: 'forged_actor_test',
-      password: 'test-password',
+      password: 'TestPass123',
       fullName: 'forged actor',
       role: 'CASHIER',
     }, 'usr_admin', forgedAdmin),
@@ -279,4 +351,29 @@ test('auth: PIN hashes stay private, actor arguments are ignored, and own-passwo
 
   db.run('DELETE FROM users WHERE id = ?', [created.id]);
   AuthService.login('admin', 'admin123');
+});
+
+test('auth: createUser enforces the same password policy as password changes', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const auth = new AuthService();
+
+  try {
+    db.run(`DELETE FROM users WHERE username = ?`, ['weak_password_user']);
+    assert.throws(
+      () => auth.createUser({
+        username: 'weak_password_user',
+        password: 'short1',
+        fullName: 'Weak password user',
+        role: 'CASHIER',
+      }, 'usr_admin', admin),
+      /8|Ø­Ø±ÙˆÙ|ÙŠØ¬Ø¨/
+    );
+    assert.equal(db.query(`SELECT id FROM users WHERE username = ?`, ['weak_password_user']).length, 0);
+  } finally {
+    db.run(`DELETE FROM users WHERE username = ?`, ['weak_password_user']);
+    AuthService.logout();
+  }
 });

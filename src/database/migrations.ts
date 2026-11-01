@@ -35,7 +35,6 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_11,
   MIGRATION_PART_12,
   MIGRATION_PART_13,
-  MIGRATION_PART_14,
   MIGRATION_ENTERPRISE,
   {
     id: '050_cash_shift_auto_close',
@@ -2218,7 +2217,27 @@ export const MIGRATIONS: Migration[] = [
       });
     },
   },
+  ...MIGRATION_PART_14,
 ].flat();
+
+/** Validate the append-only migration catalog before touching a database. */
+export function validateMigrationCatalog(migrations: Migration[] = MIGRATIONS): void {
+  const seen = new Set<string>();
+  let previousNumber = -1;
+  for (const migration of migrations) {
+    if (!migration.id || seen.has(migration.id)) {
+      throw new Error(`Duplicate or empty migration id: ${migration.id || '<empty>'}`);
+    }
+    seen.add(migration.id);
+    const numeric = Number(/^([0-9]+)/.exec(migration.id)?.[1]);
+    if (Number.isFinite(numeric) && numeric < previousNumber) {
+      throw new Error(`Migration catalog is out of numeric order at ${migration.id}.`);
+    }
+    if (Number.isFinite(numeric)) previousNumber = numeric;
+  }
+}
+
+validateMigrationCatalog();
 
 export interface MigrationReport {
   applied: string[];

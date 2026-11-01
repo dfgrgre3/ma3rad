@@ -140,7 +140,7 @@ export const AdminUsersTab: React.FC = () => {
     event.preventDefault();
     void run(
       () => {
-        if (form.password.length < 6) throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
+        AuthService.validatePasswordPolicy(form.password, form.username);
         auth.createUser({
           username: form.username.trim(),
           password: form.password,
@@ -363,7 +363,7 @@ export const AdminUsersTab: React.FC = () => {
         <Modal title={`كلمة مرور: ${active.username}`} onClose={() => setModal(null)}>
           <form onSubmit={submitPassword} className="space-y-3">
             <Field label="كلمة المرور الجديدة *">
-              <input required type="password" minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} />
+              <input required type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} />
             </Field>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="تعيين كلمة المرور" />
           </form>

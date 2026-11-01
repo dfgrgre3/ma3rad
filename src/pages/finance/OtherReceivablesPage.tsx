@@ -70,7 +70,7 @@ export const OtherReceivablesPage: React.FC = () => {
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const load = () => {
     const actor = AuthService.getCurrentUser();
-    if (!PermissionService.can(actor, "finance.receivables.view")) {
+    if (!PermissionService.can(actor, "finance.receivables.view") && !PermissionService.can(actor, "finance.view")) {
       setRows([]);
       return;
     }

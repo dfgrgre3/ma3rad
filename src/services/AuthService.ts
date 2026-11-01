@@ -323,20 +323,40 @@ export class AuthService {
 
   public static loginByPin(pin: string): User {
     const db = DatabaseManager.getInstance();
+    const unknownPinGuardKey = '__PIN_LOGIN__';
+    const guard = AuthService.getLoginGuardStatus(unknownPinGuardKey);
+    if (guard.isLocked) {
+      AuthService.recordLogin(null, unknownPinGuardKey, false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(guard.lockedUntil));
+    }
     const rows = db.query<any>(`SELECT * FROM users WHERE is_active = 1 AND pin_code IS NOT NULL`);
-    let matched: any = null;
+    const matches: any[] = [];
     for (const row of rows) {
       try {
-        if (bcrypt.compareSync(pin, row.pinCode)) { matched = row; break; }
+        if (bcrypt.compareSync(pin, row.pinCode)) matches.push(row);
       } catch { /* ignore */ }
     }
-    if (!matched) {
-      AuthService.recordLogin(null, 'pin', false, 'WRONG_PIN');
+    if (matches.length !== 1) {
+      AuthService.recordLogin(null, unknownPinGuardKey, false, matches.length > 1 ? 'DUPLICATE_PIN' : 'WRONG_PIN');
+      const updated = AuthService.getLoginGuardStatus(unknownPinGuardKey);
+      if (updated.isLocked) throw new Error(AuthService.lockoutMessage(updated.lockedUntil));
       throw new Error('رمز PIN غير صحيح.');
+    }
+    const matched = matches[0];
+    const pinGuardKey = AuthService.pinLoginLabel(matched.username);
+    const passwordGuard = AuthService.getLoginGuardStatus(matched.username);
+    if (passwordGuard.isLocked) {
+      AuthService.recordLogin(matched.id, AuthService.pinLoginLabel(matched.username), false, 'PASSWORD_LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(passwordGuard.lockedUntil));
+    }
+    const accountPinGuard = AuthService.getLoginGuardStatus(pinGuardKey);
+    if (accountPinGuard.isLocked) {
+      AuthService.recordLogin(matched.id, AuthService.pinLoginLabel(matched.username), false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(accountPinGuard.lockedUntil));
     }
     if (twoFactorAuth.isEnabled(matched.id)) {
       // A 4-6 digit PIN must never bypass a second factor.
-      AuthService.recordLogin(matched.id, matched.username, false, 'TWO_FACTOR_REQUIRED');
+      AuthService.recordLogin(matched.id, AuthService.pinLoginLabel(matched.username), false, 'TWO_FACTOR_REQUIRED');
       throw new Error('هذا الحساب محمي بالتحقق الثنائي. سجّل الدخول بكلمة المرور ورمز التحقق.');
     }
     const user: User = {
@@ -346,15 +366,19 @@ export class AuthService {
       role: matched.role,
       phone: matched.phone,
       isActive: Boolean(matched.isActive),
-      mustChangePassword: false,
+      mustChangePassword: matched.username === 'admin' && bcrypt.compareSync('admin123', matched.passwordHash),
       createdAt: matched.createdAt,
       updatedAt: matched.updatedAt
     };
     AuthService.setCurrentUser(user);
-    AuthService.recordLogin(user.id, matched.username, true);
+    AuthService.recordLogin(user.id, AuthService.pinLoginLabel(matched.username), true);
     AuthService.startSession(user.id);
     try { localStorage.setItem(SESSION_KEY, user.id); } catch { /* ignore */ }
     return user;
+  }
+
+  private static pinLoginLabel(username: string): string {
+    return `PIN:${username}`;
   }
 
   public static login(username: string, passwordAttempt: string, twoFactorCode?: string): User {
@@ -458,12 +482,14 @@ export class AuthService {
   ): User {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'users.create');
+    AuthService.validatePasswordPolicy(user.password, user.username);
     CentralUsageLimitService.assertWithin('maxUsers');
     const roleExists = this.db.query('SELECT code FROM roles WHERE code = ?', [user.role]);
     if (roleExists.length === 0) {
       throw new Error('الدور المحدد غير موجود.');
     }
     const pinHash = user.pinCode ? this.hashPin(user.pinCode) : null;
+    if (user.pinCode) this.assertUniqueActivePin(user.pinCode);
     const existing = this.db.query(`SELECT id FROM users WHERE username = ?`, [user.username]);
     if (existing.length > 0) {
       throw new Error('اسم المستخدم مسجل مسبقاً.');
@@ -584,6 +610,9 @@ export class AuthService {
       : patch.pinCode === ''
         ? null
         : this.hashPin(patch.pinCode);
+    if (patch.pinCode && (patch.isActive ?? existing.isActive)) {
+      this.assertUniqueActivePin(patch.pinCode, id);
+    }
 
     this.db.run(
       `UPDATE users SET full_name = ?, role = ?, phone = ?, pin_code = ?, is_active = ?, updated_at = ?
@@ -766,6 +795,19 @@ export class AuthService {
       throw new Error('رمز PIN يجب أن يتكون من 4 إلى 8 أرقام.');
     }
     return bcrypt.hashSync(pin, bcrypt.genSaltSync(10));
+  }
+
+  private assertUniqueActivePin(pin: string, excludeUserId?: string): void {
+    const rows = this.db.query<{ pinCode: string }>(
+      `SELECT pin_code AS pinCode FROM users
+       WHERE is_active = 1 AND pin_code IS NOT NULL AND id <> ?`,
+      [excludeUserId || '']
+    );
+    if (rows.some((row) => {
+      try { return bcrypt.compareSync(pin, row.pinCode); } catch { return false; }
+    })) {
+      throw new Error('لا يمكن استخدام رمز PIN مخصص لمستخدم نشط آخر.');
+    }
   }
 
   private mapUser(row: any): User {

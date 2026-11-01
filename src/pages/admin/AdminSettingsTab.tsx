@@ -64,7 +64,9 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
   const toast = useToast();
   const can = usePermission();
   const readOnly = !can('settings.update');
-  const [tab, setTab] = useState<Tab>(initialTab && ['general','business','branding','invoice','inventory','operations','security','backup'].includes(initialTab) ? initialTab : 'general');
+  const canViewBackup = can('settings.backup');
+  const visibleTabs = TABS.filter((item) => item.id !== 'backup' || canViewBackup);
+  const [tab, setTab] = useState<Tab>(initialTab && ['general','business','branding','invoice','inventory','operations','security','backup'].includes(initialTab) && (initialTab !== 'backup' || canViewBackup) ? initialTab : 'general');
   const changeTab = (next: Tab) => {
     setTab(next);
     onTabChange?.(next);
@@ -84,8 +86,8 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
   const [compareVersionIds, setCompareVersionIds] = useState<[string, string]>(['', '']);
 
   useEffect(() => {
-    if (initialTab) setTab(initialTab);
-  }, [initialTab]);
+    if (initialTab && (initialTab !== 'backup' || canViewBackup)) setTab(initialTab);
+  }, [canViewBackup, initialTab]);
 
   useEffect(() => {
     setSettings(SettingsService.getSettings());
@@ -328,7 +330,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {TABS.map((item) => {
+        {visibleTabs.map((item) => {
           const Icon = item.icon;
           const active = tab === item.id;
           return (
@@ -359,7 +361,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
         </div>
       </div>
 
-      <fieldset disabled={readOnly} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+      <fieldset disabled={readOnly && tab !== 'backup'} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
         {tab === 'general' && (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Field label="اسم المعرض *"><input value={settings.showroomName} onChange={(e) => set('showroomName', e.target.value)} className={inputCls} /></Field>
@@ -944,7 +946,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
 
       </fieldset>
 
-      {readOnly && (
+      {readOnly && tab !== 'backup' && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
           لا تملك صلاحية تعديل الإعدادات (settings.update). الحقول للعرض فقط.
         </div>
