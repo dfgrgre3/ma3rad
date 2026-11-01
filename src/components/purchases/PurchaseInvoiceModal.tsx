@@ -260,7 +260,7 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-1  sm:grid-cols-5 gap-2">
               <div>
                 <label htmlFor="purchase-landed-freight" className="block text-[11px] text-indigo-900 font-bold mb-0.5">النقل والشحن (ج)</label>
                 <input

@@ -130,7 +130,7 @@ export const VehiclesPage: React.FC = () => {
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div><label className="font-bold text-slate-700 block mb-1">رقم اللوحة *</label><input required value={form.plateNumber} onChange={(e) => setForm({ ...form, plateNumber: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono font-bold" /></div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">الماركة</label><input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">الموديل</label><input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">سنة الصنع</label><input type="number" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
@@ -143,7 +143,7 @@ export const VehiclesPage: React.FC = () => {
                   {drivers.map((d) => <option key={d.id} value={d.id}>{d.fullName}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">انتهاء الترخيص</label><input type="date" value={form.licenseExpiresAt} onChange={(e) => setForm({ ...form, licenseExpiresAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">انتهاء التأمين</label><input type="date" value={form.insuranceExpiresAt} onChange={(e) => setForm({ ...form, insuranceExpiresAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               </div>

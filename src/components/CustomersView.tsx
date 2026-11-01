@@ -352,7 +352,7 @@ export const CustomersView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="customer-phone" className="font-bold text-slate-700 block mb-1">رقم الهاتف *</label>
                   <input
@@ -379,7 +379,7 @@ export const CustomersView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="customer-credit-limit" className="font-bold text-slate-700 block mb-1">الحد الائتماني (ج.م)</label>
                   <input

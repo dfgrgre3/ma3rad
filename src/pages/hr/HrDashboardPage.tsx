@@ -147,7 +147,7 @@ function AttendanceMeter({ present, late, absent }: { present: number; late: num
         {lPct > 0 && <div className="bg-amber-400 h-full transition-all duration-700" style={{ width: `${lPct}%` }} />}
         {aPct > 0 && <div className="bg-rose-400 h-full transition-all duration-700" style={{ width: `${aPct}%` }} />}
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'حضر', count: present, color: 'text-emerald-600', dot: 'bg-emerald-500' },
           { label: 'متأخر', count: late, color: 'text-amber-600', dot: 'bg-amber-400' },
@@ -212,7 +212,7 @@ function LocationChart({ locations }: { locations: { location: string; count: nu
       {locations.length === 0 ? (
         <p className="text-xs text-slate-400 text-center py-6">لا توجد بيانات</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {locations.slice(0, 6).map((l, i) => {
             const pct = total > 0 ? Math.round((l.count / total) * 100) : 0;
             return (
@@ -295,7 +295,7 @@ export const HrDashboardPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* KPI Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label="إجمالي الموظفين"
               value={fmt(stats.total)}
@@ -323,7 +323,7 @@ export const HrDashboardPage: React.FC = () => {
           </div>
 
           {/* Status Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'موظفون نشطون', value: stats.active, color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: UserCheck, to: '/employees' },
               { label: 'في إجازة', value: stats.onLeave, color: 'text-amber-700 bg-amber-50 border-amber-200', icon: Calendar, to: '/employees/attendance' },
@@ -353,7 +353,7 @@ export const HrDashboardPage: React.FC = () => {
           <LocationChart locations={stats.byLocation} />
 
           {/* Navigation Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'الموظفون', desc: 'إضافة وإدارة بيانات الموظفين', icon: Users, to: '/employees', color: 'from-teal-500 to-emerald-600' },
               { label: 'الحضور والانصراف', desc: 'تسجيل ومتابعة الحضور', icon: Clock, to: '/employees/attendance', color: 'from-sky-500 to-blue-600' },

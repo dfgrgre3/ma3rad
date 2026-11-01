@@ -273,7 +273,7 @@ export const InstallmentsPage: React.FC = () => {
       </div>
 
       {/* Metrics Row */}
-      <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white border-b border-slate-200">
+      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white border-b border-slate-200">
         <div className="p-3 bg-white rounded-xl border border-slate-200">
           <span className="text-[11px] text-slate-500 font-semibold block">إجمالي مبالغ التقسيط</span>
           <span className="text-sm font-black text-slate-900 mt-1 block">{fmt(totalFinancedSum)}</span>
@@ -467,7 +467,7 @@ export const InstallmentsPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">إجمالي قيمة الفاتورة (ج.م)</label>
                   <input
@@ -491,7 +491,7 @@ export const InstallmentsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">عدد الأقساط (شهور)</label>
                   <select

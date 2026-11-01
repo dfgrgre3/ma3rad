@@ -234,7 +234,7 @@ export const FleetDashboardPage: React.FC = () => {
       ) : stats ? (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* KPI Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="إجمالي التوصيلات" value={fmt(stats.totalDeliveries)} sub={`${stats.deliveredToday} سُلّمت اليوم`} icon={Package} color="text-sky-600" bg="bg-sky-50" />
             <StatCard label="إيرادات التوصيل" value={fmtM(stats.totalFees) + ' ج'} sub="من التوصيلات المكتملة" icon={DollarSign} color="text-emerald-600" bg="bg-emerald-50" />
             <StatCard label="سائقون نشطون" value={fmt(stats.activeDrivers)} sub={`مركبات متاحة: ${stats.availableVehicles}`} icon={Users} color="text-violet-600" bg="bg-violet-50" />
@@ -242,7 +242,7 @@ export const FleetDashboardPage: React.FC = () => {
           </div>
 
           {/* Status Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'في الانتظار', value: stats.pendingDeliveries, color: 'text-slate-700 bg-slate-50 border-slate-200', icon: Clock },
               { label: 'في الطريق الآن', value: stats.inTransitDeliveries, color: 'text-sky-700 bg-sky-50 border-sky-200', icon: Truck },
@@ -266,7 +266,7 @@ export const FleetDashboardPage: React.FC = () => {
           </div>
 
           {/* Navigation Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { label: 'أوامر التوصيل', desc: 'إنشاء ومتابعة التوصيلات', icon: Truck, to: '/deliveries', color: 'from-sky-500 to-blue-600' },
               { label: 'السائقون', desc: 'إدارة بيانات السائقين', icon: UserRound, to: '/drivers', color: 'from-violet-500 to-purple-600' },

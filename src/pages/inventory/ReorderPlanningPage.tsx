@@ -199,7 +199,7 @@ export const ReorderPlanningPage: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="p-6 pb-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="p-6 pb-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
             <div className="text-[11px] font-bold text-slate-500">أصناف نفد مخزونها</div>
@@ -473,7 +473,7 @@ export const ReorderPlanningPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">الحد الأدنى ({getStockQuantityLabel(editItem)})</label>
                   <input

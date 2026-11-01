@@ -1,4 +1,5 @@
 import { DatabaseManager } from '../database/db';
+import { CategoryService } from './CategoryService';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
@@ -18,6 +19,10 @@ export interface AttributeCategory {
 
 export class AttributeService {
   private db = DatabaseManager.getInstance();
+
+  public getCategoryById(id: string): AttributeCategory | null {
+    return this.getCategories().find((category) => category.id === id) || null;
+  }
 
   public getCategories(): AttributeCategory[] {
     const attrs = this.db.query<any>(`SELECT * FROM attributes ORDER BY sort_order, name`);
@@ -74,6 +79,7 @@ export class AttributeService {
     unit?: string;
     isRequired?: boolean;
     isFilterable?: boolean;
+    appliesToCategoryId?: string | null;
     options?: string[];
   }): void {
     PermissionService.require(AuthService.requireAuth(), 'products.create');
@@ -86,6 +92,10 @@ export class AttributeService {
     ]);
     if (!validDataTypes.has(dataType)) throw new Error('نوع بيانات الخاصية غير مدعوم.');
     if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(code)) throw new Error('رمز الخاصية يجب أن يحتوي أحرفًا إنجليزية كبيرة وأرقامًا وشرطة سفلية فقط.');
+    if (input.appliesToCategoryId) {
+      const category = new CategoryService().getCategoryById(input.appliesToCategoryId);
+      if (!category) throw new Error('التصنيف المرتبط بالخاصية غير موجود.');
+    }
     const options = [...new Set((input.options || []).map((value) => value.trim()).filter(Boolean))];
     if (options.length > 0 && !['SELECT', 'MULTI_SELECT'].includes(dataType)) {
       throw new Error('القيم الاختيارية متاحة فقط لحقول الاختيار.');
@@ -96,9 +106,9 @@ export class AttributeService {
     this.db.executeTransaction((tx) => {
       tx.run(
         `INSERT INTO attributes
-          (id, code, name, data_type, unit, is_required, is_filterable, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM attributes))`,
-        [id, code, name, dataType, input.unit?.trim() || null, input.isRequired ? 1 : 0, input.isFilterable === false ? 0 : 1]
+          (id, code, name, data_type, unit, is_required, is_filterable, applies_to_category_id, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM attributes))`,
+        [id, code, name, dataType, input.unit?.trim() || null, input.isRequired ? 1 : 0, input.isFilterable === false ? 0 : 1, input.appliesToCategoryId || null]
       );
       options.forEach((value, index) => {
         tx.run(
@@ -109,4 +119,65 @@ export class AttributeService {
       });
     });
   }
+
+  public updateCategory(id: string, updates: {
+    name?: string;
+    code?: string;
+    dataType?: DynamicAttributeDataType;
+    unit?: string | null;
+    isRequired?: boolean;
+    isFilterable?: boolean;
+    appliesToCategoryId?: string | null;
+    options?: string[];
+  }): void {
+    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    const existing = this.getCategoryById(id);
+    if (!existing) throw new Error('الخاصية غير موجودة.');
+
+    if (updates.code && updates.code !== existing.code) {
+      const dup = this.db.query('SELECT id FROM attributes WHERE code = ? AND id != ?', [updates.code, id])[0];
+      if (dup) throw new Error('رمز الخاصية مستخدم بالفعل.');
+    }
+    if (updates.appliesToCategoryId) {
+      const category = new CategoryService().getCategoryById(updates.appliesToCategoryId);
+      if (!category) throw new Error('التصنيف المرتبط بالخاصية غير موجود.');
+    }
+
+    this.db.executeTransaction((tx) => {
+      tx.run(
+        `UPDATE attributes SET
+          name = COALESCE(?, name),
+          code = COALESCE(?, code),
+          data_type = COALESCE(?, data_type),
+          unit = ?,
+          is_required = COALESCE(?, is_required),
+          is_filterable = COALESCE(?, is_filterable),
+          applies_to_category_id = ?
+         WHERE id = ?`,
+        [
+          updates.name?.trim() || null,
+          updates.code?.trim() || null,
+          updates.dataType || null,
+          updates.unit !== undefined ? updates.unit : existing.unit,
+          updates.isRequired === undefined ? null : (updates.isRequired ? 1 : 0),
+          updates.isFilterable === undefined ? null : (updates.isFilterable ? 1 : 0),
+          updates.appliesToCategoryId !== undefined ? updates.appliesToCategoryId : existing.appliesToCategoryId,
+          id,
+        ]
+      );
+    });
+  }
+
+  public deleteCategory(id: string): void {
+    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    const existing = this.getCategoryById(id);
+    if (!existing) throw new Error('الخاصية غير موجودة.');
+    const used = this.db.query('SELECT COUNT(*) as c FROM product_attribute_values WHERE attribute_id = ?', [id])[0] as any;
+    if (used && used.c > 0) throw new Error('لا يمكن حذف خاصية مستخدمة في منتجات مسجلة.');
+    this.db.executeTransaction((tx) => {
+      tx.run('DELETE FROM attribute_options WHERE attribute_id = ?', [id]);
+      tx.run('DELETE FROM attributes WHERE id = ?', [id]);
+    });
+  }
+
 }

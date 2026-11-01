@@ -205,7 +205,7 @@ export const SupplierStatementPage: React.FC = () => {
 
       {/* Overview Metric Cards */}
       {selectedSupplier && statementData && (
-        <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white border-b border-slate-200">
+        <div className="p-4 grid grid-cols-1  sm:grid-cols-4 gap-3 bg-white border-b border-slate-200">
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
             <div className="text-[11px] text-slate-500 font-bold">الرصيد الافتتاحي للمدة</div>
             <div className="text-base font-black text-slate-900 mt-0.5">{fmt(statementData.openingBalance)}</div>

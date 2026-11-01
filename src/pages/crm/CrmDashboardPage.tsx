@@ -379,7 +379,7 @@ export const CrmDashboardPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
           {/* KPI Row */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
               label="إجمالي العملاء المحتملين"
               value={fmt(stats.totalLeads)}
@@ -407,7 +407,7 @@ export const CrmDashboardPage: React.FC = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'متابعات متأخرة', value: stats.overdueFollowUps, color: 'text-rose-600 bg-rose-50 border-rose-200', icon: AlertCircle, to: '/crm/leads' },
               { label: 'أنشطة هذا الأسبوع', value: stats.activitiesThisWeek, color: 'text-sky-600 bg-sky-50 border-sky-200', icon: Activity, to: '/crm/activities' },
@@ -441,7 +441,7 @@ export const CrmDashboardPage: React.FC = () => {
           </div>
 
           {/* Navigation Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: 'إدارة العملاء المحتملين', desc: 'إضافة وتتبع وتحديث الفرص', icon: UserCheck, to: '/crm/leads', color: 'from-pink-500 to-rose-600' },
               { label: 'Pipeline المبيعات', desc: 'عرض كانبان لمراحل البيع', icon: Target, to: '/crm/pipeline', color: 'from-violet-500 to-purple-600' },

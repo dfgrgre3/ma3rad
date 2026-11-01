@@ -15,10 +15,6 @@ export interface ReleaseInfo {
 }
 
 export class CentralTelemetryService {
-  static getServerUrl(): string {
-    return CentralLicenseService.getServerUrl();
-  }
-
   static async reportError(payload: {
     title?: string;
     description?: string;
@@ -27,39 +23,19 @@ export class CentralTelemetryService {
     severity?: string;
     deviceId?: string;
   }): Promise<void> {
-    const base = this.getServerUrl();
-    if (!base) return;
-    try {
-      const cred = CentralLicenseService.getCredential();
-      const deviceId = payload.deviceId || CentralLicenseService.getDeviceId();
-      await fetch(base + '/api/v1/telemetry/errors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceId,
-          deviceCredential: cred,
-          title: payload.title || 'Unhandled error',
-          description: payload.description || '',
-          stackTrace: payload.stackTrace || '',
-          issueType: payload.issueType || 'error',
-          severity: payload.severity || 'medium',
-        }),
-      });
-    } catch { /* ignore */ }
+    await CentralLicenseService.postTelemetryError({
+      deviceId: payload.deviceId,
+      title: payload.title || 'Unhandled error',
+      description: payload.description || '',
+      stackTrace: payload.stackTrace || '',
+      issueType: payload.issueType || 'error',
+      severity: payload.severity || 'medium',
+    });
   }
 
   static async fetchReleases(): Promise<ReleaseInfo[]> {
-    const base = this.getServerUrl();
-    if (!base) return [];
-    try {
-      const cred = CentralLicenseService.getCredential();
-      const res = await fetch(base + '/api/v1/releases', {
-        headers: cred ? { 'X-Device-Id': CentralLicenseService.getDeviceId(), 'X-Device-Credential': cred } : {},
-      });
-      if (!res.ok) return [] as ReleaseInfo[];
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    } catch { return [] as ReleaseInfo[]; }
+    const data = await CentralLicenseService.fetchReleases();
+    return data as ReleaseInfo[];
   }
 
   static async checkForUpdates(currentVersion: string): Promise<ReleaseInfo | null> {

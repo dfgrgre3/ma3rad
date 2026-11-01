@@ -326,7 +326,7 @@ function DailyChart({ rows }: { rows: DailyRow[] }) {
 
   return (
     <div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 text-center">
           <p className="text-lg font-black text-pink-700">{fmtM(totalRevenue)} ج</p>
           <p className="text-xs text-pink-500">إجمالي الإيرادات</p>

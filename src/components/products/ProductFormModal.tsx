@@ -247,7 +247,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       </button>
                       <input id="product-image-upload" ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onImageFiles(e.target.files)} />
                       {(existingImages.length > 0 || pendingImages.length > 0) && (
-                        <div className="grid grid-cols-3 gap-1.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                           {existingImages.map((img) => (
                             <div key={img.id} className="relative overflow-hidden rounded-lg border border-slate-200">
                               <img src={img.filePath} alt={img.caption || ''} className="h-14 w-full object-cover" />
@@ -278,7 +278,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <section className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
                       <div className="flex items-center gap-1.5 text-sm font-extrabold text-sky-800"><Ruler className="w-4 h-4" /> وحدة الصنف العام</div>
                       <p className="text-xs text-slate-600">اختر الوحدة التي ستُسجل بها الكميات في المخزون والفواتير.</p>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Field label="وحدة المخزون والبيع">
                           <select value={formData.baseUnit} onChange={(e) => setFormData({ ...formData, baseUnit: e.target.value as UnitType, sellUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
                             {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
@@ -307,7 +307,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   ) : <>
                   <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Ruler className="w-4 h-4 text-sky-600" /> المقاس والمواصفات</div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                       <Field label="المقاس (سم)" hint={autoMeters !== null ? `المساحة المحسوبة: ${autoMeters} م²/كرتونة` : 'أدخل الطول والعرض بالسنتيمتر'}>
                         <div className="flex items-center gap-2">
                           <input type="number" min="0" step="any" aria-label="الطول بالسنتيمتر" value={(formData.size || '').split(/[x×*]/i)[0] || ''} onChange={(e) => onUpdateSizeDimension(0, e.target.value)} placeholder="60" className="w-full min-w-0 px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold" />
@@ -337,7 +337,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
                   <section className="space-y-3 rounded-2xl border border-sky-200 bg-sky-50/70 p-4">
                     <div className="flex items-center gap-1.5 text-sm font-extrabold text-sky-800"><Layers className="w-4 h-4" /> الوحدات والعدد والمترات</div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                       <Field label="وحدة الأساس">
                         <select value={formData.baseUnit} onChange={(e) => setFormData({ ...formData, baseUnit: e.target.value as UnitType })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold">
                           {profileUnitOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
@@ -357,7 +357,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <Field label="وزن الكرتونة (كجم)">
                         <input type="number" step="0.01" value={formData.weightPerBox} onChange={(e) => setFormData({ ...formData, weightPerBox: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white rounded-xl border border-sky-300 font-bold" />
                       </Field>
-                      <div className="md:col-span-3 grid grid-cols-3 gap-3">
+                      <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="rounded-xl border border-sky-200 bg-white px-3 py-2">
                           <div className="text-[10px] font-bold text-slate-500">مساحة القطعة</div>
                           <div className="font-black text-sky-700">{round(areaPerPiece, 4)} م²</div>
@@ -380,7 +380,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               {activeTab === 'pricing' && canManagePricing && (
                 <section className="space-y-3">
                   <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-800"><Banknote className="w-4 h-4 text-emerald-600" /> التسعير</div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <Field label={`سعر الشراء / التكلفة (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
@@ -396,7 +396,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <Field label={`الحد الأدنى لسعر البيع (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.minSellingPriceM2} onChange={(e) => setFormData({ ...formData, minSellingPriceM2: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
-                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
                       <div>
                         <div className="text-[10px] font-bold text-emerald-700">ربح الوحدة</div>
                         <div className="font-black text-emerald-700">{CeramicMath.formatCurrency(profitPerMeter)}</div>
@@ -407,7 +407,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3">
                     <Field label={`حد الطلب الأدنى (${unitLabel})`}>
                       <input type="number" step="0.01" value={formData.minStockLevel} onChange={(e) => setFormData({ ...formData, minStockLevel: Number.parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
                     </Field>
@@ -444,7 +444,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   ) : (
                     <>
                       {openingRows.map((row, index) => (
-                        <div key={index} className={`grid grid-cols-2 items-end gap-2 rounded-xl border border-amber-200 bg-white p-3 ${formData.productType === 'CERAMIC' ? 'md:grid-cols-5' : 'md:grid-cols-3'}`}>
+                        <div key={index} className={`grid grid-cols-1 sm:grid-cols-2 items-end gap-2 rounded-xl border border-amber-200 bg-white p-3 ${formData.productType === 'CERAMIC' ? 'md:grid-cols-5' : 'md:grid-cols-3'}`}>
                           <Field label="المخزن">
                             <select value={row.warehouseId} onChange={(e) => setOpeningRows((rows) => rows.map((r, i) => i === index ? { ...r, warehouseId: e.target.value } : r))} className="w-full px-3 py-2 rounded-xl border border-amber-300 font-bold">
                               {warehouses.filter((w) => w.id === row.warehouseId || !openingRows.some((other, otherIndex) => otherIndex !== index && other.warehouseId === w.id)).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -483,7 +483,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     {variants.length === 0 ? (
                       <p className="rounded-xl border border-indigo-200 bg-white px-3 py-3 text-[11px] text-slate-500">لا توجد متغيرات. أضف متغيرات لتتبع الألوان والمقاسات المختلفة بنفس الصنف.</p>
                     ) : variants.map((v, index) => (
-                      <div key={index} className="grid grid-cols-2 items-end gap-2 rounded-xl border border-indigo-200 bg-white p-3 md:grid-cols-7">
+                      <div key={index} className="grid grid-cols-1 sm:grid-cols-2 items-end gap-2 rounded-xl border border-indigo-200 bg-white p-3 md:grid-cols-7">
                         <Field label="اسم المتغير"><input value={v.variantName} onChange={(e) => onUpdateVariantDraft(index, { variantName: e.target.value })} placeholder="رمادي 60x60" className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-bold" /></Field>
                         <Field label="SKU"><input value={v.sku} onChange={(e) => onUpdateVariantDraft(index, { sku: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-mono" /></Field>
                         <Field label="الباركود"><input value={v.barcode} onChange={(e) => onUpdateVariantDraft(index, { barcode: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-mono" /></Field>
@@ -508,7 +508,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     {attributes.filter((attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId).length === 0 ? (
                       <p className="rounded-xl border border-violet-200 bg-white px-3 py-3 text-[11px] text-slate-500">لا توجد خصائص معرّفة. يمكنك إدارتها من صفحة خصائص المنتجات.</p>
                     ) : (
-                      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3">
                         {attributes
                           .filter((attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId)
                           .map((attr) => {

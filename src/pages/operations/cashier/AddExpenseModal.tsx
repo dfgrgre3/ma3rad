@@ -35,7 +35,7 @@ export const AddExpenseModal: React.FC<Props> = ({ isOpen, categories, onClose, 
           }}
           className="space-y-4"
         >
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2 sm:col-span-1">
               <label htmlFor="expense-cat" className="font-bold text-xs text-slate-700 block mb-1.5">بند المصروف *</label>
               <select

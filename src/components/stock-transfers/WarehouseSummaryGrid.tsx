@@ -11,7 +11,7 @@ export const WarehouseSummaryGrid: React.FC<WarehouseSummaryGridProps> = ({ ware
           <span className="font-black text-base text-slate-900">{w.warehouseName}</span>
           <Building2 className="w-5 h-5 text-slate-400" />
         </div>
-        <div className="grid grid-cols-2 gap-3 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-center">
           <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3">
             <div className="text-[10px] text-emerald-800 font-bold mb-1">إجمالي الوارد</div>
             <div className="font-mono text-sm font-black text-emerald-700">

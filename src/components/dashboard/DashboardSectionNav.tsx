@@ -1,15 +1,17 @@
 import React from 'react';
-import { SECTIONS_CONFIG, type SectionId } from './types';
+import { SECTIONS_CONFIG, type DashboardSectionConfig, type SectionId } from './types';
 
 interface DashboardSectionNavProps {
   activeTab: SectionId;
   onSelectSection: (section: SectionId) => void;
+  /** الأقسام المسموح بعرضها فقط؛ عند غيابها تُعرض كل الأقسام. */
+  sections?: DashboardSectionConfig[];
 }
 
-export const DashboardSectionNav: React.FC<DashboardSectionNavProps> = ({ activeTab, onSelectSection }) => {
+export const DashboardSectionNav: React.FC<DashboardSectionNavProps> = ({ activeTab, onSelectSection, sections }) => {
   return (
     <nav aria-label="أقسام لوحة المعلومات" className="no-scrollbar flex gap-0.5 overflow-x-auto border-b border-[#d9d9d9] dark:border-[#3d3d3d]">
-      {SECTIONS_CONFIG.map((section) => {
+      {(sections ?? SECTIONS_CONFIG).map((section) => {
         const Icon = section.icon;
         const selected = activeTab === section.id;
         return (

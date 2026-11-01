@@ -54,7 +54,7 @@ export const PurchaseOrdersPage: React.FC = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter]);
+  useEffect(() => { load();   }, [statusFilter]);
 
   const openDetails = (row: PurchaseOrderRow) => {
     if (expanded === row.id) { setExpanded(null); setDetails(null); return; }

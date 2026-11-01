@@ -110,7 +110,7 @@ export const QuotationsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
+  useEffect(() => { load();   }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
 
   const totalPages = Math.max(1, Math.ceil(quotations.length / PAGE_SIZE));
@@ -405,7 +405,7 @@ export const QuotationsPage: React.FC = () => {
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 space-y-3">
-        <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
           <Stat label="إجمالي العروض" value={String(stats?.total ?? 0)} icon={FileText} tone="text-slate-700 bg-slate-50 border-slate-200" />
           <Stat label="بانتظار الموافقة" value={`${stats?.pending ?? 0} • ${fmt(stats?.pendingValue ?? 0)}`} icon={Clock} tone="text-amber-700 bg-amber-50 border-amber-200" />
           <Stat label="محوّلة لفواتير" value={`${stats?.converted ?? 0} • ${fmt(stats?.convertedValue ?? 0)}`} icon={CheckCircle2} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />

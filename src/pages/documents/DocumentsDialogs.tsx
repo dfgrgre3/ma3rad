@@ -92,7 +92,7 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
         </select>
       </div>
       <div><label className={labelCls}>عنوان المستند *</label><input required value={docDraft.title} onChange={(e) => setDocDraft({ ...docDraft, title: e.target.value })} className={inputCls} /></div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div><label className={labelCls}>التصنيف</label><input value={docDraft.category} onChange={(e) => setDocDraft({ ...docDraft, category: e.target.value })} className={inputCls} placeholder="GENERAL" /></div>
         <div>
           <label className={labelCls}>درجة السرية</label>
@@ -230,7 +230,7 @@ export const DocumentsDialogs: React.FC<DocumentsDialogsProps> = ({
         </div>
         <div><label className={labelCls}>اسم الطرف *</label><input required value={contractDraft.partyName} onChange={(e) => setContractDraft({ ...contractDraft, partyName: e.target.value })} className={inputCls} /></div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1  sm:grid-cols-4 gap-2">
         <div><label className={labelCls}>البداية *</label><input required type="date" value={contractDraft.startDate} onChange={(e) => setContractDraft({ ...contractDraft, startDate: e.target.value })} className={inputCls} /></div>
         <div><label className={labelCls}>النهاية *</label><input required type="date" value={contractDraft.endDate} onChange={(e) => setContractDraft({ ...contractDraft, endDate: e.target.value })} className={inputCls} /></div>
         <div><label className={labelCls}>القيمة</label><input type="number" min="0" step="0.01" value={contractDraft.value} onChange={(e) => setContractDraft({ ...contractDraft, value: e.target.value })} className={inputCls} /></div>

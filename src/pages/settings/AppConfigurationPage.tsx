@@ -415,7 +415,7 @@ export const AppConfigurationPage: React.FC = () => {
 
         {tab === 'overview' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
               {[
                 ['أهداف مكوّنة', stats.entries],
                 ['قواعد DOM', stats.rules],

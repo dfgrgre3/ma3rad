@@ -100,9 +100,15 @@ export class CustomerService {
     return rows.length > 0 ? rows[0] : null;
   }
 
-  public createCustomer(customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }, performedBy = 'usr_admin'): Customer {
+  public createCustomer(customer: Omit<Customer, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { code?: string; initialBalance?: number }, performedBy = 'usr_admin'): Customer {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.create');
+    const cleanName = String(customer.name || '').trim();
+    if (!cleanName) throw new Error('اسم العميل مطلوب.');
+    customer.name = cleanName;
+    if (!String(customer.phone || '').trim()) throw new Error('رقم هاتف العميل مطلوب.');
+    const existing = this.db.query('SELECT id FROM customers WHERE name = ?', [cleanName]);
+    if (existing.length > 0) throw new Error('اسم العميل مسجل مسبقاً.');
     const id = `cust_${uuidv4().substring(0, 8)}`;
     const code = customer.code || `CUST-${Date.now().toString().slice(-5)}`;
 
@@ -134,6 +140,19 @@ export class CustomerService {
     PermissionService.require(actor, 'customers.update');
     const existing = this.findCustomerById(id);
     if (!existing) throw new Error('العميل غير موجود.');
+
+    if (updates.name !== undefined) {
+      const cleanName = String(updates.name || '').trim();
+      if (!cleanName) throw new Error('اسم العميل مطلوب.');
+      updates.name = cleanName;
+      if (cleanName !== existing.name) {
+        const dup = this.db.query('SELECT id FROM customers WHERE name = ? AND id != ?', [cleanName, id]);
+        if (dup.length > 0) throw new Error('اسم العميل مسجل مسبقاً.');
+      }
+    }
+    if (updates.phone !== undefined && !String(updates.phone || '').trim()) {
+      throw new Error('رقم هاتف العميل مطلوب.');
+    }
 
     const sql = `
       UPDATE customers SET

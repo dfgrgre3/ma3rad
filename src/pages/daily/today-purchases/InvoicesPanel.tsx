@@ -79,7 +79,7 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
                   </div>
                   <StatusBadge status={row.paymentStatus} />
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
                   <div><p className="text-[10px] text-slate-500 dark:text-slate-400">الإجمالي</p><p className="mt-0.5 font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(row.total)}</p></div>
                   <div><p className="text-[10px] text-slate-500 dark:text-slate-400">المدفوع</p><p className="mt-0.5 font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(row.paid)}</p></div>
                   <div><p className="text-[10px] text-slate-500 dark:text-slate-400">المتبقي</p><p className={`mt-0.5 font-bold tabular-nums ${row.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'}`}>{fmt(row.remaining)}</p></div>

@@ -67,7 +67,7 @@ export const PurchaseFiltersSection: React.FC<PurchaseFiltersSectionProps> = ({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">المورد</span>
           <select value={filters.supplierId} onChange={(event) => onChange({ supplierId: event.target.value })} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">

@@ -103,7 +103,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
         </button>
       </div>
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs bg-white p-4 rounded-xl border border-slate-200/60">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs bg-white p-4 rounded-xl border border-slate-200/60">
           <div>
             <div className="text-slate-500 mb-0.5">المستودع</div>
             <div className="font-bold text-slate-900">{selectedAdjustment.warehouse}</div>
@@ -194,7 +194,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
 
         <div className="space-y-1.5">
           <label className="text-xs text-slate-455 font-bold block">نوع التسوية</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setAdjType('ADD')}
@@ -230,7 +230,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-xs text-slate-455 font-bold block">الكمية ({selectedUnit})</label>
             <input

@@ -27,12 +27,12 @@ export const ProductEditModal: React.FC<ProductEditModalProps> = ({ product, for
         </div>
         <form onSubmit={onSubmit} className="space-y-3 text-xs">
           <div><label className="font-bold text-slate-700 block mb-1">اسم {productSingularLabel} *</label><input required value={form.name} onChange={(e) => onChange({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" /></div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div><label className="font-bold text-slate-700 block mb-1">المقاس</label><input value={form.size} onChange={(e) => onChange({ ...form, size: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
             <div><label className="font-bold text-slate-700 block mb-1">اللون</label><input value={form.color} onChange={(e) => onChange({ ...form, color: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
             <div><label className="font-bold text-slate-700 block mb-1">التشطيب</label><input value={form.finish} onChange={(e) => onChange({ ...form, finish: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {product.productType !== 'GENERAL' && <>
               <div><label className="font-bold text-slate-700 block mb-1">عدد القطع / كرتونة</label><input type="number" min={1} step="1" value={form.piecesPerBox} onChange={(e) => onChange({ ...form, piecesPerBox: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
               <div><label className="font-bold text-slate-700 block mb-1">م² / كرتونة</label><input type="number" min={0} step="0.001" value={form.metersPerBox} onChange={(e) => onChange({ ...form, metersPerBox: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>

@@ -9,7 +9,7 @@ interface OrdersStatsProps {
 }
 
 export const OrdersStats: React.FC<OrdersStatsProps> = ({ stats }) => (
-  <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
     <Stat label="إجمالي الطلبات" value={String(stats?.total ?? 0)} icon={Package2} tone="text-slate-700 bg-slate-50 border-slate-200" />
     <Stat label="قيمة الطلبات" value={fmt(stats?.totalValue ?? 0)} icon={Wallet} tone="text-violet-700 bg-violet-50 border-violet-200" />
     <Stat label="بانتظار التأكيد" value={String(stats?.pending ?? 0)} icon={Clock} tone="text-amber-700 bg-amber-50 border-amber-200" />

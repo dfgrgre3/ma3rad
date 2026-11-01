@@ -369,7 +369,7 @@ export const EPaymentSettlementPage: React.FC = () => {
                   className="w-full border border-slate-200 rounded-xl p-2 font-mono"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-600 mb-1 font-medium">نسبة العمولة (%)</label>
                   <input
@@ -447,7 +447,7 @@ export const EPaymentSettlementPage: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-600 mb-1 font-medium">تاريخ التسوية والإيداع</label>
                   <input
@@ -473,7 +473,7 @@ export const EPaymentSettlementPage: React.FC = () => {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-600 mb-1 font-medium">المبلغ الإجمالي المقبوض</label>
                   <input

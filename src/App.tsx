@@ -3,6 +3,8 @@ import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
 import { CentralLicenseService } from './services/CentralLicenseService';
+import { CentralConfigApplier } from './services/CentralConfigApplier';
+import { CentralEstablishmentService } from './services/CentralEstablishmentService';
 import { CentralTelemetryService } from './services/CentralTelemetryService';
 import type { ReleaseInfo } from './services/CentralTelemetryService';
 import { SettingsService } from './services/SettingsService';
@@ -55,14 +57,56 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [activationComplete, checkLicense]);
 
-  // Periodically refresh central config (modules/limits/hidden menus)
+  const [centralConfigTick, setCentralConfigTick] = useState(CentralLicenseService.getConfigRevision());
+
+  // Apply any cached central config on startup
   useEffect(() => {
     if (!activationComplete) return;
-    const refresh = () => { void CentralLicenseService.fetchConfig(); };
-    refresh();
-    const timer = setInterval(refresh, 60 * 60 * 1000);
-    return () => clearInterval(timer);
+    CentralConfigApplier.apply();
   }, [activationComplete]);
+  useEffect(() => {
+    if (!activationComplete || !dbReady) return;
+    const refreshConfig = async () => {
+      const cfg = await CentralLicenseService.fetchConfig();
+      if (cfg) {
+        CentralConfigApplier.apply();
+        setCentralConfigTick(CentralLicenseService.getConfigRevision());
+      }
+    };
+    // سحب المنشأة والفروع المخصصة من منصة الإدارة المركزية (أثقل => كل ساعة).
+    const refreshEstablishment = async () => {
+      await CentralEstablishmentService.sync();
+    };
+    const refreshAll = async () => {
+      await refreshConfig();
+      await refreshEstablishment();
+    };
+
+    void refreshAll();
+    // تحديث شبه فوري: استقصاء قصير للتكوين + إعادة الجلب عند عودة التركيز للنافذة.
+    const configTimer = setInterval(() => void refreshConfig(), 60 * 1000);
+    const establishmentTimer = setInterval(() => void refreshEstablishment(), 60 * 60 * 1000);
+    // focus و visibilitychange قد يصلان معاً عند العودة للنافذة؛ نمنع الازدواج
+    // بفاصل أدنى حتى لا نُغرق المنصة المركزية بطلبات متكررة.
+    let lastRefreshAt = 0;
+    const MIN_REFRESH_INTERVAL_MS = 15 * 1000;
+    const onFocusOrVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return;
+      lastRefreshAt = now;
+      void refreshAll();
+    };
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+
+    return () => {
+      clearInterval(configTimer);
+      clearInterval(establishmentTimer);
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+    };
+  }, [activationComplete, dbReady]);
 
   // Check for published updates on startup
   useEffect(() => {
@@ -253,8 +297,8 @@ export const App: React.FC = () => {
               }}
             />
           ) : (
-            <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <AppRouter currentUser={currentUser} onLogout={() => { AuthService.logout(); setCurrentUser(null); }} />
+            <HashRouter>
+              <AppRouter key={centralConfigTick} currentUser={currentUser} onLogout={() => { AuthService.logout(); setCurrentUser(null); }} />
             </HashRouter>
           )}
           {dbReady && currentUser && <DatabasePersistenceStatus />}

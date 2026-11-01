@@ -262,7 +262,7 @@ export const DataDeletionPage: React.FC = () => {
         </div>
 
         {/* Mode switcher */}
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 lg:grid-cols-4">
           {MODES.map((item) => {
             const Icon = item.icon;
             const active = mode === item.id;

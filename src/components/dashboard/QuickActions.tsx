@@ -12,7 +12,7 @@ const QUICK_ACTIONS: QuickActionItem[] = [
 
 export const QuickActions: React.FC = () => {
   return (
-    <section aria-label="اختصارات سريعة" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <section aria-label="اختصارات سريعة" className="grid grid-cols-1 gap-2 sm:grid-cols-4">
       {QUICK_ACTIONS.map(({ to, label, detail, icon: Icon }) => (
         <Link
           key={to}

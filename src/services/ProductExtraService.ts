@@ -49,6 +49,11 @@ export class ProductExtraService {
     PermissionService.require(AuthService.requireAuth(), 'products.update');
   }
 
+  public getVariantById(id: string): ProductVariant | null {
+    const rows = this.db.query<ProductVariant>(`SELECT * FROM product_variants WHERE id = ?`, [id]);
+    return rows.length > 0 ? rows[0] : null;
+  }
+
   public getVariants(productId: string): ProductVariant[] {
     return this.db.query<ProductVariant>(
       `SELECT * FROM product_variants WHERE parent_product_id = ? ORDER BY created_at DESC`,
@@ -64,6 +69,10 @@ export class ProductExtraService {
     if (data.costPrice !== undefined || data.sellingPriceM2 !== undefined) {
       PermissionService.require(AuthService.requireAuth(), 'pricing.update');
     }
+    if (!String(data.sku || '').trim()) throw new Error('كود المتغير مطلوب.');
+    if (!String(data.variantName || '').trim()) throw new Error('اسم المتغير مطلوب.');
+    data.sku = String(data.sku).trim();
+    data.variantName = String(data.variantName).trim();
     const duplicate = this.db.query(
       `SELECT id FROM product_variants WHERE sku = ? OR (barcode IS NOT NULL AND barcode = ?)`,
       [data.sku, data.barcode || '']
@@ -89,6 +98,10 @@ export class ProductExtraService {
     if (updates.costPrice !== undefined || updates.sellingPriceM2 !== undefined) {
       PermissionService.require(AuthService.requireAuth(), 'pricing.update');
     }
+    const existing = this.getVariantById(id);
+    if (!existing) throw new Error('المتغير غير موجود.');
+    if (updates.sku !== undefined && !String(updates.sku || '').trim()) throw new Error('كود المتغير مطلوب.');
+    if (updates.variantName !== undefined && !String(updates.variantName || '').trim()) throw new Error('اسم المتغير مطلوب.');
     this.db.run(
       `UPDATE product_variants SET
         variant_name = COALESCE(?, variant_name),
@@ -110,6 +123,11 @@ export class ProductExtraService {
   public deleteVariant(id: string): void {
     this.requireWrite();
     this.db.run(`DELETE FROM product_variants WHERE id = ?`, [id]);
+  }
+
+  public getImageById(id: string): ProductImage | null {
+    const rows = this.db.query<ProductImage>(`SELECT * FROM product_images WHERE id = ?`, [id]);
+    return rows.length > 0 ? rows[0] : null;
   }
 
   public getImages(productId: string): ProductImage[] {
@@ -137,6 +155,22 @@ export class ProductExtraService {
       sqliteDb.run(`UPDATE product_images SET is_primary = 0 WHERE product_id = ?`, [productId]);
       sqliteDb.run(`UPDATE product_images SET is_primary = 1 WHERE id = ? AND product_id = ?`, [id, productId]);
     });
+  }
+
+  public updateImage(id: string, updates: { caption?: string; sortOrder?: number; isPrimary?: boolean }): void {
+    this.requireWrite();
+    const existing = this.getImageById(id);
+    if (!existing) throw new Error('الصورة غير موجودة.');
+    if (updates.isPrimary) {
+      this.setPrimaryImage(existing.productId, id);
+    }
+    this.db.run(
+      `UPDATE product_images SET
+        caption = COALESCE(?, caption),
+        sort_order = COALESCE(?, sort_order)
+       WHERE id = ?`,
+      [updates.caption ?? null, updates.sortOrder ?? null, id]
+    );
   }
 
   public deleteImage(id: string): void {

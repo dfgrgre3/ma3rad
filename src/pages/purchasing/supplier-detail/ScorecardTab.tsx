@@ -105,7 +105,7 @@ export const ScorecardTab: React.FC<ScorecardTabProps> = ({ scorecard }) => {
                 <Sparkles className="w-4 h-4" />
                 <span>ملخص التوريدات المنجزة</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+              <div className="grid grid-cols-1  sm:grid-cols-3 gap-4 text-xs">
                 <div>
                   <span className="text-slate-400 block">إجمالي أوامر الشراء:</span>
                   <span className="text-base font-black text-white">{scorecard.totalOrders} أمر شراء</span>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, HardHat, Plus } from 'lucide-react';
+import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
 
 interface EmployeesHeaderProps {
   loading: boolean;
@@ -27,13 +28,15 @@ export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
             <p className="text-xs text-slate-500 font-medium">تصنيف وتوزيع العمال في المستودعات والمعارض ومتابعة السلفيات، الرواتب، والأجور اليومية</p>
           </div>
         </div>
-        <button
-          onClick={onAddEmployee}
-          className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-orange-600/10 transition-all transform active:scale-95 shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          إضافة عامل / موظف جديد
-        </button>
+        <CentralLimitGuard metric="maxEmployees">
+          <button
+            onClick={onAddEmployee}
+            className="flex items-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-orange-600/10 transition-all transform active:scale-95 shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            إضافة عامل / موظف جديد
+          </button>
+        </CentralLimitGuard>
       </div>
 
       {loading && (

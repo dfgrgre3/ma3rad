@@ -11,6 +11,7 @@ import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../financials';
 import { ModuleRegistryService } from '../ModuleRegistryService';
 import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
+import { CentralUsageLimitService } from '../CentralUsageLimitService';
 import type { SalesInvoice, PaymentType } from '../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from './types';
@@ -462,6 +463,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   assertSaleHasItems(dto);
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'sales.create');
+  CentralUsageLimitService.assertWithin('maxInvoices');
   const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor);
   const companyId = ctx.db.query<{ companyId: string | null }>(
     `SELECT b.company_id AS companyId FROM branches b WHERE b.id = ?`,

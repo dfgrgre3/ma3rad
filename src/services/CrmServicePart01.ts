@@ -8,7 +8,14 @@ import type { Lead, CrmActivity, LeadStage } from './crmTypes';
 export class CrmServicePart01 {
 protected db = DatabaseManager.getInstance();
 
+/** كل دوال القراءة في CRM تتطلب صلاحية العرض، كي لا تُعرض البيانات عند دمج
+ *  الشاشات داخل لوحة المعلومات دون فحص صلاحية المسار الأب. */
+protected requireView(): void {
+  PermissionService.require(AuthService.requireAuth(), 'crm.view');
+}
+
 public getLeads(search = '', stage?: string): Lead[] {
+    this.requireView();
     let sql = `SELECT l.*, u.full_name AS assigned_name FROM leads l LEFT JOIN users u ON u.id = l.assigned_to WHERE 1 = 1`;
     const params: any[] = [];
     if (search.trim()) {
@@ -25,6 +32,7 @@ public getLeads(search = '', stage?: string): Lead[] {
   }
 
 public getLeadById(id: string): Lead | null {
+    this.requireView();
     return this.db.query<Lead>(`SELECT * FROM leads WHERE id = ?`, [id])[0] || null;
   }
 
@@ -119,6 +127,7 @@ public convertLeadToCustomer(id: string): { customerId: string } {
   }
 
 public getActivities(search = '', status?: string): CrmActivity[] {
+    this.requireView();
     let sql = `
       SELECT a.*, COALESCE(l.name, c.name) AS lead_name
       FROM crm_activities a

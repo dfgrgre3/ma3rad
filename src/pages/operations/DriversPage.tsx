@@ -123,7 +123,7 @@ export const DriversPage: React.FC = () => {
             </div>
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div><label className="font-bold text-slate-700 block mb-1">الاسم الكامل *</label><input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" /></div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">الهاتف *</label><input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">رقم الرخصة</label><input value={form.licenseNumber} onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
               </div>

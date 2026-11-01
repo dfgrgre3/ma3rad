@@ -398,7 +398,7 @@ export const SalesView: React.FC = () => {
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 space-y-3">
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <StatCard label="عدد الفواتير" value={String(stats?.count ?? 0)} icon={Receipt} tone="text-slate-700 bg-slate-50 border-slate-200" />
           <StatCard label="إجمالي المبيعات" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingUp} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
           {canViewDebts && <StatCard label="المحصّل" value={fmt(stats?.paidAmount ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />}

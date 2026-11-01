@@ -30,7 +30,7 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
       </div>
 
       <form onSubmit={onSubmit} className="mt-4 space-y-4 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="transfer-from-warehouse" className="block text-xs font-bold text-slate-600 mb-1">من مخزن (المصدر)</label>
             <select

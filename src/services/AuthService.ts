@@ -3,6 +3,7 @@ import type { User, UserRole } from '../types';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PermissionService } from './PermissionService';
+import { CentralUsageLimitService } from './CentralUsageLimitService';
 import { BranchAccessService } from './BranchAccessService';
 import { twoFactorAuth } from './twoFactorAuth';
 
@@ -457,6 +458,7 @@ export class AuthService {
   ): User {
     const subject = this.requireActor(actor);
     PermissionService.require(subject, 'users.create');
+    CentralUsageLimitService.assertWithin('maxUsers');
     const roleExists = this.db.query('SELECT code FROM roles WHERE code = ?', [user.role]);
     if (roleExists.length === 0) {
       throw new Error('الدور المحدد غير موجود.');

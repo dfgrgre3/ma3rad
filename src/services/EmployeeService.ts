@@ -5,6 +5,7 @@ import { PermissionService } from './PermissionService';
 import { postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 import { BranchAccessService } from './BranchAccessService';
 import { ModuleRegistryService } from './ModuleRegistryService';
+import { CentralUsageLimitService } from './CentralUsageLimitService';
 import { localDateString } from '../utils/date';
 
 export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
@@ -159,6 +160,7 @@ export class EmployeeService {
 
   static create(data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'notes'> & { notes?: string }): Employee {
     const actor = this.requireManage();
+    CentralUsageLimitService.assertWithin('maxEmployees');
     if (!data.name?.trim()) throw new Error('اسم الموظف مطلوب.');
     if (!data.phone?.trim()) throw new Error('رقم الهاتف مطلوب.');
     const branchId = data.branchId || this.branchAccess.getDefaultAccessibleBranchId(actor);

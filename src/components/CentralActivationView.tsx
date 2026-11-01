@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CentralLicenseService } from '../services/CentralLicenseService';
+import { CentralConfigApplier } from '../services/CentralConfigApplier';
 
 export const CentralActivationView: React.FC = () => {
   const [serverUrl, setServerUrl] = useState(CentralLicenseService.getServerUrl());
@@ -27,6 +28,7 @@ export const CentralActivationView: React.FC = () => {
       const res = await CentralLicenseService.activate(activationCode, deviceName);
       setStatus('Activated: ' + (res.tenantId || 'ok'));
       const cfg = await CentralLicenseService.fetchConfig();
+      CentralConfigApplier.apply();
       setConfig(cfg);
     } catch (e: any) {
       setStatus('Activation failed: ' + (e?.message || e));
@@ -36,6 +38,7 @@ export const CentralActivationView: React.FC = () => {
   const handleFetchConfig = async () => {
     try {
       const cfg = await CentralLicenseService.fetchConfig();
+      CentralConfigApplier.apply();
       setConfig(cfg);
       setStatus('Config fetched: v' + (cfg?.configurationVersion ?? 0));
     } catch (e: any) {

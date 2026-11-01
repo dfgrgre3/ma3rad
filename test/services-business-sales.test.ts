@@ -88,9 +88,12 @@ async function boot(businessType = 'services'): Promise<DatabaseManager> {
 }
 
 function sellService(): { invoiceId: string; customerId: string } {
+  // اسم/هاتف فريد لكل استدعاء: قاعدة البيانات تبقى مشتركة بين اختبارات الملف،
+  // وخدمة العملاء ترفض تكرار الاسم نفسه.
+  const unique = `${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-9);
   const customer = new CustomerService().createCustomer({
-    name: 'عميل خدمات اختباري',
-    phone: '01000000994',
+    name: `عميل خدمات اختباري ${unique}`,
+    phone: `010${unique.padStart(8, '0')}`,
     customerType: 'RETAIL',
     creditLimit: 0,
   });
@@ -138,7 +141,9 @@ test('a services business can sell without any stock and without inventory accou
   const returned = sales.returnSale(invoiceId, [{
     productId: serviceProductId,
     quantityM2: 1,
+    boxesCount: 0,
     unitPrice: 150,
+    unitCost: 100,
     reason: 'خدمة غير مكتملة',
   }], true);
 
@@ -205,7 +210,7 @@ test('voiding a services invoice reverses money only, and goods still need stock
 });
 
 test('service products default to the profile unit instead of ceramic defaults', async () => {
-  const db = await boot();
+  await boot();
   const product = new ProductService().createProduct({
     sku: 'SKU-SERVICE-DEFAULTS',
     barcode: 'BAR-SERVICE-DEFAULTS',
@@ -260,7 +265,9 @@ test('a mixed business sells service lines without stock while product lines sti
   const returned = new SalesService().returnSale(invoiceId, [{
     productId: serviceProductId,
     quantityM2: 1,
+    boxesCount: 0,
     unitPrice: 150,
+    unitCost: 100,
     reason: 'خدمة غير مكتملة',
   }], true);
   assert.equal(stockRows(db), 0);

@@ -103,7 +103,7 @@ export const ChartOfAccountsPage: React.FC = () => {
         </button>}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4 bg-white border-b border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 p-4 bg-white border-b border-slate-200">
         {(Object.keys(TYPE_LABELS) as AccountType[]).map((type) => (
           <button key={type} onClick={() => setTypeFilter(typeFilter === type ? 'ALL' : type)}
             className={`rounded-xl border px-3 py-2 text-right transition ${typeFilter === type ? 'ring-2 ring-sky-400' : ''} ${TYPE_COLORS[type]}`}>
@@ -162,7 +162,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               <button onClick={() => setModal(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={submit} className="space-y-3 text-xs">
-              {!editing && <div className="grid grid-cols-2 gap-2">
+              {!editing && <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">{'\u0627\u0644\u0643\u0648\u062F'} *</label><input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" placeholder="1106" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">{'\u0627\u0644\u0646\u0648\u0639'} *</label><select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">{(Object.keys(TYPE_LABELS) as AccountType[]).map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}</select></div>
               </div>}

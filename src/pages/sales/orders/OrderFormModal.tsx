@@ -131,7 +131,7 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1  sm:grid-cols-4 gap-3">
         <Field label="خصم الطلب (ج)" value={form.discount} onChange={(v) => setForm((p) => ({ ...p, discount: v }))} />
         <Field label="ضريبة (ج)" value={form.tax} onChange={(v) => setForm((p) => ({ ...p, tax: v }))} />
         <Field label="مصاريف الشحن (ج)" value={form.shipping} onChange={(v) => setForm((p) => ({ ...p, shipping: v }))} />

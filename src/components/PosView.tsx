@@ -1104,20 +1104,21 @@ export const PosView: React.FC = () => {
 <style>body{font-family:Tahoma,sans-serif;margin:0;padding:16px;background:#0f172a;color:#fff;} .total{font-size:48px;font-weight:900;color:#38bdf8;} .item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #334155;font-size:16px;} .change{font-size:32px;color:#34d399;font-weight:800;}</style></head><body>
 <div id="root"><div style="text-align:center;opacity:.5;">في انتظار عناصر...</div></div>
 <script>
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ch = new BroadcastChannel('pos-customer-display');
 ch.onmessage = (e) => {
-  const d = e.data;
+  const d = e.data || {};
   let html = '';
   if (d.items && d.items.length) {
-    html += d.items.map(i => '<div class="item"><span>'+i.name+'</span><span>'+i.qty+' × '+i.price+'</span></div>').join('');
+    html += d.items.map(i => '<div class="item"><span>'+esc(i.name)+'</span><span>'+esc(i.qty)+' × '+esc(i.price)+'</span></div>').join('');
   }
   html += '<div style="margin-top:16px;border-top:2px solid #38bdf8;padding-top:12px;">';
-  html += '<div class="item"><span>المجموع الفرعي</span><span>'+d.subtotal+'</span></div>';
-  if (d.discount>0) html += '<div class="item"><span>خصم</span><span>-'+d.discount+'</span></div>';
-  if (d.tax>0) html += '<div class="item"><span>ضريبة</span><span>'+d.tax+'</span></div>';
-  html += '<div class="total">الإجمالي: '+d.total+'</div>';
-  if (d.paid>0) html += '<div class="item"><span>المدفوع</span><span>'+d.paid+'</span></div>';
-  if (d.change>0) html += '<div class="change">الباقي: '+d.change+'</div>';
+  html += '<div class="item"><span>المجموع الفرعي</span><span>'+esc(d.subtotal)+'</span></div>';
+  if (d.discount>0) html += '<div class="item"><span>خصم</span><span>-'+esc(d.discount)+'</span></div>';
+  if (d.tax>0) html += '<div class="item"><span>ضريبة</span><span>'+esc(d.tax)+'</span></div>';
+  html += '<div class="total">الإجمالي: '+esc(d.total)+'</div>';
+  if (d.paid>0) html += '<div class="item"><span>المدفوع</span><span>'+esc(d.paid)+'</span></div>';
+  if (d.change>0) html += '<div class="change">الباقي: '+esc(d.change)+'</div>';
   html += '</div>';
   document.getElementById('root').innerHTML = html;
 };

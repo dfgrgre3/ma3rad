@@ -344,7 +344,7 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-center">
+        <div className="grid grid-cols-1  sm:grid-cols-5 gap-2 rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-center">
           <div>
             <span className="block text-[11px] text-slate-500">قيمة الأصناف</span>
             <span className="text-sm font-black text-slate-900">{fmt(subtotal)}</span>

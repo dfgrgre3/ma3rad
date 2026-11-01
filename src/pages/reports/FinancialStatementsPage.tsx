@@ -126,7 +126,7 @@ export const FinancialStatementsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tab, agingType, asOf, from, to, accountId]);
+  useEffect(() => { load();   }, [tab, agingType, asOf, from, to, accountId]);
 
   const exportBalance = () => {
     if (!balance) return;

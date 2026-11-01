@@ -54,7 +54,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ productId, canEdit }) => {
       {rows.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 text-center text-slate-500 py-12 text-sm">لا توجد صور لهذا المنتج</div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           {rows.map((img) => (
             <div key={img.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="h-36 bg-slate-100 flex items-center justify-center overflow-hidden">

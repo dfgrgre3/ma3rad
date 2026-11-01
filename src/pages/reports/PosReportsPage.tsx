@@ -130,7 +130,7 @@ export function PosReportsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="text-xs text-slate-500">الفواتير</div>
           <div className="text-2xl font-black text-slate-900">{fmt(totals.invoices)}</div>

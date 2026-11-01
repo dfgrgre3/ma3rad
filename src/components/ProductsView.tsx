@@ -24,6 +24,7 @@ import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
+import { CentralLimitGuard } from './ui/CentralLimitGuard';
 import {
   GRADES, SURFACES, UNITS, calcMetersFromSize, emptyForm, emptyVariant, gradeLabel,
   parseGrade, pickCell, round, unitLabelFor,
@@ -979,14 +980,14 @@ export const ProductsView: React.FC = () => {
             <Download className="w-4 h-4" />
             <span>تصدير جدول بيانات</span>
           </button>}
-          {canCreateProduct && <button onClick={handleOpenAddModal} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm">
+          {canCreateProduct && <CentralLimitGuard metric="maxProducts"><button onClick={handleOpenAddModal} className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm">
             <Plus className="w-4 h-4" />
             <span>إضافة {productSingularLabel} جديد</span>
-          </button>}
+          </button></CentralLimitGuard>}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatCard label="إجمالي الأصناف" value={String(stats?.totalProducts ?? totalItems)} hint={`نشط: ${stats?.activeProducts ?? 0} | موقوف: ${stats?.inactiveProducts ?? 0}`} icon={<Package className="w-5 h-5 text-sky-600" />} tone="bg-sky-50" />
         <StatCard label="إجمالي الكميات" value={String(stats?.totalStockM2 ?? 0)} icon={<Boxes className="w-5 h-5 text-emerald-600" />} tone="bg-emerald-50" />
         {canViewCosts && <StatCard label="قيمة المخزون" value={CeramicMath.formatCurrency(stats?.totalStockValue ?? 0)} icon={<Banknote className="w-5 h-5 text-indigo-600" />} tone="bg-indigo-50" />}
@@ -1018,7 +1019,7 @@ export const ProductsView: React.FC = () => {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSearchParams(e.target.value ? { category: e.target.value } : {}, { replace: true }); }} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="">جميع الأنواع</option>
               {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
@@ -1204,7 +1205,7 @@ export const ProductsView: React.FC = () => {
             <div className="space-y-4 p-6 text-xs">
               <div className="space-y-2">
                 {stockRows.map((row, index) => (
-                  <div key={row.warehouseId} className="grid grid-cols-3 items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                  <div key={row.warehouseId} className="grid grid-cols-1 sm:grid-cols-3 items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                     <Field label="المخزن"><div className="px-3 py-2 font-bold text-slate-700">{row.warehouseName}</div></Field>
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
                       <div className="text-[10px] font-bold text-emerald-700">الرصيد الحالي</div>
@@ -1216,7 +1217,7 @@ export const ProductsView: React.FC = () => {
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label={stockProduct.productType === 'GENERAL' ? `القيمة المضافة (${getProductUnitLabel(stockProduct)})` : 'القيمة المضافة (م²)'}>
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 font-black text-emerald-700">
                     {round(stockRows.reduce((s, r) => s + r.addBoxes, 0) * (stockProduct.productType === 'GENERAL' ? 1 : (stockProduct.metersPerBox || 0)), 3)} {getProductUnitLabel(stockProduct)}

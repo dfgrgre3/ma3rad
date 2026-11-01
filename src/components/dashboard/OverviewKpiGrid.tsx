@@ -45,7 +45,7 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
   const invoiceGrowth = Number.isFinite(rawInvoiceGrowth) ? rawInvoiceGrowth : null;
 
   return (
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:grid-cols-4">
       <KpiTile
         label="مبيعات اليوم"
         icon={ShoppingCart}

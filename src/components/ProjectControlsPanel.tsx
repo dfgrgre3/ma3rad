@@ -421,7 +421,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                 </h3>
                 <input required placeholder="عنوان المهمة" value={taskForm.title}
                   onChange={(event) => setTaskForm({ ...taskForm, title: event.target.value })} className={inputClass} />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input placeholder="المسؤول" value={taskForm.assigneeName}
                     onChange={(event) => setTaskForm({ ...taskForm, assigneeName: event.target.value })} className={inputClass} />
                   <select value={taskForm.priority}
@@ -540,7 +540,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                   onChange={(event) => setBudgetForm({ ...budgetForm, category: event.target.value })} className={inputClass} />
                 <input placeholder="الوصف" value={budgetForm.description}
                   onChange={(event) => setBudgetForm({ ...budgetForm, description: event.target.value })} className={inputClass} />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input type="number" min="0" step="0.01" placeholder="المخطط" value={budgetForm.plannedAmount}
                     onChange={(event) => setBudgetForm({ ...budgetForm, plannedAmount: event.target.value })} className={inputClass} />
                   <input type="number" min="0" step="0.01" placeholder="الفعلي" value={budgetForm.actualAmount}
@@ -620,7 +620,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
                 </select>
                 <input placeholder="الموظف" value={timeForm.employeeName}
                   onChange={(event) => setTimeForm({ ...timeForm, employeeName: event.target.value })} className={inputClass} />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input type="date" value={timeForm.entryDate}
                     onChange={(event) => setTimeForm({ ...timeForm, entryDate: event.target.value })} className={inputClass} />
                   <input type="number" required min="0.25" max="24" step="0.25" placeholder="الساعات" value={timeForm.hours}
@@ -705,7 +705,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
               </h3>
               <input required placeholder="عنوان الخطر" value={riskForm.title}
                 onChange={(event) => setRiskForm({ ...riskForm, title: event.target.value })} className={inputClass} />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <select value={riskForm.severity}
                   onChange={(event) => setRiskForm({ ...riskForm, severity: event.target.value as ProjectRiskSeverity })} className={inputClass}>
                   {Object.entries(RISK_SEVERITY_LABELS).map(([value, label]) => (
@@ -788,7 +788,7 @@ export const ProjectControlsPanel: React.FC<Props> = ({ projectId, canUpdate, ca
               </h3>
               <input required placeholder="عنوان الطلب" value={changeForm.title}
                 onChange={(event) => setChangeForm({ ...changeForm, title: event.target.value })} className={inputClass} />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input type="number" step="0.01" placeholder="الأثر المالي" value={changeForm.costImpact}
                   onChange={(event) => setChangeForm({ ...changeForm, costImpact: event.target.value })} className={inputClass} />
                 <input type="number" step="1" placeholder="أيام إضافية" value={changeForm.timeImpactDays}

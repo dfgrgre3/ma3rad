@@ -173,7 +173,7 @@ export const ProjectDetailPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="p-4 grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'قيمة العقد', value: fmt(project.contractValue), icon: Wallet, color: 'text-emerald-600 bg-emerald-50' },
           { label: 'إجمالي المبيعات', value: fmt(project.totalSold), icon: DollarSign, color: 'text-sky-600 bg-sky-50' },
@@ -280,7 +280,7 @@ export const ProjectDetailPage: React.FC = () => {
                   <label className="font-bold text-slate-700 block mb-1">الاسم *</label>
                   <input required value={unitForm.name} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} placeholder="مثال: شقة 101" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">النوع</label>
                     <select value={unitForm.unitType} onChange={(e) => setUnitForm({ ...unitForm, unitType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
@@ -386,7 +386,7 @@ export const ProjectDetailPage: React.FC = () => {
                     {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">الكمية (م²) *</label>
                     <input type="number" required min="0.01" step="0.01" value={productForm.plannedQuantityM2} onChange={(e) => setProductForm({ ...productForm, plannedQuantityM2: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />

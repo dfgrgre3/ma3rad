@@ -167,7 +167,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({ onNavigate }
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {COUNT_QUERIES.map((item) => {
           const Icon = item.icon;
           return (
@@ -214,7 +214,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({ onNavigate }
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <h3 className="mb-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">اختصارات</h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Quick label="إضافة مستخدم" to="users" icon={Users} onClick={onNavigate} />
               <Quick label="مصفوفة الصلاحيات" to="roles" icon={ShieldCheck} onClick={onNavigate} />
               <button onClick={() => { window.location.hash = '#/settings'; }} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">

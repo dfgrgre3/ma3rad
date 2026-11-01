@@ -1,8 +1,17 @@
 import { format, subDays } from 'date-fns';
 import { DatabaseManager } from '../../../database/db';
+import { AuthService } from '../../../services/AuthService';
+import { PermissionService } from '../../../services/PermissionService';
 import type { DailySale, DebtCustomer, LowStockItem, RecentInvoice, TopProduct } from './types';
 
 export function runExecutiveQueries(fromStr: string, toStr: string) {
+  // تُدمَج هذه المؤشرات داخل لوحة المعلومات، لذا تفحص طبقة القراءة صلاحيات
+  // المجالات التي تجمّعها (مبيعات/مشتريات/مالية) لا صلاحية المسار الأب وحدها.
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'sales.view');
+  PermissionService.require(actor, 'purchases.view');
+  PermissionService.require(actor, 'finance.view');
+
   const db = DatabaseManager.getInstance().getDatabase();
   if (!db) return null;
 

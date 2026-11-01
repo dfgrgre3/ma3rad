@@ -56,7 +56,7 @@ export const SuccessInvoiceModal: React.FC<{
         <p className="text-[11px]">تم خصم الكميات من المخزن وتحديث حساب العميل آلياً.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 pt-1">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
         <button
           onClick={onPrintThermal}
           className="py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5"
@@ -148,7 +148,7 @@ export const NewCustomerModal: React.FC<{
         <input value={phone} onChange={(e) => onPhoneChange(e.target.value)} placeholder="01xxxxxxxxx" className={inputCls} />
       </Field>
       {error && <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-xs text-amber-800">{error}</div>}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="نوع العميل" id="new-customer-type">
           <select value={type} onChange={(e) => onTypeChange(e.target.value as Customer['customerType'])} className={inputCls}>
             <option value="RETAIL">قطاعي</option>
@@ -312,7 +312,7 @@ export const ManagerOverrideModal: React.FC<{
           />
         </div>
         {error && <p className="text-xs text-rose-600 text-center">{error}</p>}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={onClose} className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">إلغاء</button>
           <button onClick={submit} disabled={loading} className="py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs disabled:opacity-50">{loading ? 'جاري...' : 'تأكيد'}</button>
         </div>
@@ -355,7 +355,7 @@ export const PinLoginModal: React.FC<{
           autoFocus
         />
         {error && <p className="text-xs text-rose-600 text-center">{error}</p>}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={onClose} className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs">إلغاء</button>
           <button onClick={submit} disabled={loading} className="py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl text-xs disabled:opacity-50">{loading ? '...' : 'تأكيد'}</button>
         </div>

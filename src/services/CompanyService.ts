@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
 import { AuditService } from './AuditService';
+import { CentralUsageLimitService } from './CentralUsageLimitService';
 import type { Company, CreateCompanyDTO, User } from '../types';
 
 const COMPANY_CODE = /^[A-Z0-9][A-Z0-9_-]{1,19}$/;
@@ -60,6 +61,7 @@ export class CompanyService {
   public createCompany(dto: CreateCompanyDTO): Company {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'companies.create');
+    CentralUsageLimitService.assertWithin('maxFacilities');
 
     const code = (dto.code || '').trim().toUpperCase();
     const name = (dto.name || '').trim();

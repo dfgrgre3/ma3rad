@@ -498,7 +498,7 @@ export const AfterSalesPage: React.FC = () => {
             </div>
 
             <div className="space-y-4 mt-4 text-xs">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
+              <div className="grid grid-cols-1  sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
                 <div>
                   <span className="text-slate-400 block">العميل:</span>
                   <span className="font-bold text-slate-900 dark:text-white">{selectedReturn.customerName || 'نقدي'}</span>

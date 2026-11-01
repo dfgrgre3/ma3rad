@@ -14,6 +14,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { useNavigate } from 'react-router-dom';
 import { exportToExcel } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
+import { CentralLimitGuard } from '../../components/ui/CentralLimitGuard';
 import {
   QuickSaleModal, QuickPurchaseModal, ExpenseModal, PaymentModal,
   DetailsModal, VoidModal, type PaymentTarget,
@@ -432,15 +433,17 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {canCreateSale && (
-                <button
-                  type="button"
-                  onClick={() => setQuickSaleOpen(true)}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
-                >
-                  <Plus className="h-4 w-4" /> بيع سريع
-                </button>
-              )}
+              <CentralLimitGuard metric="maxInvoices">
+                {canCreateSale && (
+                  <button
+                    type="button"
+                    onClick={() => setQuickSaleOpen(true)}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-700 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                  >
+                    <Plus className="h-4 w-4" /> بيع سريع
+                  </button>
+                )}
+              </CentralLimitGuard>
               <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800">
                 <button type="button" onClick={() => setDate(todayDate)} aria-pressed={date === todayDate} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === todayDate ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>اليوم</button>
                 <button type="button" onClick={() => setDate(moveDate(todayDate, -1))} aria-pressed={date === moveDate(todayDate, -1)} className={`min-h-8 rounded-md px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${date === moveDate(todayDate, -1) ? 'bg-white text-emerald-700 shadow-sm dark:bg-slate-700 dark:text-emerald-300' : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-700'}`}>أمس</button>
@@ -590,7 +593,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           </div>
         ) : kind === 'sales' ? (
           <section className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xl:grid-cols-6">
               <SalesMetric featured label="إجمالي المبيعات" value={fmt(data.summary.total)} hint={`${plain(data.summary.count)} فاتورة في ${date === todayDate ? 'اليوم' : formatDate(date)}`} />
               <SalesMetric label="عدد الفواتير" value={plain(data.summary.count)} hint="الفواتير غير الملغاة" />
               <SalesMetric label="المحصّل" value={fmt(data.summary.paid)} hint="إجمالي المدفوع" tone="text-emerald-700 dark:text-emerald-300" />
@@ -619,7 +622,9 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                   {search || status !== 'ALL' ? (
                     <button type="button" onClick={() => { setSearch(''); setStatus('ALL'); }} className="mt-4 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">مسح الفلاتر</button>
                   ) : canCreateSale ? (
-                    <button type="button" onClick={() => setQuickSaleOpen(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"><Plus className="h-4 w-4" /> تسجيل أول عملية بيع</button>
+                    <CentralLimitGuard metric="maxInvoices">
+                      <button type="button" onClick={() => setQuickSaleOpen(true)} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"><Plus className="h-4 w-4" /> تسجيل أول عملية بيع</button>
+                    </CentralLimitGuard>
                   ) : null}
                 </div>
               ) : (
@@ -635,7 +640,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                           </div>
                           {payBadge(row.paymentStatus, true)}
                         </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
                           <div><p className="text-[10px] text-slate-500 dark:text-slate-400">الإجمالي</p><p className="mt-0.5 font-black tabular-nums text-slate-900 dark:text-slate-100">{fmt(row.total)}</p></div>
                           <div><p className="text-[10px] text-slate-500 dark:text-slate-400">المدفوع</p><p className="mt-0.5 font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(row.paid)}</p></div>
                           <div><p className="text-[10px] text-slate-500 dark:text-slate-400">المتبقي</p><p className={`mt-0.5 font-bold tabular-nums ${row.remaining > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'}`}>{fmt(row.remaining)}</p></div>
@@ -675,7 +680,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           </section>
         ) : kind === 'purchases' ? (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard label="إجمالي المشتريات" value={fmt(data.summary.total)} hint={`${data.summary.count} فاتورة`} tone="text-orange-600" />
               <StatCard label="المدفوع" value={fmt(data.summary.paid)} />
               <StatCard label="المتبقي للموردين" value={fmt(data.summary.remaining)} tone={data.summary.remaining > 0 ? 'text-rose-600' : 'text-slate-900'} />
@@ -707,7 +712,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           </>
         ) : kind === 'expenses' ? (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard label="إجمالي المنصرف" value={fmt(data.summary.total)} hint={`${data.summary.count} حركة`} tone="text-rose-600" />
               <StatCard label="المنصرف النقدي" value={fmt(data.summary.cash)} />
               <StatCard label="أعلى بند" value={data.summary.topCategory || '—'} hint={data.summary.topCategory ? fmt(data.summary.topCategoryAmount) : ''} />
@@ -737,7 +742,7 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
           </>
         ) : (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <StatCard label="ديون جديدة اليوم" value={fmt(data.summary.newDebt)} hint={`${data.rows.length} فاتورة آجلة`} tone="text-rose-600" />
               <StatCard label="تحصيلات اليوم" value={fmt(data.summary.collectedToday)} hint={`${data.payments.length} إيصال`} tone="text-emerald-600" />
               <StatCard label="صافي التغير" value={fmt(data.summary.netChange)} tone={data.summary.netChange > 0 ? 'text-rose-600' : 'text-emerald-600'} />

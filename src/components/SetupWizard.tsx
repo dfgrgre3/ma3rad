@@ -896,7 +896,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
                 </div>
               ))}
             </div>
-            <div className="mt-2 hidden grid-cols-5 gap-2 sm:grid">
+            <div className="mt-2 hidden grid-cols-1 sm:grid-cols-5 gap-2 sm:grid">
               {STEPS.map((item, index) => {
                 const Icon = item.icon;
                 const reached = index <= step;
@@ -1183,7 +1183,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
               </div>
               <div>
                 <h3 className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-200">وحدات المنتجات والخدمات</h3>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {BUSINESS_UNITS.map((unit) => (
                     <div key={unit.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-200">
                       <input id={`setup-unit-${unit.id}`} type="checkbox" checked={businessConfig.units.includes(unit.id)} onChange={() => updateBusinessConfig({ units: businessConfig.units.includes(unit.id) ? businessConfig.units.filter((id) => id !== unit.id) : [...businessConfig.units, unit.id] })} className="accent-sky-600" />

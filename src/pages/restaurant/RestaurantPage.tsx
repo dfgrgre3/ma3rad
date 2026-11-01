@@ -310,7 +310,7 @@ export const RestaurantPage: React.FC = () => {
               <h2 className="font-semibold text-slate-800">الطاولات</h2>
               <span className="text-xs text-slate-500">{tables.filter((table) => table.isActive).length} نشطة</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-1  gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {tables.map((table) => (
                 <article key={table.id} className={`rounded border p-3 ${table.occupied ? 'border-amber-300 bg-amber-50' : table.isActive ? 'border-emerald-200 bg-white' : 'border-slate-200 bg-slate-100 opacity-60'}`}>
                   <div className="flex items-center justify-between">

@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
+import { CentralUsageLimitService } from './CentralUsageLimitService';
 
 export class BranchService {
   private db = DatabaseManager.getInstance();
@@ -54,6 +55,8 @@ export class BranchService {
   public createBranch(dto: CreateBranchDTO): Branch {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'branches.create');
+    CentralUsageLimitService.assertWithin('maxBranches');
+    CentralUsageLimitService.assertWithin('maxPos');
     const companyId = this.resolveCompanyForNewBranch(dto.companyId, actor);
     const id = `br_${uuidv4().substring(0, 8)}`;
     const now = new Date().toISOString();

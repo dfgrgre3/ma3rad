@@ -527,7 +527,7 @@ export const ChequesPage: React.FC = () => {
               </button>
             </div>
             <form onSubmit={submit} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">رقم الشيك *</label>
                   <input
@@ -549,7 +549,7 @@ export const ChequesPage: React.FC = () => {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">نوع الطرف</label>
                   <select
@@ -572,7 +572,7 @@ export const ChequesPage: React.FC = () => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">البنك المسحوب عليه</label>
                   <input

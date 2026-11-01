@@ -159,7 +159,7 @@ export const DetailsModal: React.FC<{ kind: 'sale' | 'purchase'; id: string; onC
         </div>
         : !invoice ? <LoadErrorNotice message="لم يتم العثور على الفاتورة." /> : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
             {[
               ['الإجمالي', invoice.totalAmount],
               ['المدفوع', invoice.paidAmount],

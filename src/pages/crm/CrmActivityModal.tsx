@@ -23,7 +23,7 @@ export const CrmActivityModal: React.FC<CrmActivityModalProps> = ({ leads, form,
                   {leads.map((l) => <option key={l.id} value={l.id}>{l.name} — {l.phone}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor={`${idPrefix}-activity-type`} className="font-bold text-slate-700 block mb-1">نوع النشاط</label>
                   <select id={`${idPrefix}-activity-type`} value={form.activityType} onChange={(e) => setForm({ ...form, activityType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">

@@ -304,10 +304,12 @@ export class PurchaseService {
     PermissionService.require(actor, 'purchases.create');
     ModuleRegistryService.assertModuleEnabled('purchasing');
     const branchId = this.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
-    const companyId = this.db.query<{ companyId: string | null }>(
+    const warehouseCompany = this.db.query<{ companyId: string | null }>(
       `SELECT b.company_id AS companyId FROM branches b JOIN warehouses w ON w.branch_id = b.id WHERE w.id = ?`,
       [dto.warehouseId]
-    )[0]?.companyId ?? null;
+    )[0];
+    if (!warehouseCompany) throw new Error('المخزن المحدد غير موجود.');
+    const companyId = warehouseCompany.companyId;
     const branchRegisterId = this.branchAccess.getDefaultRegisterId(branchId, actor);
 
     if (!dto.isNoNumberSupplier && dto.supplierInvoiceNumber && dto.supplierInvoiceNumber.trim()) {
@@ -323,11 +325,12 @@ export class PurchaseService {
     const purchaseId = `pur_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
     const performedBy = actor.id;
-    const supplierTerms = this.db.query<{ paymentTermsDays: number }>(
-      'SELECT payment_terms_days AS paymentTermsDays FROM suppliers WHERE id = ?',
+    const supplierTerms = this.db.query<{ paymentTermsDays: number; isActive: number }>(
+      'SELECT payment_terms_days AS paymentTermsDays, is_active AS isActive FROM suppliers WHERE id = ?',
       [dto.supplierId]
     )[0];
     if (!supplierTerms) throw new Error('المورد المحدد غير موجود.');
+    if (Number(supplierTerms.isActive) !== 1) throw new Error('المورد المحدد معطل ولا يمكن إنشاء فاتورة توريد له.');
     const paymentTermsDays = Number(supplierTerms.paymentTermsDays);
     if (!Number.isInteger(paymentTermsDays) || paymentTermsDays < 0) {
       throw new Error('مدة السداد المسجلة للمورد غير صالحة.');

@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { SettingsService } from '../services/SettingsService';
 import { AppConfigService } from '../services/AppConfigService';
@@ -6,6 +6,7 @@ import { ConfigText } from '../components/config/ConfigText';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from '../config/businessProfiles';
 import { withModuleDependencies } from '../config/moduleRegistry';
 import { CentralLicenseService } from '../services/CentralLicenseService';
+import { CentralFeaturePermissionService } from '../services/CentralFeaturePermissionService';
 
 export const PageLoader: React.FC = () => (
   <div className="flex-1 flex items-center justify-center h-full">
@@ -29,13 +30,19 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
   const businessConfig = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
   const moduleId = getBusinessModuleForPath(pathname);
 
+  // يحدّث المسار الحالي لطبقة الصلاحيات غير المرتبطة بـ React (أزرار/إجراءات).
+  // يُضبط أثناء الرسم حتى تُقيَّم صلاحيات أبناء الصفحة في نفس الدورة، ويُثبَّت
+  // بعد الالتزام (useEffect) ليبقى صحيحًا مع التنقل/الإعادة.
+  CentralFeaturePermissionService.setCurrentPath(pathname);
+  useEffect(() => {
+    CentralFeaturePermissionService.setCurrentPath(pathname);
+  }, [pathname]);
+
   // Central license/config gating (best-effort, cached)
   const centralCfg = CentralLicenseService.getCachedConfig();
   const allowedModules = centralCfg?.config?.allowedModules;
-  const hiddenMenus: string[] = Array.isArray(centralCfg?.config?.hiddenMenus) ? centralCfg.config.hiddenMenus : [];
-  const isHidden = hiddenMenus.some(h => pathname === h || pathname.startsWith(h.replace(/\/$/, '') + '/'));
 
-  if (isHidden) {
+  if (!CentralFeaturePermissionService.isPageVisible(pathname)) {
     return <Navigate to="/dashboard" replace />;
   }
   if (allowedModules && Array.isArray(allowedModules) && moduleId && !allowedModules.includes(moduleId)) {

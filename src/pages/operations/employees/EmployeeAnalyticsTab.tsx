@@ -58,7 +58,7 @@ export const EmployeeAnalyticsTab: React.FC<EmployeeAnalyticsTabProps> = ({
           <div className="space-y-6">
             <div>
               <h4 className="text-xs text-slate-500 font-black mb-3">حسب نوع الراتب:</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-center">
                   <span className="text-[10px] text-slate-500 font-bold block mb-1">راتب شهري ثابت</span>
                   <span className="text-lg font-black text-slate-900">

@@ -442,7 +442,7 @@ export const SuppliersView: React.FC = () => {
                     {canExport && <button onClick={() => window.print()} title="طباعة كشف الحساب" className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200"><Printer className="w-4 h-4" /></button>}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 no-print">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 no-print">
                   <label className="text-[10px] font-bold text-slate-500">
                     من تاريخ
                     <span className="relative mt-1 block">
@@ -511,7 +511,7 @@ export const SuppliersView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="supplier-company" className="font-bold text-slate-700 block mb-1">اسم المصنع / الشركة</label>
                   <input

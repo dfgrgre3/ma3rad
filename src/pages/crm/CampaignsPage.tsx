@@ -216,7 +216,7 @@ export const CampaignsPage: React.FC = () => {
                 <label htmlFor="campaign-name" className="font-bold text-slate-700 block mb-1">اسم الحملة *</label>
                 <input id="campaign-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="campaign-channel" className="font-bold text-slate-700 block mb-1">القناة</label>
                   <select id="campaign-channel" value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value as Channel })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
@@ -230,7 +230,7 @@ export const CampaignsPage: React.FC = () => {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="campaign-starts-at" className="font-bold text-slate-700 block mb-1">تاريخ البدء</label>
                   <input id="campaign-starts-at" type="date" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
@@ -240,7 +240,7 @@ export const CampaignsPage: React.FC = () => {
                   <input id="campaign-ends-at" type="date" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="campaign-budget" className="font-bold text-slate-700 block mb-1">الميزانية</label>
                   <input id="campaign-budget" type="number" min={0} step="0.01" value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />

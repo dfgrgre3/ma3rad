@@ -1,5 +1,6 @@
 import { DatabaseManager } from '../database/db';
 import { AuditService } from './AuditService';
+import { CentralFeaturePermissionService } from './CentralFeaturePermissionService';
 import type { Role, User } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -207,6 +208,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'admin.data', name: 'أدوات البيانات والصيانة', module: 'ADMIN' },
   { code: 'admin.data.export', name: 'تصدير بيانات النظام', module: 'ADMIN' },
   { code: 'admin.data.delete', name: 'حذف بيانات النظام', module: 'ADMIN' },
+  { code: 'admin.license.manage', name: 'إدارة ترخيص المنصة المركزية', module: 'ADMIN' },
 
   // Electronic invoicing
   { code: 'electronic_invoices.view', name: 'عرض الفواتير الإلكترونية', module: 'E_INVOICING' },
@@ -719,6 +721,19 @@ export class PermissionService {
 
   public static can(user: User | null, required: string): boolean {
     if (!user) return false;
+    // القيود المنشورة من منصة الإدارة المركزية تتقدّم على صلاحيات الأدوار،
+    // فتُخفى الأزرار/الإجراءات تلقائياً في كل واجهة تعتمد على هذه الطبقة.
+    if (!CentralFeaturePermissionService.allowsPermission(required)) return false;
+    return PermissionService.hasRoleGrant(user, required);
+  }
+
+  /**
+   * فحص صلاحية الدور فقط (بدون قيود الصفحة المركزية). يُستخدم في طبقة
+   * الخدمات لأن قيود المنصة مرتبطة بمسار الواجهة الحالي، وربطها بعمليات
+   * خلفية (مزامنة/تقارير) قد يمنع أعمالًا مشروعة.
+   */
+  public static hasRoleGrant(user: User | null, required: string): boolean {
+    if (!user) return false;
     const { grants, denies } = PermissionService.loadSets(user);
     const [mod] = required.split('.');
     // A user-level DENY always wins — including over role wildcards
@@ -735,7 +750,7 @@ export class PermissionService {
 
   /** Server-side (service-layer) enforcement — never trust the UI. */
   public static require(user: User | null, required: string): void {
-    if (!PermissionService.can(user, required)) {
+    if (!user || !PermissionService.hasRoleGrant(user, required)) {
       PermissionService.audit(
         user,
         'محاولة وصول مرفوضة',

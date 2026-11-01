@@ -69,7 +69,7 @@ export const ProductsCards: React.FC<ProductsCardsProps> = ({
                         <span className="rounded-md bg-sky-50 px-2 py-0.5 text-sky-700">{p.piecesPerBox} قطعة / {p.metersPerBox} م²</span>
                       </>}
                     </div>
-                    <div className={`grid gap-2 text-center ${canViewCosts && canViewPricing ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    <div className={`grid gap-2 text-center ${canViewCosts && canViewPricing ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                       {canViewPricing && <div className="rounded-lg border border-slate-200 py-1.5">
                         <div className="text-[9px] font-bold text-slate-400">سعر {getProductUnitLabel(p)}</div>
                         <div className="text-xs font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</div>

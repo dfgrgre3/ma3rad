@@ -9,6 +9,7 @@ import { ModuleRegistryService } from './ModuleRegistryService';
 import { SettingsService } from './SettingsService';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
 import { MasterDataSyncService } from '../sync/MasterDataSyncService';
+import { CentralUsageLimitService } from './CentralUsageLimitService';
 
 export interface ProductQueryOptions {
   brandId?: string;
@@ -175,6 +176,7 @@ export class ProductService {
 
   public createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, initialStock?: { warehouseId: string; quantityM2: number; unitCost: number }, performedBy = 'usr_admin'): Product {
     PermissionService.require(AuthService.requireAuth(), 'products.create');
+    CentralUsageLimitService.assertWithin('maxProducts');
     if (initialStock && initialStock.quantityM2 > 0 && !ModuleRegistryService.isInventoryTracked()) {
       throw new Error('هذا النشاط لا يتبّع المخزون، لذلك لا يمكن تسجيل رصيد افتتاحي. اضبط كميات المخزون من إعدادات النشاط أولًا.');
     }
@@ -192,6 +194,14 @@ export class ProductService {
     const existing = this.db.query(`SELECT id FROM products WHERE barcode = ? OR sku = ?`, [product.barcode, product.sku]);
     if (existing.length > 0) {
       throw new Error(`الباركود (${product.barcode}) أو الكود (${product.sku}) مستخدم بالفعل لمنتج آخر.`);
+    }
+    if (product.categoryId) {
+      const category = this.db.query('SELECT id FROM categories WHERE id = ?', [product.categoryId]);
+      if (category.length === 0) throw new Error('التصنيف المحدد غير موجود.');
+    }
+    if (product.brandId) {
+      const brand = this.db.query('SELECT id FROM brands WHERE id = ?', [product.brandId]);
+      if (brand.length === 0) throw new Error('الماركة المحددة غير موجودة.');
     }
 
     return this.db.executeTransaction((sqliteDb) => {
@@ -262,6 +272,23 @@ export class ProductService {
     PermissionService.require(AuthService.requireAuth(), 'products.update');
     const existing = this.getProductById(id);
     if (!existing) throw new Error('المنتج غير موجود.');
+
+    if (updates.sku && updates.sku !== existing.sku) {
+      const dup = this.db.query('SELECT id FROM products WHERE sku = ? AND id != ?', [updates.sku, id]);
+      if (dup.length > 0) throw new Error(`الكود (${updates.sku}) مستخدم بالفعل لمنتج آخر.`);
+    }
+    if (updates.barcode && updates.barcode !== existing.barcode) {
+      const dup = this.db.query('SELECT id FROM products WHERE barcode = ? AND id != ?', [updates.barcode, id]);
+      if (dup.length > 0) throw new Error(`الباركود (${updates.barcode}) مستخدم بالفعل لمنتج آخر.`);
+    }
+    if (updates.categoryId) {
+      const category = this.db.query('SELECT id FROM categories WHERE id = ?', [updates.categoryId]);
+      if (category.length === 0) throw new Error('التصنيف المحدد غير موجود.');
+    }
+    if (updates.brandId) {
+      const brand = this.db.query('SELECT id FROM brands WHERE id = ?', [updates.brandId]);
+      if (brand.length === 0) throw new Error('الماركة المحددة غير موجودة.');
+    }
 
     const sql = `
       UPDATE products SET

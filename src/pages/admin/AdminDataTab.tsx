@@ -163,7 +163,7 @@ export const AdminDataTab: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat icon={Database} label="حجم قاعدة البيانات" value={stats ? formatBytes(stats.databaseBytes) : '—'} />
         <Stat icon={HardDrive} label="حجم التخزين المحلي" value={stats ? formatBytes(stats.localStorageBytes) : '—'} />
         <Stat icon={Table2} label="عدد الجداول" value={stats ? String(stats.tableCount) : '—'} />

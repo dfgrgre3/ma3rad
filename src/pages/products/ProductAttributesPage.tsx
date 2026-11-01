@@ -190,7 +190,7 @@ export const ProductAttributesPage: React.FC = () => {
             </div>
             <form onSubmit={handleAddCategory} className="space-y-3 text-xs">
               <div><label className="font-bold text-slate-700 block mb-1">الاسم *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" /></div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">الرمز *</label><input required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="TILE_COLOR" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">الوحدة</label><input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="م² / سم" className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               </div>
@@ -212,7 +212,7 @@ export const ProductAttributesPage: React.FC = () => {
                   />
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <label className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 font-semibold">
                   <input
                     type="checkbox"

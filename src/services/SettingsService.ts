@@ -159,6 +159,34 @@ export class SettingsService {
 
   // ─── Subscriptions ──────────────────────────────────────────────────────────
 
+  public static applyCentral(patch: Record<string, string>): void {
+    const db = SettingsService.db();
+    const changedKeys: string[] = [];
+    for (const [key, value] of Object.entries(patch)) {
+      const row = db.query<{ value: string }>('SELECT value FROM system_settings WHERE key = ?', [key])[0];
+      const oldValue = row?.value ?? DEFAULT_SETTINGS[key];
+      if (oldValue === value) continue;
+      changedKeys.push(key);
+    }
+    if (changedKeys.length === 0) return;
+
+    // كتابة ذرّية: إما تُطبَّق كل قيم المنصة المركزية أو لا شيء.
+    db.executeTransaction((tx) => {
+      for (const key of changedKeys) {
+        tx.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [key, patch[key]]);
+      }
+    });
+    try {
+      new AuditService().log({
+        action: 'تطبيق إعدادات من المنصة المركزية',
+        module: 'SYSTEM',
+        recordId: changedKeys.join(','),
+        newValues: JSON.stringify(Object.fromEntries(changedKeys.map((key) => [key, patch[key]]))),
+      });
+    } catch { /* التسجيل لا يجب أن يعطّل التطبيق */ }
+    try { notifySettings(SettingsService.getSettings()); } catch { /* ignore */ }
+  }
+
   public static subscribe(listener: Listener): () => void {
     return subscribeSettings(listener);
   }

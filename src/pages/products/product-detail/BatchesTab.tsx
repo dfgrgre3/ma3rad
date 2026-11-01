@@ -85,7 +85,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
       {Object.keys(toneGroups).length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2"><Palette className="w-4 h-4 text-violet-500" /> ملخص النغمات المتاحة</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {Object.values(toneGroups).map((g) => (
               <div key={`${g.tone}-${g.caliber}`} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
                 <div className="text-xs font-bold text-slate-700 mb-1">
@@ -116,7 +116,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2"><Palette className="w-4 h-4 text-sky-500" /> تسجيل دفعة / تشغيلة جديدة</h4>
                 <button type="button" onClick={() => setFormOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">المخزن *</label>
                   <select required value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">

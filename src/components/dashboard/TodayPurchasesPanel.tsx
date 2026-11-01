@@ -73,7 +73,7 @@ export const TodayPurchasesPanel: React.FC<TodayPurchasesPanelProps> = ({
       </div>
 
       {/* 4 Compact Purchase KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
         <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
           <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">إجمالي التوريد</span>
           <div className="text-sm font-black tabular-nums text-orange-700 dark:text-orange-400 mt-0.5">

@@ -184,7 +184,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
 
         <div className="p-6 flex-1 overflow-y-auto space-y-4">
           {session.rejectionReason && session.status === 'COUNTING' && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>سبب الرفض السابق:</strong> {session.rejectionReason}</div>}
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-slate-900">{countedItems}/{items.length}</div><div className="text-[11px] text-slate-500">أصناف تم جردها</div></div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-amber-600">{Math.max(0, items.length - countedItems)}</div><div className="text-[11px] text-slate-500">أصناف متبقية</div></div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-violet-600">{varianceItems}</div><div className="text-[11px] text-slate-500">فروقات مسجلة</div></div>

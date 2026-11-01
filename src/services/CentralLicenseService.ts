@@ -2,6 +2,9 @@
 // Talks to the Central Super Admin platform over HTTPS.
 // All operations are optional and never block local business operations.
 
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
+
 const STORAGE_KEY = 'central_device_credential';
 const SERVER_KEY = 'central_server_url';
 const CONFIG_KEY = 'central_cached_config';
@@ -11,6 +14,9 @@ const LAST_VALIDATED_KEY = 'central_last_validated_at';
 // without reaching the licensing server for this long. After that, the app
 // fails closed until the license can be validated again.
 const VALIDATION_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** يُطلَق عند وصول تكوين مركزي جديد حتى تُعيد الواجهة تقييم الحدود والصلاحيات. */
+export const CENTRAL_CONFIG_CHANGED_EVENT = 'central-config-changed';
 
 export interface CentralActivationResult {
   deviceCredential?: string;
@@ -25,17 +31,62 @@ export interface CentralConfig {
   configurationVersion: number;
   tenantId?: string;
   activityId?: string;
+  activityType?: string;
   config: any;
   configJson?: string;
   signature?: string;
 }
 
 export class CentralLicenseService {
+  /**
+   * رقم مراجعة يزداد عند كل تغيّر فعلي في التكوين المركزي، فتستخدمه الواجهة
+   * لإعادة تقييم الصلاحيات وإخفاء/إظهار الأزرار فورًا.
+   */
+  private static configRevision = 0;
+
+  static getConfigRevision(): number {
+    return CentralLicenseService.configRevision;
+  }
+
   static getServerUrl(): string {
     try { return localStorage.getItem(SERVER_KEY) || 'http://localhost:4000'; } catch { return 'http://localhost:4000'; }
   }
+
+  /**
+   * القاعدة الآمنة للاتصال بالمنصة المركزية: HTTPS إلزامي، ويُسمح بـ HTTP
+   * فقط على هذا الجهاز (localhost) أثناء التطوير. أي رابط غير آمن يُرفض حتى
+   * لا يُرسل رمز الجهاز (credential) عبر اتصال غير مشفّر.
+   */
+  static getSecureServerUrl(): string {
+    const base = CentralLicenseService.getServerUrl().trim().replace(/\/+$/, '');
+    if (!base) return '';
+    try {
+      const url = new URL(base);
+      const localHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+      if (url.protocol === 'https:') return base;
+      if (url.protocol === 'http:' && localHosts.has(url.hostname)) return base;
+    } catch {
+      return '';
+    }
+    return '';
+  }
+
   static setServerUrl(url: string) {
-    localStorage.setItem(SERVER_KEY, url.replace(/\/$/, ''));
+    const normalized = String(url || '').trim().replace(/\/+$/, '');
+    if (!normalized) {
+      localStorage.setItem(SERVER_KEY, '');
+      return;
+    }
+    const previous = CentralLicenseService.getServerUrl();
+    try {
+      localStorage.setItem(SERVER_KEY, normalized);
+      if (!CentralLicenseService.getSecureServerUrl()) {
+        throw new Error('رابط المنصة المركزية يجب أن يبدأ بـ https:// (يُسمح بـ http://localhost للتطوير فقط).');
+      }
+    } catch (error) {
+      try { localStorage.setItem(SERVER_KEY, previous); } catch { /* ignore */ }
+      throw error;
+    }
   }
 
   static getCredential(): string {
@@ -53,7 +104,10 @@ export class CentralLicenseService {
   }
 
   static async activate(activationCode: string, deviceName?: string): Promise<CentralActivationResult> {
-    const base = this.getServerUrl();
+    // تفعيل الجهاز عملية إدارية حسّاسة: لا تكفي معرفة المسار، بل تُشترط صلاحية
+    // صريحة على مستوى الخدمة أيضاً (والمسار محميّ بـ admin.license.manage).
+    PermissionService.require(AuthService.getCurrentUser(), 'admin.license.manage');
+    const base = this.getSecureServerUrl();
     if (!base) throw new Error('Central server URL not configured');
     const res = await fetch(base + '/api/v1/licensing/activate', {
       method: 'POST',
@@ -120,7 +174,7 @@ export class CentralLicenseService {
    * has elapsed without a successful validation.
    */
   static async validate(): Promise<boolean> {
-    const base = this.getServerUrl();
+    const base = this.getSecureServerUrl();
     const cred = this.getCredential();
     if (!base || !cred) return false;
 
@@ -159,7 +213,7 @@ export class CentralLicenseService {
   }
 
   static async heartbeat(): Promise<void> {
-    const base = this.getServerUrl();
+    const base = this.getSecureServerUrl();
     const cred = this.getCredential();
     if (!base || !cred) return;
     try {
@@ -171,8 +225,77 @@ export class CentralLicenseService {
     } catch { /* ignore */ }
   }
 
+  /**
+   * بيانات المنشأة والفروع المخصّصة من الإدارة المركزية لهذا الجهاز.
+   * تبقى كل استدعاءات الشبكة في هذا الملف وحده (سياسة الجهاز الواحد).
+   */
+  static async fetchEstablishment(): Promise<any | null> {
+    const base = this.getSecureServerUrl();
+    const credential = this.getCredential();
+    const deviceId = this.getDeviceId();
+    if (!base || !credential) return null;
+    try {
+      // رمز الجهاز يُرسل في الترويسات فقط ولا يظهر في عنوان URL (سجلات/وسطاء).
+      const res = await fetch(base + '/api/v1/configuration/establishment', {
+        headers: { 'X-Device-Id': deviceId, 'X-Device-Credential': credential },
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * إرسال تقرير خطأ إلى القياس المركزي (best-effort).
+   */
+  static async postTelemetryError(payload: {
+    deviceId?: string;
+    title: string;
+    description: string;
+    stackTrace: string;
+    issueType: string;
+    severity: string;
+  }): Promise<void> {
+    const base = this.getSecureServerUrl();
+    if (!base) return;
+    try {
+      await fetch(base + '/api/v1/telemetry/errors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: payload.deviceId || this.getDeviceId(),
+          deviceCredential: this.getCredential(),
+          title: payload.title,
+          description: payload.description,
+          stackTrace: payload.stackTrace,
+          issueType: payload.issueType,
+          severity: payload.severity,
+        }),
+      });
+    } catch { /* ignore */ }
+  }
+
+  /**
+   * جلب قائمة الإصدارات المنشورة من الإدارة المركزية.
+   */
+  static async fetchReleases(): Promise<any[]> {
+    const base = this.getSecureServerUrl();
+    if (!base) return [];
+    try {
+      const cred = this.getCredential();
+      const res = await fetch(base + '/api/v1/releases', {
+        headers: cred ? { 'X-Device-Id': this.getDeviceId(), 'X-Device-Credential': cred } : {},
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch { return []; }
+  }
+
   static async fetchPublicKey(): Promise<string | null> {
-    const base = this.getServerUrl();
+    const base = this.getSecureServerUrl();
     if (!base) return null;
     try {
       const res = await fetch(base + '/api/v1/configuration/public-key');
@@ -183,8 +306,10 @@ export class CentralLicenseService {
   }
 
   static async verifyConfig(data: CentralConfig): Promise<boolean> {
-    // Unsigned payloads are accepted only for legacy compatibility.
-    if (!data || !data.signature || !data.config) return true;
+    // Fail closed: a configuration is trusted only when it carries a signature
+    // that verifies against the published public key. Unsigned, malformed or
+    // unverifiable payloads are rejected outright instead of being accepted.
+    if (!data || !data.config || typeof data.signature !== 'string' || !data.signature) return false;
     try {
       const pub = await this.fetchPublicKey();
       if (!pub) return false; // signed but unverifiable => fail closed
@@ -205,18 +330,29 @@ export class CentralLicenseService {
   }
 
   static async fetchConfig(): Promise<CentralConfig | null> {
-    const base = this.getServerUrl();
+    const base = this.getSecureServerUrl();
     const cred = this.getCredential();
     if (!base) return null;
     try {
-      const url = base + '/api/v1/configuration/current?deviceId=' + encodeURIComponent(this.getDeviceId()) + (cred ? '&credential=' + encodeURIComponent(cred) : '');
-      const res = await fetch(url, { headers: cred ? { 'X-Device-Id': this.getDeviceId(), 'X-Device-Credential': cred } : {} });
+      // رمز الجهاز يُرسل في الترويسات فقط ولا يظهر في عنوان URL (سجلات/وسطاء).
+      const deviceId = this.getDeviceId();
+      const res = await fetch(base + '/api/v1/configuration/current', {
+        headers: { 'X-Device-Id': deviceId, ...(cred ? { 'X-Device-Credential': cred } : {}) },
+      });
       if (!res.ok) return null;
       const data = await res.json();
       if (data) {
         // Signed configuration must verify before it can replace the cached copy.
         if (!(await this.verifyConfig(data))) return this.getCachedConfig();
+        const previous = this.getCachedConfig();
+        // لا نُشعر الواجهة إلا عند تغيّر فعلي، حتى لا تُعاد التقييمات بلا داعٍ
+        // عند الاستقصاء القصير للتحديث الفوري.
+        const changed = !previous || previous.configurationVersion !== data.configurationVersion;
         try { localStorage.setItem(CONFIG_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+        if (changed) {
+          CentralLicenseService.configRevision += 1;
+          try { this.notify(); } catch { /* ignore */ }
+        }
       }
       return data;
     } catch { return this.getCachedConfig(); }
@@ -229,6 +365,59 @@ export class CentralLicenseService {
     } catch { return null; }
   }
 
+  private static listeners = new Set<(cfg: CentralConfig | null) => void>();
+
+  static subscribe(listener: (cfg: CentralConfig | null) => void): () => void {
+    this.listeners.add(listener);
+    try { listener(this.getCachedConfig()); } catch { /* ignore */ }
+    return () => { this.listeners.delete(listener); };
+  }
+
+  private static notify(): void {
+    const cfg = this.getCachedConfig();
+    for (const l of this.listeners) {
+      try { l(cfg); } catch { /* ignore */ }
+    }
+    try {
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new Event(CENTRAL_CONFIG_CHANGED_EVENT));
+      }
+    } catch { /* ignore */ }
+  }
+
+  static getActivityType(): string | undefined {
+    return this.getCachedConfig()?.activityType || this.getCachedConfig()?.config?.activityType;
+  }
+
+  static getAllowedModules(): string[] | null {
+    const cfg = this.getCachedConfig();
+    const m = cfg?.config?.allowedModules;
+    return Array.isArray(m) ? (m as string[]) : null;
+  }
+
+  static getHiddenMenus(): string[] {
+    const cfg = this.getCachedConfig();
+    const m = cfg?.config?.hiddenMenus;
+    return Array.isArray(m) ? (m as string[]) : [];
+  }
+
+  static getFeaturePermissions(): any[] {
+    const cfg = this.getCachedConfig();
+    const m = cfg?.config?.featurePermissions;
+    return Array.isArray(m) ? m : [];
+  }
+
+  static getUsageLimits(): Record<string, any> {
+    const cfg = this.getCachedConfig();
+    const m = cfg?.config?.usageLimits;
+    return (m && typeof m === 'object') ? m : {};
+  }
+  /** أكواد الصلاحيات/الأزرار المعطّلة من منصة الإدارة المركزية لهذا الترخيص. */
+  static getDisabledPermissions(): string[] {
+    const cfg = this.getCachedConfig();
+    const m = cfg?.config?.disabledPermissions;
+    return Array.isArray(m) ? (m as string[]) : [];
+  }
   static isConfigured(): boolean {
     return !!this.getServerUrl();
   }

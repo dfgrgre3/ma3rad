@@ -195,7 +195,7 @@ export const ApprovalsPage: React.FC = () => {
         )}
       </div>
 
-      <div className="p-4 grid grid-cols-3 gap-3">
+      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'قيد الانتظار', value: stats.pending, color: 'text-amber-600 bg-amber-50 border-amber-200' },
           { label: 'تم اعتمادها', value: stats.approved, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
@@ -274,7 +274,7 @@ export const ApprovalsPage: React.FC = () => {
                 <label htmlFor="approval-description" className="font-bold text-slate-700 block mb-1">الوصف</label>
                 <textarea id="approval-description" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label htmlFor="approval-requested-value" className="font-bold text-slate-700 block mb-1">القيمة المطلوبة (ج)</label>
                   <input id="approval-requested-value" type="number" min="0" step="0.01" value={form.requestedValue} onChange={(e) => setForm({ ...form, requestedValue: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />

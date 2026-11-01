@@ -48,7 +48,7 @@ export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, ca
       {canEdit && (
         <form onSubmit={add} className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900 mb-3"><GitBranch className="w-4 h-4 text-sky-600" /> إضافة نوع / متغير</div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <input required placeholder="اسم المتغير *" value={form.variantName} onChange={(e) => setForm({ ...form, variantName: e.target.value })} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold" />
             <input required placeholder="كود SKU *" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
             <input placeholder="باركود" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />

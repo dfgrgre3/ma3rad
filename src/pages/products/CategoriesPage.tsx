@@ -130,7 +130,7 @@ export const CategoriesPage: React.FC = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-500"><FolderTree className="w-4 h-4 text-sky-600" /> إجمالي الأنواع</div>
           <div className="mt-1 text-2xl font-black text-slate-900">{totalCategories}</div>

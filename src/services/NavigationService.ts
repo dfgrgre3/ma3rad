@@ -8,6 +8,7 @@ import { resolveBusinessTerm, type BusinessTermKey } from '../config/businessTer
 import { TerminologyService } from './TerminologyService';
 import { AppConfigService } from './AppConfigService';
 import { CentralLicenseService } from './CentralLicenseService';
+import { CentralFeaturePermissionService } from './CentralFeaturePermissionService';
 
 export interface NavOverrides {
   hidden: string[];
@@ -47,6 +48,7 @@ export class NavigationService {
   private static readonly routePermissions: Array<[string, string[]]> = [
     ['/admin/data-deletion', ['admin.data.delete']],
     ['/admin/sync-conflicts', ['admin.view']],
+    ['/central-activation', ['admin.license.manage']],
     ['/data-import/types', ['settings.view']],
     ['/finance/debts', ['finance.debts.view']],
     ['/crm', ['crm.view']],
@@ -90,11 +92,8 @@ export class NavigationService {
 
   public static getAccessibleGroups(user: User | null): NavGroupDef[] {
     const centralCfg = CentralLicenseService.getCachedConfig();
-    const centralHidden: string[] = Array.isArray(centralCfg?.config?.hiddenMenus)
-      ? centralCfg!.config.hiddenMenus
-      : [];
-    const isCentralHidden = (path: string) =>
-      centralHidden.some((h) => path === h || path.startsWith(String(h).replace(/\/$/, '') + '/'));
+    // Single source of truth for per-page visibility (hidden menus + feature flags).
+    const isCentralHidden = (path: string) => !CentralFeaturePermissionService.isPageVisible(path);
     const centralAllowed: string[] | null = Array.isArray(centralCfg?.config?.allowedModules)
       ? (centralCfg!.config.allowedModules as string[])
       : null;

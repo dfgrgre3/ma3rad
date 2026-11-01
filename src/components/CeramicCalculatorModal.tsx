@@ -168,7 +168,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
           {/* Target Area Mode */}
           <fieldset>
             <legend className="block text-xs font-bold text-slate-700 mb-2">نوع المساحة المراد تبليطها</legend>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setCalculationMode('FLOOR')}
@@ -269,7 +269,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 space-y-3">
               <span className="text-xs font-bold text-slate-700 block">خصومات الفتحات (أبواب وشبابيك)</span>
               <p className="text-[11px] text-slate-500">اختر المقاس الشائع والعدد لإضافتهم دفعة واحدة، أو عدّل مقاس كل فتحة يدويًا. المقاسات إرشادية ويُفضّل مطابقتها مع القياس الفعلي بالموقع.</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(['doors', 'windows'] as const).map((kind) => {
                   const openings = kind === 'doors' ? doors : windows;
                   const setOpenings = kind === 'doors' ? setDoors : setWindows;
@@ -285,7 +285,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
                       <label className="text-[11px] text-slate-600">العدد<input type="number" min="1" max="50" step="1" value={countToAdd} onChange={e => setCountToAdd(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} className="mt-1 w-full rounded-lg border bg-white px-2 py-1.5 text-slate-900" /></label>
                       <button type="button" onClick={kind === 'doors' ? addDoors : addWindows} className="self-end rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">إضافة العدد</button>
                     </div>
-                    {openings.map((opening, index) => <div key={`${kind}-${index}`} className="grid grid-cols-2 sm:grid-cols-[1.2fr_1fr_1fr_1fr_auto] gap-2 items-end rounded-xl border border-slate-100 bg-slate-50 p-2">
+                    {openings.map((opening, index) => <div key={`${kind}-${index}`} className="grid grid-cols-1 sm:grid-cols-2 sm:grid-cols-[1.2fr_1fr_1fr_1fr_auto] gap-2 items-end rounded-xl border border-slate-100 bg-slate-50 p-2">
                       <label className="text-[11px] text-slate-500">الاسم<input aria-label={`اسم ${opening.name}`} type="text" value={opening.name} onChange={e => setOpenings(openings.map((item, i) => i === index ? { ...item, name: e.target.value } : item))} className="mt-1 w-full rounded-lg border bg-white px-2 py-1 text-slate-900" /></label>
                       <label className="col-span-2 text-[11px] text-slate-500">المقاس<select value={opening.sizePreset} onChange={e => { const preset = presets.find(option => option.id === e.target.value); setOpenings(openings.map((item, i) => i === index ? { ...item, sizePreset: e.target.value, ...(preset ? { width: preset.width, height: preset.height } : {}) } : item)); }} className="mt-1 w-full rounded-lg border bg-white px-2 py-1 text-slate-900"><option value="custom">مقاس مخصص</option>{presets.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
                       <label className="text-[11px] text-slate-500">العرض (م)<input aria-label={`${opening.name} العرض بالمتر`} type="number" min="0.01" step="0.05" value={opening.width} onChange={e => setOpenings(openings.map((item, i) => i === index ? { ...item, sizePreset: 'custom', width: Number(e.target.value) } : item))} className="mt-1 w-full rounded-lg border bg-white px-2 py-1 text-slate-900" /></label>
@@ -300,7 +300,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
             </div>
           )}
 
-          {calculationMode !== 'FLOOR' && <div className="grid grid-cols-3 gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs">
+          {calculationMode !== 'FLOOR' && <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-xs">
             <div><span className="block text-slate-500">خصم الأبواب</span><b>{doorsDeduction.toFixed(2)} م²</b></div>
             <div><span className="block text-slate-500">خصم الشبابيك</span><b>{windowsDeduction.toFixed(2)} م²</b></div>
             <div><span className="block text-slate-500">صافي الجدران</span><b>{wallsNetArea.toFixed(2)} م²</b></div>
@@ -311,7 +311,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
             <legend className="block text-xs font-bold text-slate-700 mb-2">
               طريقة التركيب ونسبة الهدر الموصى بها (Waste Allowance)
             </legend>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => chooseWaste(5)}
@@ -361,7 +361,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
               <h3 className="text-sm font-black text-slate-800">تقدير مواد التركيب</h3>
               <p className="mt-1 text-[11px] text-slate-500">تقدير إرشادي قابل للتعديل؛ الاستهلاك الفعلي يتغير حسب استواء السطح ونوع اللاصق ومقاس الفواصل.</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1  sm:grid-cols-4 gap-2">
               <label className="text-[11px] text-slate-600">طول البلاطة (سم)<input type="number" min="1" step="1" value={tileLengthCm} onChange={e => setTileLengthCm(Number(e.target.value))} className="mt-1 w-full rounded-lg border bg-white px-2 py-1.5 text-slate-900" /></label>
               <label className="text-[11px] text-slate-600">عرض البلاطة (سم)<input type="number" min="1" step="1" value={tileWidthCm} onChange={e => setTileWidthCm(Number(e.target.value))} className="mt-1 w-full rounded-lg border bg-white px-2 py-1.5 text-slate-900" /></label>
               <label className="text-[11px] text-slate-600">لاصق (كجم/م²)<input type="number" min="0" step="0.5" value={adhesiveKgPerM2} onChange={e => setAdhesiveKgPerM2(Number(e.target.value))} className="mt-1 w-full rounded-lg border bg-white px-2 py-1.5 text-slate-900" /></label>
@@ -371,7 +371,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
               <label className="flex items-center gap-2 text-[11px] text-slate-600"><input type="checkbox" checked={includeWaterproofing} onChange={e => setIncludeWaterproofing(e.target.checked)} />عزل مائي للمناطق الرطبة</label>
               {includeWaterproofing && <label className="text-[11px] text-slate-600">العزل (كجم/م²)<input type="number" min="0" step="0.1" value={waterproofingKgPerM2} onChange={e => setWaterproofingKgPerM2(Number(e.target.value))} className="mt-1 w-full rounded-lg border bg-white px-2 py-1.5 text-slate-900" /></label>}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-1  sm:grid-cols-4 gap-2 text-center">
               <div className="rounded-xl border bg-white p-2"><span className="block text-[10px] text-slate-500">لاصق 25 كجم</span><b className="text-sm text-slate-800">{adhesiveBags} كيس</b><span className="block text-[10px] text-slate-500">{adhesiveKg.toFixed(1)} كجم إجمالي · {adhesiveKgPerM2} كجم/م²</span></div>
               <div className="rounded-xl border bg-white p-2"><span className="block text-[10px] text-slate-500">روبة الفواصل</span><b className="text-sm text-slate-800">{groutKg.toFixed(1)} كجم</b><span className="block text-[10px] text-slate-500">{groutKgPerM2.toFixed(2)} كجم/م²</span></div>
               <div className="rounded-xl border bg-white p-2"><span className="block text-[10px] text-slate-500">فواصل البلاط</span><b className="text-sm text-slate-800">{spacersCount} قطعة</b><span className="block text-[10px] text-slate-500">تقدير 4 لكل بلاطة</span></div>
@@ -397,7 +397,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div className="grid grid-cols-1  sm:grid-cols-4 gap-3 text-center">
               <div className="p-2 rounded-xl bg-white border border-slate-200">
                 <span className="text-[11px] text-slate-500 block">صافي المساحة</span>
                 <span className="text-sm font-bold text-slate-900">{netTargetArea.toFixed(2)} م²</span>

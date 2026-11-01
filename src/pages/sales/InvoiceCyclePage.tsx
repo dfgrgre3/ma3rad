@@ -134,7 +134,7 @@ const CollectPaymentModal: React.FC<CollectPaymentModalProps> = ({ invoice, onCl
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">طريقة الدفع</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {(['CASH', 'CARD', 'BANK_TRANSFER'] as PaymentType[]).map(pt => (
                 <button
                   key={pt}
@@ -261,7 +261,7 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1">إجمالي الفاتورة</p>
               <p className="font-bold text-sm text-slate-900 dark:text-slate-100">{fmt(invoice.totalAmount)}</p>
@@ -492,7 +492,7 @@ export const InvoiceCyclePage: React.FC = () => {
 
       {/* Stats */}
       {stats && (
-        <div className="px-6 py-4 grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             { label: 'إجمالي الفواتير', value: stats.count, icon: Receipt, color: 'from-slate-500 to-slate-600' },
             { label: 'الإجمالي', value: fmt(stats.totalAmount), icon: TrendingUp, color: 'from-emerald-500 to-teal-600' },

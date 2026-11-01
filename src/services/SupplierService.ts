@@ -66,6 +66,12 @@ export class SupplierService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.create');
     if (Number(supplier.initialBalance || 0) !== 0) PermissionService.require(actor, 'finance.approve');
+    const cleanName = String(supplier.name || '').trim();
+    if (!cleanName) throw new Error('اسم المورد مطلوب.');
+    if (!String(supplier.phone || '').trim()) throw new Error('رقم هاتف المورد مطلوب.');
+    supplier.name = cleanName;
+    const existing = this.db.query('SELECT id FROM suppliers WHERE name = ?', [cleanName]);
+    if (existing.length > 0) throw new Error('اسم المورد مسجل مسبقاً.');
     const id = `sup_${uuidv4().substring(0, 8)}`;
     const code = supplier.code || `SUP-${Date.now().toString().slice(-5)}`;
 
@@ -99,6 +105,19 @@ export class SupplierService {
     if (updates.isActive !== undefined) PermissionService.require(actor, 'suppliers.delete');
     const existing = this.readSupplier(id);
     if (!existing) throw new Error('المورد غير موجود.');
+
+    if (updates.name !== undefined) {
+      const cleanName = String(updates.name || '').trim();
+      if (!cleanName) throw new Error('اسم المورد مطلوب.');
+      updates.name = cleanName;
+      if (cleanName !== existing.name) {
+        const dup = this.db.query('SELECT id FROM suppliers WHERE name = ? AND id != ?', [cleanName, id]);
+        if (dup.length > 0) throw new Error('اسم المورد مسجل مسبقاً.');
+      }
+    }
+    if (updates.phone !== undefined && !String(updates.phone || '').trim()) {
+      throw new Error('رقم هاتف المورد مطلوب.');
+    }
 
     const sql = `
       UPDATE suppliers SET

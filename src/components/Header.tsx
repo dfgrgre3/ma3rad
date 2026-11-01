@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Building2, Menu, Moon, Search, Sun } from 'lucide-react';
 import type { User } from '../types';
 import { NavigationService } from '../services/NavigationService';
+import { CentralFeaturePermissionService } from '../services/CentralFeaturePermissionService';
 import { BranchAccessService } from '../services/BranchAccessService';
 import { PermissionService } from '../services/PermissionService';
 import { useTheme } from '../contexts/ThemeContext';
@@ -39,10 +40,12 @@ const EXTRA_TITLES: Record<string, string> = {
 
 /** Resolve the current page title from the navigation structure. */
 export function resolvePageTitle(pathname: string): { title: string; group: string } {
-  let best: { title: string; group: string; length: number } | null = null;
+  const isHidden = (path: string) => !CentralFeaturePermissionService.isPageVisible(path);
 
+  let best: { title: string; group: string; length: number } | null = null;
   for (const group of NavigationService.getGroups()) {
     for (const item of group.items) {
+      if (isHidden(item.to)) continue;
       const matches = pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`));
       if (matches && item.to.length > (best?.length ?? -1)) {
         best = { title: item.label, group: group.label, length: item.to.length };
@@ -163,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* Actions */}
-      <div className="mr-auto flex shrink-0 items-center gap-1">
+      <div className="mr-auto flex shrink-0 flex-wrap items-center gap-1">
         {branches.length > 0 && (
           <label className="flex h-8 max-w-48 items-center gap-1.5 rounded-[2px] border border-[#a6a6a6] bg-white px-2 text-[#4d4d4d] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] sm:max-w-60">
             <Building2 className="h-3.5 w-3.5 shrink-0 text-[#0078d4]" />

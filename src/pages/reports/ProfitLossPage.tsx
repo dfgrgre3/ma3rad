@@ -138,7 +138,7 @@ export const ProfitLossPage: React.FC = () => {
                   <span className={`font-mono font-black text-xl ${pnl.netProfit >= 0 ? 'text-sky-800' : 'text-rose-800'}`}>{fmt(pnl.netProfit)}</span>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-px bg-slate-200 border-t border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-slate-200 border-t border-slate-200">
                 <div className="bg-white px-4 py-3 text-center">
                   <div className="text-[10px] text-slate-400 font-bold">هامش صافي الربح</div>
                   <div className={`text-lg font-black mt-1 ${pnl.margin >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{pnl.margin}%</div>

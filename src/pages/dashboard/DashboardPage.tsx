@@ -10,6 +10,10 @@ import { OverviewSection } from '../../components/dashboard/OverviewSection';
 import { QuickActions } from '../../components/dashboard/QuickActions';
 import { SectionCard } from '../../components/dashboard/SectionCard';
 import { SECTIONS_CONFIG, type SectionId } from '../../components/dashboard/types';
+import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
+import { ModuleRegistryService } from '../../services/ModuleRegistryService';
+import { CentralFeaturePermissionService } from '../../services/CentralFeaturePermissionService';
 
 // Lazy loaded integrated dashboards
 const ExecutiveDashboard = lazy(() => import('./ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
@@ -20,6 +24,20 @@ const CrmDashboardPage = lazy(() => import('../crm/CrmDashboardPage').then(m => 
 const FleetDashboardPage = lazy(() => import('../operations/FleetDashboardPage').then(m => ({ default: m.FleetDashboardPage })));
 const HrDashboardPage = lazy(() => import('../hr/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
 
+/**
+ * كل قسم داخل لوحة المعلومات يخضع لصلاحية مجاله ووحدته، لا لصلاحية المسار
+ * الأب (dashboard.view) وحدها. القسم بلا مدخل يبقى على dashboard.view فقط.
+ */
+const SECTION_ACCESS: Partial<Record<SectionId, { permission?: string; moduleId?: string; path?: string }>> = {
+  executive: { permission: 'finance.view', moduleId: 'finance', path: '/finance' },
+  sales: { permission: 'sales.view', moduleId: 'sales', path: '/sales' },
+  purchases: { permission: 'purchases.view', moduleId: 'purchasing', path: '/purchases' },
+  debts: { permission: 'finance.debts.view', moduleId: 'finance', path: '/finance' },
+  crm: { permission: 'crm.view', moduleId: 'customers', path: '/crm/leads' },
+  fleet: { permission: 'vehicles.view', moduleId: 'operations', path: '/deliveries' },
+  hr: { permission: 'employees.view', moduleId: 'hr', path: '/employees' },
+};
+
 export const DashboardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = searchParams.get('sec') || searchParams.get('section') || searchParams.get('tab');
@@ -29,6 +47,30 @@ export const DashboardPage: React.FC = () => {
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(new Date());
+
+  const currentUser = AuthService.getCurrentUser();
+  // القسم مسموح فقط إذا تحققت صلاحية مجاله ووحدته الفعّالة وقواعد المنصة المركزية.
+  const canViewSection = (id: SectionId) => {
+    if (id === 'all' || id === 'pulse') return true;
+    const access = SECTION_ACCESS[id];
+    if (!access) return true;
+    if (access.permission && !PermissionService.can(currentUser, access.permission)) return false;
+    if (access.moduleId && !ModuleRegistryService.isModuleEnabled(access.moduleId)) return false;
+    if (access.path && !CentralFeaturePermissionService.isPageVisible(access.path)) return false;
+    return true;
+  };
+  const hasDomainSection = SECTIONS_CONFIG.some(
+    (section) => section.id !== 'all' && section.id !== 'pulse' && canViewSection(section.id)
+  );
+  const visibleSections = SECTIONS_CONFIG.filter((section) => {
+    if (section.id === 'pulse') return true;
+    if (section.id === 'all') return hasDomainSection;
+    return canViewSection(section.id);
+  });
+  // قد يشير الرابط إلى قسم غير مسموح؛ نعود إلى ملخص اليوم.
+  const effectiveTab: SectionId = canViewSection(activeTab) ? activeTab : 'pulse';
+  // التبويب الشامل يعرض أقسامه فقط إذا كانت مسموحة، منعًا لتجاوز صلاحياتها.
+  const showSection = (id: SectionId) => effectiveTab === id || (effectiveTab === 'all' && canViewSection(id));
 
   useEffect(() => {
     const sec = searchParams.get('sec') || searchParams.get('section') || searchParams.get('tab');
@@ -53,16 +95,16 @@ export const DashboardPage: React.FC = () => {
     setLastUpdated(new Date());
   };
   const today = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
-  const isOverview = activeTab === 'all';
+  const isOverview = effectiveTab === 'all';
 
   return (
     <div id="dashboard-scroll-root" className="h-full overflow-y-auto bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
       <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 lg:p-5">
         <DashboardHeader today={today} onRefresh={refresh} />
 
-        <DashboardSectionNav activeTab={activeTab} onSelectSection={selectSection} />
+        <DashboardSectionNav activeTab={effectiveTab} onSelectSection={selectSection} sections={visibleSections} />
 
-        {(activeTab === 'pulse' || isOverview) && (
+        {(effectiveTab === 'pulse' || isOverview) && (
           <>
             <QuickActions />
             <SectionCard
@@ -78,37 +120,37 @@ export const DashboardPage: React.FC = () => {
             </SectionCard>
           </>
         )}
-        {(activeTab === 'all' || activeTab === 'executive') && (
+        {showSection('executive') && (
           <SectionCard id="sec-executive" title="الإدارة التنفيذية" subtitle="مؤشرات الأداء والأرباح والسيولة" icon={TrendingUp} iconBg="bg-indigo-50 dark:bg-indigo-950" iconColor="text-indigo-700 dark:text-indigo-300">
             <Suspense fallback={<DashboardLoader />}><ExecutiveDashboard /></Suspense>
           </SectionCard>
         )}
-        {(activeTab === 'all' || activeTab === 'sales') && (
+        {showSection('sales') && (
           <SectionCard id="sec-sales" title="تحليلات المبيعات" subtitle="أداء البيع والأصناف والعملاء" icon={ShoppingCart} iconBg="bg-emerald-50 dark:bg-emerald-950" iconColor="text-emerald-700 dark:text-emerald-300">
             <Suspense fallback={<DashboardLoader />}><SalesAnalyticsPage /></Suspense>
           </SectionCard>
         )}
-        {(activeTab === 'all' || activeTab === 'purchases') && (
+        {showSection('purchases') && (
           <SectionCard id="sec-purchases" title="المشتريات والمخزون" subtitle="حركة الفواتير وتقييم المخزون والموردين" icon={ShoppingBag} iconBg="bg-amber-50 dark:bg-amber-950" iconColor="text-amber-700 dark:text-amber-300">
             <Suspense fallback={<DashboardLoader />}><PurchaseInventoryReportPage /></Suspense>
           </SectionCard>
         )}
-        {(activeTab === 'all' || activeTab === 'debts') && (
+        {showSection('debts') && (
           <SectionCard id="sec-debts" title="الديون والذمم" subtitle="متابعة مستحقات العملاء والموردين" icon={Banknote} iconBg="bg-rose-50 dark:bg-rose-950" iconColor="text-rose-700 dark:text-rose-300">
             <Suspense fallback={<DashboardLoader />}><DebtsDashboardPage /></Suspense>
           </SectionCard>
         )}
-        {(activeTab === 'all' || activeTab === 'crm') && (
+        {showSection('crm') && (
           <SectionCard id="sec-crm" title="إدارة العملاء والفرص" subtitle="متابعة العملاء المحتملين والأنشطة" icon={Target} iconBg="bg-violet-50 dark:bg-violet-950" iconColor="text-violet-700 dark:text-violet-300">
             <Suspense fallback={<DashboardLoader />}><CrmDashboardPage /></Suspense>
           </SectionCard>
         )}
-        {(activeTab === 'all' || activeTab === 'fleet') && (
+        {showSection('fleet') && (
           <SectionCard id="sec-fleet" title="التوصيل والأسطول" subtitle="متابعة الشحنات والسائقين والمركبات" icon={Truck} iconBg="bg-cyan-50 dark:bg-cyan-950" iconColor="text-cyan-700 dark:text-cyan-300">
             <Suspense fallback={<DashboardLoader />}><FleetDashboardPage /></Suspense>
           </SectionCard>
         )}
-        {(activeTab === 'all' || activeTab === 'hr') && (
+        {showSection('hr') && (
           <SectionCard id="sec-hr" title="الموارد البشرية" subtitle="متابعة فريق العمل والحضور والعمولات" icon={Award} iconBg="bg-teal-50 dark:bg-teal-950" iconColor="text-teal-700 dark:text-teal-300">
             <Suspense fallback={<DashboardLoader />}><HrDashboardPage /></Suspense>
           </SectionCard>

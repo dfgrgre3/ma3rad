@@ -301,7 +301,7 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">الرصيد الحالي</p>
                 <p className={`text-lg font-black mt-1 ${customer.currentBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>

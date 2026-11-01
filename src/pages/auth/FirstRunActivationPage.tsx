@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
 import { CentralLicenseService } from '../../services/CentralLicenseService';
+import { CentralConfigApplier } from '../../services/CentralConfigApplier';
 
 interface FirstRunActivationPageProps {
   onSuccess: () => void;
@@ -47,6 +48,10 @@ export const FirstRunActivationPage: React.FC<FirstRunActivationPageProps> = ({ 
       }
 
       CentralLicenseService.markFirstRunActivationComplete();
+      try {
+        await CentralLicenseService.fetchConfig();
+        CentralConfigApplier.apply();
+      } catch { /* ignore */ }
       onSuccess();
     } catch (activationError) {
       setError(activationError instanceof Error ? activationError.message : 'تعذر التحقق من رمز التفعيل.');

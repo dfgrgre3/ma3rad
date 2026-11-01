@@ -27,14 +27,22 @@ export class CategoryService {
       ) pc ON c.id = pc.category_id
       ORDER BY c.name ASC
     `);
-    return rows.map(r => ({
+    const mapped = rows.map(r => ({
       id: r.id,
       name: r.name,
       parentId: r.parentId,
       description: r.description,
       createdAt: r.createdAt,
-      productCount: r.productCount || 0
+      productCount: r.productCount || 0,
+      children: [] as CategoryWithCount[],
     }));
+    const byId = new Map(mapped.map((category) => [category.id, category]));
+    for (const category of mapped) {
+      if (category.parentId && byId.has(category.parentId)) {
+        byId.get(category.parentId)!.children!.push(category);
+      }
+    }
+    return mapped;
   }
 
   public getCategoryById(id: string): Category | null {
@@ -45,6 +53,14 @@ export class CategoryService {
   public createCategory(name: string, parentId?: string, description?: string): Category {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'categories.create');
+
+    const cleanName = String(name || '').trim();
+    if (!cleanName) throw new Error('اسم التصنيف مطلوب.');
+    name = cleanName;
+    if (parentId) {
+      const parent = this.getCategoryById(parentId);
+      if (!parent) throw new Error('التصنيف الأب غير موجود.');
+    }
 
     const existing = this.db.query('SELECT id FROM categories WHERE name = ?', [name]);
     if (existing.length > 0) {
@@ -75,6 +91,19 @@ export class CategoryService {
     const old = this.getCategoryById(id);
     if (!old) throw new Error('التصنيف غير موجود.');
 
+    if (updates.parentId !== undefined && updates.parentId !== null) {
+      if (updates.parentId === id) throw new Error('لا يمكن جعل التصنيف أباً لنفسه.');
+      const descendants = this.getDescendantIds(id);
+      if (descendants.includes(updates.parentId)) throw new Error('لا يمكن نقل التصنيف إلى أحد تصنيفاته الفرعية.');
+      const parent = this.getCategoryById(updates.parentId);
+      if (!parent) throw new Error('التصنيف الأب غير موجود.');
+    }
+
+    if (updates.name !== undefined) {
+      const cleanName = String(updates.name || '').trim();
+      if (!cleanName) throw new Error('اسم التصنيف مطلوب.');
+      updates.name = cleanName;
+    }
     if (updates.name && updates.name !== old.name) {
       const dup = this.db.query('SELECT id FROM categories WHERE name = ? AND id != ?', [updates.name, id]);
       if (dup.length > 0) throw new Error('اسم التصنيف مسجل مسبقاً.');
@@ -96,6 +125,33 @@ export class CategoryService {
         [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(old), JSON.stringify(updates)]
       );
     });
+  }
+
+  public getChildren(parentId: string): CategoryWithCount[] {
+    return this.getAllCategories().filter((category) => category.parentId === parentId);
+  }
+
+  public getDescendantIds(id: string): string[] {
+    const children = this.getAllCategories().filter((category) => category.parentId === id);
+    const result: string[] = [];
+    for (const child of children) {
+      result.push(child.id);
+      result.push(...this.getDescendantIds(child.id));
+    }
+    return result;
+  }
+
+  public moveProducts(fromCategoryId: string, toCategoryId: string): number {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'products.update');
+    const target = this.getCategoryById(toCategoryId);
+    if (!target) throw new Error('التصنيف الهدف غير موجود.');
+    const count = (this.db.query('SELECT COUNT(*) as cnt FROM products WHERE category_id = ?', [fromCategoryId])[0] as any)?.cnt || 0;
+    this.db.executeTransaction((transaction) => {
+      transaction.run('UPDATE products SET category_id = ? WHERE category_id = ?', [toCategoryId, fromCategoryId]);
+      this.sync.capture(transaction, 'category', fromCategoryId, 'UPDATE');
+    });
+    return count;
   }
 
   public deleteCategory(id: string): void {

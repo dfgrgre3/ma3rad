@@ -95,7 +95,7 @@ export const AttendancePage: React.FC = () => {
         </form>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-6 py-3 bg-white border-b border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 px-6 py-3 bg-white border-b border-slate-200">
         {(Object.keys(STATUS_LABELS) as AttendanceStatus[]).map((s) => (
           <div key={s} className={`rounded-xl border px-4 py-2 ${STATUS_COLORS[s]}`}>
             <div className="text-[10px] font-bold">{STATUS_LABELS[s]}</div>

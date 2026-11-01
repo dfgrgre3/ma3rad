@@ -5,7 +5,14 @@ import {
 
 export type SectionId = 'all' | 'pulse' | 'executive' | 'sales' | 'purchases' | 'debts' | 'crm' | 'fleet' | 'hr';
 
-export const SECTIONS_CONFIG: { id: SectionId; label: string; icon: ElementType; badge?: string }[] = [
+export interface DashboardSectionConfig {
+  id: SectionId;
+  label: string;
+  icon: ElementType;
+  badge?: string;
+}
+
+export const SECTIONS_CONFIG: DashboardSectionConfig[] = [
   { id: 'all', label: 'نظرة شاملة', icon: Layers },
   { id: 'pulse', label: 'ملخص اليوم', icon: LayoutDashboard, badge: 'مباشر' },
   { id: 'executive', label: 'الأداء التنفيذي', icon: TrendingUp },

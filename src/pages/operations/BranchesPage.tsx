@@ -11,6 +11,7 @@ import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { BranchAccessService } from '../../services/BranchAccessService';
 import { useToast } from '../../components/ui/Toast';
+import { CentralLimitGuard } from '../../components/ui/CentralLimitGuard';
 import type { Company, User } from '../../types';
 
 type BranchStatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
@@ -323,18 +324,20 @@ export const BranchesPage: React.FC = () => {
           <button onClick={load} disabled={loading} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
-          {canCreate && (
-            <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-sky-700">
-              <Plus className="h-4 w-4" /> إضافة فرع
-            </button>
-          )}
+          <CentralLimitGuard metric="maxBranches">
+            {canCreate && (
+              <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-sky-700">
+                <Plus className="h-4 w-4" /> إضافة فرع
+              </button>
+            )}
+          </CentralLimitGuard>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
         {error && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
 
-        <section className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <section className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 xl:grid-cols-4">
           <SummaryCard icon={<Building2 className="h-4 w-4" />} label="إجمالي الفروع" value={branches.length} tone="sky" />
           <SummaryCard icon={<ShieldCheck className="h-4 w-4" />} label="الفروع النشطة" value={activeCount} tone="emerald" />
           <SummaryCard icon={<Warehouse className="h-4 w-4" />} label="المخازن النشطة" value={totalWarehouses} tone="violet" />
@@ -400,7 +403,7 @@ export const BranchesPage: React.FC = () => {
                   </div>
 
                   {isSelectedBranch ? (
-                    <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3">
+                    <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3">
                       <div>
                         <p className="text-[10px] font-semibold text-slate-500">إجمالي المبيعات</p>
                         <p className="mt-1 text-sm font-black text-slate-800">{formatCurrency(Number(stats?.totalSales || 0), branch.companyCurrency)}</p>

@@ -456,7 +456,7 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <SummaryCard label="المستندات" value={summary.documents} hint={`${summary.activeDocuments} نشط`} icon={FileText} />
         <SummaryCard label="مستندات قاربت الانتهاء" value={summary.expiringDocuments} hint="خلال 30 يومًا" icon={CalendarClock} tone="amber" />
         <SummaryCard label="العقود السارية" value={summary.activeContracts} hint={`من ${summary.contracts} عقد`} icon={CheckCircle2} tone="emerald" />

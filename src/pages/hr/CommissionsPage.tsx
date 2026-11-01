@@ -39,7 +39,7 @@ export const CommissionsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [month, status]);
+  useEffect(() => { load();   }, [month, status]);
 
   const generate = () => {
     setGenerating(true);

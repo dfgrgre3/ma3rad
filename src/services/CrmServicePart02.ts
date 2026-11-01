@@ -56,6 +56,7 @@ public deleteActivity(id: string): void {
   }
 
 public getPipelineStats(): { stage: LeadStage; count: number; value: number }[] {
+    this.requireView();
     return this.db.query<{ stage: LeadStage; count: number; value: number }>(
       `SELECT stage, COUNT(*) AS count, COALESCE(SUM(estimated_value), 0) AS value
        FROM leads GROUP BY stage`
@@ -63,6 +64,7 @@ public getPipelineStats(): { stage: LeadStage; count: number; value: number }[] 
   }
 
 public getActiveLeadsForSelect(): Array<{ id: string; name: string; phone: string }> {
+    this.requireView();
     return this.db.query<{ id: string; name: string; phone: string }>(
       `SELECT id, name, phone FROM leads WHERE stage NOT IN ('WON', 'LOST') ORDER BY name`
     );

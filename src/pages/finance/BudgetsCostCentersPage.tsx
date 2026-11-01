@@ -464,7 +464,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 w-full max-w-xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
             <h3 className="text-base font-bold text-slate-800 mb-3">إعداد موازنة تقديرية جديدة</h3>
             <form onSubmit={handleCreateBudget} className="space-y-4 text-xs flex-1 overflow-auto p-1">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-600 mb-1 font-medium">اسم الموازنة</label>
                   <input

@@ -603,7 +603,7 @@ export const GoodsReceiptsPage: React.FC = () => {
                       </div>
 
                       {/* Batch & Shade info */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-200">
+                      <div className="grid grid-cols-1  sm:grid-cols-4 gap-2 pt-1 border-t border-slate-200">
                         <div>
                           <label htmlFor={`grn-item-${idx}-batch`} className="block text-[10px] text-slate-500">رقم التشغيلة / اللوت</label>
                           <input

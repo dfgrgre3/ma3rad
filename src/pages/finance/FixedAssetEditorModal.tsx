@@ -19,7 +19,7 @@ export const FixedAssetEditorModal: React.FC<FixedAssetEditorModalProps> = ({ fo
             </div>
             <form onSubmit={onSubmit} className="space-y-3 text-xs">
               <div><label className="font-bold text-slate-700 block mb-1">اسم الأصل *</label><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">الفئة</label>
                   <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
@@ -28,12 +28,12 @@ export const FixedAssetEditorModal: React.FC<FixedAssetEditorModalProps> = ({ fo
                 </div>
                 <div><label className="font-bold text-slate-700 block mb-1">تاريخ الشراء *</label><input required type="date" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">تكلفة الشراء *</label><input required type="number" min={0.01} step="0.01" value={form.purchaseCost} onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
                 {!editing && <div><label className="font-bold text-slate-700 block mb-1">طريقة تمويل الاقتناء *</label><select value={form.paymentType} onChange={(e) => setForm({ ...form, paymentType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200"><option value="CASH">الخزينة نقدًا</option><option value="BANK_TRANSFER">البنك</option><option value="CREDIT">التزام اقتناء أصل</option></select></div>}
                 <div><label className="font-bold text-slate-700 block mb-1">قيمة الإنقاذ</label><input type="number" min={0} step="0.01" value={form.salvageValue} onChange={(e) => setForm({ ...form, salvageValue: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">العمر الإنتاجي (سنوات) *</label><input required type="number" min={0.5} step="0.5" value={form.usefulLifeYears} onChange={(e) => setForm({ ...form, usefulLifeYears: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">الموقع</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               </div>

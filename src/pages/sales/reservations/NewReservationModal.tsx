@@ -80,7 +80,7 @@ export const NewReservationModal: React.FC<NewReservationModalProps> = ({
 
           {/* Live Availability Indicator */}
           {availability && (
-            <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl text-center text-xs">
               <div>
                 <span className="text-slate-500 block">الرصيد الفعلي:</span>
                 <span className="font-bold text-slate-800 dark:text-slate-200">{formatProductQuantity(availability.onHand, products.find((product) => product.id === form.productId) || {})}</span>
@@ -96,7 +96,7 @@ export const NewReservationModal: React.FC<NewReservationModalProps> = ({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 الكمية المطلوبة ({products.find((product) => product.id === form.productId) ? getProductUnitLabel(products.find((product) => product.id === form.productId)!) : 'بوحدة الصنف'}) *
@@ -125,7 +125,7 @@ export const NewReservationModal: React.FC<NewReservationModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 نوع المرجع

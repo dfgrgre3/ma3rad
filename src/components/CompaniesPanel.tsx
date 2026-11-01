@@ -3,6 +3,7 @@ import { Building2, Plus, Save, Ban, RefreshCw } from 'lucide-react';
 import { CompanyService } from '../services/CompanyService';
 import { usePermission } from '../hooks/usePermission';
 import { useToast } from './ui/Toast';
+import { CentralLimitGuard } from './ui/CentralLimitGuard';
 import type { Company } from '../types';
 
 const inputCls =
@@ -105,13 +106,15 @@ export const CompaniesPanel: React.FC = () => {
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
           {can('companies.create') && (
-            <button
-              type="button"
-              onClick={() => setCreating((value) => !value)}
-              className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
-            >
-              <Plus className="h-3.5 w-3.5" /> شركة جديدة
-            </button>
+            <CentralLimitGuard metric="maxFacilities">
+              <button
+                type="button"
+                onClick={() => setCreating((value) => !value)}
+                className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+              >
+                <Plus className="h-3.5 w-3.5" /> شركة جديدة
+              </button>
+            </CentralLimitGuard>
           )}
         </div>
       </div>

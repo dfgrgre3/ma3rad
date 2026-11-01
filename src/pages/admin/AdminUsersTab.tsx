@@ -7,6 +7,7 @@ import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { BranchService } from '../../services/BranchService';
 import { usePermission } from '../../hooks/usePermission';
+import { CentralLimitGuard } from '../../components/ui/CentralLimitGuard';
 import { useToast } from '../../components/ui/Toast';
 import type { Role, User, UserRole } from '../../types';
 
@@ -203,11 +204,13 @@ export const AdminUsersTab: React.FC = () => {
           <button onClick={load} className="rounded-xl border border-slate-200 dark:border-slate-700 p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="تحديث">
             <RefreshCw className="h-4 w-4" />
           </button>
-          {can('users.create') && (
-            <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-600/25">
-              <UserPlus className="h-4 w-4" /> مستخدم جديد
-            </button>
-          )}
+          <CentralLimitGuard metric="maxUsers">
+            {can('users.create') && (
+              <button onClick={openCreate} className="flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-600/25">
+                <UserPlus className="h-4 w-4" /> مستخدم جديد
+              </button>
+            )}
+          </CentralLimitGuard>
         </div>
       </div>
 
@@ -303,7 +306,7 @@ export const AdminUsersTab: React.FC = () => {
             <Field label="الاسم الكامل *">
               <input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className={inputCls} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="اسم المستخدم *">
                 <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className={`${inputCls} font-mono`} />
               </Field>
@@ -311,7 +314,7 @@ export const AdminUsersTab: React.FC = () => {
                 <input required type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={inputCls} />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="الدور">
                 <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className={inputCls}>
                   {roles.map((role) => <option key={role.id} value={role.code}>{role.name}</option>)}
@@ -335,7 +338,7 @@ export const AdminUsersTab: React.FC = () => {
             <Field label="الاسم الكامل *">
               <input required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className={inputCls} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="الدور">
                 <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className={inputCls}>
                   {roles.map((role) => <option key={role.id} value={role.code}>{role.name}</option>)}

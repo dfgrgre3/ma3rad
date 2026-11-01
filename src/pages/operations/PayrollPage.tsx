@@ -85,7 +85,7 @@ export const PayrollPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-white border-b border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 bg-white border-b border-slate-200">
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
           <div className="text-[10px] font-bold text-slate-500">إجمالي الرواتب الشهرية</div>
           <div className="text-lg font-black text-slate-900 mt-1">{fmt(totals.salaries)}</div>

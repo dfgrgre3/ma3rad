@@ -6,6 +6,7 @@ import { localDateString } from '../utils/date';
 import { BranchAccessService } from './BranchAccessService';
 import { ModuleRegistryService } from './ModuleRegistryService';
 import { BranchService } from './BranchService';
+import { CentralUsageLimitService } from './CentralUsageLimitService';
 
 export interface Branch {
   id: string;
@@ -156,6 +157,7 @@ export class OperationsService {
     this.requireManage('branches.manage');
     PermissionService.require(AuthService.getCurrentUser(), 'branches.create');
     PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
+    CentralUsageLimitService.assertWithin('maxBranches');
     const trimmedName = input.name?.trim();
     if (!trimmedName) throw new Error('اسم الفرع مطلوب.');
     const id = `br_${uuidv4().substring(0, 8)}`;
@@ -279,6 +281,7 @@ export class OperationsService {
   public createWarehouse(input: { name: string; location?: string; branchId?: string }): WarehouseRow {
     ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('warehouses.manage');
+    CentralUsageLimitService.assertWithin('maxWarehouses');
     if (!input.name.trim()) throw new Error('اسم المخزن مطلوب.');
     const actor = AuthService.requireAuth();
     const branchId = input.branchId

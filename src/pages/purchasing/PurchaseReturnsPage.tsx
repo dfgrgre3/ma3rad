@@ -87,7 +87,7 @@ export const PurchaseReturnsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [search, dateFrom, dateTo]);
+  useEffect(() => { load();   }, [search, dateFrom, dateTo]);
   useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -215,7 +215,7 @@ export const PurchaseReturnsPage: React.FC = () => {
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 space-y-3">
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <Stat label="عدد المرتجعات" value={String(stats?.count ?? 0)} icon={RotateCcw} tone="text-slate-700 bg-slate-50 border-slate-200" />
           <Stat label="إجمالي القيمة" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingDown} tone="text-rose-700 bg-rose-50 border-rose-200" />
           <Stat label="مُسترد نقداً" value={fmt(stats?.cashRefunded ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />
@@ -421,13 +421,13 @@ export const PurchaseReturnsPage: React.FC = () => {
             </div>
             <button onClick={() => setDetail(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-1  sm:grid-cols-4 gap-3 mb-4">
             <Info label="المورد" value={detail.supplierName || '—'} />
             <Info label="المخزن" value={detail.warehouseName || '—'} />
             <Info label="القيمة" value={fmt(detail.totalAmount)} />
             <Info label="طريقة التسوية" value={REFUND_LABEL[detail.refundMethod] || '—'} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1  sm:grid-cols-3 gap-3 mb-4">
             <Info label="المُسترد نقداً" value={fmt(detail.refundedAmount)} />
             <Info label="على حساب المورد" value={fmt(detail.remainingToBalance)} />
             <Info label="بواسطة" value={detail.createdByName || '—'} />

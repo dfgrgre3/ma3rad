@@ -308,7 +308,7 @@ export const PurchaseInventoryReportPage: React.FC = () => {
           </div>
         ) : tab === 'inventory' && inventoryKpi ? (
           <div className="space-y-5">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard label="إجمالي قيمة المخزون" value={fmtM(inventoryKpi.totalValue) + ' ج'} sub="بالتكلفة المتوسطة" icon={Scale} color="text-violet-600" bg="bg-violet-50" />
               <StatCard label="إجمالي الأصناف" value={fmt(inventoryKpi.totalSkus)} sub="صنف مخزون" icon={Package} color="text-sky-600" bg="bg-sky-50" />
               <StatCard label="أصناف منخفضة" value={fmt(inventoryKpi.lowStockCount)} sub="تحتاج إعادة طلب" icon={AlertCircle} color="text-amber-600" bg="bg-amber-50" />
@@ -328,7 +328,7 @@ export const PurchaseInventoryReportPage: React.FC = () => {
         ) : purchaseKpi ? (
           <div className="space-y-5">
             {(tab === 'purchases' || tab === 'returns') && (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="إجمالي المشتريات" value={fmtM(purchaseKpi.totalPurchases) + ' ج'} sub={`${fmt(purchaseKpi.totalInvoices)} فاتورة`} icon={ShoppingBag} color="text-orange-600" bg="bg-orange-50" />
                 <StatCard label="المبلغ المدفوع" value={fmtM(purchaseKpi.totalPaid) + ' ج'} sub="إجمالي الدفعات" icon={PackageCheck} color="text-emerald-600" bg="bg-emerald-50" />
                 <StatCard label="المستحق للموردين" value={fmtM(purchaseKpi.totalDue) + ' ج'} sub="ذمم دائنة" icon={DollarSign} color="text-rose-600" bg="bg-rose-50" />

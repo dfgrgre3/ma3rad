@@ -5,6 +5,7 @@ import {
 import type { Customer, PaymentType } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
 import type { AppliedPromotion } from '../../services/PromotionService';
+import { CentralLimitGuard } from '../ui/CentralLimitGuard';
 
 const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
 
@@ -101,7 +102,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
 }) => (
   <div className="p-3 border-t border-slate-200 bg-white space-y-3 max-h-[58%] overflow-y-auto shadow-[0_-8px_24px_rgba(15,23,42,0.04)] max-[900px]:max-h-[65%]">
     {/* Order extras */}
-    <div className="grid grid-cols-3 gap-2 text-xs">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
       <div>
         <label htmlFor="pos-invoice-discount" className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Percent className="w-3 h-3" /> خصم الفاتورة</label>
         <input
@@ -140,7 +141,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
     {/* Payment type */}
     <div>
       <p className="text-[10px] font-bold text-slate-500 block mb-1">طريقة السداد</p>
-      <div role="group" aria-label="طريقة السداد" className="grid grid-cols-3 gap-1">
+      <div role="group" aria-label="طريقة السداد" className="grid grid-cols-1 sm:grid-cols-3 gap-1">
         {(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT', 'MIXED'] as PaymentType[]).map((type) => {
           const Icon = type === 'CASH' ? Banknote : CreditCard;
           return (
@@ -163,7 +164,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
     </div>
 
     {paymentType === 'MIXED' && (
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
         <div>
           <label className="text-[10px] font-bold text-slate-500">نقداً</label>
           <input type="number" min="0" step="0.01" value={splitCash || ''} onChange={(e) => setSplitCash(Number.parseFloat(e.target.value) || 0)} className={numberInputCls} />
@@ -278,7 +279,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
     />
 
     {/* Actions */}
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
       <button
         onClick={onHoldOrder}
         disabled={cartLength === 0}
@@ -303,13 +304,22 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
       )}
     </div>
 
-    <button
-      onClick={onCheckout}
-      disabled={isProcessing || cartLength === 0}
-      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-[0.99]"
+    <CentralLimitGuard
+      metric="maxInvoices"
+      fallback={
+        <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-[11px] font-bold text-amber-800">
+          تم بلوغ الحد الشهري المسموح من الفواتير في الترخيص؛ راجع الإدارة المركزية لرفع الحد.
+        </div>
+      }
     >
-      <CheckCircle2 className="w-5 h-5" />
-      <span>{isProcessing ? 'جاري الحفظ والخصم من المخزن...' : 'اعتماد وحفظ الفاتورة (F9)'}</span>
-    </button>
+      <button
+        onClick={onCheckout}
+        disabled={isProcessing || cartLength === 0}
+        className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-[0.99]"
+      >
+        <CheckCircle2 className="w-5 h-5" />
+        <span>{isProcessing ? 'جاري الحفظ والخصم من المخزن...' : 'اعتماد وحفظ الفاتورة (F9)'}</span>
+      </button>
+    </CentralLimitGuard>
   </div>
 );

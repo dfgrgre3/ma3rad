@@ -124,7 +124,7 @@ export const BarcodesPrintPage: React.FC = () => {
           {/* Label Dimensions Preset */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
             <label className="block text-xs font-bold text-slate-700">مقاس الملصق الحراري</label>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => setSettings(s => ({ ...s, labelSize: '60x40' }))}

@@ -85,7 +85,7 @@ export const TodayPurchasesPage: React.FC = () => {
     }
   }, [date]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [load]);
+  useEffect(() => { load();   }, [load]);
   const loadFor = useCallback(
     (dateValue: string) => {
       setLoading(true);
@@ -137,7 +137,7 @@ export const TodayPurchasesPage: React.FC = () => {
   const filteredRows = useMemo(() => {
     const list = filterPurchaseRows(rows, { search, status, supplierId, warehouse, paymentType, minAmount, maxAmount });
     return sortPurchaseRows(list, sortKey, sortDir);
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+     
   }, [rows, search, status, supplierId, warehouse, paymentType, minAmount, maxAmount, sortKey, sortDir]);
 
   const filteredRowsRaw = useMemo(() => rows.filter((row) => {

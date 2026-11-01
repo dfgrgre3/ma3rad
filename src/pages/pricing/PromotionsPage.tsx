@@ -186,7 +186,7 @@ export const PromotionsPage: React.FC = () => {
                 <label className="font-bold text-slate-700 block mb-1">اسم العرض *</label>
                 <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">نوع العرض</label>
                   <select value={form.promotionType} onChange={(e) => setForm({ ...form, promotionType: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">

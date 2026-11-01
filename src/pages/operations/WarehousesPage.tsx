@@ -3,6 +3,7 @@ import { Warehouse, Plus, Search, MapPin, Database, Loader2, X, Package } from '
 import { OperationsService, WarehouseRow } from '../../services/OperationsService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { CentralLimitGuard } from '../../components/ui/CentralLimitGuard';
 
 export const WarehousesPage: React.FC = () => {
   const service = new OperationsService();
@@ -53,11 +54,13 @@ export const WarehousesPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">متابعة الأرصدة الفعلية وتوزيع الأصناف على المخازن</p>
           </div>
         </div>
-        {canManage && (
-          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-            <Plus className="w-4 h-4" /> إضافة مخزن جديد
-          </button>
-        )}
+        <CentralLimitGuard metric="maxWarehouses">
+          {canManage && (
+            <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+              <Plus className="w-4 h-4" /> إضافة مخزن جديد
+            </button>
+          )}
+        </CentralLimitGuard>
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200">

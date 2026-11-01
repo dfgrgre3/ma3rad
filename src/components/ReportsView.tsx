@@ -133,7 +133,7 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* Quick access to advanced report pages */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {([
           { label: 'تقارير المبيعات المتقدمة', desc: 'حسب الفئة والمنتج والعميل والمندوب', icon: ShoppingCart, color: 'from-teal-500 to-cyan-600', href: '#/reports?tab=sales' },
           { label: 'تقارير المشتريات والمخزون', desc: 'الموردون وقيمة المخزون', icon: Truck, color: 'from-orange-500 to-amber-600', href: '#/reports?tab=purchases' },

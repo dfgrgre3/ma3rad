@@ -44,6 +44,10 @@ export class BrandService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'brands.create');
 
+    const cleanName = String(name || '').trim();
+    if (!cleanName) throw new Error('اسم الماركة مطلوب.');
+    name = cleanName;
+
     const existing = this.db.query('SELECT id FROM brands WHERE name = ?', [name]);
     if (existing.length > 0) {
       throw new Error('اسم الماركة مسجل مسبقاً.');
@@ -73,6 +77,11 @@ export class BrandService {
     const old = this.getBrandById(id);
     if (!old) throw new Error('الماركة غير موجودة.');
 
+    if (updates.name !== undefined) {
+      const cleanName = String(updates.name || '').trim();
+      if (!cleanName) throw new Error('اسم الماركة مطلوب.');
+      updates.name = cleanName;
+    }
     if (updates.name && updates.name !== old.name) {
       const dup = this.db.query('SELECT id FROM brands WHERE name = ? AND id != ?', [updates.name, id]);
       if (dup.length > 0) throw new Error('اسم الماركة مسجل مسبقاً.');
