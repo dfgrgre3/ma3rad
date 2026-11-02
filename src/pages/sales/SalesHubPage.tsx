@@ -1,90 +1,77 @@
-import React, { lazy, Suspense, useEffect } from 'react';
-import { BarChart3, CalendarDays, Receipt } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import React, { lazy } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Receipt, BarChart3, Workflow, UserRound, BookmarkPlus, ShieldCheck, FileText, Package2, RotateCcw } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
+import { WorkspaceHub } from '../common/WorkspaceHub';
+import type { WorkspaceHubTab } from '../common/WorkspaceHub';
 
-const TodaySalesPage = lazy(() => import('../daily/DailyPage').then((module) => ({ default: module.TodaySalesPage })));
 const SalesView = lazy(() => import('../../components/SalesView').then((module) => ({ default: module.SalesView })));
 const SalesAnalyticsPage = lazy(() => import('./SalesAnalyticsPage').then((module) => ({ default: module.SalesAnalyticsPage })));
+const InvoiceCyclePage = lazy(() => import('./InvoiceCyclePage').then((module) => ({ default: module.InvoiceCyclePage })));
+const CustomerStatementPage = lazy(() => import('./CustomerStatementPage').then((module) => ({ default: module.CustomerStatementPage })));
+const SalesOrdersDepositsPage = lazy(() => import('./SalesOrdersDepositsPage').then((module) => ({ default: module.SalesOrdersDepositsPage })));
+const AfterSalesPage = lazy(() => import('./AfterSalesPage').then((module) => ({ default: module.AfterSalesPage })));
+const QuotationsPage = lazy(() => import('./QuotationsPage').then((module) => ({ default: module.QuotationsPage })));
+const OrdersPage = lazy(() => import('./OrdersPage').then((module) => ({ default: module.OrdersPage })));
+const ReturnsPage = lazy(() => import('./ReturnsPage').then((module) => ({ default: module.ReturnsPage })));
 
-const TABS = [
-  { id: 'daily', label: 'مبيعات اليوم', icon: CalendarDays },
-  { id: 'invoices', label: 'الفواتير', icon: Receipt },
-  { id: 'analytics', label: 'التحليلات', icon: BarChart3 },
-] as const;
+const TABS: WorkspaceHubTab[] = [
+  { id: 'invoices', label: 'فواتير المبيعات', path: '/sales', icon: Receipt },
+  { id: 'analytics', label: 'تحليلات المبيعات', path: '/sales/analytics', icon: BarChart3 },
+  { id: 'cycle', label: 'دورة الفاتورة', path: '/sales/cycle', icon: Workflow },
+  { id: 'statement', label: 'كشف حساب عميل', path: '/sales/statement', icon: UserRound },
+  { id: 'orders-deposits', label: 'الطلبات والعربون', path: '/sales/orders-deposits', icon: BookmarkPlus },
+  { id: 'after-sales', label: 'خدمة ما بعد البيع', path: '/sales/after-sales', icon: ShieldCheck },
+  { id: 'quotations', label: 'عروض الأسعار', path: '/quotations', icon: FileText },
+  { id: 'orders', label: 'الطلبات', path: '/orders', icon: Package2 },
+  { id: 'returns', label: 'المرتجعات', path: '/returns', icon: RotateCcw },
+];
 
-type SalesTab = (typeof TABS)[number]['id'];
+const REQUIRED_PERMISSION: Record<string, string> = {
+  invoices: 'sales.view',
+  analytics: 'sales.view',
+  cycle: 'sales.view',
+  statement: 'finance.debts.view',
+  'orders-deposits': 'sales.view',
+  'after-sales': 'sales.view',
+  quotations: 'quotations.view',
+  orders: 'orders.view',
+  returns: 'returns.view',
+};
+
+const PAGE_BY_TAB = {
+  invoices: SalesView,
+  analytics: SalesAnalyticsPage,
+  cycle: InvoiceCyclePage,
+  statement: CustomerStatementPage,
+  'orders-deposits': SalesOrdersDepositsPage,
+  'after-sales': AfterSalesPage,
+  quotations: QuotationsPage,
+  orders: OrdersPage,
+  returns: ReturnsPage,
+} as const;
 
 export const SalesHubPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = searchParams.get('tab');
-  const tab = TABS.find((item) => item.id === requestedTab)?.id ?? 'invoices';
+  const { pathname } = useLocation();
+  const can = usePermission();
+  const tabs = TABS.filter((tab) => can(REQUIRED_PERMISSION[tab.id]));
+  const activeTab = tabs.find((tab) => tab.path === pathname)?.id ?? tabs[0]?.id;
+  const ActivePage = activeTab ? PAGE_BY_TAB[activeTab as keyof typeof PAGE_BY_TAB] : null;
 
-  useEffect(() => {
-    if (!requestedTab || !TABS.some((item) => item.id === requestedTab)) {
-      const next = new URLSearchParams(searchParams);
-      next.set('tab', 'invoices');
-      setSearchParams(next, { replace: true });
-    }
-  }, [requestedTab, searchParams, setSearchParams]);
-
-  const selectTab = (id: SalesTab) => {
-    const next = new URLSearchParams(searchParams);
-    next.set('tab', id);
-    setSearchParams(next, { replace: true });
-  };
-
-  const ActivePage = tab === 'daily'
-    ? TodaySalesPage
-    : tab === 'analytics'
-      ? SalesAnalyticsPage
-      : SalesView;
+  if (!tabs.length || !ActivePage) {
+    return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا توجد صلاحيات للوصول إلى مركز المبيعات.</div>;
+  }
 
   return (
-    <main className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-slate-100 dark:bg-slate-950" dir="rtl">
-      <header className="shrink-0 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4 lg:flex-row lg:items-end lg:justify-between lg:px-7">
-          <div className="min-w-0">
-            <h1 className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100 sm:text-xl">مركز المبيعات</h1>
-            <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400 sm:text-sm">
-              تابع مبيعات اليوم والفواتير وأداء المبيعات من مكان واحد.
-            </p>
-          </div>
-          <nav
-            className="no-scrollbar flex w-full min-w-0 items-stretch gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 sm:gap-1.5 lg:w-auto dark:bg-slate-800/80"
-            aria-label="أقسام المبيعات"
-          >
-            {TABS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => selectTab(id)}
-                aria-current={tab === id ? 'page' : undefined}
-                className={`relative inline-flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-lg px-1.5 py-1.5 text-xs font-bold transition-[background-color,color,box-shadow] duration-150 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500 sm:flex-row sm:gap-2 sm:px-4 sm:py-2 lg:flex-none ${
-                  tab === id
-                    ? 'bg-white text-emerald-800 shadow-sm ring-1 ring-emerald-200/80 dark:bg-slate-700 dark:text-emerald-300 dark:ring-emerald-800'
-                    : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/60 dark:hover:text-white'
-                }`}
-              >
-                {tab === id && <span className="absolute inset-y-2 right-1 w-1 rounded-full bg-emerald-500 dark:bg-emerald-400" aria-hidden="true" />}
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:h-6 sm:w-6 ${
-                  tab === id
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-300'
-                    : 'text-slate-500 dark:text-slate-400'
-                }`}>
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span>{label}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
-      <section className="mx-auto min-h-0 w-full max-w-[96rem] min-w-0 flex-1 overflow-hidden">
-        <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-slate-600 dark:text-slate-400">جاري تحميل الصفحة...</div>}>
-          <ActivePage />
-        </Suspense>
-      </section>
-    </main>
+    <WorkspaceHub
+      title="مركز المبيعات"
+      description="إدارة فواتير المبيعات والطلبات والمرتجعات والتحليلات من مكان واحد."
+      icon={Receipt}
+      tabs={tabs}
+      activeTab={activeTab}
+    >
+      <ActivePage />
+    </WorkspaceHub>
   );
 };
 

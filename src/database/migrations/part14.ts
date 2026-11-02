@@ -170,4 +170,18 @@ export const MIGRATION_PART_14: Migration[] = [
       `);
     },
   },
+  {
+    id: '109_return_idempotency_keys',
+    description: 'Add idempotency keys to sales and purchase returns for safe retries',
+    up: (db) => {
+      try { db.exec("ALTER TABLE sales_returns ADD COLUMN idempotency_key TEXT"); } catch { /* already present */ }
+      try { db.exec("ALTER TABLE purchase_returns ADD COLUMN idempotency_key TEXT"); } catch { /* already present */ }
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_returns_idempotency
+          ON sales_returns(idempotency_key) WHERE idempotency_key IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_returns_idempotency
+          ON purchase_returns(idempotency_key) WHERE idempotency_key IS NOT NULL;
+      `);
+    },
+  },
 ];

@@ -53,7 +53,7 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
   onDelete,
 }) => (
           <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
+            <table className="w-full min-w-[1200px] text-right text-xs">
               <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
                 <tr>
                   {(canExportProducts || canDeleteProduct) && <th className="p-3.5 text-center"><input aria-label="تحديد كل أصناف الصفحة" type="checkbox" checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))} onChange={onTogglePageSelection} className="rounded border-slate-300 text-sky-600" /></th>}

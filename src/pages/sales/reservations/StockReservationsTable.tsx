@@ -5,12 +5,14 @@ import { reservationStatusLabels, reservationStatusStyles } from './constants';
 
 interface StockReservationsTableProps {
   reservations: StockReservation[];
+  canAdjust?: boolean;
   onConsume: (id: string) => void;
   onRelease: (id: string) => void;
 }
 
 export const StockReservationsTable: React.FC<StockReservationsTableProps> = ({
   reservations,
+  canAdjust = false,
   onConsume,
   onRelease,
 }) => {
@@ -83,7 +85,7 @@ export const StockReservationsTable: React.FC<StockReservationsTableProps> = ({
                     </td>
                     <td className="p-3.5">
                       <div className="flex items-center justify-center gap-1.5">
-                        {r.status === 'ACTIVE' && (
+                        {canAdjust && r.status === 'ACTIVE' && (
                           <>
                             <button
                               onClick={() => onConsume(r.id)}

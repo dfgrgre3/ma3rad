@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EmployeeService } from '../../services/EmployeeService';
+import { exportToExcel } from '../../utils/export';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { localDateString } from '../../utils/date';
@@ -27,6 +28,7 @@ import {
 
 export const EmployeesPage: React.FC = () => {
   const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'employees.manage');
+  const canExportEmployees = PermissionService.can(AuthService.getCurrentUser(), 'employees.export');
   // --- Database State ---
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -53,6 +55,24 @@ export const EmployeesPage: React.FC = () => {
   };
 
   useEffect(() => { loadAll(); }, []);
+  const handleExportEmployees = () => {
+    exportToExcel({
+      title: 'الموظفون',
+      subtitle: 'قائمة الموظفين',
+      columns: [
+        { key: 'name', label: 'الاسم' },
+        { key: 'role', label: 'الدور' },
+        { key: 'location', label: 'الموقع' },
+        { key: 'phone', label: 'الهاتف' },
+        { key: 'email', label: 'البريد' },
+        { key: 'status', label: 'الحالة' },
+      ],
+      rows: employees.map((e) => ({ name: e.name, role: e.role, location: e.location, phone: e.phone, email: e.email, status: e.status })),
+      fileName: 'employees',
+      permission: 'employees.export',
+    });
+  };
+
 
   // --- Active Tab ---
   const [activeTab, setActiveTab] = useState<EmployeeTab>('directory');
@@ -250,6 +270,8 @@ export const EmployeesPage: React.FC = () => {
         dbError={dbError}
         onAddEmployee={handleOpenAddEmployee}
         onRetry={loadAll}
+        canExport={canExportEmployees}
+        onExport={handleExportEmployees}
       />
 
       {/* Tabs Switcher */}

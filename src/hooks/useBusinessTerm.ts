@@ -3,6 +3,7 @@ import type { BusinessTermKey } from '../config/businessTerminology';
 import { getBusinessProfile } from '../config/businessProfiles';
 import { TerminologyService } from '../services/TerminologyService';
 import { SettingsService } from '../services/SettingsService';
+import { getEffectiveBusinessType } from '../services/BusinessTypeService';
 import { useTheme } from '../contexts/ThemeContext';
 
 export function useBusinessTerm(
@@ -16,7 +17,7 @@ export function useBusinessTerm(
 }
 
 export function useBusinessProfileMeta() {
-  const businessType = SettingsService.getValue('businessType') || 'ceramics';
+  const businessType = getEffectiveBusinessType();
   const customLabel = SettingsService.getValue('businessTypeLabel') || '';
 
   return useMemo(() => {

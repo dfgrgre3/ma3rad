@@ -107,12 +107,14 @@ export class OperationsService {
   private requireManage(permission: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, permission);
+    PermissionService.require(actor, 'operations.update');
   }
 
   // ── Branches ───────────────────────────────────────────────────────────────
   public getBranches(search = '', includeAllAuthorizedBranches = false): Branch[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'branches.view');
+    PermissionService.require(actor, 'operations.view');
     const scope = this.branchAccess.sqlScope('b.id', undefined, actor, includeAllAuthorizedBranches);
     let sql = `
       SELECT b.*, u.full_name AS manager_name, sb.device_type AS deviceType, sb.activation_code AS activationCode,
@@ -258,6 +260,7 @@ export class OperationsService {
   public getWarehouses(search = ''): WarehouseRow[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'warehouses.view');
+    PermissionService.require(actor, 'operations.view');
     const scope = this.branchAccess.sqlScope('w.branch_id', undefined, actor);
     let sql = `
       SELECT w.*, b.name AS branch_name,
@@ -307,6 +310,7 @@ export class OperationsService {
   public getDrivers(search = ''): Driver[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'drivers.view');
+    PermissionService.require(actor, 'operations.view');
     let sql = `
       SELECT d.*, (SELECT COUNT(*) FROM deliveries dl WHERE dl.driver_id = d.id) AS trips_count
       FROM drivers d WHERE 1 = 1`;
@@ -348,6 +352,7 @@ export class OperationsService {
   public getVehicles(search = ''): Vehicle[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'vehicles.view');
+    PermissionService.require(actor, 'operations.view');
     let sql = `
       SELECT v.*, d.full_name AS assigned_driver_name
       FROM vehicles v LEFT JOIN drivers d ON d.id = v.assigned_driver_id WHERE 1 = 1`;
@@ -408,6 +413,7 @@ export class OperationsService {
   public getDeliveries(search = '', status = 'ALL'): Delivery[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'deliveries.view');
+    PermissionService.require(actor, 'operations.view');
     let sql = `
       SELECT dl.*, c.name AS customer_name, c.phone AS customer_phone,
         d.full_name AS driver_name, v.plate_number

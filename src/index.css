@@ -657,20 +657,42 @@ pre, code { overflow-wrap: anywhere; }
 /* ─────────────────────────────────────────────────────────────────────────────
    Responsive layout helpers (unified across the app)
    ───────────────────────────────────────────────────────────────────────────── */
-.app-shell { min-width: 320px; }
+.app-shell { width: 100%; min-width: 320px; }
 
-/* Keep long content from forcing horizontal page scroll on small windows. */
-.app-main { overflow-x: hidden; }
-.app-main > * { max-width: 100%; }
+/* Give each route root the full content width without imposing widths on its
+   nested controls, dialogs, or other feature-specific content. */
+.app-main { min-width: 0; overflow-x: hidden; }
+.app-main > * { width: 100%; min-width: 0; max-width: none; }
 
-/* Tables: scroll horizontally instead of overflowing the viewport.
-   `min-width: 100%` keeps normal tables full-width; wider ones scroll. */
-.app-main table {
-  display: block;
-  min-width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+/* Keep native table sizing so columns fill the available width and align
+   naturally. Only the table's immediate container scrolls when content is wide. */
+@media screen {
+  .app-main table {
+    width: 100%;
+    max-width: 100%;
+    table-layout: auto;
+  }
+
+  .app-main :has(> table) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Let broad route workspaces use the available desktop canvas. Keep narrower
+   utility layouts and modal sizing unchanged. */
+@media (min-width: 1280px) {
+  .app-main > .mx-auto[class~="max-w-6xl"],
+  .app-main > .mx-auto[class~="max-w-7xl"],
+  .app-main > .mx-auto[class~="max-w-screen-2xl"],
+  .app-main > .mx-auto[class~="max-w-[96rem]"],
+  .app-main > .mx-auto[class~="max-w-[1500px]"] {
+    width: 100%;
+    max-width: none;
+  }
 }
 
 /* Flexible media. Only cap the width: sizing classes (h-14, w-24, …) still win,
@@ -688,4 +710,3 @@ pre, code { overflow-wrap: anywhere; }
 @media (pointer: coarse) {
   .win-btn, .win-nav-item, .win-pivot { min-height: 40px; }
 }
-

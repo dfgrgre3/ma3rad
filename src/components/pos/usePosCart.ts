@@ -19,6 +19,7 @@ interface UsePosCartOptions {
   pricingService: PricingService;
   selectedCustomer: Customer | null;
   stockOf: (productId: string) => number;
+  allowDuplicateItems?: boolean;
 }
 
 export const usePosCart = ({
@@ -27,6 +28,7 @@ export const usePosCart = ({
   pricingService,
   selectedCustomer,
   stockOf,
+  allowDuplicateItems = false,
 }: UsePosCartOptions) => {
   const [cart, setCart] = useState<CartItem[]>([]);
 
@@ -73,7 +75,7 @@ export const usePosCart = ({
 
   const addToCart = useCallback((product: Product, requestedM2?: number) => {
     setCart((prev) => {
-      const existingIndex = prev.findIndex((item) => item.product.id === product.id);
+      const existingIndex = allowDuplicateItems ? -1 : prev.findIndex((item) => item.product.id === product.id);
       const sellable = getSellableUnits(product);
       const preferred = product.sellUnit && sellable.includes(product.sellUnit)
         ? product.sellUnit

@@ -172,7 +172,14 @@ export const PosView: React.FC = () => {
     updateCartPrice,
     updateCartLineDiscount,
     removeFromCart,
-  } = usePosCart({ can, notify, pricingService, selectedCustomer, stockOf });
+  } = usePosCart({
+    can,
+    notify,
+    pricingService,
+    selectedCustomer,
+    stockOf,
+    allowDuplicateItems: settings?.posAllowDuplicateItems ?? false,
+  });
   const handleSearchSubmit = usePosBarcodeSearch({
     products,
     filteredProducts,
@@ -234,6 +241,9 @@ export const PosView: React.FC = () => {
       setActiveShift(shift);
       setSettings(sysSettings);
       setTaxPercentage(sysSettings.defaultTaxPercentage || 0);
+      if (sysSettings.posShowCashButton === false) {
+        setPaymentType('CREDIT');
+      }
 
       const defaultWarehouseId = defaultWarehouse?.id || '';
       setSelectedWarehouseId(defaultWarehouseId);
@@ -588,6 +598,11 @@ export const PosView: React.FC = () => {
           stockOf={stockOf}
           gradeLabel={gradeLabel}
           onAddToCart={addToCart}
+          onAddMultipleToCart={(prods) => {
+            prods.forEach((prod) => addToCart(prod));
+            notify(`تمت إضافة ${prods.length} أصناف إلى السلة بنجاح`, 'success');
+          }}
+          multiSelectEnabled={!!settings?.posMultiSelectSearch}
         />
       </div>
 
@@ -611,6 +626,8 @@ export const PosView: React.FC = () => {
           onUpdateQuantity={updateCartQuantity}
           onUpdatePrice={updateCartPrice}
           onUpdateLineDiscount={updateCartLineDiscount}
+          sellingPriceTiersCount={settings?.sellingPriceTiersCount ?? 1}
+          sellingPriceTierNames={settings?.sellingPriceTierNames}
         />
 
         <PosCheckoutPanel
@@ -627,6 +644,7 @@ export const PosView: React.FC = () => {
           setShippingCost={setShippingCost}
           paymentType={paymentType}
           setPaymentType={setPaymentType}
+          showCashButton={settings?.posShowCashButton !== false}
           splitCash={splitCash}
           setSplitCash={setSplitCash}
           splitCard={splitCard}

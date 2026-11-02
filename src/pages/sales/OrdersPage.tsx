@@ -33,8 +33,10 @@ export const OrdersPage: React.FC = () => {
   const inventoryService = useMemo(() => new InventoryService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const user = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(user, 'sales.create');
-  const canUpdate = PermissionService.can(user, 'sales.approve');
+  const canCreate = PermissionService.can(user, 'orders.create');
+  const canUpdate = PermissionService.can(user, 'orders.update');
+  const canApprove = PermissionService.can(user, 'orders.approve');
+  const canDelete = PermissionService.can(user, 'orders.delete');
 
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -381,6 +383,8 @@ export const OrdersPage: React.FC = () => {
             pageSize={PAGE_SIZE}
             canCreate={canCreate}
             canUpdate={canUpdate}
+            canApprove={canApprove}
+            canDelete={canDelete}
             onViewDetails={openDetail}
             onPrintOrder={printOrder}
             onOpenTimeline={openTimeline}
@@ -421,6 +425,7 @@ export const OrdersPage: React.FC = () => {
         <OrderDetailModal
           order={detail}
           canUpdate={canUpdate}
+          canApprove={canApprove}
           onClose={() => setDetail(null)}
           onPrint={printOrder}
           onShareOnWhatsApp={shareOnWhatsApp}

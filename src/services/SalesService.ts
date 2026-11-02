@@ -143,6 +143,7 @@ export class SalesService {
       registerId?: string;
       shiftId?: string;
       refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
+      idempotencyKey?: string;
     } = {}
   ): SalesReturn {
     ModuleRegistryService.assertModuleEnabled('sales');

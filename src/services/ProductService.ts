@@ -31,17 +31,43 @@ export interface ProductStats {
   totalBoxes: number;
 }
 
-const STOCK_SUBQUERY = `(SELECT product_id, SUM(quantity_m2) AS qty FROM warehouse_stock GROUP BY product_id)`;
-
 export class ProductService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
   private sync = new MasterDataSyncService(this.db);
 
+  private productColumns(alias = 'p'): string {
+    const canViewCosts = PermissionService.can(AuthService.getCurrentUser(), 'finance.view');
+    return [
+      `${alias}.id`, `${alias}.product_type`, `${alias}.custom_unit`, `${alias}.sku`, `${alias}.barcode`,
+      `${alias}.name`, `${alias}.category_id`, `${alias}.brand_id`, `${alias}.grade`, `${alias}.size`,
+      `${alias}.thickness`, `${alias}.color`, `${alias}.tone`, `${alias}.finish`, `${alias}.surface_location`,
+      `${alias}.base_unit`, `${alias}.sell_unit`, `${alias}.pieces_per_box`, `${alias}.meters_per_box`,
+      `${alias}.weight_per_box`, ...(canViewCosts ? [`${alias}.cost_price`] : []),
+      `${alias}.selling_price_m2`, `${alias}.selling_price_box`, `${alias}.wholesale_price_m2`,
+      `${alias}.min_selling_price_m2`, `${alias}.min_stock_level`, `${alias}.max_stock_level`,
+      `${alias}.image_path`, `${alias}.notes`, `${alias}.is_active`, `${alias}.created_at`, `${alias}.updated_at`,
+    ].join(', ');
+  }
+
+  private stockSubquery(): { sql: string; params: string[] } {
+    const branchScope = this.branchAccess.warehouseBranchScope('w');
+    const companyScope = this.branchAccess.companyScope('w.company_id');
+    return {
+      sql: `(SELECT ws.product_id, SUM(ws.quantity_m2) AS qty
+             FROM warehouse_stock ws
+             JOIN warehouses w ON w.id = ws.warehouse_id
+             WHERE ${branchScope.clause} AND ${companyScope.clause}
+             GROUP BY ws.product_id)`,
+      params: [...branchScope.params, ...companyScope.params],
+    };
+  }
+
   public getAllProducts(search?: string, categoryId?: string, brandId?: string): Product[] {
+    PermissionService.require(AuthService.requireAuth(), 'products.view');
     const scope = this.branchAccess.companyScope('p.company_id');
     let sql = `
-      SELECT p.*, c.name as categoryName, b.name as brandName
+      SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
@@ -77,9 +103,11 @@ export class ProductService {
     pageSize = 25,
     options: ProductQueryOptions = {},
   ) {
+    PermissionService.require(AuthService.requireAuth(), 'products.view');
+    const stock = this.stockSubquery();
     const scope = this.branchAccess.companyScope('p.company_id');
     const filters: string[] = [scope.clause];
-    const params: any[] = [...scope.params];
+    const params: any[] = [...stock.params, ...scope.params];
     if (options.status === 'active') filters.push('p.is_active = 1');
     else if (options.status === 'inactive') filters.push('p.is_active = 0');
     else if (!options.includeInactive) filters.push('p.is_active = 1');
@@ -108,11 +136,11 @@ export class ProductService {
     const fromSql = `FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
-      LEFT JOIN ${STOCK_SUBQUERY} st ON st.product_id = p.id
+      LEFT JOIN ${stock.sql} st ON st.product_id = p.id
       WHERE ${where}`;
 
     return this.db.queryPage<Product>(
-      `SELECT p.*, c.name as categoryName, b.name as brandName,
+      `SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName,
               COALESCE(st.qty, 0) as totalStockM2,
               CASE WHEN p.meters_per_box > 0 THEN COALESCE(st.qty, 0) / p.meters_per_box ELSE 0 END as totalStockBoxes,
               CASE WHEN p.meters_per_box > 0 AND p.pieces_per_box > 0
@@ -124,6 +152,11 @@ export class ProductService {
   }
 
   public getProductStats(): ProductStats {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'products.view');
+    const canViewCosts = PermissionService.can(actor, 'finance.view');
+    const stock = this.stockSubquery();
+    const companyScope = this.branchAccess.companyScope('p.company_id', actor);
     const rows = this.db.query<any>(`
       SELECT
         COUNT(*) as totalProducts,
@@ -135,8 +168,9 @@ export class ProductService {
         COALESCE(SUM(CASE WHEN p.is_active = 1 THEN COALESCE(st.qty, 0) * p.cost_price ELSE 0 END), 0) as totalStockValue,
         COALESCE(SUM(CASE WHEN p.is_active = 1 AND p.meters_per_box > 0 THEN COALESCE(st.qty, 0) / p.meters_per_box ELSE 0 END), 0) as totalBoxes
       FROM products p
-      LEFT JOIN ${STOCK_SUBQUERY} st ON st.product_id = p.id
-    `);
+      LEFT JOIN ${stock.sql} st ON st.product_id = p.id
+      WHERE ${companyScope.clause}
+    `, [...stock.params, ...companyScope.params]);
     const r = rows[0] || {};
     return {
       totalProducts: Number(r.totalProducts) || 0,
@@ -145,15 +179,16 @@ export class ProductService {
       lowStock: Number(r.lowStock) || 0,
       outOfStock: Number(r.outOfStock) || 0,
       totalStockM2: Number(Number(r.totalStockM2 || 0).toFixed(2)),
-      totalStockValue: Number(Number(r.totalStockValue || 0).toFixed(2)),
+      totalStockValue: canViewCosts ? Number(Number(r.totalStockValue || 0).toFixed(2)) : 0,
       totalBoxes: Number(Number(r.totalBoxes || 0).toFixed(2)),
     };
   }
 
   public getProductById(id: string): Product | null {
+    PermissionService.require(AuthService.requireAuth(), 'products.view');
     const scope = this.branchAccess.companyScope('p.company_id');
     const rows = this.db.query<Product>(`
-      SELECT p.*, c.name as categoryName, b.name as brandName
+      SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
@@ -163,9 +198,10 @@ export class ProductService {
   }
 
   public getProductByBarcode(barcode: string): Product | null {
+    PermissionService.require(AuthService.requireAuth(), 'products.view');
     const scope = this.branchAccess.companyScope('p.company_id');
     const rows = this.db.query<Product>(`
-      SELECT p.*, c.name as categoryName, b.name as brandName
+      SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN brands b ON p.brand_id = b.id
@@ -424,7 +460,9 @@ export class ProductService {
   }
 
   public getProductStockSummary(productId: string): { totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] } {
-    const scope = this.branchAccess.warehouseBranchScope('w', undefined, AuthService.requireAuth());
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'products.view');
+    const scope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
     const rows = this.db.query<WarehouseStock>(`
       SELECT ws.*, w.name as warehouseName,
              p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
@@ -441,14 +479,15 @@ export class ProductService {
     let totalPieces = 0;
 
     const mapped = rows.map(r => {
-      const isGeneral = (r as any).productType === 'GENERAL';
-      const metersPerBox = (r as any).metersPerBox || 1.44;
-      const piecesPerBox = (r as any).piecesPerBox || 1;
+      const row = r as any;
+      const isGeneral = row.productType === 'GENERAL';
+      const metersPerBox = row.metersPerBox || 1.44;
+      const piecesPerBox = row.piecesPerBox || 1;
       const boxes = isGeneral
-        ? (r as any).baseUnit === 'BOX' ? r.quantityM2 : 0
+        ? row.baseUnit === 'BOX' ? r.quantityM2 : 0
         : Number((r.quantityM2 / metersPerBox).toFixed(2));
       const pieces = isGeneral
-        ? (r as any).baseUnit === 'PIECE' ? r.quantityM2 : 0
+        ? row.baseUnit === 'PIECE' ? r.quantityM2 : 0
         : Math.round(boxes * piecesPerBox);
       totalM2 += r.quantityM2;
       totalBoxes += boxes;

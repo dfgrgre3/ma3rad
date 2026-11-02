@@ -135,6 +135,25 @@ export class CustomerService {
     });
   }
 
+  public deleteCustomer(id: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'customers.delete');
+    const existing = this.getCustomerById(id);
+    if (!existing) throw new Error('العميل غير موجود.');
+    const balance = Number(existing.currentBalance || 0);
+    if (Math.abs(balance) > 1e-6) throw new Error('لا يمكن حذف عميل لديه رصيد.');
+    const invoices = this.db.query<{ c: number }>('SELECT COUNT(*) AS c FROM sales_invoices WHERE customer_id = ?', [id])[0]?.c ?? 0;
+    if (invoices > 0) throw new Error('لا يمكن حذف عميل لديه فواتير. يمكن إيقاف استخدامه بدلًا من الحذف.');
+    this.db.executeTransaction((db) => {
+      db.run('DELETE FROM customers WHERE id = ?', [id]);
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+         VALUES (?, ?, ?, 'حذف عميل', 'CUSTOMERS', ?, ?, NULL)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(existing)]
+      );
+    });
+  }
+
   public updateCustomer(id: string, updates: Partial<Customer>): Customer {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'customers.update');

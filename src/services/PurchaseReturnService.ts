@@ -62,6 +62,7 @@ export interface CreatePurchaseReturnDTO {
   reason: string;
   refundMethod: 'CASH' | 'BALANCE';
   items: { productId: string; quantityM2: number; boxesCount?: number }[];
+  idempotencyKey?: string;
 }
 
 type PreparedPurchaseReturnItem = Pick<
@@ -218,6 +219,36 @@ export class PurchaseReturnService {
     `, [dto.purchaseId])[0];
     if (!purchase) throw new Error('فاتورة الشراء غير موجودة.');
 
+    const idempotencyKey = dto.idempotencyKey;
+    if (idempotencyKey) {
+      const prior = this.db.query<any>(`
+        SELECT id, return_number, original_purchase_id, original_invoice_number, supplier_id,
+               warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason,
+               created_by, created_at, idempotency_key
+        FROM purchase_returns WHERE idempotency_key = ?
+      `, [idempotencyKey])[0];
+      if (prior) {
+        if (prior.original_purchase_id !== dto.purchaseId) {
+          throw new Error('The purchase return idempotency key was already used for a different purchase.');
+        }
+        return {
+          id: prior.id,
+          returnNumber: prior.return_number,
+          originalPurchaseId: prior.original_purchase_id,
+          originalInvoiceNumber: prior.original_invoice_number,
+          supplierId: prior.supplier_id,
+          warehouseId: prior.warehouse_id,
+          date: prior.date,
+          totalAmount: Number(prior.total_amount),
+          refundedAmount: Number(prior.refunded_amount),
+          remainingToBalance: Number(prior.remaining_to_balance),
+          refundMethod: Number(prior.refunded_amount) > 0 ? 'CASH' : 'BALANCE',
+          reason: prior.reason,
+          createdAt: prior.created_at,
+        };
+      }
+    }
+
     const { items: prepared, total } = this.prepareReturnItems(
       dto.items,
       this.getReturnableItems(dto.purchaseId),
@@ -235,11 +266,11 @@ export class PurchaseReturnService {
       db.run(`
         INSERT INTO purchase_returns (
           id, return_number, original_purchase_id, original_invoice_number, supplier_id,
-          warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason, created_by, idempotency_key
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         returnId, returnNumber, purchase.id, purchase.invoiceNumber, purchase.supplierId,
-        purchase.warehouseId, today, total, isCash ? total : 0, isCash ? 0 : total, dto.reason.trim(), actor.id,
+        purchase.warehouseId, today, total, isCash ? total : 0, isCash ? 0 : total, dto.reason.trim(), actor.id, dto.idempotencyKey || null,
       ]);
 
       for (const item of prepared) {

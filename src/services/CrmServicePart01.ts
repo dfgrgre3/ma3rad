@@ -98,7 +98,23 @@ public updateLead(id: string, patch: Partial<Lead>): Lead {
     });
   }
 
-public convertLeadToCustomer(id: string): { customerId: string } {
+public deleteLead(id: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'crm.delete');
+    const existing = this.getLeadById(id);
+    if (!existing) throw new Error('العميل المحتمل غير موجود.');
+    this.db.executeTransaction((db) => {
+      db.run('DELETE FROM crm_activities WHERE lead_id = ?', [id]);
+      db.run('DELETE FROM leads WHERE id = ?', [id]);
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+         VALUES (?, ?, ?, 'حذف عميل محتمل', 'CRM', ?, ?, NULL)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(existing)]
+      );
+    });
+  }
+
+  public convertLeadToCustomer(id: string): { customerId: string } {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'crm.update');
     PermissionService.require(actor, 'customers.create');

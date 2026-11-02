@@ -19,6 +19,19 @@ function isLoopbackHost(host) {
     (isIP(normalized) === 4 && normalized.startsWith('127.'));
 }
 
+/**
+ * Returns true for Tailscale CGNAT addresses (100.64.0.0/10).
+ * Traffic on this range is end-to-end encrypted by the Tailscale WireGuard
+ * tunnel, so plain HTTP is safe and acceptable here.
+ */
+function isTailscaleHost(host) {
+  const normalized = String(host).toLowerCase().replace(/^\[|\]$/g, '');
+  if (isIP(normalized) !== 4) return false;
+  const parts = normalized.split('.').map(Number);
+  // Tailscale uses 100.64.0.0/10 -> first octet 100, second octet 64-127
+  return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
+}
+
 function constantTimeEqual(left, right) {
   const a = Buffer.from(String(left));
   const b = Buffer.from(String(right));
@@ -500,8 +513,13 @@ function createHttpSyncClient({ url, token, tenantId, branchId, deviceId, timeou
   if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
     throw new TypeError('Sync server URL must not contain credentials, query parameters, or a fragment');
   }
-  if (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && isLoopbackHost(endpoint.hostname))) {
-    throw new Error('Sync connections require HTTPS except for loopback testing');
+  const isTrustedPlainHttp =
+    (endpoint.protocol === 'http:') &&
+    (isLoopbackHost(endpoint.hostname) || isTailscaleHost(endpoint.hostname));
+  if (endpoint.protocol !== 'https:' && !isTrustedPlainHttp) {
+    throw new Error(
+      'Sync connections require HTTPS, or HTTP on localhost / Tailscale (100.64-127.x.x.x).'
+    );
   }
   if (typeof token !== 'string' || Buffer.byteLength(token) < 32) throw new TypeError('A 32-byte sync bearer token is required');
   const identity = { tenantId, branchId, deviceId };

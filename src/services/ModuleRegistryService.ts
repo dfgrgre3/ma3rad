@@ -15,6 +15,7 @@ import {
 } from '../config/moduleRegistry';
 import type { User } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { getEffectiveBusinessType } from './BusinessTypeService';
 
 // Kept as a literal so the service layer does not import the React navigation tree.
 const NAV_HIDDEN_SETTING_KEY = 'nav.hidden';
@@ -57,7 +58,7 @@ export class ModuleRegistryService {
   }
 
   public static getBusinessType(): string {
-    return SettingsService.getValue('businessType') || 'ceramics';
+    return getEffectiveBusinessType();
   }
 
   public static isInventoryTracked(): boolean {
@@ -94,6 +95,7 @@ export class ModuleRegistryService {
   }
 
   public static getModuleState(): ModuleState[] {
+    if (!PermissionService.can(AuthService.getCurrentUser(), 'modules.view')) return [];
     const enabled = new Set(ModuleRegistryService.getEnabledModuleIds());
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     return MODULE_REGISTRY.map((definition) => {

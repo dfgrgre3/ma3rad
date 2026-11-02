@@ -84,6 +84,30 @@ declare global {
           limit: number
         ) => Promise<import('../sync/types').SyncPullResult>;
       };
+      tailscale?: {
+        status?: () => Promise<{
+          installed: boolean;
+          running: boolean;
+          ip: string | null;
+          nodeName?: string;
+          error?: string;
+          peers?: Array<{ name: string; ip: string | null; online: boolean; os?: string }>;
+        }>;
+        connect?: (authKey?: string) => Promise<{ ok: boolean; stdout?: string; error?: string }>;
+        disconnect?: () => Promise<{ ok: boolean; stdout?: string; error?: string }>;
+      };
+      tailscale?: {
+        status?: () => Promise<{
+          installed: boolean;
+          running: boolean;
+          ip: string | null;
+          nodeName?: string;
+          error?: string;
+          peers?: Array<{ name: string; ip: string | null; online: boolean; os?: string }>;
+        }>;
+        connect?: (authKey?: string) => Promise<{ ok: boolean; stdout?: string; error?: string }>;
+        disconnect?: () => Promise<{ ok: boolean; stdout?: string; error?: string }>;
+      };
       app?: {
         info?: () => Promise<{ version: string; packaged: boolean; dataDir: string; backupDir: string }>;
         openFolder?: (target?: 'data' | 'backups') => Promise<{ ok: boolean; path?: string; error?: string }>;
@@ -112,6 +136,8 @@ declare global {
           error?: string;
         }>;
         openFile?: (storageName: string) => Promise<{ ok: boolean; error?: string }>;
+        recognizePage?: (imageData: Uint8Array) => Promise<{ ok: boolean; text?: string; error?: string }>;
+        finishOcr?: () => Promise<{ ok: boolean; error?: string }>;
         info?: () => Promise<{ ok: boolean; directory?: string; maxBytes?: number }>;
       };
     };

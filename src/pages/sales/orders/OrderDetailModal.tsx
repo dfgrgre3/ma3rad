@@ -11,6 +11,7 @@ import { summarizeOrderQuantity } from './helpers';
 interface OrderDetailModalProps {
   order: Order;
   canUpdate: boolean;
+  canApprove: boolean;
   onClose: () => void;
   onPrint: (order: Order) => void;
   onShareOnWhatsApp: (order: Order) => void;
@@ -22,7 +23,7 @@ interface OrderDetailModalProps {
 }
 
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
-  order: detail, canUpdate, onClose, onPrint, onShareOnWhatsApp,
+  order: detail, canUpdate, canApprove, onClose, onPrint, onShareOnWhatsApp,
   onOpenTimeline, onOpenDelivery, onAdvance, onOpenConvert, onCancel,
 }) => (
   <Modal onClose={onClose} wide>
@@ -78,7 +79,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
       {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(detail.status) && (
         <button onClick={() => onOpenDelivery(detail)} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><PackageCheck className="w-3.5 h-3.5" /> تسجيل تسليم</button>
       )}
-      {canUpdate && ['PENDING', 'CONFIRMED'].includes(detail.status) && (
+      {canApprove && ['PENDING', 'CONFIRMED'].includes(detail.status) && (
         <button onClick={() => onAdvance(detail)} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
           <ChevronLeft className="w-3.5 h-3.5" />
           {detail.status === 'PENDING' ? 'تأكيد الطلب' : 'بدء التجهيز'}
@@ -87,7 +88,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
       {['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(detail.status) && (
         <button onClick={() => onOpenConvert(detail)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> إصدار فاتورة وإتمام</button>
       )}
-      {canUpdate && !['COMPLETED', 'CANCELLED'].includes(detail.status) && (
+      {canApprove && !['COMPLETED', 'CANCELLED'].includes(detail.status) && (
         <button onClick={() => onCancel(detail)} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Ban className="w-3.5 h-3.5" /> إلغاء الطلب</button>
       )}
     </div>

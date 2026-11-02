@@ -21,7 +21,6 @@ const compareAlphabetically = (a: string, b: string) => a.localeCompare(b, 'ar')
 export const PERMISSIONS: PermissionDef[] = [
   // Dashboard
   { code: 'dashboard.view', name: 'عرض لوحة المعلومات', module: 'DASHBOARD' },
-  { code: 'dashboard.export', name: 'تصدير بيانات لوحة المعلومات', module: 'DASHBOARD' },
 
   // Products
   { code: 'products.view', name: 'عرض الأصناف', module: 'PRODUCTS' },
@@ -54,7 +53,6 @@ export const PERMISSIONS: PermissionDef[] = [
   // Sales
   { code: 'sales.view', name: 'عرض المبيعات', module: 'SALES' },
   { code: 'sales.create', name: 'إنشاء فاتورة بيع', module: 'SALES' },
-  { code: 'sales.update', name: 'تعديل فاتورة بيع', module: 'SALES' },
   { code: 'sales.discount', name: 'منح خصم استثنائي', module: 'SALES' },
   { code: 'sales.credit', name: 'البيع الآجل', module: 'SALES' },
   { code: 'sales.refund', name: 'مرتجعات البيع', module: 'SALES' },
@@ -319,10 +317,11 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'reports.view', 'reports.export',
     'crm.view', 'projects.view', 'pricing.view', 'promotions.view',
     'manufacturing.view',
-    'operations.view', 'branches.view', 'warehouses.view',
+    'operations.view', 'operations.update', 'branches.view', 'warehouses.view',
     'employees.view', 'employees.export', 'employees.payroll.view', 'employees.financials.view', 'deliveries.view', 'drivers.view', 'vehicles.view',
     'approvals.view', 'approvals.create', 'approvals.approve', 'approvals.reject', 'approvals.cancel',
     'notifications.view', 'audit.view', 'audit.export',
+    'analytics.view', 'modules.view',
     'documents.view', 'documents.export', 'contracts.view', 'contracts.export',
     'hr.leave.view', 'hr.contracts.view', 'hr.documents.view',
   ],
@@ -339,6 +338,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'pricing.view', 'promotions.view',
     'approvals.view', 'approvals.create', 'notifications.view',
     'employees.view', 'deliveries.view', 'branches.view', 'warehouses.view',
+    'operations.view', 'loyalty.view',
     'documents.view', 'contracts.view',
     'hr.leave.view', 'hr.leave.request',
   ],
@@ -349,7 +349,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'customers.view', 'customers.create', 'customers.payment',
     'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
     'approvals.create', 'crm.view', 'notifications.view',
-    'documents.view', 'hr.leave.view',
+    'documents.view', 'hr.leave.view', 'loyalty.view',
   ],
   WAREHOUSE: [
     'dashboard.view', 'products.view', 'categories.view', 'brands.view',
@@ -378,7 +378,7 @@ const EXPORT_PERMISSION_SOURCES: Record<string, string> = {
   'quotations.export': 'quotations.view',
   'returns.export': 'returns.view',
   'inventory.export': 'inventory.view',
-  'dashboard.export': 'dashboard.view',
+
   'reports.export': 'reports.view',
   'customers.export': 'customers.view',
   'products.export': 'products.view',
@@ -391,6 +391,27 @@ const RECEIVABLE_PERMISSION_BACKFILL: Record<string, string[]> = {
   ADMIN: ['finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.delete', 'finance.receivables.export'],
   MANAGER: ['finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export'],
   ACCOUNTANT: ['finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export'],
+};
+
+const PERMISSION_BACKFILL_SOURCES: Record<string, string[]> = {
+  'quotations.create': ['sales.create'],
+  'quotations.update': ['sales.create'],
+  'quotations.delete': ['sales.create'],
+  'quotations.approve': ['sales.approve'],
+  'orders.create': ['sales.create'],
+  'orders.update': ['sales.create'],
+  'orders.delete': ['sales.approve'],
+  'orders.approve': ['sales.approve'],
+  'returns.create': ['sales.refund'],
+  'returns.approve': ['sales.refund'],
+  'employees.export': ['employees.view'],
+  'notifications.manage': ['notifications.view'],
+  'audit.export': ['audit.view'],
+  'loyalty.view': ['sales.view'],
+  'analytics.view': ['dashboard.view'],
+  'modules.view': ['settings.view'],
+  'operations.view': ['branches.view', 'warehouses.view', 'deliveries.view', 'employees.view', 'drivers.view', 'vehicles.view', 'manufacturing.view'],
+  'operations.update': ['branches.manage', 'warehouses.manage', 'deliveries.manage', 'employees.manage', 'drivers.manage', 'vehicles.manage'],
 };
 
 const ROLE_NAMES: Record<string, string> = {  ADMIN: 'مدير النظام',
@@ -473,6 +494,7 @@ export class PermissionService {
     }
     PermissionService.backfillExportPermissions(db, roleCode);
     PermissionService.backfillReceivablesPermissions(db, roleCode);
+    PermissionService.backfillPermissionMappings(db, roleCode);
   }
 
   private static backfillReceivablesPermissions(db: DatabaseManager, roleCode: string): void {
@@ -483,6 +505,25 @@ export class PermissionService {
     }
     db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
   }
+  private static backfillPermissionMappings(db: DatabaseManager, roleCode: string): void {
+    const markerKey = `rbac.permissionMappings.v1.${roleCode}`;
+    if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
+    for (const [newPermission, sources] of Object.entries(PERMISSION_BACKFILL_SOURCES)) {
+      const hasSource = sources.length === 0
+        ? false
+        : sources.some((source) => db.query('SELECT 1 FROM role_permissions WHERE role_code = ? AND permission_code = ?', [roleCode, source]).length > 0);
+      if (hasSource) {
+        db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, newPermission]);
+      }
+    }
+    if (roleCode === 'ADMIN') {
+      for (const permission of Object.keys(PERMISSION_BACKFILL_SOURCES)) {
+        db.run('INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)', [roleCode, permission]);
+      }
+    }
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
+  }
+
 
   private static backfillExportPermissions(db: DatabaseManager, roleCode: string): void {
     const markerKey = `rbac.exportBackfill.v2.${roleCode}`;

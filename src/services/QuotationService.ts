@@ -218,7 +218,7 @@ export class QuotationService {
 
   public createQuotation(input: QuotationInput): Quotation {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'quotations.create');
 
     const prepared = this.prepareItems(input.items, actor);
     const subtotal = round2(prepared.reduce((s, i) => s + i.totalPrice, 0));
@@ -274,7 +274,7 @@ export class QuotationService {
 
   public updateQuotation(id: string, input: QuotationInput): Quotation {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'quotations.update');
     const existing = this.getQuotation(id);
     if (!existing) throw new Error('عرض السعر غير موجود.');
     if (!['PENDING', 'EXPIRED'].includes(existing.status)) {
@@ -333,7 +333,7 @@ export class QuotationService {
 
   public setStatus(id: string, status: 'CANCELLED' | 'PENDING'): Quotation {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'quotations.update');
     const existing = this.getQuotation(id);
     if (!existing) throw new Error('عرض السعر غير موجود.');
     if (existing.status === 'CONVERTED') {
@@ -360,7 +360,7 @@ export class QuotationService {
 
   public deleteQuotation(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'quotations.delete');
     const existing = this.getQuotation(id);
     if (!existing) throw new Error('عرض السعر غير موجود.');
     if (existing.status === 'CONVERTED') {
@@ -400,7 +400,7 @@ export class QuotationService {
     options: { warehouseId?: string; expectedDeliveryDate?: string; notes?: string } = {}
   ): Order {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'orders.create');
     const quotation = this.getQuotation(id);
     if (!quotation) throw new Error('عرض السعر غير موجود.');
     if (quotation.status === 'CANCELLED') throw new Error('لا يمكن تحويل عرض سعر ملغي.');
@@ -444,7 +444,7 @@ export class QuotationService {
 
   public scheduleFollowUp(id: string, date: string | null, notes?: string | null): Quotation {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'quotations.update');
     const quotation = this.getQuotation(id);
     if (!quotation) throw new Error('عرض السعر غير موجود.');
     if (quotation.status === 'CONVERTED') throw new Error('لا يمكن جدولة متابعة لعرض محوّل.');
@@ -461,7 +461,7 @@ export class QuotationService {
   /** Mark that the customer was contacted about a pending quotation. */
   public recordContact(id: string, note?: string | null): Quotation {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'quotations.update');
     const quotation = this.getQuotation(id);
     if (!quotation) throw new Error('عرض السعر غير موجود.');
     this.db.run(
@@ -587,7 +587,7 @@ export class QuotationService {
         throw new Error(`سعر الصنف "${product.name}" لكل ${unitLabel} يجب أن يكون أكبر من صفر.`);
       }
       if (round2(units.baseUnitPrice) < Number(product.minSellingPriceM2 || 0)) {
-        PermissionService.require(actor, 'sales.approve');
+    PermissionService.require(actor, 'sales.approve');
       }
 
       const discountAmount = round2(Math.max(0, item.discountAmount || 0));

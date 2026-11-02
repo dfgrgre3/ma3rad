@@ -8,6 +8,7 @@ import {
 import { getBusinessProfileTemplateId } from '../config/businessProfiles';
 import { SettingsService } from './SettingsService';
 import type { User } from '../types';
+import { getEffectiveBusinessType } from './BusinessTypeService';
 
 const OVERRIDES_SETTING = 'businessTerminologyOverrides';
 const warnedInvalidSettings = new Set<string>();
@@ -36,7 +37,7 @@ export class TerminologyService {
   public static getTerm(
     key: BusinessTermKey,
   ): string {
-    const businessType = SettingsService.getValue('businessType') || 'ceramics';
+    const businessType = getEffectiveBusinessType();
     return resolveBusinessTerm(key, {
       businessType,
       language: 'ar',
@@ -46,7 +47,7 @@ export class TerminologyService {
 
   public static getSource(
     key: BusinessTermKey,
-    businessType = SettingsService.getValue('businessType') || 'ceramics',
+    businessType = getEffectiveBusinessType(),
     overrides = TerminologyService.getOverrides(),
   ): BusinessTermSource {
     if (overrides.ar?.[key]?.trim()) return 'organization';

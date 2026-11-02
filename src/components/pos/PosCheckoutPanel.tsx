@@ -25,6 +25,7 @@ export interface PosCheckoutPanelProps {
   setShippingCost: (value: number) => void;
   paymentType: PaymentType;
   setPaymentType: (type: PaymentType) => void;
+  showCashButton?: boolean;
   splitCash: number;
   setSplitCash: (value: number) => void;
   splitCard: number;
@@ -70,6 +71,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
   setShippingCost,
   paymentType,
   setPaymentType,
+  showCashButton = true,
   splitCash,
   setSplitCash,
   splitCard,
@@ -142,7 +144,9 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
     <div>
       <p className="text-[10px] font-bold text-slate-500 block mb-1">طريقة السداد</p>
       <div role="group" aria-label="طريقة السداد" className="grid grid-cols-1 sm:grid-cols-3 gap-1">
-        {(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT', 'MIXED'] as PaymentType[]).map((type) => {
+        {(['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT', 'MIXED'] as PaymentType[])
+          .filter((type) => showCashButton || type !== 'CASH')
+          .map((type) => {
           const Icon = type === 'CASH' ? Banknote : CreditCard;
           return (
             <button

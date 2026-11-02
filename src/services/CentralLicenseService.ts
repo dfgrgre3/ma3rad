@@ -390,7 +390,6 @@ export class CentralLicenseService {
 
   static getCachedConfig(): CentralConfig | null {
     // وضع التشغيل المحلي: لا نُطبّق أي تكوين مركزي قديم مخزَّن (قوائم/وحدات/صلاحيات).
-    if (BYPASS_FIRST_RUN_SETUP) return null;
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
       return raw ? JSON.parse(raw) : null;

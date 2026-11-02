@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AuthService } from '../services/AuthService';
 import { SettingsService } from '../services/SettingsService';
+import { getEffectiveBusinessType } from '../services/BusinessTypeService';
 import { AppConfigService } from '../services/AppConfigService';
 
 import type { User } from '../types';
@@ -21,7 +22,7 @@ export function useAppSession(
     AppConfigService.setActiveContext({
       userId: currentUser.id,
       branchId: settings.defaultBranchId || 'br_main',
-      activityId: SettingsService.getValue('businessType') || 'ceramics',
+      activityId: getEffectiveBusinessType(),
     });
   }, [dbReady, currentUser?.id]);
 

@@ -65,6 +65,8 @@ const Info: React.FC<{ label: string; value: string; sub?: string }> = ({ label,
 
 interface QuotationModalsProps {
   canCreate: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
   canApprove: boolean;
   saving: boolean;
   formOpen: boolean;
@@ -124,6 +126,8 @@ interface QuotationModalsProps {
 
 export const QuotationModals: React.FC<QuotationModalsProps> = ({
   canCreate,
+  canUpdate,
+  canDelete,
   canApprove,
   saving,
   formOpen,
@@ -344,7 +348,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
         <button onClick={() => { setDetail(null); openFollowUp(detail); }} className="px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" /> جدولة متابعة</button>
       )}
       {canCreate && <button onClick={() => duplicate(detail)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Copy className="w-3.5 h-3.5" /> نسخ</button>}
-      {canCreate && ['PENDING', 'EXPIRED'].includes(detail.status) && (
+      {canUpdate && ['PENDING', 'EXPIRED'].includes(detail.status) && (
         <button onClick={() => { setDetail(null); openEdit(detail); }} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5" /> تعديل</button>
       )}
       {canCreate && detail.status === 'PENDING' && !detail.convertedOrderNumber && (
@@ -353,7 +357,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       {canCreate && detail.status === 'PENDING' && (
         <button onClick={() => { setDetail(null); openConvert(detail); }} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> تحويل لفاتورة</button>
       )}
-      {canCreate && detail.status === 'EXPIRED' && (
+      {canUpdate && detail.status === 'EXPIRED' && (
         <button onClick={() => reopenQuotation(detail)} className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5" /> إعادة فتح</button>
       )}
       {canApprove && detail.status === 'PENDING' && (

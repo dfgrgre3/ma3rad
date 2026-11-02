@@ -6,12 +6,16 @@ import { orderStatusBadges, orderStatusLabels } from './constants';
 
 interface OrdersDepositsTableProps {
   orders: Order[];
+  canCreate?: boolean;
+  canInvoice?: boolean;
   onRecordDeposit: (order: Order) => void;
   onConvertToInvoice: (order: Order) => void;
 }
 
 export const OrdersDepositsTable: React.FC<OrdersDepositsTableProps> = ({
   orders,
+  canCreate = false,
+  canInvoice = false,
   onRecordDeposit,
   onConvertToInvoice,
 }) => {
@@ -93,7 +97,7 @@ export const OrdersDepositsTable: React.FC<OrdersDepositsTableProps> = ({
                     </td>
                     <td className="p-3.5">
                       <div className="flex items-center justify-center gap-1.5">
-                        {o.status !== 'COMPLETED' && o.status !== 'CANCELLED' && (
+                        {canCreate && o.status !== 'COMPLETED' && o.status !== 'CANCELLED' && (
                           <button
                             onClick={() => onRecordDeposit(o)}
                             className="px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 rounded-lg transition flex items-center gap-1"
@@ -104,7 +108,7 @@ export const OrdersDepositsTable: React.FC<OrdersDepositsTableProps> = ({
                           </button>
                         )}
 
-                        {o.status !== 'COMPLETED' && o.status !== 'CANCELLED' && (
+                        {canInvoice && o.status !== 'COMPLETED' && o.status !== 'CANCELLED' && (
                           <button
                             onClick={() => onConvertToInvoice(o)}
                             className="px-2.5 py-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/40 dark:text-sky-300 rounded-lg transition flex items-center gap-1"

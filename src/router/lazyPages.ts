@@ -13,7 +13,7 @@ export const SalesAnalyticsPage = lazy(() => import('../pages/sales/SalesAnalyti
 export const SalesHubPage = lazy(() => import('../pages/sales/SalesHubPage').then(m => ({ default: m.SalesHubPage })));
 export const InvoiceCyclePage = lazy(() => import('../pages/sales/InvoiceCyclePage').then(m => ({ default: m.InvoiceCyclePage })));
 export const CustomerStatementPage = lazy(() => import('../pages/sales/CustomerStatementPage').then(m => ({ default: m.CustomerStatementPage })));
-export const ReservationsDepositPage = lazy(() => import('../pages/sales/ReservationsDepositPage').then(m => ({ default: m.ReservationsDepositPage })));
+export const SalesOrdersDepositsPage = lazy(() => import('../pages/sales/SalesOrdersDepositsPage').then(m => ({ default: m.SalesOrdersDepositsPage })));
 export const AfterSalesPage = lazy(() => import('../pages/sales/AfterSalesPage').then(m => ({ default: m.AfterSalesPage })));
 export const QuotationsPage = lazy(() => import('../pages/sales/QuotationsPage').then(m => ({ default: m.QuotationsPage })));
 export const OrdersPage = lazy(() => import('../pages/sales/OrdersPage').then(m => ({ default: m.OrdersPage })));
@@ -27,6 +27,7 @@ export const TodayDebtsPage = lazy(() => import('../pages/daily/DailyPage').then
 
 // Products & Pricing
 export const ProductsView = lazy(() => import('../components/ProductsView').then(m => ({ default: m.ProductsView })));
+export const ProductCatalogHubPage = lazy(() => import('../pages/products/ProductCatalogHubPage').then(m => ({ default: m.ProductCatalogHubPage })));
 export const ProductDetailPage = lazy(() => import('../pages/products/ProductDetailPage').then(m => ({ default: m.ProductDetailPage })));
 export const ProductAttributesPage = lazy(() => import('../pages/products/ProductAttributesPage').then(m => ({ default: m.ProductAttributesPage })));
 export const BarcodesPrintPage = lazy(() => import('../pages/products/BarcodesPrintPage').then(m => ({ default: m.BarcodesPrintPage })));
@@ -37,12 +38,14 @@ export const PromotionsPage = lazy(() => import('../pages/pricing/PromotionsPage
 
 // Inventory
 export const InventoryView = lazy(() => import('../components/InventoryView').then(m => ({ default: m.InventoryView })));
+export const InventoryHubPage = lazy(() => import('../pages/inventory/InventoryHubPage').then(m => ({ default: m.InventoryHubPage })));
 export const LocationStockPage = lazy(() => import('../pages/inventory/LocationStockPage').then(m => ({ default: m.LocationStockPage })));
 export const StockLedgerPage = lazy(() => import('../pages/inventory/StockLedgerPage').then(m => ({ default: m.StockLedgerPage })));
 export const StockTransfersView = lazy(() => import('../components/StockTransfersView').then(m => ({ default: m.StockTransfersView })));
 export const InventoryCountPage = lazy(() => import('../pages/inventory/InventoryCountPage').then(m => ({ default: m.InventoryCountPage })));
 export const InventoryValuationPage = lazy(() => import('../pages/inventory/InventoryValuationPage').then(m => ({ default: m.InventoryValuationPage })));
 export const InventoryAdjustmentsPage = lazy(() => import('../pages/inventory/InventoryAdjustmentsPage').then(m => ({ default: m.InventoryAdjustmentsPage })));
+export const StockReservationsPage = lazy(() => import('../pages/inventory/StockReservationsPage').then(m => ({ default: m.StockReservationsPage })));
 
 export const ReorderPlanningPage = lazy(() => import('../pages/inventory/ReorderPlanningPage').then(m => ({ default: m.ReorderPlanningPage })));
 export const WarehouseLocationsPage = lazy(() => import('../pages/inventory/WarehouseLocationsPage').then(m => ({ default: m.WarehouseLocationsPage })));
@@ -68,6 +71,7 @@ export const HrDashboardPage = lazy(() => import('../pages/hr/HrDashboardPage').
 
 // CRM & Customers
 export const CustomersView = lazy(() => import('../components/CustomersView').then(m => ({ default: m.CustomersView })));
+export const CRMHubPage = lazy(() => import('../pages/crm/CRMHubPage').then(m => ({ default: m.CRMHubPage })));
 export const CustomerDetailPage = lazy(() => import('../pages/customers/CustomerDetailPage').then(m => ({ default: m.CustomerDetailPage })));
 export const CustomerImportedProductsPage = lazy(() => import('../pages/customers/CustomerImportedProductsPage').then(m => ({ default: m.CustomerImportedProductsPage })));
 export const ReadyDeliveriesPage = lazy(() => import('../pages/customers/ReadyDeliveriesPage').then(m => ({ default: m.ReadyDeliveriesPage })));
@@ -89,7 +93,6 @@ export const IncomingProductsPage = lazy(() => import('../pages/purchasing/Incom
 export const PurchaseReturnsPage = lazy(() => import('../pages/purchasing/PurchaseReturnsPage').then(m => ({ default: m.PurchaseReturnsPage })));
 export const SupplierClaimsPage = lazy(() => import('../pages/purchasing/SupplierClaimsPage').then(m => ({ default: m.SupplierClaimsPage })));
 export const SupplierStatementPage = lazy(() => import('../pages/purchasing/SupplierStatementPage').then(m => ({ default: m.SupplierStatementPage })));
-export const PurchasingWorkflowPage = lazy(() => import('../pages/purchasing/PurchasingWorkflowPage').then(m => ({ default: m.PurchasingWorkflowPage })));
 
 // Finance
 export const CashierView = lazy(() => import('../components/CashierView').then(m => ({ default: m.CashierView })));

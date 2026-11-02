@@ -51,7 +51,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'عروض الأسعار والطلبات والفواتير والمرتجعات وتحليلات البيع.',
     dependencies: ['customers'],
     permissions: ['sales.view'],
-    paths: ['/daily/sales', '/pos', '/restaurant', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/reservations', '/sales/after-sales', '/quotations', '/orders', '/returns'],
+    paths: ['/daily/sales', '/pos', '/restaurant', '/sales', '/sales/analytics', '/sales/cycle', '/sales/statement', '/sales/orders-deposits', '/sales/reservations', '/sales/after-sales', '/quotations', '/orders', '/returns'],
     businessEvents: ['invoice.posted', 'invoice.voided', 'sales_return.posted', 'receipt.posted'],
     settings: [
       { key: 'allowCreditSales', label: 'السماح بالبيع الآجل', type: 'boolean', defaultValue: true },
@@ -65,7 +65,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الأصناف والوحدات والمخازن والحركات والجرد والتقييم.',
     dependencies: [],
     permissions: ['inventory.view'],
-    paths: ['/inventory', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/products', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
+    paths: ['/inventory', '/inventory/hub', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/stock-reservations', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/products', '/products/catalog', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
     businessEvents: ['stock.movement.posted', 'stock.count.posted', 'stock.adjusted'],
     settings: [
       { key: 'allowNegativeStock', label: 'السماح بالمخزون السالب', type: 'boolean', defaultValue: false },
@@ -79,7 +79,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'العملاء وعلاقات العملاء والمشروعات المرتبطة بهم.',
     dependencies: [],
     permissions: ['customers.view'],
-    paths: ['/crm/dashboard', '/customers', '/customers/imported-products', '/customers/ready-deliveries', '/crm/leads', '/crm/pipeline', '/crm/activities', '/crm/campaigns'],
+    paths: ['/crm', '/crm/hub', '/crm/dashboard', '/customers', '/customers/imported-products', '/customers/ready-deliveries', '/crm/leads', '/crm/pipeline', '/crm/activities', '/crm/campaigns'],
     businessEvents: ['customer.created', 'lead.converted', 'project.created'],
     settings: [
       { key: 'creditLimitEnforced', label: 'تطبيق حد الائتمان', type: 'boolean', defaultValue: true },
@@ -92,7 +92,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'طلبات وأوامر الشراء والاستلام وفواتير الموردين والمرتجعات.',
     dependencies: ['finance'],
     permissions: ['purchases.view'],
-    paths: ['/daily/purchases', '/suppliers', '/purchases/workflow', '/purchases/requests', '/purchases/quotations', '/purchases/orders', '/purchases/receipts', '/purchases/incoming', '/purchases', '/purchases/statement', '/purchases/claims', '/purchases/returns'],
+    paths: ['/daily/purchases', '/suppliers', '/purchases/requests', '/purchases/quotations', '/purchases/orders', '/purchases/receipts', '/purchases/incoming', '/purchases', '/purchases/statement', '/purchases/claims', '/purchases/returns'],
     businessEvents: ['purchase_order.approved', 'goods_receipt.posted', 'supplier_payment.posted'],
     settings: [
       { key: 'requireApprovalAboveAmount', label: 'حد الموافقة على أمر الشراء', type: 'number', defaultValue: 0 },
@@ -133,7 +133,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'التقارير التشغيلية والمالية والضريبية والتحليلات.',
     dependencies: [],
     permissions: ['reports.view'],
-    paths: ['/reports', '/reports/statements', '/reports/profit-loss', '/reports/tax', '/reports/sales', '/reports/pos', '/reports/purchases'],
+    paths: ['/reports', '/reports/:reportId', '/reports/statements', '/reports/profit-loss', '/reports/tax', '/reports/sales', '/reports/pos', '/reports/purchases'],
     businessEvents: ['report.exported'],
     settings: [],
     activation: {},

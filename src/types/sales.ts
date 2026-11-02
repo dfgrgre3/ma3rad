@@ -43,7 +43,27 @@ export interface SalesInvoice {
   createdByName?: string;
   createdAt: string;
   updatedAt: string;
-  
+
+  // بيانات التوصيل والشحن
+  deliveryAddress?: string;
+  deliveryContactName?: string;
+  deliveryContactPhone?: string;
+  deliveryDate?: string;
+  deliveryNotes?: string;
+  driverName?: string;
+
+  // تفاصيل العروض والكوبونات المطبقة
+  couponCode?: string;
+  promotionName?: string;
+  promotionDiscount?: number;
+
+  // تفاصيل تجزئة المدفوعات (Split Payments)
+  paymentSplits?: Array<{
+    method: PaymentType | string;
+    amount: number;
+    reference?: string;
+  }>;
+
   items?: SalesInvoiceItem[];
 }
 

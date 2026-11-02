@@ -15,6 +15,8 @@ interface OrdersTableProps {
   pageSize: number;
   canCreate: boolean;
   canUpdate: boolean;
+  canApprove: boolean;
+  canDelete: boolean;
   onViewDetails: (order: Order) => void;
   onPrintOrder: (order: Order) => void;
   onOpenTimeline: (order: Order) => void;
@@ -28,7 +30,7 @@ interface OrdersTableProps {
 }
 
 export const OrdersTable: React.FC<OrdersTableProps> = ({
-  orders, pageItems, page, totalPages, pageSize, canCreate, canUpdate,
+  orders, pageItems, page, totalPages, pageSize, canCreate, canUpdate, canApprove, canDelete,
   onViewDetails, onPrintOrder, onOpenTimeline, onShareOnWhatsApp, onEditOrder,
   onOpenDelivery, onOpenConvert, onRemoveOrder, onPrevPage, onNextPage,
 }) => (
@@ -89,7 +91,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                     <IconBtn title="طباعة الطلب" onClick={() => onPrintOrder(o)}><Printer className="w-4 h-4" /></IconBtn>
                     <IconBtn title="سجل الحالات" onClick={() => onOpenTimeline(o)}><History className="w-4 h-4" /></IconBtn>
                     <IconBtn title="مشاركة واتساب" onClick={() => onShareOnWhatsApp(o)}><MessageCircle className="w-4 h-4 text-emerald-600" /></IconBtn>
-                    {canCreate && o.status === 'PENDING' && (
+                    {canUpdate && o.status === 'PENDING' && (
                       <IconBtn title="تعديل الطلب" onClick={() => onEditOrder(o)}><Pencil className="w-4 h-4" /></IconBtn>
                     )}
                     {canUpdate && ['CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(o.status) && (
@@ -98,7 +100,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                     {canUpdate && ['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(o.status) && (
                       <button onClick={() => onOpenConvert(o)} className="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1"><Receipt className="w-3 h-3" /> فاتورة</button>
                     )}
-                    {canUpdate && o.status === 'CANCELLED' && (
+                    {canDelete && o.status === 'CANCELLED' && (
                       <IconBtn title="حذف الطلب الملغي" onClick={() => onRemoveOrder(o)}><Trash2 className="w-4 h-4 text-rose-500" /></IconBtn>
                     )}
                   </div>

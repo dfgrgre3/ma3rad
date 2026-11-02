@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld('ceramisys', {
     saveClientConfig: (config) => ipcRenderer.invoke('sync:client-config:save', config),
     clearClientConfig: () => ipcRenderer.invoke('sync:client-config:clear'),
   },
+  tailscale: {
+    status: () => ipcRenderer.invoke('tailscale:status'),
+    connect: (authKey) => ipcRenderer.invoke('tailscale:connect', authKey),
+    disconnect: () => ipcRenderer.invoke('tailscale:disconnect'),
+  },
   app: {
     info: () => ipcRenderer.invoke('app:info'),
     openFolder: (target) => ipcRenderer.invoke('app:openFolder', target),
@@ -56,6 +61,8 @@ contextBridge.exposeInMainWorld('ceramisys', {
   documents: {
     importFile: () => ipcRenderer.invoke('documents:import'),
     openFile: (storageName) => ipcRenderer.invoke('documents:open', storageName),
+    recognizePage: (imageData) => ipcRenderer.invoke('documents:ocr-page', imageData),
+    finishOcr: () => ipcRenderer.invoke('documents:ocr-finish'),
     info: () => ipcRenderer.invoke('documents:info'),
   },
 });

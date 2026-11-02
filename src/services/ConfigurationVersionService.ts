@@ -7,6 +7,7 @@ import { PermissionService } from './PermissionService';
 import { SettingsService } from './SettingsService';
 import { TerminologyService } from './TerminologyService';
 import type { User } from '../types';
+import { getEffectiveBusinessType } from './BusinessTypeService';
 
 export interface ActivityConfigurationSnapshot {
   schemaVersion: 1;
@@ -43,7 +44,7 @@ export class ConfigurationVersionService {
   }
 
   private static createSnapshot(): ActivityConfigurationSnapshot {
-    const businessType = SettingsService.getValue('businessType') || 'general';
+    const businessType = getEffectiveBusinessType();
     const enabledModules = ModuleRegistryService.getEnabledModuleIds();
     return {
       schemaVersion: 1,

@@ -1,5 +1,6 @@
 // Default settings and branch identity shared by database setup and migrations.
 export const DEFAULT_SETTINGS: Record<string, string> = {
+  businessType: 'ceramics',
   showroomName: '',
   tagline: '',
   phone: '',
@@ -16,6 +17,11 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   receiptHeader: 'أهلاً بكم ونتشرف بخدمتكم',
   receiptFooter: 'البضاعة المباعة ترد خلال 14 يوماً بالحالة الأصلية ومع الفاتورة\nشكراً لزيارتكم',
   autoBackupIntervalHours: '24',
+  a4PrinterName: '',
+  a5PrinterName: '',
+  barcodePrinterName: '',
+  defaultInvoiceSize: 'a4',
+  defaultInvoiceTemplate: 'classic',
 
   // Added alongside the branches / approvals / delivery modules.
   defaultBranchId: 'br_main',
@@ -40,6 +46,32 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   sidebarStyle: 'default',
   navigationLayout: 'sidebar',
   businessTerminologyOverrides: '{}',
+  sellingPriceTiersCount: '1',
+  sellingPriceTierNames: '["سعر القطاعي (الأساسي)", "سعر الجملة", "سعر خاص / موزع", "سعر مشاريع", "سعر كبار العملاء"]',
+  posShowCashButton: '1',
+  posAllowDuplicateItems: '0',
+  posAutoSaveInvoice: '0',
+  posMultiSelectSearch: '0',
+  invoiceTableStyle: 'bordered',
+  invoiceShowItemCode: '1',
+  invoiceShowItemSpecs: '1',
+  invoiceShowBoxesCount: '1',
+  invoiceShowLineDiscount: '1',
+  invoiceShowTableSummary: '1',
+  allowOverdraftSale: '0',
+  insufficientStockAsReserved: '0',
+  lockSaleOnReservedQty: '0',
+  preventPermitSaleWithoutStock: '0',
+  preventOverdraftDeliveryPermit: '0',
+  allowAdminOverdraftSale: '0',
+  allowPermissionHoldersOverdraftSale: '0',
+  allowLineItemDiscount: '1',
+  returnRequiresInvoiceOrCustomer: '0',
+  newInvoicesUnderDelivery: '0',
+  vatOnDeliveryFee: '0',
+  cashierMaxDiscountPercentWithoutApproval: '0',
+  requireRemoteManagerApproval: '1',
+  posItemRemovalReasons: JSON.stringify(['غلط في الإدخال', 'العميل غيّر رأيه', 'صنف تالف', 'سعر غلط']),
 };
 
 // Keys added after the original settings backfill. Migration 012 inserts any
@@ -48,6 +80,7 @@ export const EXTENDED_SETTINGS_KEYS = [
   'brandName', 'brandShortName', 'brandLogoDataUrl', 'brandPrimaryColor',
   'brandAccentColor', 'themeMode', 'fontFamily', 'showBrandText', 'sidebarStyle',
   'navigationLayout', 'businessTerminologyOverrides',
+  'sellingPriceTiersCount', 'sellingPriceTierNames', 'posShowCashButton', 'posAllowDuplicateItems', 'posAutoSaveInvoice', 'posMultiSelectSearch', 'invoiceTableStyle', 'invoiceShowItemCode', 'invoiceShowItemSpecs', 'invoiceShowBoxesCount', 'invoiceShowLineDiscount', 'invoiceShowTableSummary', 'allowOverdraftSale', 'insufficientStockAsReserved', 'lockSaleOnReservedQty', 'preventPermitSaleWithoutStock', 'preventOverdraftDeliveryPermit', 'allowAdminOverdraftSale', 'allowPermissionHoldersOverdraftSale', 'allowLineItemDiscount', 'returnRequiresInvoiceOrCustomer', 'newInvoicesUnderDelivery', 'vatOnDeliveryFee', 'cashierMaxDiscountPercentWithoutApproval', 'requireRemoteManagerApproval', 'posItemRemovalReasons',
 ];
 
 export const DEFAULT_BRANCH_ID = 'br_main';

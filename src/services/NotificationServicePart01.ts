@@ -1,4 +1,6 @@
 import { DatabaseManager } from '../database/db';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
 import { v4 as uuidv4 } from 'uuid';
 import { addLocalDays, localDateString } from '../utils/date';
 import type { Notification, NotificationType } from './notificationTypes';
@@ -93,10 +95,14 @@ public createNotification(
   }
 
 public deleteNotification(id: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'notifications.manage');
     this.db.run('DELETE FROM notifications WHERE id = ?', [id]);
   }
 
 public deleteAllNotifications(userId?: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'notifications.manage');
     if (userId) {
       this.db.run('DELETE FROM notifications WHERE user_id = ?', [userId]);
     } else {

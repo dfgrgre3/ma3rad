@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CalendarClock, CheckCircle2, Download, FileText,
   Loader2, LockKeyhole, Plus, RefreshCw, Search, ShieldCheck,
@@ -68,8 +69,18 @@ async function pickAttachment(): Promise<EnterpriseDocumentVersion | null> {
 export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' }) => {
   const toast = useToast();
   const can = usePermission();
+  const navigate = useNavigate();
+  const canViewDocuments = can('documents.view');
+  const canViewContracts = can('contracts.view');
+  const canExportDocuments = can('documents.export');
+  const canExportContracts = can('contracts.export');
   const service = useMemo(() => new DocumentService(), []);
-  const [tab, setTab] = useState<Mode>(mode);
+  const initialTab: Mode = mode === 'contracts' && canViewContracts
+    ? 'contracts'
+    : canViewDocuments
+      ? 'documents'
+      : 'contracts';
+  const [tab, setTab] = useState<Mode>(initialTab);
   const [summary, setSummary] = useState<DocumentModuleSummary>(emptySummary);
   const [companies, setCompanies] = useState<DocumentCompanyOption[]>([]);
   const [documents, setDocuments] = useState<EnterpriseDocument[]>([]);
@@ -120,18 +131,21 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
     notes: '',
   });
 
-  const canViewDocuments = can('documents.view');
-  const canViewContracts = can('contracts.view');
-  const canExportDocuments = can('documents.export');
-  const canExportContracts = can('contracts.export');
-
-  useEffect(() => setTab(mode), [mode]);
+  useEffect(() => setTab(initialTab), [initialTab]);
 
   const load = useCallback(() => {
     setLoading(true);
     try {
       const nextSummary = service.getSummary();
-      setSummary(nextSummary);
+      setSummary({
+        documents: canViewDocuments ? nextSummary.documents : 0,
+        activeDocuments: canViewDocuments ? nextSummary.activeDocuments : 0,
+        archivedDocuments: canViewDocuments ? nextSummary.archivedDocuments : 0,
+        expiringDocuments: canViewDocuments ? nextSummary.expiringDocuments : 0,
+        contracts: canViewContracts ? nextSummary.contracts : 0,
+        activeContracts: canViewContracts ? nextSummary.activeContracts : 0,
+        expiringContracts: canViewContracts ? nextSummary.expiringContracts : 0,
+      });
       try {
         setCompanies(service.getCompanyOptions());
       } catch {
@@ -456,26 +470,26 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 px-4 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <SummaryCard label="المستندات" value={summary.documents} hint={`${summary.activeDocuments} نشط`} icon={FileText} />
-        <SummaryCard label="مستندات قاربت الانتهاء" value={summary.expiringDocuments} hint="خلال 30 يومًا" icon={CalendarClock} tone="amber" />
-        <SummaryCard label="العقود السارية" value={summary.activeContracts} hint={`من ${summary.contracts} عقد`} icon={CheckCircle2} tone="emerald" />
-        <SummaryCard label="عقود قاربت الانتهاء" value={summary.expiringContracts} hint="تحتاج قرار تجديد" icon={ShieldCheck} tone="rose" />
+      <div className="grid grid-cols-1 gap-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2 md:grid-cols-4">
+        {canViewDocuments && <SummaryCard label="المستندات" value={summary.documents} hint={`${summary.activeDocuments} نشط`} icon={FileText} />}
+        {canViewDocuments && <SummaryCard label="مستندات قاربت الانتهاء" value={summary.expiringDocuments} hint="خلال 30 يومًا" icon={CalendarClock} tone="amber" />}
+        {canViewContracts && <SummaryCard label="العقود السارية" value={summary.activeContracts} hint={`من ${summary.contracts} عقد`} icon={CheckCircle2} tone="emerald" />}
+        {canViewContracts && <SummaryCard label="عقود قاربت الانتهاء" value={summary.expiringContracts} hint="تحتاج قرار تجديد" icon={ShieldCheck} tone="rose" />}
       </div>
 
       <div className="flex items-center gap-2 px-4 pt-3">
-        <button
-          onClick={() => { setTab('documents'); setStatusFilter('ALL'); }}
+        {canViewDocuments && <button
+          onClick={() => { navigate('/documents'); setStatusFilter('ALL'); }}
           className={`px-4 py-2 rounded-xl text-xs font-bold border ${tab === 'documents' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`}
         >
           المستندات ({documentTotal})
-        </button>
-        <button
-          onClick={() => { setTab('contracts'); setStatusFilter('ALL'); }}
+        </button>}
+        {canViewContracts && <button
+          onClick={() => { navigate('/contracts'); setStatusFilter('ALL'); }}
           className={`px-4 py-2 rounded-xl text-xs font-bold border ${tab === 'contracts' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'}`}
         >
           العقود ({contractTotal})
-        </button>
+        </button>}
       </div>
 
       <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 mt-3 flex flex-col sm:flex-row gap-2">
@@ -540,4 +554,3 @@ export const DocumentsPage: React.FC<{ mode?: Mode }> = ({ mode = 'documents' })
     </div>
   );
 };
-

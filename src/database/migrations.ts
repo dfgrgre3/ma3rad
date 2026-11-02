@@ -2217,6 +2217,15 @@ export const MIGRATIONS: Migration[] = [
       });
     },
   },
+  {
+    id: '103_default_business_type',
+    description: 'Persist the canonical default business type for legacy databases.',
+    up: (db: Database) => {
+      db.run('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)', [
+        'businessType', DEFAULT_SETTINGS.businessType,
+      ]);
+    },
+  },
   ...MIGRATION_PART_14,
 ].flat();
 

@@ -3,6 +3,7 @@ import { BookmarkPlus, RefreshCw, Search, Receipt } from 'lucide-react';
 import type { ReservationTab } from './types';
 
 interface ReservationsToolbarProps {
+  mode?: 'orders' | 'reservations';
   activeTab: ReservationTab;
   onTabChange: (tab: ReservationTab) => void;
   search: string;
@@ -16,6 +17,7 @@ interface ReservationsToolbarProps {
 }
 
 export const ReservationsToolbar: React.FC<ReservationsToolbarProps> = ({
+  mode,
   activeTab,
   onTabChange,
   search,
@@ -31,7 +33,7 @@ export const ReservationsToolbar: React.FC<ReservationsToolbarProps> = ({
     <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
       {/* Navigation Tabs */}
       <div className="flex bg-slate-100 dark:bg-slate-700/60 p-1 rounded-xl w-full md:w-auto">
-        <button
+        {mode !== 'reservations' && <button
           onClick={() => onTabChange('orders')}
           className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
             activeTab === 'orders'
@@ -41,8 +43,8 @@ export const ReservationsToolbar: React.FC<ReservationsToolbarProps> = ({
         >
           <Receipt className="w-4 h-4" />
           طلبات الحجز والعربونات ({ordersCount})
-        </button>
-        <button
+        </button>}
+        {mode !== 'orders' && <button
           onClick={() => onTabChange('reservations')}
           className={`flex-1 md:flex-initial px-5 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2 ${
             activeTab === 'reservations'
@@ -52,7 +54,7 @@ export const ReservationsToolbar: React.FC<ReservationsToolbarProps> = ({
         >
           <BookmarkPlus className="w-4 h-4" />
           سجل حجز الأصناف بالمخازن ({reservationsCount})
-        </button>
+        </button>}
       </div>
 
       {/* Search & Filters */}

@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { SettingsService } from '../services/SettingsService';
+import { getEffectiveBusinessType } from '../services/BusinessTypeService';
 import { AppConfigService } from '../services/AppConfigService';
 import { ConfigText } from '../components/config/ConfigText';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from '../config/businessProfiles';
@@ -26,7 +27,7 @@ interface ModuleGuardProps {
 
 export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
   const { pathname } = useLocation();
-  const businessType = SettingsService.getValue('businessType') || 'ceramics';
+  const businessType = getEffectiveBusinessType();
   const modules = withModuleDependencies(parseEnabledModules(SettingsService.getValue('enabledModules'), businessType));
   const businessConfig = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
   const moduleId = getBusinessModuleForPath(pathname);

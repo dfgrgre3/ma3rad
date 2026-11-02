@@ -23,6 +23,8 @@ export interface PosCartPanelProps {
   onUpdateQuantity: (index: number, value: number) => void;
   onUpdatePrice: (index: number, value: number) => void;
   onUpdateLineDiscount: (index: number, value: number) => void;
+  sellingPriceTiersCount?: number;
+  sellingPriceTierNames?: string[];
 }
 
 export const PosCartPanel: React.FC<PosCartPanelProps> = ({
@@ -80,6 +82,8 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
             onUpdateQuantity={onUpdateQuantity}
             onUpdatePrice={onUpdatePrice}
             onUpdateLineDiscount={onUpdateLineDiscount}
+            sellingPriceTiersCount={sellingPriceTiersCount}
+            sellingPriceTierNames={sellingPriceTierNames}
           />
         ))
       )}

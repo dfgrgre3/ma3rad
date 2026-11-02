@@ -20,6 +20,7 @@ type ReturnOptions = {
   registerId?: string;
   shiftId?: string;
   refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
+  idempotencyKey?: string;
 };
 
 interface ReturnTransactionParams {
@@ -53,10 +54,42 @@ export function createSaleReturn(
   options: ReturnOptions = {}
 ): SalesReturn {
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'sales.refund');
+  PermissionService.require(actor, 'returns.create');
+    if (refundCash) PermissionService.require(actor, 'returns.approve');
   const inv = ctx.getInvoiceById(invoiceId);
   if (!inv) throw new Error('الفاتورة الأصلية غير موجودة.');
   if (inv.invoiceStatus === 'VOID') throw new Error('لا يمكن مرتجعة فاتورة ملغاة.');
+
+  const idempotencyKey = options.idempotencyKey;
+  if (idempotencyKey) {
+    const prior = ctx.db.query<any>(
+      `SELECT id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
+              date, total_amount, refunded_amount, remaining_to_balance, reason, refund_method, created_by, created_at
+       FROM sales_returns WHERE idempotency_key = ?`,
+      [idempotencyKey]
+    )[0];
+    if (prior) {
+      if (prior.original_invoice_id !== invoiceId) {
+        throw new Error('The sales return idempotency key was already used for a different invoice.');
+      }
+      return {
+        id: prior.id,
+        returnNumber: prior.return_number,
+        originalInvoiceId: prior.original_invoice_id,
+        originalInvoiceNumber: prior.original_invoice_number,
+        customerId: prior.customer_id,
+        warehouseId: prior.warehouse_id,
+        date: prior.date,
+        totalAmount: Number(prior.total_amount),
+        refundedAmount: Number(prior.refunded_amount),
+        remainingToBalance: Number(prior.remaining_to_balance),
+        reason: prior.reason,
+        refundMethod: prior.refund_method,
+        createdBy: prior.created_by,
+        createdAt: prior.created_at,
+      };
+    }
+  }
 
   const normalizedItems = normalizeReturnUnits(ctx, returnItems);
   const requestedByProduct = validateReturnRequest(inv, normalizedItems);
@@ -235,14 +268,14 @@ function insertSalesReturn(
     INSERT INTO sales_returns (
       id, return_number, original_invoice_id, original_invoice_number, customer_id,
       warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason,
-      register_id, shift_id, refund_method, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      register_id, shift_id, refund_method, created_by, idempotency_key
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
     inv.warehouseId, today, totalReturnAmount, impact.cashRefund, impact.balanceDelta,
     items[0]?.reason || 'مرتجع سيراميك',
     options.registerId || (impact.cashRefund > 0 && refundMethod === 'CASH' ? 'cr_main' : null),
-    options.shiftId || null, refundMethod, actor.id,
+    options.shiftId || null, refundMethod, actor.id, options.idempotencyKey || null,
   ]);
 }
 

@@ -5,12 +5,20 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { round2 } from './financials';
 import { getProductUnitLabel } from '../utils/productUnits';
+import { BranchAccessService } from './BranchAccessService';
 
 export * from './reservationTypes';
 import type { StockReservation, ReservationReference } from './reservationTypes';
 
+export interface ExpireOverdueResult {
+  candidates: number;
+  released: number;
+  failed: number;
+}
+
 export class ReservationService {
   private db = DatabaseManager.getInstance();
+  private branchAccess = new BranchAccessService();
 
   public getReservations(filters: { status?: string; search?: string } = {}): StockReservation[] {
     PermissionService.require(AuthService.requireAuth(), 'inventory.view');
@@ -24,7 +32,9 @@ export class ReservationService {
       JOIN products p ON p.id = r.product_id
       JOIN warehouses w ON w.id = r.warehouse_id
       WHERE 1 = 1`;
-    const params: any[] = [];
+    const scope = this.branchAccess.warehouseBranchScope('w');
+    sql += ` AND ${scope.clause}`;
+    const params: any[] = [...scope.params];
     if (filters.status && filters.status !== 'ALL') { sql += ` AND r.status = ?`; params.push(filters.status); }
     if (filters.search?.trim()) {
       sql += ` AND (p.name LIKE ? OR p.sku LIKE ? OR r.reference_id LIKE ?)`;
@@ -36,6 +46,8 @@ export class ReservationService {
   }
 
   public getAvailability(productId: string, warehouseId: string): { onHand: number; reserved: number; available: number; productType?: 'CERAMIC' | 'GENERAL'; baseUnit?: string; customUnit?: string } {
+    AuthService.requireAuth();
+    this.branchAccess.requireWarehouseAccess(warehouseId);
     const row = this.db.query<any>(
       `SELECT ws.quantity_m2 AS onHand, ws.reserved_m2 AS reserved, p.product_type AS productType,
               p.base_unit AS baseUnit, p.custom_unit AS customUnit
@@ -55,6 +67,7 @@ export class ReservationService {
   }): StockReservation {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
+    this.branchAccess.requireWarehouseAccess(input.warehouseId, actor);
     const quantity = round2(input.quantityM2);
     if (!(quantity > 0)) throw new Error('كمية الحجز يجب أن تكون أكبر من صفر.');
 
@@ -103,19 +116,10 @@ export class ReservationService {
       [id]
     )[0];
     if (!row) throw new Error('الحجز غير موجود.');
+    this.branchAccess.requireWarehouseAccess(row.warehouseId, actor);
     if (row.status !== 'ACTIVE') throw new Error('الحجز غير نشط بالفعل.');
 
-    this.db.executeTransaction((db) => {
-      db.run(
-        `UPDATE stock_reservations SET status = ?, released_at = ? WHERE id = ?`,
-        [reason, new Date().toISOString(), id]
-      );
-      db.run(
-        `UPDATE warehouse_stock SET reserved_m2 = MAX(0, reserved_m2 - ?), last_updated = CURRENT_TIMESTAMP
-         WHERE product_id = ? AND warehouse_id = ?`,
-        [Number(row.quantity), row.productId, row.warehouseId]
-      );
-    });
+    this.db.executeTransaction((db) => this.releaseReservationInternal(db, row, reason));
   }
 
   /** Converts an active reservation into an actual stock deduction. */
@@ -129,6 +133,7 @@ export class ReservationService {
       [id]
     )[0];
     if (!row) throw new Error('الحجز غير موجود.');
+    this.branchAccess.requireWarehouseAccess(row.warehouseId, actor);
     if (row.status !== 'ACTIVE') throw new Error('لا يمكن تنفيذ حجز غير نشط.');
 
     this.db.executeTransaction((db) => {
@@ -168,15 +173,46 @@ export class ReservationService {
     });
   }
 
-  public expireOverdue(): number {
+  public expireOverdue(): ExpireOverdueResult {
     const today = new Date().toISOString();
     const rows = this.db.query<any>(
       `SELECT id FROM stock_reservations WHERE status = 'ACTIVE' AND expires_at IS NOT NULL AND expires_at < ?`,
       [today]
     );
+    let released = 0;
+    let failed = 0;
     for (const row of rows) {
-      try { this.releaseReservation(row.id, 'EXPIRED'); } catch { /* continue */ }
+      try {
+        this.db.executeTransaction((db) => {
+          const current = db.query<any>(
+            `SELECT id, product_id AS productId, warehouse_id AS warehouseId, quantity_m2 AS quantity, status
+             FROM stock_reservations WHERE id = ?`, [row.id]
+          )[0];
+          if (!current || current.status !== 'ACTIVE') return;
+          this.releaseReservationInternal(db, current, 'EXPIRED');
+          released++;
+        });
+      } catch {
+        failed++;
+        // An individual expired reservation must not block the rest.
+      }
     }
-    return rows.length;
+    return { candidates: rows.length, released, failed };
+  }
+
+  private releaseReservationInternal(
+    db: DatabaseManager,
+    row: { id: string; productId: string; warehouseId: string; quantity: number },
+    reason: 'RELEASED' | 'EXPIRED'
+  ): void {
+    db.run(
+      `UPDATE stock_reservations SET status = ?, released_at = ? WHERE id = ? AND status = 'ACTIVE'`,
+      [reason, new Date().toISOString(), row.id]
+    );
+    db.run(
+      `UPDATE warehouse_stock SET reserved_m2 = MAX(0, reserved_m2 - ?), last_updated = CURRENT_TIMESTAMP
+       WHERE product_id = ? AND warehouse_id = ?`,
+      [Number(row.quantity), row.productId, row.warehouseId]
+    );
   }
 }

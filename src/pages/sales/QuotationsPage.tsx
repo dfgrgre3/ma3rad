@@ -44,8 +44,10 @@ export const QuotationsPage: React.FC = () => {
   const inventoryService = useMemo(() => new InventoryService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const user = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(user, 'sales.create');
-  const canApprove = PermissionService.can(user, 'sales.approve');
+  const canCreate = PermissionService.can(user, 'quotations.create');
+  const canUpdate = PermissionService.can(user, 'quotations.update');
+  const canDelete = PermissionService.can(user, 'quotations.delete');
+  const canApprove = PermissionService.can(user, 'quotations.approve');
 
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -533,6 +535,8 @@ export const QuotationsPage: React.FC = () => {
 
       <QuotationModals
         canCreate={canCreate}
+        canUpdate={canUpdate}
+        canDelete={canDelete}
         canApprove={canApprove}
         saving={saving}
         formOpen={formOpen}

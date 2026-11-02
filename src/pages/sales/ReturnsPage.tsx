@@ -57,7 +57,8 @@ export const ReturnsPage: React.FC = () => {
   const service = useMemo(() => new SalesService(), []);
   const productService = useMemo(() => new ProductService(), []);
   const printService = useMemo(() => new PrintService(), []);
-  const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'sales.refund');
+  const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'returns.create');
+  const canApproveReturn = PermissionService.can(AuthService.getCurrentUser(), 'returns.approve');
 
   const [docPreview, setDocPreview] = useState<{
     title: string;

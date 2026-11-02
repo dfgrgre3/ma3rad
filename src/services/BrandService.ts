@@ -14,9 +14,10 @@ export class BrandService {
   private sync = new MasterDataSyncService(this.db);
 
   public getAllBrands(): BrandWithCount[] {
+    PermissionService.require(AuthService.requireAuth(), 'brands.view');
     const rows = this.db.query<any>(`
       SELECT 
-        b.*,
+        b.id, b.name, b.country, b.created_at,
         COALESCE(pc.product_count, 0) as productCount
       FROM brands b
       LEFT JOIN (
@@ -36,7 +37,11 @@ export class BrandService {
   }
 
   public getBrandById(id: string): Brand | null {
-    const rows = this.db.query<Brand>('SELECT * FROM brands WHERE id = ?', [id]);
+    PermissionService.require(AuthService.requireAuth(), 'brands.view');
+    const rows = this.db.query<Brand>(
+      'SELECT id, name, country, created_at FROM brands WHERE id = ?',
+      [id]
+    );
     return rows.length > 0 ? rows[0] : null;
   }
 

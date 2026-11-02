@@ -33,6 +33,21 @@ export interface SyncBootstrapEntityProgress {
   completed: boolean;
 }
 
+export interface ResolvedConflict {
+  id: string;
+  eventId: string;
+  tenantId: string;
+  sourceBranchId: string;
+  entityType: string;
+  entityId: string;
+  remoteVersion: number;
+  localVersion: number | null;
+  reason: string;
+  status: string;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
 export interface SyncBootstrapProgress {
   processedThisBatch: number;
   entities: SyncBootstrapEntityProgress[];
@@ -307,11 +322,29 @@ export class MasterDataSyncService {
     );
   }
 
-  resolveConflict(conflictId: string, resolution: 'KEEP_LOCAL' | 'ACCEPT_REMOTE'): void {
+  listResolvedConflicts(limit = 50): ResolvedConflict[] {
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      throw new RangeError('Resolved conflict list size must be an integer between 1 and 200');
+    }
+    const identity = MasterDataSyncService.configuredIdentity;
+    if (!identity) return [];
+    return this.dbManager.query(
+      `SELECT id, event_id AS eventId, tenant_id AS tenantId, source_branch_id AS sourceBranchId,
+              entity_type AS entityType, entity_id AS entityId,
+              remote_version AS remoteVersion, local_version AS localVersion,
+              reason, status, resolved_at AS resolvedAt, created_at AS createdAt
+       FROM sync_conflicts
+       WHERE tenant_id=? AND status IN ('RESOLVED_LOCAL','RESOLVED_REMOTE','RESOLVED_AUTO')
+       ORDER BY resolved_at DESC LIMIT ?`,
+      [identity.tenantId, limit]
+    );
+  }
+
+  resolveConflict(conflictId: string, resolution: 'KEEP_LOCAL' | 'ACCEPT_REMOTE' | 'AUTO_MERGED', mergedPayload?: Record<string, unknown>): void {
     const identity = MasterDataSyncService.configuredIdentity;
     if (!identity) throw new Error('Synchronization identity is not configured');
     if (!conflictId.trim()) throw new TypeError('Conflict ID is required');
-    if (resolution !== 'KEEP_LOCAL' && resolution !== 'ACCEPT_REMOTE') {
+    if (resolution !== 'KEEP_LOCAL' && resolution !== 'ACCEPT_REMOTE' && resolution !== 'AUTO_MERGED') {
       throw new TypeError('Invalid synchronization conflict resolution');
     }
 
@@ -336,6 +369,33 @@ export class MasterDataSyncService {
       const event = JSON.parse(conflict.remotePayload) as SyncEvent;
       const spec = ENTITY_SPECS[conflict.entityType];
       const columns = this.availableColumns(transaction, spec);
+      if (resolution === 'AUTO_MERGED' && mergedPayload) {
+        const remoteEvent = JSON.parse(conflict.remotePayload) as SyncEvent;
+        const syntheticEvent: SyncEvent = { ...remoteEvent, payload: { row: mergedPayload } };
+        this.writeIncomingRow(transaction, spec, columns, syntheticEvent);
+        const lv = this.getVersion(transaction, identity.tenantId, conflict.entityType, conflict.entityId)?.entityVersion ?? 0;
+        const mergedVersion = Math.max(lv, conflict.remoteVersion) + 1;
+        this.saveVersion(transaction, identity.tenantId, conflict.entityType, conflict.entityId, mergedVersion, identity.branchId);
+        this.outbox.enqueue({
+          tenantId: identity.tenantId,
+          branchId: identity.branchId,
+          deviceId: identity.deviceId,
+          entityType: conflict.entityType as MasterEntityType,
+          entityId: conflict.entityId,
+          operationType: 'UPDATE',
+          entityVersion: mergedVersion,
+          dataScope: 'TENANT',
+          payload: { row: mergedPayload },
+        });
+        transaction.run(
+          `UPDATE sync_conflicts SET status='RESOLVED_AUTO', resolved_at=CURRENT_TIMESTAMP WHERE id=? AND status='OPEN'`,
+          [conflictId]
+        );
+        this.logResolution(transaction, identity, syntheticEvent, 'AUTO_MERGED');
+        this.inbox.markApplied(conflict.eventId);
+        return;
+      }
+
       if (resolution === 'ACCEPT_REMOTE') {
         this.writeIncomingRow(transaction, spec, columns, event);
         this.saveVersion(

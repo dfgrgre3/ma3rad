@@ -130,7 +130,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           navigationLayout={navigationLayout}
         />
 
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 w-full flex-1">
           {/* ── Desktop sidebar (hidden when navigation lives in the header) ────── */}
           {navigationLayout === 'sidebar' && (
             <div className="hidden shrink-0 lg:block">

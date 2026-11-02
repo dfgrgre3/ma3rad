@@ -14,15 +14,16 @@ export const appRoutes: RouteDef[] = [
   { path: 'tools', element: <Navigate to="/dashboard" replace /> },
 
   // Sales & POS
-  { path: 'sales/analytics', element: <Navigate to="/sales?tab=analytics" replace /> },
+  { path: 'sales/analytics', element: <P.SalesAnalyticsPage /> },
   { path: 'sales/cycle', element: <P.InvoiceCyclePage /> },
   { path: 'sales/statement', element: <P.CustomerStatementPage /> },
-  { path: 'sales/reservations', element: <P.ReservationsDepositPage /> },
+  { path: 'sales/orders-deposits', element: <P.SalesOrdersDepositsPage /> },
+  { path: 'sales/reservations', element: <Navigate to="/sales/orders-deposits" replace /> },
   { path: 'sales/after-sales', element: <P.AfterSalesPage /> },
   { path: 'restaurant', element: <P.RestaurantPage /> },
   { path: 'pos', element: <P.PosView /> },
   { path: 'sales', element: <P.SalesHubPage /> },
-  { path: 'daily/sales', element: <Navigate to="/sales?tab=daily" replace /> },
+  { path: 'daily/sales', element: <P.TodaySalesPage /> },
   { path: 'daily/purchases', element: <P.TodayPurchasesPage /> },
   { path: 'daily/expenses', element: <P.TodayExpensesPage /> },
   { path: 'daily/debts', element: <P.TodayDebtsPage /> },
@@ -31,7 +32,8 @@ export const appRoutes: RouteDef[] = [
   { path: 'returns', element: <P.ReturnsPage /> },
 
   // Products & Pricing
-  { path: 'products', element: <P.ProductsView /> },
+  { path: 'products/catalog', element: <P.ProductCatalogHubPage /> },
+  { path: 'products', element: <P.ProductCatalogHubPage /> },
   { path: 'products/attributes', element: <P.ProductAttributesPage /> },
   { path: 'products/barcodes', element: <P.BarcodesPrintPage /> },
   { path: 'products/:id', element: <P.ProductDetailPage /> },
@@ -41,7 +43,8 @@ export const appRoutes: RouteDef[] = [
   { path: 'promotions', element: <P.PromotionsPage /> },
 
   // Inventory
-  { path: 'inventory', element: <P.InventoryView /> },
+  { path: 'inventory/hub', element: <P.InventoryHubPage /> },
+  { path: 'inventory', element: <P.InventoryHubPage /> },
   { path: 'inventory/warehouse-stock', element: <P.LocationStockPage mode="warehouse" /> },
   { path: 'inventory/showroom-stock', element: <P.LocationStockPage mode="showroom" /> },
   { path: 'inventory/ledger', element: <P.StockLedgerPage /> },
@@ -49,7 +52,8 @@ export const appRoutes: RouteDef[] = [
   { path: 'inventory/counts', element: <P.InventoryCountPage /> },
   { path: 'inventory/valuation', element: <P.InventoryValuationPage /> },
   { path: 'inventory/adjustments', element: <P.InventoryAdjustmentsPage /> },
-  { path: 'inventory/reservations', element: <P.ReservationsDepositPage defaultTab="reservations" /> },
+  { path: 'inventory/stock-reservations', element: <P.StockReservationsPage /> },
+  { path: 'inventory/reservations', element: <Navigate to="/inventory/stock-reservations" replace /> },
   { path: 'inventory/reorder-planning', element: <P.ReorderPlanningPage /> },
   { path: 'inventory/locations', element: <P.WarehouseLocationsPage /> },
   { path: 'inventory/damage-quarantine', element: <P.DamageQuarantinePage /> },
@@ -60,19 +64,19 @@ export const appRoutes: RouteDef[] = [
   { path: 'warehouses', element: <P.WarehousesPage /> },
 
   // CRM
+  { path: 'crm/hub', element: <P.CRMHubPage /> },
+  { path: 'crm/dashboard', element: <P.CRMHubPage /> },
   { path: 'customers', element: <P.CustomersView /> },
   { path: 'customers/imported-products', element: <P.CustomerImportedProductsPage /> },
   { path: 'customers/ready-deliveries', element: <P.ReadyDeliveriesPage /> },
   { path: 'customers/:id/imported-products', element: <P.CustomerImportedProductsPage /> },
   { path: 'customers/:id', element: <P.CustomerDetailPage /> },
-  { path: 'crm/dashboard', element: <P.CrmDashboardPage /> },
   { path: 'crm/leads', element: <P.LeadsPage /> },
   { path: 'crm/pipeline', element: <P.PipelinePage /> },
   { path: 'crm/activities', element: <P.CrmActivitiesPage /> },
   { path: 'crm/campaigns', element: <P.CampaignsPage /> },
 
   // Purchasing
-  { path: 'purchases/workflow', element: <P.PurchasingWorkflowPage /> },
   { path: 'suppliers', element: <P.SuppliersView /> },
   { path: 'suppliers/:id', element: <P.SupplierDetailPage /> },
   { path: 'purchases', element: <P.PurchasesView /> },
@@ -122,6 +126,8 @@ export const appRoutes: RouteDef[] = [
 
   // Reports
   { path: 'reports', element: <P.ReportsHubPage /> },
+  { path: 'reports/category/:categoryId', element: <P.ReportsHubPage /> },
+  { path: 'reports/:reportId', element: <P.ReportsHubPage /> },
   { path: 'reports/tax', element: <Navigate to="/reports?tab=tax" replace /> },
   { path: 'reports/profit-loss', element: <Navigate to="/reports?tab=profitLoss" replace /> },
   { path: 'reports/statements', element: <Navigate to="/reports?tab=finance" replace /> },

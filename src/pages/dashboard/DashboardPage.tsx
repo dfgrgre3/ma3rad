@@ -103,14 +103,14 @@ export const DashboardPage: React.FC = () => {
   const isOverview = effectiveTab === 'all';
 
   return (
-    <div id="dashboard-scroll-root" className="h-full overflow-y-auto bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:p-4 lg:p-5">
+    <div id="dashboard-scroll-root" className="dashboard-page h-full overflow-x-hidden overflow-y-auto bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
+      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:space-y-5 sm:p-5 lg:p-6">
         <DashboardHeader today={today} onRefresh={refresh} />
 
         <DashboardSectionNav activeTab={effectiveTab} onSelectSection={selectSection} sections={visibleSections} />
 
         {(effectiveTab === 'pulse' || isOverview) && !canViewSection('pulse') && (
-          <SectionCard id="sec-pulse" title="ملخص لوحة المعلومات" subtitle="تتطلب المؤشرات صلاحيات المجالات التي تعرض بياناتها." icon={LayoutDashboard} iconBg="bg-slate-100" iconColor="text-slate-600">
+          <SectionCard id="sec-pulse" title="ملخص لوحة المعلومات" subtitle="تتطلب المؤشرات صلاحيات المجالات التي تعرض بياناتها." icon={LayoutDashboard}>
             <p className="p-4 text-sm text-slate-600">لا توجد صلاحية كافية لعرض مؤشرات المبيعات والمشتريات والمالية والعملاء والمخزون.</p>
           </SectionCard>
         )}

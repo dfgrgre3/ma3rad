@@ -34,6 +34,7 @@ import {
 import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../config/moduleRegistry';
 import { ModuleRegistryService } from '../services/ModuleRegistryService';
 import { BusinessProfileService } from '../services/BusinessProfileService';
+import { getEffectiveBusinessType } from '../services/BusinessTypeService';
 import { ConfigurationVersionService } from '../services/ConfigurationVersionService';
 import { auditLogger } from '../services/auditLogger';
 import type { User } from '../types';
@@ -303,7 +304,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         )[0];
       }
     } catch { /* use the seeded defaults below when setup records are unavailable */ }
-    const businessType = SettingsService.getValue('businessType') || 'ceramics';
+    const businessType = getEffectiveBusinessType();
     return mergeSetupDraft({
       showroomName: current?.showroomName || '',
       legalName: company?.legalName || '',
@@ -334,7 +335,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
     }, draft);
   });
   const [businessConfig, setBusinessConfig] = useState<BusinessConfiguration>(() => {
-    const businessType = form.businessType || SettingsService.getValue('businessType') || 'ceramics';
+    const businessType = form.businessType || getEffectiveBusinessType();
     const savedConfig = draft?.businessConfig
       ? JSON.stringify(draft.businessConfig)
       : SettingsService.getValue('businessProfileConfig');
@@ -602,7 +603,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
       toast.error('اكتب اسم النشاط التجاري (حرفان على الأقل)');
       return;
     }
-    const savedBusinessType = SettingsService.getValue('businessType') || 'ceramics';
+    const savedBusinessType = getEffectiveBusinessType();
     const savedBusinessConfig = parseBusinessConfiguration(
       SettingsService.getValue('businessProfileConfig'),
       savedBusinessType,

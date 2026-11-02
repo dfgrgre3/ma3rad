@@ -6,6 +6,7 @@ import {
   type BusinessProfileAttributeDefinition,
 } from '../config/businessProfiles';
 import { SettingsService } from './SettingsService';
+import { getEffectiveBusinessType } from './BusinessTypeService';
 
 /**
  * Turns the attribute names declared by a business profile into real
@@ -179,7 +180,7 @@ export class BusinessProfileService {
 
   /** Apply the attributes declared by the currently saved business profile. */
   public static applyFromSettings(): { created: string[]; existing: string[] } {
-    const businessType = SettingsService.getValue('businessType') || 'general';
+    const businessType = getEffectiveBusinessType();
     const config = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), businessType);
     const profiles = [businessType, ...config.additionalActivityIds].map(getBusinessProfile);
     const definitionsByCode = new Map<string, BusinessProfileAttributeDefinition>();

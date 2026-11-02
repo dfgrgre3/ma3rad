@@ -1,14 +1,9 @@
 import {
-  LayoutDashboard, TrendingUp, ShoppingCart, Receipt, FileText, Package2,
-  RotateCcw as RotateCcl, Layers, BookOpen, ArrowLeftRight, ScanLine,
-  Wrench, Package, FolderTree, Tags, Ruler, Star, Barcode, Users,
-  UserRound, Workflow, Activity, Boxes, Handshake, ClipboardList, ClipboardCheck, ShoppingBag,
-  Undo2, Wallet, TrendingDown, Banknote, CalendarDays, Building2, Warehouse, PackageCheck,
-  HardHat, Truck, Car, BarChart3, CheckSquare, Bell, ShieldCheck, Settings,
-  Download, Cpu, SlidersHorizontal, BadgeDollarSign, BookmarkPlus, FileSpreadsheet, MessageCircle,
-  Trash2, ShieldAlert, CreditCard, Lock, Target, Award, FileSignature, Factory, RefreshCw,
+  Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Building2, CalendarDays, Car, CheckSquare,
+  CreditCard, Cpu, Download, Factory, FileSignature, FileSpreadsheet, FileText, HardHat,
+  RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Trash2, Truck, UserRound,
+  Wallet, Warehouse,
 } from 'lucide-react';
-import type { ComponentType } from 'react';
 import type { NavGroupDef } from './navigationTypes';
 
 export const NAV_GROUPS_02: NavGroupDef[] = [
@@ -44,6 +39,13 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     perm: 'reports.view',
     items: [
       { label: 'مركز التقارير', to: '/reports', icon: BarChart3, perm: 'reports.view' },
+      { label: 'التقارير الأساسية', to: '/reports/category/core', icon: BarChart3, perm: 'reports.view' },
+      { label: 'الحركة والعمليات', to: '/reports/category/operations', icon: Activity, perm: 'reports.view' },
+      { label: 'المبيعات والربحية', to: '/reports/category/sales', icon: ShoppingCart, perm: 'reports.view' },
+      { label: 'الائتمان والتحصيل', to: '/reports/category/credit', icon: CreditCard, perm: 'reports.view' },
+      { label: 'المخزون والمشتريات', to: '/reports/category/inventory', icon: Boxes, perm: 'reports.view' },
+      { label: 'المالية والخزينة', to: '/reports/category/finance', icon: Wallet, perm: 'reports.view' },
+      { label: 'التوقعات والتحليل', to: '/reports/category/forecast', icon: Sparkles, perm: 'reports.view' },
     ],
   },
 {
@@ -63,8 +65,8 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     color: 'text-indigo-600',
     perm: 'documents.view',
     items: [
-      { label: 'مركز المستندات', to: '/documents', icon: FileText, perm: 'documents.view' },
-      { label: 'العقود والتجديدات', to: '/contracts', icon: ClipboardList, perm: 'contracts.view' },
+      { label: 'مركز المستندات والعقود', to: '/documents', icon: FileText, anyPerms: ['documents.view', 'contracts.view'] },
+      { label: 'العقود', to: '/contracts', icon: FileSignature, perm: 'contracts.view' },
     ],
   },
 {
@@ -85,6 +87,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'النسخ الاحتياطي', to: '/backup', icon: Download, perm: 'settings.backup' },
       { label: 'صحة النظام', to: '/system-health', icon: Cpu, perm: 'settings.maintenance' },
       { label: 'الإعدادات', to: '/settings', icon: Settings, anyPerms: ['settings.view', 'settings.backup'] },
+      { label: 'تفعيل المنصة المركزية', to: '/central-activation', icon: ShieldCheck, perm: 'admin.license.manage' },
       { label: 'محرك التكوين الديناميكي', to: '/settings/app-configuration', icon: SlidersHorizontal, perm: 'settings.view' },
       { label: 'استوديو التكوين', to: '/settings/configuration-studio', icon: SlidersHorizontal, perm: 'settings.view' },
     ],

@@ -134,6 +134,10 @@ export interface SystemSettings {
   /** Network printer TCP port; ESC/POS default is 9100. */
   thermalPort?: number;
   a4PrinterName?: string;
+  a5PrinterName?: string;
+  barcodePrinterName?: string;
+  defaultInvoiceSize?: 'a4' | 'a5' | 'thermal';
+  defaultInvoiceTemplate?: 'classic' | 'modern' | 'compact' | 'detailed';
   receiptHeader?: string;
   receiptFooter?: string;
   logoPath?: string;
@@ -168,6 +172,41 @@ export interface SystemSettings {
   sessionTimeoutMinutes?: number;
   maxFailedLoginAttempts?: number;
   defaultBranchId?: string;
+
+  // POS & Invoicing settings
+  sellingPriceTiersCount?: number;
+  sellingPriceTierNames?: string[];
+  sellingPriceTierNames?: string[];
+  posShowCashButton?: boolean;
+  posAllowDuplicateItems?: boolean;
+  posAutoSaveInvoice?: boolean;
+  posMultiSelectSearch?: boolean;
+
+  // Invoice Items Table Design
+  invoiceTableStyle?: 'bordered' | 'striped' | 'minimal';
+  invoiceShowItemCode?: boolean;
+  invoiceShowItemSpecs?: boolean;
+  invoiceShowBoxesCount?: boolean;
+  invoiceShowLineDiscount?: boolean;
+  invoiceShowTableSummary?: boolean;
+
+  // Operational Policies & Inventory Controls
+  allowOverdraftSale?: boolean;
+  insufficientStockAsReserved?: boolean;
+  lockSaleOnReservedQty?: boolean;
+  preventPermitSaleWithoutStock?: boolean;
+  preventOverdraftDeliveryPermit?: boolean;
+  allowAdminOverdraftSale?: boolean;
+  allowPermissionHoldersOverdraftSale?: boolean;
+  allowLineItemDiscount?: boolean;
+  returnRequiresInvoiceOrCustomer?: boolean;
+  newInvoicesUnderDelivery?: boolean;
+  vatOnDeliveryFee?: boolean;
+
+  // Cashier Limits & Approvals
+  cashierMaxDiscountPercentWithoutApproval?: number;
+  requireRemoteManagerApproval?: boolean;
+  posItemRemovalReasons?: string[];
 }
 
 // ─── HR / Employees ────────────────────────────────────────────────────────────

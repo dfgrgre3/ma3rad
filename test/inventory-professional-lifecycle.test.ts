@@ -379,9 +379,9 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
     cancelCountSession(session!);
   }
 
-  db.run("DELETE FROM schema_migrations WHERE id = '103_inventory_count_type_options'");
+  db.run("DELETE FROM schema_migrations WHERE id = '107_inventory_count_type_options'");
   const migrationReport = runMigrations(db.getDatabase());
-  assert.ok(migrationReport.applied.includes('103_inventory_count_type_options'));
+  assert.ok(migrationReport.applied.includes('107_inventory_count_type_options'));
   assert.equal(
     queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM stock_count_items')?.count,
     queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM stock_counts')?.count,

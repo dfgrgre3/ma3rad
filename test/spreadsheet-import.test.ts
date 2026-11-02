@@ -8,6 +8,7 @@ import {
   validateSpreadsheetFileMetadata,
 } from '../src/services/SpreadsheetImportService.ts';
 import { DataImportService, type ParsedImport } from '../src/services/DataImportService.ts';
+import { parsePdfExtractedText } from '../src/services/PdfImportData.ts';
 
 const toArrayBuffer = (bytes: Uint8Array | ArrayBuffer): ArrayBuffer => {
   if (bytes instanceof ArrayBuffer) return bytes;
@@ -30,6 +31,23 @@ test('spreadsheet import validates extension, file size, and file signature befo
   const parsed = parseSpreadsheetBuffer(csv, 'customers.csv');
   assert.deepEqual(parsed.sheets[0].headers, ['name', 'phone']);
   assert.equal(parsed.sheets[0].rows.length, 1);
+});
+
+test('PDF text parsing creates reviewable tabular, labeled, and generic rows', () => {
+  const table = parsePdfExtractedText('الكود\tاسم الصنف\tالسعر\nA1\tبلاط\t250\nB2\tرخام\t500', 'قائمة');
+  assert.deepEqual(table.headers, ['الكود', 'اسم الصنف', 'السعر']);
+  assert.deepEqual(table.rows, [
+    { الكود: 'A1', 'اسم الصنف': 'بلاط', السعر: '250' },
+    { الكود: 'B2', 'اسم الصنف': 'رخام', السعر: '500' },
+  ]);
+
+  const labeled = parsePdfExtractedText('اسم العميل: أحمد\nرقم الهاتف: 0100', 'عميل');
+  assert.deepEqual(labeled.headers, ['اسم العميل', 'رقم الهاتف']);
+  assert.deepEqual(labeled.rows, [{ 'اسم العميل': 'أحمد', 'رقم الهاتف': '0100' }]);
+
+  const generic = parsePdfExtractedText('ملاحظة أولى\nملاحظة ثانية', 'ملاحظات');
+  assert.deepEqual(generic.headers, ['النص المستخرج']);
+  assert.equal(generic.rows.length, 2);
 });
 
 test('spreadsheet import rejects worksheet row and column ranges beyond configured limits', () => {

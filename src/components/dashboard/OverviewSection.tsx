@@ -37,9 +37,9 @@ export const OverviewSection: React.FC = () => {
 
   if (!metrics && loading) {
     return (
-      <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center">
-        <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950 flex items-center justify-center mb-2">
-          <Activity className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+      <div className="flex flex-col items-center justify-center py-12 text-center text-slate-500">
+        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 dark:bg-sky-950">
+          <Activity className="h-4 w-4 text-sky-600 dark:text-sky-400" />
         </div>
         <p className="text-xs font-bold text-slate-600 dark:text-slate-400">جاري استرجاع بيانات لوحة المؤشرات...</p>
       </div>
@@ -48,13 +48,13 @@ export const OverviewSection: React.FC = () => {
 
   if (!metrics) {
     return (
-      <div className="p-6 text-center border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 rounded-xl" role="alert">
-        <AlertTriangle className="h-6 w-6 text-rose-500 mx-auto mb-2" />
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center dark:border-rose-900 dark:bg-rose-950/30" role="alert">
+        <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-rose-500" />
         <p className="text-xs font-bold text-rose-800 dark:text-rose-200">{dashboardError || 'تعذر تحميل مؤشرات النظام'}</p>
         <button
           type="button"
           onClick={loadData}
-          className="mt-3 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold"
+          className="mt-3 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700"
         >
           إعادة المحاولة
         </button>
@@ -66,14 +66,14 @@ export const OverviewSection: React.FC = () => {
   const averageTicket = metrics.salesCount > 0 ? metrics.todaySales / metrics.salesCount : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-3 sm:space-y-4">
       {dashboardError && (
-        <div role="alert" className="flex items-center justify-between p-2.5 rounded-lg border border-rose-200 bg-rose-50 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
-          <span className="flex items-center gap-1.5">
+        <div role="alert" className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+          <span className="flex min-w-0 items-center gap-1.5">
             <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
             {dashboardError}
           </span>
-          <button type="button" onClick={loadData} className="font-bold underline">إعادة المحاولة</button>
+          <button type="button" onClick={loadData} className="shrink-0 font-bold underline">إعادة المحاولة</button>
         </div>
       )}
 

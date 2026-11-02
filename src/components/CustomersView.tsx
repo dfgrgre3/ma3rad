@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Users, Plus, Search, DollarSign, FileText, 
-  Printer, ArrowUpRight, ArrowDownRight, Phone, MapPin
+  Printer, ArrowUpRight, ArrowDownRight, Phone, MapPin, Trash2
 } from 'lucide-react';
 import { CustomerService } from '../services/CustomerService';
 import { Customer } from '../types';
@@ -24,6 +24,7 @@ export const CustomersView: React.FC = () => {
   const can = usePermission();
   const canCreate = can('customers.create');
   const canCollect = can('customers.payment');
+  const canDelete = can('customers.delete');
   const canViewPurchases = can('sales.view');
   const canViewDebts = can('finance.debts.view');
   const canViewStatement = canViewPurchases && canViewDebts;
@@ -73,6 +74,12 @@ export const CustomersView: React.FC = () => {
       console.error(e);
     }
   };
+  const handleDeleteCustomer = (customer: any) => {
+    if (!window.confirm(`حذف العميل "${customer.name}"؟`)) return;
+    try { customerService.deleteCustomer(customer.id); loadCustomers(); }
+    catch (e: any) { alert(e?.message || 'تعذر حذف العميل.'); }
+  };
+
 
   useEffect(() => {
     loadCustomers();
@@ -281,6 +288,15 @@ export const CustomersView: React.FC = () => {
                   <DollarSign className="w-4 h-4" />
                   <span>سند قبض / تحصيل</span>
                 </button>}
+                {canDelete && selectedCustomer && (
+                  <button
+                    onClick={() => handleDeleteCustomer(selectedCustomer)}
+                    className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center gap-1.5 border border-rose-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>حذف</span>
+                  </button>
+                )}
               </div>
 
               {/* Statement Summary Card */}

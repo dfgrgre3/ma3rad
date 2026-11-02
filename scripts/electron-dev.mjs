@@ -1,0 +1,64 @@
+import { spawn } from 'node:child_process';
+
+const host = '127.0.0.1';
+const port = 5173;
+const devUrl = `http://${host}:${port}`;
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const children = new Set();
+
+function run(command, args, env = process.env) {
+  const child = spawn(command, args, {
+    cwd: process.cwd(),
+    env,
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+  children.add(child);
+  child.once('exit', () => children.delete(child));
+  return child;
+}
+
+async function waitForVite(timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(devUrl);
+      if (response.ok || response.status < 500) return;
+    } catch {
+      // Vite is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Vite did not become ready at ${devUrl}.`);
+}
+
+function stopAll() {
+  for (const child of children) {
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
+    } else {
+      child.kill('SIGTERM');
+    }
+  }
+}
+
+process.once('SIGINT', () => { stopAll(); process.exit(130); });
+process.once('SIGTERM', () => { stopAll(); process.exit(143); });
+
+const vite = run(npmCommand, ['run', 'dev', '--', '--host', host, '--port', String(port)]);
+try {
+  await waitForVite();
+  const electron = run(npmCommand, ['exec', '--', 'electron', '.'], {
+    ...process.env,
+    VITE_DEV_SERVER_URL: devUrl,
+  });
+  const exitCode = await new Promise((resolve) => electron.once('exit', (code, signal) => {
+    resolve(typeof code === 'number' ? code : signal ? 1 : 0);
+  }));
+  stopAll();
+  process.exit(exitCode);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  stopAll();
+  process.exit(1);
+}

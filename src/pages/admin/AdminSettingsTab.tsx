@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Save, Palette, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History, Download,
+  Save, Palette, Table as TableIcon, Columns, Info, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History, Download,
+  Printer, Eye, Star, CheckCircle, RefreshCw, Layers, LayoutTemplate, FileText, CheckCircle2, X, ExternalLink, SlidersHorizontal, Sparkles, Plus,
 } from 'lucide-react';
 import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
@@ -8,6 +9,7 @@ import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
 import { BusinessProfileSupportNotice } from '../../components/business/BusinessProfileSupportNotice';
 import type { SystemSettings } from '../../types';
+import { PrintService, type InvoiceTemplateId, type InvoiceSizeId } from '../../services/PrintService';
 import {
   BUSINESS_MODULES,
   BUSINESS_ACTIVITY_FAMILY_OPTIONS,
@@ -22,6 +24,7 @@ import {
 } from '../../config/businessProfiles';
 import { ModuleRegistryService } from '../../services/ModuleRegistryService';
 import { BusinessProfileService } from '../../services/BusinessProfileService';
+import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
 import { CompaniesPanel } from '../../components/CompaniesPanel';
 import { BackupPage } from '../settings/BackupPage';
 import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../../config/moduleRegistry';
@@ -78,12 +81,49 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
     () => TerminologyService.getOverrides(),
   );
   const [dirty, setDirty] = useState(false);
-  const [activitySearch, setActivitySearch] = useState('');
+    const [activitySearch, setActivitySearch] = useState('');
   const [activityFamily, setActivityFamily] = useState('all');
   const canViewConfigHistory = can('audit.view');
   const [configurationVersions, setConfigurationVersions] = useState<ActivityConfigurationVersion[]>([]);
   const [configurationHistoryError, setConfigurationHistoryError] = useState<string | null>(null);
   const [compareVersionIds, setCompareVersionIds] = useState<[string, string]>(['', '']);
+
+  const printService = useMemo(() => new PrintService(), []);
+  const [systemPrinters, setSystemPrinters] = useState<string[]>([]);
+  const [isScanningPrinters, setIsScanningPrinters] = useState(false);
+  const [scannedPrintersCount, setScannedPrintersCount] = useState<number | null>(null);
+
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateId>('classic');
+  const [previewSize, setPreviewSize] = useState<InvoiceSizeId>('a4');
+  const [newReasonInput, setNewReasonInput] = useState('');
+  const [showAddReason, setShowAddReason] = useState(false);
+
+  const scanPrinters = async (notify = true) => {
+    setIsScanningPrinters(true);
+    try {
+      const res = await window.ceramisys?.printing?.listPrinters?.();
+      if (res?.ok && Array.isArray(res.printers)) {
+        setSystemPrinters(res.printers);
+        setScannedPrintersCount(res.printers.length);
+        if (notify) toast.success(`تم استكشاف ${res.printers.length} طابعة في النظام بنجاح.`);
+      } else if (notify) {
+        toast.info('لم يتم العثور على طابعات مثبتة عبر خدمة الطباعة.');
+      }
+    } catch {
+      if (notify) {
+        toast.info('استكشاف الطابعات التلقائي متاح داخل تطبيق سطح المكتب، ويمكنك إدخال اسم الطابعة يدوياً.');
+      }
+    } finally {
+      setIsScanningPrinters(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 'invoice') {
+      scanPrinters(false);
+    }
+  }, [tab]);
 
   useEffect(() => {
     if (initialTab && (initialTab !== 'backup' || canViewBackup)) setTab(initialTab);
@@ -822,67 +862,844 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
         )}
 
         {tab === 'invoice' && (
-          <div className="grid grid-cols-1 gap-3">
-            <Field label="ترويسة الفاتورة"><textarea rows={3} value={settings.receiptHeader || ''} onChange={(e) => set('receiptHeader', e.target.value)} className={inputCls} /></Field>
-            <Field label="تذييل الفاتورة وشروط الاسترجاع"><textarea rows={3} value={settings.receiptFooter || ''} onChange={(e) => set('receiptFooter', e.target.value)} className={inputCls} /></Field>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="اسم طابعة الإيصالات الحرارية">
-                <div className="flex gap-2">
-                  <input value={settings.thermalPrinterName || ''} onChange={(e) => set('thermalPrinterName', e.target.value)} className={inputCls} />
+          <div className="space-y-6">
+            {/* Action Bar Header */}
+            <div className="rounded-2xl border border-sky-100 bg-gradient-to-r from-sky-50 to-indigo-50/40 p-4 dark:border-sky-900/30 dark:from-sky-950/20 dark:to-indigo-950/10">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 text-white shadow-md shadow-sky-600/20">
+                    <Printer className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
+                      إدارة الفواتير والطباعة الشاملة
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      اعتماد الفورما الرسمية، اختيار المقاس المفضل، وتهيئة طابعة كل مقاس من مكان واحد موحد مع معاينة حية.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        const res = await window.ceramisys?.printing?.listPrinters?.();
-                        if (res?.ok && res.printers.length) {
-                          const current = settings.thermalPrinterName || '';
-                          const list = res.printers.map((p) => (p === current ? `${p} ✓` : p)).join('\n');
-                          const picked = window.prompt('الطابعات المتاحة (اكتب الاسم بدقة):\n\n' + list, current);
-                          if (picked) set('thermalPrinterName', picked.trim());
-                        } else {
-                          alert('لم يتم العثور على طابعات مثبتة في النظام.');
-                        }
-                      } catch {
-                        alert('جلب قائمة الطابعات متاح داخل تطبيق سطح المكتب فقط.');
-                      }
+                    onClick={() => {
+                      setPreviewTemplate((settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'classic');
+                      setPreviewSize((settings.defaultInvoiceSize as InvoiceSizeId) || 'a4');
+                      setPreviewModalOpen(true);
                     }}
-                    className="shrink-0 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-sky-600/20 transition"
                   >
-                    استعراض
+                    <Eye className="w-4 h-4" />
+                    معاينة حيّة للفورم
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isScanningPrinters}
+                    onClick={() => scanPrinters(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 text-xs font-bold transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isScanningPrinters ? 'animate-spin' : ''}`} />
+                    {isScanningPrinters ? 'جاري الفحص...' : 'استكشاف الطابعات'}
                   </button>
                 </div>
-              </Field>
-              <Field label="كود صفحة الأحرف (Codepage)">
-                <select value={settings.thermalCodepage ?? 54} onChange={(e) => set('thermalCodepage', Number(e.target.value))} className={inputCls}>
-                  <option value={54}>54 — عربي ويندوز-1256 (الأغلب)</option>
-                  <option value={32}>32 — عربي (بعض الأجهزة)</option>
-                  <option value={16}>16 — WPC1256 (أخرى)</option>
-                </select>
-              </Field>
-              <Field label="عرض ورق الإيصال">
-                <select value={settings.thermalPaperWidth || '80'} onChange={(e) => set('thermalPaperWidth', e.target.value as '58' | '80')} className={inputCls}>
-                  <option value="80">80 مم (48 حرفاً)</option>
-                  <option value="58">58 مم (32 حرفاً)</option>
-                </select>
-              </Field>
-              <Field label="طريقة التوصيل">
-                <select value={settings.thermalTransport || 'system'} onChange={(e) => set('thermalTransport', e.target.value as 'system' | 'network')} className={inputCls}>
-                  <option value="system">طابعة مثبتة في النظام (USB)</option>
-                  <option value="network">طابعة شبكية مباشرة (TCP 9100)</option>
-                </select>
-              </Field>
-              {settings.thermalTransport === 'network' && (
-                <>
-                  <Field label="عنوان IPv4 خاص بالطابعة">
-                    <input value={settings.thermalHost || ''} onChange={(e) => set('thermalHost', e.target.value)} placeholder="مثال: 192.168.1.100" className={inputCls} />
-                  </Field>
-                  <Field label="منفذ الطباعة الشبكية">
-                    <input value="9100" readOnly className={inputCls} />
-                  </Field>
-                </>
+              </div>
+
+              {scannedPrintersCount !== null && (
+                <div className="mt-2.5 text-[11px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>تم العثور على {scannedPrintersCount} طابعة مثبتة في النظام. يمكنك الآن اختيارها مباشرة من القوائم أدناه.</span>
+                </div>
               )}
-              <Field label="اسم طابعة A4"><input value={settings.a4PrinterName || ''} onChange={(e) => set('a4PrinterName', e.target.value)} className={inputCls} /></Field>
             </div>
+
+            {/* Section 1: Template Approval & Favorite Size */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <LayoutTemplate className="w-4 h-4 text-sky-600" />
+                  <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">
+                    اعتماد الفورما والمفضلة (Invoice Form Approval)
+                  </h4>
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  الفورما والمقاس المعتمدان سيتم تطبيقهما تلقائياً على كافة مبيعات ونقاط بيع النظام
+                </span>
+              </div>
+
+              {/* Template Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  {
+                    id: 'classic' as const,
+                    title: 'كلاسيكي رسمي (Classic)',
+                    tag: 'النمط التقليدي',
+                    desc: 'ترويسة مؤسسية متوازنة، جداول واضحة بتفقيط ومربعات مجاميع معتمدة ومناسبة للأعمال الرسمية.',
+                    icon: FileText,
+                  },
+                  {
+                    id: 'modern' as const,
+                    title: 'عصري حديث (Modern)',
+                    tag: 'تصميم معاصر',
+                    desc: 'مظهر أنيق جذاب بلمسات تدرج ملونة، بطاقات بيانات للعميل والمخزن، وبادجات دفع بارزة.',
+                    icon: Sparkles,
+                  },
+                  {
+                    id: 'compact' as const,
+                    title: 'مدمج واقتصادي (Compact)',
+                    tag: 'توفير الورق',
+                    desc: 'تصميم كثيف عالي الكفاءة يقلل استهلاك الورق ويسرّع الطباعة المباشرة، ممتاز للعمليات الكثيفة.',
+                    icon: LayoutTemplate,
+                  },
+                  {
+                    id: 'detailed' as const,
+                    title: 'تفصيلي للمعارض (Detailed)',
+                    tag: 'مواصفات السيراميك',
+                    desc: 'مصمم خصيصاً لمعارض السيراميك والمواد: تفاصيل الفرز، المقاس، الكراتين، المستودع، وضمان الاستلام.',
+                    icon: Layers,
+                  },
+                ].map((tpl) => {
+                  const isApproved = (settings.defaultInvoiceTemplate || 'classic') === tpl.id;
+                  const Icon = tpl.icon;
+                  return (
+                    <div
+                      key={tpl.id}
+                      className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition-all ${
+                        isApproved
+                          ? 'border-sky-500 bg-sky-50/40 dark:border-sky-500/60 dark:bg-sky-950/20 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-1 mb-2">
+                          <span className="flex items-center gap-1.5 text-xs font-black text-slate-800 dark:text-slate-200">
+                            <Icon className={`w-3.5 h-3.5 ${isApproved ? 'text-sky-600' : 'text-slate-500'}`} />
+                            {tpl.title}
+                          </span>
+                          {isApproved && (
+                            <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-600 text-white text-[10px] font-black">
+                              <Star className="w-2.5 h-2.5 fill-current" />
+                              معتمدة
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-3">
+                          {tpl.desc}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            set('defaultInvoiceTemplate', tpl.id);
+                            toast.success(`تم اعتماد فورما "${tpl.title}" كالفورما المفضلة للنظام.`);
+                          }}
+                          disabled={isApproved}
+                          className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold text-center transition ${
+                            isApproved
+                              ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 cursor-default'
+                              : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-sky-50 hover:text-sky-700 border border-slate-200 dark:border-slate-600'
+                          }`}
+                        >
+                          {isApproved ? '✓ معتمدة حالياً' : 'اعتماد كمعتمدة'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewTemplate(tpl.id);
+                            setPreviewModalOpen(true);
+                          }}
+                          className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300 text-[11px] font-bold"
+                          title="معاينة هذه الفورما"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Favorite Size Selector */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      المقاس المفضل (الافتراضي للطباعة)
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      المقاس المحدد سيتم اختياره تلقائياً عند طلب طباعة أو تصدير الفواتير
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800 shrink-0">
+                    المقاس المعتمد حالياً: {(settings.defaultInvoiceSize || 'a4').toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {[
+                    { id: 'a4' as const, label: 'مقاس A4 كامل', dim: '210 × 297 مم', desc: 'الأكثر شيوعاً للمستندات والملفات الرسمية' },
+                    { id: 'a5' as const, label: 'مقاس A5 نصف صفحة', dim: '148 × 210 مم', desc: 'اقتصادي وسريع للفواتير الميدانية والمختصرة' },
+                    { id: 'thermal' as const, label: 'إيصال حراري (كاشير)', dim: '80 مم / 58 مم', desc: 'لنقاط البيع السريعة ورول ماكينات الكاشير' },
+                  ].map((sz) => {
+                    const isSelected = (settings.defaultInvoiceSize || 'a4') === sz.id;
+                    return (
+                      <button
+                        key={sz.id}
+                        type="button"
+                        onClick={() => {
+                          set('defaultInvoiceSize', sz.id);
+                          toast.success(`تم اعتماد مقاس ${sz.label} كمقاس افتراضي للطباعة.`);
+                        }}
+                        className={`flex flex-col text-right p-3 rounded-xl border transition ${
+                          isSelected
+                            ? 'border-sky-500 bg-white dark:bg-slate-900 shadow-sm ring-2 ring-sky-500/20'
+                            : 'border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                            {isSelected ? <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" /> : <span className="w-3.5 h-3.5 rounded-full border border-slate-300 inline-block" />}
+                            {sz.label}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                            {sz.dim}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">{sz.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Invoice Items Table Customization Design */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <TableIcon className="w-4 h-4 text-sky-600" />
+                  <div>
+                    <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">
+                      تصميم شكل جدول الأصناف في الفواتير (Invoice Items Table Styling)
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      تخصيص نمط الحدود والتسطير، والأعمدة المعروضة في جداول الفاتورة A4 و A5 والمطبوعات
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Style Options */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
+                  نمط تسطير الجدول
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    {
+                      id: 'bordered' as const,
+                      title: 'كلاسيكي بشبكة حدود (Grid Bordered)',
+                      desc: 'حدود كاملة لكل خلية وعمود، النمط المعتمد الأكثر دقة ووضوحاً للمعاملات الرسمية.',
+                    },
+                    {
+                      id: 'striped' as const,
+                      title: 'عصري بسطور متناوبة (Zebra Striped)',
+                      desc: 'خلفيات رمادية خفيفة متبادلة للسطور مع حدود أفقية ناعمة، مريح وسهل القراءة.',
+                    },
+                    {
+                      id: 'minimal' as const,
+                      title: 'مدمج وموفر للورق (Clean Minimal)',
+                      desc: 'خطوط أفقية ناعمة فقط ومسافات مضغوطة لتقليل استهلاك حبر وطباعة الورق.',
+                    },
+                  ].map((styleOption) => {
+                    const isSelected = (settings.invoiceTableStyle || 'bordered') === styleOption.id;
+                    return (
+                      <button
+                        key={styleOption.id}
+                        type="button"
+                        onClick={() => set('invoiceTableStyle', styleOption.id)}
+                        className={`p-3 rounded-xl border text-right transition flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-sky-500 bg-sky-50/50 dark:bg-sky-950/20 ring-1 ring-sky-500 shadow-sm'
+                            : 'border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/40 hover:border-slate-300'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                              {styleOption.title}
+                            </span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-sky-600" />}
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            {styleOption.desc}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Column Visibility Toggles */}
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
+                  تخصيص أعمدة وبيانات بنود الفاتورة
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settings.invoiceShowItemCode !== false}
+                      onChange={(e) => set('invoiceShowItemCode', e.target.checked)}
+                      className="accent-sky-600 rounded"
+                    />
+                    إظهار كود الصنف (SKU / الباركود)
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settings.invoiceShowItemSpecs !== false}
+                      onChange={(e) => set('invoiceShowItemSpecs', e.target.checked)}
+                      className="accent-sky-600 rounded"
+                    />
+                    إظهار المقاس وفرز الصنف
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settings.invoiceShowBoxesCount !== false}
+                      onChange={(e) => set('invoiceShowBoxesCount', e.target.checked)}
+                      className="accent-sky-600 rounded"
+                    />
+                    إظهار عدد الكراتين والقطع
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settings.invoiceShowLineDiscount !== false}
+                      onChange={(e) => set('invoiceShowLineDiscount', e.target.checked)}
+                      className="accent-sky-600 rounded"
+                    />
+                    إظهار عمود الخصم للبند
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settings.invoiceShowTableSummary !== false}
+                      onChange={(e) => set('invoiceShowTableSummary', e.target.checked)}
+                      className="accent-sky-600 rounded"
+                    />
+                    إظهار شريط ملخص الجدول (إجمالي البنود والكميات)
+                  </label>
+                </div>
+              </div>
+
+              {/* Table Live Mini-Preview */}
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                <span className="text-[11px] font-bold text-slate-500 mb-2 block">
+                  معاينة مباشرة لشكل جدول الأصناف:
+                </span>
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs">
+                  <table className="w-full text-center border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold border-b-2 border-slate-300 dark:border-slate-700">
+                        <th className="p-2 w-8 border border-slate-200 dark:border-slate-700">#</th>
+                        <th className="p-2 text-right border border-slate-200 dark:border-slate-700">الصنف والبيان</th>
+                        <th className="p-2 border border-slate-200 dark:border-slate-700">الوحدة</th>
+                        <th className="p-2 border border-slate-200 dark:border-slate-700">الكمية</th>
+                        <th className="p-2 border border-slate-200 dark:border-slate-700">السعر</th>
+                        {settings.invoiceShowLineDiscount !== false && (
+                          <th className="p-2 border border-slate-200 dark:border-slate-700">الخصم</th>
+                        )}
+                        <th className="p-2 border border-slate-200 dark:border-slate-700">الإجمالي</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className={`${
+                        settings.invoiceTableStyle === 'striped' ? 'bg-slate-50/60 dark:bg-slate-800/30' : ''
+                      } ${settings.invoiceTableStyle === 'minimal' ? 'border-b border-slate-100 dark:border-slate-800' : 'border-b border-slate-200 dark:border-slate-700'}`}>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700 text-slate-400">1</td>
+                        <td className="p-2 text-right border border-slate-200 dark:border-slate-700">
+                          <div className="font-bold text-slate-900 dark:text-slate-100">سيراميك كليوباترا رويال بيج 60×120</div>
+                          <div className="text-[10px] text-slate-500 flex gap-2 mt-0.5">
+                            {settings.invoiceShowItemCode !== false && <span>كود: CL-6012-ROY</span>}
+                            {settings.invoiceShowItemSpecs !== false && <span>مقاس: 60×120 · فرز أول</span>}
+                          </div>
+                        </td>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700">م²</td>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700 font-bold">
+                          45 م²
+                          {settings.invoiceShowBoxesCount !== false && (
+                            <div className="text-[10px] text-slate-400 font-normal">31 كرتونة</div>
+                          )}
+                        </td>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700">220.00</td>
+                        {settings.invoiceShowLineDiscount !== false && (
+                          <td className="p-2 border border-slate-200 dark:border-slate-700 text-slate-400">—</td>
+                        )}
+                        <td className="p-2 border border-slate-200 dark:border-slate-700 font-black text-sky-600">9,900.00</td>
+                      </tr>
+                      <tr className={`${
+                        settings.invoiceTableStyle === 'striped' ? 'bg-white dark:bg-slate-900' : ''
+                      } ${settings.invoiceTableStyle === 'minimal' ? 'border-b border-slate-100 dark:border-slate-800' : 'border-b border-slate-200 dark:border-slate-700'}`}>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700 text-slate-400">2</td>
+                        <td className="p-2 text-right border border-slate-200 dark:border-slate-700">
+                          <div className="font-bold text-slate-900 dark:text-slate-100">غراء سيراميك سافيتو سوبر 25 كجم</div>
+                          <div className="text-[10px] text-slate-500 flex gap-2 mt-0.5">
+                            {settings.invoiceShowItemCode !== false && <span>كود: SAV-25KG-SUP</span>}
+                          </div>
+                        </td>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700">شيكارة</td>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700 font-bold">5</td>
+                        <td className="p-2 border border-slate-200 dark:border-slate-700">110.00</td>
+                        {settings.invoiceShowLineDiscount !== false && (
+                          <td className="p-2 border border-slate-200 dark:border-slate-700 text-rose-600 font-bold">25.00</td>
+                        )}
+                        <td className="p-2 border border-slate-200 dark:border-slate-700 font-black text-sky-600">525.00</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {settings.invoiceShowTableSummary !== false && (
+                    <div className="p-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 flex justify-around text-[11px] text-slate-600 dark:text-slate-300">
+                      <span>عدد البنود: <strong>2</strong></span>
+                      <span>إجمالي الكراتين: <strong>31</strong></span>
+                      <span>إجمالي الكمية: <strong>50</strong></span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Section 2: Unified Printer Setup For Each Size (All in one place) */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-sky-600" />
+                  <div>
+                    <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">
+                      طابعة كل مقاس من مكان واحد (Unified Printers Hub)
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      اضبط الطابعة المخصصة لكل حجم (A4، A5، إيصالات كاشير، باركود) بسهولة مع إمكانية تجربة الطباعة فوراً
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => scanPrinters(true)}
+                    className="text-[11px] font-bold text-sky-600 hover:text-sky-700 hover:underline flex items-center gap-1"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isScanningPrinters ? 'animate-spin' : ''}`} />
+                    تحديث طابعات ويندوز
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* A4 Printer */}
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Printer className="w-3.5 h-3.5 text-sky-600" />
+                      طابعة مقاس A4 (فواتير كاملة)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => printService.printTestPage('a4', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'classic')}
+                      className="text-[11px] font-bold text-sky-600 hover:underline"
+                    >
+                      تجربة طباعة A4
+                    </button>
+                  </div>
+
+                  {systemPrinters.length > 0 ? (
+                    <div className="flex gap-2">
+                      <select
+                        value={settings.a4PrinterName || ''}
+                        onChange={(e) => set('a4PrinterName', e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">-- اختر طابعة من النظام --</option>
+                        {systemPrinters.map((p) => (
+                          <option key={p} value={p}>{p} {p === settings.a4PrinterName ? '✓' : ''}</option>
+                        ))}
+                      </select>
+                      <input
+                        value={settings.a4PrinterName || ''}
+                        onChange={(e) => set('a4PrinterName', e.target.value)}
+                        placeholder="أو اكتب الاسم يدوياً"
+                        className={`${inputCls} max-w-[140px]`}
+                        title="كتابة الاسم يدوياً"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={settings.a4PrinterName || ''}
+                      onChange={(e) => set('a4PrinterName', e.target.value)}
+                      placeholder="مثال: HP LaserJet Pro M404"
+                      className={inputCls}
+                    />
+                  )}
+                  <p className="text-[10px] text-slate-400">تُستخدم لطباعة الفواتير، عروض الأسعار، وسندات المرتجع بمقاس A4.</p>
+                </div>
+
+                {/* A5 Printer */}
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Printer className="w-3.5 h-3.5 text-sky-600" />
+                      طابعة مقاس A5 (نصف صفحة)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => printService.printTestPage('a5', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'classic')}
+                      className="text-[11px] font-bold text-sky-600 hover:underline"
+                    >
+                      تجربة طباعة A5
+                    </button>
+                  </div>
+
+                  {systemPrinters.length > 0 ? (
+                    <div className="flex gap-2">
+                      <select
+                        value={settings.a5PrinterName || ''}
+                        onChange={(e) => set('a5PrinterName', e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">-- اختر طابعة من النظام --</option>
+                        {systemPrinters.map((p) => (
+                          <option key={p} value={p}>{p} {p === settings.a5PrinterName ? '✓' : ''}</option>
+                        ))}
+                      </select>
+                      <input
+                        value={settings.a5PrinterName || ''}
+                        onChange={(e) => set('a5PrinterName', e.target.value)}
+                        placeholder="أو اكتب الاسم يدوياً"
+                        className={`${inputCls} max-w-[140px]`}
+                        title="كتابة الاسم يدوياً"
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={settings.a5PrinterName || ''}
+                      onChange={(e) => set('a5PrinterName', e.target.value)}
+                      placeholder="مثال: Epson L3150 (A5)"
+                      className={inputCls}
+                    />
+                  )}
+                  <p className="text-[10px] text-slate-400">تُستخدم للطباعة على دفاتر أو ورق A5 الاقتصادي نصف الحجم.</p>
+                </div>
+
+                {/* Thermal Printer */}
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2.5 md:col-span-2">
+                  <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Printer className="w-3.5 h-3.5 text-amber-600" />
+                      طابعة الإيصالات الحرارية (كاشير ونقاط البيع POS Thermal)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => printService.printTestPage('thermal')}
+                      className="text-[11px] font-bold text-amber-600 hover:underline"
+                    >
+                      تجربة طباعة إيصال حراري
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className={labelCls}>اسم طابعة الإيصالات</label>
+                      {systemPrinters.length > 0 ? (
+                        <div className="flex gap-2">
+                          <select
+                            value={settings.thermalPrinterName || ''}
+                            onChange={(e) => set('thermalPrinterName', e.target.value)}
+                            className={inputCls}
+                          >
+                            <option value="">-- اختر طابعة من النظام --</option>
+                            {systemPrinters.map((p) => (
+                              <option key={p} value={p}>{p} {p === settings.thermalPrinterName ? '✓' : ''}</option>
+                            ))}
+                          </select>
+                          <input
+                            value={settings.thermalPrinterName || ''}
+                            onChange={(e) => set('thermalPrinterName', e.target.value)}
+                            placeholder="يدوي"
+                            className={`${inputCls} max-w-[120px]`}
+                          />
+                        </div>
+                      ) : (
+                        <input
+                          value={settings.thermalPrinterName || ''}
+                          onChange={(e) => set('thermalPrinterName', e.target.value)}
+                          placeholder="مثال: Xprinter XP-N160I أو POS-80"
+                          className={inputCls}
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>عرض ورق الإيصال</label>
+                      <select
+                        value={settings.thermalPaperWidth || '80'}
+                        onChange={(e) => set('thermalPaperWidth', e.target.value as '58' | '80')}
+                        className={inputCls}
+                      >
+                        <option value="80">80 مم (الأكثر شيوعاً - 48 حرفاً)</option>
+                        <option value="58">58 مم (شريط ضيق - 32 حرفاً)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>كود ترميز الأحرف (Codepage)</label>
+                      <select
+                        value={settings.thermalCodepage ?? 54}
+                        onChange={(e) => set('thermalCodepage', Number(e.target.value))}
+                        className={inputCls}
+                      >
+                        <option value={54}>54 — عربي ويندوز-1256 (الأغلب)</option>
+                        <option value={32}>32 — عربي (بعض الأجهزة)</option>
+                        <option value={16}>16 — WPC1256 (أجهزة أخرى)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>طريقة التوصيل</label>
+                      <select
+                        value={settings.thermalTransport || 'system'}
+                        onChange={(e) => set('thermalTransport', e.target.value as 'system' | 'network')}
+                        className={inputCls}
+                      >
+                        <option value="system">طابعة مثبتة في النظام (USB)</option>
+                        <option value="network">طابعة شبكية مباشرة (TCP 9100)</option>
+                      </select>
+                    </div>
+
+                    {settings.thermalTransport === 'network' && (
+                      <>
+                        <div className="sm:col-span-2">
+                          <label className={labelCls}>عنوان IPv4 الخاص بالطابعة الشبكية</label>
+                          <input
+                            value={settings.thermalHost || ''}
+                            onChange={(e) => set('thermalHost', e.target.value)}
+                            placeholder="مثال: 192.168.1.150"
+                            className={inputCls}
+                          />
+                        </div>
+                        <div>
+                          <label className={labelCls}>منفذ الطباعة (Port)</label>
+                          <input value="9100" readOnly className={`${inputCls} bg-slate-100 dark:bg-slate-700/50`} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Barcode / Labels Printer */}
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/40 p-3.5 space-y-2 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <Printer className="w-3.5 h-3.5 text-indigo-600" />
+                      طابعة ملصقات الباركود والأصناف (Barcode Labels Printer)
+                    </label>
+                  </div>
+
+                  {systemPrinters.length > 0 ? (
+                    <div className="flex gap-2">
+                      <select
+                        value={settings.barcodePrinterName || ''}
+                        onChange={(e) => set('barcodePrinterName', e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">-- اختر طابعة ملصقات من النظام --</option>
+                        {systemPrinters.map((p) => (
+                          <option key={p} value={p}>{p} {p === settings.barcodePrinterName ? '✓' : ''}</option>
+                        ))}
+                      </select>
+                      <input
+                        value={settings.barcodePrinterName || ''}
+                        onChange={(e) => set('barcodePrinterName', e.target.value)}
+                        placeholder="أو اكتب الاسم يدوياً"
+                        className={`${inputCls} max-w-[160px]`}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      value={settings.barcodePrinterName || ''}
+                      onChange={(e) => set('barcodePrinterName', e.target.value)}
+                      placeholder="مثال: Xprinter XP-365B أو Zebra ZD220"
+                      className={inputCls}
+                    />
+                  )}
+                  <p className="text-[10px] text-slate-400">تُستخدم لطباعة ملصقات الباركود، كود التخزين، وأسعار البضائع على الرفوف.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Header & Footer Text */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+              <h4 className="text-xs font-black text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800 pb-2">
+                نصوص الترويسة والتذييل وشروط الاسترجاع
+              </h4>
+
+              <div className="grid grid-cols-1 gap-3">
+                <Field label="ترويسة الفاتورة (نص إضافي أو رسالة ترحيبية)">
+                  <textarea
+                    rows={2}
+                    value={settings.receiptHeader || ''}
+                    onChange={(e) => set('receiptHeader', e.target.value)}
+                    placeholder="مثال: أهلاً بكم في معرضنا - نسعد بخدمتكم دائماً"
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="تذييل الفاتورة وشروط الاسترجاع والاستبدال">
+                  <textarea
+                    rows={3}
+                    value={settings.receiptFooter || ''}
+                    onChange={(e) => set('receiptFooter', e.target.value)}
+                    placeholder="مثال: البضاعة المباعة ترد وتستبدل خلال 14 يوماً مع إحضار أصل الفاتورة وبحالتها الأصلية بالكرتونة السليمة."
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {/* Live Form Preview Modal */}
+            {previewModalOpen && (
+              <div
+                className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-5"
+                dir="rtl"
+              >
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-6xl h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  {/* Modal Header */}
+                  <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
+                        <Eye className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                          معاينة حيّة للفورم والمقاسات
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300">
+                            بيانات تجريبية لمعرض سيراميك
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          يمكنك تجربة الفورمات والمقاسات المختلفة واعتماد المناسب منها بضغطة زر واحدة
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          set('defaultInvoiceTemplate', previewTemplate);
+                          set('defaultInvoiceSize', previewSize);
+                          toast.success('تم اعتماد هذه الفورما وهذا المقاس كمفضلين للنظام بنجاح.');
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        اعتماد هذه الفورما الآن
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => printService.printTestPage(previewSize, previewTemplate)}
+                        className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        طباعة تجريبية
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPreviewModalOpen(false)}
+                        className="p-1.5 rounded-xl text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Template & Size Switcher Bar */}
+                  <div className="px-4 py-2.5 bg-slate-100/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-600 dark:text-slate-300">الفورما:</span>
+                      {[
+                        { id: 'classic' as const, label: 'كلاسيكي' },
+                        { id: 'modern' as const, label: 'عصري' },
+                        { id: 'compact' as const, label: 'مدمج' },
+                        { id: 'detailed' as const, label: 'تفصيلي للمعارض' },
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setPreviewTemplate(t.id)}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                            previewTemplate === t.id
+                              ? 'bg-sky-600 text-white shadow-sm'
+                              : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200'
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-600 dark:text-slate-300">المقاس:</span>
+                      {[
+                        { id: 'a4' as const, label: 'A4' },
+                        { id: 'a5' as const, label: 'A5' },
+                        { id: 'thermal' as const, label: 'حراري (Thermal)' },
+                      ].map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setPreviewSize(s.id)}
+                          className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                            previewSize === s.id
+                              ? 'bg-sky-600 text-white shadow-sm'
+                              : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200'
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Iframe Preview Container */}
+                  <div className="flex-1 bg-slate-200/70 dark:bg-slate-950 p-2 sm:p-4 overflow-auto flex items-center justify-center">
+                    <div className={`bg-white shadow-xl rounded-lg overflow-hidden transition-all duration-200 h-full ${
+                      previewSize === 'thermal'
+                        ? 'w-[360px]'
+                        : previewSize === 'a5'
+                        ? 'w-[680px]'
+                        : 'w-[840px] max-w-full'
+                    }`}>
+                      <iframe
+                        title="معاينة الفورما"
+                        srcDoc={printService.getTemplatePreviewHtml(previewTemplate, previewSize, settings)}
+                        className="w-full h-full border-none bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -905,22 +1722,667 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
         )}
 
         {tab === 'operations' && (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field label="حد اعتماد الخصم %">
-              <input type="number" min={0} max={100} value={settings.discountApprovalThresholdPercent ?? 10} onChange={(e) => set('discountApprovalThresholdPercent', Number(e.target.value))} className={inputCls} />
-            </Field>
-            <Field label="رسوم التوصيل الافتراضية">
-              <input type="number" min={0} value={settings.defaultDeliveryFee ?? 0} onChange={(e) => set('defaultDeliveryFee', Number(e.target.value))} className={inputCls} />
-            </Field>
-            <Field label="أيام سماح الأقساط">
-              <input type="number" min={0} value={settings.installmentGraceDays ?? 3} onChange={(e) => set('installmentGraceDays', Number(e.target.value))} className={inputCls} />
-            </Field>
-            <Field label="اعتماد إجباري لتسويات المخزون">
-              <Toggle checked={!!settings.requireApprovalForStockAdjustments} onChange={(v) => set('requireApprovalForStockAdjustments', v)} label={settings.requireApprovalForStockAdjustments ? 'مطلوب' : 'غير مطلوب'} />
-            </Field>
-            <Field label="اعتماد إجباري لتغيير الأسعار">
-              <Toggle checked={!!settings.requireApprovalForPriceChanges} onChange={(v) => set('requireApprovalForPriceChanges', v)} label={settings.requireApprovalForPriceChanges ? 'مطلوب' : 'غير مطلوب'} />
-            </Field>
+          <div className="space-y-6">
+            {/* إعدادات نقطة البيع والفواتير المطابقة للتصميم */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 space-y-4">
+              {/* عدد أسعار البيع للصنف مع محرر أسماء المستويات */}
+              <div className="pb-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={settings.sellingPriceTiersCount ?? 1}
+                      onChange={(e) => set('sellingPriceTiersCount', Number(e.target.value))}
+                      className="min-w-[130px] px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+                    >
+                      <option value={1}>سعر واحد</option>
+                      <option value={2}>سعران (2)</option>
+                      <option value={3}>3 أسعار</option>
+                      <option value={4}>4 أسعار</option>
+                      <option value={5}>5 أسعار</option>
+                    </select>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      كل سعر ليه اسمه — والاختيار بينهم من زر تثبيت السعر في الفاتورة
+                    </p>
+                  </div>
+                  <label className="text-xs font-black text-slate-900 dark:text-slate-100 shrink-0">
+                    عدد أسعار البيع للصنف
+                  </label>
+                </div>
+
+                {/* محرر تخصيص أسماء أسعار البيع */}
+                {(settings.sellingPriceTiersCount ?? 1) > 1 && (
+                  <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700 space-y-2 mt-2">
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      تسمية مستويات الأسعار (تظهر في زر تثبيت السعر بنقطة البيع):
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {Array.from({ length: settings.sellingPriceTiersCount ?? 1 }).map((_, tierIdx) => {
+                        const defaultNames = ['سعر القطاعي (الأساسي)', 'سعر الجملة', 'سعر خاص / موزع', 'سعر مشاريع', 'سعر كبار العملاء'];
+                        const currentNames = Array.isArray(settings.sellingPriceTierNames) ? [...settings.sellingPriceTierNames] : defaultNames;
+                        const currentVal = currentNames[tierIdx] || defaultNames[tierIdx] || `سعر ${tierIdx + 1}`;
+
+                        return (
+                          <div key={tierIdx} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
+                            <span className="font-bold text-sky-600 shrink-0 text-[11px]">{tierIdx + 1}:</span>
+                            <input
+                              type="text"
+                              value={currentVal}
+                              onChange={(e) => {
+                                const updated = [...currentNames];
+                                updated[tierIdx] = e.target.value;
+                                set('sellingPriceTierNames', updated as any);
+                              }}
+                              className="w-full bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none"
+                              placeholder={defaultNames[tierIdx] || `سعر ${tierIdx + 1}`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* إظهار زر «نقدي» في نقطة البيع */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.posShowCashButton !== false}
+                  onClick={() => set('posShowCashButton', settings.posShowCashButton === false ? true : false)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.posShowCashButton !== false ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.posShowCashButton !== false ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    إظهار زر «نقدي» في نقطة البيع
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    عند الإيقاف تكون كل الفواتير آجلة افتراضيًا
+                  </div>
+                </div>
+              </div>
+
+              {/* السماح بتكرار الصنف في الفاتورة */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.posAllowDuplicateItems}
+                  onClick={() => set('posAllowDuplicateItems', !settings.posAllowDuplicateItems)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.posAllowDuplicateItems ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.posAllowDuplicateItems ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    السماح بتكرار الصنف في الفاتورة
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    إضافة صنف موجود بالفعل تنزّله سطرًا جديدًا مستقلاً بدل زيادة الكمية — مفيد لبيع نفس الصنف بسعرين مختلفين
+                  </div>
+                </div>
+              </div>
+
+              {/* الحفظ التلقائي للفاتورة */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.posAutoSaveInvoice}
+                  onClick={() => set('posAutoSaveInvoice', !settings.posAutoSaveInvoice)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.posAutoSaveInvoice ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.posAutoSaveInvoice ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    الحفظ التلقائي للفاتورة
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    أول صنف يتضاف بيحفظ الفاتورة فورًا وكل إضافة بتحدّثها — بيأثر في المخزن مباشرة وبيطلب صلاحية تعديل الفواتير
+                  </div>
+                </div>
+              </div>
+
+              {/* اختيار أكثر من صنف من البحث */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.posMultiSelectSearch}
+                  onClick={() => set('posMultiSelectSearch', !settings.posMultiSelectSearch)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.posMultiSelectSearch ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.posMultiSelectSearch ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    اختيار أكثر من صنف من البحث
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    مربع جنب كل صنف في نتايج البحث وقت عمل الفاتورة: علّم الأصناف اللي عايزها واضغط «أضف المحدد» فيتضافوا كلهم مرة واحدة بكمية 1، وتقدر بعدها تعدل الكميات والأسعار لكل صنف مباشرة من الفاتورة.
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. السماح بالبيع على المكشوف */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.allowOverdraftSale}
+                  onClick={() => set('allowOverdraftSale', !settings.allowOverdraftSale)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.allowOverdraftSale ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.allowOverdraftSale ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    السماح بالبيع على المكشوف
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    بيع كمية أكبر من المتاح بالمخزن للجميع. عند الإيقاف: المدير العام وأصحاب الصلاحية بالإعدادين اللي تحت هما بس اللي يقدروا يبيعوا على المكشوف.
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. الصنف اللي رصيده مش كفاية يتباع كمحجوز */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.insufficientStockAsReserved}
+                  onClick={() => set('insufficientStockAsReserved', !settings.insufficientStockAsReserved)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.insufficientStockAsReserved ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.insufficientStockAsReserved ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    الصنف اللي رصيده مش كفاية يتباع كمحجوز
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    بدل ما الفاتورة تترفض بتتحوّل لـ«تسليم بأذونات» لوحدها وتظهر في فواتير الأذونات — لصاحب صلاحية «بيع الصنف اللي رصيده مش كفاية كمحجوز».
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. قفل البيع على الكمية المحجوزة */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.lockSaleOnReservedQty}
+                  onClick={() => set('lockSaleOnReservedQty', !settings.lockSaleOnReservedQty)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.lockSaleOnReservedQty ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.lockSaleOnReservedQty ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    قفل البيع على الكمية المحجوزة
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    المتاح للبيع = الرصيد ناقص المحجوز لفواتير تحت التسليم في نفس المخزن. الفاتورة اللي محتاجة أكتر بتترفض ومش بتتحوّل لأذونات — إلا لصاحب الصلاحية.
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. منع البيع بأذونات للصنف اللي مفيش منه كمية */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.preventPermitSaleWithoutStock}
+                  onClick={() => set('preventPermitSaleWithoutStock', !settings.preventPermitSaleWithoutStock)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.preventPermitSaleWithoutStock ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.preventPermitSaleWithoutStock ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    منع البيع بأذونات للصنف اللي مفيش منه كمية
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    فاتورة «تسليم بأذونات» فيها صنف أكتر من المتاح في المخزن (الرصيد ناقص المحجوز) بتترفض، ومفيش تحويل تلقائي لأذونات. الزرار يفضل شغّال لكن الفاتورة تتطلب توفير الرصيد أولاً.
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. منع إذن التسليم على المكشوف */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.preventOverdraftDeliveryPermit}
+                  onClick={() => set('preventOverdraftDeliveryPermit', !settings.preventOverdraftDeliveryPermit)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.preventOverdraftDeliveryPermit ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.preventOverdraftDeliveryPermit ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    منع إذن التسليم على المكشوف
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                    إذن التسليم (عمله وتعديله واعتماده و«صرف كل الباقي» وتسليم البند) بيترفض لو رصيد المخزن اللي هيتسلّم منه مش كفاية — اختار مخزن فيه البضاعة. إلا لصاحب صلاحية «عمل إذن تسليم بأكتر من رصيد المخزن»
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. السماح للمدير العام بالبيع على المكشوف */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-2.5 rounded-xl">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.allowAdminOverdraftSale}
+                  onClick={() => set('allowAdminOverdraftSale', !settings.allowAdminOverdraftSale)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.allowAdminOverdraftSale ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.allowAdminOverdraftSale ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    السماح للمدير العام بالبيع على المكشوف
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    لما «السماح بالبيع على المكشوف» مقفول: المدير العام ما يبيعش بأكتر من المتاح إلا لو ده مفعّل
+                  </div>
+                </div>
+              </div>
+
+              {/* 7. السماح لأصحاب صلاحية «البيع على المكشوف» */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 p-2.5 rounded-xl">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.allowPermissionHoldersOverdraftSale}
+                  onClick={() => set('allowPermissionHoldersOverdraftSale', !settings.allowPermissionHoldersOverdraftSale)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.allowPermissionHoldersOverdraftSale ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.allowPermissionHoldersOverdraftSale ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    السماح لأصحاب صلاحية «البيع على المكشوف»
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    لما «السماح بالبيع على المكشوف» مقفول: المستخدم اللي معاه الصلاحية (زي دور «مدير فرع») ما يبيعش بأكتر من المتاح إلا لو ده مفعّل
+                  </div>
+                </div>
+              </div>
+
+              {/* 8. الخصم على الصنف الواحد في الفاتورة */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.allowLineItemDiscount !== false}
+                  onClick={() => set('allowLineItemDiscount', settings.allowLineItemDiscount === false ? true : false)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.allowLineItemDiscount !== false ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.allowLineItemDiscount !== false ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    الخصم على الصنف الواحد في الفاتورة
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                    علامة صغيرة على كل صنف في الفاتورة تحط عليه خصم (مبلغ أو نسبة) يطّلع من سعره بس. لأصحاب صلاحية «منح خصم على الفاتورة»، وبيتحسب في «أقصى خصم يدوي للكاشير»
+                  </div>
+                </div>
+              </div>
+
+              {/* 9. المرتجع لازم يتربط بفاتورة أو بعميل */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.returnRequiresInvoiceOrCustomer}
+                  onClick={() => set('returnRequiresInvoiceOrCustomer', !settings.returnRequiresInvoiceOrCustomer)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.returnRequiresInvoiceOrCustomer ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.returnRequiresInvoiceOrCustomer ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    المرتجع لازم يتربط بفاتورة أو بعميل
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    عند التشغيل: المرتجع لازم يتربط بالفاتورة الأصلية أو بالعميل، وسعره بيتجاب من البيع الفعلي (صافي بعد الخصم). عند الإيقاف: المرتجع الحر بسعر البيع الحالي أو اليدوي متاح.
+                  </div>
+                </div>
+              </div>
+
+              {/* 10. الفواتير الجديدة تحت التسليم (بإذن تسليم) */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.newInvoicesUnderDelivery}
+                  onClick={() => set('newInvoicesUnderDelivery', !settings.newInvoicesUnderDelivery)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.newInvoicesUnderDelivery ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.newInvoicesUnderDelivery ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    الفواتير الجديدة تحت التسليم (بإذن تسليم)
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    عند التشغيل: الفاتورة الجديدة بتبدأ «تسليم على دفعات» والبضاعة ما بتخرجش من المخزن غير بإذن تسليم. عند الإيقاف: الفاتورة «تم التسليم فوراً» ويتم الخصم المباشر من المخزن.
+                  </div>
+                </div>
+              </div>
+
+              {/* 11. ضريبة القيمة المضافة على التوصيل */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!!settings.vatOnDeliveryFee}
+                  onClick={() => set('vatOnDeliveryFee', !settings.vatOnDeliveryFee)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.vatOnDeliveryFee ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.vatOnDeliveryFee ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    ضريبة القيمة المضافة على التوصيل
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    عند التشغيل: رسوم التوصيل في الفاتورة بتتحسب عليها ضريبة وبتدخل ضريبة الفاتورة وإجمالها، وبتنزل في الفاتورة الإلكترونية بند خاضع. عند الإيقاف: رسوم التوصيل غير خاضعة للضريبة.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* حدود الكاشير والموافقات مطابق تماماً للتصميم المرفق */}
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 p-5 space-y-5">
+              <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
+                  حدود الكاشير والموافقات
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  اللي معاه الصلاحية المباشرة بيعمل على طول، واللي صلاحيته «بموافقة المدير» بيطلب موافقة — من «الأدوار والصلاحيات». الإعدادات دي بتكمّلها.
+                </p>
+              </div>
+
+              {/* أقصى خصم للكاشير من غير موافقة */}
+              <div className="space-y-1.5">
+                <div className="relative rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30 px-3.5 pt-2 pb-2 focus-within:border-[#1e5871] focus-within:ring-1 focus-within:ring-[#1e5871] transition">
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    أقصى خصم للكاشير من غير موافقة
+                  </label>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={settings.cashierMaxDiscountPercentWithoutApproval ?? settings.discountApprovalThresholdPercent ?? 0}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        set('cashierMaxDiscountPercentWithoutApproval', val);
+                        set('discountApprovalThresholdPercent', val);
+                      }}
+                      className="w-full bg-transparent text-sm font-black text-slate-900 dark:text-slate-100 focus:outline-none"
+                    />
+                    <span className="text-sm font-bold text-slate-400 select-none">%</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  الخصم اليدوي على الفاتورة فوق النسبة دي بيحتاج موافقة مدير، إلا لو المستخدم معاه صلاحية «خصم فوق الحد المسموح للكاشير». خصم العميل الدائم مسموح لحد نسبته.
+                </p>
+              </div>
+
+              {/* طلب موافقة المدير عن بُعد */}
+              <div className="flex flex-row-reverse items-center justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.requireRemoteManagerApproval !== false}
+                  onClick={() => set('requireRemoteManagerApproval', settings.requireRemoteManagerApproval === false ? true : false)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    settings.requireRemoteManagerApproval !== false ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      settings.requireRemoteManagerApproval !== false ? 'translate-x-0' : '-translate-x-5'
+                    }`}
+                  />
+                </button>
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    طلب موافقة المدير عن بُعد
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    الكاشير يبعت الطلب والمدير يوافق من موبايله أو من أي جهاز، من غير ما يكون جنبه. عند الإيقاف المدير لازم يدخّل اسمه وكلمة مروره على نفس الجهاز.
+                  </div>
+                </div>
+              </div>
+
+              {/* أسباب حذف سطر من الفاتورة */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="text-right">
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    أسباب حذف سطر من الفاتورة
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    بتظهر اختيارات سريعة في ديالوج حذف السطر في الكاشير — والكاشير يقدر يكتب سبب تاني.
+                  </div>
+                </div>
+
+                {/* Chips container */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {/* أزرار الأسباب الحالية */}
+                  {((Array.isArray(settings.posItemRemovalReasons) && settings.posItemRemovalReasons.length > 0)
+                    ? settings.posItemRemovalReasons
+                    : ['غلط في الإدخال', 'العميل غيّر رأيه', 'صنف تالف', 'سعر غلط']
+                  ).map((reason, idx) => (
+                    <div
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = Array.isArray(settings.posItemRemovalReasons) && settings.posItemRemovalReasons.length > 0
+                            ? [...settings.posItemRemovalReasons]
+                            : ['غلط في الإدخال', 'العميل غيّر رأيه', 'صنف تالف', 'سعر غلط'];
+                          current.splice(idx, 1);
+                          set('posItemRemovalReasons', current as any);
+                        }}
+                        className="text-slate-400 hover:text-rose-500 transition p-0.5"
+                        title="حذف هذا السبب"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                      <span>{reason}</span>
+                    </div>
+                  ))}
+
+                  {/* زر وحقل إضافة سبب */}
+                  {showAddReason ? (
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-[#1e5871] bg-white dark:bg-slate-800">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newReasonInput}
+                        onChange={(e) => setNewReasonInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newReasonInput.trim()) {
+                            e.preventDefault();
+                            const current = Array.isArray(settings.posItemRemovalReasons) && settings.posItemRemovalReasons.length > 0
+                              ? [...settings.posItemRemovalReasons]
+                              : ['غلط في الإدخال', 'العميل غيّر رأيه', 'صنف تالف', 'سعر غلط'];
+                            if (!current.includes(newReasonInput.trim())) {
+                              current.push(newReasonInput.trim());
+                              set('posItemRemovalReasons', current as any);
+                            }
+                            setNewReasonInput('');
+                            setShowAddReason(false);
+                          } else if (e.key === 'Escape') {
+                            setShowAddReason(false);
+                            setNewReasonInput('');
+                          }
+                        }}
+                        placeholder="اكتب السبب واضغط Enter"
+                        className="text-xs bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none w-36"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newReasonInput.trim()) {
+                            const current = Array.isArray(settings.posItemRemovalReasons) && settings.posItemRemovalReasons.length > 0
+                              ? [...settings.posItemRemovalReasons]
+                              : ['غلط في الإدخال', 'العميل غيّر رأيه', 'صنف تالف', 'سعر غلط'];
+                            if (!current.includes(newReasonInput.trim())) {
+                              current.push(newReasonInput.trim());
+                              set('posItemRemovalReasons', current as any);
+                            }
+                            setNewReasonInput('');
+                          }
+                          setShowAddReason(false);
+                        }}
+                        className="text-xs text-sky-600 hover:text-sky-800 font-bold px-1"
+                      >
+                        إضافة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddReason(false);
+                          setNewReasonInput('');
+                        }}
+                        className="text-slate-400 hover:text-slate-600 p-0.5"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddReason(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 hover:border-[#1e5871] bg-transparent text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-[#1e5871] transition"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>إضافة سبب</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Field label="حد اعتماد الخصم %">
+                <input type="number" min={0} max={100} value={settings.discountApprovalThresholdPercent ?? 10} onChange={(e) => set('discountApprovalThresholdPercent', Number(e.target.value))} className={inputCls} />
+              </Field>
+              <Field label="رسوم التوصيل الافتراضية">
+                <input type="number" min={0} value={settings.defaultDeliveryFee ?? 0} onChange={(e) => set('defaultDeliveryFee', Number(e.target.value))} className={inputCls} />
+              </Field>
+              <Field label="أيام سماح الأقساط">
+                <input type="number" min={0} value={settings.installmentGraceDays ?? 3} onChange={(e) => set('installmentGraceDays', Number(e.target.value))} className={inputCls} />
+              </Field>
+              <Field label="اعتماد إجباري لتسويات المخزون">
+                <Toggle checked={!!settings.requireApprovalForStockAdjustments} onChange={(v) => set('requireApprovalForStockAdjustments', v)} label={settings.requireApprovalForStockAdjustments ? 'مطلوب' : 'غير مطلوب'} />
+              </Field>
+              <Field label="اعتماد إجباري لتغيير الأسعار">
+                <Toggle checked={!!settings.requireApprovalForPriceChanges} onChange={(v) => set('requireApprovalForPriceChanges', v)} label={settings.requireApprovalForPriceChanges ? 'مطلوب' : 'غير مطلوب'} />
+              </Field>
+            </div>
           </div>
         )}
 
@@ -963,7 +2425,7 @@ interface BusinessProfileForm {
 }
 
 function readBusinessProfile(): BusinessProfileForm {
-  const storedType = SettingsService.getValue('businessType') || 'ceramics';
+  const storedType = getEffectiveBusinessType();
   const type = BUSINESS_TYPES.some((item) => item.id === storedType) ? storedType : 'custom';
   const config = parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), type);
   return {
@@ -975,7 +2437,7 @@ function readBusinessProfile(): BusinessProfileForm {
 }
 
 function readBusinessConfiguration(): BusinessConfiguration {
-  const type = SettingsService.getValue('businessType') || 'ceramics';
+  const type = getEffectiveBusinessType();
   return parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), type);
 }
 

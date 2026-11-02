@@ -15,6 +15,7 @@ const {
   loadSyncClientConfig,
   registerSyncClientConfigHandlers,
 } = require('./syncClientConfig');
+const tailscaleService = require('./tailscaleService');
 
 // Load the documented local .env file for development launches. Explicit
 // process environment values take precedence; packaged deployments can set the
@@ -164,11 +165,12 @@ function createWindow() {
     },
   });
 
-  if (!app.isPackaged) {
-    win.loadURL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173');
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+  if (!app.isPackaged && devServerUrl) {
+    win.loadURL(devServerUrl);
     if (!process.env.CERAMISYS_E2E) win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'));
+    win.loadFile(APP_HTML_PATH);
   }
 
   win.maximize();
@@ -331,6 +333,21 @@ ipcMain.handle('sync:pull', async (event, scope, cursor, limit) => {
   validateIpcSender(event);
   if (!syncClient) throw new Error('Branch synchronization is not configured.');
   return syncClient.pullEvents(scope, cursor, limit);
+});
+
+ipcMain.handle('tailscale:status', async (event) => {
+  validateIpcSender(event);
+  return tailscaleService.getStatus();
+});
+
+ipcMain.handle('tailscale:connect', async (event, authKey) => {
+  validateIpcSender(event);
+  return tailscaleService.connect(authKey);
+});
+
+ipcMain.handle('tailscale:disconnect', async (event) => {
+  validateIpcSender(event);
+  return tailscaleService.disconnect();
 });
 
 // ─── Offline guard ───────────────────────────────────────────────────────────

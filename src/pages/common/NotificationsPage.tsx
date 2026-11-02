@@ -8,6 +8,7 @@ import {
 import { NotificationService, Notification, NotificationType } from '../../services/NotificationService';
 import { NotificationPreferencesService } from '../../services/NotificationPreferencesService';
 import { AuthService } from '../../services/AuthService';
+import { PermissionService } from '../../services/PermissionService';
 
 export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export const NotificationsPage: React.FC = () => {
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
   const notificationService = new NotificationService();
+  const canManageNotifications = PermissionService.can(AuthService.getCurrentUser(), 'notifications.manage');
   const preferencesService = new NotificationPreferencesService();
   const preferenceOptions: Array<{ key: keyof UpdateNotificationPreferencesDTO; label: string }> = [
     { key: 'lowStockAlerts', label: 'تنبيهات المخزون المنخفض والنافد' },
@@ -286,13 +288,15 @@ export const NotificationsPage: React.FC = () => {
                       <Check className="w-4 h-4" />
                     </button>
                   )}
-                  <button
-                    onClick={() => handleDelete(notif.id)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
-                    title="حذف"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {canManageNotifications && (
+                    <button
+                      onClick={() => handleDelete(notif.id)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition"
+                      title="حذف"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -300,7 +304,7 @@ export const NotificationsPage: React.FC = () => {
         )}
       </div>
 
-      {notifications.length > 0 && (
+      {notifications.length > 0 && canManageNotifications && (
         <div className="flex justify-end">
           <button
             onClick={handleDeleteAll}

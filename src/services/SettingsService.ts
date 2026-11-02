@@ -52,6 +52,10 @@ export class SettingsService {
       thermalHost: map.thermalHost || '',
       thermalPort: map.thermalPort ? Number(map.thermalPort) : 9100,
       a4PrinterName: map.a4PrinterName || '',
+      a5PrinterName: map.a5PrinterName || '',
+      barcodePrinterName: map.barcodePrinterName || '',
+      defaultInvoiceSize: (map.defaultInvoiceSize as any) || 'a4',
+      defaultInvoiceTemplate: (map.defaultInvoiceTemplate as any) || 'classic',
       receiptHeader: map.receiptHeader || '',
       receiptFooter: map.receiptFooter || '',
       logoPath: map.logoPath || '',
@@ -77,6 +81,45 @@ export class SettingsService {
       sessionTimeoutMinutes: num(map.sessionTimeoutMinutes, 480),
       maxFailedLoginAttempts: num(map.maxFailedLoginAttempts, 5),
       defaultBranchId: map.defaultBranchId || 'br_main',
+      sellingPriceTiersCount: num(map.sellingPriceTiersCount, 1),
+      sellingPriceTierNames: (() => {
+        try {
+          const parsed = JSON.parse(map.sellingPriceTierNames || '[]');
+          if (Array.isArray(parsed) && parsed.length) return parsed;
+        } catch {}
+        return ['سعر القطاعي (الأساسي)', 'سعر الجملة', 'سعر خاص / موزع', 'سعر مشاريع', 'سعر كبار العملاء'];
+      })(),
+      posShowCashButton: map.posShowCashButton === undefined ? true : bool(map.posShowCashButton),
+      posAllowDuplicateItems: bool(map.posAllowDuplicateItems),
+      posAutoSaveInvoice: bool(map.posAutoSaveInvoice),
+      posMultiSelectSearch: bool(map.posMultiSelectSearch),
+      invoiceTableStyle: (map.invoiceTableStyle as any) || 'bordered',
+      invoiceShowItemCode: map.invoiceShowItemCode === undefined ? true : bool(map.invoiceShowItemCode),
+      invoiceShowItemSpecs: map.invoiceShowItemSpecs === undefined ? true : bool(map.invoiceShowItemSpecs),
+      invoiceShowBoxesCount: map.invoiceShowBoxesCount === undefined ? true : bool(map.invoiceShowBoxesCount),
+      invoiceShowLineDiscount: map.invoiceShowLineDiscount === undefined ? true : bool(map.invoiceShowLineDiscount),
+      invoiceShowTableSummary: map.invoiceShowTableSummary === undefined ? true : bool(map.invoiceShowTableSummary),
+      allowOverdraftSale: bool(map.allowOverdraftSale),
+      insufficientStockAsReserved: bool(map.insufficientStockAsReserved),
+      lockSaleOnReservedQty: bool(map.lockSaleOnReservedQty),
+      preventPermitSaleWithoutStock: bool(map.preventPermitSaleWithoutStock),
+      preventOverdraftDeliveryPermit: bool(map.preventOverdraftDeliveryPermit),
+      allowAdminOverdraftSale: bool(map.allowAdminOverdraftSale),
+      allowPermissionHoldersOverdraftSale: bool(map.allowPermissionHoldersOverdraftSale),
+      allowLineItemDiscount: map.allowLineItemDiscount === undefined ? true : bool(map.allowLineItemDiscount),
+      returnRequiresInvoiceOrCustomer: bool(map.returnRequiresInvoiceOrCustomer),
+      newInvoicesUnderDelivery: bool(map.newInvoicesUnderDelivery),
+      vatOnDeliveryFee: bool(map.vatOnDeliveryFee),
+      cashierMaxDiscountPercentWithoutApproval: num(map.cashierMaxDiscountPercentWithoutApproval ?? map.discountApprovalThresholdPercent, 0),
+      requireRemoteManagerApproval: bool(map.requireRemoteManagerApproval, true),
+      posItemRemovalReasons: (() => {
+        try {
+          const val = map.posItemRemovalReasons;
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string' && val.trim().startsWith('[')) return JSON.parse(val);
+        } catch {}
+        return ['غلط في الإدخال', 'العميل غيّر رأيه', 'صنف تالف', 'سعر غلط'];
+      })(),
     };
   }
 

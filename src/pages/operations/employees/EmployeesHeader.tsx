@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, HardHat, Plus } from 'lucide-react';
+import { AlertCircle, Download, HardHat, Plus } from 'lucide-react';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
 
 interface EmployeesHeaderProps {
@@ -7,6 +7,8 @@ interface EmployeesHeaderProps {
   dbError: string | null;
   onAddEmployee: () => void;
   onRetry: () => void;
+  canExport?: boolean;
+  onExport?: () => void;
 }
 
 export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
@@ -14,6 +16,8 @@ export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
   dbError,
   onAddEmployee,
   onRetry,
+  canExport,
+  onExport,
 }) => {
   return (
     <>
@@ -37,6 +41,15 @@ export const EmployeesHeader: React.FC<EmployeesHeaderProps> = ({
             إضافة عامل / موظف جديد
           </button>
         </CentralLimitGuard>
+          {canExport && onExport && (
+            <button
+              onClick={onExport}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              تصدير
+            </button>
+          )}
       </div>
 
       {loading && (

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserRound, Plus, Search, Filter, Phone, Mail, Building2, Tag, Calendar, X, Loader2, ArrowLeftRight } from 'lucide-react';
+import { UserRound, Plus, Search, Filter, Phone, Mail, Building2, Tag, Calendar, X, Loader2, ArrowLeftRight, Trash2 } from 'lucide-react';
 import { CrmService, Lead, LeadStage } from '../../services/CrmService';
 import { PermissionService } from '../../services/PermissionService';
 import { AuthService } from '../../services/AuthService';
@@ -41,6 +41,7 @@ export const LeadsPage: React.FC = () => {
   const user = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(user, 'crm.create');
   const canUpdate = PermissionService.can(user, 'crm.update');
+  const canDelete = PermissionService.can(user, 'crm.delete');
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState('');
@@ -218,6 +219,15 @@ export const LeadsPage: React.FC = () => {
                         >
                           <ArrowLeftRight className="w-4 h-4" />
                         </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDelete(lead)}
+                            title="حذف العميل المحتمل"
+                            className="p-1.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

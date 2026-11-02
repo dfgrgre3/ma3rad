@@ -10,6 +10,7 @@ export class LoyaltyService {
   private db = DatabaseManager.getInstance();
 
   public getAllLoyaltyTiers(): LoyaltyTier[] {
+    PermissionService.require(AuthService.requireAuth(), 'loyalty.view');
     return this.db.query<LoyaltyTier>('SELECT * FROM loyalty_tiers ORDER BY min_points ASC');
   }
 
@@ -31,6 +32,7 @@ export class LoyaltyService {
   }
 
   public getCustomerLoyalty(customerId: string): CustomerLoyalty | null {
+    PermissionService.require(AuthService.requireAuth(), 'loyalty.view');
     const rows = this.db.query<any>(`
       SELECT cl.*, lt.name as tierName
       FROM customer_loyalty cl

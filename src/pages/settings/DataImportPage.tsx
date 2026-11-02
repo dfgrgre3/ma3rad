@@ -18,6 +18,8 @@ import {
 } from '../../services/SpreadsheetImportService';
 import { formatImportValue } from '../admin/adminDataUtils';
 import { hasOfficeCompoundFileSignature } from '../../services/xlsxBackup';
+import { parsePdfExtractedText } from '../../services/PdfImportData';
+import { extractPdfText, MAX_PDF_IMPORT_BYTES } from '../../services/PdfImportService';
 
 const parseSpreadsheetInWorker = (buffer: ArrayBuffer, fileName: string): Promise<{ buffer: ArrayBuffer; sheets: ParsedSpreadsheetSheet[] }> =>
   new Promise((resolve, reject) => {
@@ -52,6 +54,7 @@ export const DataImportPage: React.FC = () => {
   const [manualOverride, setManualOverride] = useState(false);
   const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
   const [spreadsheetSheets, setSpreadsheetSheets] = useState<ParsedSpreadsheetSheet[]>([]);
+  const [pdfText, setPdfText] = useState('');
   const [dynamicName, setDynamicName] = useState('');
   const [dynamicPreview, setDynamicPreview] = useState<{ headers: string[]; rows: Record<string, unknown>[] } | null>(null);
   const [dynamicResult, setDynamicResult] = useState<DynamicImportResult | null>(null);
@@ -61,10 +64,41 @@ export const DataImportPage: React.FC = () => {
 
   const handleFile = async (file?: File) => {
     if (!file) return;
-    setBusy(true); setMessage(''); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]);
+    setBusy(true); setMessage(''); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]); setPdfText('');
     setDynamicPreview(null); setDynamicResult(null); setBackupImport(null); setFileName(file.name);
     try {
       const lowerName = file.name.toLocaleLowerCase();
+      if (lowerName.endsWith('.pdf')) {
+        if (file.size > MAX_PDF_IMPORT_BYTES) {
+          throw new Error(`حجم PDF يتجاوز الحد الأقصى (${MAX_PDF_IMPORT_BYTES / 1024 / 1024} ميجابايت).`);
+        }
+        const buffer = await file.arrayBuffer();
+        const extractedText = await extractPdfText(buffer, setMessage);
+        const sheet = parsePdfExtractedText(extractedText, file.name.replace(/\.pdf$/i, ''));
+        const parsed = service.parseRows(
+          sheet.headers,
+          sheet.rows,
+          manualOverride && manualEntity ? manualEntity : undefined,
+        );
+        if (parsed.entity === 'dynamic' && !PermissionService.can(currentUser, 'admin.data')) {
+          throw new Error('لم يتم التعرف على نوع بيانات معروف. يلزم منح صلاحية إدارة البيانات لإنشاء نوع مرن.');
+        }
+        setPdfText(extractedText);
+        setFileBuffer(buffer);
+        setSpreadsheetSheets([sheet]);
+        setData(parsed);
+        setManualEntity(parsed.entity);
+        if (parsed.entity === 'dynamic') {
+          setDynamicPreview({ headers: sheet.headers, rows: sheet.rows });
+          setDynamicName(file.name.replace(/\.pdf$/i, ''));
+        } else {
+          setDynamicPreview(null);
+          setIssues(service.validate(parsed));
+        }
+        setMessage('تم استخراج النص محليًا. راجع النص والبيانات المقترحة وطابق الحقول قبل الحفظ.');
+        return;
+      }
+
       const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
       const isEncryptedXlsx = lowerName.endsWith('.xlsx') && hasOfficeCompoundFileSignature(header);
       if (lowerName.endsWith('.ceramisys-backup') || isEncryptedXlsx) {
@@ -122,6 +156,40 @@ export const DataImportPage: React.FC = () => {
     } else setDynamicPreview(null);
   };
 
+  const changePdfText = (text: string) => {
+    setPdfText(text);
+    setResult(null);
+    setDynamicResult(null);
+    try {
+      const sheet = parsePdfExtractedText(text, fileName.replace(/\.pdf$/i, ''));
+      const next = service.parseRows(
+        sheet.headers,
+        sheet.rows,
+        manualOverride && manualEntity ? manualEntity : undefined,
+      );
+      if (next.entity === 'dynamic' && !PermissionService.can(currentUser, 'admin.data')) {
+        throw new Error('لم يتم التعرف على نوع بيانات معروف. يلزم منح صلاحية إدارة البيانات لإنشاء نوع مرن.');
+      }
+      setSpreadsheetSheets([sheet]);
+      setData(next);
+      setManualEntity(next.entity);
+      if (next.entity === 'dynamic') {
+        setDynamicPreview({ headers: sheet.headers, rows: sheet.rows });
+        setIssues([]);
+      } else {
+        setDynamicPreview(null);
+        setIssues(service.validate(next));
+      }
+      setMessage('');
+    } catch (error: any) {
+      setData(null);
+      setSpreadsheetSheets([]);
+      setDynamicPreview(null);
+      setIssues([]);
+      setMessage(error?.message || 'تعذر تحويل النص المستخرج إلى صفوف بيانات.');
+    }
+  };
+
   const changeMapping = (key: string, header: string) => {
     if (!data) return;
     const next = { ...data, mapping: { ...data.mapping, [key]: header } };
@@ -168,7 +236,7 @@ export const DataImportPage: React.FC = () => {
         to="/data-import"
         className="px-4 py-2 rounded-xl text-xs font-black bg-sky-600 text-white shadow-sm"
       >
-        مركز استيراد الملفات (جداول البيانات وCSV)
+        مركز استيراد الملفات (الجداول وPDF)
       </Link>
       <Link
         to="/data-import/types"
@@ -179,7 +247,7 @@ export const DataImportPage: React.FC = () => {
     </div>
 
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><div className="flex items-center gap-3"><span className="rounded-2xl bg-sky-100 p-3 text-sky-700"><FileSpreadsheet className="w-6 h-6" /></span><div><h1 className="text-2xl font-black text-slate-900">مركز استيراد البيانات</h1><p className="mt-1 text-sm text-slate-500">ارفع ملف جدول بيانات أو CSV لاستيراد سجلات محددة، أو نسخة مشفرة لدمج سجلاتها بعد مراجعتها.</p></div></div></div>
+      <div><div className="flex items-center gap-3"><span className="rounded-2xl bg-sky-100 p-3 text-sky-700"><FileSpreadsheet className="w-6 h-6" /></span><div><h1 className="text-2xl font-black text-slate-900">مركز استيراد البيانات</h1><p className="mt-1 text-sm text-slate-500">ارفع جدول بيانات أو PDF لاستخراج البيانات ومراجعتها قبل الحفظ، أو نسخة مشفرة لدمج سجلاتها.</p></div></div></div>
       {data && data.entity !== 'dynamic' && <button onClick={downloadTemplate} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4"/>تنزيل قالب {ENTITY_META[data.entity].label}</button>}
     </div>
 
@@ -187,10 +255,14 @@ export const DataImportPage: React.FC = () => {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block"><span className="mb-2 block text-xs font-black text-slate-600">تحديد نوع البيانات</span><select value={manualEntity} onChange={e=>changeEntity(e.target.value as ImportEntity)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold"><option value="">اكتشاف تلقائي من الملف</option>{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><option key={key} value={key}>{meta.label}</option>)}{PermissionService.can(currentUser,'admin.data')&&<option value="dynamic">إنشاء نوع بيانات مرن</option>}</select></label>
-          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملف جدول بيانات أو CSV أو نسخة مشفرة'}<input type="file" accept=".xlsx,.xls,.csv,.ceramisys-backup,application/octet-stream" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
+          <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملف Excel أو CSV أو PDF أو نسخة مشفرة'}<input type="file" accept=".xlsx,.xls,.csv,.pdf,.ceramisys-backup,application/pdf,application/octet-stream" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
         </div>
-        <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV والنسخ المشفرة ‎.xlsx‎ و‎.ceramisys-backup‎. حد ملفات الجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت، و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. النسخة المشفرة تُدمج بعد فك تشفيرها ومراجعة السجلات، ولا تستبدل قاعدة البيانات كاملة.</p>
+        <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV وPDF والنسخ المشفرة ‎.xlsx‎ و‎.ceramisys-backup‎. حد PDF {MAX_PDF_IMPORT_BYTES / 1024 / 1024} ميجابايت، وحد ملفات الجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. يُقرأ PDF محليًا، وتُراجع البيانات قبل حفظها. النسخة المشفرة تُدمج بعد المراجعة ولا تستبدل قاعدة البيانات كاملة.</p>
         {message && <div className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${result?.created ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{message}</span></div>}
+        {pdfText && <label className="block rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-xs font-black text-sky-950">النص المستخرج من PDF — صحّح أخطاء القراءة قبل الاستيراد
+          <textarea value={pdfText} onChange={event=>changePdfText(event.target.value)} rows={10} className="mt-2 w-full rounded-lg border border-sky-200 bg-white p-3 text-sm font-normal leading-6 text-slate-800" dir="auto" />
+          <span className="mt-2 block text-[11px] font-normal text-sky-800">تتم المعالجة على الجهاز. الصفحات المصورة تُقرأ بتقنية OCR المحلية للغتين العربية والإنجليزية.</span>
+        </label>}
         {backupImport && <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
           <div><h2 className="font-black text-amber-950">مراجعة النسخة المشفرة قبل الدمج</h2><p className="mt-1 text-xs leading-5 text-amber-900">السجلات الجديدة ستُضاف، والسجلات المتعارضة ستُحدّث بعد موافقتك. لن تُحذف البيانات الأخرى ولن تُستبدل قاعدة البيانات كاملة. الجداول المحمية لن تُستورد.</p></div>
           <div className="flex flex-wrap gap-2 text-xs font-bold">

@@ -19,6 +19,7 @@ import { CeramicMath } from '../utils/ceramicMath';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { exportToExcel } from '../utils/export';
 import { SettingsService } from '../services/SettingsService';
+import { getEffectiveBusinessType } from '../services/BusinessTypeService';
 import { BusinessProfileService } from '../services/BusinessProfileService';
 import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
@@ -75,7 +76,7 @@ export const ProductsView: React.FC = () => {
 
   const [formData, setFormData] = useState<FormState>(emptyForm());
   const [businessConfig] = useState(() => {
-    const type = SettingsService.getValue('businessType') || 'ceramics';
+    const type = getEffectiveBusinessType();
     return parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), type);
   });
   const [openingRows, setOpeningRows] = useState<OpeningStockRow[]>([]);

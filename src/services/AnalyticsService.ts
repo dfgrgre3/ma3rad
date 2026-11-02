@@ -26,6 +26,7 @@ export class AnalyticsService {
   public getSalesAnalytics(dateFrom: string, dateTo: string): SalesAnalytics {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.view', '/sales');
+    PermissionService.require(actor, 'analytics.view');
 
     const scope = this.branchAccess.sqlScope(
       'si.branch_id',
@@ -231,6 +232,7 @@ export class AnalyticsService {
   }
 
   public getSnapshots(metricName: string, periodStart: string, periodEnd: string): AnalyticsSnapshot[] {
+    PermissionService.require(AuthService.requireAuth(), 'analytics.view');
     return this.db.query<AnalyticsSnapshot>(`
       SELECT * FROM analytics_snapshots
       WHERE metric_name = ? AND period_start >= ? AND period_end <= ?
@@ -240,6 +242,7 @@ export class AnalyticsService {
 
   public getDashboardMetrics(): Array<{ name: string; value: number; label: string; trend: 'up' | 'down' | 'stable' }> {
     const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'analytics.view');
     const today = localDateString();
     const monthStartStr = `${today.slice(0, 7)}-01`;
     const scope = this.branchAccess.sqlScope(

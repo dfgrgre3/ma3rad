@@ -15,9 +15,10 @@ export class CategoryService {
   private sync = new MasterDataSyncService(this.db);
 
   public getAllCategories(): CategoryWithCount[] {
+    PermissionService.require(AuthService.requireAuth(), 'categories.view');
     const rows = this.db.query<any>(`
       SELECT 
-        c.*,
+        c.id, c.name, c.parent_id, c.description, c.created_at,
         COALESCE(pc.product_count, 0) as productCount
       FROM categories c
       LEFT JOIN (
@@ -46,7 +47,11 @@ export class CategoryService {
   }
 
   public getCategoryById(id: string): Category | null {
-    const rows = this.db.query<Category>('SELECT * FROM categories WHERE id = ?', [id]);
+    PermissionService.require(AuthService.requireAuth(), 'categories.view');
+    const rows = this.db.query<Category>(
+      'SELECT id, name, parent_id, description, created_at FROM categories WHERE id = ?',
+      [id]
+    );
     return rows.length > 0 ? rows[0] : null;
   }
 
@@ -146,7 +151,7 @@ export class CategoryService {
     PermissionService.require(actor, 'products.update');
     const target = this.getCategoryById(toCategoryId);
     if (!target) throw new Error('التصنيف الهدف غير موجود.');
-    const count = (this.db.query('SELECT COUNT(*) as cnt FROM products WHERE category_id = ?', [fromCategoryId])[0] as any)?.cnt || 0;
+    const count = this.db.query('SELECT COUNT(*) as cnt FROM products WHERE category_id = ?', [fromCategoryId])[0]?.cnt || 0;
     this.db.executeTransaction((transaction) => {
       transaction.run('UPDATE products SET category_id = ? WHERE category_id = ?', [toCategoryId, fromCategoryId]);
       this.sync.capture(transaction, 'category', fromCategoryId, 'UPDATE');
@@ -161,12 +166,12 @@ export class CategoryService {
     const category = this.getCategoryById(id);
     if (!category) throw new Error('التصنيف غير موجود.');
 
-    const childCount = this.db.query('SELECT COUNT(*) as cnt FROM categories WHERE parent_id = ?', [id])[0] as any;
+    const childCount = this.db.query('SELECT COUNT(*) as cnt FROM categories WHERE parent_id = ?', [id])[0];
     if (childCount && childCount.cnt > 0) {
       throw new Error('لا يمكن حذف تصنيف يحتوي على تصنيفات فرعية.');
     }
 
-    const productCount = this.db.query('SELECT COUNT(*) as cnt FROM products WHERE category_id = ?', [id])[0] as any;
+    const productCount = this.db.query('SELECT COUNT(*) as cnt FROM products WHERE category_id = ?', [id])[0];
     if (productCount && productCount.cnt > 0) {
       throw new Error('لا يمكن حذف تصنيف مرتبط بمنتجات. قم بتعديل أو حذف المنتجات أولاً.');
     }

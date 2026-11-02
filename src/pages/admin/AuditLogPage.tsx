@@ -1,5 +1,8 @@
 import React from 'react';
-import { Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Download, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { PermissionService } from '../../services/PermissionService';
+import { AuthService } from '../../services/AuthService';
+import { exportToExcel } from '../../utils/export';
 import { useAuditLogs } from './audit/useAuditLogs';
 import { AuditStatsCards } from './audit/AuditStatsCards';
 import { AuditFilterBar } from './audit/AuditFilterBar';
@@ -29,6 +32,24 @@ export const AuditLogPage: React.FC = () => {
     refresh,
   } = useAuditLogs();
 
+  const canExportAudit = PermissionService.can(AuthService.getCurrentUser(), 'audit.export');
+  const handleExport = () => {
+    exportToExcel({
+      title: 'سجل المراجعة',
+      subtitle: 'سجل العمليات',
+      columns: [
+        { key: 'id', label: 'المعرف' },
+        { key: 'module', label: 'الوحدة' },
+        { key: 'action', label: 'العملية' },
+        { key: 'userName', label: 'المستخدم' },
+        { key: 'createdAt', label: 'التاريخ' },
+      ],
+      rows: (logs || []).map((l) => ({ id: l.id, module: l.module, action: l.action, userName: l.userName, createdAt: l.createdAt })),
+      fileName: 'audit-log',
+      permission: 'audit.export',
+    });
+  };
+
   if (isLoadingInitial) {
     return (
       <div className="flex items-center justify-center h-full text-slate-500">
@@ -57,6 +78,15 @@ export const AuditLogPage: React.FC = () => {
           <RefreshCw className={`w-4 h-4 ${isLoadingLogs ? 'animate-spin' : ''}`} />
           تحديث السجل
         </button>
+          {canExportAudit && (
+            <button
+              onClick={handleExport}
+              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 hover:bg-slate-50 transition-colors text-xs shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              تصدير
+            </button>
+          )}
       </div>
 
       <AuditStatsCards stats={stats} />

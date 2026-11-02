@@ -9,6 +9,7 @@ import { localDateString } from '../utils/date';
 import { getProductUnitLabel } from '../utils/productUnits';
 import { normalizeUom } from '../utils/uom';
 import { resolveSaleUnits } from './sales/unitResolution';
+import { BranchAccessService } from './BranchAccessService';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED';
 
@@ -43,6 +44,7 @@ export interface Order {
   deliveryProgress?: number;
   createdAt: string;
   updatedAt?: string;
+  branchId?: string | null;
   items?: OrderItem[];
 }
 
@@ -137,8 +139,10 @@ export interface ConvertOrderOptions {
 export class OrderService {
   private db = DatabaseManager.getInstance();
   private sales = new SalesService();
+  private branchAccess = new BranchAccessService();
 
   public getOrders(search = '', status: 'ALL' | OrderStatus = 'ALL', dateFrom?: string, dateTo?: string): Order[] {
+    PermissionService.require(AuthService.requireAuth(), 'sales.view');
     let sql = `
       SELECT o.*, c.name AS customer_name, c.phone AS customer_phone, w.name AS warehouse_name,
              si.invoice_number AS invoice_number,
@@ -152,7 +156,9 @@ export class OrderService {
       JOIN warehouses w ON w.id = o.warehouse_id
       LEFT JOIN sales_invoices si ON si.id = o.invoice_id
       WHERE 1 = 1`;
-    const params: any[] = [];
+    const scope = this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)');
+    sql += ` AND ${scope.clause}`;
+    const params: any[] = [...scope.params];
 
     if (status !== 'ALL') {
       sql += ` AND o.status = ?`;
@@ -176,6 +182,7 @@ export class OrderService {
   }
 
   public getOrder(id: string): Order | null {
+    PermissionService.require(AuthService.requireAuth(), 'sales.view');
     const rows = this.db.query<Order>(
       `SELECT o.*, c.name AS customer_name, c.phone AS customer_phone, w.name AS warehouse_name,
               si.invoice_number AS invoice_number
@@ -183,26 +190,31 @@ export class OrderService {
        JOIN customers c ON c.id = o.customer_id
        JOIN warehouses w ON w.id = o.warehouse_id
        LEFT JOIN sales_invoices si ON si.id = o.invoice_id
-       WHERE o.id = ?`,
-      [id]
+       WHERE o.id = ? AND ${this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').clause}`,
+      [id, ...this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').params]
     );
     if (rows.length === 0) return null;
     return { ...rows[0], items: this.getOrderItems(id) };
   }
 
   public getOrderItems(orderId: string): OrderItem[] {
+    PermissionService.require(AuthService.requireAuth(), 'sales.view');
     return this.db.query<OrderItem>(
       `SELECT oi.*, p.sku, p.size, p.meters_per_box,
               p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM order_items oi
        LEFT JOIN products p ON p.id = oi.product_id
-       WHERE oi.order_id = ?
+       WHERE oi.order_id = ? AND EXISTS (
+         SELECT 1 FROM orders o
+         WHERE o.id = oi.order_id AND ${this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').clause}
+       )
        ORDER BY oi.rowid ASC`,
-      [orderId]
+      [orderId, ...this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').params]
     );
   }
 
   public getStats(): OrderStats {
+    PermissionService.require(AuthService.requireAuth(), 'sales.view');
     const row = this.db.query<any>(
       `SELECT COUNT(*) AS total,
               COALESCE(SUM(total_amount), 0) AS totalValue,
@@ -212,7 +224,9 @@ export class OrderService {
               COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END), 0) AS completed,
               COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN total_amount ELSE 0 END), 0) AS completedValue,
               COALESCE(SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END), 0) AS cancelled
-       FROM orders`
+       FROM orders o
+       WHERE ${this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').clause}`,
+      this.branchAccess.sqlScope('o.branch_id', '(SELECT w2.branch_id FROM warehouses w2 WHERE w2.id = o.warehouse_id)').params
     )[0] || {};
     return {
       total: Number(row.total || 0),
@@ -228,12 +242,13 @@ export class OrderService {
 
   public createOrder(input: OrderInput): Order {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'orders.create');
     if (!input.customerId) throw new Error('يجب اختيار العميل.');
     const items = this.normalizeItems(input.items);
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
 
     const warehouse = this.resolveWarehouse(input.warehouseId);
+    const branchId = this.branchAccess.requireWarehouseAccess(warehouse);
     const totals = this.computeTotals(items, input);
     const id = `ord_${uuidv4().substring(0, 8)}`;
 
@@ -242,12 +257,12 @@ export class OrderService {
       const orderNumber = db.nextNumber('ORD');
 
       db.run(
-        `INSERT INTO orders (id, order_number, date, customer_id, warehouse_id, quotation_id,
+        `INSERT INTO orders (id, order_number, date, customer_id, warehouse_id, branch_id, quotation_id,
           expected_delivery_date, subtotal, discount_amount, tax_amount, shipping_cost,
           total_amount, paid_amount, remaining_amount, status, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'PENDING', ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'PENDING', ?, ?)`,
         [
-          id, orderNumber, localDateString(), input.customerId, warehouse,
+          id, orderNumber, localDateString(), input.customerId, warehouse, branchId,
           input.quotationId || null, input.expectedDeliveryDate || null,
           totals.subtotal, totals.discountAmount, totals.taxAmount, totals.shippingCost,
           totals.totalAmount, totals.totalAmount, input.notes || null, actor.id,
@@ -276,7 +291,7 @@ export class OrderService {
 
   public updateOrder(id: string, input: OrderInput): Order {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'orders.update');
     const existing = this.getOrder(id);
     if (!existing) throw new Error('الطلب غير موجود.');
     if (existing.status !== 'PENDING') {
@@ -287,6 +302,7 @@ export class OrderService {
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
 
     const warehouse = this.resolveWarehouse(input.warehouseId || existing.warehouseId);
+    const branchId = this.branchAccess.requireWarehouseAccess(warehouse);
     const totals = this.computeTotals(items, input);
 
     return this.db.executeTransaction((db) => {
@@ -294,12 +310,12 @@ export class OrderService {
       this.assertStockAndReserve(db, warehouse, items);
 
       db.run(
-        `UPDATE orders SET customer_id = ?, warehouse_id = ?, quotation_id = ?,
+        `UPDATE orders SET customer_id = ?, warehouse_id = ?, branch_id = ?, quotation_id = ?,
           expected_delivery_date = ?, subtotal = ?, discount_amount = ?, tax_amount = ?,
           shipping_cost = ?, total_amount = ?, remaining_amount = ?, notes = ?,
           updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [
-          input.customerId, warehouse, input.quotationId || null, input.expectedDeliveryDate || null,
+          input.customerId, warehouse, branchId, input.quotationId || null, input.expectedDeliveryDate || null,
           totals.subtotal, totals.discountAmount, totals.taxAmount, totals.shippingCost,
           totals.totalAmount, totals.totalAmount, input.notes || null, id,
         ]
@@ -327,7 +343,7 @@ export class OrderService {
 
   public updateStatus(id: string, status: OrderStatus): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.approve');
+    PermissionService.require(actor, 'orders.approve');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
 
@@ -370,7 +386,7 @@ export class OrderService {
     markDeliveredAt = true
   ): Order {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.approve');
+    PermissionService.require(actor, 'orders.approve');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
     if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
@@ -433,6 +449,8 @@ export class OrderService {
   }
 
   public getStatusHistory(orderId: string): OrderStatusEntry[] {
+    PermissionService.require(AuthService.requireAuth(), 'sales.view');
+    if (!this.getOrder(orderId)) return [];
     return this.db.query<OrderStatusEntry>(
       `SELECT * FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC, rowid ASC`,
       [orderId]
@@ -441,7 +459,7 @@ export class OrderService {
 
   public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string): Order {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.create');
+    PermissionService.require(actor, 'orders.update');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
     if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
@@ -488,6 +506,7 @@ export class OrderService {
     if (!order.items || order.items.length === 0) throw new Error('الطلب لا يحتوي على بنود.');
 
     const warehouseId = options.warehouseId || order.warehouseId;
+    this.branchAccess.requireWarehouseAccess(warehouseId);
     const total = round2(order.totalAmount);
     const paymentType: PaymentType = options.paymentType || 'CREDIT';
     const paidAmount = paymentType === 'CASH' && options.paidAmount === undefined
@@ -544,7 +563,7 @@ export class OrderService {
 
   public deleteCancelledOrder(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.approve');
+    PermissionService.require(actor, 'orders.delete');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
     if (order.status !== 'CANCELLED') throw new Error('يمكن حذف الطلبات الملغاة فقط.');
@@ -559,17 +578,20 @@ export class OrderService {
 
   private resolveWarehouse(warehouseId?: string): string {
     if (warehouseId) {
-      const exists = this.db.query<{ id: string }>(
-        `SELECT id FROM warehouses WHERE id = ? AND is_active = 1`,
-        [warehouseId]
-      )[0];
-      if (!exists) throw new Error('المخزن المحدد غير موجود أو غير نشط.');
+      this.branchAccess.requireWarehouseAccess(warehouseId);
       return warehouseId;
     }
+    const branchId = this.branchAccess.getCurrentBranchId();
     const fallback = this.db.query<{ id: string }>(
-      `SELECT id FROM warehouses WHERE is_active = 1 ORDER BY is_default DESC, created_at ASC LIMIT 1`
+      `SELECT id FROM warehouses
+       WHERE is_active = 1 AND (branch_id = ? OR id IN (
+         SELECT warehouse_id FROM branch_warehouses WHERE branch_id = ?
+       ))
+       ORDER BY is_default DESC, created_at ASC LIMIT 1`,
+      [branchId, branchId]
     )[0];
     if (!fallback) throw new Error('لا يوجد مخزن نشط.');
+    this.branchAccess.requireWarehouseAccess(fallback.id);
     return fallback.id;
   }
 
