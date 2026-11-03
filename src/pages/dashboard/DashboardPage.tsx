@@ -92,7 +92,7 @@ export const DashboardPage: React.FC = () => {
     next.delete('section');
     next.delete('tab');
     setSearchParams(next, { replace: true });
-    document.getElementById('dashboard-scroll-root')?.scrollTo({ top: 0, behavior: 'smooth' });
+    document.querySelector('main.app-main')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const refresh = () => {
@@ -103,8 +103,8 @@ export const DashboardPage: React.FC = () => {
   const isOverview = effectiveTab === 'all';
 
   return (
-    <div id="dashboard-scroll-root" className="dashboard-page h-full overflow-x-hidden overflow-y-auto bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
-      <div className="mx-auto max-w-[1500px] space-y-4 p-3 sm:space-y-5 sm:p-5 lg:p-6">
+    <div className="dashboard-page bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
+      <div className="space-y-4 p-3 sm:space-y-5 sm:p-5 lg:p-6">
         <DashboardHeader today={today} onRefresh={refresh} />
 
         <DashboardSectionNav activeTab={effectiveTab} onSelectSection={selectSection} sections={visibleSections} />

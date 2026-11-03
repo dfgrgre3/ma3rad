@@ -699,6 +699,50 @@ pre, code { overflow-wrap: anywhere; }
    and icons keep their fixed dimensions. */
 .app-main :where(img, video) { max-width: 100%; }
 
+/* Smooth page transitions & prevent layout shift / jitter */
+.app-main {
+  overflow-y: scroll; /* Reserve scrollbar gutter consistently to prevent horizontal jumping */
+}
+
+@keyframes pageFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition-wrapper {
+  animation: pageFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-wrapper {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Full-width page layout ─────────────────────────────────────────────────
+   Ensures every direct child of .app-main (page roots) fills the available
+   width without any horizontal margin collapsing it. Individual page
+   components may still add their own horizontal padding via p-* or px-*. */
+.app-main > * {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Page-level wrappers: ensure content fills full available width */
+.page-root {
+  width: 100%;
+  min-width: 0;
+}
+
 /* Small screens: tighten header/status bar and allow action bars to wrap. */
 @media (max-width: 640px) {
   .app-header { height: auto; min-height: 3rem; flex-wrap: wrap; row-gap: 0.25rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+﻿import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, BarChart3, Search, Sparkles } from 'lucide-react';
 import { REPORT_CATEGORIES, REPORT_DEFINITIONS } from './reportCatalog';
@@ -55,7 +55,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const LegacyReport: React.FC<{ tab: LegacyTab }> = ({ tab }) => (
   <Suspense
-    fallback={<div className="p-10 text-center text-sm text-slate-500">جارٍ تحميل التقرير…</div>}
+    fallback={<div className="p-10 text-center text-sm text-slate-500">Ø¬Ø§Ø±Ù ØªØ­Ù…ÙŠÙ„ Ø§Ù„ØªÙ‚Ø±ÙŠØ±â€¦</div>}
   >
     {tab === 'sales' && <div className="h-full overflow-auto"><SalesReportsPage /></div>}
     {tab === 'purchases' && <div className="h-full overflow-auto"><PurchaseInventoryReportPage /></div>}
@@ -114,7 +114,7 @@ export const ReportsHubPage: React.FC = () => {
               onClick={backToHub}
               className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
             >
-              <ArrowLeft className="h-4 w-4" /> مركز التقارير
+              <ArrowLeft className="h-4 w-4" /> Ù…Ø±ÙƒØ² Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±
             </button>
             <span className="text-xs font-bold text-slate-400">/ {selectedReport.title}</span>
           </div>
@@ -137,7 +137,7 @@ export const ReportsHubPage: React.FC = () => {
             onClick={backToHub}
             className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-100"
           >
-            <ArrowLeft className="h-4 w-4" /> مركز التقارير
+            <ArrowLeft className="h-4 w-4" /> Ù…Ø±ÙƒØ² Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±
           </button>
           <span className="text-xs font-bold text-slate-400">/ {legacy?.title || tabParam}</span>
         </div>
@@ -160,16 +160,16 @@ export const ReportsHubPage: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto bg-slate-100 p-4 lg:p-6 dark:bg-slate-950" dir="rtl">
-      <div className="mx-auto max-w-7xl space-y-5">
+      <div className="w-full space-y-5">
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-slate-700 dark:bg-slate-900">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-600 text-white shadow-lg shadow-teal-500/25">
               <BarChart3 className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">مركز التقارير والتحليلات</h1>
+              <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">Ù…Ø±ÙƒØ² Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ± ÙˆØ§Ù„ØªØ­Ù„ÙŠÙ„Ø§Øª</h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {REPORT_DEFINITIONS.length} تقريرًا في الحركة والمبيعات والائتمان والمخزون والمالية والتوقعات
+                {REPORT_DEFINITIONS.length} ØªÙ‚Ø±ÙŠØ±Ù‹Ø§ ÙÙŠ Ø§Ù„Ø­Ø±ÙƒØ© ÙˆØ§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª ÙˆØ§Ù„Ø§Ø¦ØªÙ…Ø§Ù† ÙˆØ§Ù„Ù…Ø®Ø²ÙˆÙ† ÙˆØ§Ù„Ù…Ø§Ù„ÙŠØ© ÙˆØ§Ù„ØªÙˆÙ‚Ø¹Ø§Øª
               </p>
             </div>
           </div>
@@ -178,7 +178,7 @@ export const ReportsHubPage: React.FC = () => {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="ابحث عن تقرير…"
+              placeholder="Ø§Ø¨Ø­Ø« Ø¹Ù† ØªÙ‚Ø±ÙŠØ±â€¦"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-3 pr-9 text-xs font-bold dark:border-slate-700 dark:bg-slate-800"
             />
           </div>
@@ -187,7 +187,7 @@ export const ReportsHubPage: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <span className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             {category === 'all'
-              ? 'جميع التقارير'
+              ? 'Ø¬Ù…ÙŠØ¹ Ø§Ù„ØªÙ‚Ø§Ø±ÙŠØ±'
               : REPORT_CATEGORIES.find((item) => item.id === category)?.label}
           </span>
         </div>
@@ -225,7 +225,7 @@ export const ReportsHubPage: React.FC = () => {
                         <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">{report.description}</p>
                       </div>
                       <span className="mt-auto inline-flex items-center gap-1 text-[10px] font-bold text-teal-600">
-                        <Sparkles className="h-3 w-3" /> فتح التقرير
+                        <Sparkles className="h-3 w-3" /> ÙØªØ­ Ø§Ù„ØªÙ‚Ø±ÙŠØ±
                       </span>
                     </button>
                   );
@@ -237,7 +237,7 @@ export const ReportsHubPage: React.FC = () => {
 
         {filtered.length === 0 && (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm font-bold text-slate-400 dark:border-slate-700 dark:bg-slate-900">
-            لا يوجد تقرير مطابق لبحثك.
+            Ù„Ø§ ÙŠÙˆØ¬Ø¯ ØªÙ‚Ø±ÙŠØ± Ù…Ø·Ø§Ø¨Ù‚ Ù„Ø¨Ø­Ø«Ùƒ.
           </div>
         )}
       </div>

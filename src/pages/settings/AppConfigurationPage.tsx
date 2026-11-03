@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, Check, ChevronLeft, Eye, EyeOff,
   FileText, History, LayoutList, Redo2, RotateCcw, Save, Search, Settings2, ShieldCheck,
@@ -33,13 +33,13 @@ const labelCls = 'mb-1 block text-[11px] font-bold text-slate-600 dark:text-slat
 type TabId = 'overview' | 'pages' | 'sections' | 'fields' | 'texts' | 'policies' | 'history';
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
-  { id: 'overview', label: 'نظرة عامة', icon: Sparkles },
-  { id: 'pages', label: 'الصفحات', icon: LayoutList },
-  { id: 'sections', label: 'الأقسام', icon: Boxes },
-  { id: 'fields', label: 'الحقول', icon: SlidersHorizontal },
-  { id: 'texts', label: 'النصوص', icon: Type },
-  { id: 'policies', label: 'السياسات والترقيم', icon: Settings2 },
-  { id: 'history', label: 'السجل والإصدارات', icon: History },
+  { id: 'overview', label: 'Ù†Ø¸Ø±Ø© Ø¹Ø§Ù…Ø©', icon: Sparkles },
+  { id: 'pages', label: 'Ø§Ù„ØµÙØ­Ø§Øª', icon: LayoutList },
+  { id: 'sections', label: 'Ø§Ù„Ø£Ù‚Ø³Ø§Ù…', icon: Boxes },
+  { id: 'fields', label: 'Ø§Ù„Ø­Ù‚ÙˆÙ„', icon: SlidersHorizontal },
+  { id: 'texts', label: 'Ø§Ù„Ù†ØµÙˆØµ', icon: Type },
+  { id: 'policies', label: 'Ø§Ù„Ø³ÙŠØ§Ø³Ø§Øª ÙˆØ§Ù„ØªØ±Ù‚ÙŠÙ…', icon: Settings2 },
+  { id: 'history', label: 'Ø§Ù„Ø³Ø¬Ù„ ÙˆØ§Ù„Ø¥ØµØ¯Ø§Ø±Ø§Øª', icon: History },
 ];
 
 const NAV_LABELS = new Map(NAV_GROUPS.flatMap((group) => group.items.map((item) => [item.to, item.label])));
@@ -98,7 +98,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; l
     aria-pressed={checked}
   >
     {checked ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-    {label ?? (checked ? 'ظاهر' : 'مخفي')}
+    {label ?? (checked ? 'Ø¸Ø§Ù‡Ø±' : 'Ù…Ø®ÙÙŠ')}
   </button>
 );
 
@@ -162,7 +162,7 @@ export const AppConfigurationPage: React.FC = () => {
       if (path === '*' || seen.has(path)) continue;
       seen.add(path);
       const nav = NAV_LABELS.get(path);
-      const label = nav || (path === '/' ? 'الرئيسية' : path.replace(/^\//, '').replace(/[/-]/g, ' '));
+      const label = nav || (path === '/' ? 'Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©' : path.replace(/^\//, '').replace(/[/-]/g, ' '));
       pages.push({ path, label });
     }
     return pages.sort((a, b) => a.label.localeCompare(b.label, 'ar'));
@@ -238,17 +238,17 @@ export const AppConfigurationPage: React.FC = () => {
           ...(ruleNote.trim() ? { note: ruleNote.trim() } : {}),
         };
       // Validate early so the list never shows an unsavable rule.
-      if (ruleKind === 'selector' && !rule.selector) throw new Error('اكتب محدد العنصر (CSS selector).');
-      if (ruleKind === 'text' && !rule.matchText?.trim()) throw new Error('اكتب النص الأصلي المطلوب استبداله.');
+      if (ruleKind === 'selector' && !rule.selector) throw new Error('Ø§ÙƒØªØ¨ Ù…Ø­Ø¯Ø¯ Ø§Ù„Ø¹Ù†ØµØ± (CSS selector).');
+      if (ruleKind === 'text' && !rule.matchText?.trim()) throw new Error('Ø§ÙƒØªØ¨ Ø§Ù„Ù†Øµ Ø§Ù„Ø£ØµÙ„ÙŠ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨ Ø§Ø³ØªØ¨Ø¯Ø§Ù„Ù‡.');
       setRules((current) => [...current, rule]);
       setDirty(true);
       setRuleSelector('');
       setRuleMatch('');
       setRuleReplacement('');
       setRuleNote('');
-      toast.success('تمت إضافة القاعدة إلى المسودة. اضغط «حفظ» لتطبيقها.');
+      toast.success('ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø© Ø¥Ù„Ù‰ Ø§Ù„Ù…Ø³ÙˆØ¯Ø©. Ø§Ø¶ØºØ· Â«Ø­ÙØ¸Â» Ù„ØªØ·Ø¨ÙŠÙ‚Ù‡Ø§.');
     } catch (error) {
-      toast.error('تعذر إضافة القاعدة', error instanceof Error ? error.message : String(error));
+      toast.error('ØªØ¹Ø°Ø± Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø©', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -264,11 +264,11 @@ export const AppConfigurationPage: React.FC = () => {
 
   const save = () => {
     try {
-      AppConfigService.saveConfig({ entries, rules }, 'تحديث من محرك التكوين الديناميكي', AuthService.getCurrentUser());
+      AppConfigService.saveConfig({ entries, rules }, 'ØªØ­Ø¯ÙŠØ« Ù…Ù† Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙƒÙˆÙŠÙ† Ø§Ù„Ø¯ÙŠÙ†Ø§Ù…ÙŠÙƒÙŠ', AuthService.getCurrentUser());
       setDirty(false);
-      toast.success('تم حفظ التكوين وتطبيقه على الواجهة.');
+      toast.success('ØªÙ… Ø­ÙØ¸ Ø§Ù„ØªÙƒÙˆÙŠÙ† ÙˆØªØ·Ø¨ÙŠÙ‚Ù‡ Ø¹Ù„Ù‰ Ø§Ù„ÙˆØ§Ø¬Ù‡Ø©.');
     } catch (error) {
-      toast.error('تعذر حفظ التكوين', error instanceof Error ? error.message : String(error));
+      toast.error('ØªØ¹Ø°Ø± Ø­ÙØ¸ Ø§Ù„ØªÙƒÙˆÙŠÙ†', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -278,13 +278,13 @@ export const AppConfigurationPage: React.FC = () => {
   };
 
   const resetAll = () => {
-    if (!window.confirm('إعادة ضبط كل تكوين الواجهة؟ ستعود الصفحات والأقسام والنصوص إلى حالتها الأصلية، ولن تُحذف أي بيانات أعمال.')) return;
+    if (!window.confirm('Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø· ÙƒÙ„ ØªÙƒÙˆÙŠÙ† Ø§Ù„ÙˆØ§Ø¬Ù‡Ø©ØŸ Ø³ØªØ¹ÙˆØ¯ Ø§Ù„ØµÙØ­Ø§Øª ÙˆØ§Ù„Ø£Ù‚Ø³Ø§Ù… ÙˆØ§Ù„Ù†ØµÙˆØµ Ø¥Ù„Ù‰ Ø­Ø§Ù„ØªÙ‡Ø§ Ø§Ù„Ø£ØµÙ„ÙŠØ©ØŒ ÙˆÙ„Ù† ØªÙØ­Ø°Ù Ø£ÙŠ Ø¨ÙŠØ§Ù†Ø§Øª Ø£Ø¹Ù…Ø§Ù„.')) return;
     try {
       AppConfigService.reset(AuthService.getCurrentUser());
       setDirty(false);
-      toast.success('تمت إعادة ضبط محرك التكوين.');
+      toast.success('ØªÙ…Øª Ø¥Ø¹Ø§Ø¯Ø© Ø¶Ø¨Ø· Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙƒÙˆÙŠÙ†.');
     } catch (error) {
-      toast.error('تعذرت إعادة الضبط', error instanceof Error ? error.message : String(error));
+      toast.error('ØªØ¹Ø°Ø±Øª Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ø¶Ø¨Ø·', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -300,39 +300,39 @@ export const AppConfigurationPage: React.FC = () => {
       URL.revokeObjectURL(url);
       try {
         await navigator.clipboard.writeText(json);
-        toast.success('تم تصدير التكوين ونسخه إلى الحافظة.');
+        toast.success('ØªÙ… ØªØµØ¯ÙŠØ± Ø§Ù„ØªÙƒÙˆÙŠÙ† ÙˆÙ†Ø³Ø®Ù‡ Ø¥Ù„Ù‰ Ø§Ù„Ø­Ø§ÙØ¸Ø©.');
       } catch {
-        toast.success('تم تصدير ملف التكوين.');
+        toast.success('ØªÙ… ØªØµØ¯ÙŠØ± Ù…Ù„Ù Ø§Ù„ØªÙƒÙˆÙŠÙ†.');
       }
     } catch (error) {
-      toast.error('تعذر تصدير التكوين', error instanceof Error ? error.message : String(error));
+      toast.error('ØªØ¹Ø°Ø± ØªØµØ¯ÙŠØ± Ø§Ù„ØªÙƒÙˆÙŠÙ†', error instanceof Error ? error.message : String(error));
     }
   };
 
   const importConfig = (raw: string) => {
     if (!raw.trim()) {
-      toast.error('ألصق محتوى ملف التكوين أولًا.');
+      toast.error('Ø£Ù„ØµÙ‚ Ù…Ø­ØªÙˆÙ‰ Ù…Ù„Ù Ø§Ù„ØªÙƒÙˆÙŠÙ† Ø£ÙˆÙ„Ù‹Ø§.');
       return;
     }
-    if (!window.confirm('استيراد التكوين سيستبدل كل الأهداف والقواعد الحالية. هل تريد المتابعة؟')) return;
+    if (!window.confirm('Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„ØªÙƒÙˆÙŠÙ† Ø³ÙŠØ³ØªØ¨Ø¯Ù„ ÙƒÙ„ Ø§Ù„Ø£Ù‡Ø¯Ø§Ù ÙˆØ§Ù„Ù‚ÙˆØ§Ø¹Ø¯ Ø§Ù„Ø­Ø§Ù„ÙŠØ©. Ù‡Ù„ ØªØ±ÙŠØ¯ Ø§Ù„Ù…ØªØ§Ø¨Ø¹Ø©ØŸ')) return;
     try {
       AppConfigService.importJson(raw, AuthService.getCurrentUser());
       setImportText('');
       setDirty(false);
-      toast.success('تم استيراد التكوين بنجاح.');
+      toast.success('ØªÙ… Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„ØªÙƒÙˆÙŠÙ† Ø¨Ù†Ø¬Ø§Ø­.');
     } catch (error) {
-      toast.error('تعذر استيراد التكوين', error instanceof Error ? error.message : String(error));
+      toast.error('ØªØ¹Ø°Ø± Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„ØªÙƒÙˆÙŠÙ†', error instanceof Error ? error.message : String(error));
     }
   };
 
   const restoreVersion = (version: AppConfigVersion) => {
-    if (!window.confirm(`استعادة الإصدار ${version.version}؟ سيُنشأ إصدار جديد مطابق له.`)) return;
+    if (!window.confirm(`Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ø¥ØµØ¯Ø§Ø± ${version.version}ØŸ Ø³ÙŠÙÙ†Ø´Ø£ Ø¥ØµØ¯Ø§Ø± Ø¬Ø¯ÙŠØ¯ Ù…Ø·Ø§Ø¨Ù‚ Ù„Ù‡.`)) return;
     try {
       AppConfigService.restoreVersion(version.id, AuthService.getCurrentUser());
       setDirty(false);
-      toast.success(`تمت استعادة الإصدار ${version.version}.`);
+      toast.success(`ØªÙ…Øª Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ø¥ØµØ¯Ø§Ø± ${version.version}.`);
     } catch (error) {
-      toast.error('تعذرت استعادة الإصدار', error instanceof Error ? error.message : String(error));
+      toast.error('ØªØ¹Ø°Ø±Øª Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ø¥ØµØ¯Ø§Ø±', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -340,12 +340,12 @@ export const AppConfigurationPage: React.FC = () => {
     try {
       const actor = AuthService.getCurrentUser();
       const enabled = ModuleRegistryService.isModuleEnabled(moduleId);
-      if (enabled) ModuleRegistryService.deactivate(moduleId, actor, 'من محرك التكوين');
-      else ModuleRegistryService.activate(moduleId, actor, 'من محرك التكوين');
+      if (enabled) ModuleRegistryService.deactivate(moduleId, actor, 'Ù…Ù† Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙƒÙˆÙŠÙ†');
+      else ModuleRegistryService.activate(moduleId, actor, 'Ù…Ù† Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙƒÙˆÙŠÙ†');
       setModuleState(ModuleRegistryService.getModuleState());
-      toast.success(enabled ? 'تم تعطيل الوحدة وإخفاء صفحاتها.' : 'تم تفعيل الوحدة.');
+      toast.success(enabled ? 'ØªÙ… ØªØ¹Ø·ÙŠÙ„ Ø§Ù„ÙˆØ­Ø¯Ø© ÙˆØ¥Ø®ÙØ§Ø¡ ØµÙØ­Ø§ØªÙ‡Ø§.' : 'ØªÙ… ØªÙØ¹ÙŠÙ„ Ø§Ù„ÙˆØ­Ø¯Ø©.');
     } catch (error) {
-      toast.error('تعذر تغيير حالة الوحدة', error instanceof Error ? error.message : String(error));
+      toast.error('ØªØ¹Ø°Ø± ØªØºÙŠÙŠØ± Ø­Ø§Ù„Ø© Ø§Ù„ÙˆØ­Ø¯Ø©', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -362,36 +362,36 @@ export const AppConfigurationPage: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto bg-slate-100 p-4 dark:bg-slate-950 lg:p-6" dir="rtl" data-config-ignore>
-      <div className="mx-auto max-w-7xl space-y-4">
+      <div className="w-full space-y-4">
         <header className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-violet-500 to-sky-600 text-white shadow-lg shadow-violet-500/25">
               <Wand2 className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">محرك التكوين الديناميكي</h1>
+              <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙƒÙˆÙŠÙ† Ø§Ù„Ø¯ÙŠÙ†Ø§Ù…ÙŠÙƒÙŠ</h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                تحكم في الصفحات والأقسام والحقول والنصوص والسياسات والترقيم وقوالب الطباعة دون تعديل الكود.
+                ØªØ­ÙƒÙ… ÙÙŠ Ø§Ù„ØµÙØ­Ø§Øª ÙˆØ§Ù„Ø£Ù‚Ø³Ø§Ù… ÙˆØ§Ù„Ø­Ù‚ÙˆÙ„ ÙˆØ§Ù„Ù†ØµÙˆØµ ÙˆØ§Ù„Ø³ÙŠØ§Ø³Ø§Øª ÙˆØ§Ù„ØªØ±Ù‚ÙŠÙ… ÙˆÙ‚ÙˆØ§Ù„Ø¨ Ø§Ù„Ø·Ø¨Ø§Ø¹Ø© Ø¯ÙˆÙ† ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„ÙƒÙˆØ¯.
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={resetDraft} disabled={!dirty} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
-              <RotateCcw className="h-3.5 w-3.5" /> تراجع
+              <RotateCcw className="h-3.5 w-3.5" /> ØªØ±Ø§Ø¬Ø¹
             </button>
             <button onClick={save} disabled={readOnly || !dirty} className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-40">
-              <Save className="h-4 w-4" /> حفظ وتطبيق
+              <Save className="h-4 w-4" /> Ø­ÙØ¸ ÙˆØªØ·Ø¨ÙŠÙ‚
             </button>
           </div>
         </header>
 
         {readOnly && (
           <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            <ShieldCheck className="ml-1 inline h-3.5 w-3.5" /> وضع القراءة فقط: تحتاج صلاحية settings.update للحفظ.
+            <ShieldCheck className="ml-1 inline h-3.5 w-3.5" /> ÙˆØ¶Ø¹ Ø§Ù„Ù‚Ø±Ø§Ø¡Ø© ÙÙ‚Ø·: ØªØ­ØªØ§Ø¬ ØµÙ„Ø§Ø­ÙŠØ© settings.update Ù„Ù„Ø­ÙØ¸.
           </p>
         )}
 
-        <nav className="flex flex-wrap gap-2" aria-label="أقسام محرك التكوين">
+        <nav className="flex flex-wrap gap-2" aria-label="Ø£Ù‚Ø³Ø§Ù… Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙƒÙˆÙŠÙ†">
           {TABS.filter((item) => item.id !== 'history' || canViewHistory).map((item) => {
             const Icon = item.icon;
             const active = tab === item.id;
@@ -417,12 +417,12 @@ export const AppConfigurationPage: React.FC = () => {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
               {[
-                ['أهداف مكوّنة', stats.entries],
-                ['قواعد DOM', stats.rules],
-                ['صفحات مخفية', stats.pagesHidden],
-                ['أقسام مخفية', stats.sectionsHidden],
-                ['حقول مخفية', stats.fieldsHidden],
-                ['نصوص مخصصة', stats.textOverrides],
+                ['Ø£Ù‡Ø¯Ø§Ù Ù…ÙƒÙˆÙ‘Ù†Ø©', stats.entries],
+                ['Ù‚ÙˆØ§Ø¹Ø¯ DOM', stats.rules],
+                ['ØµÙØ­Ø§Øª Ù…Ø®ÙÙŠØ©', stats.pagesHidden],
+                ['Ø£Ù‚Ø³Ø§Ù… Ù…Ø®ÙÙŠØ©', stats.sectionsHidden],
+                ['Ø­Ù‚ÙˆÙ„ Ù…Ø®ÙÙŠØ©', stats.fieldsHidden],
+                ['Ù†ØµÙˆØµ Ù…Ø®ØµØµØ©', stats.textOverrides],
               ].map(([label, value]) => (
                 <div key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
                   <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{label}</div>
@@ -432,25 +432,25 @@ export const AppConfigurationPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Card title="كيف يعمل المحرك؟" description="كل تعديل يُحفظ كإصدار قابل للاستعادة، ويُطبّق فورًا على الواجهة.">
+              <Card title="ÙƒÙŠÙ ÙŠØ¹Ù…Ù„ Ø§Ù„Ù…Ø­Ø±ÙƒØŸ" description="ÙƒÙ„ ØªØ¹Ø¯ÙŠÙ„ ÙŠÙØ­ÙØ¸ ÙƒØ¥ØµØ¯Ø§Ø± Ù‚Ø§Ø¨Ù„ Ù„Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø©ØŒ ÙˆÙŠÙØ·Ø¨Ù‘Ù‚ ÙÙˆØ±Ù‹Ø§ Ø¹Ù„Ù‰ Ø§Ù„ÙˆØ§Ø¬Ù‡Ø©.">
                 <ul className="space-y-2 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
-                  <li><strong>الصفحات:</strong> إخفاء الصفحة يخفي رابطها ويمنع فتح مسارها.</li>
-                  <li><strong>الأقسام:</strong> أخفِ أي قسم عبر محدد CSS أو عبر تغليفه بـ ConfigSection.</li>
-                  <li><strong>الحقول:</strong> إخفاء أو إلزام أو إعادة تسمية حقول النماذج.</li>
-                  <li><strong>النصوص:</strong> استبدال أي نص ظاهر حرفيًا في أي صفحة.</li>
-                  <li><strong>السياسات والترقيم:</strong> تجاوزات مركزية تُقرأ من الخدمات الحالية.</li>
+                  <li><strong>Ø§Ù„ØµÙØ­Ø§Øª:</strong> Ø¥Ø®ÙØ§Ø¡ Ø§Ù„ØµÙØ­Ø© ÙŠØ®ÙÙŠ Ø±Ø§Ø¨Ø·Ù‡Ø§ ÙˆÙŠÙ…Ù†Ø¹ ÙØªØ­ Ù…Ø³Ø§Ø±Ù‡Ø§.</li>
+                  <li><strong>Ø§Ù„Ø£Ù‚Ø³Ø§Ù…:</strong> Ø£Ø®ÙÙ Ø£ÙŠ Ù‚Ø³Ù… Ø¹Ø¨Ø± Ù…Ø­Ø¯Ø¯ CSS Ø£Ùˆ Ø¹Ø¨Ø± ØªØºÙ„ÙŠÙÙ‡ Ø¨Ù€ ConfigSection.</li>
+                  <li><strong>Ø§Ù„Ø­Ù‚ÙˆÙ„:</strong> Ø¥Ø®ÙØ§Ø¡ Ø£Ùˆ Ø¥Ù„Ø²Ø§Ù… Ø£Ùˆ Ø¥Ø¹Ø§Ø¯Ø© ØªØ³Ù…ÙŠØ© Ø­Ù‚ÙˆÙ„ Ø§Ù„Ù†Ù…Ø§Ø°Ø¬.</li>
+                  <li><strong>Ø§Ù„Ù†ØµÙˆØµ:</strong> Ø§Ø³ØªØ¨Ø¯Ø§Ù„ Ø£ÙŠ Ù†Øµ Ø¸Ø§Ù‡Ø± Ø­Ø±ÙÙŠÙ‹Ø§ ÙÙŠ Ø£ÙŠ ØµÙØ­Ø©.</li>
+                  <li><strong>Ø§Ù„Ø³ÙŠØ§Ø³Ø§Øª ÙˆØ§Ù„ØªØ±Ù‚ÙŠÙ…:</strong> ØªØ¬Ø§ÙˆØ²Ø§Øª Ù…Ø±ÙƒØ²ÙŠØ© ØªÙÙ‚Ø±Ø£ Ù…Ù† Ø§Ù„Ø®Ø¯Ù…Ø§Øª Ø§Ù„Ø­Ø§Ù„ÙŠØ©.</li>
                 </ul>
               </Card>
-              <Card title="نسخ احتياطي للتكوين">
+              <Card title="Ù†Ø³Ø® Ø§Ø­ØªÙŠØ§Ø·ÙŠ Ù„Ù„ØªÙƒÙˆÙŠÙ†">
                 <div className="flex flex-wrap gap-2">
                   <button onClick={() => void exportConfig()} className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700">
-                    <ArrowDownToLine className="h-4 w-4" /> تصدير JSON
+                    <ArrowDownToLine className="h-4 w-4" /> ØªØµØ¯ÙŠØ± JSON
                   </button>
                   <button onClick={resetAll} disabled={readOnly} className="flex items-center gap-1.5 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-40 dark:border-rose-500/30 dark:hover:bg-rose-950/30">
-                    <RotateCcw className="h-4 w-4" /> إعادة الضبط الكامل
+                    <RotateCcw className="h-4 w-4" /> Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ø¶Ø¨Ø· Ø§Ù„ÙƒØ§Ù…Ù„
                   </button>
                 </div>
-                <label className="mt-3 block text-[11px] font-bold text-slate-600 dark:text-slate-300">استيراد تكوين (JSON)</label>
+                <label className="mt-3 block text-[11px] font-bold text-slate-600 dark:text-slate-300">Ø§Ø³ØªÙŠØ±Ø§Ø¯ ØªÙƒÙˆÙŠÙ† (JSON)</label>
                 <textarea
                   value={importText}
                   onChange={(event) => setImportText(event.target.value)}
@@ -461,10 +461,10 @@ export const AppConfigurationPage: React.FC = () => {
                 />
                 <div className="mt-2 flex gap-2">
                   <button onClick={() => importConfig(importText)} disabled={readOnly} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40">
-                    <ArrowUpFromLine className="h-4 w-4" /> استيراد
+                    <ArrowUpFromLine className="h-4 w-4" /> Ø§Ø³ØªÙŠØ±Ø§Ø¯
                   </button>
                   <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
-                    <FileText className="h-4 w-4" /> من ملف
+                    <FileText className="h-4 w-4" /> Ù…Ù† Ù…Ù„Ù
                     <input
                       type="file"
                       accept="application/json,.json"
@@ -486,8 +486,8 @@ export const AppConfigurationPage: React.FC = () => {
 
         {tab === 'pages' && (
           <Card
-            title="الصفحات والتنقل"
-            description="أخفِ صفحة كاملة أو غيّر اسمها أو ترتيبها. الإخفاء لا يحذف البيانات، ويمنع فتح المسار أيضًا."
+            title="Ø§Ù„ØµÙØ­Ø§Øª ÙˆØ§Ù„ØªÙ†Ù‚Ù„"
+            description="Ø£Ø®ÙÙ ØµÙØ­Ø© ÙƒØ§Ù…Ù„Ø© Ø£Ùˆ ØºÙŠÙ‘Ø± Ø§Ø³Ù…Ù‡Ø§ Ø£Ùˆ ØªØ±ØªÙŠØ¨Ù‡Ø§. Ø§Ù„Ø¥Ø®ÙØ§Ø¡ Ù„Ø§ ÙŠØ­Ø°Ù Ø§Ù„Ø¨ÙŠØ§Ù†Ø§ØªØŒ ÙˆÙŠÙ…Ù†Ø¹ ÙØªØ­ Ø§Ù„Ù…Ø³Ø§Ø± Ø£ÙŠØ¶Ù‹Ø§."
             actions={
               <div className="relative w-64">
                 <Search className="pointer-events-none absolute right-2 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -495,7 +495,7 @@ export const AppConfigurationPage: React.FC = () => {
                   type="search"
                   value={pageSearch}
                   onChange={(event) => setPageSearch(event.target.value)}
-                  placeholder="ابحث في الصفحات..."
+                  placeholder="Ø§Ø¨Ø­Ø« ÙÙŠ Ø§Ù„ØµÙØ­Ø§Øª..."
                   className={`${inputCls} pr-7`}
                 />
               </div>
@@ -514,8 +514,8 @@ export const AppConfigurationPage: React.FC = () => {
                     <input
                       value={entry?.label ?? ''}
                       onChange={(event) => upsertEntry('page', page.path, { label: event.target.value })}
-                      placeholder="التسمية الافتراضية"
-                      aria-label={`تسمية ${page.label}`}
+                      placeholder="Ø§Ù„ØªØ³Ù…ÙŠØ© Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠØ©"
+                      aria-label={`ØªØ³Ù…ÙŠØ© ${page.label}`}
                       className={inputCls}
                       disabled={readOnly}
                     />
@@ -523,8 +523,8 @@ export const AppConfigurationPage: React.FC = () => {
                       type="number"
                       value={entry?.order ?? ''}
                       onChange={(event) => upsertEntry('page', page.path, { order: event.target.value === '' ? undefined : Number(event.target.value) })}
-                      placeholder="الترتيب"
-                      aria-label={`ترتيب ${page.label}`}
+                      placeholder="Ø§Ù„ØªØ±ØªÙŠØ¨"
+                      aria-label={`ØªØ±ØªÙŠØ¨ ${page.label}`}
                       className={inputCls}
                       disabled={readOnly}
                     />
@@ -533,14 +533,14 @@ export const AppConfigurationPage: React.FC = () => {
                         checked={enabled}
                         disabled={readOnly}
                         onChange={(value) => upsertEntry('page', page.path, { enabled: value })}
-                        label={enabled ? 'ظاهرة' : 'مخفية'}
+                        label={enabled ? 'Ø¸Ø§Ù‡Ø±Ø©' : 'Ù…Ø®ÙÙŠØ©'}
                       />
                     </div>
                   </div>
                 );
               })}
               {filteredPages.length === 0 && (
-                <p className="rounded-xl border border-slate-200 p-6 text-center text-xs text-slate-500 dark:border-slate-700">لا توجد صفحات تطابق البحث.</p>
+                <p className="rounded-xl border border-slate-200 p-6 text-center text-xs text-slate-500 dark:border-slate-700">Ù„Ø§ ØªÙˆØ¬Ø¯ ØµÙØ­Ø§Øª ØªØ·Ø§Ø¨Ù‚ Ø§Ù„Ø¨Ø­Ø«.</p>
               )}
             </div>
           </Card>
@@ -548,11 +548,11 @@ export const AppConfigurationPage: React.FC = () => {
 
         {tab === 'sections' && (
           <div className="space-y-4">
-            <Card title="أقسام مُعرّفة في الكود" description="تظهر الأقسام هنا بعد زيارة صفحتها مرة واحدة. يمكن إخفاؤها أو إعادة تسميتها.">
+            <Card title="Ø£Ù‚Ø³Ø§Ù… Ù…ÙØ¹Ø±Ù‘ÙØ© ÙÙŠ Ø§Ù„ÙƒÙˆØ¯" description="ØªØ¸Ù‡Ø± Ø§Ù„Ø£Ù‚Ø³Ø§Ù… Ù‡Ù†Ø§ Ø¨Ø¹Ø¯ Ø²ÙŠØ§Ø±Ø© ØµÙØ­ØªÙ‡Ø§ Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©. ÙŠÙ…ÙƒÙ† Ø¥Ø®ÙØ§Ø¤Ù‡Ø§ Ø£Ùˆ Ø¥Ø¹Ø§Ø¯Ø© ØªØ³Ù…ÙŠØªÙ‡Ø§.">
               <div className="space-y-1.5">
                 {registeredSections.length === 0 && (
                   <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-[11px] text-slate-500 dark:border-slate-700">
-                    لم تُسجّل أقسام بعد. افتح صفحة تحتوي على ConfigSection ثم عد إلى هنا، أو استخدم قواعد المحدد بالأسفل.
+                    Ù„Ù… ØªÙØ³Ø¬Ù‘Ù„ Ø£Ù‚Ø³Ø§Ù… Ø¨Ø¹Ø¯. Ø§ÙØªØ­ ØµÙØ­Ø© ØªØ­ØªÙˆÙŠ Ø¹Ù„Ù‰ ConfigSection Ø«Ù… Ø¹Ø¯ Ø¥Ù„Ù‰ Ù‡Ù†Ø§ØŒ Ø£Ùˆ Ø§Ø³ØªØ®Ø¯Ù… Ù‚ÙˆØ§Ø¹Ø¯ Ø§Ù„Ù…Ø­Ø¯Ø¯ Ø¨Ø§Ù„Ø£Ø³ÙÙ„.
                   </p>
                 )}
                 {registeredSections.map((target) => {
@@ -567,13 +567,13 @@ export const AppConfigurationPage: React.FC = () => {
                       <input
                         value={entry?.label ?? ''}
                         onChange={(event) => upsertEntry('section', target.key, { label: event.target.value })}
-                        placeholder="تسمية القسم"
-                        aria-label={`تسمية ${target.label}`}
+                        placeholder="ØªØ³Ù…ÙŠØ© Ø§Ù„Ù‚Ø³Ù…"
+                        aria-label={`ØªØ³Ù…ÙŠØ© ${target.label}`}
                         className={inputCls}
                         disabled={readOnly}
                       />
-                      <Toggle checked={enabled} disabled={readOnly} onChange={(value) => upsertEntry('section', target.key, { enabled: value })} label={enabled ? 'ظاهر' : 'مخفي'} />
-                      <button onClick={() => removeEntry('section', target.key)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" title="مسح التخصيص" aria-label="مسح التخصيص">
+                      <Toggle checked={enabled} disabled={readOnly} onChange={(value) => upsertEntry('section', target.key, { enabled: value })} label={enabled ? 'Ø¸Ø§Ù‡Ø±' : 'Ù…Ø®ÙÙŠ'} />
+                      <button onClick={() => removeEntry('section', target.key)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" title="Ù…Ø³Ø­ Ø§Ù„ØªØ®ØµÙŠØµ" aria-label="Ù…Ø³Ø­ Ø§Ù„ØªØ®ØµÙŠØµ">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
@@ -582,63 +582,63 @@ export const AppConfigurationPage: React.FC = () => {
               </div>
             </Card>
 
-            <Card title="قواعد المحدد والنصوص" description="تحكم في أي عنصر في أي صفحة دون تعديل ملفاتها: أخفِ قسمًا، أظهره، أو استبدل نصه.">
+            <Card title="Ù‚ÙˆØ§Ø¹Ø¯ Ø§Ù„Ù…Ø­Ø¯Ø¯ ÙˆØ§Ù„Ù†ØµÙˆØµ" description="ØªØ­ÙƒÙ… ÙÙŠ Ø£ÙŠ Ø¹Ù†ØµØ± ÙÙŠ Ø£ÙŠ ØµÙØ­Ø© Ø¯ÙˆÙ† ØªØ¹Ø¯ÙŠÙ„ Ù…Ù„ÙØ§ØªÙ‡Ø§: Ø£Ø®ÙÙ Ù‚Ø³Ù…Ù‹Ø§ØŒ Ø£Ø¸Ù‡Ø±Ù‡ØŒ Ø£Ùˆ Ø§Ø³ØªØ¨Ø¯Ù„ Ù†ØµÙ‡.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Field label="نوع القاعدة">
+                <Field label="Ù†ÙˆØ¹ Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø©">
                   <select value={ruleKind} onChange={(event) => setRuleKind(event.target.value as 'selector' | 'text')} className={inputCls}>
-                    <option value="selector">عنصر عبر محدد CSS</option>
-                    <option value="text">نص ظاهر حرفي</option>
+                    <option value="selector">Ø¹Ù†ØµØ± Ø¹Ø¨Ø± Ù…Ø­Ø¯Ø¯ CSS</option>
+                    <option value="text">Ù†Øµ Ø¸Ø§Ù‡Ø± Ø­Ø±ÙÙŠ</option>
                   </select>
                 </Field>
-                <Field label="الصفحة">
+                <Field label="Ø§Ù„ØµÙØ­Ø©">
                   <select value={rulePage} onChange={(event) => setRulePage(event.target.value)} className={inputCls}>
-                    <option value="*">كل الصفحات</option>
+                    <option value="*">ÙƒÙ„ Ø§Ù„ØµÙØ­Ø§Øª</option>
                     {pageCatalog.map((page) => <option key={page.path} value={page.path}>{page.label} ({page.path})</option>)}
                   </select>
                 </Field>
                 {ruleKind === 'selector' ? (
                   <>
-                    <Field label="محدد العنصر (CSS)">
-                      <input value={ruleSelector} onChange={(event) => setRuleSelector(event.target.value)} placeholder="#sec-pulse أو .some-class" dir="ltr" className={`${inputCls} font-mono`} />
+                    <Field label="Ù…Ø­Ø¯Ø¯ Ø§Ù„Ø¹Ù†ØµØ± (CSS)">
+                      <input value={ruleSelector} onChange={(event) => setRuleSelector(event.target.value)} placeholder="#sec-pulse Ø£Ùˆ .some-class" dir="ltr" className={`${inputCls} font-mono`} />
                     </Field>
-                    <Field label="الإجراء">
+                    <Field label="Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡">
                       <select value={ruleAction} onChange={(event) => setRuleAction(event.target.value as 'hide' | 'show' | 'text')} className={inputCls}>
-                        <option value="hide">إخفاء</option>
-                        <option value="show">إظهار</option>
-                        <option value="text">استبدال النص</option>
+                        <option value="hide">Ø¥Ø®ÙØ§Ø¡</option>
+                        <option value="show">Ø¥Ø¸Ù‡Ø§Ø±</option>
+                        <option value="text">Ø§Ø³ØªØ¨Ø¯Ø§Ù„ Ø§Ù„Ù†Øµ</option>
                       </select>
                     </Field>
                   </>
                 ) : (
-                  <Field label="النص الأصلي">
-                    <input value={ruleMatch} onChange={(event) => setRuleMatch(event.target.value)} placeholder="مثال: إجمالي المبيعات" className={inputCls} />
+                  <Field label="Ø§Ù„Ù†Øµ Ø§Ù„Ø£ØµÙ„ÙŠ">
+                    <input value={ruleMatch} onChange={(event) => setRuleMatch(event.target.value)} placeholder="Ù…Ø«Ø§Ù„: Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¨ÙŠØ¹Ø§Øª" className={inputCls} />
                   </Field>
                 )}
                 {(ruleKind === 'text' || ruleAction === 'text') && (
-                  <Field label="النص البديل" full>
-                    <input value={ruleReplacement} onChange={(event) => setRuleReplacement(event.target.value)} placeholder="النص الجديد الذي سيظهر" className={inputCls} />
+                  <Field label="Ø§Ù„Ù†Øµ Ø§Ù„Ø¨Ø¯ÙŠÙ„" full>
+                    <input value={ruleReplacement} onChange={(event) => setRuleReplacement(event.target.value)} placeholder="Ø§Ù„Ù†Øµ Ø§Ù„Ø¬Ø¯ÙŠØ¯ Ø§Ù„Ø°ÙŠ Ø³ÙŠØ¸Ù‡Ø±" className={inputCls} />
                   </Field>
                 )}
-                <Field label="ملاحظة (اختياري)" full>
-                  <input value={ruleNote} onChange={(event) => setRuleNote(event.target.value)} placeholder="سبب القاعدة" className={inputCls} />
+                <Field label="Ù…Ù„Ø§Ø­Ø¸Ø© (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)" full>
+                  <input value={ruleNote} onChange={(event) => setRuleNote(event.target.value)} placeholder="Ø³Ø¨Ø¨ Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø©" className={inputCls} />
                 </Field>
               </div>
               <button onClick={addRule} disabled={readOnly} className="mt-2 flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40">
-                <Wand2 className="h-4 w-4" /> إضافة القاعدة للمسودة
+                <Wand2 className="h-4 w-4" /> Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø© Ù„Ù„Ù…Ø³ÙˆØ¯Ø©
               </button>
 
               <div className="mt-4 space-y-1.5">
-                {rules.length === 0 && <p className="text-center text-[11px] text-slate-400">لا توجد قواعد بعد.</p>}
+                {rules.length === 0 && <p className="text-center text-[11px] text-slate-400">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù‚ÙˆØ§Ø¹Ø¯ Ø¨Ø¹Ø¯.</p>}
                 {rules.map((rule) => (
                   <div key={rule.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
                     <span className={`rounded-lg px-2 py-1 text-[10px] font-bold ${rule.kind === 'selector' ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300' : 'bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300'}`}>
-                      {rule.kind === 'selector' ? 'عنصر' : 'نص'}
+                      {rule.kind === 'selector' ? 'Ø¹Ù†ØµØ±' : 'Ù†Øµ'}
                     </span>
                     <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-slate-500" dir="ltr">
-                      {rule.pagePath} · {rule.kind === 'selector' ? rule.selector : `${rule.matchText} → ${rule.replacementText}`} · {rule.action}
+                      {rule.pagePath} Â· {rule.kind === 'selector' ? rule.selector : `${rule.matchText} â†’ ${rule.replacementText}`} Â· {rule.action}
                     </code>
-                    <Toggle checked={rule.enabled} disabled={readOnly} onChange={(value) => updateRule(rule.id, { enabled: value })} label={rule.enabled ? 'مفعّلة' : 'معطلة'} />
-                    <button onClick={() => removeRule(rule.id)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" aria-label="حذف القاعدة">
+                    <Toggle checked={rule.enabled} disabled={readOnly} onChange={(value) => updateRule(rule.id, { enabled: value })} label={rule.enabled ? 'Ù…ÙØ¹Ù‘Ù„Ø©' : 'Ù…Ø¹Ø·Ù„Ø©'} />
+                    <button onClick={() => removeRule(rule.id)} disabled={readOnly} className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40" aria-label="Ø­Ø°Ù Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø©">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -650,10 +650,10 @@ export const AppConfigurationPage: React.FC = () => {
 
         {tab === 'fields' && (
           <div className="space-y-4">
-            <Card title="حقول النماذج المسجّلة" description="تظهر الحقول بعد زيارة النموذج مرة واحدة. يمكن إخفاؤها أو جعلها مطلوبة أو إعادة تسميتها.">
+            <Card title="Ø­Ù‚ÙˆÙ„ Ø§Ù„Ù†Ù…Ø§Ø°Ø¬ Ø§Ù„Ù…Ø³Ø¬Ù‘Ù„Ø©" description="ØªØ¸Ù‡Ø± Ø§Ù„Ø­Ù‚ÙˆÙ„ Ø¨Ø¹Ø¯ Ø²ÙŠØ§Ø±Ø© Ø§Ù„Ù†Ù…ÙˆØ°Ø¬ Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©. ÙŠÙ…ÙƒÙ† Ø¥Ø®ÙØ§Ø¤Ù‡Ø§ Ø£Ùˆ Ø¬Ø¹Ù„Ù‡Ø§ Ù…Ø·Ù„ÙˆØ¨Ø© Ø£Ùˆ Ø¥Ø¹Ø§Ø¯Ø© ØªØ³Ù…ÙŠØªÙ‡Ø§.">
               {registeredFields.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-[11px] text-slate-500 dark:border-slate-700">
-                  لم تُسجّل حقول بعد. غلّف الحقل بـ ConfigField أو أضف هدفًا يدويًا بالأسفل.
+                  Ù„Ù… ØªÙØ³Ø¬Ù‘Ù„ Ø­Ù‚ÙˆÙ„ Ø¨Ø¹Ø¯. ØºÙ„Ù‘Ù Ø§Ù„Ø­Ù‚Ù„ Ø¨Ù€ ConfigField Ø£Ùˆ Ø£Ø¶Ù Ù‡Ø¯ÙÙ‹Ø§ ÙŠØ¯ÙˆÙŠÙ‹Ø§ Ø¨Ø§Ù„Ø£Ø³ÙÙ„.
                 </p>
               ) : (
                 <div className="space-y-1.5">
@@ -667,9 +667,9 @@ export const AppConfigurationPage: React.FC = () => {
                           <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{entry?.label || target.label}</div>
                           <code className="text-[9px] text-slate-400" dir="ltr">{target.key}</code>
                         </div>
-                        <input value={entry?.label ?? ''} onChange={(event) => upsertEntry('field', target.key, { label: event.target.value })} placeholder="تسمية الحقل" className={inputCls} disabled={readOnly} aria-label={`تسمية ${target.label}`} />
-                        <Toggle checked={visible} disabled={readOnly} onChange={(value) => upsertEntry('field', target.key, { enabled: value })} label={visible ? 'ظاهر' : 'مخفي'} />
-                        <Toggle checked={required} disabled={readOnly} onChange={(value) => upsertEntry('field', target.key, { required: value })} label={required ? 'مطلوب' : 'اختياري'} />
+                        <input value={entry?.label ?? ''} onChange={(event) => upsertEntry('field', target.key, { label: event.target.value })} placeholder="ØªØ³Ù…ÙŠØ© Ø§Ù„Ø­Ù‚Ù„" className={inputCls} disabled={readOnly} aria-label={`ØªØ³Ù…ÙŠØ© ${target.label}`} />
+                        <Toggle checked={visible} disabled={readOnly} onChange={(value) => upsertEntry('field', target.key, { enabled: value })} label={visible ? 'Ø¸Ø§Ù‡Ø±' : 'Ù…Ø®ÙÙŠ'} />
+                        <Toggle checked={required} disabled={readOnly} onChange={(value) => upsertEntry('field', target.key, { required: value })} label={required ? 'Ù…Ø·Ù„ÙˆØ¨' : 'Ø§Ø®ØªÙŠØ§Ø±ÙŠ'} />
                       </div>
                     );
                   })}
@@ -677,7 +677,7 @@ export const AppConfigurationPage: React.FC = () => {
               )}
             </Card>
 
-            <Card title="إضافة هدف حقل يدويًا" description="استخدم معرّف النموذج ومفتاح الحقل كما في الكود.">
+            <Card title="Ø¥Ø¶Ø§ÙØ© Ù‡Ø¯Ù Ø­Ù‚Ù„ ÙŠØ¯ÙˆÙŠÙ‹Ø§" description="Ø§Ø³ØªØ®Ø¯Ù… Ù…Ø¹Ø±Ù‘Ù Ø§Ù„Ù†Ù…ÙˆØ°Ø¬ ÙˆÙ…ÙØªØ§Ø­ Ø§Ù„Ø­Ù‚Ù„ ÙƒÙ…Ø§ ÙÙŠ Ø§Ù„ÙƒÙˆØ¯.">
               <ManualEntryForm
                 domain="field"
                 readOnly={readOnly}
@@ -691,12 +691,12 @@ export const AppConfigurationPage: React.FC = () => {
 
         {tab === 'texts' && (
           <div className="space-y-4">
-            <Card title="نصوص النظام القابلة للتعديل" description="قيم مرتبطة بمكوّن ConfigText وتُحدَّث فورًا في الواجهة.">
+            <Card title="Ù†ØµÙˆØµ Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ù‚Ø§Ø¨Ù„Ø© Ù„Ù„ØªØ¹Ø¯ÙŠÙ„" description="Ù‚ÙŠÙ… Ù…Ø±ØªØ¨Ø·Ø© Ø¨Ù…ÙƒÙˆÙ‘Ù† ConfigText ÙˆØªÙØ­Ø¯ÙŽÙ‘Ø« ÙÙˆØ±Ù‹Ø§ ÙÙŠ Ø§Ù„ÙˆØ§Ø¬Ù‡Ø©.">
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {APP_CONFIG_TEXT_CATALOG.map((item) => {
                   const entry = formEntries.get(entryKey('text', item.key));
                   return (
-                    <Field key={item.key} label={`${item.label} — ${item.key}`}>
+                    <Field key={item.key} label={`${item.label} â€” ${item.key}`}>
                       <div className="flex gap-2">
                         <input
                           value={entry?.value ?? item.value}
@@ -705,8 +705,8 @@ export const AppConfigurationPage: React.FC = () => {
                           disabled={readOnly}
                         />
                         {entry && (
-                          <button onClick={() => removeEntry('text', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300" title="استعادة الافتراضي">
-                            افتراضي
+                          <button onClick={() => removeEntry('text', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300" title="Ø§Ø³ØªØ¹Ø§Ø¯Ø© Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ">
+                            Ø§ÙØªØ±Ø§Ø¶ÙŠ
                           </button>
                         )}
                       </div>
@@ -716,19 +716,19 @@ export const AppConfigurationPage: React.FC = () => {
               </div>
             </Card>
 
-            <Card title="استبدال أي نص ظاهر" description="يطابق النص الموجود في الصفحة حرفيًا ويستبدله. يعمل على كل الصفحات دون تعديل ملفاتها.">
+            <Card title="Ø§Ø³ØªØ¨Ø¯Ø§Ù„ Ø£ÙŠ Ù†Øµ Ø¸Ø§Ù‡Ø±" description="ÙŠØ·Ø§Ø¨Ù‚ Ø§Ù„Ù†Øµ Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø§Ù„ØµÙØ­Ø© Ø­Ø±ÙÙŠÙ‹Ø§ ÙˆÙŠØ³ØªØ¨Ø¯Ù„Ù‡. ÙŠØ¹Ù…Ù„ Ø¹Ù„Ù‰ ÙƒÙ„ Ø§Ù„ØµÙØ­Ø§Øª Ø¯ÙˆÙ† ØªØ¹Ø¯ÙŠÙ„ Ù…Ù„ÙØ§ØªÙ‡Ø§.">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field label="الصفحة">
+                <Field label="Ø§Ù„ØµÙØ­Ø©">
                   <select value={rulePage} onChange={(event) => setRulePage(event.target.value)} className={inputCls}>
-                    <option value="*">كل الصفحات</option>
+                    <option value="*">ÙƒÙ„ Ø§Ù„ØµÙØ­Ø§Øª</option>
                     {pageCatalog.map((page) => <option key={page.path} value={page.path}>{page.label} ({page.path})</option>)}
                   </select>
                 </Field>
-                <Field label="النص الظاهر حاليًا">
-                  <input value={ruleMatch} onChange={(event) => setRuleMatch(event.target.value)} placeholder="مثال: المخزون" className={inputCls} />
+                <Field label="Ø§Ù„Ù†Øµ Ø§Ù„Ø¸Ø§Ù‡Ø± Ø­Ø§Ù„ÙŠÙ‹Ø§">
+                  <input value={ruleMatch} onChange={(event) => setRuleMatch(event.target.value)} placeholder="Ù…Ø«Ø§Ù„: Ø§Ù„Ù…Ø®Ø²ÙˆÙ†" className={inputCls} />
                 </Field>
-                <Field label="النص الجديد">
-                  <input value={ruleReplacement} onChange={(event) => setRuleReplacement(event.target.value)} placeholder="مثال: المستودع" className={inputCls} />
+                <Field label="Ø§Ù„Ù†Øµ Ø§Ù„Ø¬Ø¯ÙŠØ¯">
+                  <input value={ruleReplacement} onChange={(event) => setRuleReplacement(event.target.value)} placeholder="Ù…Ø«Ø§Ù„: Ø§Ù„Ù…Ø³ØªÙˆØ¯Ø¹" className={inputCls} />
                 </Field>
               </div>
               <button
@@ -736,7 +736,7 @@ export const AppConfigurationPage: React.FC = () => {
                   setRuleKind('text');
                   setRuleAction('text');
                   if (!ruleMatch.trim()) {
-                    toast.error('اكتب النص الأصلي المراد استبداله.');
+                    toast.error('Ø§ÙƒØªØ¨ Ø§Ù„Ù†Øµ Ø§Ù„Ø£ØµÙ„ÙŠ Ø§Ù„Ù…Ø±Ø§Ø¯ Ø§Ø³ØªØ¨Ø¯Ø§Ù„Ù‡.');
                     return;
                   }
                   const rule: AppConfigRule = {
@@ -747,12 +747,12 @@ export const AppConfigurationPage: React.FC = () => {
                   setDirty(true);
                   setRuleMatch('');
                   setRuleReplacement('');
-                  toast.success('أُضيفت قاعدة النص إلى المسودة.');
+                  toast.success('Ø£ÙØ¶ÙŠÙØª Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ù†Øµ Ø¥Ù„Ù‰ Ø§Ù„Ù…Ø³ÙˆØ¯Ø©.');
                 }}
                 disabled={readOnly}
                 className="mt-2 flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-40"
               >
-                <Type className="h-4 w-4" /> إضافة قاعدة نص
+                <Type className="h-4 w-4" /> Ø¥Ø¶Ø§ÙØ© Ù‚Ø§Ø¹Ø¯Ø© Ù†Øµ
               </button>
             </Card>
           </div>
@@ -760,7 +760,7 @@ export const AppConfigurationPage: React.FC = () => {
 
         {tab === 'policies' && (
           <div className="space-y-4">
-            <Card title="السياسات المركزية" description="تتجاوز قيم الإعدادات العامة عند قراءتها من الخدمات. اتركها فارغة لاستخدام إعدادات النظام.">
+            <Card title="Ø§Ù„Ø³ÙŠØ§Ø³Ø§Øª Ø§Ù„Ù…Ø±ÙƒØ²ÙŠØ©" description="ØªØªØ¬Ø§ÙˆØ² Ù‚ÙŠÙ… Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¹Ø§Ù…Ø© Ø¹Ù†Ø¯ Ù‚Ø±Ø§Ø¡ØªÙ‡Ø§ Ù…Ù† Ø§Ù„Ø®Ø¯Ù…Ø§Øª. Ø§ØªØ±ÙƒÙ‡Ø§ ÙØ§Ø±ØºØ© Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø¸Ø§Ù….">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {APP_CONFIG_POLICY_CATALOG.map((policy) => (
                   <Field key={policy.key} label={`${policy.label} (${policy.key})`}>
@@ -771,16 +771,16 @@ export const AppConfigurationPage: React.FC = () => {
                         className={inputCls}
                         disabled={readOnly}
                       >
-                        <option value="">استخدام إعدادات النظام</option>
-                        <option value="1">نعم</option>
-                        <option value="0">لا</option>
+                        <option value="">Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø¸Ø§Ù…</option>
+                        <option value="1">Ù†Ø¹Ù…</option>
+                        <option value="0">Ù„Ø§</option>
                       </select>
                     ) : (
                       <input
                         type={policy.type === 'number' ? 'number' : 'text'}
                         value={policyValue(policy.key)}
                         onChange={(event) => upsertEntry('policy', policy.key, { value: event.target.value, label: policy.label, props: { type: policy.type } })}
-                        placeholder={policy.fallback || 'استخدام إعدادات النظام'}
+                        placeholder={policy.fallback || 'Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø¸Ø§Ù…'}
                         className={inputCls}
                         disabled={readOnly}
                       />
@@ -791,7 +791,7 @@ export const AppConfigurationPage: React.FC = () => {
               </div>
             </Card>
 
-            <Card title="ترقيم المستندات" description="قوالب الترقيم تُطبَّق على كل مستندات النظام عبر nextNumber.">
+            <Card title="ØªØ±Ù‚ÙŠÙ… Ø§Ù„Ù…Ø³ØªÙ†Ø¯Ø§Øª" description="Ù‚ÙˆØ§Ù„Ø¨ Ø§Ù„ØªØ±Ù‚ÙŠÙ… ØªÙØ·Ø¨ÙŽÙ‘Ù‚ Ø¹Ù„Ù‰ ÙƒÙ„ Ù…Ø³ØªÙ†Ø¯Ø§Øª Ø§Ù„Ù†Ø¸Ø§Ù… Ø¹Ø¨Ø± nextNumber.">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 {APP_CONFIG_NUMBERING_CATALOG.map((item) => {
                   const props = numberingProps(item.key);
@@ -805,20 +805,20 @@ export const AppConfigurationPage: React.FC = () => {
                           dir="ltr"
                           className={`${inputCls} font-mono`}
                           disabled={readOnly}
-                          aria-label={`قالب ترقيم ${item.label}`}
+                          aria-label={`Ù‚Ø§Ù„Ø¨ ØªØ±Ù‚ÙŠÙ… ${item.label}`}
                         />
-                        <button onClick={() => removeEntry('numbering', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300" title="القالب الافتراضي">
-                          افتراضي
+                        <button onClick={() => removeEntry('numbering', item.key)} disabled={readOnly} className="shrink-0 rounded-xl border border-slate-200 px-2 text-[10px] font-bold text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300" title="Ø§Ù„Ù‚Ø§Ù„Ø¨ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ">
+                          Ø§ÙØªØ±Ø§Ø¶ÙŠ
                         </button>
                       </div>
-                      <p className="mt-1 text-[10px] text-slate-400" dir="ltr">المتاح: {'{prefix}'} {'{year}'} {'{month}'} {'{day}'} {'{seq:6}'}</p>
+                      <p className="mt-1 text-[10px] text-slate-400" dir="ltr">Ø§Ù„Ù…ØªØ§Ø­: {'{prefix}'} {'{year}'} {'{month}'} {'{day}'} {'{seq:6}'}</p>
                     </Field>
                   );
                 })}
               </div>
             </Card>
 
-            <Card title="قوالب الطباعة" description="نصوص/قوالب قابلة للقراءة من PrintService ومكوّنات الطباعة عبر AppConfigService.getPrintTemplate.">
+            <Card title="Ù‚ÙˆØ§Ù„Ø¨ Ø§Ù„Ø·Ø¨Ø§Ø¹Ø©" description="Ù†ØµÙˆØµ/Ù‚ÙˆØ§Ù„Ø¨ Ù‚Ø§Ø¨Ù„Ø© Ù„Ù„Ù‚Ø±Ø§Ø¡Ø© Ù…Ù† PrintService ÙˆÙ…ÙƒÙˆÙ‘Ù†Ø§Øª Ø§Ù„Ø·Ø¨Ø§Ø¹Ø© Ø¹Ø¨Ø± AppConfigService.getPrintTemplate.">
               <div className="space-y-3">
                 {APP_CONFIG_PRINT_CATALOG.map((item) => (
                   <Field key={item.key} label={`${item.label} (${item.key})`}>
@@ -826,7 +826,7 @@ export const AppConfigurationPage: React.FC = () => {
                       value={printValue(item.key)}
                       onChange={(event) => upsertEntry('print', item.key, { value: event.target.value, label: item.label })}
                       rows={3}
-                      placeholder="اتركه فارغًا لاستخدام القالب الافتراضي"
+                      placeholder="Ø§ØªØ±ÙƒÙ‡ ÙØ§Ø±ØºÙ‹Ø§ Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ù‚Ø§Ù„Ø¨ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ"
                       className={`${inputCls} font-mono`}
                       disabled={readOnly}
                     />
@@ -835,15 +835,15 @@ export const AppConfigurationPage: React.FC = () => {
               </div>
             </Card>
 
-            <Card title="الوحدات والميزات" description="تعطيل الوحدة يخفي صفحاتها ويمنع عملياتها مع الاحتفاظ ببياناتها.">
+            <Card title="Ø§Ù„ÙˆØ­Ø¯Ø§Øª ÙˆØ§Ù„Ù…ÙŠØ²Ø§Øª" description="ØªØ¹Ø·ÙŠÙ„ Ø§Ù„ÙˆØ­Ø¯Ø© ÙŠØ®ÙÙŠ ØµÙØ­Ø§ØªÙ‡Ø§ ÙˆÙŠÙ…Ù†Ø¹ Ø¹Ù…Ù„ÙŠØ§ØªÙ‡Ø§ Ù…Ø¹ Ø§Ù„Ø§Ø­ØªÙØ§Ø¸ Ø¨Ø¨ÙŠØ§Ù†Ø§ØªÙ‡Ø§.">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {moduleState.map((module) => (
                   <div key={module.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
                     <div className="min-w-0">
                       <div className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{module.label}</div>
-                      <div className="text-[10px] text-slate-400">{module.enabled ? 'مفعّلة' : 'معطّلة'}{module.available ? '' : ' · غير متاحة'}</div>
+                      <div className="text-[10px] text-slate-400">{module.enabled ? 'Ù…ÙØ¹Ù‘Ù„Ø©' : 'Ù…Ø¹Ø·Ù‘Ù„Ø©'}{module.available ? '' : ' Â· ØºÙŠØ± Ù…ØªØ§Ø­Ø©'}</div>
                     </div>
-                    <Toggle checked={module.enabled} disabled={readOnly || !module.available} onChange={() => toggleModule(module.id)} label={module.enabled ? 'مفعّلة' : 'معطّلة'} />
+                    <Toggle checked={module.enabled} disabled={readOnly || !module.available} onChange={() => toggleModule(module.id)} label={module.enabled ? 'Ù…ÙØ¹Ù‘Ù„Ø©' : 'Ù…Ø¹Ø·Ù‘Ù„Ø©'} />
                   </div>
                 ))}
               </div>
@@ -852,21 +852,21 @@ export const AppConfigurationPage: React.FC = () => {
         )}
 
         {tab === 'history' && canViewHistory && (
-          <Card title="سجل إصدارات التكوين" description="كل حفظ يُنشئ إصدارًا قابلًا للاستعادة. الاستعادة تُنشئ إصدارًا جديدًا ولا تمحو السجل.">
+          <Card title="Ø³Ø¬Ù„ Ø¥ØµØ¯Ø§Ø±Ø§Øª Ø§Ù„ØªÙƒÙˆÙŠÙ†" description="ÙƒÙ„ Ø­ÙØ¸ ÙŠÙÙ†Ø´Ø¦ Ø¥ØµØ¯Ø§Ø±Ù‹Ø§ Ù‚Ø§Ø¨Ù„Ù‹Ø§ Ù„Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø©. Ø§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø© ØªÙÙ†Ø´Ø¦ Ø¥ØµØ¯Ø§Ø±Ù‹Ø§ Ø¬Ø¯ÙŠØ¯Ù‹Ø§ ÙˆÙ„Ø§ ØªÙ…Ø­Ùˆ Ø§Ù„Ø³Ø¬Ù„.">
             {versionsError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300">{versionsError}</p>}
             <div className="space-y-1.5">
               {versions.map((version) => (
                 <div key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-800 dark:text-slate-100">الإصدار {version.version} · {version.reason}</div>
-                    <div className="text-[10px] text-slate-400">{version.createdByName} · {version.createdAt} · {version.snapshot.entries.length} هدف · {version.snapshot.rules.length} قاعدة</div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-100">Ø§Ù„Ø¥ØµØ¯Ø§Ø± {version.version} Â· {version.reason}</div>
+                    <div className="text-[10px] text-slate-400">{version.createdByName} Â· {version.createdAt} Â· {version.snapshot.entries.length} Ù‡Ø¯Ù Â· {version.snapshot.rules.length} Ù‚Ø§Ø¹Ø¯Ø©</div>
                   </div>
                   <button onClick={() => restoreVersion(version)} disabled={readOnly} className="flex items-center gap-1.5 rounded-lg border border-sky-200 px-2.5 py-1.5 text-[10px] font-bold text-sky-700 hover:bg-sky-50 disabled:opacity-40 dark:border-sky-800 dark:text-sky-300 dark:hover:bg-sky-950/40">
-                    <Redo2 className="h-3.5 w-3.5" /> استعادة
+                    <Redo2 className="h-3.5 w-3.5" /> Ø§Ø³ØªØ¹Ø§Ø¯Ø©
                   </button>
                 </div>
               ))}
-              {versions.length === 0 && !versionsError && <p className="py-6 text-center text-xs text-slate-400">لا توجد إصدارات محفوظة بعد.</p>}
+              {versions.length === 0 && !versionsError && <p className="py-6 text-center text-xs text-slate-400">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¥ØµØ¯Ø§Ø±Ø§Øª Ù…Ø­ÙÙˆØ¸Ø© Ø¨Ø¹Ø¯.</p>}
             </div>
           </Card>
         )}
@@ -891,7 +891,7 @@ const ManualEntryForm: React.FC<{
         placeholder={placeholderKey}
         dir="ltr"
         className={`${inputCls} max-w-md font-mono`}
-        aria-label="مفتاح الهدف"
+        aria-label="Ù…ÙØªØ§Ø­ Ø§Ù„Ù‡Ø¯Ù"
       />
       <button
         type="button"
@@ -902,7 +902,7 @@ const ManualEntryForm: React.FC<{
         }}
         className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-40"
       >
-        <Check className="h-4 w-4" /> إضافة
+        <Check className="h-4 w-4" /> Ø¥Ø¶Ø§ÙØ©
       </button>
     </div>
   );

@@ -13,7 +13,7 @@ import { CentralFeaturePermissionService } from '../services/CentralFeaturePermi
 export const PageLoader: React.FC = () => (
   <div className="flex-1 flex items-center justify-center h-full">
     <div className="flex flex-col items-center gap-3">
-      <div className="w-8 h-8 rounded-xl bg-sky-600 animate-bounce shadow-lg shadow-sky-500/20" />
+      <div className="w-7 h-7 border-2 border-slate-200 border-t-sky-600 rounded-full animate-spin" />
       <p className="text-xs text-slate-500 font-medium">
         <ConfigText k="shell.loading" fallback="جاري التحميل..." />
       </p>
@@ -42,7 +42,7 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
 
   // وضع التشغيل المحلي: فتح كل الصفحات دون أي بوابة (وحدات/مظهر/قيود مركزية).
   if (OPEN_ALL_PAGES) {
-    return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+    return <Suspense fallback={<PageLoader />}><div key={pathname} className="page-transition-wrapper min-h-full w-full">{children}</div></Suspense>;
   }
 
   // Central license/config gating (best-effort, cached)
@@ -63,8 +63,10 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
+  return <Suspense fallback={<PageLoader />}><div key={pathname} className="page-transition-wrapper min-h-full w-full">{children}</div></Suspense>;
 };
 
 // Shorthand alias for concise route definitions
 export const S = ModuleGuard;
+
+

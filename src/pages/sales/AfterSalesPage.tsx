@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   RotateCcw, ShieldCheck, AlertTriangle, Search, Calendar, Eye,
   Printer, Loader2, X, RefreshCw, CheckCircle2, TrendingDown,
@@ -13,13 +13,13 @@ import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../types';
 import { useToast } from '../../components/ui/Toast';
 import { formatProductQuantity } from '../../utils/productUnits';
 
-const fmtCurrency = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
+const fmtCurrency = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' Ø¬';
 
 const REFUND_LABELS: Record<string, string> = {
-  CASH: 'استرداد نقدي من الخزينة',
-  CARD: 'استرداد على البطاقة',
-  BANK_TRANSFER: 'تحويل بنكي',
-  BALANCE: 'إضافة رصيد دائن للعميل (Credit Note)',
+  CASH: 'Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ù†Ù‚Ø¯ÙŠ Ù…Ù† Ø§Ù„Ø®Ø²ÙŠÙ†Ø©',
+  CARD: 'Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ø¹Ù„Ù‰ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©',
+  BANK_TRANSFER: 'ØªØ­ÙˆÙŠÙ„ Ø¨Ù†ÙƒÙŠ',
+  BALANCE: 'Ø¥Ø¶Ø§ÙØ© Ø±ØµÙŠØ¯ Ø¯Ø§Ø¦Ù† Ù„Ù„Ø¹Ù…ÙŠÙ„ (Credit Note)',
 };
 
 const REFUND_BADGES: Record<string, string> = {
@@ -30,12 +30,12 @@ const REFUND_BADGES: Record<string, string> = {
 };
 
 const COMMON_REASONS = [
-  'كسر أثناء النقل أو التعتيق',
-  'عيب صناعة أو اختلاف لون/فرز',
-  'مقاس غير متطابق مع التصميم',
-  'زيادة في الكمية المطلوبة عن المساحة',
-  'تغيير رغبة العميل أو اختيار موديل آخر',
-  'خطأ في تسجيل كود الصنف بالمعرض',
+  'ÙƒØ³Ø± Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ù†Ù‚Ù„ Ø£Ùˆ Ø§Ù„ØªØ¹ØªÙŠÙ‚',
+  'Ø¹ÙŠØ¨ ØµÙ†Ø§Ø¹Ø© Ø£Ùˆ Ø§Ø®ØªÙ„Ø§Ù Ù„ÙˆÙ†/ÙØ±Ø²',
+  'Ù…Ù‚Ø§Ø³ ØºÙŠØ± Ù…ØªØ·Ø§Ø¨Ù‚ Ù…Ø¹ Ø§Ù„ØªØµÙ…ÙŠÙ…',
+  'Ø²ÙŠØ§Ø¯Ø© ÙÙŠ Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø© Ø¹Ù† Ø§Ù„Ù…Ø³Ø§Ø­Ø©',
+  'ØªØºÙŠÙŠØ± Ø±ØºØ¨Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø£Ùˆ Ø§Ø®ØªÙŠØ§Ø± Ù…ÙˆØ¯ÙŠÙ„ Ø¢Ø®Ø±',
+  'Ø®Ø·Ø£ ÙÙŠ ØªØ³Ø¬ÙŠÙ„ ÙƒÙˆØ¯ Ø§Ù„ØµÙ†Ù Ø¨Ø§Ù„Ù…Ø¹Ø±Ø¶',
 ];
 
 const getTabButtonClass = (isActive: boolean, activeClass: string) =>
@@ -79,7 +79,7 @@ export const AfterSalesPage: React.FC = () => {
       setTopReasons(salesService.getTopReturnReasons(6));
       setRecentInvoices(salesService.getAllInvoices());
     } catch (e: any) {
-      toast.error(e?.message || 'تعذر تحميل بيانات خدمة ما بعد البيع.');
+      toast.error(e?.message || 'ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø®Ø¯Ù…Ø© Ù…Ø§ Ø¨Ø¹Ø¯ Ø§Ù„Ø¨ÙŠØ¹.');
     } finally {
       setLoading(false);
     }
@@ -97,7 +97,7 @@ export const AfterSalesPage: React.FC = () => {
       const items = salesService.getReturnItems(ret.id);
       setReturnItems(items);
     } catch (e: any) {
-      toast.error('تعذر تحميل بنود المرتجع.');
+      toast.error('ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ø¨Ù†ÙˆØ¯ Ø§Ù„Ù…Ø±ØªØ¬Ø¹.');
     } finally {
       setLoadingReturnDetails(false);
     }
@@ -111,12 +111,12 @@ export const AfterSalesPage: React.FC = () => {
         printService.printSalesReturn(fullReturn);
       }
     } catch (e: any) {
-      toast.error(e?.message || 'تعذر طباعة إشعار الإرجاع.');
+      toast.error(e?.message || 'ØªØ¹Ø°Ø± Ø·Ø¨Ø§Ø¹Ø© Ø¥Ø´Ø¹Ø§Ø± Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹.');
     }
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 w-full">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700">
         <div>
@@ -124,10 +124,10 @@ export const AfterSalesPage: React.FC = () => {
             <span className="p-2.5 rounded-xl bg-rose-600/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
               <RotateCcw className="w-6 h-6" />
             </span>
-            خدمة ما بعد البيع والضمانات (After-Sales & Warranty)
+            Ø®Ø¯Ù…Ø© Ù…Ø§ Ø¨Ø¹Ø¯ Ø§Ù„Ø¨ÙŠØ¹ ÙˆØ§Ù„Ø¶Ù…Ø§Ù†Ø§Øª (After-Sales & Warranty)
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            إدارة المرتجعات، الإشعارات الدائنة، متابعة جودة المنتجات والضمان، وتحليل أسباب شكاوى واستبدال السيراميك
+            Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§ØªØŒ Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ø§Ù„Ø¯Ø§Ø¦Ù†Ø©ØŒ Ù…ØªØ§Ø¨Ø¹Ø© Ø¬ÙˆØ¯Ø© Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª ÙˆØ§Ù„Ø¶Ù…Ø§Ù†ØŒ ÙˆØªØ­Ù„ÙŠÙ„ Ø£Ø³Ø¨Ø§Ø¨ Ø´ÙƒØ§ÙˆÙ‰ ÙˆØ§Ø³ØªØ¨Ø¯Ø§Ù„ Ø§Ù„Ø³ÙŠØ±Ø§Ù…ÙŠÙƒ
           </p>
         </div>
 
@@ -137,7 +137,7 @@ export const AfterSalesPage: React.FC = () => {
             className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition flex items-center gap-1.5"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            تحديث
+            ØªØ­Ø¯ÙŠØ«
           </button>
         </div>
       </div>
@@ -149,10 +149,10 @@ export const AfterSalesPage: React.FC = () => {
             <RotateCcw className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">إجمالي المرتجعات</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats?.count ?? 0} عملية</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats?.count ?? 0} Ø¹Ù…Ù„ÙŠØ©</div>
             <div className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-0.5">
-              بقيمة {fmtCurrency(stats?.totalAmount || 0)}
+              Ø¨Ù‚ÙŠÙ…Ø© {fmtCurrency(stats?.totalAmount || 0)}
             </div>
           </div>
         </div>
@@ -162,12 +162,12 @@ export const AfterSalesPage: React.FC = () => {
             <ArrowRightLeft className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">إشعارات دائنة (أرصدة عملاء)</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ø¯Ø§Ø¦Ù†Ø© (Ø£Ø±ØµØ¯Ø© Ø¹Ù…Ù„Ø§Ø¡)</div>
             <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">
               {fmtCurrency(stats?.creditedToBalance || 0)}
             </div>
             <div className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold mt-0.5">
-              رصيد متاح لمشتريات قادمة
+              Ø±ØµÙŠØ¯ Ù…ØªØ§Ø­ Ù„Ù…Ø´ØªØ±ÙŠØ§Øª Ù‚Ø§Ø¯Ù…Ø©
             </div>
           </div>
         </div>
@@ -177,12 +177,12 @@ export const AfterSalesPage: React.FC = () => {
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">مستردات نقدية / بنكية</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ù…Ø³ØªØ±Ø¯Ø§Øª Ù†Ù‚Ø¯ÙŠØ© / Ø¨Ù†ÙƒÙŠØ©</div>
             <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">
               {fmtCurrency(stats?.cashRefunded || 0)}
             </div>
             <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
-              منصرف من الخزينة أو البنك
+              Ù…Ù†ØµØ±Ù Ù…Ù† Ø§Ù„Ø®Ø²ÙŠÙ†Ø© Ø£Ùˆ Ø§Ù„Ø¨Ù†Ùƒ
             </div>
           </div>
         </div>
@@ -192,10 +192,10 @@ export const AfterSalesPage: React.FC = () => {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">مرتجعات اليوم</div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats?.todayCount ?? 0} عملية</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Ù…Ø±ØªØ¬Ø¹Ø§Øª Ø§Ù„ÙŠÙˆÙ…</div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{stats?.todayCount ?? 0} Ø¹Ù…Ù„ÙŠØ©</div>
             <div className="text-[11px] text-sky-600 dark:text-sky-400 font-semibold mt-0.5">
-              بقيمة {fmtCurrency(stats?.todayAmount || 0)}
+              Ø¨Ù‚ÙŠÙ…Ø© {fmtCurrency(stats?.todayAmount || 0)}
             </div>
           </div>
         </div>
@@ -213,7 +213,7 @@ export const AfterSalesPage: React.FC = () => {
             )}
           >
             <RotateCcw className="w-4 h-4" />
-            سجل المرتجعات والإشعارات الدائنة ({returnsList.length})
+            Ø³Ø¬Ù„ Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª ÙˆØ§Ù„Ø¥Ø´Ø¹Ø§Ø±Ø§Øª Ø§Ù„Ø¯Ø§Ø¦Ù†Ø© ({returnsList.length})
           </button>
           <button
             onClick={() => setActiveTab('warranty')}
@@ -223,7 +223,7 @@ export const AfterSalesPage: React.FC = () => {
             )}
           >
             <ShieldCheck className="w-4 h-4" />
-            سجل الفواتير الحديثة ({recentInvoices.length})
+            Ø³Ø¬Ù„ Ø§Ù„ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø­Ø¯ÙŠØ«Ø© ({recentInvoices.length})
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -233,7 +233,7 @@ export const AfterSalesPage: React.FC = () => {
             )}
           >
             <PieIcon className="w-4 h-4" />
-            تحليل أسباب المرتجعات
+            ØªØ­Ù„ÙŠÙ„ Ø£Ø³Ø¨Ø§Ø¨ Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª
           </button>
         </div>
 
@@ -243,7 +243,7 @@ export const AfterSalesPage: React.FC = () => {
             <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="بحث بالرقم أو العميل أو الفاتورة..."
+              placeholder="Ø¨Ø­Ø« Ø¨Ø§Ù„Ø±Ù‚Ù… Ø£Ùˆ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø£Ùˆ Ø§Ù„ÙØ§ØªÙˆØ±Ø©..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-3 pr-9 py-2 text-sm bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500"
@@ -256,7 +256,7 @@ export const AfterSalesPage: React.FC = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center p-16 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700">
           <Loader2 className="w-8 h-8 text-rose-600 animate-spin mb-3" />
-          <p className="text-sm text-slate-500">جاري تحميل البيانات...</p>
+          <p className="text-sm text-slate-500">Ø¬Ø§Ø±ÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª...</p>
         </div>
       ) : activeTab === 'returns' ? (
         /* Returns Table */
@@ -265,22 +265,22 @@ export const AfterSalesPage: React.FC = () => {
             <table className="w-full text-right text-sm">
               <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
                 <tr>
-                  <th className="p-3.5">رقم الإشعار</th>
-                  <th className="p-3.5">الفاتورة الأصلية</th>
-                  <th className="p-3.5">العميل</th>
-                  <th className="p-3.5">التاريخ</th>
-                  <th className="p-3.5">سبب الإرجاع</th>
-                  <th className="p-3.5">إجمالي المرتجع</th>
-                  <th className="p-3.5">المسترد نقداً</th>
-                  <th className="p-3.5">المضاف للرصيد</th>
-                  <th className="p-3.5 text-center">إجراءات</th>
+                  <th className="p-3.5">Ø±Ù‚Ù… Ø§Ù„Ø¥Ø´Ø¹Ø§Ø±</th>
+                  <th className="p-3.5">Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø£ØµÙ„ÙŠØ©</th>
+                  <th className="p-3.5">Ø§Ù„Ø¹Ù…ÙŠÙ„</th>
+                  <th className="p-3.5">Ø§Ù„ØªØ§Ø±ÙŠØ®</th>
+                  <th className="p-3.5">Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹</th>
+                  <th className="p-3.5">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø±ØªØ¬Ø¹</th>
+                  <th className="p-3.5">Ø§Ù„Ù…Ø³ØªØ±Ø¯ Ù†Ù‚Ø¯Ø§Ù‹</th>
+                  <th className="p-3.5">Ø§Ù„Ù…Ø¶Ø§Ù Ù„Ù„Ø±ØµÙŠØ¯</th>
+                  <th className="p-3.5 text-center">Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                 {returnsList.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="p-12 text-center text-slate-400">
-                      لا توجد عمليات إرجاع مطابقة لمعايير البحث.
+                      Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¹Ù…Ù„ÙŠØ§Øª Ø¥Ø±Ø¬Ø§Ø¹ Ù…Ø·Ø§Ø¨Ù‚Ø© Ù„Ù…Ø¹Ø§ÙŠÙŠØ± Ø§Ù„Ø¨Ø­Ø«.
                     </td>
                   </tr>
                 ) : (
@@ -291,16 +291,16 @@ export const AfterSalesPage: React.FC = () => {
                         {ret.returnNumber}
                       </td>
                       <td className="p-3.5 font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        {ret.invoiceNumber || '—'}
+                        {ret.invoiceNumber || 'â€”'}
                       </td>
                       <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                        {ret.customerName || 'عميل نقدي'}
+                        {ret.customerName || 'Ø¹Ù…ÙŠÙ„ Ù†Ù‚Ø¯ÙŠ'}
                       </td>
                       <td className="p-3.5 text-xs text-slate-500 font-mono">
-                        {ret.date ? ret.date.substring(0, 10) : '—'}
+                        {ret.date ? ret.date.substring(0, 10) : 'â€”'}
                       </td>
                       <td className="p-3.5 text-slate-700 dark:text-slate-300 max-w-xs truncate">
-                        {ret.reason || 'إرجاع بضاعة'}
+                        {ret.reason || 'Ø¥Ø±Ø¬Ø§Ø¹ Ø¨Ø¶Ø§Ø¹Ø©'}
                       </td>
                       <td className="p-3.5 font-bold text-slate-900 dark:text-white">
                         {fmtCurrency(ret.totalAmount)}
@@ -316,14 +316,14 @@ export const AfterSalesPage: React.FC = () => {
                           <button
                             onClick={() => handleViewReturn(ret)}
                             className="p-1.5 text-slate-500 hover:text-sky-600 dark:hover:text-sky-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
-                            title="عرض تفاصيل المرتجع"
+                            title="Ø¹Ø±Ø¶ ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ù…Ø±ØªØ¬Ø¹"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handlePrintReturn(ret)}
                             className="p-1.5 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-700 rounded-lg transition"
-                            title="طباعة إشعار دائن"
+                            title="Ø·Ø¨Ø§Ø¹Ø© Ø¥Ø´Ø¹Ø§Ø± Ø¯Ø§Ø¦Ù†"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
@@ -341,8 +341,8 @@ export const AfterSalesPage: React.FC = () => {
         <div className="space-y-4">
           <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 p-4 rounded-2xl flex items-start gap-3">
             <div className="text-xs text-sky-900 dark:text-sky-200 leading-relaxed">
-              <strong className="block text-sm font-bold mb-0.5">سجل الفواتير الحديثة</strong>
-              يعرض هذا الجدول عمر الفاتورة وملاحظاتها فقط. لا يسجل مطالبات ضمان أو يحدد أهلية الضمان.
+              <strong className="block text-sm font-bold mb-0.5">Ø³Ø¬Ù„ Ø§Ù„ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø­Ø¯ÙŠØ«Ø©</strong>
+              ÙŠØ¹Ø±Ø¶ Ù‡Ø°Ø§ Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø¹Ù…Ø± Ø§Ù„ÙØ§ØªÙˆØ±Ø© ÙˆÙ…Ù„Ø§Ø­Ø¸Ø§ØªÙ‡Ø§ ÙÙ‚Ø·. Ù„Ø§ ÙŠØ³Ø¬Ù„ Ù…Ø·Ø§Ù„Ø¨Ø§Øª Ø¶Ù…Ø§Ù† Ø£Ùˆ ÙŠØ­Ø¯Ø¯ Ø£Ù‡Ù„ÙŠØ© Ø§Ù„Ø¶Ù…Ø§Ù†.
             </div>
           </div>
 
@@ -350,20 +350,20 @@ export const AfterSalesPage: React.FC = () => {
             <div className="p-4 border-b border-slate-100 dark:border-slate-700">
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <FileText className="w-4 h-4 text-sky-600" />
-                الفواتير الحديثة وعمرها
+                Ø§Ù„ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø­Ø¯ÙŠØ«Ø© ÙˆØ¹Ù…Ø±Ù‡Ø§
               </h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-right text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
                   <tr>
-                    <th className="p-3.5">رقم الفاتورة</th>
-                    <th className="p-3.5">التاريخ</th>
-                    <th className="p-3.5">العميل</th>
-                    <th className="p-3.5">قيمة الفاتورة</th>
-                    <th className="p-3.5">طريقة الدفع</th>
-                    <th className="p-3.5">العمر منذ الإصدار</th>
-                    <th className="p-3.5">ملاحظات الفاتورة</th>
+                    <th className="p-3.5">Ø±Ù‚Ù… Ø§Ù„ÙØ§ØªÙˆØ±Ø©</th>
+                    <th className="p-3.5">Ø§Ù„ØªØ§Ø±ÙŠØ®</th>
+                    <th className="p-3.5">Ø§Ù„Ø¹Ù…ÙŠÙ„</th>
+                    <th className="p-3.5">Ù‚ÙŠÙ…Ø© Ø§Ù„ÙØ§ØªÙˆØ±Ø©</th>
+                    <th className="p-3.5">Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹</th>
+                    <th className="p-3.5">Ø§Ù„Ø¹Ù…Ø± Ù…Ù†Ø° Ø§Ù„Ø¥ØµØ¯Ø§Ø±</th>
+                    <th className="p-3.5">Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„ÙØ§ØªÙˆØ±Ø©</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
@@ -375,10 +375,10 @@ export const AfterSalesPage: React.FC = () => {
                           {inv.invoiceNumber}
                         </td>
                         <td className="p-3.5 text-xs text-slate-500 font-mono">
-                          {inv.date ? inv.date.substring(0, 10) : '—'}
+                          {inv.date ? inv.date.substring(0, 10) : 'â€”'}
                         </td>
                         <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                          {inv.customerName || 'عميل نقدي'}
+                          {inv.customerName || 'Ø¹Ù…ÙŠÙ„ Ù†Ù‚Ø¯ÙŠ'}
                         </td>
                         <td className="p-3.5 font-bold text-slate-900 dark:text-white">
                           {fmtCurrency(inv.totalAmount)}
@@ -388,11 +388,11 @@ export const AfterSalesPage: React.FC = () => {
                         </td>
                         <td className="p-3.5">
                           <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-slate-100 text-slate-600 border-slate-200">
-                            {`منذ ${daysAgo} يوم`}
+                            {`Ù…Ù†Ø° ${daysAgo} ÙŠÙˆÙ…`}
                           </span>
                         </td>
                         <td className="p-3.5 text-xs text-slate-500 max-w-xs truncate">
-                          {inv.notes || '—'}
+                          {inv.notes || 'â€”'}
                         </td>
                       </tr>
                     );
@@ -408,11 +408,11 @@ export const AfterSalesPage: React.FC = () => {
           <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm">
             <h3 className="font-black text-slate-900 dark:text-white text-base mb-4 flex items-center gap-2">
               <PieIcon className="w-5 h-5 text-indigo-600" />
-              أكثر أسباب المرتجعات تكراراً
+              Ø£ÙƒØ«Ø± Ø£Ø³Ø¨Ø§Ø¨ Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø§Øª ØªÙƒØ±Ø§Ø±Ø§Ù‹
             </h3>
             <div className="space-y-4">
               {topReasons.length === 0 ? (
-                <p className="text-slate-400 text-sm text-center py-8">لا توجد بيانات مرتجعات مسجلة حتى الآن.</p>
+                <p className="text-slate-400 text-sm text-center py-8">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¨ÙŠØ§Ù†Ø§Øª Ù…Ø±ØªØ¬Ø¹Ø§Øª Ù…Ø³Ø¬Ù„Ø© Ø­ØªÙ‰ Ø§Ù„Ø¢Ù†.</p>
               ) : (
                 topReasons.map((r, i) => {
                   const totalCount = stats?.count || 1;
@@ -422,7 +422,7 @@ export const AfterSalesPage: React.FC = () => {
                       <div className="flex justify-between items-center text-xs font-bold">
                         <span className="text-slate-800 dark:text-slate-200">{r.reason}</span>
                         <span className="text-slate-500">
-                          {r.count} عملية ({fmtCurrency(r.amount)})
+                          {r.count} Ø¹Ù…Ù„ÙŠØ© ({fmtCurrency(r.amount)})
                         </span>
                       </div>
                       <div className="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
@@ -442,7 +442,7 @@ export const AfterSalesPage: React.FC = () => {
             <div>
               <h3 className="font-black text-slate-900 dark:text-white text-base mb-4 flex items-center gap-2">
                 <Award className="w-5 h-5 text-amber-500" />
-                توصيات تحسين تجربة العميل وجودة التوريد
+                ØªÙˆØµÙŠØ§Øª ØªØ­Ø³ÙŠÙ† ØªØ¬Ø±Ø¨Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„ ÙˆØ¬ÙˆØ¯Ø© Ø§Ù„ØªÙˆØ±ÙŠØ¯
               </h3>
               <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
                 <li className="flex items-start gap-2">
@@ -450,7 +450,7 @@ export const AfterSalesPage: React.FC = () => {
                     1
                   </span>
                   <span>
-                    <strong>التأكد من أرقام اللوت (Tone/Caliber):</strong> فحص كراتين البورسلين والسيراميك عند الصرف لضمان خروج نفس اللوت للفاتورة الواحدة لتفادي تفاوت الدرجات.
+                    <strong>Ø§Ù„ØªØ£ÙƒØ¯ Ù…Ù† Ø£Ø±Ù‚Ø§Ù… Ø§Ù„Ù„ÙˆØª (Tone/Caliber):</strong> ÙØ­Øµ ÙƒØ±Ø§ØªÙŠÙ† Ø§Ù„Ø¨ÙˆØ±Ø³Ù„ÙŠÙ† ÙˆØ§Ù„Ø³ÙŠØ±Ø§Ù…ÙŠÙƒ Ø¹Ù†Ø¯ Ø§Ù„ØµØ±Ù Ù„Ø¶Ù…Ø§Ù† Ø®Ø±ÙˆØ¬ Ù†ÙØ³ Ø§Ù„Ù„ÙˆØª Ù„Ù„ÙØ§ØªÙˆØ±Ø© Ø§Ù„ÙˆØ§Ø­Ø¯Ø© Ù„ØªÙØ§Ø¯ÙŠ ØªÙØ§ÙˆØª Ø§Ù„Ø¯Ø±Ø¬Ø§Øª.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -458,7 +458,7 @@ export const AfterSalesPage: React.FC = () => {
                     2
                   </span>
                   <span>
-                    <strong>التحميل الآمن لحماية النقل:</strong> تدريب عمال التعتيق والسائقين على رص الكراتين عمودياً واستخدام الأحزمة لمنع الكسر أثناء الحركة.
+                    <strong>Ø§Ù„ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¢Ù…Ù† Ù„Ø­Ù…Ø§ÙŠØ© Ø§Ù„Ù†Ù‚Ù„:</strong> ØªØ¯Ø±ÙŠØ¨ Ø¹Ù…Ø§Ù„ Ø§Ù„ØªØ¹ØªÙŠÙ‚ ÙˆØ§Ù„Ø³Ø§Ø¦Ù‚ÙŠÙ† Ø¹Ù„Ù‰ Ø±Øµ Ø§Ù„ÙƒØ±Ø§ØªÙŠÙ† Ø¹Ù…ÙˆØ¯ÙŠØ§Ù‹ ÙˆØ§Ø³ØªØ®Ø¯Ø§Ù… Ø§Ù„Ø£Ø­Ø²Ù…Ø© Ù„Ù…Ù†Ø¹ Ø§Ù„ÙƒØ³Ø± Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø­Ø±ÙƒØ©.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -466,15 +466,15 @@ export const AfterSalesPage: React.FC = () => {
                     3
                   </span>
                   <span>
-                    <strong>حساب نسبة الهالك بدقة (5% إلى 10%):</strong> إرشاد العميل عند الشراء لاحتساب نسبة الهالك وقص السيراميك بدقة لتجنب طلبات استرجاع الفائض أو النقص.
+                    <strong>Ø­Ø³Ø§Ø¨ Ù†Ø³Ø¨Ø© Ø§Ù„Ù‡Ø§Ù„Ùƒ Ø¨Ø¯Ù‚Ø© (5% Ø¥Ù„Ù‰ 10%):</strong> Ø¥Ø±Ø´Ø§Ø¯ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¹Ù†Ø¯ Ø§Ù„Ø´Ø±Ø§Ø¡ Ù„Ø§Ø­ØªØ³Ø§Ø¨ Ù†Ø³Ø¨Ø© Ø§Ù„Ù‡Ø§Ù„Ùƒ ÙˆÙ‚Øµ Ø§Ù„Ø³ÙŠØ±Ø§Ù…ÙŠÙƒ Ø¨Ø¯Ù‚Ø© Ù„ØªØ¬Ù†Ø¨ Ø·Ù„Ø¨Ø§Øª Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø§Ù„ÙØ§Ø¦Ø¶ Ø£Ùˆ Ø§Ù„Ù†Ù‚Øµ.
                   </span>
                 </li>
               </ul>
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-500 flex items-center justify-between">
-              <span>نظام ضبط الجودة CeramiSys QA</span>
-              <span className="text-emerald-600 font-bold">معدل سلامة التوريد: 98.4%</span>
+              <span>Ù†Ø¸Ø§Ù… Ø¶Ø¨Ø· Ø§Ù„Ø¬ÙˆØ¯Ø© CeramiSys QA</span>
+              <span className="text-emerald-600 font-bold">Ù…Ø¹Ø¯Ù„ Ø³Ù„Ø§Ù…Ø© Ø§Ù„ØªÙˆØ±ÙŠØ¯: 98.4%</span>
             </div>
           </div>
         </div>
@@ -487,7 +487,7 @@ export const AfterSalesPage: React.FC = () => {
             <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-700">
               <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                 <RotateCcw className="w-5 h-5 text-rose-600" />
-                تفاصيل إشعار المرتجع: {selectedReturn.returnNumber}
+                ØªÙØ§ØµÙŠÙ„ Ø¥Ø´Ø¹Ø§Ø± Ø§Ù„Ù…Ø±ØªØ¬Ø¹: {selectedReturn.returnNumber}
               </h3>
               <button
                 onClick={() => setSelectedReturn(null)}
@@ -500,25 +500,25 @@ export const AfterSalesPage: React.FC = () => {
             <div className="space-y-4 mt-4 text-xs">
               <div className="grid grid-cols-1  sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl">
                 <div>
-                  <span className="text-slate-400 block">العميل:</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{selectedReturn.customerName || 'نقدي'}</span>
+                  <span className="text-slate-400 block">Ø§Ù„Ø¹Ù…ÙŠÙ„:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{selectedReturn.customerName || 'Ù†Ù‚Ø¯ÙŠ'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">الفاتورة الأصلية:</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedReturn.invoiceNumber || '—'}</span>
+                  <span className="text-slate-400 block">Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø§Ù„Ø£ØµÙ„ÙŠØ©:</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">{selectedReturn.invoiceNumber || 'â€”'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">إجمالي القيمة:</span>
+                  <span className="text-slate-400 block">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù‚ÙŠÙ…Ø©:</span>
                   <span className="font-bold text-rose-600">{fmtCurrency(selectedReturn.totalAmount)}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block">التاريخ:</span>
+                  <span className="text-slate-400 block">Ø§Ù„ØªØ§Ø±ÙŠØ®:</span>
                   <span className="font-mono text-slate-700 dark:text-slate-300">{selectedReturn.date}</span>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-900 dark:text-white mb-2">الأصناف المرتجعة إلى المخزن:</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white mb-2">Ø§Ù„Ø£ØµÙ†Ø§Ù Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø© Ø¥Ù„Ù‰ Ø§Ù„Ù…Ø®Ø²Ù†:</h4>
                 {loadingReturnDetails ? (
                   <div className="p-8 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-slate-400" /></div>
                 ) : (
@@ -526,11 +526,11 @@ export const AfterSalesPage: React.FC = () => {
                     <table className="w-full text-right">
                       <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 font-bold border-b border-slate-200 dark:border-slate-700">
                         <tr>
-                          <th className="p-2.5">الصنف</th>
-                          <th className="p-2.5">الكمية المرتجعة</th>
-                          <th className="p-2.5">سعر الوحدة</th>
-                          <th className="p-2.5">الإجمالي</th>
-                          <th className="p-2.5">السبب</th>
+                          <th className="p-2.5">Ø§Ù„ØµÙ†Ù</th>
+                          <th className="p-2.5">Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø±ØªØ¬Ø¹Ø©</th>
+                          <th className="p-2.5">Ø³Ø¹Ø± Ø§Ù„ÙˆØ­Ø¯Ø©</th>
+                          <th className="p-2.5">Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</th>
+                          <th className="p-2.5">Ø§Ù„Ø³Ø¨Ø¨</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -540,7 +540,7 @@ export const AfterSalesPage: React.FC = () => {
                             <td className="p-2.5 font-semibold text-rose-600">{formatProductQuantity(item.quantityM2, item)}</td>
                             <td className="p-2.5 font-mono">{fmtCurrency(item.unitPrice)}</td>
                             <td className="p-2.5 font-bold font-mono">{fmtCurrency(item.totalRefund)}</td>
-                            <td className="p-2.5 text-slate-500">{selectedReturn.reason || 'إرجاع'}</td>
+                            <td className="p-2.5 text-slate-500">{selectedReturn.reason || 'Ø¥Ø±Ø¬Ø§Ø¹'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -556,14 +556,14 @@ export const AfterSalesPage: React.FC = () => {
                   className="px-4 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition flex items-center gap-1.5"
                 >
                   <Printer className="w-4 h-4" />
-                  طباعة إشعار الإرجاع
+                  Ø·Ø¨Ø§Ø¹Ø© Ø¥Ø´Ø¹Ø§Ø± Ø§Ù„Ø¥Ø±Ø¬Ø§Ø¹
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedReturn(null)}
                   className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 rounded-xl transition"
                 >
-                  إغلاق
+                  Ø¥ØºÙ„Ø§Ù‚
                 </button>
               </div>
             </div>

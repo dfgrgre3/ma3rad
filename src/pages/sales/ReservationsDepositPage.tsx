@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BookmarkPlus, Loader2, Clock, Plus } from 'lucide-react';
 import { ReservationService, StockReservation } from '../../services/ReservationService';
 import { OrderService, Order } from '../../services/OrderService';
@@ -79,7 +79,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
         setReservations([]);
       }
     } catch (e: any) {
-      toast.error(e?.message || 'تعذر تحميل بيانات الحجوزات.');
+      toast.error(e?.message || 'ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø¬ÙˆØ²Ø§Øª.');
     } finally {
       setLoading(false);
     }
@@ -116,25 +116,25 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
 
   // Handle release reservation
   const handleRelease = (id: string) => {
-    if (!window.confirm('هل أنت متأكد من إلغاء فك حجز هذه الكمية وإعادتها للمخزون الحر؟')) return;
+    if (!window.confirm('Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø¥Ù„ØºØ§Ø¡ ÙÙƒ Ø­Ø¬Ø² Ù‡Ø°Ù‡ Ø§Ù„ÙƒÙ…ÙŠØ© ÙˆØ¥Ø¹Ø§Ø¯ØªÙ‡Ø§ Ù„Ù„Ù…Ø®Ø²ÙˆÙ† Ø§Ù„Ø­Ø±ØŸ')) return;
     try {
       resService.releaseReservation(id, 'RELEASED');
-      toast.success('تم فك حجز الكمية بنجاح.');
+      toast.success('ØªÙ… ÙÙƒ Ø­Ø¬Ø² Ø§Ù„ÙƒÙ…ÙŠØ© Ø¨Ù†Ø¬Ø§Ø­.');
       loadData();
     } catch (e: any) {
-      toast.error(e?.message || 'فشل فك الحجز.');
+      toast.error(e?.message || 'ÙØ´Ù„ ÙÙƒ Ø§Ù„Ø­Ø¬Ø².');
     }
   };
 
   // Handle consume reservation
   const handleConsume = (id: string) => {
-    if (!window.confirm('هل تريد تأكيد صرف الكمية المحجوزة من المخزن فعلياً؟')) return;
+    if (!window.confirm('Ù‡Ù„ ØªØ±ÙŠØ¯ ØªØ£ÙƒÙŠØ¯ ØµØ±Ù Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø­Ø¬ÙˆØ²Ø© Ù…Ù† Ø§Ù„Ù…Ø®Ø²Ù† ÙØ¹Ù„ÙŠØ§Ù‹ØŸ')) return;
     try {
       resService.consumeReservation(id);
-      toast.success('تم صرف الكمية المحجوزة وتحديث المخزون بنجاح.');
+      toast.success('ØªÙ… ØµØ±Ù Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø­Ø¬ÙˆØ²Ø© ÙˆØªØ­Ø¯ÙŠØ« Ø§Ù„Ù…Ø®Ø²ÙˆÙ† Ø¨Ù†Ø¬Ø§Ø­.');
       loadData();
     } catch (e: any) {
-      toast.error(e?.message || 'فشل تنفيذ الحجز.');
+      toast.error(e?.message || 'ÙØ´Ù„ ØªÙ†ÙÙŠØ° Ø§Ù„Ø­Ø¬Ø².');
     }
   };
 
@@ -142,18 +142,18 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   const handleCreateReservation = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newResForm.productId || !newResForm.warehouseId || !newResForm.quantityM2) {
-      toast.warning('يرجى ملء جميع الحقول الإلزامية.');
+      toast.warning('ÙŠØ±Ø¬Ù‰ Ù…Ù„Ø¡ Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø­Ù‚ÙˆÙ„ Ø§Ù„Ø¥Ù„Ø²Ø§Ù…ÙŠØ©.');
       return;
     }
     const qty = Number(newResForm.quantityM2);
     if (qty <= 0) {
-      toast.warning('الكمية يجب أن تكون أكبر من صفر.');
+      toast.warning('Ø§Ù„ÙƒÙ…ÙŠØ© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø£ÙƒØ¨Ø± Ù…Ù† ØµÙØ±.');
       return;
     }
     if (availability && qty > availability.available) {
       const product = products.find((item) => item.id === newResForm.productId);
-      const unit = product ? getProductUnitLabel(product) : 'الوحدة';
-      toast.error(`الكمية المتاحة (${availability.available} ${unit}) غير كافية.`);
+      const unit = product ? getProductUnitLabel(product) : 'Ø§Ù„ÙˆØ­Ø¯Ø©';
+      toast.error(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…ØªØ§Ø­Ø© (${availability.available} ${unit}) ØºÙŠØ± ÙƒØ§ÙÙŠØ©.`);
       return;
     }
 
@@ -167,12 +167,12 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
         expiresAt: newResForm.expiresAt || undefined,
         notes: newResForm.notes || undefined,
       });
-      toast.success('تم تسجيل الحجز وتجميد الكمية بالمخزن بنجاح.');
+      toast.success('ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø­Ø¬Ø² ÙˆØªØ¬Ù…ÙŠØ¯ Ø§Ù„ÙƒÙ…ÙŠØ© Ø¨Ø§Ù„Ù…Ø®Ø²Ù† Ø¨Ù†Ø¬Ø§Ø­.');
       setShowNewResModal(false);
       setNewResForm(createEmptyNewReservationForm());
       loadData();
     } catch (e: any) {
-      toast.error(e?.message || 'تعذر إنشاء الحجز.');
+      toast.error(e?.message || 'ØªØ¹Ø°Ø± Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø­Ø¬Ø².');
     }
   };
 
@@ -182,24 +182,24 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
     if (!depositModalOrder) return;
     const amount = Number(depositAmount);
     if (!amount || amount <= 0) {
-      toast.warning('يرجى إدخال مبلغ صحيح للعربون.');
+      toast.warning('ÙŠØ±Ø¬Ù‰ Ø¥Ø¯Ø®Ø§Ù„ Ù…Ø¨Ù„Øº ØµØ­ÙŠØ­ Ù„Ù„Ø¹Ø±Ø¨ÙˆÙ†.');
       return;
     }
     if (amount > depositModalOrder.remainingAmount) {
-      toast.warning(`مبلغ العربون (${amount} ج) يتجاوز المتبقي (${depositModalOrder.remainingAmount} ج).`);
+      toast.warning(`Ù…Ø¨Ù„Øº Ø§Ù„Ø¹Ø±Ø¨ÙˆÙ† (${amount} Ø¬) ÙŠØªØ¬Ø§ÙˆØ² Ø§Ù„Ù…ØªØ¨Ù‚ÙŠ (${depositModalOrder.remainingAmount} Ø¬).`);
       return;
     }
 
     setSubmittingDeposit(true);
     try {
       orderService.recordDeposit(depositModalOrder.id, amount, depositPaymentType, depositNotes);
-      toast.success(`تم تسجيل عربون بقيمة ${fmtCurrency(amount)} للطلب بنجاح.`);
+      toast.success(`ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø¹Ø±Ø¨ÙˆÙ† Ø¨Ù‚ÙŠÙ…Ø© ${fmtCurrency(amount)} Ù„Ù„Ø·Ù„Ø¨ Ø¨Ù†Ø¬Ø§Ø­.`);
       setDepositModalOrder(null);
       setDepositAmount('');
       setDepositNotes('');
       loadData();
     } catch (e: any) {
-      toast.error(e?.message || 'فشل تسجيل العربون.');
+      toast.error(e?.message || 'ÙØ´Ù„ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¹Ø±Ø¨ÙˆÙ†.');
     } finally {
       setSubmittingDeposit(false);
     }
@@ -208,20 +208,20 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   // Handle Convert Order to Invoice
   const handleConvertToInvoice = (order: Order) => {
     if (order.status === 'COMPLETED') {
-      toast.info('هذا الطلب تم إصدار فاتورة له مسبقاً.');
+      toast.info('Ù‡Ø°Ø§ Ø§Ù„Ø·Ù„Ø¨ ØªÙ… Ø¥ØµØ¯Ø§Ø± ÙØ§ØªÙˆØ±Ø© Ù„Ù‡ Ù…Ø³Ø¨Ù‚Ø§Ù‹.');
       return;
     }
-    if (!window.confirm(`هل تريد تحويل الطلب رقم "${order.orderNumber}" إلى فاتورة مبيعات معتمدة وصرف البضاعة؟`)) return;
+    if (!window.confirm(`Ù‡Ù„ ØªØ±ÙŠØ¯ ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨ Ø±Ù‚Ù… "${order.orderNumber}" Ø¥Ù„Ù‰ ÙØ§ØªÙˆØ±Ø© Ù…Ø¨ÙŠØ¹Ø§Øª Ù…Ø¹ØªÙ…Ø¯Ø© ÙˆØµØ±Ù Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø©ØŸ`)) return;
     try {
       const inv = orderService.convertToInvoice(order.id, {
         paidAmount: order.paidAmount,
         paymentType: order.remainingAmount <= 0 ? 'CASH' : 'CREDIT',
-        notes: `تحويل طلب حجز رقم ${order.orderNumber}`,
+        notes: `ØªØ­ÙˆÙŠÙ„ Ø·Ù„Ø¨ Ø­Ø¬Ø² Ø±Ù‚Ù… ${order.orderNumber}`,
       });
-      toast.success(`تم إنشاء الفاتورة بنجاح برقم: ${inv.invoiceNumber}`);
+      toast.success(`ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ø¨Ù†Ø¬Ø§Ø­ Ø¨Ø±Ù‚Ù…: ${inv.invoiceNumber}`);
       loadData();
     } catch (e: any) {
-      toast.error(e?.message || 'فشل تحويل الطلب إلى فاتورة.');
+      toast.error(e?.message || 'ÙØ´Ù„ ØªØ­ÙˆÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨ Ø¥Ù„Ù‰ ÙØ§ØªÙˆØ±Ø©.');
     }
   };
 
@@ -232,11 +232,11 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   );
 
   if (!canViewPage) {
-    return <div className="p-8 text-center text-slate-500">ليس لديك صلاحية عرض هذه الصفحة.</div>;
+    return <div className="p-8 text-center text-slate-500">Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø¹Ø±Ø¶ Ù‡Ø°Ù‡ Ø§Ù„ØµÙØ­Ø©.</div>;
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 w-full">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700">
         <div>
@@ -244,10 +244,10 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
             <span className="p-2.5 rounded-xl bg-sky-600/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
               <BookmarkPlus className="w-6 h-6" />
             </span>
-            إدارة الحجوزات والعربونات (Sales Reservations & Deposits)
+            Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø­Ø¬ÙˆØ²Ø§Øª ÙˆØ§Ù„Ø¹Ø±Ø¨ÙˆÙ†Ø§Øª (Sales Reservations & Deposits)
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            حجز كميات البضاعة، إدارة العربونات والمقدمات للطلبات الكبيرة، ومنع بيع البضاعة المحجوزة
+            Ø­Ø¬Ø² ÙƒÙ…ÙŠØ§Øª Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø©ØŒ Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„Ø¹Ø±Ø¨ÙˆÙ†Ø§Øª ÙˆØ§Ù„Ù…Ù‚Ø¯Ù…Ø§Øª Ù„Ù„Ø·Ù„Ø¨Ø§Øª Ø§Ù„ÙƒØ¨ÙŠØ±Ø©ØŒ ÙˆÙ…Ù†Ø¹ Ø¨ÙŠØ¹ Ø§Ù„Ø¨Ø¶Ø§Ø¹Ø© Ø§Ù„Ù…Ø­Ø¬ÙˆØ²Ø©
           </p>
         </div>
 
@@ -257,23 +257,23 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
               const result = resService.expireOverdue();
               loadData();
               if (result.failed > 0) {
-                toast.warning(`تم تحديث ${result.released} حجزاً، وتعذر تحديث ${result.failed} حجز.`);
+                toast.warning(`ØªÙ… ØªØ­Ø¯ÙŠØ« ${result.released} Ø­Ø¬Ø²Ø§Ù‹ØŒ ÙˆØªØ¹Ø°Ø± ØªØ­Ø¯ÙŠØ« ${result.failed} Ø­Ø¬Ø².`);
               } else {
-                toast.success(`تم تحديث ${result.released} من أصل ${result.candidates} حجز منتهي.`);
+                toast.success(`ØªÙ… ØªØ­Ø¯ÙŠØ« ${result.released} Ù…Ù† Ø£ØµÙ„ ${result.candidates} Ø­Ø¬Ø² Ù…Ù†ØªÙ‡ÙŠ.`);
               }
             }}
             className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-xl transition flex items-center gap-1.5"
-            title="فحص الحجوزات المنتهية"
+            title="ÙØ­Øµ Ø§Ù„Ø­Ø¬ÙˆØ²Ø§Øª Ø§Ù„Ù…Ù†ØªÙ‡ÙŠØ©"
           >
             <Clock className="w-4 h-4 text-amber-500" />
-            تحديث الصلاحيات
+            ØªØ­Ø¯ÙŠØ« Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª
           </button>}
           {mode === 'inventory' && canAdjustInventory && <button
             onClick={() => setShowNewResModal(true)}
             className="px-4 py-2 text-sm font-bold text-white bg-sky-600 hover:bg-sky-500 rounded-xl shadow-sm hover:shadow transition flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            حجز كمية بضاعة يدوياً
+            Ø­Ø¬Ø² ÙƒÙ…ÙŠØ© Ø¨Ø¶Ø§Ø¹Ø© ÙŠØ¯ÙˆÙŠØ§Ù‹
           </button>}
         </div>
       </div>
@@ -305,7 +305,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
       {loading ? (
         <div className="flex flex-col items-center justify-center p-16 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700">
           <Loader2 className="w-8 h-8 text-sky-600 animate-spin mb-3" />
-          <p className="text-sm text-slate-500">جاري تحميل البيانات...</p>
+          <p className="text-sm text-slate-500">Ø¬Ø§Ø±ÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª...</p>
         </div>
       ) : mode === 'sales' ? (
         /* Orders & Deposits Table */
