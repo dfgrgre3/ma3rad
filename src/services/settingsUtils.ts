@@ -1,6 +1,6 @@
 import type { SystemSettings } from '../types';
 
-export type SettingsPatch = Partial<Record<string, string | number | boolean | null | undefined>>;
+export type SettingsPatch = Partial<Record<string, string | number | boolean | string[] | null | undefined>>;
 
 export type Listener = (settings: SystemSettings) => void;
 

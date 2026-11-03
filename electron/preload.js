@@ -65,4 +65,10 @@ contextBridge.exposeInMainWorld('ceramisys', {
     finishOcr: () => ipcRenderer.invoke('documents:ocr-finish'),
     info: () => ipcRenderer.invoke('documents:info'),
   },
+  license: {
+    getHwid: () => ipcRenderer.invoke('license:get-hwid'),
+    load: () => ipcRenderer.invoke('license:load'),
+    save: (payload) => ipcRenderer.invoke('license:save', payload),
+    clear: () => ipcRenderer.invoke('license:clear'),
+  },
 });

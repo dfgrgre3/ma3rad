@@ -111,8 +111,8 @@ export class ConflictResolver {
    * Returns an ordered list of FieldDiff — conflicts first, then differences, then identical.
    */
   compareFields(
-    localPayload: string | null,
-    remotePayload: string,
+    localPayload: string | Record<string, unknown> | null,
+    remotePayload: string | Record<string, unknown>,
     _entityType?: string,
   ): FieldDiff[] {
     const local = this.safeExtractRow(localPayload);
@@ -156,8 +156,8 @@ export class ConflictResolver {
    */
   autoResolve(
     entityType: string,
-    localPayload: string | null,
-    remotePayload: string,
+    localPayload: string | Record<string, unknown> | null,
+    remotePayload: string | Record<string, unknown>,
   ): AutoResolution | null {
     const policy = this.policyFor(entityType);
 
@@ -211,8 +211,8 @@ export class ConflictResolver {
    * Build a merged payload row from local and remote, according to strategy.
    */
   buildMergedPayload(
-    localPayload: string | null,
-    remotePayload: string,
+    localPayload: string | Record<string, unknown> | null,
+    remotePayload: string | Record<string, unknown>,
     diffs: FieldDiff[],
     strategy: MergeStrategy,
   ): Record<string, unknown> {
@@ -234,8 +234,9 @@ export class ConflictResolver {
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
-  private safeExtractRow(payload: string | null): Record<string, unknown> {
+  private safeExtractRow(payload: string | Record<string, unknown> | null): Record<string, unknown> {
     if (!payload) return {};
+    if (typeof payload === 'object') return this.extractRow(payload) ?? {};
     try {
       const parsed = JSON.parse(payload);
       return this.extractRow(parsed) ?? {};

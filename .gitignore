@@ -80,3 +80,7 @@ $RECYCLE.BIN/
 
 # Windows runtime-generated spellcheck dictionaries
 Microsoft/
+
+# Compiled V8 Bytecode
+*.jsc
+

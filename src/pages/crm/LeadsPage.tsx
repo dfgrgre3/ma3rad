@@ -105,6 +105,16 @@ export const LeadsPage: React.FC = () => {
     }
   };
 
+  const handleDelete = (lead: Lead) => {
+    if (!confirm(`هل أنت متأكد من حذف العميل المحتمل "${lead.name}"؟`)) return;
+    try {
+      service.deleteLead(lead.id);
+      load();
+    } catch (err: any) {
+      alert(err?.message || 'تعذر حذف العميل.');
+    }
+  };
+
   const handleConvert = (lead: Lead) => {
     if (!confirm(`تحويل "${lead.name}" إلى عميل مسجل؟`)) return;
     try {

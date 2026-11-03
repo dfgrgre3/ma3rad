@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { DatabaseManager } from '../database/db';
 import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
+import { CentralLicenseService } from '../services/CentralLicenseService';
 import { scheduleAutomaticBackupChecks } from '../services/BackupScheduler';
 import { toAppError } from '../errors/appError';
 import { ElectronSyncTransport } from '../sync/ElectronSyncTransport';
@@ -73,6 +74,7 @@ export function useAppStartup() {
   };
 
   useEffect(() => {
+    void CentralLicenseService.initHardwareBinding();
     initDb();
     return () => {
       if (backupTimer.current) clearInterval(backupTimer.current);

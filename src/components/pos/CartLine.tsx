@@ -38,6 +38,7 @@ export const CartLine: React.FC<CartLineProps> = ({
   onUpdatePrice,
   onUpdateLineDiscount,
   sellingPriceTiersCount = 1,
+  sellingPriceTierNames = [],
 }) => {
   const [isPriceMenuOpen, setIsPriceMenuOpen] = useState(false);
   const lineTotal = round2(item.quantityM2 * item.unitPrice - item.discountAmount);

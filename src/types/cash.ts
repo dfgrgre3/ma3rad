@@ -176,7 +176,6 @@ export interface SystemSettings {
   // POS & Invoicing settings
   sellingPriceTiersCount?: number;
   sellingPriceTierNames?: string[];
-  sellingPriceTierNames?: string[];
   posShowCashButton?: boolean;
   posAllowDuplicateItems?: boolean;
   posAutoSaveInvoice?: boolean;

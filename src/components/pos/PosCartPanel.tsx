@@ -45,6 +45,8 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
   onUpdateQuantity,
   onUpdatePrice,
   onUpdateLineDiscount,
+  sellingPriceTiersCount = 1,
+  sellingPriceTierNames = [],
 }) => (
   <>
     <PosCustomerPicker

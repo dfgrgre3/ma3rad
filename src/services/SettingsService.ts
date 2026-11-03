@@ -111,7 +111,7 @@ export class SettingsService {
       newInvoicesUnderDelivery: bool(map.newInvoicesUnderDelivery),
       vatOnDeliveryFee: bool(map.vatOnDeliveryFee),
       cashierMaxDiscountPercentWithoutApproval: num(map.cashierMaxDiscountPercentWithoutApproval ?? map.discountApprovalThresholdPercent, 0),
-      requireRemoteManagerApproval: bool(map.requireRemoteManagerApproval, true),
+      requireRemoteManagerApproval: map.requireRemoteManagerApproval === undefined ? true : bool(map.requireRemoteManagerApproval),
       posItemRemovalReasons: (() => {
         try {
           const val = map.posItemRemovalReasons;

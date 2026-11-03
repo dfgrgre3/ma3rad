@@ -124,6 +124,12 @@ declare global {
         ) => Promise<{ ok: boolean; error?: string }>;
         rawCups?: (bytes: Uint8Array, printerName: string) => Promise<{ ok: boolean; error?: string }>;
       };
+      license?: {
+        getHwid?: () => Promise<string>;
+        load?: () => Promise<{ active: boolean; reason?: string; license?: any; hwid: string; currentHwid?: string; boundHwid?: string }>;
+        save?: (payload: any) => Promise<{ ok: boolean; hwid: string }>;
+        clear?: () => Promise<{ ok: boolean }>;
+      };
       documents?: {
         importFile?: () => Promise<{
           ok: boolean;

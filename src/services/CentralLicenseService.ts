@@ -121,7 +121,24 @@ export class CentralLicenseService {
   static setCredential(cred: string) {
     localStorage.setItem(STORAGE_KEY, cred);
   }
+  private static cachedHwid = '';
+
+  static async initHardwareBinding(): Promise<string> {
+    try {
+      if (typeof window !== 'undefined' && window.ceramisys?.license?.getHwid) {
+        const hwid = await window.ceramisys.license.getHwid();
+        if (hwid) {
+          this.cachedHwid = hwid;
+          localStorage.setItem('central_device_id', hwid);
+          return hwid;
+        }
+      }
+    } catch { /* fallback */ }
+    return this.getDeviceId();
+  }
+
   static getDeviceId(): string {
+    if (this.cachedHwid) return this.cachedHwid;
     try {
       let id = localStorage.getItem('central_device_id');
       if (!id) { id = 'dev_' + Math.random().toString(36).slice(2, 10); localStorage.setItem('central_device_id', id); }
@@ -166,6 +183,15 @@ export class CentralLicenseService {
     if (!res.ok) throw new Error(data.message || data.error || 'activation_failed');
     if (typeof data.deviceCredential === 'string' && data.deviceCredential) {
       this.setCredential(data.deviceCredential);
+      try {
+        if (typeof window !== 'undefined' && window.ceramisys?.license?.save) {
+          await window.ceramisys.license.save({
+            deviceCredential: data.deviceCredential,
+            tenantId: data.tenantId,
+            activatedAt: Date.now(),
+          });
+        }
+      } catch { /* ignore safeStorage error */ }
     }
     return data;
   }
@@ -185,6 +211,9 @@ export class CentralLicenseService {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(LAST_VALIDATED_KEY);
       localStorage.removeItem(FIRST_RUN_ACTIVATION_KEY);
+      if (typeof window !== 'undefined' && window.ceramisys?.license?.clear) {
+        window.ceramisys.license.clear().catch(() => {});
+      }
     } catch {
       // Storage unavailability is handled by the activation gate.
     }
@@ -212,6 +241,19 @@ export class CentralLicenseService {
    * has elapsed without a successful validation.
    */
   static async validate(): Promise<boolean> {
+    if (typeof window !== 'undefined' && window.ceramisys?.license?.load) {
+      try {
+        const check = await window.ceramisys.license.load();
+        if (!check.active && check.reason === 'hardware_mismatch_cloned') {
+          console.error('License violation: Software cloning detected on unauthorized hardware.');
+          return false;
+        }
+        if (!check.active && check.reason === 'clock_rollback_detected') {
+          console.error('License violation: System clock rollback detected.');
+          return false;
+        }
+      } catch { /* ignore */ }
+    }
     const base = this.getSecureServerUrl();
     const cred = this.getCredential();
     if (!base || !cred) return false;

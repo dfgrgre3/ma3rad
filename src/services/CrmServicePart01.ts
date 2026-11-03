@@ -142,7 +142,9 @@ public deleteLead(id: string): void {
     return { customerId: customer.id };
   }
 
-public getActivities(search = '', status?: string): CrmActivity[] {
+
+
+  public getActivities(search = '', status?: string): CrmActivity[] {
     this.requireView();
     let sql = `
       SELECT a.*, COALESCE(l.name, c.name) AS lead_name

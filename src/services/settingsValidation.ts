@@ -30,7 +30,8 @@ function validateStringSetting(key: string, value: string): string {
   return value;
 }
 
-function serializeSetting(key: string, raw: string | number | boolean | null | undefined): string | undefined {
+function serializeSetting(key: string, raw: string | number | boolean | string[] | null | undefined): string | undefined {
+  if (Array.isArray(raw)) return JSON.stringify(raw);
   if (raw === undefined) return undefined;
   if (raw === null) return '';
   if (typeof raw === 'boolean') return raw ? '1' : '0';

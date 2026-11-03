@@ -16,6 +16,7 @@ const {
   registerSyncClientConfigHandlers,
 } = require('./syncClientConfig');
 const tailscaleService = require('./tailscaleService');
+const { registerLicenseHandlers } = require('./licenseGuard');
 
 // Load the documented local .env file for development launches. Explicit
 // process environment values take precedence; packaged deployments can set the
@@ -47,7 +48,19 @@ const BACKUP_DIR = path.join(APP_DATA_DIR, 'backups');
 const DB_FILE = path.join(DATA_DIR, 'ceramisys.sqlite');
 const REMEMBERED_CREDENTIALS_FILE = path.join(APP_DATA_DIR, 'remembered-login.enc');
 
+// Security: Anti-debugging & inspection switches
+const dangerousSwitches = ['--inspect', '--inspect-brk', '--remote-debugging-port'];
+if (app.isPackaged && dangerousSwitches.some(sw => process.argv.some(arg => arg.startsWith(sw)))) {
+  app.quit();
+}
+
 app.disableHardwareAcceleration();
+
+// تحسينات استهلاك الموارد للأجهزة الضعيفة والقديمة (Low-spec optimizations)
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 // Security: Allowed origins for IPC communication
 const ALLOWED_ORIGINS = new Set([
@@ -173,6 +186,25 @@ function createWindow() {
     win.loadFile(APP_HTML_PATH);
   }
 
+  // Security: DevTools protection in production
+  win.webContents.on('devtools-opened', () => {
+    if (app.isPackaged) {
+      win.webContents.closeDevTools();
+    }
+  });
+
+  win.webContents.on('before-input-event', (event, input) => {
+    if (app.isPackaged) {
+      const isDevKey = input.key === 'F12' ||
+        (input.control && input.shift && ['I', 'J', 'C', 'i', 'j', 'c'].includes(input.key)) ||
+        (input.control && ['u', 'U', 'r', 'R'].includes(input.key)) ||
+        input.key === 'F5';
+      if (isDevKey) {
+        event.preventDefault();
+      }
+    }
+  });
+
   win.maximize();
 }
 
@@ -200,6 +232,11 @@ registerDocumentHandlers({
   ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, appDataDir: APP_DATA_DIR,
 });
 registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR, MAX_PRINT_DATA });
+registerLicenseHandlers({
+  ipcMain,
+  validateIpcSender,
+  appDataDir: APP_DATA_DIR,
+});
 registerSyncClientConfigHandlers({
   ipcMain,
   validateIpcSender,
