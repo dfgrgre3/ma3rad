@@ -339,7 +339,7 @@ export class SecurityService {
       }
       // يجب حاليًا تنفيذ التشفير الفعلي
       // يمكن استخدام encryptBackupWithSignature المتقدم
-      if (!password) throw new Error('ØÙƒÙ„Ù…Ø© Ù…Ø±ÙˆØ± Ø§Ù„Ù†Ø³Ø®Ø© Ø§Ù„Ø§Ø­ØªÙŠØ§Ø·ÙŠØ© Ù…Ø·Ù„ÙˆØ¨Ø©.');
+      if (!password) throw new Error('كلمة مرور النسخة الاحتياطية مطلوبة.');
       return await encryptExternalBackup(backupData, password);
     } catch (error: any) {
       if (this.config.auditLogging) {

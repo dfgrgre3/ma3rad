@@ -369,7 +369,7 @@ test('auth: createUser enforces the same password policy as password changes', a
         fullName: 'Weak password user',
         role: 'CASHIER',
       }, 'usr_admin', admin),
-      /8|Ø­Ø±ÙˆÙ|ÙŠØ¬Ø¨/
+      /8|حروف|يجب/
     );
     assert.equal(db.query(`SELECT id FROM users WHERE username = ?`, ['weak_password_user']).length, 0);
   } finally {

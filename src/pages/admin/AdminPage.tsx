@@ -40,26 +40,26 @@ interface TabDef {
 const TABS: TabDef[] = [
   {
     id: "overview",
-    label: "Ù†Ø¸Ø±Ø© Ø¹Ø§Ù…Ø©",
+    label: "نظرة عامة",
     icon: LayoutDashboard,
     perm: "admin.view",
   },
-  { id: "users", label: "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†", icon: Users, perm: "users.view" },
+  { id: "users", label: "المستخدمون", icon: Users, perm: "users.view" },
   {
     id: "roles",
-    label: "Ø§Ù„Ø£Ø¯ÙˆØ§Ø± ÙˆØ§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª",
+    label: "الأدوار والصلاحيات",
     icon: ShieldCheck,
     perm: "roles.manage",
   },
   // settings merged into /settings hub
   {
     id: "navigation",
-    label: "Ø§Ù„Ù‚ÙˆØ§Ø¦Ù…",
+    label: "القوائم",
     icon: ListTree,
     perm: "admin.navigation",
   },
-  { id: "data", label: "Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª", icon: Database, perm: "admin.data" },
-  { id: "audit", label: "Ø³Ø¬Ù„ Ø§Ù„ØªØ¯Ù‚ÙŠÙ‚", icon: ScrollText, perm: "audit.view" },
+  { id: "data", label: "البيانات", icon: Database, perm: "admin.data" },
+  { id: "audit", label: "سجل التدقيق", icon: ScrollText, perm: "audit.view" },
 ];
 
 const COUNT_QUERIES: {
@@ -71,42 +71,42 @@ const COUNT_QUERIES: {
 }[] = [
   {
     key: "users",
-    label: "Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙˆÙ†",
+    label: "المستخدمون",
     table: "users",
     icon: Users,
     color: "text-sky-600",
   },
   {
     key: "products",
-    label: "Ø§Ù„Ø£ØµÙ†Ø§Ù",
+    label: "الأصناف",
     table: "products",
     icon: Package,
     color: "text-amber-600",
   },
   {
     key: "customers",
-    label: "Ø§Ù„Ø¹Ù…Ù„Ø§Ø¡",
+    label: "العملاء",
     table: "customers",
     icon: Building2,
     color: "text-pink-600",
   },
   {
     key: "invoices",
-    label: "ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø¨ÙŠØ¹",
+    label: "فواتير البيع",
     table: "sales_invoices",
     icon: Receipt,
     color: "text-emerald-600",
   },
   {
     key: "purchases",
-    label: "ÙÙˆØ§ØªÙŠØ± Ø§Ù„Ø´Ø±Ø§Ø¡",
+    label: "فواتير الشراء",
     table: "purchase_invoices",
     icon: Wallet,
     color: "text-orange-600",
   },
   {
     key: "audit",
-    label: "Ø³Ø¬Ù„Ø§Øª Ø§Ù„ØªØ¯Ù‚ÙŠÙ‚",
+    label: "سجلات التدقيق",
     table: "audit_logs",
     icon: Activity,
     color: "text-violet-600",
@@ -149,10 +149,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({ initialTab }) => {
           <ShieldCheck className="h-8 w-8 text-rose-500" />
         </div>
         <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
-          Ù…Ø±ÙƒØ² Ø§Ù„ØªØ­ÙƒÙ… ØºÙŠØ± Ù…ØªØ§Ø­
+          مركز التحكم غير متاح
         </h2>
         <p className="max-w-md text-sm text-slate-500">
-          ØªØ­ØªØ§Ø¬ ØµÙ„Ø§Ø­ÙŠØ© admin.view Ù„Ù„Ø¯Ø®ÙˆÙ„ Ø¥Ù„Ù‰ Ù…Ø±ÙƒØ² Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø¥Ø¯Ø§Ø±ÙŠ.
+          تحتاج صلاحية admin.view للدخول إلى مركز التحكم الإداري.
         </p>
       </div>
     );
@@ -164,23 +164,23 @@ export const AdminPage: React.FC<AdminPageProps> = ({ initialTab }) => {
 
   return (
     <div className="w-full space-y-5 p-4 lg:p-6">
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-lg shadow-sky-500/25">
               <SlidersHorizontal className="h-6 w-6" />
             </div>
             <div>
               <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">
-                Ù…Ø±ÙƒØ² Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø¥Ø¯Ø§Ø±ÙŠ
+                مركز التحكم الإداري
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                ØªØ­ÙƒÙ… ÙƒØ§Ù…Ù„ ÙÙŠ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…ÙŠÙ† ÙˆØ§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª ÙˆØ§Ù„Ù‡ÙˆÙŠØ© ÙˆØ§Ù„Ù‚ÙˆØ§Ø¦Ù… ÙˆØ§Ù„Ø¨ÙŠØ§Ù†Ø§Øª â€”{" "}
+                تحكم كامل في المستخدمين والصلاحيات والهوية والقوائم والبيانات —{" "}
                 {user?.fullName}
               </p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Ù…Ø¯ÙŠØ± Ø§Ù„Ù†Ø¸Ø§Ù…
+            <CheckCircle2 className="h-3.5 w-3.5" /> مدير النظام
           </span>
         </div>
 
@@ -299,41 +299,41 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-              <Database className="h-4 w-4 text-sky-500" /> Ø­Ø§Ù„Ø© Ø§Ù„Ù†Ø¸Ø§Ù…
+              <Database className="h-4 w-4 text-sky-500" /> حالة النظام
             </h3>
             <div className="space-y-2 text-xs">
               <Row
-                label="Ø­Ø¬Ù… Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª"
-                value={storage ? fmt(storage.databaseBytes) : "â€”"}
+                label="حجم قاعدة البيانات"
+                value={storage ? fmt(storage.databaseBytes) : "—"}
               />
               <Row
-                label="Ø§Ù„ØªØ®Ø²ÙŠÙ† Ø§Ù„Ù…Ø­Ù„ÙŠ"
-                value={storage ? fmt(storage.localStorageBytes) : "â€”"}
+                label="التخزين المحلي"
+                value={storage ? fmt(storage.localStorageBytes) : "—"}
               />
               <Row
-                label="Ø¹Ø¯Ø¯ Ø§Ù„Ø¬Ø¯Ø§ÙˆÙ„"
-                value={storage ? String(storage.tableCount) : "â€”"}
+                label="عدد الجداول"
+                value={storage ? String(storage.tableCount) : "—"}
               />
               <Row
-                label="Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø³Ø¬Ù„Ø§Øª"
+                label="إجمالي السجلات"
                 value={
-                  storage ? storage.totalRows.toLocaleString("en-US") : "â€”"
+                  storage ? storage.totalRows.toLocaleString("en-US") : "—"
                 }
               />
               <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
                 <span className="font-bold text-slate-500 dark:text-slate-400">
-                  Ø³Ù„Ø§Ù…Ø© Ø§Ù„Ù‚Ø§Ø¹Ø¯Ø©
+                  سلامة القاعدة
                 </span>
                 {integrity === "ok" ? (
                   <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Ø³Ù„ÙŠÙ…Ø©
+                    <CheckCircle2 className="h-3.5 w-3.5" /> سليمة
                   </span>
                 ) : integrity === "bad" ? (
                   <span className="inline-flex items-center gap-1 font-bold text-rose-600 dark:text-rose-400">
-                    <AlertTriangle className="h-3.5 w-3.5" /> ØªØ­ØªØ§Ø¬ Ù…Ø±Ø§Ø¬Ø¹Ø©
+                    <AlertTriangle className="h-3.5 w-3.5" /> تحتاج مراجعة
                   </span>
                 ) : (
-                  <span className="font-bold text-slate-400">ØºÙŠØ± Ù…ØªØ§Ø­</span>
+                  <span className="font-bold text-slate-400">غير متاح</span>
                 )}
               </div>
             </div>
@@ -341,17 +341,17 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <h3 className="mb-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-              Ø§Ø®ØªØµØ§Ø±Ø§Øª
+              اختصارات
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Quick
-                label="Ø¥Ø¶Ø§ÙØ© Ù…Ø³ØªØ®Ø¯Ù…"
+                label="إضافة مستخدم"
                 to="users"
                 icon={Users}
                 onClick={onNavigate}
               />
               <Quick
-                label="Ù…ØµÙÙˆÙØ© Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª"
+                label="مصفوفة الصلاحيات"
                 to="roles"
                 icon={ShieldCheck}
                 onClick={onNavigate}
@@ -363,11 +363,11 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
                 className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 <SettingsIcon className="h-4 w-4 text-sky-500" />
-                <span className="flex-1 text-right">Ø§Ù„Ù‡ÙˆÙŠØ© ÙˆØ§Ù„Ù…Ø¸Ù‡Ø±</span>
+                <span className="flex-1 text-right">الهوية والمظهر</span>
                 <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
               </button>
               <Quick
-                label="Ù…Ø­Ø±Ø± Ø§Ù„Ù‚ÙˆØ§Ø¦Ù…"
+                label="محرر القوائم"
                 to="navigation"
                 icon={ListTree}
                 onClick={onNavigate}
@@ -378,7 +378,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
 
         {canViewAudit && <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-extrabold text-slate-900 dark:text-slate-100">
-            <ScrollText className="h-4 w-4 text-violet-500" /> Ø£Ø­Ø¯Ø« Ø§Ù„Ø¹Ù…Ù„ÙŠØ§Øª
+            <ScrollText className="h-4 w-4 text-violet-500" /> أحدث العمليات
           </h3>
           <div className="space-y-1">
             {recent.map((log) => (
@@ -392,7 +392,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
                     {log.action}
                   </div>
                   <div className="text-[10px] text-slate-400">
-                    {log.userName} Â· {log.module}
+                    {log.userName} · {log.module}
                   </div>
                 </div>
                 <span className="whitespace-nowrap font-mono text-[10px] text-slate-400">
@@ -402,7 +402,7 @@ const Overview: React.FC<{ onNavigate: (tab: TabId) => void }> = ({
             ))}
             {recent.length === 0 && (
               <div className="py-6 text-center text-xs text-slate-400">
-                Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¹Ù…Ù„ÙŠØ§Øª Ù…Ø³Ø¬Ù„Ø© Ø¨Ø¹Ø¯.
+                لا توجد عمليات مسجلة بعد.
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { AdminSettingsTab } from '../admin/AdminSettingsTab';
@@ -33,8 +33,8 @@ export const SettingsHubPage: React.FC = () => {
             <SettingsIcon className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">Ù…Ø±ÙƒØ² Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù†Ø¸Ø§Ù…</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¹Ø§Ù…Ø©ØŒ Ø§Ù„Ù†Ø´Ø§Ø·ØŒ Ø§Ù„Ù‡ÙˆÙŠØ©ØŒ Ø§Ù„ÙÙˆØ§ØªÙŠØ±ØŒ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†ØŒ Ø§Ù„ØªØ´ØºÙŠÙ„ØŒ Ø§Ù„Ø£Ù…Ø§Ù†ØŒ ÙˆØ§Ù„Ù†Ø³Ø® ÙˆØ§Ù„Ø§Ø³ØªØ¹Ø§Ø¯Ø©</p>
+            <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">مركز إعدادات النظام</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">الإعدادات العامة، النشاط، الهوية، الفواتير، المخزون، التشغيل، الأمان، والنسخ والاستعادة</p>
           </div>
         </div>
 
