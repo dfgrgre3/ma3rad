@@ -5,6 +5,8 @@ import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnit
 import { AppConfigService } from './AppConfigService';
 import { EscPosService } from './EscPosService';
 import { SettingsService } from './SettingsService';
+import { getEffectiveBusinessType } from './BusinessTypeService';
+import { getProfilePrintTemplate } from '../config/businessProfiles';
 
 export type InvoiceTemplateId = 'classic' | 'modern' | 'compact' | 'detailed';
 export type InvoiceSizeId = 'a4' | 'a5' | 'thermal';
@@ -172,7 +174,12 @@ export class PrintService {
     const settings = { ...this.getSettings(), ...(opts.settingsOverride || {}) };
     const autoPrint = opts.autoPrint ?? false;
     const size: InvoiceSizeId = opts.size || (settings.defaultInvoiceSize as InvoiceSizeId) || 'a4';
-    const template: InvoiceTemplateId = opts.template || (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'classic';
+    const profileTemplate = getProfilePrintTemplate(getEffectiveBusinessType(), 'sales_invoice');
+    const resolvedProfileTemplate =
+      profileTemplate && (['classic', 'modern', 'compact', 'detailed'] as const).includes(profileTemplate as any)
+        ? (profileTemplate as InvoiceTemplateId)
+        : undefined;
+    const template: InvoiceTemplateId = opts.template || (settings.defaultInvoiceTemplate as InvoiceTemplateId) || resolvedProfileTemplate || 'classic';
 
     if (size === 'thermal') {
       return this.getThermalInvoiceHtml(invoice, settings, autoPrint);

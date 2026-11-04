@@ -279,6 +279,10 @@ export const PERMISSIONS: PermissionDef[] = [
   // HR documents
   { code: 'hr.documents.view', name: 'عرض مستندات الموظفين', module: 'HR' },
   { code: 'hr.documents.manage', name: 'إدارة مستندات الموظفين وأرشفتها', module: 'HR' },
+
+  // HR recruitment
+  { code: 'hr.recruitment.view', name: 'عرض الوظائف والمرشحين', module: 'HR' },
+  { code: 'hr.recruitment.manage', name: 'إدارة الوظائف ومراحل التوظيف', module: 'HR' },
 ];
 
 // Default permissions per built-in role. These are only used to seed a role
@@ -492,6 +496,7 @@ export class PermissionService {
       PermissionService.reconcileManagerPermissions(db, defaults);
       PermissionService.backfillInventoryCountApproval(db);
     }
+    PermissionService.backfillRecruitmentPermissions(db, roleCode);
     PermissionService.backfillExportPermissions(db, roleCode);
     PermissionService.backfillReceivablesPermissions(db, roleCode);
     PermissionService.backfillPermissionMappings(db, roleCode);
@@ -509,6 +514,9 @@ export class PermissionService {
     const markerKey = `rbac.permissionMappings.v1.${roleCode}`;
     if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
     for (const [newPermission, sources] of Object.entries(PERMISSION_BACKFILL_SOURCES)) {
+      // Destructive (delete) grants are full-access capabilities and must never
+      // be propagated through legacy coarse-grained sources for built-in roles.
+      if (MANAGER_RESTRICTED.has(newPermission)) continue;
       const hasSource = sources.length === 0
         ? false
         : sources.some((source) => db.query('SELECT 1 FROM role_permissions WHERE role_code = ? AND permission_code = ?', [roleCode, source]).length > 0);
@@ -551,6 +559,39 @@ export class PermissionService {
         ['ADMIN', permission]
       );
     }
+  }
+
+  private static backfillRecruitmentPermissions(db: DatabaseManager, roleCode: string): void {
+    const markerKey = `rbac.recruitmentPermissions.v1.${roleCode}`;
+    if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
+    if (roleCode === 'ADMIN') {
+      db.run(
+        'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+        ['ADMIN', 'hr.recruitment.view']
+      );
+      db.run(
+        'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+        ['ADMIN', 'hr.recruitment.manage']
+      );
+    } else if (roleCode === 'MANAGER') {
+      const current = new Set(db.query<{ permissionCode: string }>(
+        'SELECT permission_code AS permissionCode FROM role_permissions WHERE role_code = ?',
+        [roleCode]
+      ).map((row) => row.permissionCode));
+      if (current.has('employees.view')) {
+        db.run(
+          'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+          ['MANAGER', 'hr.recruitment.view']
+        );
+      }
+      if (current.has('employees.manage')) {
+        db.run(
+          'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+          ['MANAGER', 'hr.recruitment.manage']
+        );
+      }
+    }
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
   }
 
   private static backfillInventoryCountApproval(db: DatabaseManager): void {

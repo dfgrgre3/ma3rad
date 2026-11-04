@@ -90,10 +90,11 @@ export class SalesService {
     paymentType: PaymentType = 'CASH',
     registerId?: string,
     shiftId?: string,
-    notes = ''
+    notes = '',
+    idempotencyKey?: string
   ): CustomerPayment {
     ModuleRegistryService.assertModuleEnabled('sales');
-    return recordInvoicePaymentEntry(this.context(), invoiceId, amount, paymentType, registerId, shiftId, notes);
+    return recordInvoicePaymentEntry(this.context(), invoiceId, amount, paymentType, registerId, shiftId, notes, idempotencyKey);
   }
 
   /** Record one receipt allocated across several open invoices in one transaction. */

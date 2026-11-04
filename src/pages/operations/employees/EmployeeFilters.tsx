@@ -1,12 +1,13 @@
 import React from 'react';
 import { Calendar, Filter, Search } from 'lucide-react';
-import { DEFAULT_LOCATIONS, type EmployeeTab } from './types';
+import type { EmployeeTab } from './types';
 
 interface EmployeeFiltersProps {
   activeTab: EmployeeTab;
   searchQuery: string;
   selectedLocation: string;
   attendanceDate: string;
+  locations: string[];
   onSearchQueryChange: (value: string) => void;
   onSelectedLocationChange: (value: string) => void;
   onAttendanceDateChange: (value: string) => void;
@@ -17,6 +18,7 @@ export const EmployeeFilters: React.FC<EmployeeFiltersProps> = ({
   searchQuery,
   selectedLocation,
   attendanceDate,
+  locations,
   onSearchQueryChange,
   onSelectedLocationChange,
   onAttendanceDateChange,
@@ -46,7 +48,7 @@ export const EmployeeFilters: React.FC<EmployeeFiltersProps> = ({
               className="bg-transparent text-xs text-slate-800 font-bold focus:outline-none cursor-pointer"
             >
               <option value="ALL" className="bg-white text-slate-800">الكل</option>
-              {DEFAULT_LOCATIONS.map(loc => (
+              {locations.map(loc => (
                 <option key={loc} value={loc} className="bg-white text-slate-800">{loc}</option>
               ))}
             </select>

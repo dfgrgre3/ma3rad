@@ -88,7 +88,7 @@ class TailscaleService {
         peers,
         backendState: data.BackendState
       };
-    } catch (e) {
+    } catch {
       return {
         installed: true,
         running: false,
@@ -118,4 +118,3 @@ class TailscaleService {
 }
 
 module.exports = new TailscaleService();
-

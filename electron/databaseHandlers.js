@@ -1,5 +1,6 @@
 const { createCipheriv, createDecipheriv, randomBytes } = require('node:crypto');
 const backupStrategyService = require('./backupStrategyService');
+const safeStorageCompat = require('./safeStorageCompat');
 
 const DB_MAGIC = Buffer.from('CERAMISYS-DB\0v1\0', 'utf8');
 const DB_KEY_FILE = 'database-key.enc';
@@ -7,8 +8,7 @@ const DB_KEY_FILE = 'database-key.enc';
 async function decryptStoredString(safeStorage, encrypted) {
   // shouldReEncrypt is a signal to migrate the ciphertext, not to decrypt the
   // same bytes again. Repeating that call can loop forever on some platforms.
-  const decrypted = await safeStorage.decryptStringAsync(encrypted);
-  return decrypted.result;
+  return safeStorageCompat.decryptString(safeStorage, encrypted);
 }
 
 function hasDatabaseMagic(bytes) {
@@ -16,7 +16,7 @@ function hasDatabaseMagic(bytes) {
 }
 
 async function readOrCreateDatabaseKey({ appDataDir, fs, safeStorage, path, createIfMissing = true }) {
-  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
+  if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
     throw new Error('تشفير قاعدة البيانات غير متاح في مخزن النظام الآمن على هذا الجهاز.');
   }
   const keyPath = path.join(appDataDir, DB_KEY_FILE);
@@ -32,7 +32,7 @@ async function readOrCreateDatabaseKey({ appDataDir, fs, safeStorage, path, crea
 
   const key = randomBytes(32);
   const temporaryPath = `${keyPath}.tmp`;
-  const encryptedKey = await safeStorage.encryptStringAsync(key.toString('base64'));
+  const encryptedKey = await safeStorageCompat.encryptString(safeStorage, key.toString('base64'));
   await fs.writeFile(temporaryPath, encryptedKey, { mode: 0o600 });
   await fs.rename(temporaryPath, keyPath);
   return key;
@@ -321,7 +321,7 @@ ipcMain.handle('db:cleanup-backups', async (event, retention = {}) => {
   ipcMain.handle('credentials:get', async (event) => {
     validateIpcSender(event);
     if (!fsSync.existsSync(REMEMBERED_CREDENTIALS_FILE)) return null;
-    if (!(await safeStorage.isAsyncEncryptionAvailable())) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
+    if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
     const encrypted = await fs.readFile(REMEMBERED_CREDENTIALS_FILE);
     const credentials = JSON.parse(await decryptStoredString(safeStorage, encrypted));
     if (typeof credentials.username !== 'string' || typeof credentials.password !== 'string') {
@@ -337,9 +337,9 @@ ipcMain.handle('db:cleanup-backups', async (event, retention = {}) => {
   ipcMain.handle('credentials:set', async (event, { username, password }) => {
     validateIpcSender(event);
     if (typeof username !== 'string' || typeof password !== 'string') throw new Error('بيانات الدخول غير صالحة للحفظ.');
-    if (!(await safeStorage.isAsyncEncryptionAvailable())) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
+    if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) throw new Error('التخزين الآمن لكلمات المرور غير متاح على هذا الجهاز.');
     ensureDirs();
-    const encrypted = await safeStorage.encryptStringAsync(JSON.stringify({ username, password, consented: true }));
+    const encrypted = await safeStorageCompat.encryptString(safeStorage, JSON.stringify({ username, password, consented: true }));
     const temporaryFile = `${REMEMBERED_CREDENTIALS_FILE}.tmp`;
     await fs.writeFile(temporaryFile, encrypted, { mode: 0o600 });
     await fs.rename(temporaryFile, REMEMBERED_CREDENTIALS_FILE);

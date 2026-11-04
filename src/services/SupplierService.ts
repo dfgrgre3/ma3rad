@@ -169,7 +169,6 @@ export class SupplierService {
     if (!sup) throw new Error('المورد غير موجود.');
 
     const paymentId = `spay_${uuidv4().substring(0, 8)}`;
-    const receiptNumber = `PAY-${Date.now().toString().slice(-6)}`;
     const today = localDateString();
 
     return this.db.executeTransaction((sqliteDb) => {
@@ -183,6 +182,7 @@ export class SupplierService {
           return prior as SupplierPayment;
         }
       }
+      const receiptNumber = sqliteDb.nextNumber('PAY');
       // 1. Insert Payment Receipt
       sqliteDb.run(`
         INSERT INTO supplier_payments (

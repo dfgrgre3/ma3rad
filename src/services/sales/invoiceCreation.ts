@@ -6,12 +6,14 @@ import { InventoryCostingService } from '../InventoryCostingService';
 import { BatchService } from '../BatchService';
 import { localDateString } from '../../utils/date';
 import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
-import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
+import { paymentAccountCode } from '../../database/ledger';
 import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../financials';
 import { ModuleRegistryService } from '../ModuleRegistryService';
-import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
 import { CentralUsageLimitService } from '../CentralUsageLimitService';
+import { defaultEffectEngine } from '../effects/EffectEngine';
+import type { Effect } from '../effects/EffectTypes';
+import '../effects/handlers/salesInvoiceHandlers';
 import type { SalesInvoice, PaymentType } from '../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from './types';
@@ -452,13 +454,6 @@ function buildLedgerEntries(
   ];
 }
 
-function insertAuditLog(sqliteDb: any, actor: any, invoiceId: string, invoiceNumber: string | number, totals: ReturnType<typeof computeSaleTotals>): void {
-  sqliteDb.run(`
-    INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-    VALUES (?, ?, ?, 'إصدار فاتورة مبيعات', 'SALES', ?, ?)
-  `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoiceId, JSON.stringify({ invoiceNumber, totalAmount: totals.totalAmount, paidAmount: totals.paidAmount })]);
-}
-
 export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): SalesInvoice {
   assertSaleHasItems(dto);
   const actor = AuthService.requireAuth();
@@ -536,17 +531,37 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     // Any cost not relieved from inventory belongs to stock-free lines (services).
     const serviceCost = trackInventory ? round2(financialTotals.totalCost - inventoryCost) : 0;
     const ledgerLines = buildLedgerEntries(dto, financialTotals, inventoryCost, Math.max(0, serviceCost));
-    postLedgerEntry(sqliteDb.getDatabase(), {
-      date: today,
-      description: `Sale ${invoiceNumber}`,
-      referenceType: 'SALES_INVOICE',
-      referenceId: invoiceId,
-      createdBy: actor.id,
-      lines: ledgerLines,
-    });
+    const effects: Effect[] = [
+      {
+        type: 'ledger.post',
+        payload: {
+          aggregateType: 'sales_invoice',
+          aggregateId: invoiceId,
+          data: {
+            date: today,
+            description: `Sale ${invoiceNumber}`,
+            referenceType: 'SALES_INVOICE',
+            referenceId: invoiceId,
+            createdBy: actor.id,
+            lines: ledgerLines,
+          },
+        },
+      },
+      {
+        type: 'audit.log',
+        payload: {
+          aggregateType: 'sales_invoice',
+          aggregateId: invoiceId,
+          data: { invoiceId, invoiceNumber, totals },
+        },
+      },
+      {
+        type: 'sync.capture',
+        payload: { aggregateType: 'sales_invoice', aggregateId: invoiceId, data: {} },
+      },
+    ];
+    defaultEffectEngine.run({ db: sqliteDb, actorId: actor.id, actorName: actor.fullName }, effects);
 
-    insertAuditLog(sqliteDb, actor, invoiceId, invoiceNumber, totals);
-    new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_invoice', invoiceId, 'CREATE');
     return ctx.getInvoiceById(invoiceId)!;
   });
 }

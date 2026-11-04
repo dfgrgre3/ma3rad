@@ -52,4 +52,13 @@ function isAllowedIpcSender(event, options) {
   return isAllowedAppUrl(frame.url, options);
 }
 
-module.exports = { isAllowedAppUrl, isAllowedIpcSender, sameLocalFileUrl };
+module.exports = {
+  isAllowedAppUrl,
+  isAllowedIpcSender,
+  sameLocalFileUrl,
+  get crypto() { return require('./security/crypto'); },
+  get licenseValidator() { return require('./security/licenseValidator'); },
+  get fileIntegrity() { return require('./security/fileIntegrity'); },
+  get ipcGuard() { return require('./security/ipcGuard'); },
+  get auditLogger() { return require('./security/auditLogger'); },
+};

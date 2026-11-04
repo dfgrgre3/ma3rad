@@ -17,6 +17,7 @@ const compiledFiles = [
   'syncClientConfig',
   'syncRelay',
   'gracefulShutdown',
+  'safeStorageCompat',
 ];
 
 console.log('🛡️ Cleaning plain JS files to keep only compiled V8 bytecode in release bundle...');
@@ -36,4 +37,3 @@ for (const name of compiledFiles) {
 }
 
 console.log('✅ Production bundle ready: All business logic is compiled to binary.');
-

@@ -5,14 +5,16 @@ import { SettingsService } from '../SettingsService';
 import { InventoryCostingService } from '../InventoryCostingService';
 import { BatchService } from '../BatchService';
 import { localDateString } from '../../utils/date';
-import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
+import { paymentAccountCode } from '../../database/ledger';
 import { round2 } from '../financials';
 import type { SalesInvoice } from '../../types';
 import type { DatabaseManager } from '../../database/db';
 import { isServiceProduct } from '../../utils/productUnits';
 import type { InvoiceWithItems, SalesContext } from './context';
 import { ModuleRegistryService } from '../ModuleRegistryService';
-import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
+import { defaultEffectEngine } from '../effects/EffectEngine';
+import type { Effect } from '../effects/EffectTypes';
+import '../effects/handlers/salesInvoiceHandlers';
 
 function restoreInvoiceItem(
   sqliteDb: DatabaseManager,
@@ -121,36 +123,45 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
         .filter((item) => !isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit }))
         .reduce((sum, item) => sum + Number(item.totalCost || 0), 0))
       : 0;
-    postLedgerEntry(sqliteDb.getDatabase(), {
-      date: localDateString(),
-      description: `Void sale ${inv.invoiceNumber}`,
-      referenceType: 'SALES_VOID',
-      referenceId: invoiceId,
-      createdBy: actor.id,
-      lines: [
-        { accountCode: '4101', debit: round2(inv.subtotal - inv.discountAmount), credit: 0 },
-        ...(inv.shippingCost > 0 ? [{ accountCode: '4102', debit: inv.shippingCost, credit: 0 }] : []),
-        ...(inv.taxAmount > 0 ? [{ accountCode: '2102', debit: inv.taxAmount, credit: 0 }] : []),
-        ...(inv.paidAmount > 0 ? [{
-          accountCode: paymentAccountCode(inv.paymentType),
-          debit: 0,
-          credit: inv.paidAmount,
-        }] : []),
-        ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),
-        ...(invoiceCost > 0 ? [
-          { accountCode: '1104', debit: invoiceCost, credit: 0 },
-          { accountCode: '5101', debit: 0, credit: invoiceCost },
-        ] : []),
-      ],
-    });
+    const effects: Effect[] = [
+      {
+        type: 'ledger.post',
+        payload: {
+          aggregateType: 'sales_invoice',
+          aggregateId: invoiceId,
+          data: {
+            date: localDateString(),
+            description: `Void sale ${inv.invoiceNumber}`,
+            referenceType: 'SALES_VOID',
+            referenceId: invoiceId,
+            createdBy: actor.id,
+            lines: [
+              { accountCode: '4101', debit: round2(inv.subtotal - inv.discountAmount), credit: 0 },
+              ...(inv.shippingCost > 0 ? [{ accountCode: '4102', debit: inv.shippingCost, credit: 0 }] : []),
+              ...(inv.taxAmount > 0 ? [{ accountCode: '2102', debit: inv.taxAmount, credit: 0 }] : []),
+              ...(inv.paidAmount > 0 ? [{ accountCode: paymentAccountCode(inv.paymentType), debit: 0, credit: inv.paidAmount }] : []),
+              ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),
+              ...(invoiceCost > 0 ? [{ accountCode: '1104', debit: invoiceCost, credit: 0 }, { accountCode: '5101', debit: 0, credit: invoiceCost }] : []),
+            ],
+          },
+        },
+      },
+      {
+        type: 'audit.log',
+        payload: {
+          aggregateType: 'sales_invoice',
+          aggregateId: invoiceId,
+          data: { recordId: invoiceId, action: 'إلغاء فاتورة مبيعات', module: 'SALES', oldValues: { invoiceNumber: inv.invoiceNumber }, newValues: { reason } },
+        },
+      },
+      {
+        type: 'sync.capture',
+        payload: { aggregateType: 'sales_invoice', aggregateId: invoiceId, data: { operation: 'UPDATE' } },
+      },
+    ];
+    defaultEffectEngine.run({ db: sqliteDb, actorId: actor.id, actorName: actor.fullName }, effects);
 
     sqliteDb.run(`UPDATE sales_invoices SET invoice_status = 'VOID', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [invoiceId]);
-    new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_invoice', invoiceId, 'UPDATE');
-
-    sqliteDb.run(`
-      INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
-      VALUES (?, ?, ?, 'إلغاء فاتورة مبيعات', 'SALES', ?, ?, ?)
-    `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoiceId, JSON.stringify({ invoiceNumber: inv.invoiceNumber }), JSON.stringify({ reason })]);
 
     return ctx.getInvoiceById(invoiceId)!;
   });

@@ -21,23 +21,24 @@ type ProductUnitInfo = {
   customUnit?: string;
 };
 
-export const getProductUnitLabel = (product: ProductUnitInfo): string => {
+export const getProductUnitLabel = (product?: ProductUnitInfo | null): string => {
   // Ceramic products keep the historical area/linear-meter wording even when
   // their stored base unit differs. Every other product type (GENERAL, SERVICE)
   // is described by its configured unit.
-  if (!product.productType || product.productType === 'CERAMIC') {
-    return product.baseUnit === 'LINEAR_METER' ? 'متر طولي' : 'م²';
+  const info = product ?? {};
+  if (!info.productType || info.productType === 'CERAMIC') {
+    return info.baseUnit === 'LINEAR_METER' ? 'متر طولي' : 'م²';
   }
-  if (product.baseUnit === 'CUSTOM') return product.customUnit?.trim() || 'وحدة';
-  if (!product.baseUnit) return product.customUnit?.trim() || 'وحدة';
-  return Object.entries(UNIT_LABELS).find(([unit]) => unit === product.baseUnit)?.[1] || 'وحدة';
+  if (info.baseUnit === 'CUSTOM') return info.customUnit?.trim() || 'وحدة';
+  if (!info.baseUnit) return info.customUnit?.trim() || 'وحدة';
+  return Object.entries(UNIT_LABELS).find(([unit]) => unit === info.baseUnit)?.[1] || 'وحدة';
 };
 
-export const formatProductQuantity = (quantity: number, product: ProductUnitInfo): string =>
+export const formatProductQuantity = (quantity: number, product?: ProductUnitInfo | null): string =>
   `${Number(quantity || 0).toLocaleString('ar-EG')} ${getProductUnitLabel(product)}`;
 
-export const getStockQuantityLabel = (product: ProductUnitInfo): string =>
-  !product.productType || product.productType === 'CERAMIC' ? 'م²' : getProductUnitLabel(product);
+export const getStockQuantityLabel = (product?: ProductUnitInfo | null): string =>
+  !product?.productType || product.productType === 'CERAMIC' ? 'م²' : getProductUnitLabel(product);
 
 /**
  * A service line is sold without a stock movement even when the business tracks

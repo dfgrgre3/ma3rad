@@ -390,7 +390,7 @@ export class PurchaseService {
 
       if (dto.paidAmount > 0 && dto.paymentType !== 'CREDIT') {
         const paymentId = `spay_${uuidv4().substring(0, 8)}`;
-        const receiptNumber = `PAY-${Date.now().toString().slice(-8)}`;
+        const receiptNumber = sqliteDb.nextNumber('PAY');
         sqliteDb.run(`
           INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, branch_id, notes, performed_by)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -488,7 +488,8 @@ export class PurchaseService {
     amount: number,
     paymentType: PaymentType = 'CASH',
     registerId = 'cr_main',
-    notes = ''
+    notes = '',
+    idempotencyKey?: string
   ): { id: string; receiptNumber: string; amount: number } {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.payment');
@@ -506,15 +507,31 @@ export class PurchaseService {
     const paymentId = `spay_${uuidv4().substring(0, 8)}`;
 
     return this.db.executeTransaction((db) => {
+      if (idempotencyKey) {
+        const prior = db.query<any>(
+          `SELECT * FROM supplier_payments WHERE idempotency_key = ?`,
+          [idempotencyKey]
+        )[0];
+        if (prior) {
+          const alloc = db.query<{ purchaseInvoiceId: string }>(
+            `SELECT purchase_invoice_id AS purchaseInvoiceId FROM supplier_payment_allocations WHERE payment_id = ?`,
+            [prior.id]
+          )[0];
+          if (!alloc || alloc.purchaseInvoiceId !== purchaseId || round2(Number(prior.amount)) !== value) {
+            throw new Error('The idempotency key was already used for a different payment.');
+          }
+          return { id: prior.id, receiptNumber: prior.receiptNumber, amount: prior.amount };
+        }
+      }
       const receiptNumber = db.nextNumber('PAY');
       const newPaid = round2(invoice.paidAmount + value);
       const newRemaining = round2(Math.max(0, invoice.remainingAmount - value));
       const status = newRemaining <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID';
 
       db.run(
-        `INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, branch_id, notes, performed_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [paymentId, receiptNumber, invoice.supplierId, value, paymentType, today, registerId, branchId, notes || `سداد دفعة على فاتورة توريد ${invoice.invoiceNumber}`, actor.id]
+        `INSERT INTO supplier_payments (id, receipt_number, supplier_id, amount, payment_type, date, register_id, branch_id, notes, performed_by, idempotency_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [paymentId, receiptNumber, invoice.supplierId, value, paymentType, today, registerId, branchId, notes || `سداد دفعة على فاتورة توريد ${invoice.invoiceNumber}`, actor.id, idempotencyKey || null]
       );
       db.run(`INSERT INTO supplier_payment_allocations (id,payment_id,purchase_invoice_id,amount) VALUES (?,?,?,?)`,
         [`spa_${uuidv4().substring(0, 8)}`, paymentId, purchaseId, value]);

@@ -69,6 +69,11 @@ contextBridge.exposeInMainWorld('ceramisys', {
     getHwid: () => ipcRenderer.invoke('license:get-hwid'),
     load: () => ipcRenderer.invoke('license:load'),
     save: (payload) => ipcRenderer.invoke('license:save', payload),
+    applyOfflineLicense: (certificate) => ipcRenderer.invoke('license:apply-offline', certificate),
+    exportOfflineRequest: (customerInfo) => ipcRenderer.invoke('license:export-offline-request', customerInfo),
     clear: () => ipcRenderer.invoke('license:clear'),
+  },
+  security: {
+    checkIntegrity: () => ipcRenderer.invoke('security:check-integrity'),
   },
 });

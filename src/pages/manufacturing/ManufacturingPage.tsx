@@ -5,6 +5,8 @@ import { ProductService } from '../../services/ProductService';
 import { BranchService } from '../../services/BranchService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
+import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
+import { getProfileWorkflows } from '../../config/businessProfiles';
 
 export const ManufacturingPage: React.FC = () => {
   const service = useMemo(() => new ManufacturingService(), []);
@@ -122,6 +124,14 @@ export const ManufacturingPage: React.FC = () => {
           <RefreshCw className="h-4 w-4" />
         </button>
       </div>
+      {getProfileWorkflows(getEffectiveBusinessType()).length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
+          <span className="font-bold text-slate-500">سير عمل النشاط: </span>
+          {getProfileWorkflows(getEffectiveBusinessType()).map((w) => (
+            <span key={w.id} className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800" title={w.steps.join(' → ')}>{w.label.ar}</span>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-1 border-b border-slate-200">
         {[

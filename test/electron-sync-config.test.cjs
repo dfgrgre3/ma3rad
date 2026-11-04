@@ -12,11 +12,11 @@ const {
 
 const TOKEN = 'electron-sync-config-token-with-at-least-thirty-two-bytes';
 
-async function createConfigHandlers() {
+async function createConfigHandlers(safeStorageOverride) {
   const appDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-sync-config-'));
   const handlers = new Map();
   const ipcMain = { handle: (name, handler) => handlers.set(name, handler) };
-  const safeStorage = {
+  const safeStorage = safeStorageOverride || {
     isAsyncEncryptionAvailable: async () => true,
     encryptStringAsync: async (value) => Buffer.from(`encrypted:${Buffer.from(value).toString('base64')}`),
     decryptStringAsync: async (value) => {
@@ -85,6 +85,27 @@ test('sync client configuration is encrypted, reloadable, and never returns its 
       (await context.handlers.get('sync:client-config:get')(context.event)).tokenConfigured,
       true,
     );
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('sync client configuration supports synchronous safeStorage APIs', async () => {
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString(),
+  };
+  const context = await createConfigHandlers(safeStorage);
+  try {
+    await context.handlers.get('sync:client-config:save')(context.event, validConfig());
+    const loaded = await loadSyncClientConfig({
+      appDataDir: context.appDataDir,
+      fs,
+      path,
+      safeStorage,
+    });
+    assert.equal(loaded.token, TOKEN);
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }

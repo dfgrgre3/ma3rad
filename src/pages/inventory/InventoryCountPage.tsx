@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
-import { branchAccess } from './inventory-count/branchAccess';
-import { loadBranchCountSessions, loadCountProducts, loadCountSessionItems, loadCountWarehouses } from './inventory-count/countSessionData';
-import { approveCountSession, cancelCountSession, rejectCountSession, saveCountDraft, startCountSession, submitCountSession } from './inventory-count/countSessionService';
+import { branchAccess } from '../../services/inventory-count/branchAccess';
+import { loadBranchCountSessions, loadCountProducts, loadCountSessionItems, loadCountWarehouses } from '../../services/inventory-count/countSessionData';
+import { approveCountSession, cancelCountSession, rejectCountSession, saveCountDraft, startCountSession, submitCountSession } from '../../services/inventory-count/countSessionService';
 import { countCountedItems, countVarianceItems, filterCountSessions, getVisibleCountItems } from './inventory-count/helpers';
 import { InventoryCountHeader } from './inventory-count/InventoryCountHeader';
 import { CountSessionsToolbar } from './inventory-count/CountSessionsToolbar';
 import { CountSessionsTable } from './inventory-count/CountSessionsTable';
 import { StartCountSessionModal } from './inventory-count/StartCountSessionModal';
 import { SessionCountModal } from './inventory-count/SessionCountModal';
-import type { CountItem, CountProductOption, CountSession, CountType, WarehouseOption } from './inventory-count/types';
+import type { CountItem, CountProductOption, CountSession, CountType, WarehouseOption } from '../../services/inventory-count/types';
 
-export { loadBranchCountSessions } from './inventory-count/countSessionData';
+export { loadBranchCountSessions } from '../../services/inventory-count/countSessionData';
 
 export const InventoryCountPage: React.FC = () => {
   const [sessions, setSessions] = useState<CountSession[]>([]);
@@ -80,24 +80,24 @@ export const InventoryCountPage: React.FC = () => {
     try {
       PermissionService.require(AuthService.requireAuth(), 'inventory.count');
     } catch (error: any) {
-      setErrorMsg(error?.message || 'ليس لديك صلاحية بدء جلسة جرد.');
+      setErrorMsg(error?.message || 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø¨Ø¯Ø¡ Ø¬Ù„Ø³Ø© Ø¬Ø±Ø¯.');
       return;
     }
 
     if (!selectedWarehouseId) {
-      setErrorMsg('الرجاء اختيار مستودع الجرد.');
+      setErrorMsg('Ø§Ù„Ø±Ø¬Ø§Ø¡ Ø§Ø®ØªÙŠØ§Ø± Ù…Ø³ØªÙˆØ¯Ø¹ Ø§Ù„Ø¬Ø±Ø¯.');
       return;
     }
 
     try {
       branchAccess.requireWarehouseAccess(selectedWarehouseId);
     } catch (error: any) {
-      setErrorMsg(error?.message || 'ليس لديك صلاحية الوصول إلى المخزن المحدد.');
+      setErrorMsg(error?.message || 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø§Ù„ÙˆØµÙˆÙ„ Ø¥Ù„Ù‰ Ø§Ù„Ù…Ø®Ø²Ù† Ø§Ù„Ù…Ø­Ø¯Ø¯.');
       return;
     }
 
     if (countType !== 'FULL' && selectedProductIds.length === 0) {
-      setErrorMsg('اختر صنفًا واحدًا على الأقل للجرد الجزئي أو المفاجئ.');
+      setErrorMsg('Ø§Ø®ØªØ± ØµÙ†ÙÙ‹Ø§ ÙˆØ§Ø­Ø¯Ù‹Ø§ Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„ Ù„Ù„Ø¬Ø±Ø¯ Ø§Ù„Ø¬Ø²Ø¦ÙŠ Ø£Ùˆ Ø§Ù„Ù…ÙØ§Ø¬Ø¦.');
       return;
     }
 
@@ -115,7 +115,7 @@ export const InventoryCountPage: React.FC = () => {
       loadSessions();
     } catch (err: any) {
       console.error(err);
-      setErrorMsg('حدث خطأ أثناء بدء جلسة الجرد: ' + err.message);
+      setErrorMsg('Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø¨Ø¯Ø¡ Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯: ' + err.message);
     }
   };
 
@@ -128,7 +128,7 @@ export const InventoryCountPage: React.FC = () => {
       setShowSessionModal(true);
     } catch (e) {
       console.error(e);
-      alert(e instanceof Error ? e.message : 'تعذر فتح جلسة الجرد.');
+      alert(e instanceof Error ? e.message : 'ØªØ¹Ø°Ø± ÙØªØ­ Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯.');
     }
   };
 
@@ -165,10 +165,10 @@ export const InventoryCountPage: React.FC = () => {
     if (!activeSession) return;
     try {
       saveCountDraft(activeSession, sessionItems);
-      alert('تم حفظ المسودة بنجاح.');
+      alert('ØªÙ… Ø­ÙØ¸ Ø§Ù„Ù…Ø³ÙˆØ¯Ø© Ø¨Ù†Ø¬Ø§Ø­.');
     } catch (e) {
       console.error(e);
-      alert(e instanceof Error ? `فشل حفظ المسودة: ${e.message}` : 'فشل حفظ المسودة.');
+      alert(e instanceof Error ? `ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„Ù…Ø³ÙˆØ¯Ø©: ${e.message}` : 'ÙØ´Ù„ Ø­ÙØ¸ Ø§Ù„Ù…Ø³ÙˆØ¯Ø©.');
     }
   };
 
@@ -180,7 +180,7 @@ export const InventoryCountPage: React.FC = () => {
       loadSessions();
     } catch (e: any) {
       console.error(e);
-      alert('فشل ترحيل الجرد: ' + e.message);
+      alert('ÙØ´Ù„ ØªØ±Ø­ÙŠÙ„ Ø§Ù„Ø¬Ø±Ø¯: ' + e.message);
     }
   };
 
@@ -190,28 +190,28 @@ export const InventoryCountPage: React.FC = () => {
       approveCountSession(activeSession);
       setShowSessionModal(false);
       loadSessions();
-    } catch (error: any) { alert(error?.message || 'تعذر اعتماد الجرد.'); }
+    } catch (error: any) { alert(error?.message || 'ØªØ¹Ø°Ø± Ø§Ø¹ØªÙ…Ø§Ø¯ Ø§Ù„Ø¬Ø±Ø¯.'); }
   };
 
   const handleRejectSession = () => {
     if (!activeSession) return;
-    const reason = prompt('اكتب سبب رفض الجرد وإعادته للعد:');
+    const reason = prompt('Ø§ÙƒØªØ¨ Ø³Ø¨Ø¨ Ø±ÙØ¶ Ø§Ù„Ø¬Ø±Ø¯ ÙˆØ¥Ø¹Ø§Ø¯ØªÙ‡ Ù„Ù„Ø¹Ø¯:');
     if (!reason) return;
     try {
       rejectCountSession(activeSession, reason);
       setShowSessionModal(false);
       loadSessions();
-    } catch (error: any) { alert(error?.message || 'تعذر رفض الجرد.'); }
+    } catch (error: any) { alert(error?.message || 'ØªØ¹Ø°Ø± Ø±ÙØ¶ Ø§Ù„Ø¬Ø±Ø¯.'); }
   };
 
   const handleCancelSession = () => {
-    if (!activeSession || !confirm('هل تريد إلغاء جلسة الجرد؟ لن يتم تعديل أرصدة المخزون.')) return;
+    if (!activeSession || !confirm('Ù‡Ù„ ØªØ±ÙŠØ¯ Ø¥Ù„ØºØ§Ø¡ Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯ØŸ Ù„Ù† ÙŠØªÙ… ØªØ¹Ø¯ÙŠÙ„ Ø£Ø±ØµØ¯Ø© Ø§Ù„Ù…Ø®Ø²ÙˆÙ†.')) return;
     try {
       cancelCountSession(activeSession);
       setShowSessionModal(false);
       loadSessions();
     } catch (error: any) {
-      alert(error?.message || 'تعذر إلغاء جلسة الجرد.');
+      alert(error?.message || 'ØªØ¹Ø°Ø± Ø¥Ù„ØºØ§Ø¡ Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯.');
     }
   };
 

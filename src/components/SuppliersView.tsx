@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useIdempotencyKey } from '../hooks/useIdempotencyKey';
 import { 
   Users, Plus, Search, DollarSign, FileText, Download, Printer,
   ArrowUpRight, ArrowDownRight, Phone, Building2, Pencil, Power,
@@ -29,6 +30,7 @@ const downloadCsv = (name: string, rows: unknown[][]) => {
 };
 
 export const SuppliersView: React.FC = () => {
+  const paymentIdempotency = useIdempotencyKey();
   const suppliersLabel = useBusinessTerm('entities.suppliers.plural');
   const supplierSingularLabel = useBusinessTerm('entities.suppliers.singular');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
@@ -147,8 +149,10 @@ export const SuppliersView: React.FC = () => {
         paymentData.amount,
         paymentData.paymentType,
         'cr_main',
-        paymentData.notes
+        paymentData.notes,
+        paymentIdempotency.getKey()
       );
+      paymentIdempotency.resetKey();
       setIsPaymentModalOpen(false);
       loadSuppliers();
       const updatedSupplier = supplierService.getSupplierById(selectedSupplier.id)!;

@@ -1,6 +1,6 @@
-import type { CountItem, CountSession, VisibleCountItem } from './types';
+﻿import type { CountItem, CountSession, VisibleCountItem } from '../../../services/inventory-count/types';
 
-export const fmtCountCurrency = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
+export const fmtCountCurrency = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' Ø¬';
 
 export const filterCountSessions = (
   sessions: CountSession[],

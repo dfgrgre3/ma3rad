@@ -260,7 +260,8 @@ export class DatabaseManager {
     } catch {
       // Fallback for runtimes whose ESM bundler cannot import the browser distribution.
       try {
-        const { createRequire } = await import('node:module');
+        const nodeModuleId = 'node:module';
+        const { createRequire } = await import(/* @vite-ignore */ nodeModuleId);
         const __require = createRequire(import.meta.url);
         return __require('sql.js');
       } catch {

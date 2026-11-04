@@ -11,7 +11,7 @@ const {
 const { registerAppHandlers } = require('../electron/appHandlers');
 const { registerPrintingHandlers } = require('../electron/printing');
 
-async function createHandlers(fsImpl = fs) {
+async function createHandlers(fsImpl = fs, safeStorageOverride) {
   const appDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-electron-'));
   const dataDir = path.join(appDataDir, 'data');
   const backupDir = path.join(appDataDir, 'backups');
@@ -36,7 +36,7 @@ async function createHandlers(fsImpl = fs) {
     }
   };
   const app = { getVersion: () => 'test', isPackaged: false };
-  const safeStorage = {
+  const safeStorage = safeStorageOverride || {
     isAsyncEncryptionAvailable: async () => true,
     encryptStringAsync: async (value) => Buffer.from(value),
     decryptStringAsync: async (value) => ({ result: value.toString(), shouldReEncrypt: false }),
@@ -103,6 +103,23 @@ test('registered database handlers initialize directories and load/save within t
 
     await fs.writeFile(dbFile, Buffer.from([1, 2, 3, 4, 5]));
     await assert.rejects(handlers.get('db:load')(event), /maximum allowed size/i);
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('database handlers persist on Electron versions with synchronous safeStorage APIs', async () => {
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString(),
+  };
+  const context = await createHandlers(fs, safeStorage);
+  try {
+    const { handlers, event } = context;
+    const saved = await handlers.get('db:save')(event, new Uint8Array([7, 8, 9]));
+    assert.equal(saved.ok, true, saved.error);
+    assert.deepEqual(Array.from(await handlers.get('db:load')(event)), [7, 8, 9]);
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }

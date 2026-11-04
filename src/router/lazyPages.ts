@@ -66,6 +66,7 @@ export const CommissionsPage = lazy(() => import('../pages/hr/CommissionsPage').
 export const LeavePage = lazy(() => import('../pages/hr/LeavePage').then(m => ({ default: m.LeavePage })));
 export const EmployeeContractsPage = lazy(() => import('../pages/hr/EmployeeContractsPage').then(m => ({ default: m.EmployeeContractsPage })));
 export const EmployeeDocumentsPage = lazy(() => import('../pages/hr/EmployeeDocumentsPage').then(m => ({ default: m.EmployeeDocumentsPage })));
+export const RecruitmentPage = lazy(() => import('../pages/hr/RecruitmentPage').then(m => ({ default: m.RecruitmentPage })));
 export const ManufacturingPage = lazy(() => import('../pages/manufacturing/ManufacturingPage').then(m => ({ default: m.ManufacturingPage })));
 export const HrDashboardPage = lazy(() => import('../pages/hr/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
 

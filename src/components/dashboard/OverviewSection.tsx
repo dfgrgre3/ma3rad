@@ -11,6 +11,7 @@ import { SalesTrendCard } from './SalesTrendCard';
 import { TodayPurchasesPanel } from './TodayPurchasesPanel';
 import { TopCustomersCard } from './TopCustomersCard';
 import { TopProductsCard } from './TopProductsCard';
+import { ProfileKpiPanel } from './ProfileKpiPanel';
 import { useOverviewDashboardData } from './useOverviewDashboardData';
 
 export const OverviewSection: React.FC = () => {
@@ -67,6 +68,7 @@ export const OverviewSection: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-3 sm:space-y-4">
+      <ProfileKpiPanel />
       {dashboardError && (
         <div role="alert" className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
           <span className="flex min-w-0 items-center gap-1.5">

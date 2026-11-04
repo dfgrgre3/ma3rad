@@ -5,6 +5,9 @@ import { localDateString } from '../../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../../database/ledger';
 import { round2 } from '../financials';
 import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
+import { defaultEffectEngine } from '../effects/EffectEngine';
+import type { Effect } from '../effects/EffectTypes';
+import '../effects/handlers/salesInvoiceHandlers';
 import type { CustomerPayment, PaymentType } from '../../types';
 import type { SalesContext } from './context';
 
@@ -16,7 +19,8 @@ export function recordInvoicePaymentEntry(
   paymentType: PaymentType = 'CASH',
   registerId?: string,
   shiftId?: string,
-  notes = ''
+  notes = '',
+  idempotencyKey?: string
 ): CustomerPayment {
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'customers.payment');
@@ -39,6 +43,18 @@ export function recordInvoicePaymentEntry(
   }
 
   return ctx.db.executeTransaction((db) => {
+    if (idempotencyKey) {
+      const prior = db.query<CustomerPayment>(
+        `SELECT * FROM customer_payments WHERE idempotency_key = ?`,
+        [idempotencyKey]
+      )[0];
+      if (prior) {
+        if (prior.invoiceId !== invoiceId || round2(Number(prior.amount)) !== value || prior.paymentType !== paymentType) {
+          throw new Error('The idempotency key was already used for a different payment.');
+        }
+        return prior;
+      }
+    }
     const receiptNumber = db.nextNumber('REC');
     const newPaid = round2(invoice.paidAmount + value);
     const newRemaining = round2(Math.max(0, invoice.remainingAmount - value));
@@ -46,13 +62,14 @@ export function recordInvoicePaymentEntry(
     db.run(
       `INSERT INTO customer_payments (
          id, receipt_number, customer_id, invoice_id, amount, payment_type, date, branch_id,
-         register_id, shift_id, notes, performed_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         register_id, shift_id, notes, performed_by, idempotency_key
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         paymentId, receiptNumber, invoice.customerId, invoiceId, value, paymentType, today, branchId,
         register, shiftId || null,
         notes || `تحصيل دفعة على الفاتورة ${invoice.invoiceNumber}`,
         actor.id,
+        idempotencyKey || null,
       ]
     );
     db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
@@ -72,30 +89,43 @@ export function recordInvoicePaymentEntry(
     if (paymentType === 'CASH') {
       db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [value, register]);
     }
-    postLedgerEntry(db.getDatabase(), {
-      date: today,
-      description: `Customer receipt ${receiptNumber}`,
-      referenceType: 'CUSTOMER_PAYMENT',
-      referenceId: paymentId,
-      createdBy: actor.id,
-      lines: [
-        { accountCode: paymentAccountCode(paymentType), debit: value, credit: 0 },
-        { accountCode: '1103', debit: 0, credit: value },
-      ],
-    });
+    const effects: Effect[] = [
+      {
+        type: 'ledger.post',
+        payload: {
+          aggregateType: 'customer_payment',
+          aggregateId: paymentId,
+          data: {
+            date: today,
+            description: `Customer receipt ${receiptNumber}`,
+            referenceType: 'CUSTOMER_PAYMENT',
+            referenceId: paymentId,
+            createdBy: actor.id,
+            lines: [
+              { accountCode: paymentAccountCode(paymentType), debit: value, credit: 0 },
+              { accountCode: '1103', debit: 0, credit: value },
+            ],
+          },
+        },
+      },
+      {
+        type: 'audit.log',
+        payload: {
+          aggregateType: 'customer_payment',
+          aggregateId: paymentId,
+          data: { recordId: invoiceId, action: 'تحصيل دفعة على فاتورة', module: 'SALES', newValues: { receiptNumber, invoiceNumber: invoice.invoiceNumber, amount: value, paymentType } },
+        },
+      },
+      {
+        type: 'sync.capture',
+        payload: { aggregateType: 'customer_payment', aggregateId: paymentId, data: { operation: 'CREATE' } },
+      },
+    ];
+    defaultEffectEngine.run({ db, actorId: actor.id, actorName: actor.fullName }, effects);
+
     if (shiftId) {
       db.run(`UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?`, [value, shiftId]);
     }
-
-    new BusinessRecordSyncService(db).capture(db, 'customer_payment', paymentId, 'CREATE');
-
-    db.run(
-      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-       VALUES (?, ?, ?, 'تحصيل دفعة على فاتورة', 'SALES', ?, ?)`,
-      [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, invoiceId, JSON.stringify({
-        receiptNumber, invoiceNumber: invoice.invoiceNumber, amount: value, paymentType,
-      })]
-    );
 
     return {
       id: paymentId,

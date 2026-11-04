@@ -36,6 +36,63 @@ import {
   type ActivityDefinition,
 } from './activityCatalog';
 
+export interface BusinessProfileDashboardKpi {
+  id: string;
+  label: { ar: string; en: string };
+  source: 'sales' | 'inventory' | 'finance' | 'customers' | 'manufacturing' | 'restaurant';
+  format?: 'number' | 'currency' | 'm2' | 'percent';
+}
+
+export interface BusinessProfileDashboard {
+  kpis: BusinessProfileDashboardKpi[];
+  widgets?: string[];
+}
+
+export interface BusinessProfileReport {
+  id: string;
+  reportId: string;
+  category: string;
+  label: { ar: string; en: string };
+}
+
+export interface BusinessProfilePrintTemplate {
+  id: string;
+  documentType: 'sales_invoice' | 'purchase_invoice' | 'receipt' | 'return' | 'transfer' | 'quotation';
+  templateId: string;
+  label: { ar: string; en: string };
+}
+
+export interface BusinessProfilePermissionSuggestion {
+  roles: Array<{ role: string; permissions: string[] }>;
+}
+
+export interface BusinessProfilePricingTier {
+  id: string;
+  name: string;
+  factor: number;
+}
+
+export interface BusinessProfilePricingRules {
+  tiers: BusinessProfilePricingTier[];
+  defaultMarginPercent?: number;
+}
+
+export interface BusinessProfileWorkflow {
+  id: string;
+  label: { ar: string; en: string };
+  steps: string[];
+}
+
+export interface BusinessProfileNavigationItem {
+  path: string;
+  label?: { ar: string; en: string };
+  order?: number;
+}
+
+export interface BusinessProfileNavigation {
+  groups: Array<{ id: string; label: { ar: string; en: string }; items: BusinessProfileNavigationItem[]; order?: number }>;
+}
+
 export interface BusinessProfile {
   schemaVersion: number;
   profileVersion: number;
@@ -49,6 +106,15 @@ export interface BusinessProfile {
   };
   modules: { enabledByDefault: string[]; optional: string[] };
   support: Record<string, string | boolean>;
+  // Phase 3+ — optional capability declarations (defaults apply when absent).
+  dashboard?: BusinessProfileDashboard;
+  reports?: BusinessProfileReport[];
+  printTemplates?: BusinessProfilePrintTemplate[];
+  permissions?: BusinessProfilePermissionSuggestion;
+  pricingRules?: BusinessProfilePricingRules;
+  workflows?: BusinessProfileWorkflow[];
+  features?: string[];
+  navigation?: BusinessProfileNavigation;
 }
 
 export type BusinessProfileAttributeDataType =
@@ -216,6 +282,76 @@ function validateBusinessProfile(value: unknown): BusinessProfile {
     || profile.support.profileDefaults !== 'implemented') {
     fail('support status must explicitly declare profile defaults.');
   }
+  if (profile.dashboard !== undefined) {
+    const d = profile.dashboard;
+    if (!d || typeof d !== 'object' || !Array.isArray(d.kpis) || d.kpis.length === 0) {
+      fail('dashboard must declare at least one KPI.');
+    }
+    for (const kpi of d.kpis) {
+      if (!kpi || typeof kpi.id !== 'string' || !kpi.id.trim()
+        || !kpi.label?.ar?.trim() || !kpi.label?.en?.trim()
+        || !['sales', 'inventory', 'finance', 'customers', 'manufacturing', 'restaurant'].includes(kpi.source)) {
+        fail('dashboard KPI is invalid.');
+      }
+    }
+  }
+  if (profile.reports !== undefined) {
+    if (!Array.isArray(profile.reports)) fail('reports must be an array.');
+    for (const r of profile.reports) {
+      if (!r || typeof r.id !== 'string' || typeof r.reportId !== 'string' || typeof r.category !== 'string'
+        || !r.label?.ar?.trim() || !r.label?.en?.trim()) fail('report declaration is invalid.');
+    }
+  }
+  if (profile.printTemplates !== undefined) {
+    if (!Array.isArray(profile.printTemplates)) fail('print templates must be an array.');
+    const docTypes = new Set(['sales_invoice', 'purchase_invoice', 'receipt', 'return', 'transfer', 'quotation']);
+    for (const t of profile.printTemplates) {
+      if (!t || typeof t.id !== 'string' || typeof t.templateId !== 'string'
+        || !docTypes.has(t.documentType) || !t.label?.ar?.trim() || !t.label?.en?.trim()) {
+        fail('print template declaration is invalid.');
+      }
+    }
+  }
+  if (profile.permissions !== undefined) {
+    const p = profile.permissions;
+    if (!p || !Array.isArray(p.roles)) fail('permissions must declare roles.');
+    for (const r of p.roles) {
+      if (!r || typeof r.role !== 'string' || !Array.isArray(r.permissions)) fail('permission role is invalid.');
+    }
+  }
+  if (profile.pricingRules !== undefined) {
+    const pr = profile.pricingRules;
+    if (!pr || !Array.isArray(pr.tiers)) fail('pricing rules must declare tiers.');
+    for (const tier of pr.tiers) {
+      if (!tier || typeof tier.id !== 'string' || typeof tier.name !== 'string' || typeof tier.factor !== 'number') {
+        fail('pricing tier is invalid.');
+      }
+    }
+  }
+  if (profile.workflows !== undefined) {
+    if (!Array.isArray(profile.workflows)) fail('workflows must be an array.');
+    for (const w of profile.workflows) {
+      if (!w || typeof w.id !== 'string' || !w.label?.ar?.trim() || !w.label?.en?.trim() || !Array.isArray(w.steps)) {
+        fail('workflow declaration is invalid.');
+      }
+    }
+  }
+  if (profile.features !== undefined) {
+    if (!isStringArray(profile.features)) fail('features must be a string array.');
+  }
+  if (profile.navigation !== undefined) {
+    const n = profile.navigation;
+    const groups = n.groups;
+    if (!Array.isArray(groups) || groups.length === 0) fail('navigation must declare groups.');
+    for (const g of groups) {
+      if (!g || typeof g.id !== 'string' || !g.label?.ar?.trim() || !g.label?.en?.trim() || !Array.isArray(g.items)) {
+        fail('navigation group is invalid.');
+      }
+      for (const item of g.items) {
+        if (!item || typeof item.path !== 'string') fail('navigation item is invalid.');
+      }
+    }
+  }
   return profile as BusinessProfile;
 }
 
@@ -303,6 +439,43 @@ export function getBusinessProfileCapabilities(businessType: string): BusinessPr
 export const getBusinessProfileTemplateId = (businessType: string): string =>
   ACTIVITY_BY_ID.get(businessType)?.profileId
   || (PROFILE_BY_ID.has(businessType) ? businessType : 'general');
+
+export const getProfileDashboard = (businessType: string): BusinessProfileDashboard | undefined =>
+  getBusinessProfile(businessType).dashboard;
+
+export const getProfileReports = (businessType: string): BusinessProfileReport[] =>
+  getBusinessProfile(businessType).reports ?? [];
+
+export const getProfilePrintTemplates = (businessType: string): BusinessProfilePrintTemplate[] =>
+  getBusinessProfile(businessType).printTemplates ?? [];
+
+export const getProfilePermissionSuggestions = (businessType: string): BusinessProfilePermissionSuggestion | undefined =>
+  getBusinessProfile(businessType).permissions;
+
+export const getProfilePricingRules = (businessType: string): BusinessProfilePricingRules | undefined =>
+  getBusinessProfile(businessType).pricingRules;
+
+export const getProfileWorkflows = (businessType: string): BusinessProfileWorkflow[] =>
+  getBusinessProfile(businessType).workflows ?? [];
+
+export const getProfileFeatures = (businessType: string): string[] =>
+  getBusinessProfile(businessType).features ?? [];
+
+export const getProfileNavigation = (businessType: string): BusinessProfileNavigation | undefined =>
+  getBusinessProfile(businessType).navigation;
+
+export function getProfilePrintTemplate(businessType: string, documentType: BusinessProfilePrintTemplate['documentType']): string | undefined {
+  return getProfilePrintTemplates(businessType).find((template) => template.documentType === documentType)?.templateId;
+}
+
+// Backward-compatible alias used by older UI code and generated bundles.
+export const getProfilePrintTmp = getProfilePrintTemplate;
+
+export function getPricingTierFactor(businessType: string, tierId: string, fallback: number): number {
+  const rules = getProfilePricingRules(businessType);
+  const tier = rules?.tiers.find((t) => t.id === tierId);
+  return typeof tier?.factor === 'number' ? tier.factor : fallback;
+}
 
 export const BUSINESS_TYPES = [
   ...ACTIVITY_DEFINITIONS.map((activity) => ({

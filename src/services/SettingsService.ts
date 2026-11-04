@@ -86,7 +86,9 @@ export class SettingsService {
         try {
           const parsed = JSON.parse(map.sellingPriceTierNames || '[]');
           if (Array.isArray(parsed) && parsed.length) return parsed;
-        } catch {}
+        } catch {
+          // Invalid stored settings use the defaults below.
+        }
         return ['سعر القطاعي (الأساسي)', 'سعر الجملة', 'سعر خاص / موزع', 'سعر مشاريع', 'سعر كبار العملاء'];
       })(),
       posShowCashButton: map.posShowCashButton === undefined ? true : bool(map.posShowCashButton),
@@ -117,7 +119,9 @@ export class SettingsService {
           const val = map.posItemRemovalReasons;
           if (Array.isArray(val)) return val;
           if (typeof val === 'string' && val.trim().startsWith('[')) return JSON.parse(val);
-        } catch {}
+        } catch {
+          // Invalid stored settings use the defaults below.
+        }
         return ['غلط في الإدخال', 'العميل غيّر رأيه', 'صنف تالف', 'سعر غلط'];
       })(),
     };

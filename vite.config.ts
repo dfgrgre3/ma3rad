@@ -60,6 +60,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    sourcemap: false,
+    target: process.env.CERAMISYS_LEGACY_BUILD === '1' ? 'chrome108' : 'modules',
     chunkSizeWarningLimit: 2000,
     // Keep stable third-party code cacheable and out of the application entry chunk.
     rollupOptions: {

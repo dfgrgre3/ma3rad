@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, FileSignature, Loader2, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { ContractService } from '../../services/ContractService';
 import { EmployeeService } from '../../services/EmployeeService';
@@ -53,6 +54,7 @@ const emptyForm = {
 };
 
 export const EmployeeContractsPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const service = useMemo(() => new ContractService(), []);
   const toast = useToast();
   const can = usePermission();
@@ -62,6 +64,7 @@ export const EmployeeContractsPage: React.FC = () => {
   const [rows, setRows] = useState<EmployeeContract[]>([]);
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
   const [status, setStatus] = useState<ContractStatus | 'ALL'>('ALL');
+  const [employeeFilter, setEmployeeFilter] = useState(searchParams.get('employeeId') || '');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -71,7 +74,7 @@ export const EmployeeContractsPage: React.FC = () => {
   const load = useCallback(() => {
     setLoading(true);
     try {
-      setRows(service.getContracts({ status }));
+      setRows(service.getContracts({ status, employeeId: employeeFilter || undefined }));
       const data = service.getSummary();
       setSummary({ active: data.active, expiring: data.expiring, expired: data.expired, draft: data.draft });
       if (canManage && can('employees.view')) {
@@ -82,9 +85,10 @@ export const EmployeeContractsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [can, canManage, service, status, toast]);
+  }, [can, canManage, employeeFilter, service, status, toast]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setEmployeeFilter(searchParams.get('employeeId') || ''); }, [searchParams]);
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();

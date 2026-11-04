@@ -1,4 +1,4 @@
-import { DatabaseManager } from '../../../database/db';
+﻿import { DatabaseManager } from '../../database/db';
 import { branchAccess } from './branchAccess';
 import type { CountItem, CountProductOption, CountSession, WarehouseOption } from './types';
 
@@ -17,7 +17,7 @@ export function loadBranchCountSessions(): CountSession[] {
       COALESCE(sc.approval_status, 'PENDING') as approvalStatus,
       COALESCE(sc.rejection_reason, '') as rejectionReason,
       sc.date as startDate,
-      COALESCE(u.full_name, 'النظام') as countedBy,
+      COALESCE(u.full_name, 'Ø§Ù„Ù†Ø¸Ø§Ù…') as countedBy,
       sc.total_items as itemsCount,
       sc.items_with_variance as itemsWithVariance,
       sc.total_variance_value as totalVarianceValue

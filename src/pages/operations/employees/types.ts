@@ -1,10 +1,13 @@
 export interface Employee {
   id: string;
+  branchId?: string;
+  employmentType?: 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'TEMPORARY';
   name: string;
   location: string; // e.g. مخزن الهرم, معرض بنها, إلخ
   role: string;
   phone: string;
   email: string;
+  notes?: string;
   baseSalary: number;
   salaryType: 'MONTHLY' | 'DAILY';
   status: 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
@@ -34,6 +37,8 @@ export interface PayrollPayable {
 }
 
 export interface EmployeeFormState {
+  branchId: string;
+  employmentType: NonNullable<Employee['employmentType']>;
   name: string;
   location: string;
   role: string;
@@ -43,6 +48,7 @@ export interface EmployeeFormState {
   salaryType: Employee['salaryType'];
   status: Employee['status'];
   joinedDate: string;
+  notes: string;
 }
 
 export interface TransactionFormState {
@@ -53,15 +59,6 @@ export interface TransactionFormState {
 }
 
 export type EmployeeTab = 'directory' | 'finance' | 'attendance' | 'analytics';
-
-export const DEFAULT_LOCATIONS = [
-  'معرض بنها',
-  'المخزن الرئيسي',
-  'مخزن الهرم',
-  'معرض مدينة نصر',
-  'فرع أكتوبر',
-  'الإدارة العامة / الحسابات'
-];
 
 export const STATUS_LABELS: Record<Employee['status'], { label: string; color: string }> = {
   ACTIVE: { label: 'على رأس العمل', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25' },

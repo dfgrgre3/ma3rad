@@ -10,12 +10,14 @@ import { localDateString } from '../utils/date';
 
 export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
 export type SalaryType = 'MONTHLY' | 'DAILY';
+export type EmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'TEMPORARY';
 export type PayrollTxType = 'ADVANCE' | 'BONUS' | 'DEDUCTION' | 'SALARY_PAYOUT';
 export type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE';
 
 export interface Employee {
   id: string;
   branchId?: string;
+  employmentType?: EmploymentType;
   name: string;
   location: string;
   role: string;
@@ -170,7 +172,7 @@ export class EmployeeService {
     params.push(...companyScope.params);
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const sql = `SELECT e.id, e.branch_id AS branchId, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
+    const sql = `SELECT e.id, e.branch_id AS branchId, e.employment_type AS employmentType, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
                         e.joined_date, e.notes, e.created_at, e.updated_at
                  FROM employees e ${where} ORDER BY COALESCE(e.name, e.full_name) ASC`;
     return this.db.query<Employee>(sql, params);
@@ -185,7 +187,7 @@ export class EmployeeService {
       ? 'base_salary AS baseSalary, salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
     const rows = this.db.query<Employee>(
-      `SELECT e.id, e.branch_id AS branchId, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
+      `SELECT e.id, e.branch_id AS branchId, e.employment_type AS employmentType, e.name, e.location, e.role, e.phone, e.email, ${salaryColumns}, e.status,
               e.joined_date, e.notes, e.created_at, e.updated_at FROM employees e
        WHERE e.id = ? AND ${scope.clause} AND ${companyScope.clause}`,
       [id, ...scope.params, ...companyScope.params]
@@ -197,21 +199,33 @@ export class EmployeeService {
     const actor = this.requireManage();
     CentralUsageLimitService.assertWithin('maxEmployees');
     if (!data.name?.trim()) throw new Error('اسم الموظف مطلوب.');
+    if (!data.role?.trim()) throw new Error('المسمى الوظيفي مطلوب.');
     if (!data.phone?.trim()) throw new Error('رقم الهاتف مطلوب.');
-    const branchId = data.branchId || this.branchAccess.getDefaultAccessibleBranchId(actor);
+    this.validateEmployeeFields(data);
+    if (!Number.isFinite(data.baseSalary) || data.baseSalary < 0) {
+      throw new Error('الراتب الأساسي يجب أن يكون رقماً موجباً أو صفراً.');
+    }
+    if (!['MONTHLY', 'DAILY'].includes(data.salaryType)) throw new Error('دورة احتساب الراتب غير صالحة.');
+    if (!['ACTIVE', 'ON_LEAVE', 'SUSPENDED'].includes(data.status)) throw new Error('الحالة الإدارية غير صالحة.');
+    const branchId = data.branchId || this.branchAccess.getCurrentBranchId(actor);
     this.branchAccess.requireBranchAccess(branchId, actor);
     const id = `emp_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('EMP');
+      const companyId = db.query<{ companyId: string | null }>(
+        'SELECT company_id AS companyId FROM branches WHERE id = ?',
+        [branchId]
+      )[0]?.companyId || 'cmp_main';
+      const joinedDate = data.joinedDate || localDateString();
       db.run(
         `INSERT INTO employees (
            id, code, full_name, name, phone, email, job_title, role, location, branch_id,
            employment_type, hired_at, joined_date, base_salary, salary_type, status, is_active, notes, company_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'FULL_TIME', ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, code, data.name, data.name, data.phone, data.email || null, data.role, data.role,
-         data.location || '', branchId, data.joinedDate, data.joinedDate, data.baseSalary,
-         data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes || null,
-         this.branchAccess.getAccessibleCompanyIds(actor)?.[0] || 'cmp_main']
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, code, data.name.trim(), data.name.trim(), this.normalizePhone(data.phone), data.email?.trim() || null, data.role.trim(), data.role.trim(),
+         data.location?.trim() || '', branchId, data.employmentType || 'FULL_TIME', joinedDate, joinedDate, data.baseSalary,
+         data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes?.trim() || null,
+         companyId]
       );
       return this.getById(id)!;
     });
@@ -222,6 +236,7 @@ export class EmployeeService {
     const existing = this.getById(id);
     if (!existing) throw new Error('الموظف غير موجود.');
     if (data.branchId) this.branchAccess.requireBranchAccess(data.branchId, actor);
+    this.validateEmployeeFields(data);
     const nextStatus = data.status ?? existing.status;
     this.db.run(
       `UPDATE employees SET
@@ -229,6 +244,7 @@ export class EmployeeService {
          full_name = COALESCE(?, full_name),
          location = COALESCE(?, location),
          branch_id = COALESCE(?, branch_id),
+         employment_type = COALESCE(?, employment_type),
          role = COALESCE(?, role),
          job_title = COALESCE(?, job_title),
          phone = COALESCE(?, phone),
@@ -240,14 +256,54 @@ export class EmployeeService {
          joined_date = COALESCE(?, joined_date),
          hired_at = COALESCE(?, hired_at),
          notes = COALESCE(?, notes),
+         company_id = CASE WHEN ? IS NULL THEN company_id ELSE COALESCE((SELECT company_id FROM branches WHERE id = ?), 'cmp_main') END,
          updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [data.name ?? null, data.name ?? null, data.location ?? null, data.branchId ?? null, data.role ?? null, data.role ?? null,
-       data.phone ?? null, data.email ?? null, data.baseSalary ?? null, data.salaryType ?? null,
+      [data.name ?? null, data.name ?? null, data.location ?? null, data.branchId ?? null, data.employmentType ?? null, data.role ?? null, data.role ?? null,
+       data.phone === undefined ? null : this.normalizePhone(data.phone), data.email ?? null, data.baseSalary ?? null, data.salaryType ?? null,
        nextStatus, nextStatus === 'ACTIVE' ? 1 : 0, data.joinedDate ?? null, data.joinedDate ?? null,
-       data.notes ?? null, id]
+       data.notes ?? null, data.branchId ?? null, data.branchId ?? null, id]
     );
     return this.getById(id)!;
+  }
+
+  private static validateEmployeeFields(data: Partial<Employee>): void {
+    if (data.name !== undefined && !data.name.trim()) throw new Error('اسم الموظف مطلوب.');
+    if (data.role !== undefined && !data.role.trim()) throw new Error('المسمى الوظيفي مطلوب.');
+    if (data.phone !== undefined) {
+      const phone = this.normalizePhone(data.phone);
+      const digitCount = phone.replace(/\D/g, '').length;
+      if (!/^\+?[\d\s()-]{7,20}$/.test(phone) || digitCount < 7 || digitCount > 15) {
+        throw new Error('رقم الهاتف غير صالح.');
+      }
+    }
+    if (data.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
+      throw new Error('البريد الإلكتروني غير صالح.');
+    }
+    if (data.baseSalary !== undefined && (!Number.isFinite(data.baseSalary) || data.baseSalary < 0)) {
+      throw new Error('الراتب الأساسي يجب أن يكون رقماً موجباً أو صفراً.');
+    }
+    if (data.joinedDate) {
+      const validDate = /^\d{4}-\d{2}-\d{2}$/.test(data.joinedDate)
+        && Number.isFinite(Date.parse(`${data.joinedDate}T00:00:00Z`))
+        && new Date(`${data.joinedDate}T00:00:00Z`).toISOString().slice(0, 10) === data.joinedDate;
+      if (!validDate) throw new Error('تاريخ الالتحاق غير صالح.');
+    }
+    if (data.employmentType && !['FULL_TIME', 'PART_TIME', 'CONTRACT', 'TEMPORARY'].includes(data.employmentType)) {
+      throw new Error('نوع التوظيف غير صالح.');
+    }
+    if (data.salaryType && !['MONTHLY', 'DAILY'].includes(data.salaryType)) {
+      throw new Error('دورة احتساب الراتب غير صالحة.');
+    }
+    if (data.status && !['ACTIVE', 'ON_LEAVE', 'SUSPENDED'].includes(data.status)) {
+      throw new Error('الحالة الإدارية غير صالحة.');
+    }
+  }
+
+  private static normalizePhone(phone: string): string {
+    return phone.trim()
+      .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+      .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0));
   }
 
   static delete(id: string): void {

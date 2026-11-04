@@ -7,14 +7,16 @@ import { BatchService } from '../BatchService';
 import { localDateString } from '../../utils/date';
 import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
 import { convertQuantity } from '../../utils/uom';
-import { paymentAccountCode, postLedgerEntry } from '../../database/ledger';
+import { paymentAccountCode } from '../../database/ledger';
 import { computeReturnImpact, round2 } from '../financials';
 import type { SalesReturn } from '../../types';
 import type { DatabaseManager } from '../../database/db';
 import type { InvoiceWithItems, SalesContext } from './context';
 import type { ReturnRequestItem } from './types';
 import { ModuleRegistryService } from '../ModuleRegistryService';
-import { BusinessRecordSyncService } from '../../sync/BusinessRecordSyncService';
+import { defaultEffectEngine } from '../effects/EffectEngine';
+import type { Effect } from '../effects/EffectTypes';
+import '../effects/handlers/salesInvoiceHandlers';
 
 type ReturnOptions = {
   registerId?: string;
@@ -190,12 +192,44 @@ function createReturnInTransaction(
   // restore inventory value to the ledger.
   const returnedCost = params.trackInventory ? returnCosts.inventoryCost : 0;
   const returnedServiceCost = params.trackInventory ? returnCosts.serviceCost : 0;
-  postReturnLedger(sqliteDb, params, returnId, returnNumber, totalReturnAmount, impact, returnedCost, returnedServiceCost);
+  const ledgerLines = buildReturnLedgerLines(params, returnId, returnNumber, totalReturnAmount, impact, returnedCost, returnedServiceCost);
   updateShiftRefunds(sqliteDb, options.shiftId, impact.cashRefund);
   updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnAmount);
-  new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_invoice', invoiceId, 'UPDATE');
-  insertReturnAuditLog(sqliteDb, params, returnId, returnNumber, totalReturnAmount, impact.cashRefund);
-  new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'sales_return', returnId, 'CREATE');
+
+  const effects: Effect[] = [
+    {
+      type: 'ledger.post',
+      payload: {
+        aggregateType: 'sales_return',
+        aggregateId: returnId,
+        data: {
+          date: today,
+          description: `Sales return ${returnNumber}`,
+          referenceType: 'SALES_RETURN',
+          referenceId: returnId,
+          createdBy: actor.id,
+          lines: ledgerLines,
+        },
+      },
+    },
+    {
+      type: 'audit.log',
+      payload: {
+        aggregateType: 'sales_return',
+        aggregateId: returnId,
+        data: { recordId: returnId, action: 'مرتجع مبيعات', module: 'SALES', newValues: { returnNumber, totalReturnAmount, refundMethod } },
+      },
+    },
+    {
+      type: 'sync.capture',
+      payload: { aggregateType: 'sales_invoice', aggregateId: invoiceId, data: { operation: 'UPDATE' } },
+    },
+    {
+      type: 'sync.capture',
+      payload: { aggregateType: 'sales_return', aggregateId: returnId, data: { operation: 'CREATE' } },
+    },
+  ];
+  defaultEffectEngine.run({ db: sqliteDb, actorId: actor.id, actorName: actor.fullName }, effects);
 
   return {
     id: returnId,
@@ -442,8 +476,7 @@ function updateCashRegisterAfterReturn(
   }
 }
 
-function postReturnLedger(
-  sqliteDb: DatabaseManager,
+function buildReturnLedgerLines(
   params: ReturnTransactionParams,
   returnId: string,
   returnNumber: string,
@@ -451,7 +484,7 @@ function postReturnLedger(
   impact: ReturnType<typeof computeReturnImpact>,
   returnedCost: number,
   returnedServiceCost = 0
-): void {
+): any[] {
   const { today, actor, inv } = params;
   const taxReduction = inv.totalAmount > 0
     ? round2(totalReturnAmount * Number(inv.taxAmount || 0) / inv.totalAmount)
@@ -471,14 +504,7 @@ function postReturnLedger(
     lines.push({ accountCode: '2105', debit: returnedServiceCost, credit: 0 });
     lines.push({ accountCode: '5102', debit: 0, credit: returnedServiceCost });
   }
-  postLedgerEntry(sqliteDb.getDatabase(), {
-    date: today,
-    description: `Sales return ${returnNumber}`,
-    referenceType: 'SALES_RETURN',
-    referenceId: returnId,
-    createdBy: actor.id,
-    lines,
-  });
+  return lines;
 }
 
 function updateShiftRefunds(
@@ -503,21 +529,4 @@ function updateInvoiceReturnedAmount(
      updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
     [totalReturnAmount, invoiceId]
   );
-}
-
-function insertReturnAuditLog(
-  sqliteDb: DatabaseManager,
-  params: ReturnTransactionParams,
-  returnId: string,
-  returnNumber: string,
-  totalReturnAmount: number,
-  cashRefund: number
-): void {
-  const { actor, inv } = params;
-  sqliteDb.run(`
-    INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-    VALUES (?, ?, ?, 'مرتجع مبيعات', 'SALES', ?, ?)
-  `, [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, returnId, JSON.stringify({
-    returnNumber, totalReturnAmount, cashRefund, invoiceNumber: inv.invoiceNumber,
-  })]);
 }

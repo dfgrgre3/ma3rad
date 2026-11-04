@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { EmployeeService } from '../../services/EmployeeService';
 import { exportToExcel } from '../../utils/export';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { BranchAccessService } from '../../services/BranchAccessService';
 import { localDateString } from '../../utils/date';
 import { EmployeeAnalyticsTab } from './employees/EmployeeAnalyticsTab';
 import { EmployeeAttendanceTab } from './employees/EmployeeAttendanceTab';
@@ -16,7 +18,6 @@ import { EmployeeTransactionModal } from './employees/EmployeeTransactionModal';
 import { EmployeesHeader } from './employees/EmployeesHeader';
 import { calculateTotalWagesBill, filterEmployees, getEmployeeFinancials } from './employees/helpers';
 import {
-  DEFAULT_LOCATIONS,
   type AttendanceRecord,
   type Employee,
   type EmployeeFormState,
@@ -27,6 +28,7 @@ import {
 } from './employees/types';
 
 export const EmployeesPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'employees.manage');
   const canExportEmployees = PermissionService.can(AuthService.getCurrentUser(), 'employees.export');
   // --- Database State ---
@@ -34,12 +36,20 @@ export const EmployeesPage: React.FC = () => {
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [payrollPayables, setPayrollPayables] = useState<PayrollPayable[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [employeeBranches, setEmployeeBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
 
   const loadAll = () => {
     setLoading(true);
     try {
+      const branchAccess = new BranchAccessService();
+      const currentBranchId = branchAccess.getCurrentBranchId();
+      setEmployeeBranches(
+        branchAccess.getSelectableBranches()
+          .filter((branch) => branch.id === currentBranchId)
+          .map(({ id, name }) => ({ id, name }))
+      );
       setEmployees(EmployeeService.getAll() as unknown as Employee[]);
       setTransactions(canManageEmployees
         ? EmployeeService.getTransactions() as unknown as FinancialTransaction[]
@@ -55,6 +65,7 @@ export const EmployeesPage: React.FC = () => {
   };
 
   useEffect(() => { loadAll(); }, []);
+  useEffect(() => { setSearchQuery(searchParams.get('search') || ''); }, [searchParams]);
   const handleExportEmployees = () => {
     exportToExcel({
       title: 'الموظفون',
@@ -78,12 +89,14 @@ export const EmployeesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<EmployeeTab>('directory');
 
   // --- Filtering & Search ---
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
 
   // --- Modal States ---
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isEmployeeSaving, setIsEmployeeSaving] = useState(false);
+  const [employeeFormError, setEmployeeFormError] = useState<string | null>(null);
 
   const [isTxModalOpen, setIsTxModalOpen] = useState(false);
   const [selectedEmpForTx, setSelectedEmpForTx] = useState<string>('');
@@ -93,15 +106,18 @@ export const EmployeesPage: React.FC = () => {
 
   // --- Forms Fields ---
   const [empForm, setEmpForm] = useState<EmployeeFormState>({
+    branchId: '',
+    employmentType: 'FULL_TIME',
     name: '',
-    location: DEFAULT_LOCATIONS[0],
+    location: '',
     role: '',
     phone: '',
     email: '',
     baseSalary: 6000,
     salaryType: 'MONTHLY' as Employee['salaryType'],
     status: 'ACTIVE' as Employee['status'],
-    joinedDate: localDateString()
+    joinedDate: localDateString(),
+    notes: '',
   });
 
   const [txForm, setTxForm] = useState<TransactionFormState>({
@@ -118,42 +134,57 @@ export const EmployeesPage: React.FC = () => {
   // --- Actions handlers ---
   const handleOpenAddEmployee = () => {
     setEditingEmployee(null);
+    setEmployeeFormError(null);
     setEmpForm({
+      branchId: employeeBranches[0]?.id || '',
+      employmentType: 'FULL_TIME',
       name: '',
-      location: DEFAULT_LOCATIONS[0],
+      location: employeeBranches[0]?.name || '',
       role: '',
       phone: '',
       email: '',
       baseSalary: 6000,
       salaryType: 'MONTHLY',
       status: 'ACTIVE',
-      joinedDate: localDateString()
+      joinedDate: localDateString(),
+      notes: '',
     });
     setIsEmployeeModalOpen(true);
   };
 
   const handleOpenEditEmployee = (emp: Employee) => {
     setEditingEmployee(emp);
+    setEmployeeFormError(null);
     setEmpForm({
+      branchId: emp.branchId || employeeBranches[0]?.id || '',
+      employmentType: emp.employmentType || 'FULL_TIME',
       name: emp.name,
-      location: emp.location,
+      location: employeeBranches.find((branch) => branch.id === (emp.branchId || employeeBranches[0]?.id))?.name || emp.location,
       role: emp.role,
       phone: emp.phone,
       email: emp.email,
       baseSalary: emp.baseSalary,
       salaryType: emp.salaryType,
       status: emp.status,
-      joinedDate: emp.joinedDate
+      joinedDate: emp.joinedDate,
+      notes: emp.notes || '',
     });
     setIsEmployeeModalOpen(true);
   };
 
   const handleSaveEmployee = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isEmployeeSaving) return;
     if (!empForm.name.trim() || !empForm.role.trim()) {
-      alert('اسم الموظف والمسمى الوظيفي مطلوبان.');
+      setEmployeeFormError('اسم الموظف والمسمى الوظيفي مطلوبان.');
       return;
     }
+    if (!empForm.branchId) {
+      setEmployeeFormError('لا يوجد فرع نشط متاح لحفظ الموظف.');
+      return;
+    }
+    setEmployeeFormError(null);
+    setIsEmployeeSaving(true);
     try {
       if (editingEmployee) {
         EmployeeService.update(editingEmployee.id, empForm);
@@ -163,8 +194,16 @@ export const EmployeesPage: React.FC = () => {
       setIsEmployeeModalOpen(false);
       loadAll();
     } catch (err: any) {
-      alert(err?.message || 'تعذر حفظ بيانات الموظف.');
+      setEmployeeFormError(err?.message || 'تعذر حفظ بيانات الموظف.');
+    } finally {
+      setIsEmployeeSaving(false);
     }
+  };
+
+  const handleCloseEmployeeForm = () => {
+    if (isEmployeeSaving) return;
+    setEmployeeFormError(null);
+    setIsEmployeeModalOpen(false);
   };
 
   const handleDeleteEmployee = (id: string) => {
@@ -249,6 +288,9 @@ export const EmployeesPage: React.FC = () => {
   };
 
   const filteredEmployees = filterEmployees(employees, searchQuery, selectedLocation);
+  const employeeLocations = [...new Set([
+    ...employees.map((employee) => employee.location).filter(Boolean),
+  ])];
 
   // --- Reports calculations ---
   const totalWagesBill = calculateTotalWagesBill(employees);
@@ -292,6 +334,7 @@ export const EmployeesPage: React.FC = () => {
           onSearchQueryChange={setSearchQuery}
           onSelectedLocationChange={setSelectedLocation}
           onAttendanceDateChange={setAttendanceDate}
+          locations={employeeLocations}
         />
 
         {/* Tab Content Panels */}
@@ -342,6 +385,7 @@ export const EmployeesPage: React.FC = () => {
             <EmployeeAnalyticsTab
               employees={employees}
               transactions={transactions}
+              locations={employeeLocations}
             />
           )}
 
@@ -353,8 +397,11 @@ export const EmployeesPage: React.FC = () => {
         open={isEmployeeModalOpen}
         editingEmployee={editingEmployee}
         form={empForm}
+        branches={employeeBranches}
+        isSaving={isEmployeeSaving}
+        error={employeeFormError}
         onFormChange={setEmpForm}
-        onClose={() => setIsEmployeeModalOpen(false)}
+        onClose={handleCloseEmployeeForm}
         onSubmit={handleSaveEmployee}
       />
 

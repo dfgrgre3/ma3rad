@@ -9,6 +9,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { formatProductQuantity } from '../../utils/productUnits';
 import type { PaymentType } from '../../types';
 import { fmt, input, label, LoadErrorNotice, ModalShell, useRegisters } from './DailyModalShared';
+import { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
 
 export type PaymentTarget =
   | { kind: 'sale'; id: string; branchId?: string; name: string; remaining: number }
@@ -17,6 +18,7 @@ export type PaymentTarget =
 
 export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void; onSaved: () => void }> = ({ target, onClose, onSaved }) => {
   const toast = useToast();
+  const paymentKey = useIdempotencyKey();
   const { registers, error: registersError } = useRegisters();
   const [amount, setAmount] = useState(String(target.remaining));
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
@@ -42,12 +44,13 @@ export const PaymentModal: React.FC<{ target: PaymentTarget; onClose: () => void
     setSaving(true);
     try {
       if (target.kind === 'sale') {
-        new SalesService().recordInvoicePayment(target.id, value, paymentType, registerId, undefined, notes);
+        new SalesService().recordInvoicePayment(target.id, value, paymentType, registerId, undefined, notes, paymentKey.getKey());
       } else if (target.kind === 'purchase') {
-        new PurchaseService().recordPayment(target.id, value, paymentType, registerId, notes);
+        new PurchaseService().recordPayment(target.id, value, paymentType, registerId, notes, paymentKey.getKey());
       } else {
-        new CustomerService().recordPayment(target.id, value, paymentType, registerId, undefined, notes);
+        new CustomerService().recordPayment(target.id, value, paymentType, registerId, undefined, notes, AuthService.getCurrentUser()?.id || 'usr_admin', undefined, paymentKey.getKey());
       }
+      paymentKey.resetKey();
       toast.success('تم تسجيل الدفعة');
       onSaved();
       onClose();

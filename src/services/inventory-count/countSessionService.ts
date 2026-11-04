@@ -1,12 +1,12 @@
-import { v4 as uuidv4 } from 'uuid';
-import { DatabaseManager } from '../../../database/db';
-import { AuthService } from '../../../services/AuthService';
-import { postLedgerEntry } from '../../../database/ledger';
-import { localDateString } from '../../../utils/date';
-import { InventoryCostingService } from '../../../services/InventoryCostingService';
-import { PermissionService } from '../../../services/PermissionService';
-import { AuditService } from '../../../services/AuditService';
-import { getStockQuantityLabel } from '../../../utils/productUnits';
+﻿import { v4 as uuidv4 } from 'uuid';
+import { DatabaseManager } from '../../database/db';
+import { AuthService } from '../AuthService';
+import { postLedgerEntry } from '../../database/ledger';
+import { localDateString } from '../../utils/date';
+import { InventoryCostingService } from '../InventoryCostingService';
+import { PermissionService } from '../PermissionService';
+import { AuditService } from '../AuditService';
+import { getStockQuantityLabel } from '../../utils/productUnits';
 import { branchAccess } from './branchAccess';
 import type { CountItem, CountSession, CountType } from './types';
 
@@ -50,7 +50,7 @@ export function startCountSession(input: StartCountSessionInput): void {
     countType === 'FULL' ? [selectedWarehouseId] : [selectedWarehouseId, ...selectedIds]);
 
     if (products.length === 0) {
-      throw new Error('لا توجد منتجات مسجلة في النظام لبدء الجرد.');
+      throw new Error('Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª Ù…Ø³Ø¬Ù„Ø© ÙÙŠ Ø§Ù„Ù†Ø¸Ø§Ù… Ù„Ø¨Ø¯Ø¡ Ø§Ù„Ø¬Ø±Ø¯.');
     }
 
     // 2. Insert master session into stock_counts
@@ -87,9 +87,9 @@ export function saveCountDraft(activeSession: CountSession, sessionItems: CountI
     'SELECT warehouse_id AS warehouseId FROM stock_counts WHERE id = ?',
     [activeSession.id]
   )[0];
-  if (!sessionRow) throw new Error('جلسة الجرد غير موجودة.');
+  if (!sessionRow) throw new Error('Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©.');
   branchAccess.requireWarehouseAccess(sessionRow.warehouseId, actor);
-  if (activeSession.status !== 'COUNTING') throw new Error('لا يمكن تعديل جلسة جرد غير مفتوحة.');
+  if (activeSession.status !== 'COUNTING') throw new Error('Ù„Ø§ ÙŠÙ…ÙƒÙ† ØªØ¹Ø¯ÙŠÙ„ Ø¬Ù„Ø³Ø© Ø¬Ø±Ø¯ ØºÙŠØ± Ù…ÙØªÙˆØ­Ø©.');
   db.executeTransaction((txDb) => {
     const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!current || current.status !== 'COUNTING') throw new Error('Session is no longer open. Reload it before saving.');
@@ -140,14 +140,14 @@ function getCountStockInfo(txDb: DatabaseManager, item: CountItem, warehouseId: 
 
 function validateCountItemMembership(item: CountItem, sessionItemIds: Set<string>): void {
   if (!sessionItemIds.has(item.id)) {
-    throw new Error('بيانات أصناف الجرد لا تتبع الجلسة المفتوحة.');
+    throw new Error('Ø¨ÙŠØ§Ù†Ø§Øª Ø£ØµÙ†Ø§Ù Ø§Ù„Ø¬Ø±Ø¯ Ù„Ø§ ØªØªØ¨Ø¹ Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ù…ÙØªÙˆØ­Ø©.');
   }
 }
 
 function validateCountedQuantity(item: CountItem, reservedM2: number): void {
   if (item.countedQuantityM2 !== null && item.countedQuantityM2 < reservedM2) {
     const unit = getStockQuantityLabel(item);
-    throw new Error(`الكمية المعدودة للصنف "${item.productName}" (${item.countedQuantityM2} ${unit}) أقل من الكمية المحجوزة (${reservedM2} ${unit}). يجب فك الحجز أو تصحيح الكمية قبل الترحيل.`);
+    throw new Error(`Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø¹Ø¯ÙˆØ¯Ø© Ù„Ù„ØµÙ†Ù "${item.productName}" (${item.countedQuantityM2} ${unit}) Ø£Ù‚Ù„ Ù…Ù† Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø­Ø¬ÙˆØ²Ø© (${reservedM2} ${unit}). ÙŠØ¬Ø¨ ÙÙƒ Ø§Ù„Ø­Ø¬Ø² Ø£Ùˆ ØªØµØ­ÙŠØ­ Ø§Ù„ÙƒÙ…ÙŠØ© Ù‚Ø¨Ù„ Ø§Ù„ØªØ±Ø­ÙŠÙ„.`);
   }
 }
 
@@ -216,7 +216,7 @@ function postCountVariance(
   `, [
     txId, txNum, txType, item.productId, warehouseId,
     diffM2, boxesCount, unitCost, value, activeSession.id,
-    `تسوية فروقات الجرد (${activeSession.code}): ${item.discrepancyReason || 'فارق جرد'}`, actorId,
+    `ØªØ³ÙˆÙŠØ© ÙØ±ÙˆÙ‚Ø§Øª Ø§Ù„Ø¬Ø±Ø¯ (${activeSession.code}): ${item.discrepancyReason || 'ÙØ§Ø±Ù‚ Ø¬Ø±Ø¯'}`, actorId,
   ]);
 
   if (fifoPlan) {
@@ -290,10 +290,10 @@ function postCountItems(
 }
 
 export function submitCountSession(activeSession: CountSession, sessionItems: CountItem[]): void {
-  if (sessionItems.some(item => item.countedQuantityM2 === null)) throw new Error('أكمل عد جميع الأصناف قبل إرسال الجرد للمراجعة.');
+  if (sessionItems.some(item => item.countedQuantityM2 === null)) throw new Error('Ø£ÙƒÙ…Ù„ Ø¹Ø¯ Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø£ØµÙ†Ø§Ù Ù‚Ø¨Ù„ Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø¬Ø±Ø¯ Ù„Ù„Ù…Ø±Ø§Ø¬Ø¹Ø©.');
   for (const item of sessionItems) {
     if (item.countedQuantityM2 !== null && Number(item.countedQuantityM2) !== item.systemQuantityM2 && !item.discrepancyReason?.trim()) {
-      throw new Error(`حدد سبب الفرق للصنف ${item.productName}.`);
+      throw new Error(`Ø­Ø¯Ø¯ Ø³Ø¨Ø¨ Ø§Ù„ÙØ±Ù‚ Ù„Ù„ØµÙ†Ù ${item.productName}.`);
     }
   }
   saveCountDraft(activeSession, sessionItems);
@@ -302,7 +302,7 @@ export function submitCountSession(activeSession: CountSession, sessionItems: Co
   PermissionService.require(actor, 'inventory.count');
   db.executeTransaction(txDb => {
     const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
-    if (!current || current.status !== 'COUNTING') throw new Error('الجلسة ليست قيد العد.');
+    if (!current || current.status !== 'COUNTING') throw new Error('Ø§Ù„Ø¬Ù„Ø³Ø© Ù„ÙŠØ³Øª Ù‚ÙŠØ¯ Ø§Ù„Ø¹Ø¯.');
     txDb.run("UPDATE stock_counts SET status = 'REVIEW', approval_status = 'PENDING', rejection_reason = NULL WHERE id = ? AND status = 'COUNTING'", [activeSession.id]);
   });
   new AuditService().log({ userId: actor.id, userName: actor.fullName, action: 'SUBMIT_FOR_REVIEW', module: 'INVENTORY_COUNT', recordId: activeSession.id, newValues: JSON.stringify({ status: 'REVIEW' }) });
@@ -317,14 +317,14 @@ export function approveCountSession(activeSession: CountSession): boolean {
     'SELECT warehouse_id AS warehouseId, created_by AS createdBy FROM stock_counts WHERE id = ?',
     [activeSession.id]
   )[0];
-  if (!sessionRow) throw new Error('جلسة الجرد غير موجودة.');
+  if (!sessionRow) throw new Error('Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©.');
   branchAccess.requireWarehouseAccess(sessionRow.warehouseId, actor);
-  if (sessionRow.createdBy === actor.id) throw new Error('لا يمكن لمنشئ الجرد اعتماده.');
+  if (sessionRow.createdBy === actor.id) throw new Error('Ù„Ø§ ÙŠÙ…ÙƒÙ† Ù„Ù…Ù†Ø´Ø¦ Ø§Ù„Ø¬Ø±Ø¯ Ø§Ø¹ØªÙ…Ø§Ø¯Ù‡.');
   const countWarehouseId = sessionRow.warehouseId;
   db.executeTransaction((txDb) => {
     const currentSession = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!currentSession || currentSession.status !== 'REVIEW') {
-      throw new Error('تم ترحيل الجلسة أو إغلاقها بالفعل. أعد تحميل البيانات قبل المتابعة.');
+      throw new Error('ØªÙ… ØªØ±Ø­ÙŠÙ„ Ø§Ù„Ø¬Ù„Ø³Ø© Ø£Ùˆ Ø¥ØºÙ„Ø§Ù‚Ù‡Ø§ Ø¨Ø§Ù„ÙØ¹Ù„. Ø£Ø¹Ø¯ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù‚Ø¨Ù„ Ø§Ù„Ù…ØªØ§Ø¨Ø¹Ø©.');
     }
     const { varianceCount, totalVarianceVal } = postCountItems(
       txDb, activeSession, [], actor.id, countWarehouseId
@@ -351,15 +351,15 @@ export function rejectCountSession(activeSession: CountSession, reason: string):
   const session = db.query<{ warehouseId: string; status: string; createdBy: string }>(
     'SELECT warehouse_id AS warehouseId, status, created_by AS createdBy FROM stock_counts WHERE id = ?', [activeSession.id]
   )[0];
-  if (!session) throw new Error('جلسة الجرد غير موجودة.');
+  if (!session) throw new Error('Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯ ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©.');
   branchAccess.requireWarehouseAccess(session.warehouseId, actor);
-  if (session.status !== 'REVIEW') throw new Error('الجلسة ليست بانتظار المراجعة.');
-  if (session.createdBy === actor.id) throw new Error('لا يمكن لمنشئ الجرد مراجعته.');
+  if (session.status !== 'REVIEW') throw new Error('Ø§Ù„Ø¬Ù„Ø³Ø© Ù„ÙŠØ³Øª Ø¨Ø§Ù†ØªØ¸Ø§Ø± Ø§Ù„Ù…Ø±Ø§Ø¬Ø¹Ø©.');
+  if (session.createdBy === actor.id) throw new Error('Ù„Ø§ ÙŠÙ…ÙƒÙ† Ù„Ù…Ù†Ø´Ø¦ Ø§Ù„Ø¬Ø±Ø¯ Ù…Ø±Ø§Ø¬Ø¹ØªÙ‡.');
   const cleanReason = reason.trim();
-  if (!cleanReason) throw new Error('سبب الرفض مطلوب.');
+  if (!cleanReason) throw new Error('Ø³Ø¨Ø¨ Ø§Ù„Ø±ÙØ¶ Ù…Ø·Ù„ÙˆØ¨.');
   db.executeTransaction(txDb => {
     const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
-    if (!current || current.status !== 'REVIEW') throw new Error('تم تحديث حالة الجلسة؛ أعد تحميلها.');
+    if (!current || current.status !== 'REVIEW') throw new Error('ØªÙ… ØªØ­Ø¯ÙŠØ« Ø­Ø§Ù„Ø© Ø§Ù„Ø¬Ù„Ø³Ø©Ø› Ø£Ø¹Ø¯ ØªØ­Ù…ÙŠÙ„Ù‡Ø§.');
     txDb.run("UPDATE stock_counts SET status = 'COUNTING', approval_status = 'REJECTED', rejection_reason = ? WHERE id = ? AND status = 'REVIEW'", [cleanReason, activeSession.id]);
   });
   new AuditService().log({ userId: actor.id, userName: actor.fullName, action: 'REJECT', module: 'INVENTORY_COUNT', recordId: activeSession.id, newValues: JSON.stringify({ status: 'COUNTING', reason: cleanReason }) });

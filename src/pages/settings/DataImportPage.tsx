@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { AlertCircle, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload, WandSparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, Eye, EyeOff, FileSpreadsheet, Loader2, Upload, WandSparkles } from 'lucide-react';
 import { DataImportService, ENTITY_META, ImportEntity, ParsedImport, ImportIssue } from '../../services/DataImportService';
 import { BackupService } from '../../services/BackupService';
 import { DataAdminService, type DataImportPreview, type DataImportSheet } from '../../services/DataAdminService';
@@ -59,13 +59,16 @@ export const DataImportPage: React.FC = () => {
   const [dynamicPreview, setDynamicPreview] = useState<{ headers: string[]; rows: Record<string, unknown>[] } | null>(null);
   const [dynamicResult, setDynamicResult] = useState<DynamicImportResult | null>(null);
   const [backupImport, setBackupImport] = useState<{ sheets: DataImportSheet[]; preview: DataImportPreview } | null>(null);
+  const [encryptedBackupFile, setEncryptedBackupFile] = useState<File | null>(null);
+  const [backupPassword, setBackupPassword] = useState('');
+  const [showBackupPassword, setShowBackupPassword] = useState(false);
   const currentUser = AuthService.getCurrentUser();
   const canOpen = service.canOpen(currentUser);
 
   const handleFile = async (file?: File) => {
     if (!file) return;
     setBusy(true); setMessage(''); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]); setPdfText('');
-    setDynamicPreview(null); setDynamicResult(null); setBackupImport(null); setFileName(file.name);
+    setDynamicPreview(null); setDynamicResult(null); setBackupImport(null); setEncryptedBackupFile(null); setBackupPassword(''); setShowBackupPassword(false); setFileName(file.name);
     try {
       const lowerName = file.name.toLocaleLowerCase();
       if (lowerName.endsWith('.pdf')) {
@@ -105,10 +108,8 @@ export const DataImportPage: React.FC = () => {
         if (!PermissionService.can(currentUser, 'admin.data.delete')) {
           throw new Error('لا تملك صلاحية استيراد النسخ الاحتياطية. يلزم منح صلاحية إدارة البيانات.');
         }
-        const sheets = await backupService.readBackupDataForImport(file);
-        const preview = adminDataService.previewDataImport(sheets);
-        setBackupImport({ sheets, preview });
-        setMessage('تمت قراءة النسخة المشفرة. راجع ملخص السجلات قبل دمجها مع البيانات الحالية.');
+        setEncryptedBackupFile(file);
+        setMessage('أدخل كلمة مرور النسخة الاحتياطية لفتح الملف ومراجعته.');
         return;
       }
       const extension = validateSpreadsheetFileMetadata(file.name, file.size);
@@ -130,6 +131,26 @@ export const DataImportPage: React.FC = () => {
       if (parsed.confidence < 0.35 && parsed.entity !== 'dynamic') setMessage('التعرف التلقائي غير واثق. اختر نوع البيانات الصحيح وراجع مطابقة الأعمدة.');
     } catch (e: any) { setData(null); setMessage(e?.message || 'تعذرت قراءة الملف.'); }
     finally { setBusy(false); }
+  };
+
+  const openEncryptedBackup = async () => {
+    if (!encryptedBackupFile) return;
+    if (!backupPassword) {
+      setMessage('أدخل كلمة مرور النسخة الاحتياطية لفتح الملف.');
+      return;
+    }
+    setBusy(true); setMessage('');
+    try {
+      const sheets = await backupService.readBackupDataForImport(encryptedBackupFile, backupPassword);
+      const preview = adminDataService.previewDataImport(sheets);
+      setBackupImport({ sheets, preview });
+      setEncryptedBackupFile(null);
+      setBackupPassword('');
+      setMessage('تمت قراءة النسخة المشفرة. راجع ملخص السجلات قبل دمجها مع البيانات الحالية.');
+    } catch (e: any) {
+      const errorMessage = e?.message?.replace(/^Error invoking remote method '[^']+': Error:\s*/, '');
+      setMessage(errorMessage || 'تعذر فتح النسخة المشفرة. تحقق من كلمة المرور وحاول مجددًا.');
+    } finally { setBusy(false); }
   };
 
   const runBackupImport = async () => {
@@ -259,20 +280,102 @@ export const DataImportPage: React.FC = () => {
         </div>
         <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV وPDF والنسخ المشفرة ‎.xlsx‎ و‎.ceramisys-backup‎. حد PDF {MAX_PDF_IMPORT_BYTES / 1024 / 1024} ميجابايت، وحد ملفات الجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. يُقرأ PDF محليًا، وتُراجع البيانات قبل حفظها. النسخة المشفرة تُدمج بعد المراجعة ولا تستبدل قاعدة البيانات كاملة.</p>
         {message && <div className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${result?.created ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{message}</span></div>}
+        {encryptedBackupFile && <div className="flex flex-wrap items-end gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <label className="min-w-60 flex-1 text-xs font-black text-amber-950">كلمة مرور النسخة الاحتياطية
+            <span className="mt-1.5 flex overflow-hidden rounded-lg border border-amber-300 bg-white focus-within:ring-2 focus-within:ring-amber-400">
+              <input
+                type={showBackupPassword ? 'text' : 'password'}
+                value={backupPassword}
+                onChange={event => setBackupPassword(event.target.value)}
+                onKeyDown={event => { if (event.key === 'Enter') void openEncryptedBackup(); }}
+                autoComplete="off"
+                className="min-w-0 flex-1 px-3 py-2.5 text-sm font-normal text-slate-900 outline-none"
+                placeholder="أدخل كلمة المرور لفتح الملف"
+              />
+              <button
+                type="button"
+                onClick={() => setShowBackupPassword(visible => !visible)}
+                aria-label={showBackupPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                aria-pressed={showBackupPassword}
+                className="px-3 text-amber-800 hover:bg-amber-50"
+              >
+                {showBackupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </span>
+          </label>
+          <button type="button" onClick={() => void openEncryptedBackup()} disabled={busy || !backupPassword} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">
+            {busy ? 'جارٍ فتح الملف...' : 'فتح الملف'}
+          </button>
+        </div>}
         {pdfText && <label className="block rounded-xl border border-sky-200 bg-sky-50/60 p-4 text-xs font-black text-sky-950">النص المستخرج من PDF — صحّح أخطاء القراءة قبل الاستيراد
           <textarea value={pdfText} onChange={event=>changePdfText(event.target.value)} rows={10} className="mt-2 w-full rounded-lg border border-sky-200 bg-white p-3 text-sm font-normal leading-6 text-slate-800" dir="auto" />
           <span className="mt-2 block text-[11px] font-normal text-sky-800">تتم المعالجة على الجهاز. الصفحات المصورة تُقرأ بتقنية OCR المحلية للغتين العربية والإنجليزية.</span>
         </label>}
-        {backupImport && <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-          <div><h2 className="font-black text-amber-950">مراجعة النسخة المشفرة قبل الدمج</h2><p className="mt-1 text-xs leading-5 text-amber-900">السجلات الجديدة ستُضاف، والسجلات المتعارضة ستُحدّث بعد موافقتك. لن تُحذف البيانات الأخرى ولن تُستبدل قاعدة البيانات كاملة. الجداول المحمية لن تُستورد.</p></div>
-          <div className="flex flex-wrap gap-2 text-xs font-bold">
-            <span className="rounded-lg bg-white px-3 py-2">جداول: {backupImport.preview.tables.length}</span>
-            <span className="rounded-lg bg-emerald-100 px-3 py-2 text-emerald-900">جديد: {backupImport.preview.newRows}</span>
-            <span className="rounded-lg bg-orange-100 px-3 py-2 text-orange-900">متعارض: {backupImport.preview.conflictRows}</span>
-            <span className="rounded-lg bg-white px-3 py-2">متخطى: {backupImport.preview.skippedRows}</span>
+        {backupImport && <div role="dialog" aria-modal="true" aria-labelledby="backup-import-review-title" className="fixed inset-0 z-[100] flex flex-col gap-4 overflow-hidden bg-amber-50 p-3 text-slate-900 sm:p-5 lg:p-7">
+          <div className="shrink-0">
+            <h2 id="backup-import-review-title" className="text-xl font-black text-amber-950 sm:text-2xl">مراجعة النسخة المشفرة قبل الدمج</h2>
+            <p className="mt-2 text-sm leading-6 text-amber-900">السجلات الجديدة ستُضاف، والسجلات المتعارضة ستُحدّث بعد موافقتك. لن تُحذف البيانات الأخرى ولن تُستبدل قاعدة البيانات كاملة. الجداول المحمية لن تُستورد.</p>
           </div>
-          <div className="max-h-64 space-y-2 overflow-auto">{backupImport.preview.tables.map(table=><div key={table.table} className="rounded-lg border border-amber-200 bg-white p-3 text-xs"><div className="flex flex-wrap items-center justify-between gap-2"><strong className="font-mono">{table.table}</strong><span>الملف: {table.incomingRows} · الحالي: {table.existingRows} · جديد: {table.newRows} · متعارض: {table.conflictRows} · متخطى: {table.skippedRows}</span></div>{table.protected&&<p className="mt-2 font-bold text-amber-700">جدول محمي — لن يتم استيراده</p>}{table.sampleConflicts.map((conflict,index)=><div key={`${conflict.key}-${index}`} className="mt-2 rounded-lg bg-amber-50 p-2"><div className="font-bold">مفتاح السجل: {conflict.key}</div>{conflict.changes.length?conflict.changes.map(change=><div key={change.column} className="mt-1 break-words text-slate-700">{change.column} — الحالي: {formatImportValue(change.existing)} ← الملف: {formatImportValue(change.imported)}</div>):<div className="mt-1 text-slate-600">لا توجد اختلافات في القيم.</div>}</div>)}</div>)}</div>
-          <div className="flex flex-wrap gap-2"><button onClick={()=>void runBackupImport()} disabled={busy||backupImport.preview.newRows+backupImport.preview.conflictRows===0} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">دمج السجلات المعروضة</button><button onClick={()=>setBackupImport(null)} disabled={busy} className="rounded-xl border border-amber-300 px-4 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-40">إلغاء</button></div>
+          <div className="flex shrink-0 flex-wrap gap-2 text-sm font-bold">
+            <span className="rounded-lg bg-white px-4 py-2.5">جداول: {backupImport.preview.tables.length}</span>
+            <span className="rounded-lg bg-emerald-100 px-4 py-2.5 text-emerald-900">جديد: {backupImport.preview.newRows}</span>
+            <span className="rounded-lg bg-orange-100 px-4 py-2.5 text-orange-900">متعارض: {backupImport.preview.conflictRows}</span>
+            <span className="rounded-lg bg-white px-4 py-2.5">متخطى: {backupImport.preview.skippedRows}</span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-amber-200 bg-white">
+            <table className="min-w-full text-right text-sm">
+              <thead className="sticky top-0 z-10 bg-amber-100 text-amber-950">
+                <tr>
+                  <th className="whitespace-nowrap p-3 sm:p-4">الجدول</th>
+                  <th className="whitespace-nowrap p-3 sm:p-4">في الملف</th>
+                  <th className="whitespace-nowrap p-3 sm:p-4">الحالي</th>
+                  <th className="whitespace-nowrap p-3 sm:p-4">جديد</th>
+                  <th className="whitespace-nowrap p-3 sm:p-4">متعارض</th>
+                  <th className="whitespace-nowrap p-3 sm:p-4">متخطى</th>
+                  <th className="whitespace-nowrap p-3 sm:p-4">الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {backupImport.preview.tables.map(table=>(
+                  <React.Fragment key={table.table}>
+                    <tr className="border-t border-amber-100">
+                      <td className="whitespace-nowrap p-3 font-mono font-bold sm:p-4">{table.table}</td>
+                      <td className="p-3 sm:p-4">{table.incomingRows}</td>
+                      <td className="p-3 sm:p-4">{table.existingRows}</td>
+                      <td className="p-3 sm:p-4">{table.newRows}</td>
+                      <td className="p-3 sm:p-4">{table.conflictRows}</td>
+                      <td className="p-3 sm:p-4">{table.skippedRows}</td>
+                      <td className={`whitespace-nowrap p-3 font-bold sm:p-4 ${table.protected ? 'text-amber-700' : 'text-emerald-700'}`}>
+                        {table.protected ? 'محمي — لن يُستورد' : 'جاهز للدمج'}
+                      </td>
+                    </tr>
+                    {table.sampleConflicts.length > 0 && (
+                      <tr className="border-t border-amber-100 bg-amber-50">
+                        <td colSpan={7} className="space-y-2 p-3 sm:p-4">
+                          {table.sampleConflicts.map((conflict,index)=>(
+                            <div key={`${conflict.key}-${index}`} className="rounded-lg bg-white p-3">
+                              <div className="font-bold">مفتاح السجل: {conflict.key}</div>
+                              {conflict.changes.length
+                                ? conflict.changes.map(change=>(
+                                  <div key={change.column} className="mt-1 break-words text-slate-700">
+                                    {change.column} — الحالي: {formatImportValue(change.existing)} ← الملف: {formatImportValue(change.imported)}
+                                  </div>
+                                ))
+                                : <div className="mt-1 text-slate-600">لا توجد اختلافات في القيم.</div>}
+                            </div>
+                          ))}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-3 border-t border-amber-200 pt-3">
+            <button onClick={()=>void runBackupImport()} disabled={busy||backupImport.preview.newRows+backupImport.preview.conflictRows===0} className="rounded-xl bg-amber-700 px-5 py-3 text-sm font-black text-white disabled:opacity-40">{busy ? 'جارٍ الدمج...' : 'دمج السجلات المعروضة'}</button>
+            <button onClick={()=>setBackupImport(null)} disabled={busy} className="rounded-xl border border-amber-300 bg-white px-5 py-3 text-sm font-bold text-amber-900 disabled:opacity-40">إلغاء</button>
+          </div>
         </div>}
         {data?.entity === 'dynamic' && dynamicPreview && <div className="space-y-4 rounded-xl border border-violet-200 bg-violet-50/60 p-4"><div className="flex items-start gap-3"><WandSparkles className="mt-1 h-5 w-5 text-violet-700"/><div><h2 className="font-black text-violet-950">نوع غير معروف — سيُنشأ له تعريف قابل لإعادة الاستخدام</h2><p className="mt-1 text-xs leading-5 text-violet-900">سيتم استنتاج أنواع الحقول مبدئيًا، وحفظ كل قيمة أصلية كما وردت في الملف. يمكن تعديل التعريف والبحث والتصدير من إدارة الأنواع.</p></div></div><label className="block text-xs font-black text-slate-700">اسم نوع البيانات<input value={dynamicName} onChange={e=>setDynamicName(e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm" placeholder="اسم الورقة أو اسم واضح لهذا النوع"/></label><div className="overflow-auto rounded-lg border border-slate-200 bg-white"><table className="min-w-full text-right text-xs"><thead className="bg-slate-100"><tr>{dynamicPreview.headers.map(h=><th key={h} className="p-2.5">{h}</th>)}</tr></thead><tbody>{dynamicPreview.rows.slice(0,8).map((row,i)=><tr key={i} className="border-t border-slate-100">{dynamicPreview.headers.map(h=><td key={h} className="max-w-48 truncate p-2.5">{String(row[h]??'')}</td>)}</tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-bold text-slate-600">{dynamicPreview.rows.length} سجل · {dynamicPreview.headers.length} حقل · ستُحفظ القيم الأصلية كاملة</span><button onClick={runImport} disabled={!dynamicName.trim()||busy||!PermissionService.can(currentUser,'admin.data')} className="rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-black text-white disabled:opacity-40">إنشاء النوع واستيراد البيانات</button></div>{dynamicResult&&<Link className="inline-block text-sm font-black text-violet-800 underline" to="/data-import/types">فتح إدارة الأنواع والسجلات</Link>}</div>}
         {data && data.entity !== 'dynamic' && <>

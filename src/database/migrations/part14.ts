@@ -184,4 +184,40 @@ export const MIGRATION_PART_14: Migration[] = [
       `);
     },
   },
+  {
+    id: '110_customer_payment_idempotency',
+    description: 'Add idempotency keys to invoice-linked customer payments for safe retries',
+    up: (db) => {
+      try { db.exec('ALTER TABLE customer_payments ADD COLUMN idempotency_key TEXT'); } catch { /* already present */ }
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_customer_payments_idempotency
+          ON customer_payments(idempotency_key) WHERE idempotency_key IS NOT NULL;
+      `);
+    },
+  },
+  {
+    id: '111_domain_events',
+    description: 'Append-only log of emitted business effects for observability and idempotency (Phase 5 seed)',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS domain_events (
+          id TEXT PRIMARY KEY,
+          aggregate_type TEXT NOT NULL,
+          aggregate_id TEXT NOT NULL,
+          effect_type TEXT NOT NULL,
+          effect_key TEXT,
+          payload_json TEXT NOT NULL DEFAULT '{}',
+          status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','PROCESSED','FAILED','SKIPPED')),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          processed_at TEXT,
+          error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_domain_events_aggregate ON domain_events(aggregate_type, aggregate_id);
+        CREATE INDEX IF NOT EXISTS idx_domain_events_type ON domain_events(effect_type);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_events_unique
+          ON domain_events(aggregate_type, aggregate_id, effect_type, effect_key)
+          WHERE effect_key IS NOT NULL;
+      `);
+    },
+  },
 ];

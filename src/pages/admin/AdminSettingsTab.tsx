@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Save, Palette, Table as TableIcon, Columns, Info, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History, Download,
   Printer, Eye, Star, CheckCircle, RefreshCw, Layers, LayoutTemplate, FileText, CheckCircle2, X, ExternalLink, SlidersHorizontal, Sparkles, Plus,
@@ -17,6 +18,8 @@ import {
   BUSINESS_UNITS,
   getActivityModuleIds,
   getDefaultBusinessConfiguration,
+  getProfileFeatures,
+  getProfileNavigation,
   parseBusinessConfiguration,
   parseEnabledModules,
   serializeBusinessConfiguration,
@@ -98,6 +101,16 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
   const [previewSize, setPreviewSize] = useState<InvoiceSizeId>('a4');
   const [newReasonInput, setNewReasonInput] = useState('');
   const [showAddReason, setShowAddReason] = useState(false);
+
+  useEffect(() => {
+    if (!previewModalOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [previewModalOpen]);
 
   const scanPrinters = async (notify = true) => {
     setIsScanningPrinters(true);
@@ -207,6 +220,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
       // Applying a profile also creates its declared product attributes; this is
       // additive and never removes manually created attributes.
       BusinessProfileService.applyFromSettings();
+      BusinessProfileService.applyPermissionsFromSettings();
       ConfigurationVersionService.recordCurrent('تحديث من إعدادات النشاط', actor);
       if (canViewConfigHistory) {
         setConfigurationVersions(ConfigurationVersionService.getVersions());
@@ -422,12 +436,28 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
 
         {tab === 'business' && (
           <div className="space-y-5">
+            {getProfileFeatures(businessProfile.type).length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
+                <span className="font-bold text-slate-500">ميزات النشاط: </span>
+                {getProfileFeatures(businessProfile.type).map((f) => (
+                  <span key={f} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700">{f}</span>
+                ))}
+              </div>
+            )}
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">خصص النظام لنشاطك</h3>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 غيّر نوع النشاط والوحدات الظاهرة في القائمة في أي وقت. إخفاء الوحدة لا يحذف بياناتها.
               </p>
             </div>
+            {getProfileNavigation(businessProfile.type)?.groups?.length ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-800">
+                <span className="font-bold text-slate-500">navigation النشاط: </span>
+                {getProfileNavigation(businessProfile.type)!.groups.map((g) => (
+                  <span key={g.id} className="ml-2 inline-block rounded-full bg-white px-2 py-0.5 dark:bg-slate-700">{g.label.ar}</span>
+                ))}
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_14rem]">
               <input
                 type="search"
@@ -1576,11 +1606,15 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
 
             {/* Live Form Preview Modal */}
             {previewModalOpen && (
-              <div
-                className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-5"
-                dir="rtl"
-              >
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-6xl h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              createPortal(
+                <div
+                  className="fixed inset-0 z-[100] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-5"
+                  dir="rtl"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="معاينة حيّة للفورم والمقاسات"
+                >
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-6xl h-[94dvh] max-h-[calc(100dvh-1rem)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                   {/* Modal Header */}
                   <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
@@ -1698,7 +1732,9 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                     </div>
                   </div>
                 </div>
-              </div>
+                </div>,
+                document.body,
+              )
             )}
           </div>
         )}

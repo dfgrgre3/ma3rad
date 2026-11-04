@@ -538,6 +538,7 @@ export const DebtsDashboardPage: React.FC = () => {
           paymentType,
           registerId,
           paymentReference,
+          paymentGroupKey,
         );
       }
       setTarget(null);

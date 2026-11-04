@@ -763,6 +763,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({ onComplete }) => {
         if (options.modules && moduleValidation) {
           ModuleRegistryService.setEnabledModules(moduleValidation.enabled, AuthService.getCurrentUser(), 'إعداد أولي');
           BusinessProfileService.applyFromSettings();
+          BusinessProfileService.applyPermissionsFromSettings();
         }
       });
 

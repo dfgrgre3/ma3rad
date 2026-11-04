@@ -15,6 +15,7 @@ import { MIGRATION_PART_11 } from './migrations/part11';
 import { MIGRATION_PART_12 } from './migrations/part12';
 import { MIGRATION_PART_13 } from './migrations/part13';
 import { MIGRATION_PART_14 } from './migrations/part14';
+import { MIGRATION_PART_15 } from './migrations/part15';
 import { MIGRATION_ENTERPRISE } from './migrations/enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './migrationSupport';
 
@@ -2226,7 +2227,39 @@ export const MIGRATIONS: Migration[] = [
       ]);
     },
   },
+  {
+    id: '104_journal_entries_reference_unique',
+    description: 'Enforce one journal entry per (reference_type, reference_id) when existing data allows it',
+    up: (db: Database) => {
+      const dupes = db.exec(`
+        SELECT reference_type, reference_id, COUNT(*) AS c
+        FROM journal_entries
+        WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL
+        GROUP BY reference_type, reference_id
+        HAVING c > 1
+        LIMIT 1
+      `);
+      const dupRows = dupes[0]?.values ?? [];
+      if (dupRows.length > 0) {
+        // Never rewrite the accounting audit trail automatically. Fresh and
+        // reconciled databases get the hard guarantee; legacy databases with
+        // duplicates keep the existing programmatic idempotency and must be
+        // reconciled manually (the migration is recorded as applied and does
+        // not retry).
+        console.warn(
+          '[104_journal_entries_reference_unique] Skipped unique index: duplicate (reference_type, reference_id) rows exist. Reconcile them, then the index will be created on the next run.'
+        );
+        return;
+      }
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_entries_reference_unique
+          ON journal_entries(reference_type, reference_id)
+          WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL;
+      `);
+    },
+  },
   ...MIGRATION_PART_14,
+  ...MIGRATION_PART_15,
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

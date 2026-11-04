@@ -5,9 +5,11 @@ import {
   Printer, ArrowUpRight, ArrowDownRight, Phone, MapPin, Trash2
 } from 'lucide-react';
 import { CustomerService } from '../services/CustomerService';
+import { AuthService } from '../services/AuthService';
 import { Customer } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
+import { useIdempotencyKey } from '../hooks/useIdempotencyKey';
 import { usePermission } from '../hooks/usePermission';
 import { ConfiguredActionButton } from './config/ConfiguredActionButton';
 const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
@@ -18,6 +20,7 @@ const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItem
 );
 
 export const CustomersView: React.FC = () => {
+  const paymentIdempotency = useIdempotencyKey();
   const customersLabel = useBusinessTerm('entities.customers.plural');
   const customerSingularLabel = useBusinessTerm('entities.customers.singular');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
@@ -128,8 +131,12 @@ export const CustomersView: React.FC = () => {
         paymentData.paymentType,
         'cr_main',
         undefined,
-        paymentData.notes
+        paymentData.notes,
+        AuthService.getCurrentUser()?.id || 'usr_admin',
+        undefined,
+        paymentIdempotency.getKey()
       );
+      paymentIdempotency.resetKey();
       setIsPaymentModalOpen(false);
       loadCustomers();
       if (canViewStatement) {

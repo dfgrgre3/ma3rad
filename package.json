@@ -1,6 +1,6 @@
 {
   "name": "ceramisys-erp",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "نظام مكتبي لإدارة معارض السيراميك ومواد التشطيب",
   "main": "electron/entry.js",
   "engines": {
@@ -16,19 +16,24 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src electron test",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
-    "electron:pack": "npm run bundle:secure && electron-builder --dir && node scripts/restore-source.cjs",
-    "electron:dist": "npm run bundle:secure && electron-builder --win nsis && node scripts/restore-source.cjs",
-    "electron:dist:all": "npm run build && electron-builder --win nsis --x64 --ia32",
-    "electron:dist:ia32": "npm run build && electron-builder --win nsis --ia32",
-    "electron:dist:x64": "npm run build && electron-builder --win nsis --x64",
-    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/auth-login-guard.test.ts test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/data-integrity.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/dynamic-attributes.test.ts test/spreadsheet-import.test.ts test/branch-access.test.ts test/branch-scoped-pages.test.ts test/branch-ledger-reports.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/companies.test.ts test/company-data-scope.test.ts test/uom.test.ts test/cycle-audit.test.ts test/sale-units.test.ts test/order-quotation-units.test.ts test/company-organization-settings.test.ts test/module-registry.test.ts test/inventory-module-guard.test.ts test/operations-module-guard.test.ts test/purchasing-authorization.test.ts test/export-authorization.test.ts test/services-business-sales.test.ts test/purchases-without-inventory.test.ts test/sales-authorization.test.ts test/approval-controls.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/finance-enterprise-lifecycle.test.ts test/product-units.test.ts test/sales-reports.test.ts test/documents.test.ts test/document-approval-trigger.test.ts test/electron-handlers.test.cjs test/electron-sync-config.test.cjs test/electron-documents.test.cjs test/electron-close.test.cjs test/electron-startup.test.ts test/backup-encryption.test.ts test/backup-restore.test.ts test/projects.test.ts test/project-controls.test.ts test/hr-leave.test.ts test/hr-contracts.test.ts test/hr-documents.test.ts test/manufacturing.test.ts test/manufacturing-quality.test.ts test/manufacturing-maintenance.test.ts test/manufacturing-wip.test.ts test/manufacturing-disposition.test.ts test/performance.test.ts test/central-license.test.ts test/central-config.test.ts test/observability.test.ts test/two-factor.test.ts test/cache.test.ts test/data-admin-import.test.ts test/electron-sync-relay.test.cjs test/navigation-persistence.test.ts test/single-device.test.ts test/security-scope-regressions.test.ts test/sync-foundation.test.ts test/app-configuration.test.ts test/dace-scoped-config.test.ts test/dashboard-permissions.test.ts test/central-api.test.cjs test/promotion-pos.test.ts test/electronic-invoice-security.test.ts test/notification-preferences.test.ts",
-    "electron:dist:mac": "npm run build && electron-builder --mac",
-    "electron:dist:linux": "npm run build && electron-builder --linux",
+    "electron:pack:x64": "npm run bundle:secure && node scripts/electron-builder-with-temp-output.cjs --win nsis --x64 && node scripts/create-installer-launcher.cjs && node scripts/restore-source.cjs",
+    "electron:pack:all": "npm run electron:pack:x64 && npm run electron:pack:ia32",
+    "electron:pack": "npm run electron:pack:all",
+    "electron:pack:ia32": "node scripts/build-legacy-windows.cjs",
+    "electron:dist:x64": "npm run build && node scripts/electron-builder-with-temp-output.cjs --win nsis --x64 && node scripts/create-installer-launcher.cjs && node scripts/restore-source.cjs",
+    "electron:dist:ia32": "node scripts/build-legacy-windows.cjs",
+    "electron:dist:all": "npm run electron:dist:x64 && npm run electron:dist:ia32",
+    "electron:dist": "npm run electron:pack:all",
+    "test": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/comprehensive-security.test.ts test/auth-login-guard.test.ts test/financials.test.ts test/integration.test.ts test/receivables.test.ts test/data-integrity.test.ts test/services.test.ts test/permissions.test.ts test/sales.test.ts test/escpos.test.ts test/electron-security.test.ts test/dynamic-data.test.ts test/dynamic-attributes.test.ts test/spreadsheet-import.test.ts test/branch-access.test.ts test/branch-scoped-pages.test.ts test/branch-ledger-reports.test.ts test/general-product-units.test.ts test/business-profiles.test.ts test/companies.test.ts test/company-data-scope.test.ts test/uom.test.ts test/cycle-audit.test.ts test/sale-units.test.ts test/order-quotation-units.test.ts test/company-organization-settings.test.ts test/module-registry.test.ts test/inventory-module-guard.test.ts test/operations-module-guard.test.ts test/purchasing-authorization.test.ts test/export-authorization.test.ts test/services-business-sales.test.ts test/purchases-without-inventory.test.ts test/sales-authorization.test.ts test/approval-controls.test.ts test/financial-statements-ui.test.ts test/database-recovery.test.ts test/security-accounting-audit.test.ts test/impact-registry.test.ts test/effects-engine.test.ts test/purchasing-lifecycle.test.ts test/inventory-professional-lifecycle.test.ts test/finance-enterprise-lifecycle.test.ts test/product-units.test.ts test/sales-reports.test.ts test/documents.test.ts test/document-approval-trigger.test.ts test/electron-handlers.test.cjs test/electron-sync-config.test.cjs test/electron-documents.test.cjs test/electron-close.test.cjs test/electron-startup.test.ts test/backup-encryption.test.ts test/backup-restore.test.ts test/projects.test.ts test/project-controls.test.ts     test/hr-leave.test.ts test/hr-recruitment.test.ts test/hr-contracts.test.ts test/hr-documents.test.ts test/manufacturing.test.ts test/manufacturing-quality.test.ts test/manufacturing-maintenance.test.ts test/manufacturing-wip.test.ts test/manufacturing-disposition.test.ts test/performance.test.ts test/central-license.test.ts test/central-config.test.ts test/observability.test.ts test/two-factor.test.ts test/cache.test.ts test/data-admin-import.test.ts test/electron-sync-relay.test.cjs test/navigation-persistence.test.ts test/single-device.test.ts test/security-scope-regressions.test.ts test/sync-foundation.test.ts test/app-configuration.test.ts test/dace-scoped-config.test.ts test/dashboard-permissions.test.ts test/central-api.test.cjs test/promotion-pos.test.ts test/electronic-invoice-security.test.ts test/notification-preferences.test.ts",
+    "test:security": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/comprehensive-security.test.ts",
+    "electron:dist:mac": "npm run build && node scripts/electron-builder-with-temp-output.cjs --mac",
+    "electron:dist:linux": "npm run build && node scripts/electron-builder-with-temp-output.cjs --linux",
     "e2e": "npm run build && playwright test",
+    "ui-audit:scan": "node scripts/ui-audit/scan.mjs",
     "test:sync": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/sync-foundation.test.ts test/electron-sync-relay.test.cjs test/electron-sync-config.test.cjs",
     "test:security-scope": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/security-scope-regressions.test.ts",
     "compile:bytenode": "node scripts/compile-bytenode.cjs",
-    "bundle:secure": "npm run build && npm run compile:bytenode && node scripts/prepare-production-bundle.cjs"
+    "bundle:secure": "node scripts/restore-source.cjs && npm run build && npm run compile:bytenode && node scripts/prepare-production-bundle.cjs"
   },
   "build": {
     "appId": "com.ceramisys.erp",
@@ -46,6 +51,10 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "node_modules/bytenode/**/*",
+      "!electron/**/*.bak",
+      "!electron/**/*.tmp",
+      "!**/*.map",
       "package.json"
     ],
     "win": {
@@ -53,13 +62,10 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64",
-            "ia32"
-          ]
+          "arch": ["x64"]
         }
       ],
-      "artifactName": "CeramiSys--."
+      "artifactName": "CeramiSys-Setup-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -129,7 +135,7 @@
     "tesseract.js": "^7.0.0",
     "uuid": "^11.1.0",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",
-    "bytenode": "^1.5.5"
+    "bytenode": "^2.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.28.0",
@@ -144,7 +150,6 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
-    "bytenode": "^2.1.0",
     "crypto-browserify": "^3.12.1",
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0",

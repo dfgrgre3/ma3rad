@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
 import { useLocation } from 'react-router-dom';
 import {
   RotateCcw, Plus, Search, Calendar, Printer, Loader2, X, AlertTriangle, Eye,
@@ -53,6 +54,7 @@ type ReturnDetail = SalesReturn & { items: SalesReturnItem[]; customerName?: str
 type ReturnLine = ReturnableItem & { quantityM2: number; reason: string; entryUnit: string };
 
 export const ReturnsPage: React.FC = () => {
+  const returnIdempotency = useIdempotencyKey();
   const location = useLocation() as { state?: { invoiceId?: string } };
   const service = useMemo(() => new SalesService(), []);
   const productService = useMemo(() => new ProductService(), []);
@@ -233,8 +235,9 @@ export const ReturnsPage: React.FC = () => {
           })),
           refundCash && refundMethod !== 'BALANCE',
           AuthService.getCurrentUser()?.id || 'usr_admin',
-          { refundMethod }
+          { refundMethod, idempotencyKey: returnIdempotency.getKey() }
         );
+        returnIdempotency.resetKey();
       }
       setModalOpen(false);
       setExchangeMode(false);

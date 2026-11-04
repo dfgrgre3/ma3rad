@@ -2,6 +2,7 @@
 
 const { randomBytes } = require('node:crypto');
 const { createHttpSyncClient } = require('./syncRelay');
+const safeStorageCompat = require('./safeStorageCompat');
 
 const CONFIG_FILE = 'sync-client-config.enc';
 
@@ -43,13 +44,12 @@ async function loadSyncClientConfig({ appDataDir, fs, path, safeStorage }) {
     throw new Error(`Could not read the encrypted sync client configuration: ${error.message || error}`);
   }
 
-  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
+  if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
     throw new Error('OS secure storage is unavailable; the sync client configuration cannot be opened safely.');
   }
   let parsed;
   try {
-    const decrypted = await safeStorage.decryptStringAsync(encrypted);
-    parsed = JSON.parse(decrypted.result);
+    parsed = JSON.parse(await safeStorageCompat.decryptString(safeStorage, encrypted));
   } catch (error) {
     throw new Error(`Could not decrypt or parse the sync client configuration: ${error.message || error}`);
   }
@@ -57,7 +57,7 @@ async function loadSyncClientConfig({ appDataDir, fs, path, safeStorage }) {
 }
 
 async function saveSyncClientConfig({ appDataDir, fs, path, safeStorage }, input) {
-  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
+  if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
     throw new Error('OS secure storage is unavailable; the sync client token was not saved.');
   }
   let candidate = input;
@@ -69,7 +69,7 @@ async function saveSyncClientConfig({ appDataDir, fs, path, safeStorage }, input
   const config = normalizeConfig(candidate);
   const configPath = path.join(appDataDir, CONFIG_FILE);
   const temporaryPath = `${configPath}.${randomBytes(8).toString('hex')}.tmp`;
-  const encrypted = await safeStorage.encryptStringAsync(JSON.stringify(config));
+  const encrypted = await safeStorageCompat.encryptString(safeStorage, JSON.stringify(config));
   try {
     await fs.mkdir(appDataDir, { recursive: true });
     await fs.writeFile(temporaryPath, encrypted, { flag: 'wx', mode: 0o600 });

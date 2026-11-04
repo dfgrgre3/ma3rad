@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
 import {
   RotateCcw, Plus, Search, Calendar, Printer, Loader2, X, AlertTriangle, Eye,
   RefreshCw, FileSpreadsheet, FileDown, ChevronLeft, ChevronRight, Banknote,
@@ -44,6 +45,7 @@ type ReturnLine = ReturnablePurchaseItem & { quantityM2: number };
 type ReturnDetail = PurchaseReturnRow & { items: any[] };
 
 export const PurchaseReturnsPage: React.FC = () => {
+  const returnIdempotency = useIdempotencyKey();
   const service = useMemo(() => new PurchaseReturnService(), []);
   const purchaseService = useMemo(() => new PurchaseService(), []);
   const printService = useMemo(() => new PrintService(), []);
@@ -139,7 +141,9 @@ export const PurchaseReturnsPage: React.FC = () => {
         reason,
         refundMethod,
         items: selected.map((l) => ({ productId: l.productId, quantityM2: l.quantityM2 })),
+        idempotencyKey: returnIdempotency.getKey(),
       });
+      returnIdempotency.resetKey();
       toast.success('تم تسجيل مرتجع الشراء وتحديث المخزون وحساب المورد.');
       setModalOpen(false);
       load();

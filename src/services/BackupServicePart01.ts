@@ -20,13 +20,32 @@ private require(): { id: string; fullName: string } {
     return user;
   }
 
-public async exportBackupFile(): Promise<void> {
+public async exportBackupFile(password?: string): Promise<void> {
     const user = this.require();
-    const password = window.prompt('أنشئ كلمة مرور لملف XLSX المشفر (12 حرفًا على الأقل). لن تُحفظ كلمة المرور داخل التطبيق:');
-    if (!password) throw new Error('أُلغي تصدير النسخة المشفرة.');
-    if (password.length < 12 || password.length > 255) throw new Error('يجب أن تتراوح كلمة مرور النسخة بين 12 و255 حرفًا.');
-    const repeatedPassword = window.prompt('أعد إدخال كلمة مرور النسخة للتأكيد:');
-    if (password !== repeatedPassword) throw new Error('كلمتا المرور غير متطابقتين.');
+    let pwd: string | undefined = password;
+    if (!pwd) {
+      if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        try {
+          const prompted = window.prompt('أنشئ كلمة مرور لملف XLSX المشفر (12 حرفًا على الأقل). لن تُحفظ كلمة المرور داخل التطبيق:');
+          if (!prompted) throw new Error('أُلغي تصدير النسخة المشفرة.');
+          if (prompted.length < 12 || prompted.length > 255) throw new Error('يجب أن تتراوح كلمة مرور النسخة بين 12 و255 حرفًا.');
+          const repeatedPassword = window.prompt('أعد إدخال كلمة مرور النسخة للتأكيد:');
+          if (prompted !== repeatedPassword) throw new Error('كلمتا المرور غير متطابقتين.');
+          pwd = prompted;
+        } catch (e: any) {
+          if (e?.message?.includes('prompt() is not supported')) {
+            throw new Error('يرجى إدخال كلمة مرور النسخة الاحتياطية من خلال نافذة التصدير.');
+          }
+          throw e;
+        }
+      } else {
+        throw new Error('كلمة المرور مطلوبة لتصدير النسخة المشفرة (12 حرفًا على الأقل).');
+      }
+    } else {
+      if (pwd.length < 12 || pwd.length > 255) {
+        throw new Error('يجب أن تتراوح كلمة مرور النسخة بين 12 و255 حرفًا.');
+      }
+    }
     await this.db.flush();
     const binary = this.db.exportDatabaseBinary();
     const inspection = this.verifyBackupFile(binary);
@@ -34,7 +53,7 @@ public async exportBackupFile(): Promise<void> {
     const workbook = createXlsxBackupWorkbook(binary);
     const encryptXlsx = window.ceramisys?.db?.encryptXlsxBackup;
     if (!encryptXlsx) throw new Error('تشفير ملف XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
-    const encrypted = await encryptXlsx(workbook, password);
+    const encrypted = await encryptXlsx(workbook, pwd);
     const blobBytes = new ArrayBuffer(encrypted.byteLength);
     new Uint8Array(blobBytes).set(encrypted);
     const blob = new Blob([blobBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -61,23 +80,46 @@ public async exportBackupFile(): Promise<void> {
     });
   }
 
+public async isEncryptedBackupFile(file: File): Promise<boolean> {
+    const headerBytes = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+    return hasOfficeCompoundFileSignature(headerBytes) || isEncryptedBackup(headerBytes);
+  }
+
 public verifyBackupFile(bytes: Uint8Array) {
     return this.db.inspectDatabaseBinary(bytes);
   }
 
-private async readBackupBytes(file: File): Promise<Uint8Array> {
+private async readBackupBytes(file: File, password?: string): Promise<Uint8Array> {
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     if (hasOfficeCompoundFileSignature(fileBytes)) {
-      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:');
-      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
+      let pwd: string | undefined = password;
+      if (!pwd) {
+        if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+          try {
+            pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:') || undefined;
+          } catch {
+            // Prompt failure is reported by the missing-password check below.
+          }
+        }
+      }
+      if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية XLSX مطلوبة.');
       const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
       if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
-      return extractDatabaseFromXlsxBackup(await decryptXlsx(fileBytes, password));
+      return extractDatabaseFromXlsxBackup(await decryptXlsx(fileBytes, pwd));
     }
     if (isEncryptedBackup(fileBytes)) {
-      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
-      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
-      return decryptExternalBackup(fileBytes, password);
+      let pwd: string | undefined = password;
+      if (!pwd) {
+        if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+          try {
+            pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:') || undefined;
+          } catch {
+            // Prompt failure is reported by the missing-password check below.
+          }
+        }
+      }
+      if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية مطلوبة.');
+      return decryptExternalBackup(fileBytes, pwd);
     }
 
     if (isEncryptedLocalDatabase(fileBytes)) {
@@ -116,14 +158,14 @@ private async verifyRestoredDatabase(currentSnapshot: Uint8Array): Promise<void>
     }
   }
 
-public async restoreBackupFromFile(file: File): Promise<{
+public async restoreBackupFromFile(file: File, password?: string): Promise<{
     productsCount: number;
     invoicesCount: number;
     customersCount: number;
     journalEntriesCount: number;
   }> {
     const user = this.require();
-    const bytes = await this.readBackupBytes(file);
+    const bytes = await this.readBackupBytes(file, password);
 
     // Validate integrity and inspect contents before replacing live database
     const inspection = this.verifyBackupFile(bytes);
@@ -163,7 +205,7 @@ public async restoreBackupFromFile(file: File): Promise<{
     };
   }
 
-  public async readBackupDataForImport(file: File): Promise<Array<{
+  public async readBackupDataForImport(file: File, password?: string): Promise<Array<{
       name: string;
       columns: string[];
       rows: Array<Record<string, unknown>>;
@@ -179,11 +221,20 @@ public async restoreBackupFromFile(file: File): Promise<{
       const encryptedBytes = new Uint8Array(await file.arrayBuffer());
       const isEncryptedXlsx = hasOfficeCompoundFileSignature(encryptedBytes);
       if (isEncryptedXlsx) {
-        const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:');
-        if (!password) throw new Error('أُلغي فك تشفير النسخة.');
+        let pwd: string | undefined = password;
+        if (!pwd) {
+          if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+            try {
+              pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:') || undefined;
+            } catch {
+              // Prompt failure is reported by the missing-password check below.
+            }
+          }
+        }
+        if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية XLSX مطلوبة.');
         const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
         if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
-        const bytes = extractDatabaseFromXlsxBackup(await decryptXlsx(encryptedBytes, password));
+        const bytes = extractDatabaseFromXlsxBackup(await decryptXlsx(encryptedBytes, pwd));
         const inspection = this.verifyBackupFile(bytes);
         if (!inspection.valid) {
           throw new Error(`الملف تالف أو غير صالح للاستيراد: ${inspection.error || inspection.integrity}`);
@@ -191,9 +242,18 @@ public async restoreBackupFromFile(file: File): Promise<{
         return this.db.readImportTablesBinary(bytes);
       }
       if (!isEncryptedBackup(encryptedBytes)) throw new Error('محتوى الملف ليس نسخة مشفرة صالحة.');
-      const password = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:');
-      if (!password) throw new Error('أُلغي فك تشفير النسخة.');
-      const bytes = await decryptExternalBackup(encryptedBytes, password);
+      let pwd: string | undefined = password;
+      if (!pwd) {
+        if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+          try {
+            pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:') || undefined;
+          } catch {
+            // Prompt failure is reported by the missing-password check below.
+          }
+        }
+      }
+      if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية مطلوبة.');
+      const bytes = await decryptExternalBackup(encryptedBytes, pwd);
       const inspection = this.verifyBackupFile(bytes);
       if (!inspection.valid) {
         throw new Error(`الملف تالف أو غير صالح للاستيراد: ${inspection.error || inspection.integrity}`);

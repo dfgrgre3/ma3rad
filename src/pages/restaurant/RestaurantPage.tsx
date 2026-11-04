@@ -16,6 +16,8 @@ import {
 } from '../../services/RestaurantService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
+import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
+import { getProfileWorkflows } from '../../config/businessProfiles';
 
 type OrderLineDraft = { productId: string; quantity: string; notes: string };
 type RecipeLineDraft = { componentProductId: string; quantity: string; unit: string };
@@ -294,6 +296,14 @@ export const RestaurantPage: React.FC = () => {
           <RefreshCw className="h-4 w-4" /> تحديث
         </button>
       </header>
+      {getProfileWorkflows(getEffectiveBusinessType()).length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
+          <span className="font-bold text-slate-500">سير عمل النشاط: </span>
+          {getProfileWorkflows(getEffectiveBusinessType()).map((w) => (
+            <span key={w.id} className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800" title={w.steps.join(' → ')}>{w.label.ar}</span>
+          ))}
+        </div>
+      )}
 
       <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         <button onClick={() => setTab('floor')} className={`rounded px-3 py-2 text-sm ${tab === 'floor' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>الصالة والطلبات</button>

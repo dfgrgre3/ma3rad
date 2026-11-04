@@ -5,6 +5,8 @@ import { CeramicMath } from '../../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 import { getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit } from '../../utils/uom';
 import { round2, type CartItem, type PosUnit } from './types';
+import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
+import { getPricingTierFactor } from '../../config/businessProfiles';
 
 export interface CartLineProps {
   item: CartItem;
@@ -40,6 +42,7 @@ export const CartLine: React.FC<CartLineProps> = ({
   sellingPriceTiersCount = 1,
   sellingPriceTierNames = [],
 }) => {
+  const businessType = getEffectiveBusinessType();
   const [isPriceMenuOpen, setIsPriceMenuOpen] = useState(false);
   const lineTotal = round2(item.quantityM2 * item.unitPrice - item.discountAmount);
   const isGeneral = item.product.productType === 'GENERAL' || item.product.baseUnit === 'SERVICE';
@@ -58,24 +61,24 @@ export const CartLine: React.FC<CartLineProps> = ({
     ];
 
     if (sellingPriceTiersCount >= 2) {
-      const wholesale = item.product.wholesalePriceM2 || round2(item.product.sellingPriceM2 * 0.9);
+      const wholesale = item.product.wholesalePriceM2 || round2(item.product.sellingPriceM2 * getPricingTierFactor(businessType, 'wholesale', 0.9));
       tiers.push({ id: 'wholesale', label: names[1] || defaultLabels[1], price: round2(pricePerUnit(wholesale, item.soldBy, item.product)) });
     }
     if (sellingPriceTiersCount >= 3) {
-      const minPrice = item.product.minSellingPriceM2 || round2(item.product.sellingPriceM2 * 0.85);
+      const minPrice = item.product.minSellingPriceM2 || round2(item.product.sellingPriceM2 * getPricingTierFactor(businessType, 'min_price', 0.85));
       tiers.push({ id: 'min_price', label: names[2] || defaultLabels[2], price: round2(pricePerUnit(minPrice, item.soldBy, item.product)) });
     }
     if (sellingPriceTiersCount >= 4) {
-      const distPrice = round2(item.product.sellingPriceM2 * 0.8);
+      const distPrice = round2(item.product.sellingPriceM2 * getPricingTierFactor(businessType, 'distributor', 0.8));
       tiers.push({ id: 'distributor', label: names[3] || defaultLabels[3], price: round2(pricePerUnit(distPrice, item.soldBy, item.product)) });
     }
     if (sellingPriceTiersCount >= 5) {
-      const vipPrice = round2(item.product.sellingPriceM2 * 0.75);
+      const vipPrice = round2(item.product.sellingPriceM2 * getPricingTierFactor(businessType, 'vip', 0.75));
       tiers.push({ id: 'vip', label: names[4] || defaultLabels[4], price: round2(pricePerUnit(vipPrice, item.soldBy, item.product)) });
     }
 
     return tiers;
-  }, [item.product, item.soldBy, sellingPriceTiersCount, sellingPriceTierNames]);
+  }, [item.product, item.soldBy, sellingPriceTiersCount, sellingPriceTierNames, businessType]);
 
   return (
     <div

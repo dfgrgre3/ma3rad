@@ -178,6 +178,52 @@ export class BusinessProfileService {
     });
   }
 
+  /** Apply the suggested permissions declared by the currently saved business profile.
+   *  Non-destructive: only adds missing roles/permissions, never removes. */
+  public static applyPermissionsFromSettings(): { rolesCreated: number; permissionsAdded: number } {
+    const businessType = getEffectiveBusinessType();
+    const profile = getBusinessProfile(businessType);
+    const suggestions = profile.permissions;
+    if (!suggestions || !Array.isArray(suggestions.roles) || suggestions.roles.length === 0) {
+      return { rolesCreated: 0, permissionsAdded: 0 };
+    }
+    const db = DatabaseManager.getInstance();
+    let rolesCreated = 0;
+    let permissionsAdded = 0;
+    db.executeTransaction((tx) => {
+      for (const suggestion of suggestions.roles) {
+        const roleCode = suggestion.role.trim();
+        if (!roleCode) continue;
+        const existingRole = tx.query<{ code: string }>(
+          `SELECT code FROM roles WHERE code = ?`, [roleCode]
+        )[0];
+        if (!existingRole) {
+          tx.run(
+            `INSERT INTO roles (id, code, name, description, is_system)
+             VALUES (?, ?, ?, ?, 0)`,
+            [`role_${uuidv4().substring(0, 8)}`, roleCode, roleCode, `Suggested by business profile ${profile.id}`]
+          );
+          rolesCreated += 1;
+        }
+        for (const permission of suggestion.permissions) {
+          const code = permission.trim();
+          if (!code) continue;
+          const exists = tx.query<{ c: number }>(
+            `SELECT COUNT(*) AS c FROM role_permissions WHERE role_code = ? AND permission_code = ?`,
+            [roleCode, code]
+          )[0]?.c ?? 0;
+          if (!exists) {
+            tx.run(
+              `INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)`,
+              [roleCode, code]
+            );
+            permissionsAdded += 1;
+          }
+        }
+      }
+    });
+    return { rolesCreated, permissionsAdded };
+  }
   /** Apply the attributes declared by the currently saved business profile. */
   public static applyFromSettings(): { created: string[]; existing: string[] } {
     const businessType = getEffectiveBusinessType();

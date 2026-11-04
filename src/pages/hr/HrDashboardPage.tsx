@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Users, TrendingUp, Wallet, Clock, Calendar, Award, AlertCircle, Loader2,
+  Users, TrendingUp, Wallet, Clock, Calendar, Award, AlertCircle, Loader2, BriefcaseBusiness,
   RefreshCw, UserCheck, UserX, BarChart3, Activity, ArrowUpRight, HardHat,
   DollarSign, CheckCircle2, Percent, Building2,
 } from 'lucide-react';
@@ -237,6 +237,7 @@ export const HrDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
   const canManage = PermissionService.can(user, 'employees.manage');
+  const canViewRecruitment = PermissionService.can(user, 'hr.recruitment.view');
   const [stats, setStats] = useState<HrStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -275,6 +276,11 @@ export const HrDashboardPage: React.FC = () => {
           <button onClick={() => navigate('/employees/attendance')} className="text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-sky-200">
             <Clock className="w-3.5 h-3.5" /> الحضور
           </button>
+          {canViewRecruitment && (
+            <button onClick={() => navigate('/employees/recruitment')} className="text-xs font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 transition px-3 py-2 rounded-lg flex items-center gap-1.5 border border-violet-200">
+              <BriefcaseBusiness className="w-3.5 h-3.5" /> التوظيف
+            </button>
+          )}
           <button onClick={load} className="p-2 hover:bg-slate-100 rounded-lg transition">
             <RefreshCw className={`w-4 h-4 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -359,6 +365,7 @@ export const HrDashboardPage: React.FC = () => {
               { label: 'الحضور والانصراف', desc: 'تسجيل ومتابعة الحضور', icon: Clock, to: '/employees/attendance', color: 'from-sky-500 to-blue-600' },
               { label: 'الرواتب والمسحوبات', desc: 'صرف الرواتب والسلف والحسومات', icon: Wallet, to: '/employees/payroll', color: 'from-emerald-500 to-green-600' },
               { label: 'عمولات المبيعات', desc: 'حساب وتوزيع العمولات', icon: Award, to: '/employees/commissions', color: 'from-amber-500 to-orange-600' },
+              ...(canViewRecruitment ? [{ label: 'التوظيف والمرشحون', desc: 'الوظائف الشاغرة حتى ربط الموظف الجديد', icon: BriefcaseBusiness, to: '/employees/recruitment', color: 'from-violet-500 to-indigo-600' }] : []),
             ].map(card => (
               <button
                 key={card.to}

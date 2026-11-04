@@ -4,6 +4,8 @@ import { ArrowLeft, BarChart3, Search, Sparkles } from 'lucide-react';
 import { REPORT_CATEGORIES, REPORT_DEFINITIONS } from './reportCatalog';
 import type { ReportCategoryId, ReportDefinition } from './reportCatalog';
 import { ReportView } from './ReportView';
+import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
+import { getBusinessProfile, getProfileReports } from '../../config/businessProfiles';
 
 const SalesReportsPage = lazy(() =>
   import('./SalesReportsPage').then((m) => ({ default: m.SalesReportsPage })),
@@ -173,6 +175,14 @@ export const ReportsHubPage: React.FC = () => {
               </p>
             </div>
           </div>
+          {getProfileReports(getEffectiveBusinessType()).length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs dark:border-slate-700 dark:bg-slate-900">
+              <span className="font-bold text-slate-500">تقارير موصى بها للنشاط ({getBusinessProfile(getEffectiveBusinessType()).name.ar}): </span>
+              {getProfileReports(getEffectiveBusinessType()).map((r) => (
+                <span key={r.id} className="ml-2 inline-block rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800">{r.label.ar}</span>
+              ))}
+            </div>
+          )}
           <div className="relative w-full sm:w-72">
             <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input

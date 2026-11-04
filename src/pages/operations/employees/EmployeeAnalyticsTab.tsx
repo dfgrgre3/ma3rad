@@ -1,16 +1,18 @@
 import React from 'react';
 import { ArrowLeftRight, Landmark, MapPin } from 'lucide-react';
 import { fmtCurrency } from './helpers';
-import { DEFAULT_LOCATIONS, TX_TYPES, type Employee, type FinancialTransaction } from './types';
+import { TX_TYPES, type Employee, type FinancialTransaction } from './types';
 
 interface EmployeeAnalyticsTabProps {
   employees: Employee[];
   transactions: FinancialTransaction[];
+  locations: string[];
 }
 
 export const EmployeeAnalyticsTab: React.FC<EmployeeAnalyticsTabProps> = ({
   employees,
   transactions,
+  locations,
 }) => {
   return (
     <div className="space-y-6">
@@ -26,7 +28,7 @@ export const EmployeeAnalyticsTab: React.FC<EmployeeAnalyticsTabProps> = ({
           </h3>
 
           <div className="space-y-4">
-            {DEFAULT_LOCATIONS.map(loc => {
+            {locations.map(loc => {
               const count = employees.filter(e => e.location === loc).length;
               const percentage = employees.length > 0 ? (count / employees.length) * 100 : 0;
 

@@ -31,6 +31,28 @@ npm run electron:dev
 
 - Node.js 22.13 أو أحدث (تم التحقق على Node 24)
 - Windows لتوليد مثبّت NSIS (يمكن بناء macOS/Linux من بيئاتها)
+- نسخة x64 لـ Windows 10/11، ونسخة 32 بت (IA32) لـ Windows 7/8/8.1/10/11.
+- نسخة Windows 7 تستخدم Electron 22.3.27؛ هذا الإصدار قديم وغير مدعوم أمنيًا.
+
+### بناء مثبّت Windows
+
+```bash
+npm run electron:dist:all
+```
+
+ينشئ الأمر مثبّتين في `release/`: ملف `*-x64.exe` لأجهزة Windows 10/11، وملف
+`*-x86.exe` لأجهزة 32 بت التي تعمل بـ Windows 7 حتى 11. نسخة 32 بت تعمل أيضًا
+على Windows 64 بت. شغّل `Install-CeramiSys.cmd` لنسخة x64 أو
+`Install-CeramiSys-x86.cmd` لنسخة 32 بت؛ يضبط كل منهما مجلدًا مؤقتًا قابلًا
+للكتابة قبل تشغيل NSIS.
+
+لبناء نسخة واحدة استخدم `npm run electron:dist:x64` أو
+`npm run electron:dist:ia32`. كما أن `npm run electron:pack` ينشئ النسختين
+المحميتين ببايت كود ملائم لكل إصدار Electron. يلزم اتصال بالإنترنت أول مرة
+لبناء نسخة 32 بت لتنزيل Electron 22.3.27.
+
+دعم Windows 7 عبر Electron قديم لا يعني أن النظام ما زال مدعومًا أمنيًا، ولا
+يمكن ضمان التشغيل على كل عتاد أو أجهزة دون الحد الأدنى لمتطلبات Electron.
 
 ## استيراد ملفات PDF
 

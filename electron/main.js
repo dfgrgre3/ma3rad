@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const { randomBytes } = require('node:crypto');
+const safeStorageCompat = require('./safeStorageCompat');
 const { registerPrintingHandlers } = require('./printing');
 const { registerDatabaseHandlers } = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
@@ -17,6 +18,27 @@ const {
 } = require('./syncClientConfig');
 const tailscaleService = require('./tailscaleService');
 const { registerLicenseHandlers } = require('./licenseGuard');
+
+// ───────────────────────────── Environment ────────────────────────────────────
+//   LICENSE_MODE=account|hardwa   (default: hardwa)
+//     "account"  -> slots are bound to the licensed account + credential only.
+//                  A fresh machine activates with EDAR code + account and runs
+//                  on any hardware that has the credential.
+//     "hardwa"   -> existing behaviour: license is bound to this machine's
+//                  hardware fingerprint (getHardwareId). Use this only when
+//                  your license is issued per device.
+//                 Override with the process environment (set in the target) and
+//                 do not rely on .env for shipped builds: process.env is not
+//                 guaranteed to be backed by a file in production.
+//   CERAMISYS_USER_DATA_DIR  -> absolute path for the application data folder.
+//   CENTRAL_API_URL          -> central platform base URL.
+// ─────────────────────────────────────────────────────────────────────────────
+let LICENSE_MODE = process.env.LICENSE_MODE || 'hardwa';
+LICENSE_MODE = String(LICENSE_MODE).trim().toLowerCase();
+if (LICENSE_MODE !== 'account' && LICENSE_MODE !== 'hardwa') {
+  LICENSE_MODE = 'hardwa';
+}
+console.info(`[init] LICENSE_MODE=${LICENSE_MODE}`);
 
 // Load the documented local .env file for development launches. Explicit
 // process environment values take precedence; packaged deployments can set the
@@ -134,7 +156,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true
+      sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
   });
 
@@ -205,6 +229,12 @@ function createWindow() {
     }
   });
 
+    // Security: Prevent webview attachment
+  win.webContents.on('will-attach-webview', (event) => {
+    event.preventDefault();
+    console.warn('Security: Prevented webview attachment');
+  });
+
   win.maximize();
 }
 
@@ -236,6 +266,16 @@ registerLicenseHandlers({
   ipcMain,
   validateIpcSender,
   appDataDir: APP_DATA_DIR,
+  licenseMode: LICENSE_MODE,
+});
+
+const { FileIntegrityChecker } = require('./security/fileIntegrity');
+const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
+ipcMain.handle('security:check-integrity', async (event) => {
+  validateIpcSender(event);
+  return integrityChecker.verifyManifest({
+    'electron/preload.js': integrityChecker.hashFile('electron/preload.js'),
+  });
 });
 registerSyncClientConfigHandlers({
   ipcMain,
@@ -247,14 +287,13 @@ registerSyncClientConfigHandlers({
 });
 
 async function loadOrCreateSyncJournalKey() {
-  if (!(await safeStorage.isAsyncEncryptionAvailable())) {
+  if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
     throw new Error('OS secure storage is unavailable; the sync journal cannot be opened safely.');
   }
   const keyPath = path.join(APP_DATA_DIR, 'sync-journal-key.enc');
   const readKey = async () => {
     const encrypted = await fs.readFile(keyPath);
-    const decrypted = await safeStorage.decryptStringAsync(encrypted);
-    const key = Buffer.from(decrypted.result, 'base64');
+    const key = Buffer.from(await safeStorageCompat.decryptString(safeStorage, encrypted), 'base64');
     if (key.length !== 32) throw new Error('The stored sync journal encryption key is invalid.');
     return key;
   };
@@ -265,7 +304,7 @@ async function loadOrCreateSyncJournalKey() {
   }
 
   const key = randomBytes(32);
-  const encrypted = await safeStorage.encryptStringAsync(key.toString('base64'));
+  const encrypted = await safeStorageCompat.encryptString(safeStorage, key.toString('base64'));
   try {
     await fs.writeFile(keyPath, encrypted, { flag: 'wx', mode: 0o600 });
     return key;
@@ -457,6 +496,9 @@ function installOfflineNetworkGuard(ses) {
 }
 
 app.whenReady().then(async () => {
+  // Security: Deny all permission requests (camera, mic, etc.)
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => callback(false));
+
   if (!CENTRAL_API_URL) {
     console.warn('CENTRAL_API_URL is unset or invalid; central API network requests are disabled. Set an HTTPS origin without a path, query, or credentials.');
   }

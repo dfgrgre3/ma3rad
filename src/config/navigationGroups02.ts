@@ -1,7 +1,7 @@
 import {
   Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Building2, CalendarDays, Car, CheckSquare,
   CreditCard, Cpu, Download, Factory, FileSignature, FileSpreadsheet, FileText, HardHat,
-  RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Trash2, Truck, UserRound,
+  RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Trash2, Truck, UserPlus, UserRound,
   Wallet, Warehouse,
 } from 'lucide-react';
 import type { NavGroupDef } from './navigationTypes';
@@ -25,6 +25,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'الإجازات', to: '/employees/leave', icon: CalendarDays, perm: 'hr.leave.view' },
       { label: 'عقود الموظفين', to: '/employees/contracts', icon: FileSignature, perm: 'hr.contracts.view' },
       { label: 'مستندات الموظفين', to: '/employees/documents', icon: FileText, perm: 'hr.documents.view' },
+      { label: 'التوظيف والمرشحون', to: '/employees/recruitment', icon: UserPlus, perm: 'hr.recruitment.view' },
       { label: 'التوصيل', to: '/deliveries', icon: Truck, perm: 'deliveries.view' },
       { label: 'السائقون', to: '/drivers', icon: UserRound, perm: 'drivers.view' },
       { label: 'المركبات', to: '/vehicles', icon: Car, perm: 'vehicles.view' },

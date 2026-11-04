@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { DatabaseManager } from '../../database/db';
@@ -32,6 +33,7 @@ import { RecordPaymentModal } from './supplier-detail/RecordPaymentModal';
 import { EditSupplierModal } from './supplier-detail/EditSupplierModal';
 
 export const SupplierDetailPage: React.FC = () => {
+  const paymentIdempotency = useIdempotencyKey();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('overview');
@@ -231,8 +233,10 @@ export const SupplierDetailPage: React.FC = () => {
         Number(paymentData.amount),
         paymentData.paymentType,
         'cr_main',
-        paymentData.notes
+        paymentData.notes,
+        paymentIdempotency.getKey()
       );
+      paymentIdempotency.resetKey();
       setIsPaymentModalOpen(false);
       loadSupplierData();
     } catch (err: any) {

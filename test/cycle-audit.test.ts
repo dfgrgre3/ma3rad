@@ -12,6 +12,7 @@ import { PurchaseOrderService } from '../src/services/PurchaseOrderService.ts';
 import { ProcurementService } from '../src/services/ProcurementService.ts';
 import { InventoryService } from '../src/services/InventoryService.ts';
 import { ReservationService } from '../src/services/ReservationService.ts';
+import { localDateString } from '../src/utils/date.ts';
 
 /**
  * Systematic cycle audit: every documented mutation must leave the same
@@ -496,7 +497,7 @@ test('inventory and accounting audit: movements, reservations, transfers and led
   const closedSetting = one<{ value: string }>(
     `SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'`
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   q(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('accounting_closed_until_date', ?)`, [today]);
   const invoicesBefore = one<{ n: number }>(`SELECT COUNT(*) AS n FROM sales_invoices`).n;
   const stockBeforeClosedSale = stockOf(productId);

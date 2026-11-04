@@ -95,7 +95,7 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
     taxAmount: 420,
     items: invoice.items.map((item) => ({ ...item, productName: '<img src=x onerror=alert(1)>' })),
   });
-  assert.match(invoiceHtml, /الضريبة \(14%\)/);
+  assert.match(invoiceHtml, /ضريبة القيمة المضافة \(14%\)/);
   assert.match(invoiceHtml, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.match(invoiceHtml, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.doesNotMatch(invoiceHtml, /<img src=x onerror=alert\(1\)>/);

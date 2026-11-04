@@ -81,6 +81,7 @@ $RECYCLE.BIN/
 # Windows runtime-generated spellcheck dictionaries
 Microsoft/
 
-# Compiled V8 Bytecode
-*.jsc
+# UI audit (regenerable artifacts; run `npm run ui-audit:scan` and `npx playwright test e2e/ui-audit.spec.ts`)
+docs/ui-audit/manifest.json
+docs/ui-audit/smoke-report.json
 
