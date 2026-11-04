@@ -227,6 +227,77 @@ test('service products default to the profile unit instead of ceramic defaults',
   assert.equal(getStockQuantityLabel({ productType: 'SERVICE', baseUnit: 'SERVICE' }), 'خدمة');
 });
 
+test('explicit zero values from a blank product form are not replaced with sample defaults', async () => {
+  await boot();
+  const product = new ProductService().createProduct({
+    productType: 'GENERAL',
+    sku: 'SKU-BLANK-FIELDS',
+    barcode: 'BAR-BLANK-FIELDS',
+    name: 'منتج بدون قيم افتراضية',
+    categoryId: 'cat_floor',
+    brandId: 'br_cleo',
+    baseUnit: 'PIECE',
+    sellUnit: 'PIECE',
+    grade: 'GRADE_1',
+    size: '',
+    piecesPerBox: 0,
+    metersPerBox: 0,
+    weightPerBox: 0,
+    costPrice: 0,
+    sellingPriceM2: 0,
+    sellingPriceBox: 0,
+    wholesalePriceM2: 0,
+    minSellingPriceM2: 0,
+    minStockLevel: 0,
+    maxStockLevel: 0,
+    isActive: true,
+  });
+
+  assert.equal(product.piecesPerBox, 0);
+  assert.equal(product.metersPerBox, 0);
+  assert.equal(product.minStockLevel, 0);
+  assert.equal(product.maxStockLevel, 0);
+});
+
+test('generated product barcode starts at 1 and both identifiers skip used values', async () => {
+  await boot();
+  const service = new ProductService();
+  assert.equal(service.generateNextBarcode(), '1');
+  const generatedSku = service.generateNextSku();
+  assert.match(generatedSku, /^SKU-[A-F0-9]{8}$/);
+
+  service.createProduct({
+    productType: 'GENERAL',
+    sku: generatedSku,
+    barcode: '1',
+    name: 'منتج لاختبار توليد الأكواد',
+    categoryId: 'cat_floor',
+    brandId: 'br_cleo',
+    baseUnit: 'PIECE',
+    sellUnit: 'PIECE',
+    grade: 'GRADE_1',
+    size: '',
+    piecesPerBox: 0,
+    metersPerBox: 0,
+    weightPerBox: 0,
+    costPrice: 0,
+    sellingPriceM2: 0,
+    sellingPriceBox: 0,
+    wholesalePriceM2: 0,
+    minSellingPriceM2: 0,
+    minStockLevel: 0,
+    maxStockLevel: 0,
+    isActive: true,
+  });
+
+  assert.equal(service.generateNextBarcode(), '2');
+  const nextSku = service.generateNextSku();
+  assert.match(nextSku, /^SKU-[A-F0-9]{8}$/);
+  assert.notEqual(nextSku, generatedSku);
+  assert.equal(service.generateNextBarcode('2'), '3');
+  assert.notEqual(service.generateNextSku(nextSku), nextSku);
+});
+
 // Every preset profile that declares "services" must be able to sell without
 // stock. This guards the "any business type" promise across profiles, not just
 // the `services` preset.

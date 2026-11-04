@@ -12,7 +12,13 @@ export const ListPagination: React.FC<{ page: number; totalPages: number; totalI
   </div>
 );
 
-export const Field: React.FC<{ id?: string; label: string; required?: boolean; hint?: string; children: React.ReactNode }> = ({ id, label, required, hint, children }) => {
+export const Field: React.FC<{
+  id?: string;
+  label: string;
+  required?: boolean;
+  hint?: string;
+  children: React.ReactNode;
+}> = ({ id, label, required, hint, children }) => {
   const controlId = id || `field-${label.replace(/\s+/g, '-').toLowerCase()}`;
   const fieldChildren = React.isValidElement(children)
     ? React.cloneElement(children as React.ReactElement<{ id?: string }>, {

@@ -160,6 +160,94 @@ test('app configuration overrides printed document titles and footers', async ()
   assert.match(html, /شكرًا لتعاملكم معنا/);
 });
 
+test('table-first invoices keep optional details hidden and honor section and column settings', async () => {
+  await DatabaseManager.getInstance().initialize();
+  const invoice = {
+    invoiceNumber: 'INV-TABLE-1',
+    date: '2026-11-04',
+    customerName: 'عميل الاختبار',
+    customerPhone: '0500000000',
+    warehouseName: 'المستودع الرئيسي',
+    paymentType: 'CASH',
+    subtotal: 100,
+    discountAmount: 10,
+    taxAmount: 0,
+    taxPercentage: 0,
+    shippingCost: 5,
+    totalAmount: 95,
+    paidAmount: 95,
+    remainingAmount: 0,
+    promotionName: 'عرض الاختبار',
+    couponCode: 'SAVE10',
+    deliveryAddress: 'عنوان التوصيل للاختبار',
+    notes: 'ملاحظة داخلية للاختبار',
+    paymentSplits: [{ method: 'CARD', amount: 95, reference: 'مرجع الدفع للاختبار' }],
+    items: [{
+      productName: 'بلاط تجريبي',
+      productSku: 'SKU-PRIVATE',
+      size: '60×60',
+      productGrade: 'GRADE_1',
+      soldBy: 'M2',
+      baseUnit: 'M2',
+      quantityM2: 2,
+      quantity: 2,
+      boxesCount: 1,
+      piecesCount: 4,
+      unitPrice: 50,
+      discountAmount: 10,
+      totalPrice: 90,
+      productType: 'CERAMIC',
+    }],
+  } as any;
+  const service = new PrintService();
+  assert.match(service.getInvoiceHtml(invoice), /class="items-table/);
+  const hiddenHtml = service.getInvoiceHtml(invoice, {
+    template: 'table',
+    settingsOverride: {
+      invoiceShowPromotions: false,
+      invoiceShowShipping: false,
+      invoiceShowPaymentSplits: false,
+      invoiceShowNotes: false,
+      invoiceShowItemCode: false,
+      invoiceShowItemSpecs: false,
+      invoiceShowBrandLogo: false,
+      brandLogoDataUrl: 'data:image/png;base64,c2FtcGxl',
+      brandPrimaryColor: '#102030',
+      brandAccentColor: '#405060',
+      invoiceFontFamily: 'Arial',
+      invoiceTableColumns: ['product', 'quantity', 'unitPrice', 'total'],
+    },
+  });
+  assert.match(hiddenHtml, /INV-TABLE-1/);
+  assert.match(hiddenHtml, /--invoice-primary:#102030/);
+  assert.doesNotMatch(hiddenHtml, /عرض الاختبار|SAVE10|عنوان التوصيل للاختبار|مرجع الدفع للاختبار|ملاحظة داخلية للاختبار|SKU-PRIVATE/);
+  assert.doesNotMatch(hiddenHtml, /<th>خصم البند<\/th>|src="data:image\/png/);
+  assert.match(hiddenHtml, /الخصم/);
+  assert.match(hiddenHtml, /التوصيل والنقل/);
+  assert.match(hiddenHtml, /<th>الإجمالي<\/th>/);
+
+  const visibleHtml = service.getInvoiceHtml(invoice, {
+    template: 'table',
+    settingsOverride: {
+      invoiceShowPromotions: true,
+      invoiceShowShipping: true,
+      invoiceShowPaymentSplits: true,
+      invoiceShowNotes: true,
+      invoiceSectionOrder: ['notes', 'delivery', 'promotions', 'paymentSplits'],
+      invoiceTableColumns: ['product', 'lineDiscount', 'total'],
+    },
+  });
+  const orderedText = [
+    visibleHtml.indexOf('ملاحظة داخلية للاختبار'),
+    visibleHtml.indexOf('عنوان التوصيل للاختبار'),
+    visibleHtml.indexOf('عرض الاختبار'),
+    visibleHtml.indexOf('مرجع الدفع للاختبار'),
+  ];
+  assert.ok(orderedText.every((index) => index >= 0));
+  assert.deepEqual(orderedText, [...orderedText].sort((a, b) => a - b));
+  assert.match(visibleHtml, /<th>خصم البند<\/th>/);
+});
+
 test('app configuration rejects writes without permission', async () => {
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();

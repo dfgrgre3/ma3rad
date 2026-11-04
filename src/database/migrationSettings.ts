@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   a5PrinterName: '',
   barcodePrinterName: '',
   defaultInvoiceSize: 'a4',
-  defaultInvoiceTemplate: 'classic',
+  defaultInvoiceTemplate: 'table',
 
   // Added alongside the branches / approvals / delivery modules.
   defaultBranchId: 'br_main',
@@ -52,12 +52,20 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   posAllowDuplicateItems: '0',
   posAutoSaveInvoice: '0',
   posMultiSelectSearch: '0',
-  invoiceTableStyle: 'bordered',
-  invoiceShowItemCode: '1',
-  invoiceShowItemSpecs: '1',
-  invoiceShowBoxesCount: '1',
-  invoiceShowLineDiscount: '1',
+  invoiceTableStyle: 'minimal',
+  invoiceShowItemCode: '0',
+  invoiceShowItemSpecs: '0',
+  invoiceShowBoxesCount: '0',
+  invoiceShowLineDiscount: '0',
   invoiceShowTableSummary: '1',
+  invoiceTableColumns: '["number","product","unit","quantity","unitPrice","total"]',
+  invoiceShowPromotions: '0',
+  invoiceShowShipping: '0',
+  invoiceShowPaymentSplits: '0',
+  invoiceShowNotes: '0',
+  invoiceShowBrandLogo: '1',
+  invoiceFontFamily: 'Cairo',
+  invoiceSectionOrder: '["promotions","delivery","paymentSplits","notes"]',
   allowOverdraftSale: '0',
   insufficientStockAsReserved: '0',
   lockSaleOnReservedQty: '0',
@@ -80,7 +88,7 @@ export const EXTENDED_SETTINGS_KEYS = [
   'brandName', 'brandShortName', 'brandLogoDataUrl', 'brandPrimaryColor',
   'brandAccentColor', 'themeMode', 'fontFamily', 'showBrandText', 'sidebarStyle',
   'navigationLayout', 'businessTerminologyOverrides',
-  'sellingPriceTiersCount', 'sellingPriceTierNames', 'posShowCashButton', 'posAllowDuplicateItems', 'posAutoSaveInvoice', 'posMultiSelectSearch', 'invoiceTableStyle', 'invoiceShowItemCode', 'invoiceShowItemSpecs', 'invoiceShowBoxesCount', 'invoiceShowLineDiscount', 'invoiceShowTableSummary', 'allowOverdraftSale', 'insufficientStockAsReserved', 'lockSaleOnReservedQty', 'preventPermitSaleWithoutStock', 'preventOverdraftDeliveryPermit', 'allowAdminOverdraftSale', 'allowPermissionHoldersOverdraftSale', 'allowLineItemDiscount', 'returnRequiresInvoiceOrCustomer', 'newInvoicesUnderDelivery', 'vatOnDeliveryFee', 'cashierMaxDiscountPercentWithoutApproval', 'requireRemoteManagerApproval', 'posItemRemovalReasons',
+  'sellingPriceTiersCount', 'sellingPriceTierNames', 'posShowCashButton', 'posAllowDuplicateItems', 'posAutoSaveInvoice', 'posMultiSelectSearch', 'invoiceTableStyle', 'invoiceShowItemCode', 'invoiceShowItemSpecs', 'invoiceShowBoxesCount', 'invoiceShowLineDiscount', 'invoiceShowTableSummary', 'invoiceTableColumns', 'invoiceShowPromotions', 'invoiceShowShipping', 'invoiceShowPaymentSplits', 'invoiceShowNotes', 'invoiceShowBrandLogo', 'invoiceFontFamily', 'invoiceSectionOrder', 'allowOverdraftSale', 'insufficientStockAsReserved', 'lockSaleOnReservedQty', 'preventPermitSaleWithoutStock', 'preventOverdraftDeliveryPermit', 'allowAdminOverdraftSale', 'allowPermissionHoldersOverdraftSale', 'allowLineItemDiscount', 'returnRequiresInvoiceOrCustomer', 'newInvoicesUnderDelivery', 'vatOnDeliveryFee', 'cashierMaxDiscountPercentWithoutApproval', 'requireRemoteManagerApproval', 'posItemRemovalReasons',
 ];
 
 export const DEFAULT_BRANCH_ID = 'br_main';

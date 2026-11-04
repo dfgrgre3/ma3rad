@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Save, Palette, Table as TableIcon, Columns, Info, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History, Download,
-  Printer, Eye, Star, CheckCircle, RefreshCw, Layers, LayoutTemplate, FileText, CheckCircle2, X, ExternalLink, SlidersHorizontal, Sparkles, Plus,
+  Printer, Eye, Star, CheckCircle, RefreshCw, Layers, LayoutTemplate, FileText, CheckCircle2, X, ExternalLink, SlidersHorizontal, Sparkles, Plus, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { SettingsService } from '../../services/SettingsService';
 import { AuthService } from '../../services/AuthService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
 import { BusinessProfileSupportNotice } from '../../components/business/BusinessProfileSupportNotice';
-import type { SystemSettings } from '../../types';
+import type { InvoiceSectionId, InvoiceTableColumnId, SystemSettings } from '../../types';
 import { PrintService, type InvoiceTemplateId, type InvoiceSizeId } from '../../services/PrintService';
 import {
   BUSINESS_MODULES,
@@ -61,6 +61,35 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'backup', label: 'النسخ والاستعادة', icon: Download },
 ];
 
+const DEFAULT_INVOICE_SECTION_ORDER: InvoiceSectionId[] = ['promotions', 'delivery', 'paymentSplits', 'notes'];
+const DEFAULT_INVOICE_TABLE_COLUMNS: InvoiceTableColumnId[] = ['number', 'product', 'unit', 'quantity', 'unitPrice', 'total'];
+const INVOICE_SECTION_OPTIONS: { id: InvoiceSectionId; label: string }[] = [
+  { id: 'promotions', label: 'العروض والخصومات الإضافية' },
+  { id: 'delivery', label: 'الشحن والتوصيل' },
+  { id: 'paymentSplits', label: 'تفاصيل الدفعات المجزأة' },
+  { id: 'notes', label: 'الملاحظات الإضافية' },
+];
+const INVOICE_COLUMN_OPTIONS: { id: InvoiceTableColumnId; label: string }[] = [
+  { id: 'number', label: 'رقم البند' },
+  { id: 'product', label: 'الصنف والبيان' },
+  { id: 'unit', label: 'الوحدة' },
+  { id: 'quantity', label: 'الكمية' },
+  { id: 'boxes', label: 'عدد الكراتين' },
+  { id: 'pieces', label: 'عدد القطع' },
+  { id: 'unitPrice', label: 'سعر الوحدة' },
+  { id: 'lineDiscount', label: 'خصم البند' },
+  { id: 'total', label: 'الإجمالي' },
+];
+
+function moveListItem<T>(items: T[], item: T, direction: -1 | 1): T[] {
+  const index = items.indexOf(item);
+  const nextIndex = index + direction;
+  if (index < 0 || nextIndex < 0 || nextIndex >= items.length) return items;
+  const reordered = [...items];
+  [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+  return reordered;
+}
+
 interface AdminSettingsTabProps {
   initialTab?: Tab;
   onTabChange?: (tab: Tab) => void;
@@ -97,7 +126,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
   const [scannedPrintersCount, setScannedPrintersCount] = useState<number | null>(null);
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateId>('classic');
+  const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateId>('table');
   const [previewSize, setPreviewSize] = useState<InvoiceSizeId>('a4');
   const [newReasonInput, setNewReasonInput] = useState('');
   const [showAddReason, setShowAddReason] = useState(false);
@@ -168,6 +197,46 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
     setSettings((prev) => ({ ...prev, [key]: value }));
     setDirty(true);
   };
+
+  const setInvoiceTableColumn = (column: InvoiceTableColumnId, checked: boolean) => {
+    const current = settings.invoiceTableColumns?.length
+      ? settings.invoiceTableColumns
+      : DEFAULT_INVOICE_TABLE_COLUMNS;
+    set('invoiceTableColumns', checked
+      ? [...current, column].filter((value, index, values) => values.indexOf(value) === index)
+      : current.filter((value) => value !== column));
+    if (column === 'lineDiscount') set('invoiceShowLineDiscount', checked);
+    if (column === 'boxes') set('invoiceShowBoxesCount', checked || current.includes('pieces'));
+    if (column === 'pieces') set('invoiceShowBoxesCount', checked || current.includes('boxes'));
+  };
+  const setInvoiceTableColumnGroup = (columns: InvoiceTableColumnId[], checked: boolean) => {
+    const current = settings.invoiceTableColumns?.length
+      ? settings.invoiceTableColumns
+      : DEFAULT_INVOICE_TABLE_COLUMNS;
+    set('invoiceTableColumns', checked
+      ? [...current, ...columns].filter((value, index, values) => values.indexOf(value) === index)
+      : current.filter((value) => !columns.includes(value)));
+    set('invoiceShowBoxesCount', checked);
+  };
+  const moveInvoiceTableColumn = (column: InvoiceTableColumnId, direction: -1 | 1) => {
+    const current = settings.invoiceTableColumns?.length
+      ? settings.invoiceTableColumns
+      : DEFAULT_INVOICE_TABLE_COLUMNS;
+    set('invoiceTableColumns', moveListItem(current, column, direction));
+  };
+  const moveInvoiceSection = (section: InvoiceSectionId, direction: -1 | 1) => {
+    const current = settings.invoiceSectionOrder?.length
+      ? settings.invoiceSectionOrder
+      : DEFAULT_INVOICE_SECTION_ORDER;
+    set('invoiceSectionOrder', moveListItem(current, section, direction));
+  };
+  const invoiceTableColumns = settings.invoiceTableColumns?.length
+    ? settings.invoiceTableColumns
+    : DEFAULT_INVOICE_TABLE_COLUMNS;
+  const invoiceSectionOrder = [
+    ...(settings.invoiceSectionOrder?.length ? settings.invoiceSectionOrder : DEFAULT_INVOICE_SECTION_ORDER),
+    ...DEFAULT_INVOICE_SECTION_ORDER.filter((section) => !(settings.invoiceSectionOrder || DEFAULT_INVOICE_SECTION_ORDER).includes(section)),
+  ];
 
   const save = () => {
     try {
@@ -914,7 +983,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                   <button
                     type="button"
                     onClick={() => {
-                      setPreviewTemplate((settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'classic');
+                      setPreviewTemplate((settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'table');
                       setPreviewSize((settings.defaultInvoiceSize as InvoiceSizeId) || 'a4');
                       setPreviewModalOpen(true);
                     }}
@@ -959,42 +1028,69 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
               </div>
 
               {/* Template Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                 {[
                   {
+                    key: 'table',
+                    id: 'table' as const,
+                    size: undefined as InvoiceSizeId | undefined,
+                    title: 'جدول واضح',
+                    tag: 'Table-first',
+                    desc: 'تخطيط هادئ يضع جدول البنود والإجماليات في المقدمة ويخفي التفاصيل الاختيارية.',
+                    icon: TableIcon,
+                  },
+                  {
+                    key: 'classic',
                     id: 'classic' as const,
+                    size: undefined as InvoiceSizeId | undefined,
                     title: 'كلاسيكي رسمي (Classic)',
                     tag: 'النمط التقليدي',
                     desc: 'ترويسة مؤسسية متوازنة، جداول واضحة بتفقيط ومربعات مجاميع معتمدة ومناسبة للأعمال الرسمية.',
                     icon: FileText,
                   },
                   {
+                    key: 'modern',
                     id: 'modern' as const,
+                    size: undefined as InvoiceSizeId | undefined,
                     title: 'عصري حديث (Modern)',
                     tag: 'تصميم معاصر',
                     desc: 'مظهر أنيق جذاب بلمسات تدرج ملونة، بطاقات بيانات للعميل والمخزن، وبادجات دفع بارزة.',
                     icon: Sparkles,
                   },
                   {
+                    key: 'compact',
                     id: 'compact' as const,
+                    size: undefined as InvoiceSizeId | undefined,
                     title: 'مدمج واقتصادي (Compact)',
                     tag: 'توفير الورق',
                     desc: 'تصميم كثيف عالي الكفاءة يقلل استهلاك الورق ويسرّع الطباعة المباشرة، ممتاز للعمليات الكثيفة.',
                     icon: LayoutTemplate,
                   },
                   {
+                    key: 'detailed',
                     id: 'detailed' as const,
-                    title: 'تفصيلي للمعارض (Detailed)',
+                    size: undefined as InvoiceSizeId | undefined,
+                    title: 'تفصيلي للمعارض',
                     tag: 'مواصفات السيراميك',
                     desc: 'مصمم خصيصاً لمعارض السيراميك والمواد: تفاصيل الفرز، المقاس، الكراتين، المستودع، وضمان الاستلام.',
                     icon: Layers,
                   },
+                  {
+                    key: 'thermal',
+                    id: 'compact' as const,
+                    size: 'thermal' as InvoiceSizeId,
+                    title: 'إيصال حراري',
+                    tag: 'Compact thermal',
+                    desc: 'نسخة حرارية سريعة؛ اعتمادها يختار المقاس الحراري مع الحفاظ على قالب Compact.',
+                    icon: Printer,
+                  },
                 ].map((tpl) => {
-                  const isApproved = (settings.defaultInvoiceTemplate || 'classic') === tpl.id;
+                  const isApproved = (settings.defaultInvoiceTemplate || 'table') === tpl.id
+                    && (!tpl.size || (settings.defaultInvoiceSize || 'a4') === tpl.size);
                   const Icon = tpl.icon;
                   return (
                     <div
-                      key={tpl.id}
+                      key={tpl.key}
                       className={`relative flex flex-col justify-between rounded-xl border p-3.5 transition-all ${
                         isApproved
                           ? 'border-sky-500 bg-sky-50/40 dark:border-sky-500/60 dark:bg-sky-950/20 shadow-sm'
@@ -1024,9 +1120,10 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                           type="button"
                           onClick={() => {
                             set('defaultInvoiceTemplate', tpl.id);
+                            if (tpl.size) set('defaultInvoiceSize', tpl.size);
                             toast.success(`تم اعتماد فورما "${tpl.title}" كالفورما المفضلة للنظام.`);
                           }}
-                          disabled={isApproved}
+                          disabled={readOnly || isApproved}
                           className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold text-center transition ${
                             isApproved
                               ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 cursor-default'
@@ -1039,6 +1136,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                           type="button"
                           onClick={() => {
                             setPreviewTemplate(tpl.id);
+                            if (tpl.size) setPreviewSize(tpl.size);
                             setPreviewModalOpen(true);
                           }}
                           className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300 text-[11px] font-bold"
@@ -1106,6 +1204,89 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
               </div>
             </div>
 
+            <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+              <div className="flex items-start gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <SlidersHorizontal className="mt-0.5 h-4 w-4 text-sky-600" />
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 dark:text-slate-200">تفاصيل الفاتورة ومظهرها</h4>
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    تُحفظ البيانات كما هي؛ هذه الخيارات تحدد ما يظهر في النسخة المطبوعة فقط. اللونان يستخدمان إعدادات الهوية المشتركة.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { key: 'invoiceShowPromotions' as const, label: 'إظهار تفاصيل العروض والقسائم' },
+                  { key: 'invoiceShowShipping' as const, label: 'إظهار تفاصيل الشحن والتوصيل' },
+                  { key: 'invoiceShowPaymentSplits' as const, label: 'إظهار تفاصيل الدفعات المجزأة' },
+                  { key: 'invoiceShowNotes' as const, label: 'إظهار الملاحظات الإضافية' },
+                ].map((option) => (
+                  <label key={option.key} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={settings[option.key] === true}
+                      disabled={readOnly}
+                      onChange={(event) => set(option.key, event.target.checked)}
+                      className="accent-sky-600"
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <span className={labelCls}>ترتيب التفاصيل الاختيارية في الفاتورة</span>
+                  {invoiceSectionOrder.map((section, index) => {
+                    const option = INVOICE_SECTION_OPTIONS.find((item) => item.id === section)!;
+                    return (
+                      <div key={section} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                        <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">{index + 1}. {option.label}</span>
+                        <div className="flex gap-1">
+                          <button type="button" aria-label={`تحريك ${option.label} لأعلى`} disabled={readOnly || index === 0} onClick={() => moveInvoiceSection(section, -1)} className="rounded border border-slate-200 p-1 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                            <ArrowUp className="h-3 w-3" />
+                          </button>
+                          <button type="button" aria-label={`تحريك ${option.label} لأسفل`} disabled={readOnly || index === invoiceSectionOrder.length - 1} onClick={() => moveInvoiceSection(section, 1)} className="rounded border border-slate-200 p-1 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                            <ArrowDown className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="اللون الأساسي">
+                      <ColorInput disabled={readOnly} value={settings.brandPrimaryColor || '#0284c7'} onChange={(value) => set('brandPrimaryColor', value)} />
+                    </Field>
+                    <Field label="اللون المساند">
+                      <ColorInput disabled={readOnly} value={settings.brandAccentColor || '#4f46e5'} onChange={(value) => set('brandAccentColor', value)} />
+                    </Field>
+                  </div>
+                  <Field label="خط الفاتورة">
+                    <select disabled={readOnly} value={settings.invoiceFontFamily || 'Cairo'} onChange={(event) => set('invoiceFontFamily', event.target.value as SystemSettings['invoiceFontFamily'])} className={inputCls}>
+                      <option value="Cairo">القاهرة</option>
+                      <option value="Tajawal">تجوال</option>
+                      <option value="Tahoma">تاهوما</option>
+                      <option value="Arial">أريال</option>
+                    </select>
+                  </Field>
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-2.5 dark:border-slate-700">
+                    <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                      <input type="checkbox" checked={settings.invoiceShowBrandLogo !== false} disabled={readOnly} onChange={(event) => set('invoiceShowBrandLogo', event.target.checked)} className="accent-sky-600" />
+                      إظهار شعار المعرض
+                    </label>
+                    <label className="cursor-pointer rounded-lg border border-dashed border-slate-300 px-2.5 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800">
+                      <Upload className="mr-1 inline h-3 w-3" />{settings.brandLogoDataUrl ? 'تغيير الشعار' : 'رفع الشعار'}
+                      <input type="file" accept="image/*" disabled={readOnly} className="hidden" onChange={(event) => onLogo(event.target.files?.[0])} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* Section: Invoice Items Table Customization Design */}
             <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -1145,11 +1326,12 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                       desc: 'خطوط أفقية ناعمة فقط ومسافات مضغوطة لتقليل استهلاك حبر وطباعة الورق.',
                     },
                   ].map((styleOption) => {
-                    const isSelected = (settings.invoiceTableStyle || 'bordered') === styleOption.id;
+                    const isSelected = (settings.invoiceTableStyle || 'minimal') === styleOption.id;
                     return (
                       <button
                         key={styleOption.id}
                         type="button"
+                        disabled={readOnly}
                         onClick={() => set('invoiceTableStyle', styleOption.id)}
                         className={`p-3 rounded-xl border text-right transition flex flex-col justify-between ${
                           isSelected
@@ -1179,11 +1361,45 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                 <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
                   تخصيص أعمدة وبيانات بنود الفاتورة
                 </label>
+                <p className="mb-2 text-[10px] text-slate-500">
+                  اختر الأعمدة ورتّبها من الأعلى إلى الأسفل؛ اسم الصنف مطلوب دائماً، والخصومات والكراتين مخفية افتراضياً.
+                </p>
+                <div className="mb-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {INVOICE_COLUMN_OPTIONS.map((column) => {
+                    const selected = invoiceTableColumns.includes(column.id);
+                    const position = invoiceTableColumns.indexOf(column.id);
+                    return (
+                      <div key={column.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+                        <label className="flex items-center gap-2 text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            disabled={readOnly || column.id === 'product'}
+                            onChange={(event) => setInvoiceTableColumn(column.id, event.target.checked)}
+                            className="accent-sky-600"
+                          />
+                          {column.label}
+                        </label>
+                        {selected && (
+                          <div className="flex gap-1">
+                            <button type="button" aria-label={`تحريك ${column.label} لأعلى`} disabled={readOnly || position === 0} onClick={() => moveInvoiceTableColumn(column.id, -1)} className="rounded border border-slate-200 p-1 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                              <ArrowUp className="h-3 w-3" />
+                            </button>
+                            <button type="button" aria-label={`تحريك ${column.label} لأسفل`} disabled={readOnly || position === invoiceTableColumns.length - 1} onClick={() => moveInvoiceTableColumn(column.id, 1)} className="rounded border border-slate-200 p-1 text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300">
+                              <ArrowDown className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
                     <input
                       type="checkbox"
                       checked={settings.invoiceShowItemCode !== false}
+                      disabled={readOnly}
                       onChange={(e) => set('invoiceShowItemCode', e.target.checked)}
                       className="accent-sky-600 rounded"
                     />
@@ -1194,6 +1410,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                     <input
                       type="checkbox"
                       checked={settings.invoiceShowItemSpecs !== false}
+                      disabled={readOnly}
                       onChange={(e) => set('invoiceShowItemSpecs', e.target.checked)}
                       className="accent-sky-600 rounded"
                     />
@@ -1203,8 +1420,9 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                   <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
                     <input
                       type="checkbox"
-                      checked={settings.invoiceShowBoxesCount !== false}
-                      onChange={(e) => set('invoiceShowBoxesCount', e.target.checked)}
+                      checked={invoiceTableColumns.includes('boxes') || invoiceTableColumns.includes('pieces')}
+                      disabled={readOnly}
+                      onChange={(e) => setInvoiceTableColumnGroup(['boxes', 'pieces'], e.target.checked)}
                       className="accent-sky-600 rounded"
                     />
                     إظهار عدد الكراتين والقطع
@@ -1213,8 +1431,9 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                   <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">
                     <input
                       type="checkbox"
-                      checked={settings.invoiceShowLineDiscount !== false}
-                      onChange={(e) => set('invoiceShowLineDiscount', e.target.checked)}
+                      checked={invoiceTableColumns.includes('lineDiscount')}
+                      disabled={readOnly}
+                      onChange={(e) => setInvoiceTableColumn('lineDiscount', e.target.checked)}
                       className="accent-sky-600 rounded"
                     />
                     إظهار عمود الخصم للبند
@@ -1224,6 +1443,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                     <input
                       type="checkbox"
                       checked={settings.invoiceShowTableSummary !== false}
+                      disabled={readOnly}
                       onChange={(e) => set('invoiceShowTableSummary', e.target.checked)}
                       className="accent-sky-600 rounded"
                     />
@@ -1345,7 +1565,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                     </label>
                     <button
                       type="button"
-                      onClick={() => printService.printTestPage('a4', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'classic')}
+                      onClick={() => printService.printTestPage('a4', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'table')}
                       className="text-[11px] font-bold text-sky-600 hover:underline"
                     >
                       تجربة طباعة A4
@@ -1392,7 +1612,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                     </label>
                     <button
                       type="button"
-                      onClick={() => printService.printTestPage('a5', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'classic')}
+                      onClick={() => printService.printTestPage('a5', (settings.defaultInvoiceTemplate as InvoiceTemplateId) || 'table')}
                       className="text-[11px] font-bold text-sky-600 hover:underline"
                     >
                       تجربة طباعة A5
@@ -1637,6 +1857,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <button
                         type="button"
+                        disabled={readOnly}
                         onClick={() => {
                           set('defaultInvoiceTemplate', previewTemplate);
                           set('defaultInvoiceSize', previewSize);
@@ -1672,6 +1893,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-slate-600 dark:text-slate-300">الفورما:</span>
                       {[
+                        { id: 'table' as const, label: 'جدول واضح' },
                         { id: 'classic' as const, label: 'كلاسيكي' },
                         { id: 'modern' as const, label: 'عصري' },
                         { id: 'compact' as const, label: 'مدمج' },
@@ -2544,9 +2766,9 @@ const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; l
   </button>
 );
 
-const ColorInput: React.FC<{ value: string; onChange: (value: string) => void }> = ({ value, onChange }) => (
+const ColorInput: React.FC<{ value: string; onChange: (value: string) => void; disabled?: boolean }> = ({ value, onChange, disabled }) => (
   <div className="flex items-center gap-2">
-    <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-9 w-12 cursor-pointer rounded-lg border border-slate-200 bg-transparent dark:border-slate-700" />
-    <input value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} font-mono`} />
+    <input type="color" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="h-9 w-12 cursor-pointer rounded-lg border border-slate-200 bg-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700" />
+    <input value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className={`${inputCls} font-mono`} />
   </div>
 );

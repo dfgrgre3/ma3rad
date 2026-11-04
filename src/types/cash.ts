@@ -108,6 +108,18 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export type InvoiceSectionId = 'promotions' | 'delivery' | 'paymentSplits' | 'notes';
+export type InvoiceTableColumnId =
+  | 'number'
+  | 'product'
+  | 'unit'
+  | 'quantity'
+  | 'boxes'
+  | 'pieces'
+  | 'unitPrice'
+  | 'lineDiscount'
+  | 'total';
+
 export interface SystemSettings {
   showroomName: string;
   tagline?: string;
@@ -137,7 +149,7 @@ export interface SystemSettings {
   a5PrinterName?: string;
   barcodePrinterName?: string;
   defaultInvoiceSize?: 'a4' | 'a5' | 'thermal';
-  defaultInvoiceTemplate?: 'classic' | 'modern' | 'compact' | 'detailed';
+  defaultInvoiceTemplate?: 'table' | 'classic' | 'modern' | 'compact' | 'detailed';
   receiptHeader?: string;
   receiptFooter?: string;
   logoPath?: string;
@@ -188,6 +200,14 @@ export interface SystemSettings {
   invoiceShowBoxesCount?: boolean;
   invoiceShowLineDiscount?: boolean;
   invoiceShowTableSummary?: boolean;
+  invoiceTableColumns?: InvoiceTableColumnId[];
+  invoiceShowPromotions?: boolean;
+  invoiceShowShipping?: boolean;
+  invoiceShowPaymentSplits?: boolean;
+  invoiceShowNotes?: boolean;
+  invoiceShowBrandLogo?: boolean;
+  invoiceFontFamily?: 'Cairo' | 'Tajawal' | 'Tahoma' | 'Arial';
+  invoiceSectionOrder?: InvoiceSectionId[];
 
   // Operational Policies & Inventory Controls
   allowOverdraftSale?: boolean;

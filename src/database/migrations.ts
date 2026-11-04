@@ -2260,6 +2260,42 @@ export const MIGRATIONS: Migration[] = [
   },
   ...MIGRATION_PART_14,
   ...MIGRATION_PART_15,
+  {
+    id: '113_table_first_invoice_default',
+    description: 'Use the simple table-first invoice for installations on the legacy default template.',
+    up: (db: Database) => {
+      db.run(
+        "UPDATE system_settings SET value = 'table' WHERE key = 'defaultInvoiceTemplate' AND value = 'classic'",
+      );
+      db.run(
+        "UPDATE system_settings SET value = 'minimal' WHERE key = 'invoiceTableStyle' AND value = 'bordered'",
+      );
+    },
+  },
+  {
+    id: '114_product_form_field_preferences_and_tones',
+    description: 'Persist per-user product form defaults and managed ceramic tones.',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS product_form_field_preferences (
+          user_id TEXT NOT NULL,
+          field_key TEXT NOT NULL,
+          value_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (user_id, field_key),
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS product_tone_options (
+          tone TEXT PRIMARY KEY COLLATE NOCASE,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT OR IGNORE INTO product_tone_options (tone)
+        SELECT DISTINCT TRIM(tone)
+        FROM products
+        WHERE tone IS NOT NULL AND TRIM(tone) <> '';
+      `);
+    },
+  },
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

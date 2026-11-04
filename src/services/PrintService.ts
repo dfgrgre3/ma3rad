@@ -7,8 +7,9 @@ import { EscPosService } from './EscPosService';
 import { SettingsService } from './SettingsService';
 import { getEffectiveBusinessType } from './BusinessTypeService';
 import { getProfilePrintTemplate } from '../config/businessProfiles';
+import type { InvoiceSectionId, InvoiceTableColumnId } from '../types';
 
-export type InvoiceTemplateId = 'classic' | 'modern' | 'compact' | 'detailed';
+export type InvoiceTemplateId = 'table' | 'classic' | 'modern' | 'compact' | 'detailed';
 export type InvoiceSizeId = 'a4' | 'a5' | 'thermal';
 
 export interface InvoiceHtmlOptions {
@@ -176,10 +177,10 @@ export class PrintService {
     const size: InvoiceSizeId = opts.size || (settings.defaultInvoiceSize as InvoiceSizeId) || 'a4';
     const profileTemplate = getProfilePrintTemplate(getEffectiveBusinessType(), 'sales_invoice');
     const resolvedProfileTemplate =
-      profileTemplate && (['classic', 'modern', 'compact', 'detailed'] as const).includes(profileTemplate as any)
+      profileTemplate && (['table', 'classic', 'modern', 'compact', 'detailed'] as const).includes(profileTemplate as any)
         ? (profileTemplate as InvoiceTemplateId)
         : undefined;
-    const template: InvoiceTemplateId = opts.template || (settings.defaultInvoiceTemplate as InvoiceTemplateId) || resolvedProfileTemplate || 'classic';
+    const template: InvoiceTemplateId = opts.template || (settings.defaultInvoiceTemplate as InvoiceTemplateId) || resolvedProfileTemplate || 'table';
 
     if (size === 'thermal') {
       return this.getThermalInvoiceHtml(invoice, settings, autoPrint);
@@ -194,6 +195,9 @@ export class PrintService {
     if (template === 'detailed') {
       return this.getDetailedInvoiceHtml(invoice, settings, size, autoPrint);
     }
+    if (template === 'table') {
+      return this.getTableFirstInvoiceHtml(invoice, settings, size, autoPrint);
+    }
 
     return this.getClassicInvoiceHtml(invoice, settings, size, autoPrint);
   }
@@ -202,7 +206,7 @@ export class PrintService {
    * Generates live preview HTML for any template & size combination.
    */
   public getTemplatePreviewHtml(
-    template: InvoiceTemplateId = 'classic',
+    template: InvoiceTemplateId = 'table',
     size: InvoiceSizeId = 'a4',
     settingsOverride?: Partial<SystemSettings>,
   ): string {
@@ -289,12 +293,176 @@ export class PrintService {
    * Returns logo HTML for the invoice header.
    */
   private logoHtml(settings: SystemSettings, size: number): string {
+    if (settings.invoiceShowBrandLogo === false) return '';
     if (settings.brandLogoDataUrl) {
       return `<img src="${settings.brandLogoDataUrl}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:6px;" alt="شعار">`;
     }
     const color = settings.brandPrimaryColor || '#0369a1';
     const letter = (settings.brandShortName || settings.showroomName || 'س').slice(0, 2);
     return `<div style="width:${size}px;height:${size}px;border-radius:8px;background:${this.esc(color)};display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:${Math.round(size * 0.45)}px;">${this.esc(letter)}</div>`;
+  }
+
+  private invoiceBrandStyles(settings: SystemSettings): string {
+    const primary = /^#[0-9a-f]{6}$/i.test(settings.brandPrimaryColor || '')
+      ? settings.brandPrimaryColor
+      : '#0369a1';
+    const accent = /^#[0-9a-f]{6}$/i.test(settings.brandAccentColor || '')
+      ? settings.brandAccentColor
+      : '#4f46e5';
+    const font = ['Cairo', 'Tajawal', 'Tahoma', 'Arial'].includes(settings.invoiceFontFamily || '')
+      ? settings.invoiceFontFamily
+      : 'Cairo';
+    return `:root{--invoice-primary:${primary};--invoice-accent:${accent}}body{font-family:'${font}',Tahoma,Arial,sans-serif!important}.invoice-primary{color:var(--invoice-primary)!important}.invoice-accent{color:var(--invoice-accent)!important}.invoice-primary-bg{background-color:var(--invoice-primary)!important}.showroom-title,.brand-title,.title,.grand-total,.grand-tot,.card-title,.meta-card-title,.tafqeet-label{color:var(--invoice-primary)!important}.header,.top-bar,.header-panel{border-color:var(--invoice-primary)!important}.grand-total,.grand-tot{border-color:var(--invoice-primary)!important}.badge,.pill{background-color:var(--invoice-primary)!important}.grand-sum{background:var(--invoice-primary)!important;color:#fff!important}`;
+  }
+
+  private orderedInvoiceDetails(
+    invoice: SalesInvoice & { items?: any[] },
+    settings: SystemSettings,
+    isA5: boolean,
+  ): string {
+    const sections: Record<InvoiceSectionId, string> = {
+      promotions: settings.invoiceShowPromotions
+        ? this.promotionsHtml(invoice, isA5)
+        : '',
+      delivery: settings.invoiceShowShipping
+        ? this.deliveryDetailsHtml(invoice, isA5)
+        : '',
+      paymentSplits: settings.invoiceShowPaymentSplits
+        ? this.paymentSplitsHtml(invoice, isA5)
+        : '',
+      notes: settings.invoiceShowNotes && invoice.notes
+        ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:${isA5 ? '5px 8px' : '8px 10px'};margin-top:6px;"><strong style="color:#92400e;">ملاحظات إضافية:</strong><br><span style="color:#78350f;">${this.esc(invoice.notes)}</span></div>`
+        : '',
+    };
+    const defaultOrder: InvoiceSectionId[] = ['promotions', 'delivery', 'paymentSplits', 'notes'];
+    const order = Array.isArray(settings.invoiceSectionOrder)
+      ? settings.invoiceSectionOrder.filter((section): section is InvoiceSectionId => section in sections)
+      : defaultOrder;
+    for (const section of defaultOrder) {
+      if (!order.includes(section)) order.push(section);
+    }
+    return order.map((section) => sections[section]).join('');
+  }
+
+  private tableFirstColumns(settings: SystemSettings): InvoiceTableColumnId[] {
+    const valid: InvoiceTableColumnId[] = [
+      'number', 'product', 'unit', 'quantity', 'boxes', 'pieces', 'unitPrice', 'lineDiscount', 'total',
+    ];
+    const configured = settings.invoiceTableColumns;
+    const columns = Array.isArray(configured)
+      ? configured.filter((column): column is InvoiceTableColumnId => valid.includes(column))
+      : [];
+    return columns.length ? columns : ['number', 'product', 'unit', 'quantity', 'unitPrice', 'total'];
+  }
+
+  private getTableFirstInvoiceHtml(
+    invoice: SalesInvoice & { items: any[] },
+    settings: SystemSettings,
+    size: 'a4' | 'a5',
+    autoPrint: boolean,
+  ): string {
+    const isA5 = size === 'a5';
+    const primary = /^#[0-9a-f]{6}$/i.test(settings.brandPrimaryColor || '')
+      ? settings.brandPrimaryColor
+      : '#0369a1';
+    const tableStyle = settings.invoiceTableStyle || 'minimal';
+    const columns = this.tableFirstColumns(settings);
+    const documentTitle = this.printOverride('sales.invoice.a4', isA5 ? 'فاتورة مبيعات A5' : 'فاتورة مبيعات');
+    const labels: Record<InvoiceTableColumnId, string> = {
+      number: '#',
+      product: 'الصنف والبيان',
+      unit: 'الوحدة',
+      quantity: 'الكمية',
+      boxes: 'الكراتين',
+      pieces: 'القطع',
+      unitPrice: 'سعر الوحدة',
+      lineDiscount: 'خصم البند',
+      total: 'الإجمالي',
+    };
+    const valueFor = (column: InvoiceTableColumnId, item: any, index: number): string => {
+      switch (column) {
+        case 'number': return String(index + 1);
+        case 'product':
+          return `<strong>${this.esc(item.productName || '-')}</strong>${settings.invoiceShowItemCode || settings.invoiceShowItemSpecs ? `<small>${settings.invoiceShowItemCode && item.productSku ? `كود: ${this.esc(item.productSku)}` : ''}${settings.invoiceShowItemCode && settings.invoiceShowItemSpecs && item.productSku && item.size ? ' · ' : ''}${settings.invoiceShowItemSpecs && item.size && item.size !== '—' ? `مقاس: ${this.esc(item.size)}` : ''}${settings.invoiceShowItemSpecs && item.productGrade ? ` · ${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'}` : ''}</small>` : ''}`;
+        case 'unit': return this.esc(getProductUnitLabel(item));
+        case 'quantity': return this.esc(formatProductQuantity(item.quantityM2, item));
+        case 'boxes': return item.productType === 'GENERAL' ? '—' : this.esc(item.boxesCount ?? '—');
+        case 'pieces': return item.productType === 'GENERAL' ? '—' : this.esc(item.piecesCount ?? '—');
+        case 'unitPrice': return CeramicMath.formatCurrency(item.unitPrice);
+        case 'lineDiscount':
+          return item.discountAmount > 0 ? CeramicMath.formatCurrency(item.discountAmount) : '—';
+        case 'total': return CeramicMath.formatCurrency(item.totalPrice);
+      }
+    };
+    const itemsHtml = (invoice.items || []).map((item, index) => `
+      <tr>${columns.map((column) => `<td class="${column === 'product' ? 'product-cell' : ''}">${valueFor(column, item, index)}</td>`).join('')}</tr>
+    `).join('');
+    const detailsHtml = this.orderedInvoiceDetails(invoice, settings, isA5);
+    const footer = this.printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
+    const taxPercent = this.esc(invoice.taxPercentage ?? 0);
+    const discountRow = invoice.discountAmount > 0
+      ? `<div class="total-row discount-row"><span>الخصم</span><strong>−${CeramicMath.formatCurrency(invoice.discountAmount)}</strong></div>`
+      : '';
+    const shippingRow = invoice.shippingCost > 0
+      ? `<div class="total-row"><span>التوصيل والنقل</span><strong>${CeramicMath.formatCurrency(invoice.shippingCost)}</strong></div>`
+      : '';
+    const taxRow = invoice.taxAmount > 0
+      ? `<div class="total-row"><span>ضريبة القيمة المضافة (${taxPercent}%)</span><strong>${CeramicMath.formatCurrency(invoice.taxAmount)}</strong></div>`
+      : '';
+    const columnsHeading = columns.map((column) => `<th>${labels[column]}</th>`).join('');
+
+    return `<!DOCTYPE html>
+      <html lang="ar" dir="rtl">
+        <head>
+          <meta charset="utf-8">
+          <title>${this.esc(documentTitle)} ${this.esc(invoice.invoiceNumber)}</title>
+          <style>
+            @page{size:${isA5 ? 'A5' : 'A4'};margin:${isA5 ? '8mm' : '12mm'}}
+            *{box-sizing:border-box}
+            body{font-family:'Cairo',Tahoma,Arial,sans-serif;color:#17212b;font-size:${isA5 ? '10px' : '12px'};line-height:1.55;margin:0;padding:${isA5 ? '10px' : '20px'}}
+            ${this.invoiceBrandStyles(settings)}
+            .masthead{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 0 14px;border-bottom:3px solid ${primary};margin-bottom:14px}
+            .brand{display:flex;align-items:center;gap:12px;min-width:0}.brand-name{font-size:${isA5 ? '17px' : '23px'};font-weight:800;color:var(--invoice-primary)}.brand-meta{font-size:10px;color:#66737f;margin-top:3px}
+            .invoice-id{text-align:left;min-width:150px}.invoice-label{color:var(--invoice-accent);font-weight:800;font-size:12px}.invoice-number{font:700 ${isA5 ? '14px' : '17px'} monospace;letter-spacing:.3px;margin-top:3px}.date-line{color:#66737f;font-size:10px;margin-top:3px}
+            .customer-line{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:12px;padding:10px 0;border-bottom:1px solid #dfe5e9;margin-bottom:12px}.field-label{color:#72808d;font-size:9px;display:block}.field-value{font-weight:700;margin-top:2px;word-break:break-word}
+            table{width:100%;border-collapse:collapse;table-layout:auto}thead th{text-align:right;background:#f0f3f5;border-top:1px solid #cbd4da;border-bottom:2px solid ${primary};padding:${isA5 ? '6px 5px' : '9px 7px'};font-size:${isA5 ? '9px' : '10px'};color:#34424d}
+            tbody td{padding:${isA5 ? '6px 5px' : '9px 7px'};border-bottom:1px solid #e4e9ec;vertical-align:top}tbody tr:nth-child(even){background:#fafbfc}.items-table.bordered th,.items-table.bordered td{border:1px solid #d5dde2}.items-table.striped tbody tr:nth-child(even){background:#f1f4f6}.items-table.striped th,.items-table.striped td{border-bottom:1px solid #d5dde2}.items-table.minimal th,.items-table.minimal td{border-left:0;border-right:0}.product-cell{min-width:145px}.product-cell small{display:block;color:#697783;font-size:9px;font-weight:400;margin-top:2px}
+            .item-summary{display:flex;gap:20px;justify-content:flex-end;color:#66737f;font-size:10px;padding:8px 0 0}
+            .post-table{display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,34%);gap:24px;align-items:start;margin-top:16px}.details{min-width:0}.totals{border-top:2px solid ${primary};padding-top:7px}.total-row{display:flex;justify-content:space-between;gap:14px;padding:4px 0}.total-row strong{white-space:nowrap}.discount-row{color:#9a4a36}.grand-total{border-top:1px solid #bcc8cf;margin-top:5px;padding-top:9px;font-size:${isA5 ? '13px' : '16px'};color:var(--invoice-primary);font-weight:900}.paid{color:#287453}.balance{color:#9a4a36}
+            .details>div{margin-top:8px}.signature{margin-top:${isA5 ? '22px' : '34px'};display:grid;grid-template-columns:1fr 1fr 1fr;gap:25px;text-align:center;color:#687680;font-size:10px}.signature span{border-top:1px dashed #9ca9b1;padding-top:6px}.footer{margin-top:18px;border-top:1px solid #dfe5e9;padding-top:8px;text-align:center;white-space:pre-line;color:#687680;font-size:9px}
+            @media print{body{padding:0}}
+          </style>
+        </head>
+        <body>
+          <header class="masthead">
+            <div class="brand">${this.logoHtml(settings, isA5 ? 38 : 48)}<div><div class="brand-name">${this.esc(settings.showroomName || 'معرض السيراميك والبورسلين')}</div><div class="brand-meta">${this.esc(settings.tagline || '')}${settings.phone ? ` · ${this.esc(settings.phone)}` : ''}${settings.address ? ` · ${this.esc(settings.address)}` : ''}</div></div></div>
+            <div class="invoice-id"><div class="invoice-label">${this.esc(documentTitle)}</div><div class="invoice-number">${this.esc(invoice.invoiceNumber)}</div><div class="date-line">${this.esc(invoice.date || '')}</div></div>
+          </header>
+          <section class="customer-line">
+            <div><span class="field-label">العميل</span><div class="field-value">${this.esc(invoice.customerName || 'عميل نقدي')}</div></div>
+            <div><span class="field-label">رقم الهاتف</span><div class="field-value">${this.esc(invoice.customerPhone || '—')}</div></div>
+            <div><span class="field-label">المستودع · طريقة الدفع</span><div class="field-value">${this.esc(invoice.warehouseName || '—')} · ${this.paymentTypeLabel(invoice.paymentType)}</div></div>
+          </section>
+          <table class="items-table ${tableStyle}">
+            <thead><tr>${columnsHeading}</tr></thead>
+            <tbody>${itemsHtml || `<tr><td colspan="${columns.length}" style="text-align:center;color:#72808d;padding:18px">لا توجد أصناف في الفاتورة</td></tr>`}</tbody>
+          </table>
+          ${settings.invoiceShowTableSummary !== false ? `<div class="item-summary"><span>عدد البنود: <strong>${invoice.items.length}</strong></span><span>الكمية الإجمالية: <strong>${formatProductQuantity(invoice.items.reduce((sum: number, item: any) => sum + (item.quantityM2 || item.quantity || 0), 0), invoice.items[0])}</strong></span></div>` : ''}
+          <section class="post-table">
+            <div class="details">${detailsHtml}</div>
+            <div class="totals">
+              <div class="total-row"><span>المجموع الفرعي</span><strong>${CeramicMath.formatCurrency(invoice.subtotal)}</strong></div>
+              ${discountRow}${taxRow}${shippingRow}
+              <div class="total-row grand-total"><span>الإجمالي</span><strong>${CeramicMath.formatCurrency(invoice.totalAmount)}</strong></div>
+              <div class="total-row paid"><span>المبلغ المسدد</span><strong>${CeramicMath.formatCurrency(invoice.paidAmount)}</strong></div>
+              ${invoice.remainingAmount > 0 ? `<div class="total-row balance"><span>المتبقي</span><strong>${CeramicMath.formatCurrency(invoice.remainingAmount)}</strong></div>` : ''}
+            </div>
+          </section>
+          <div class="signature"><span>البائع / المحاسب</span><span>استلام العميل</span><span>اعتماد الإدارة</span></div>
+          ${footer ? `<footer class="footer">${this.esc(footer)}</footer>` : ''}
+          ${autoPrint ? `<script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>` : ''}
+        </body>
+      </html>`;
   }
 
   /**
@@ -486,6 +654,7 @@ export class PrintService {
             .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: ${isA5 ? '16px' : '30px'}; margin-top: ${isA5 ? '20px' : '36px'}; text-align: center; font-size: ${isA5 ? '10px' : '11px'}; color: #475569; }
             .signatures div { border-top: 1px dashed #94a3b8; padding-top: 6px; }
             .footer { margin-top: ${isA5 ? '12px' : '20px'}; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 8px; font-size: ${isA5 ? '9px' : '10px'}; color: #64748b; white-space: pre-line; }
+            ${this.invoiceBrandStyles(settings)}
             @media print { body { padding: 0; } }
           </style>
         </head>
@@ -551,10 +720,7 @@ export class PrintService {
 
           <div class="bottom-section">
             <div class="payment-notes">
-              ${this.promotionsHtml(invoice, isA5)}
-              ${this.deliveryDetailsHtml(invoice, isA5)}
-              ${this.paymentSplitsHtml(invoice, isA5)}
-              ${invoice.notes ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:${isA5 ? '5px 8px' : '8px 10px'};margin-top:6px;"><strong style="color:#92400e;">ملاحظات إضافية:</strong><br><span style="color:#78350f;">${this.esc(invoice.notes)}</span></div>` : ''}
+              ${this.orderedInvoiceDetails(invoice, settings, isA5)}
             </div>
             <div class="totals-box">
               <div class="total-row"><span>المجموع الفرعي:</span> <span>${CeramicMath.formatCurrency(invoice.subtotal)}</span></div>
@@ -614,19 +780,19 @@ export class PrintService {
         <td style="padding: ${isA5 ? '5px 3px' : '8px 6px'}; font-weight: bold; color: #64748b;">${idx + 1}</td>
         <td style="padding: ${isA5 ? '5px 6px' : '8px 10px'}; text-align: right;">
           <div style="font-weight: 700; color: #0f172a;">${this.esc(item.productName)}</div>
-          <div style="font-size: ${isA5 ? '9px' : '10px'}; color: #64748b; margin-top: 2px; display: flex; gap: 4px; flex-wrap: wrap;">
-            <span style="background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-family: monospace;">${this.esc(item.productSku)}</span>
-            ${item.size && item.size !== '—' ? `<span style="background: #f1f5f9; padding: 1px 5px; border-radius: 4px;">${this.esc(item.size)}</span>` : ''}
-            <span style="background: ${item.productGrade === 'GRADE_1' ? '#dcfce7' : '#fef3c7'}; padding: 1px 5px; border-radius: 4px; color: ${item.productGrade === 'GRADE_1' ? '#15803d' : '#92400e'};">${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'}</span>
-          </div>
+          ${settings.invoiceShowItemCode || settings.invoiceShowItemSpecs ? `<div style="font-size: ${isA5 ? '9px' : '10px'}; color: #64748b; margin-top: 2px; display: flex; gap: 4px; flex-wrap: wrap;">
+            ${settings.invoiceShowItemCode && item.productSku ? `<span style="background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-family: monospace;">${this.esc(item.productSku)}</span>` : ''}
+            ${settings.invoiceShowItemSpecs && item.size && item.size !== '—' ? `<span style="background: #f1f5f9; padding: 1px 5px; border-radius: 4px;">${this.esc(item.size)}</span>` : ''}
+            ${settings.invoiceShowItemSpecs && item.productGrade ? `<span style="background: ${item.productGrade === 'GRADE_1' ? '#dcfce7' : '#fef3c7'}; padding: 1px 5px; border-radius: 4px; color: ${item.productGrade === 'GRADE_1' ? '#15803d' : '#92400e'};">${item.productGrade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'}</span>` : ''}
+          </div>` : ''}
         </td>
         <td style="padding: ${isA5 ? '5px 3px' : '8px 6px'}; color: #475569;">${getProductUnitLabel(item)}</td>
         <td style="padding: ${isA5 ? '5px 3px' : '8px 6px'}; font-weight: 700; color: #0f172a;">
           ${formatProductQuantity(item.quantityM2, item)}
-          ${item.productType === 'GENERAL' ? '' : `<div style="font-size: ${isA5 ? '9px' : '10px'}; color: #64748b; font-weight: normal;">${item.boxesCount} كرتونة${item.piecesCount ? ` · ${item.piecesCount} قطعة` : ''}</div>`}
+          ${settings.invoiceShowBoxesCount && item.productType !== 'GENERAL' ? `<div style="font-size: ${isA5 ? '9px' : '10px'}; color: #64748b; font-weight: normal;">${item.boxesCount} كرتونة${item.piecesCount ? ` · ${item.piecesCount} قطعة` : ''}</div>` : ''}
         </td>
         <td style="padding: ${isA5 ? '5px 3px' : '8px 6px'}; font-weight: 600;">${CeramicMath.formatCurrency(item.unitPrice)}</td>
-        <td style="padding: ${isA5 ? '5px 3px' : '8px 6px'}; color: ${item.discountAmount > 0 ? '#e11d48' : '#94a3b8'};">${item.discountAmount > 0 ? `-${CeramicMath.formatCurrency(item.discountAmount)}` : '—'}</td>
+        ${settings.invoiceShowLineDiscount ? `<td style="padding: ${isA5 ? '5px 3px' : '8px 6px'}; color: ${item.discountAmount > 0 ? '#e11d48' : '#94a3b8'};">${item.discountAmount > 0 ? `-${CeramicMath.formatCurrency(item.discountAmount)}` : '—'}</td>` : ''}
         <td style="padding: ${isA5 ? '5px 3px' : '8px 6px'}; font-weight: 800; color: #0369a1;">${CeramicMath.formatCurrency(item.totalPrice)}</td>
       </tr>
     `).join('');
@@ -669,13 +835,14 @@ export class PrintService {
             .signatures { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: ${isA5 ? '16px' : '30px'}; margin-top: ${isA5 ? '20px' : '36px'}; text-align: center; font-size: ${isA5 ? '10px' : '11px'}; color: #475569; }
             .signatures div { border-top: 1px dashed #94a3b8; padding-top: 6px; }
             .footer-modern { margin-top: ${isA5 ? '12px' : '20px'}; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; color: #64748b; font-size: ${isA5 ? '9px' : '10px'}; white-space: pre-line; }
+            ${this.invoiceBrandStyles(settings)}
             @media print { body { padding: 0; } }
           </style>
         </head>
         <body>
           <div class="hero-header">
             <div class="brand-block">
-              ${settings.brandLogoDataUrl ? `<img src="${settings.brandLogoDataUrl}" style="width:${isA5 ? '40px' : '52px'};height:${isA5 ? '40px' : '52px'};object-fit:contain;border-radius:8px;border:2px solid rgba(255,255,255,0.2);" alt="شعار">` : ''}
+              ${settings.invoiceShowBrandLogo !== false && settings.brandLogoDataUrl ? `<img src="${settings.brandLogoDataUrl}" style="width:${isA5 ? '40px' : '52px'};height:${isA5 ? '40px' : '52px'};object-fit:contain;border-radius:8px;border:2px solid rgba(255,255,255,0.2);" alt="شعار">` : ''}
               <div>
                 <div class="brand-title">${this.esc(settings.showroomName || 'معرض السيراميك')}</div>
                 <div class="brand-sub">${this.esc(settings.tagline || '')}</div>
@@ -718,7 +885,7 @@ export class PrintService {
                 <th>الوحدة</th>
                 <th>الكمية</th>
                 <th>سعر الوحدة</th>
-                <th>الخصم</th>
+                ${settings.invoiceShowLineDiscount ? '<th>الخصم</th>' : ''}
                 <th>الإجمالي</th>
               </tr>
             </thead>
@@ -734,10 +901,7 @@ export class PrintService {
 
           <div class="summary-section">
             <div class="payment-notes">
-              ${this.promotionsHtml(invoice, isA5)}
-              ${this.deliveryDetailsHtml(invoice, isA5)}
-              ${this.paymentSplitsHtml(invoice, isA5)}
-              ${invoice.notes ? `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:${isA5 ? '5px 8px' : '8px 12px'};font-size:${isA5 ? '10px' : '11px'};margin-top:6px;"><strong style="color:#92400e;">ملاحظات:</strong><br><span style="color:#78350f;">${this.esc(invoice.notes)}</span></div>` : ''}
+              ${this.orderedInvoiceDetails(invoice, settings, isA5)}
             </div>
             <div class="summary-card">
               <div class="sum-row"><span>المجموع الفرعي</span> <span>${CeramicMath.formatCurrency(invoice.subtotal)}</span></div>
@@ -796,12 +960,12 @@ export class PrintService {
       <tr style="border-bottom: 1px solid #cbd5e1; text-align: center;${idx % 2 === 1 ? ' background:#f8fafc;' : ''}">
         <td style="padding: 3px 2px;">${idx + 1}</td>
         <td style="padding: 3px 5px; text-align: right; font-weight: 600;">
-          ${this.esc(item.productName)} <span style="font-size: 9px; color: #64748b;">[${this.esc(item.productSku)} | ${this.esc(item.size || '')} | ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري'}]</span>
+          ${this.esc(item.productName)} ${(settings.invoiceShowItemCode || settings.invoiceShowItemSpecs) ? `<span style="font-size: 9px; color: #64748b;">[${settings.invoiceShowItemCode ? this.esc(item.productSku || '') : ''}${settings.invoiceShowItemCode && settings.invoiceShowItemSpecs ? ' | ' : ''}${settings.invoiceShowItemSpecs ? `${this.esc(item.size || '')} | ${item.productGrade === 'GRADE_1' ? 'أول' : 'تجاري'}` : ''}]</span>` : ''}
         </td>
         <td style="padding: 3px 2px;">${getProductUnitLabel(item)}</td>
-        <td style="padding: 3px 2px; font-weight: 700;">${formatProductQuantity(item.quantityM2, item)}${item.productType === 'GENERAL' ? '' : ` <span style="font-size:8px;color:#64748b;">(${item.boxesCount}ك)</span>`}</td>
+        <td style="padding: 3px 2px; font-weight: 700;">${formatProductQuantity(item.quantityM2, item)}${settings.invoiceShowBoxesCount && item.productType !== 'GENERAL' ? ` <span style="font-size:8px;color:#64748b;">(${item.boxesCount}ك)</span>` : ''}</td>
         <td style="padding: 3px 2px;">${CeramicMath.formatCurrency(item.unitPrice)}</td>
-        <td style="padding: 3px 2px; color: ${item.discountAmount > 0 ? '#dc2626' : '#cbd5e1'};">${item.discountAmount > 0 ? CeramicMath.formatCurrency(item.discountAmount) : '—'}</td>
+        ${settings.invoiceShowLineDiscount ? `<td style="padding: 3px 2px; color: ${item.discountAmount > 0 ? '#dc2626' : '#cbd5e1'};">${item.discountAmount > 0 ? CeramicMath.formatCurrency(item.discountAmount) : '—'}</td>` : ''}
         <td style="padding: 3px 2px; font-weight: 700;">${CeramicMath.formatCurrency(item.totalPrice)}</td>
       </tr>
     `).join('');
@@ -829,13 +993,14 @@ export class PrintService {
             .signatures-compact { display: flex; justify-content: space-around; margin-top: ${isA5 ? '14px' : '20px'}; font-size: ${isA5 ? '9px' : '10px'}; color: #475569; }
             .signatures-compact span { border-top: 1px dashed #94a3b8; padding-top: 4px; min-width: 80px; text-align: center; }
             .footer { text-align: center; font-size: ${isA5 ? '8px' : '9px'}; margin-top: 6px; color: #475569; white-space: pre-line; }
+            ${this.invoiceBrandStyles(settings)}
             @media print { body { padding: 0; } }
           </style>
         </head>
         <body>
           <div class="top-bar">
             <div style="display: flex; align-items: center; gap: 6px;">
-              ${settings.brandLogoDataUrl ? `<img src="${settings.brandLogoDataUrl}" style="width:${isA5 ? '24px' : '30px'};height:${isA5 ? '24px' : '30px'};object-fit:contain;" alt="">` : ''}
+              ${settings.invoiceShowBrandLogo !== false && settings.brandLogoDataUrl ? `<img src="${settings.brandLogoDataUrl}" style="width:${isA5 ? '24px' : '30px'};height:${isA5 ? '24px' : '30px'};object-fit:contain;" alt="">` : ''}
               <div>
                 <span class="title">${this.esc(settings.showroomName)}</span>
                 <span style="font-size: ${isA5 ? '9px' : '10px'}; color: #475569; margin-right: 6px;">${this.esc(settings.address || '')} | ت: ${this.esc(settings.phone || '')}</span>
@@ -863,7 +1028,7 @@ export class PrintService {
                 <th>الوحدة</th>
                 <th>الكمية</th>
                 <th>السعر</th>
-                <th>الخصم</th>
+                ${settings.invoiceShowLineDiscount ? '<th>الخصم</th>' : ''}
                 <th>الإجمالي</th>
               </tr>
             </thead>
@@ -875,10 +1040,7 @@ export class PrintService {
           <div class="bottom-grid">
             <div style="font-size: ${isA5 ? '9px' : '10px'}; max-width: 52%;">
               <div style="margin-bottom: 3px;"><strong>بنود:</strong> ${invoice.items.length} · <strong>كراتين:</strong> ${totalBoxes}</div>
-              ${this.promotionsHtml(invoice, isA5)}
-              ${this.deliveryDetailsHtml(invoice, isA5)}
-              ${this.paymentSplitsHtml(invoice, isA5)}
-              ${invoice.notes ? `<div style="background:#fffbeb;padding:2px 4px;border-radius:3px;font-size:${isA5 ? '8px' : '9px'};margin-top:4px;"><strong>ملاحظات:</strong> ${this.esc(invoice.notes)}</div>` : ''}
+              ${this.orderedInvoiceDetails(invoice, settings, isA5)}
             </div>
             <div style="min-width: ${isA5 ? '180px' : '220px'};">
               <div class="tot-line"><span>المجموع:</span> <span>${CeramicMath.formatCurrency(invoice.subtotal)}</span></div>
@@ -938,14 +1100,14 @@ export class PrintService {
         <td style="padding: ${isA5 ? '4px 4px' : '6px 6px'}; text-align: right; font-weight: 700;">
           ${this.esc(item.productName)}
         </td>
-        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-family: monospace; font-size: ${isA5 ? '9px' : '10px'};">${this.esc(item.productSku || '-')}</td>
-        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${this.esc(item.size || '—')}</td>
-        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${item.productGrade === 'GRADE_1' ? '<span style="color:#0369a1;font-weight:700;">فرز أول</span>' : '<span style="color:#92400e;">فرز تجاري</span>'}</td>
+        ${settings.invoiceShowItemCode ? `<td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-family: monospace; font-size: ${isA5 ? '9px' : '10px'};">${this.esc(item.productSku || '-')}</td>` : ''}
+        ${settings.invoiceShowItemSpecs ? `<td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${this.esc(item.size || '—')}</td>
+        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${item.productGrade === 'GRADE_1' ? '<span style="color:#0369a1;font-weight:700;">فرز أول</span>' : '<span style="color:#92400e;">فرز تجاري</span>'}</td>` : ''}
         <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-weight: 700;">${formatProductQuantity(item.quantityM2, item)}</td>
-        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${item.productType === 'GENERAL' ? '—' : (item.boxesCount || '—')}</td>
-        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-size: ${isA5 ? '9px' : '10px'};">${item.productType === 'GENERAL' ? '—' : (item.piecesCount || '—')}</td>
+        ${settings.invoiceShowBoxesCount ? `<td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${item.productType === 'GENERAL' ? '—' : (item.boxesCount || '—')}</td>
+        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-size: ${isA5 ? '9px' : '10px'};">${item.productType === 'GENERAL' ? '—' : (item.piecesCount || '—')}</td>` : ''}
         <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'};">${CeramicMath.formatCurrency(item.unitPrice)}</td>
-        <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; color: ${item.discountAmount > 0 ? '#dc2626' : '#cbd5e1'};">${item.discountAmount > 0 ? CeramicMath.formatCurrency(item.discountAmount) : '—'}</td>
+        ${settings.invoiceShowLineDiscount ? `<td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; color: ${item.discountAmount > 0 ? '#dc2626' : '#cbd5e1'};">${item.discountAmount > 0 ? CeramicMath.formatCurrency(item.discountAmount) : '—'}</td>` : ''}
         <td style="padding: ${isA5 ? '4px 2px' : '6px 4px'}; font-weight: 800; color: #0284c7;">${CeramicMath.formatCurrency(item.totalPrice)}</td>
       </tr>
     `).join('');
@@ -986,6 +1148,7 @@ export class PrintService {
             .signatures-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: ${isA5 ? '16px' : '30px'}; margin-top: ${isA5 ? '18px' : '30px'}; text-align: center; font-size: ${isA5 ? '10px' : '11px'}; color: #475569; }
             .signatures-grid div { border-top: 1px dashed #94a3b8; padding-top: 6px; }
             .footer-detailed { margin-top: ${isA5 ? '8px' : '14px'}; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 6px; font-size: ${isA5 ? '9px' : '10px'}; color: #64748b; white-space: pre-line; }
+            ${this.invoiceBrandStyles(settings)}
             @media print { body { padding: 0; } }
           </style>
         </head>
@@ -1030,14 +1193,12 @@ export class PrintService {
               <tr style="text-align: center;">
                 <th style="width: 22px;">#</th>
                 <th style="text-align: right;">الصنف والبيان</th>
-                <th>الكود</th>
-                <th>المقاس</th>
-                <th>الفرز</th>
+                ${settings.invoiceShowItemCode ? '<th>الكود</th>' : ''}
+                ${settings.invoiceShowItemSpecs ? '<th>المقاس</th><th>الفرز</th>' : ''}
                 <th>الكمية</th>
-                <th>الكراتين</th>
-                <th>القطع</th>
+                ${settings.invoiceShowBoxesCount ? '<th>الكراتين</th><th>القطع</th>' : ''}
                 <th>السعر</th>
-                <th>الخصم</th>
+                ${settings.invoiceShowLineDiscount ? '<th>الخصم</th>' : ''}
                 <th>الإجمالي</th>
               </tr>
             </thead>
@@ -1059,10 +1220,7 @@ export class PrintService {
               <div>• يُرجى فحص الفرز ورقم الصبغة (Tone) ومقاس البلاط قبل التركيب، حيث لا يُقبل الاسترجاع بعد التركيب نهائياً.</div>
               <div>• الاسترجاع والاستبدال خلال 14 يوماً من تاريخ الفاتورة مع ضرورة سلامة الكراتين الأصلية وعدم فتحها.</div>
               <div>• الكميات المباعة بأقل من كرتونة كاملة لا تسترجع.</div>
-              ${this.promotionsHtml(invoice, isA5)}
-              ${this.deliveryDetailsHtml(invoice, isA5)}
-              ${this.paymentSplitsHtml(invoice, isA5)}
-              ${invoice.notes ? `<div style="margin-top: 4px; border-top: 1px dashed #fde68a; padding-top: 3px;"><strong>ملاحظات:</strong> ${this.esc(invoice.notes)}</div>` : ''}
+              ${this.orderedInvoiceDetails(invoice, settings, isA5)}
               ${settings.receiptFooter ? `<div style="margin-top: 4px; border-top: 1px dashed #fde68a; padding-top: 3px;">${this.esc(settings.receiptFooter)}</div>` : ''}
             </div>
 
@@ -1124,7 +1282,7 @@ export class PrintService {
           <span>${formatProductQuantity(item.quantityM2, item)}${item.productType === 'GENERAL' ? '' : ` (${item.boxesCount} كرتونة)`} × ${item.unitPrice}</span>
           <span style="font-weight: 700;">${CeramicMath.formatCurrency(item.totalPrice)}</span>
         </div>
-        ${item.discountAmount > 0 ? `<div style="display: flex; justify-content: space-between; color: #b91c1c; font-size: 10px;"><span>خصم</span><span>-${CeramicMath.formatCurrency(item.discountAmount)}</span></div>` : ''}
+        ${settings.invoiceShowLineDiscount && item.discountAmount > 0 ? `<div style="display: flex; justify-content: space-between; color: #b91c1c; font-size: 10px;"><span>خصم</span><span>-${CeramicMath.formatCurrency(item.discountAmount)}</span></div>` : ''}
       </div>
     `).join('');
 
@@ -1146,10 +1304,12 @@ export class PrintService {
             .totals-row { display: flex; justify-content: space-between; }
             .grand { font-size: 15px; font-weight: 800; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
             .footer { text-align: center; font-size: 10px; margin-top: 8px; white-space: pre-line; }
+            ${this.invoiceBrandStyles(settings)}
             @media print { body { margin: 0; } }
           </style>
         </head>
         <body>
+          ${settings.invoiceShowBrandLogo !== false ? `<div class="center">${this.logoHtml(settings, 26)}</div>` : ''}
           <div class="center shop-name">${this.esc(settings.showroomName)}</div>
           <div class="center muted">${this.esc(settings.tagline || '')}</div>
           <div class="center muted">${this.esc(settings.address || '')}${settings.phone ? ' | ت: ' + this.esc(settings.phone) : ''}</div>
@@ -1169,28 +1329,8 @@ export class PrintService {
           <div class="totals-row grand"><span>الإجمالي</span><span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
           <div class="totals-row"><span>المدفوع</span><span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
           <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : 'آجل'}</span></div>
-          ${invoice.paymentSplits && invoice.paymentSplits.length > 0 ? `
-            <div style="font-size:10px;color:#333;margin:2px 0;border-top:1px dotted #ccc;padding-top:2px;">
-              ${invoice.paymentSplits.map((s) => `<div style="display:flex;justify-content:space-between;"><span>• ${this.paymentTypeLabel(s.method)}</span><span>${CeramicMath.formatCurrency(s.amount)}</span></div>`).join('')}
-            </div>
-          ` : ''}
           ${invoice.remainingAmount > 0 ? `<div class="totals-row" style="color: #b91c1c; font-weight: 700;"><span>المتبقي</span><span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
-          ${invoice.couponCode || invoice.promotionName ? `
-            <div class="divider"></div>
-            <div style="font-size:10px;text-align:center;color:#047857;">
-              ${invoice.promotionName ? `<div>عرض: ${this.esc(invoice.promotionName)}</div>` : ''}
-              ${invoice.couponCode ? `<div>كوبون: ${this.esc(invoice.couponCode)} (وفرت ${CeramicMath.formatCurrency(invoice.discountAmount || 0)})</div>` : ''}
-            </div>
-          ` : ''}
-          ${invoice.deliveryAddress ? `
-            <div class="divider"></div>
-            <div style="font-size:10px;color:#1e3a8a;">
-              <div style="font-weight:700;">بيانات التوصيل:</div>
-              <div>${this.esc(invoice.deliveryAddress)}</div>
-              ${invoice.deliveryContactName || invoice.deliveryContactPhone ? `<div>مستلم: ${this.esc(invoice.deliveryContactName || '')} (${this.esc(invoice.deliveryContactPhone || '')})</div>` : ''}
-              ${invoice.deliveryDate ? `<div>تاريخ التسليم: ${this.esc(invoice.deliveryDate)}</div>` : ''}
-            </div>
-          ` : ''}
+          ${this.orderedInvoiceDetails(invoice, settings, true)}
           <div class="footer">${this.esc(receiptFooter)}</div>
           ${autoPrint ? `<script>
             window.onload = function() {
@@ -1222,7 +1362,7 @@ export class PrintService {
    */
   public printTestPage(
     size: InvoiceSizeId = 'a4',
-    template: InvoiceTemplateId = 'classic',
+    template: InvoiceTemplateId = 'table',
   ): void {
     const sample = this.getSampleInvoice();
     this.printInvoice(sample, size, template);

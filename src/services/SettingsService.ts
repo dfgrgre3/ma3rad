@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS } from '../database/migrations';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { AuditService } from './AuditService';
-import type { SystemSettings, User } from '../types';
+import type { InvoiceSectionId, InvoiceTableColumnId, SystemSettings, User } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 export { HEX_COLOR, bool, num, type Listener, type SettingsPatch } from './settingsUtils';
@@ -18,6 +18,21 @@ import { validateSettings } from './settingsValidation';
  * - subscribers (theme provider, header, sidebar) are notified on change
  */
 export class SettingsService {
+  private static parseInvoiceList<T extends string>(
+    value: string | undefined,
+    allowed: readonly T[],
+    fallback: T[],
+  ): T[] {
+    try {
+      const parsed = JSON.parse(value || '[]');
+      if (!Array.isArray(parsed)) return fallback;
+      const normalized = parsed.filter((item): item is T => allowed.includes(item));
+      return normalized.length ? [...new Set(normalized)] : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
   private static db() {
     return DatabaseManager.getInstance();
   }
@@ -31,6 +46,19 @@ export class SettingsService {
 
   public static getSettings(): SystemSettings {
     const map = SettingsService.getAllRaw();
+    const invoiceTableColumns = SettingsService.parseInvoiceList<InvoiceTableColumnId>(
+      map.invoiceTableColumns,
+      ['number', 'product', 'unit', 'quantity', 'boxes', 'pieces', 'unitPrice', 'lineDiscount', 'total'],
+      ['number', 'product', 'unit', 'quantity', 'unitPrice', 'total'],
+    );
+    const invoiceShowLineDiscount = map.invoiceShowLineDiscount === undefined ? false : bool(map.invoiceShowLineDiscount);
+    const invoiceShowBoxesCount = map.invoiceShowBoxesCount === undefined ? false : bool(map.invoiceShowBoxesCount);
+    if (invoiceShowLineDiscount && !invoiceTableColumns.includes('lineDiscount')) {
+      invoiceTableColumns.push('lineDiscount');
+    }
+    if (invoiceShowBoxesCount && !invoiceTableColumns.includes('boxes') && !invoiceTableColumns.includes('pieces')) {
+      invoiceTableColumns.push('boxes', 'pieces');
+    }
     return {
       showroomName: map.showroomName || 'معرض السيراميك والبورسلين',
       tagline: map.tagline || '',
@@ -55,7 +83,7 @@ export class SettingsService {
       a5PrinterName: map.a5PrinterName || '',
       barcodePrinterName: map.barcodePrinterName || '',
       defaultInvoiceSize: (map.defaultInvoiceSize as any) || 'a4',
-      defaultInvoiceTemplate: (map.defaultInvoiceTemplate as any) || 'classic',
+      defaultInvoiceTemplate: (map.defaultInvoiceTemplate as SystemSettings['defaultInvoiceTemplate']) || 'table',
       receiptHeader: map.receiptHeader || '',
       receiptFooter: map.receiptFooter || '',
       logoPath: map.logoPath || '',
@@ -95,12 +123,26 @@ export class SettingsService {
       posAllowDuplicateItems: bool(map.posAllowDuplicateItems),
       posAutoSaveInvoice: bool(map.posAutoSaveInvoice),
       posMultiSelectSearch: bool(map.posMultiSelectSearch),
-      invoiceTableStyle: (map.invoiceTableStyle as any) || 'bordered',
-      invoiceShowItemCode: map.invoiceShowItemCode === undefined ? true : bool(map.invoiceShowItemCode),
-      invoiceShowItemSpecs: map.invoiceShowItemSpecs === undefined ? true : bool(map.invoiceShowItemSpecs),
-      invoiceShowBoxesCount: map.invoiceShowBoxesCount === undefined ? true : bool(map.invoiceShowBoxesCount),
-      invoiceShowLineDiscount: map.invoiceShowLineDiscount === undefined ? true : bool(map.invoiceShowLineDiscount),
+      invoiceTableStyle: (map.invoiceTableStyle as any) || 'minimal',
+      invoiceShowItemCode: map.invoiceShowItemCode === undefined ? false : bool(map.invoiceShowItemCode),
+      invoiceShowItemSpecs: map.invoiceShowItemSpecs === undefined ? false : bool(map.invoiceShowItemSpecs),
+      invoiceShowBoxesCount,
+      invoiceShowLineDiscount,
       invoiceShowTableSummary: map.invoiceShowTableSummary === undefined ? true : bool(map.invoiceShowTableSummary),
+      invoiceTableColumns,
+      invoiceShowPromotions: map.invoiceShowPromotions === undefined ? false : bool(map.invoiceShowPromotions),
+      invoiceShowShipping: map.invoiceShowShipping === undefined ? false : bool(map.invoiceShowShipping),
+      invoiceShowPaymentSplits: map.invoiceShowPaymentSplits === undefined ? false : bool(map.invoiceShowPaymentSplits),
+      invoiceShowNotes: map.invoiceShowNotes === undefined ? false : bool(map.invoiceShowNotes),
+      invoiceShowBrandLogo: map.invoiceShowBrandLogo === undefined ? true : bool(map.invoiceShowBrandLogo),
+      invoiceFontFamily: (['Cairo', 'Tajawal', 'Tahoma', 'Arial'] as const).includes(map.invoiceFontFamily as any)
+        ? map.invoiceFontFamily as SystemSettings['invoiceFontFamily']
+        : 'Cairo',
+      invoiceSectionOrder: SettingsService.parseInvoiceList<InvoiceSectionId>(
+        map.invoiceSectionOrder,
+        ['promotions', 'delivery', 'paymentSplits', 'notes'],
+        ['promotions', 'delivery', 'paymentSplits', 'notes'],
+      ),
       allowOverdraftSale: bool(map.allowOverdraftSale),
       insufficientStockAsReserved: bool(map.insufficientStockAsReserved),
       lockSaleOnReservedQty: bool(map.lockSaleOnReservedQty),

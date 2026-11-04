@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ProductService, ProductStats } from '../services/ProductService';
+import { ProductFormPreferencesService } from '../services/ProductFormPreferencesService';
 import { InventoryService } from '../services/InventoryService';
 import { CategoryService, CategoryWithCount } from '../services/CategoryService';
 import { BrandService, BrandWithCount } from '../services/BrandService';
@@ -27,15 +28,76 @@ import { parseBusinessConfiguration } from '../config/businessProfiles';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 import { CentralLimitGuard } from './ui/CentralLimitGuard';
 import {
-  GRADES, SURFACES, UNITS, calcMetersFromSize, emptyForm, emptyVariant, gradeLabel,
+  GRADES, SURFACES, UNITS, calcMetersFromSize, emptyProductEntryForm, emptyVariant, gradeLabel,
   parseGrade, pickCell, round, unitLabelFor,
-  type FormState, type OpeningStockRow, type TabId, type VariantDraft,
+  type FormState, type OpeningStockRow, type ProductEntryFormState, type TabId, type VariantDraft,
 } from './products/productFormModel';
 import { Field, ListPagination, StatCard } from './products/ProductUi';
 import { ProductFormModal } from './products/ProductFormModal';
 import { ProductsTable } from './products/ProductsTable';
 import { ProductsCards } from './products/ProductsCards';
 
+const PRODUCT_FORM_DEFAULT_FIELDS: readonly (keyof ProductEntryFormState)[] = [
+  'productType', 'name', 'categoryId', 'brandId', 'grade', 'size', 'thickness',
+  'color', 'tone', 'finish', 'surfaceLocation', 'baseUnit', 'sellUnit',
+  'customUnit', 'piecesPerBox', 'metersPerBox', 'weightPerBox', 'costPrice',
+  'sellingPriceM2', 'sellingPriceBox', 'wholesalePriceM2', 'minSellingPriceM2',
+  'minStockLevel', 'maxStockLevel', 'notes',
+];
+const PRODUCT_FORM_FIELD_LABELS: Record<keyof FormState, string> = {
+  productType: 'نوع الصنف',
+  name: 'اسم الصنف',
+  sku: 'كود الصنف',
+  barcode: 'الباركود',
+  categoryId: 'نوع المنتج (التصنيف)',
+  brandId: 'الماركة / المصنع',
+  grade: 'الفرز والدرجة',
+  size: 'المقاس',
+  thickness: 'السمك',
+  color: 'اللون',
+  tone: 'التون',
+  finish: 'التشطيب',
+  surfaceLocation: 'الاستخدام / السطح',
+  baseUnit: 'وحدة الأساس',
+  sellUnit: 'وحدة البيع',
+  customUnit: 'اسم الوحدة',
+  piecesPerBox: 'عدد القطع بالكرتونة',
+  metersPerBox: 'المترات بالكرتونة',
+  weightPerBox: 'وزن الكرتونة',
+  costPrice: 'سعر الشراء / التكلفة',
+  sellingPriceM2: 'سعر البيع',
+  sellingPriceBox: 'سعر الكرتونة',
+  wholesalePriceM2: 'سعر الجملة',
+  minSellingPriceM2: 'الحد الأدنى لسعر البيع',
+  minStockLevel: 'حد الطلب الأدنى',
+  maxStockLevel: 'الحد الأقصى للمخزون',
+  notes: 'ملاحظات',
+};
+const isProductFormDefaultField = (field: string): field is keyof ProductEntryFormState =>
+  PRODUCT_FORM_DEFAULT_FIELDS.some((candidate) => candidate === field);
+
+const applyRememberedFormFields = (
+  form: ProductEntryFormState,
+  preferences: Record<string, string | number>,
+  categories: CategoryWithCount[],
+  brands: BrandWithCount[],
+): ProductEntryFormState => {
+  const next = { ...form };
+  for (const field of PRODUCT_FORM_DEFAULT_FIELDS) {
+    const value = preferences[field];
+    if (value === undefined || typeof value !== typeof next[field]) continue;
+    if (field === 'categoryId' && !categories.some((category) => category.id === value)) continue;
+    if (field === 'brandId' && value !== '' && !brands.some((brand) => brand.id === value)) continue;
+    if (field === 'productType' && value !== 'CERAMIC' && value !== 'GENERAL') continue;
+    if (field === 'grade' && !GRADES.some((grade) => grade.value === value)) continue;
+    if (field === 'surfaceLocation' && !SURFACES.some((surface) => surface.value === value)) continue;
+    if ((field === 'baseUnit' || field === 'sellUnit')
+      && !UNITS.some((unit) => unit.value === value)
+      && !(value === 'CUSTOM')) continue;
+    Object.assign(next, { [field]: value });
+  }
+  return next;
+};
 
 
 export const ProductsView: React.FC = () => {
@@ -73,8 +135,10 @@ export const ProductsView: React.FC = () => {
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [showNewBrand, setShowNewBrand] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('basic');
+  const [toneOptions, setToneOptions] = useState<string[]>([]);
+  const [rememberedFields, setRememberedFields] = useState<Record<string, string | number>>({});
 
-  const [formData, setFormData] = useState<FormState>(emptyForm());
+  const [formData, setFormData] = useState<ProductEntryFormState>(emptyProductEntryForm());
   const [businessConfig] = useState(() => {
     const type = getEffectiveBusinessType();
     return parseBusinessConfiguration(SettingsService.getValue('businessProfileConfig'), type);
@@ -92,7 +156,7 @@ export const ProductsView: React.FC = () => {
   const profileUnitOptions = useMemo(() => {
     const options = UNITS.filter((unit) => businessConfig.units.includes(unit.value));
     if (businessConfig.customUnits.length > 0) options.push({ value: 'CUSTOM', label: 'وحدة مخصصة' });
-    if (!options.some((unit) => unit.value === formData.baseUnit)) {
+    if (formData.baseUnit && !options.some((unit) => unit.value === formData.baseUnit)) {
       const existing = UNITS.find((unit) => unit.value === formData.baseUnit);
       options.push(existing || { value: formData.baseUnit, label: unitLabelFor(formData.baseUnit, formData.customUnit) });
     }
@@ -125,6 +189,7 @@ export const ProductsView: React.FC = () => {
   const canManagePricing = editingProduct ? canUpdatePricing : canCreateProduct;
 
   const productService = new ProductService();
+  const productFormPreferences = new ProductFormPreferencesService();
   const inventoryService = new InventoryService();
   const categoryService = new CategoryService();
   const brandService = new BrandService();
@@ -231,10 +296,38 @@ export const ProductsView: React.FC = () => {
 
   const defaultOpeningRow = (warehouseId: string): OpeningStockRow => ({ warehouseId, boxes: 0, pieces: 0, meters: 0 });
 
+  const regenerateProductCode = (field: 'sku' | 'barcode', currentValue: string) => {
+    try {
+      const value = field === 'sku'
+        ? productService.generateNextSku(currentValue)
+        : productService.generateNextBarcode(currentValue);
+      setFormData((current) => ({ ...current, [field]: value }));
+    } catch (error) {
+      alert(`تعذر توليد ${field === 'sku' ? 'كود الصنف' : 'الباركود'}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
   const handleOpenAddModal = () => {
+    let preferences: Record<string, string | number>;
+    let tones: string[];
+    let generatedCodes: { sku: string; barcode: string };
+    try {
+      preferences = productFormPreferences.getPreferences();
+      tones = productFormPreferences.getTones();
+      generatedCodes = {
+        sku: productService.generateNextSku(),
+        barcode: productService.generateNextBarcode(),
+      };
+    } catch (error) {
+      console.error('تعذر تحميل بيانات نموذج الصنف المحفوظة:', error);
+      alert(`تعذر تجهيز نموذج الصنف: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
     setEditingProduct(null);
     setShowNewCategory(false);
     setShowNewBrand(false);
+    setRememberedFields(preferences);
+    setToneOptions(tones);
     setActiveTab('basic');
     setVariants([]);
     setRemovedVariantIds([]);
@@ -243,18 +336,19 @@ export const ProductsView: React.FC = () => {
     setPendingImages([]);
     setRemovedImageIds([]);
     setEditStock([]);
-    const randCode = Date.now().toString().slice(-6);
-    setFormData({
-      ...emptyForm(
-        categories[0]?.id || '',
-        brands[0]?.id || '',
-        businessConfig.businessType === 'ceramics' ? 'CERAMIC' : 'GENERAL',
-        { baseUnit: businessConfig.units[0] as any },
-      ),
-      sku: `${businessConfig.businessType === 'ceramics' ? 'TILE' : 'SKU'}-${randCode}`,
-      barcode: `622${randCode}01`,
+    const initialForm = applyRememberedFormFields({
+      ...emptyProductEntryForm(),
+      ...generatedCodes,
+    }, preferences, categories, brands);
+    const initialAttributes: Record<string, string> = {};
+    Object.entries(preferences).forEach(([key, value]) => {
+      if (key.startsWith('attribute:') && typeof value === 'string') {
+        initialAttributes[key.slice('attribute:'.length)] = value;
+      }
     });
-    setOpeningRows([defaultOpeningRow(warehouses[0]?.id || '')]);
+    setFormData(initialForm);
+    setAttributeValues(initialAttributes);
+    setOpeningRows([defaultOpeningRow('')]);
     setIsModalOpen(true);
   };
 
@@ -304,7 +398,7 @@ export const ProductsView: React.FC = () => {
         barcode: v.barcode || '',
         color: v.color || '',
         size: v.size || '',
-        grade: v.grade || 'GRADE_1',
+        grade: v.grade || '',
         costPrice: v.costPrice || 0,
         sellingPriceM2: v.sellingPriceM2 || 0,
       })));
@@ -330,7 +424,7 @@ export const ProductsView: React.FC = () => {
       };
     });
     setOpeningRows((rows) => rows.map((row) => recalcOpeningRow(
-      { ...formData, size },
+      { piecesPerBox: formData.piecesPerBox },
       autoMeters ?? formData.metersPerBox,
       row,
     )));
@@ -346,7 +440,7 @@ export const ProductsView: React.FC = () => {
   };
 
   const handlePiecesPerBoxChange = (pieces: number) => {
-    const nextPieces = pieces || 1;
+    const nextPieces = pieces;
     const autoMeters = calcMetersFromSize(formData.size, nextPieces);
     setFormData((form) => ({
       ...form,
@@ -365,7 +459,7 @@ export const ProductsView: React.FC = () => {
     setFormData((form) => ({ ...form, metersPerBox: meters, sellingPriceBox: round(form.sellingPriceM2 * meters) }));
   };
 
-  const recalcOpeningRow = (form: FormState, metersPerBox: number, row: OpeningStockRow): OpeningStockRow => ({
+  const recalcOpeningRow = (form: Pick<ProductEntryFormState, 'piecesPerBox'>, metersPerBox: number, row: OpeningStockRow): OpeningStockRow => ({
     ...row,
     pieces: Math.round(row.boxes * (form.piecesPerBox || 0)),
     meters: round(row.boxes * (metersPerBox || 0), 3),
@@ -386,10 +480,7 @@ export const ProductsView: React.FC = () => {
   };
 
   const addOpeningRow = () => {
-    const used = new Set(openingRows.map((r) => r.warehouseId));
-    const next = warehouses.find((w) => !used.has(w.id));
-    if (!next) return;
-    setOpeningRows((rows) => [...rows, defaultOpeningRow(next.id)]);
+    setOpeningRows((rows) => [...rows, defaultOpeningRow('')]);
   };
 
   const removeOpeningRow = (index: number) => {
@@ -457,7 +548,7 @@ export const ProductsView: React.FC = () => {
   };
 
   const addVariantDraft = () => {
-    setVariants((prev) => [...prev, { ...emptyVariant(), sku: `${formData.sku}-V${prev.length + 1}` }]);
+    setVariants((prev) => [...prev, emptyVariant()]);
   };
 
   const updateVariantDraft = (index: number, patch: Partial<VariantDraft>) => {
@@ -498,9 +589,15 @@ export const ProductsView: React.FC = () => {
   };
 
   const isProductFormValid = () => {
+    if (!formData.productType) { alert('اختر نوع الصنف.'); return false; }
     if (!formData.name.trim()) { alert('أدخل اسم الصنف.'); return false; }
     if (!formData.categoryId) { alert('اختر نوع المنتج أو أضف نوعًا جديدًا.'); return false; }
     if (formData.productType === 'CERAMIC' && !formData.brandId) { alert('اختر الماركة أو أضف ماركة جديدة.'); return false; }
+    if (!formData.baseUnit || !formData.sellUnit) { alert('اختر وحدة الأساس ووحدة البيع.'); return false; }
+    if (formData.productType === 'CERAMIC' && (!formData.grade || !formData.surfaceLocation)) {
+      alert('اختر درجة الصنف والاستخدام / السطح.');
+      return false;
+    }
     if (!formData.barcode.trim() || !formData.sku.trim()) { alert('الباركود وكود الصنف مطلوبان.'); return false; }
     const applicableAttributes = attributes.filter(
       (attribute) => !attribute.appliesToCategoryId || attribute.appliesToCategoryId === formData.categoryId,
@@ -516,36 +613,53 @@ export const ProductsView: React.FC = () => {
     return true;
   };
 
-  const buildProductPayload = () => ({
-    productType: formData.productType,
-    name: formData.name.trim(),
-    sku: formData.sku.trim(),
-    barcode: formData.barcode.trim(),
-    categoryId: formData.categoryId,
-    brandId: formData.brandId,
-    grade: formData.productType === 'CERAMIC' ? formData.grade : 'GRADE_1',
-    size: formData.productType === 'CERAMIC' ? formData.size : '',
-    thickness: formData.thickness,
-    color: formData.color,
-    tone: formData.tone,
-    finish: formData.finish,
-    surfaceLocation: formData.surfaceLocation,
-    baseUnit: formData.baseUnit,
-    sellUnit: formData.sellUnit,
-    customUnit: formData.customUnit,
-    piecesPerBox: formData.productType === 'CERAMIC' ? formData.piecesPerBox : 1,
-    metersPerBox: formData.productType === 'CERAMIC' ? formData.metersPerBox : 1,
-    weightPerBox: formData.weightPerBox,
-    costPrice: formData.costPrice,
-    sellingPriceM2: formData.sellingPriceM2,
-    sellingPriceBox: formData.sellingPriceBox,
-    wholesalePriceM2: formData.wholesalePriceM2,
-    minSellingPriceM2: formData.minSellingPriceM2,
-    minStockLevel: formData.minStockLevel,
-    maxStockLevel: formData.maxStockLevel,
-    notes: formData.notes,
-    imagePath: existingImages.find((i) => i.isPrimary)?.filePath || '',
-  });
+  const buildProductPayload = () => {
+    const productType = formData.productType;
+    const baseUnit = formData.baseUnit;
+    const sellUnit = formData.sellUnit;
+    if (!productType || !baseUnit || !sellUnit) {
+      throw new Error('يجب اختيار نوع الصنف ووحدات القياس قبل الحفظ.');
+    }
+    let grade: CeramicGrade = 'GRADE_1';
+    if (productType === 'CERAMIC') {
+      if (!formData.grade) throw new Error('يجب اختيار درجة الصنف قبل الحفظ.');
+      grade = formData.grade;
+    }
+    const surfaceLocation = formData.surfaceLocation || undefined;
+    if (productType === 'CERAMIC' && !surfaceLocation) {
+      throw new Error('يجب اختيار درجة الصنف والاستخدام / السطح قبل الحفظ.');
+    }
+    return {
+      productType,
+      name: formData.name.trim(),
+      sku: formData.sku.trim(),
+      barcode: formData.barcode.trim(),
+      categoryId: formData.categoryId,
+      brandId: formData.brandId,
+      grade,
+      size: productType === 'CERAMIC' ? formData.size : '',
+      thickness: formData.thickness,
+      color: formData.color,
+      tone: formData.tone,
+      finish: formData.finish,
+      surfaceLocation,
+      baseUnit,
+      sellUnit,
+      customUnit: formData.customUnit,
+      piecesPerBox: formData.piecesPerBox,
+      metersPerBox: formData.metersPerBox,
+      weightPerBox: formData.weightPerBox,
+      costPrice: formData.costPrice,
+      sellingPriceM2: formData.sellingPriceM2,
+      sellingPriceBox: formData.sellingPriceBox,
+      wholesalePriceM2: formData.wholesalePriceM2,
+      minSellingPriceM2: formData.minSellingPriceM2,
+      minStockLevel: formData.minStockLevel,
+      maxStockLevel: formData.maxStockLevel,
+      notes: formData.notes,
+      imagePath: existingImages.find((i) => i.isPrimary)?.filePath || '',
+    };
+  };
 
   const saveNewProductImages = (productId: string) => {
     pendingImages.forEach((dataUrl, index) => {
@@ -586,6 +700,69 @@ export const ProductsView: React.FC = () => {
   const saveNewProductDetails = (productId: string) => {
     saveNewProductImages(productId);
     saveOpeningStock(productId);
+  };
+
+  const handleSaveSelectedProductFields = (fieldKeys: string[]): boolean => {
+    try {
+      const options = new Set<string>([
+        ...PRODUCT_FORM_DEFAULT_FIELDS.map((field) => String(field)),
+        ...attributes.map((attribute) => `attribute:${attribute.id}`),
+      ]);
+      if (fieldKeys.some((key) => !options.has(key))) {
+        throw new Error('توجد خانة غير صالحة ضمن الاختيارات.');
+      }
+
+      const nextPreferences: Record<string, string | number> = {};
+      fieldKeys.forEach((field) => {
+        if (field.startsWith('attribute:')) {
+          const attributeId = field.slice('attribute:'.length);
+          const value = attributeValues[attributeId];
+          if (value !== undefined) nextPreferences[field] = value;
+        } else if (isProductFormDefaultField(field)) {
+          nextPreferences[field] = formData[field];
+        }
+      });
+
+      productFormPreferences.replacePreferences(nextPreferences);
+      setRememberedFields(nextPreferences);
+      return true;
+    } catch (err) {
+      alert(`تعذر حفظ اختيارات الخانات: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  };
+
+  const handleAddTone = (tone: string): boolean => {
+    const value = tone.trim();
+    if (!value) return false;
+    try {
+      const savedTone = productFormPreferences.addTone(value);
+      const nextOptions = [...toneOptions, savedTone].sort((a, b) => a.localeCompare(b, 'ar'));
+      setToneOptions(nextOptions);
+      setFormData((current) => ({ ...current, tone: savedTone }));
+      return true;
+    } catch (error) {
+      alert(`تعذر إضافة التون: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  };
+
+  const handleDeleteTone = (tone: string) => {
+    if (!toneOptions.includes(tone)) return;
+    if (!confirm(`حذف التون «${tone}» من قائمة الاختيارات؟ لن تتغير بيانات الأصناف المحفوظة به.`)) return;
+    try {
+      productFormPreferences.deleteTone(tone);
+      setToneOptions((current) => current.filter((item) => item !== tone));
+      setRememberedFields((current) => {
+        if (current.tone !== tone) return current;
+        const next = { ...current };
+        delete next.tone;
+        return next;
+      });
+      setFormData((current) => current.tone === tone ? { ...current, tone: '' } : current);
+    } catch (error) {
+      alert(`تعذر حذف التون: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const handleSaveProduct = (e: React.FormEvent) => {
@@ -950,7 +1127,7 @@ export const ProductsView: React.FC = () => {
   const profitPerMeter = formData.sellingPriceM2 - formData.costPrice;
   const profitMargin = formData.sellingPriceM2 > 0 ? (profitPerMeter / formData.sellingPriceM2) * 100 : 0;
   const stockValue = formData.costPrice * openingRows.reduce((sum, row) => sum + row.meters, 0);
-  const unitLabel = unitLabelFor(formData.baseUnit, formData.customUnit);
+  const unitLabel = formData.baseUnit ? unitLabelFor(formData.baseUnit, formData.customUnit) : '';
 
   const tracksInventory = businessConfig.trackInventory !== false;
 
@@ -1131,6 +1308,20 @@ export const ProductsView: React.FC = () => {
         canCreate={canCreateProduct}
         canUpdate={canUpdateProduct}
         editingProduct={editingProduct}
+        rememberedFields={rememberedFields}
+        fieldPreferenceOptions={[
+          ...PRODUCT_FORM_DEFAULT_FIELDS.map((key) => ({ key, label: PRODUCT_FORM_FIELD_LABELS[key] })),
+          ...attributes.map((attribute) => ({
+            key: `attribute:${attribute.id}`,
+            label: `خاصية: ${attribute.name}`,
+          })),
+        ]}
+        onSaveSelectedFields={handleSaveSelectedProductFields}
+        onRegenerateBarcode={() => regenerateProductCode('barcode', formData.barcode)}
+        onRegenerateSku={() => regenerateProductCode('sku', formData.sku)}
+        toneOptions={toneOptions}
+        onAddTone={handleAddTone}
+        onDeleteTone={handleDeleteTone}
         productSingularLabel={productSingularLabel}
         onClose={() => setIsModalOpen(false)}
         tabs={tabs}

@@ -73,6 +73,14 @@ export interface FormState {
   notes: string;
 }
 
+export interface ProductEntryFormState extends Omit<FormState, 'productType' | 'grade' | 'surfaceLocation' | 'baseUnit' | 'sellUnit'> {
+  productType: FormState['productType'] | '';
+  grade: CeramicGrade | '';
+  surfaceLocation: FormState['surfaceLocation'] | '';
+  baseUnit: UnitType | '';
+  sellUnit: UnitType | '';
+}
+
 export interface OpeningStockRow {
   warehouseId: string;
   boxes: number;
@@ -140,9 +148,32 @@ export const emptyForm = (
   };
 };
 
+export const emptyProductEntryForm = (): ProductEntryFormState => ({
+  ...emptyForm(),
+  productType: '',
+  categoryId: '',
+  brandId: '',
+  grade: '',
+  size: '',
+  thickness: 0,
+  finish: '',
+  surfaceLocation: '',
+  baseUnit: '',
+  sellUnit: '',
+  piecesPerBox: 0,
+  metersPerBox: 0,
+  costPrice: 0,
+  sellingPriceM2: 0,
+  sellingPriceBox: 0,
+  wholesalePriceM2: 0,
+  minSellingPriceM2: 0,
+  minStockLevel: 0,
+  maxStockLevel: 0,
+});
+
 export const emptyVariant = (): VariantDraft => ({
   variantName: '', sku: '', barcode: '', color: '', size: '',
-  grade: 'GRADE_1', costPrice: 0, sellingPriceM2: 0,
+  grade: '', costPrice: 0, sellingPriceM2: 0,
 });
 
 export const pickCell = (row: Record<string, any>, keys: string[]): string => {

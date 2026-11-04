@@ -210,6 +210,32 @@ export class ProductService {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  public generateNextBarcode(currentValue = ''): string {
+    PermissionService.require(AuthService.requireAuth(), 'products.create');
+    const rows = this.db.query<{ barcode: string; sku: string }>(
+      'SELECT barcode, sku FROM products',
+    );
+    const usedCodes = new Set(rows.flatMap((row) => [row.barcode, row.sku]));
+    if (currentValue) usedCodes.add(currentValue);
+    let sequence = 1;
+    while (usedCodes.has(String(sequence))) sequence += 1;
+    return String(sequence);
+  }
+
+  public generateNextSku(currentValue = ''): string {
+    PermissionService.require(AuthService.requireAuth(), 'products.create');
+    const rows = this.db.query<{ barcode: string; sku: string }>(
+      'SELECT barcode, sku FROM products',
+    );
+    const usedCodes = new Set(rows.flatMap((row) => [row.barcode, row.sku]));
+    if (currentValue) usedCodes.add(currentValue);
+    let candidate = '';
+    do {
+      candidate = `SKU-${uuidv4().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+    } while (usedCodes.has(candidate));
+    return candidate;
+  }
+
   public createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, initialStock?: { warehouseId: string; quantityM2: number; unitCost: number }, performedBy = 'usr_admin'): Product {
     PermissionService.require(AuthService.requireAuth(), 'products.create');
     CentralUsageLimitService.assertWithin('maxProducts');
@@ -253,10 +279,10 @@ export class ProductService {
         id, product.productType || defaultProductType, product.customUnit || '', product.sku, product.barcode, product.name, product.categoryId, product.brandId,
           product.grade || 'GRADE_1', product.size || '', product.thickness || 0, product.color || '', product.tone || '', product.finish || '',
         product.surfaceLocation || defaultSurface, product.baseUnit || defaultUnit, product.sellUnit || defaultUnit,
-        product.piecesPerBox || 1, product.metersPerBox || 1, product.weightPerBox || 0,
-        product.costPrice || 0, product.sellingPriceM2 || 0, product.sellingPriceBox || 0,
-        product.wholesalePriceM2 || 0, product.minSellingPriceM2 || 0, product.minStockLevel || 10,
-        product.maxStockLevel || 1000, product.imagePath || '', product.notes || '', 1,
+        product.piecesPerBox ?? 1, product.metersPerBox ?? 1, product.weightPerBox ?? 0,
+        product.costPrice ?? 0, product.sellingPriceM2 ?? 0, product.sellingPriceBox ?? 0,
+        product.wholesalePriceM2 ?? 0, product.minSellingPriceM2 ?? 0, product.minStockLevel ?? 10,
+        product.maxStockLevel ?? 1000, product.imagePath || '', product.notes || '', 1,
         (this.branchAccess.getAccessibleCompanyIds(AuthService.requireAuth()) || ['cmp_main'])[0]
       ]);
       this.sync.capture(sqliteDb, 'product', id, 'CREATE');
