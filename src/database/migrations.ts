@@ -2403,6 +2403,32 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '118_sales_return_customer_credit_vat',
+    description: 'Recalculate legacy sales return credits including proportional VAT.',
+    up: (db: Database) => {
+      db.exec(`
+        UPDATE sales_invoices
+        SET returned_amount = COALESCE((
+          SELECT SUM(
+            COALESCE(sr.refunded_amount, 0) +
+            COALESCE(sr.remaining_to_balance, 0) +
+            CASE
+              WHEN MAX(0, COALESCE(sales_invoices.subtotal, 0) - COALESCE(sales_invoices.discount_amount, 0)) > 0
+              THEN ROUND(
+                COALESCE(sr.total_amount, 0) * COALESCE(sales_invoices.tax_amount, 0) /
+                MAX(0, COALESCE(sales_invoices.subtotal, 0) - COALESCE(sales_invoices.discount_amount, 0)),
+                2
+              )
+              ELSE 0
+            END
+          )
+          FROM sales_returns sr
+          WHERE sr.original_invoice_id = sales_invoices.id
+        ), 0)
+      `);
+    },
+  },
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

@@ -7,11 +7,17 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { MIGRATIONS, validateMigrationCatalog } from '../src/database/migrations.ts';
 
 test('external backup encryption authenticates and round-trips SQLite bytes', async () => {
-  const source = new TextEncoder().encode('sqlite database bytes');
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const source = db.exportDatabaseBinary();
   const encrypted = await encryptExternalBackup(source, 'correct horse battery');
   assert.ok(isEncryptedBackup(encrypted));
   assert.notDeepEqual(encrypted, source);
-  assert.deepEqual(await decryptExternalBackup(encrypted, 'correct horse battery'), source);
+  const decrypted = await decryptExternalBackup(encrypted, 'correct horse battery');
+  assert.deepEqual(decrypted, source);
+  const inspection = db.inspectDatabaseBinary(decrypted);
+  assert.equal(inspection.valid, true);
+  assert.equal(inspection.integrity, 'ok');
   await assert.rejects(decryptExternalBackup(encrypted, 'wrong password'), /كلمة المرور غير صحيحة/);
 });
 

@@ -9,6 +9,8 @@ import { SalesService } from '../src/services/SalesService.ts';
 import { BackupService } from '../src/services/BackupService.ts';
 import officeCrypto from 'officecrypto-tool';
 import { createXlsxBackupWorkbook } from '../src/services/xlsxBackup.ts';
+import { encryptExternalBackup } from '../src/services/backupEncryption.ts';
+import { MIGRATIONS } from '../src/database/migrations.ts';
 
 /**
  * Restoring a production backup is a destructive, all-or-nothing operation:
@@ -63,6 +65,62 @@ function stubDesktopBackupApi(): { snapshots: Array<{ label: string; bytes: numb
   };
   return { snapshots };
 }
+
+test('migration 118 recalculates legacy sales return credits including VAT', async () => {
+  const manager = await boot();
+  seedProduct('prod_return_vat_migration', 5);
+  const customer = new CustomerService().createCustomer({
+    name: 'عميل ترحيل ضريبة المرتجعات',
+    phone: '01000009502',
+    customerType: 'RETAIL',
+    creditLimit: 100000,
+  });
+  const invoice = new SalesService().createSale({
+    customerId: customer.id,
+    warehouseId: 'wh_main',
+    items: [{
+      productId: 'prod_return_vat_migration',
+      soldBy: 'M2',
+      quantityM2: 1,
+      boxesCount: 1,
+      piecesCount: 4,
+      unitPrice: 100,
+    }],
+    paidAmount: 100,
+    paymentType: 'CASH',
+  });
+
+  manager.run(
+    `UPDATE sales_invoices
+     SET subtotal = 100, discount_amount = 0, tax_amount = 15, total_amount = 115, returned_amount = 0
+     WHERE id = ?`,
+    [invoice.id]
+  );
+  manager.run(
+    `INSERT INTO sales_returns (
+       id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
+       date, total_amount, refunded_amount, remaining_to_balance, reason, created_by
+     ) VALUES (?, ?, ?, ?, ?, ?, '2026-11-05', 100, 40, 60, 'legacy return', ?)`,
+    [
+      'ret_vat_migration_118',
+      'RET-VAT-MIGRATION-118',
+      invoice.id,
+      invoice.invoiceNumber,
+      customer.id,
+      'wh_main',
+      'usr_admin',
+    ]
+  );
+
+  const migration = MIGRATIONS.find((item) => item.id === '118_sales_return_customer_credit_vat');
+  assert.ok(migration);
+  migration.up(manager.getDatabase());
+
+  assert.equal(
+    Number(one<{ amount: number }>('SELECT returned_amount AS amount FROM sales_invoices WHERE id = ?', [invoice.id]).amount),
+    115
+  );
+});
 
 test('restoring a production backup replaces live data only after a verified snapshot', async () => {
   const manager = await boot();
@@ -183,6 +241,27 @@ test('restoring a production backup replaces live data only after a verified sna
     Number(one<{ q: number }>(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_restore_a'`).q),
     37
   );
+});
+
+test('an encrypted external backup restores as an integrity-checked SQLite database', async () => {
+  const manager = await boot();
+  const databaseBytes = manager.exportDatabaseBinary();
+  const password = 'correct horse battery';
+  const encryptedBytes = await encryptExternalBackup(databaseBytes, password);
+  const { snapshots } = stubDesktopBackupApi();
+
+  const restored = await new BackupService().restoreBackupFromFile(
+    new File([encryptedBytes], 'ceramisys_backup_external.ceramisys-backup', {
+      type: 'application/octet-stream',
+    }),
+    password
+  );
+
+  assert.deepEqual(snapshots.map((snapshot) => snapshot.label), ['pre_restore']);
+  const inspection = manager.inspectDatabaseBinary(manager.exportDatabaseBinary());
+  assert.equal(inspection.valid, true);
+  assert.equal(inspection.integrity, 'ok');
+  assert.equal(restored.invoicesCount, inspection.invoicesCount);
 });
 
 test('an encrypted XLSX workbook restores the complete SQLite backup through the restore flow', async () => {
