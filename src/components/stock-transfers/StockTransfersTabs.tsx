@@ -57,6 +57,7 @@ export const StockTransfersTabs: React.FC<StockTransfersTabsProps> = ({
           <option value="IN_TRANSIT">قيد النقل</option>
           <option value="RECEIVED_FULL">مستلمة بالكامل</option>
           <option value="RECEIVED_PARTIAL">استلام جزئي</option>
+          <option value="COMPLETED">مكتملة مع فقد موثق</option>
           <option value="REJECTED">مرفوضة</option>
         </select>
       </div>

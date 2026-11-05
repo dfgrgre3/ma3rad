@@ -8,7 +8,7 @@ import { localDateString } from '../../utils/date';
 import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
 import { convertQuantity } from '../../utils/uom';
 import { paymentAccountCode } from '../../database/ledger';
-import { computeReturnImpact, round2 } from '../financials';
+import { calculateReturnTax, computeReturnImpact, round2 } from '../financials';
 import type { SalesReturn } from '../../types';
 import type { DatabaseManager } from '../../database/db';
 import type { InvoiceWithItems, SalesContext } from './context';
@@ -46,6 +46,8 @@ interface ReturnProduct {
   productType: string;
   baseUnit: string;
 }
+
+type AuthoritativeReturnItem = ReturnRequestItem & { returnAmount: number };
 
 export function createSaleReturn(
   ctx: SalesContext,
@@ -178,10 +180,7 @@ function createReturnInTransaction(
   validateReturnQuantities(sqliteDb, invoiceId, inv, requestedByProduct);
   const authoritativeItems = getAuthoritativeReturnItems(inv, items);
   const returnNumber = sqliteDb.nextNumber('RET');
-  const totalReturnAmount = round2(authoritativeItems.reduce(
-    (sum, item) => sum + round2(item.quantityM2 * item.unitPrice),
-    0
-  ));
+  const totalReturnAmount = round2(authoritativeItems.reduce((sum, item) => sum + item.returnAmount, 0));
   const refundMethod = options.refundMethod || 'CASH';
   const impact = computeReturnImpact({
     invoiceTotal: inv.totalAmount,
@@ -281,17 +280,34 @@ function validateReturnQuantities(
 function getAuthoritativeReturnItems(
   inv: InvoiceWithItems,
   returnItems: ReturnRequestItem[]
-): ReturnRequestItem[] {
+): AuthoritativeReturnItem[] {
   return returnItems.map((item) => {
     const soldLines = inv.items.filter((line) => line.productId === item.productId);
     const soldQuantity = soldLines.reduce((sum, line) => sum + Number(line.quantityM2 || 0), 0);
     const weightedPrice = (key: 'unitPrice' | 'unitCost') => soldQuantity > 0
       ? soldLines.reduce((sum, line) => sum + Number(line[key] || 0) * Number(line.quantityM2 || 0), 0) / soldQuantity
       : 0;
+    const invoiceSubtotal = Math.max(0, Number(inv.subtotal || 0));
+    const invoiceDiscount = Math.max(0, Number(inv.discountAmount || 0));
+    const discountedUnitValue = soldQuantity > 0
+      ? soldLines.reduce((sum, line) => {
+        const quantity = Math.max(0, Number(line.quantityM2 || 0));
+        if (quantity === 0) return sum;
+        const lineAmount = Number.isFinite(Number(line.totalPrice))
+          ? Number(line.totalPrice)
+          : Math.max(0, Number(line.unitPrice || 0) * quantity - Number(line.discountAmount || 0));
+        const invoiceDiscountShare = invoiceSubtotal > 0
+          ? invoiceDiscount * lineAmount / invoiceSubtotal
+          : 0;
+        const lineNet = Math.max(0, lineAmount - invoiceDiscountShare);
+        return sum + lineNet;
+      }, 0) / soldQuantity
+      : 0;
     return {
       ...item,
       unitPrice: round2(weightedPrice('unitPrice')),
       unitCost: round2(weightedPrice('unitCost')),
+      returnAmount: round2(item.quantityM2 * discountedUnitValue),
     };
   });
 }
@@ -324,7 +340,7 @@ function insertSalesReturn(
 function processReturnItems(
   sqliteDb: DatabaseManager,
   params: ReturnTransactionParams,
-  items: ReturnRequestItem[],
+  items: AuthoritativeReturnItem[],
   fifoEnabled: boolean
 ): { inventoryCost: number; serviceCost: number } {
   let inventoryCost = 0;
@@ -340,11 +356,11 @@ function processReturnItems(
 function processReturnItem(
   sqliteDb: DatabaseManager,
   params: ReturnTransactionParams,
-  item: ReturnRequestItem,
+  item: AuthoritativeReturnItem,
   fifoEnabled: boolean
 ): { inventoryCost: number; serviceCost: number } {
   const { invoiceId, returnId, inv, actor } = params;
-  const lineTotal = round2(item.quantityM2 * item.unitPrice);
+  const lineTotal = item.returnAmount;
   const product = sqliteDb.query<ReturnProduct>(
     `SELECT name, grade, meters_per_box, pieces_per_box, size, product_type, base_unit FROM products WHERE id = ?`,
     [item.productId]
@@ -477,7 +493,7 @@ function updateCashRegisterAfterReturn(
   cashRefund: number
 ): void {
   if (cashRefund > 0 && refundMethod === 'CASH') {
-    if (!options.registerId) throw new Error('ÙŠØ¬Ø¨ ØªØ­Ø¯ÙŠØ¯ Ø®Ø²ÙŠÙ†Ø© Ø§Ù„ÙØ±Ø¹ Ù„Ù„Ù…Ø±ØªØ¬Ø¹ Ø§Ù„Ù†Ù‚Ø¯ÙŠ.');
+    if (!options.registerId) throw new Error('يجب تحديد خزينة الفرع للمرتجع النقدي.');
     sqliteDb.run(
       `UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`,
       [cashRefund, options.registerId]
@@ -494,11 +510,9 @@ function buildReturnLedgerLines(
   returnedCost: number,
   returnedServiceCost = 0
 ): any[] {
-  const { today, actor, inv } = params;
+  const { inv } = params;
   const taxableInvoiceBase = Math.max(0, Number(inv.subtotal || 0) - Number(inv.discountAmount || 0));
-  const taxReduction = taxableInvoiceBase > 0
-    ? round2(totalReturnAmount * Number(inv.taxAmount || 0) / taxableInvoiceBase)
-    : 0;
+  const taxReduction = calculateReturnTax(totalReturnAmount, Number(inv.taxAmount || 0), taxableInvoiceBase);
   const refundAccount = impact.cashRefund > 0 ? paymentAccountCode(params.options.refundMethod || 'CASH') : undefined;
   const lines = [
     { accountCode: '4101', debit: round2(totalReturnAmount - taxReduction), credit: 0 },

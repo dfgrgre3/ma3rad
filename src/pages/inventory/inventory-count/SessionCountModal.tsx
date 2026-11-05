@@ -40,13 +40,13 @@ const isBlindCounting = (session: CountSession) =>
 const QuantityVariance: React.FC<{ value: number; item: CountItem }> = ({ value, item }) => {
   if (value > 0) return <span className="text-emerald-600">+{formatProductQuantity(value, item)}</span>;
   if (value < 0) return <span className="text-rose-600">{formatProductQuantity(value, item)}</span>;
-  return <span className="text-slate-500">Ù…Ø·Ø§Ø¨Ù‚</span>;
+  return <span className="text-slate-500">مطابق</span>;
 };
 
 const FinancialVariance: React.FC<{ value: number }> = ({ value }) => {
   if (value > 0) return <span className="text-emerald-600">+{fmtCountCurrency(value)}</span>;
   if (value < 0) return <span className="text-rose-600">{fmtCountCurrency(value)}</span>;
-  return <span className="text-slate-500">0 Ø¬</span>;
+  return <span className="text-slate-500">0 ج</span>;
 };
 
 const CountItemRow: React.FC<CountItemRowProps> = ({
@@ -67,7 +67,7 @@ const CountItemRow: React.FC<CountItemRowProps> = ({
       <td className="px-4 py-3 text-slate-900 font-semibold">{item.productName}</td>
       <td className="px-4 py-3 font-mono text-slate-500 font-bold">
         {blindCounting ? (
-          <span className="text-violet-600 bg-violet-50 px-2 py-0.5 rounded text-[10px] border border-violet-200">ðŸ”’ Ù…Ø®ÙÙŠ (Ø¹Ø¯Ù‘ Ø£Ø¹Ù…Ù‰)</span>
+          <span className="text-violet-600 bg-violet-50 px-2 py-0.5 rounded text-[10px] border border-violet-200">🔒 مخفي (عدّ أعمى)</span>
         ) : (
           formatProductQuantity(item.systemQuantityM2, item)
         )}
@@ -81,51 +81,51 @@ const CountItemRow: React.FC<CountItemRowProps> = ({
             step="0.01"
             value={item.countedQuantityM2 ?? ''}
             onChange={(e) => onCountChange(index, e.target.value)}
-            placeholder="Ø£Ø¯Ø®Ù„ Ø§Ù„Ø¬Ø±Ø¯ Ø§Ù„ÙØ¹Ù„ÙŠ"
+            placeholder="أدخل الجرد الفعلي"
             className="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-mono w-28 focus:outline-none focus:border-violet-500 text-slate-900"
           />
         )}
       </td>
       <td className="px-4 py-3 font-mono font-bold">
         {blindCounting ? (
-          <span className="text-slate-400 text-[11px]">ÙŠØ­ØªØ³Ø¨ Ø¨Ø¹Ø¯ Ø§Ù„Ø¥Ø¯Ø®Ø§Ù„</span>
+          <span className="text-slate-400 text-[11px]">يحتسب بعد الإدخال</span>
         ) : isCounted ? (
           <QuantityVariance value={item.varianceM2} item={item} />
         ) : (
-          <span className="text-slate-400">â€”</span>
+          <span className="text-slate-400">—</span>
         )}
       </td>
       <td className="px-2 py-2">
         {hasVariance ? (
           isPosted ? (
-            <span className="text-xs font-bold text-slate-700">{item.discrepancyReason || 'ØºÙŠØ± Ù…Ø­Ø¯Ø¯'}</span>
+            <span className="text-xs font-bold text-slate-700">{item.discrepancyReason || 'غير محدد'}</span>
           ) : (
             <select
               value={item.discrepancyReason || ''}
               onChange={(e) => onDiscrepancyReasonChange(index, e.target.value)}
               className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 focus:outline-none focus:border-violet-500"
             >
-              <option value="">-- Ø³Ø¨Ø¨ Ø§Ù„ÙØ§Ø±Ù‚ --</option>
-              <option value="BREAKAGE">ÙƒØ³Ø± ÙˆØªÙ„Ù</option>
-              <option value="THEFT">Ø¹Ø¬Ø² / ÙÙ‚Ø¯</option>
-              <option value="MISCOUNT">Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø¹Ø¯</option>
-              <option value="INPUT_ERROR">Ø®Ø·Ø£ Ø¥Ø¯Ø®Ø§Ù„ Ø³Ø§Ø¨Ù‚</option>
-              <option value="SUPPLIER_SHORTAGE">Ø¹Ø¬Ø² ØªÙˆØ±ÙŠØ¯</option>
-              <option value="OTHER">Ø£Ø®Ø±Ù‰</option>
+              <option value="">-- سبب الفارق --</option>
+              <option value="BREAKAGE">كسر وتلف</option>
+              <option value="THEFT">عجز / فقد</option>
+              <option value="MISCOUNT">خطأ في العد</option>
+              <option value="INPUT_ERROR">خطأ إدخال سابق</option>
+              <option value="SUPPLIER_SHORTAGE">عجز توريد</option>
+              <option value="OTHER">أخرى</option>
             </select>
           )
         ) : (
-          <span className="text-slate-300 text-xs">â€”</span>
+          <span className="text-slate-300 text-xs">—</span>
         )}
       </td>
       <td className="px-4 py-3 font-mono text-slate-500">{fmtCountCurrency(item.unitCost)}</td>
       <td className="px-4 py-3 font-mono font-bold">
         {blindCounting ? (
-          <span className="text-slate-400">â€”</span>
+          <span className="text-slate-400">—</span>
         ) : isCounted ? (
           <FinancialVariance value={item.varianceValue} />
         ) : (
-          <span className="text-slate-500">â€”</span>
+          <span className="text-slate-500">—</span>
         )}
       </td>
       <td className="px-2 py-2">
@@ -134,7 +134,7 @@ const CountItemRow: React.FC<CountItemRowProps> = ({
           disabled={isPosted}
           onChange={(e) => onNoteChange(index, e.target.value)}
           maxLength={250}
-          placeholder="Ù…Ù„Ø§Ø­Ø¸Ø©"
+          placeholder="ملاحظة"
           className="w-28 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs disabled:border-transparent"
         />
       </td>
@@ -168,13 +168,13 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
           <div className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-violet-600" />
             <h3 className="text-base font-black text-slate-900">
-              Ø¬Ù„Ø³Ø© Ø§Ù„Ø¬Ø±Ø¯: {session.code} ({session.warehouse})
+              جلسة الجرد: {session.code} ({session.warehouse})
             </h3>
           </div>
           <div className="flex gap-2">
             {session.status === 'POSTED' && <>
-              <button onClick={() => exportToExcel({ title: `Inventory count ${session.code}`, subtitle: `${session.warehouse} Â· ${session.startDate}`, fileName: `count-${session.code}`, columns: [{ key: 'product', label: 'Product' }, { key: 'system', label: 'System quantity' }, { key: 'counted', label: 'Counted quantity' }, { key: 'variance', label: 'Variance' }, { key: 'reason', label: 'Reason' }, { key: 'notes', label: 'Notes' }], rows: items.map(item => ({ product: item.productName, system: item.systemQuantityM2, counted: item.countedQuantityM2, variance: item.varianceM2, reason: item.discrepancyReason, notes: item.notes })), permission: 'inventory.export' })} className="rounded-lg border px-3 py-1 text-xs">Excel</button>
-              <button onClick={() => exportToPdf({ title: `Inventory count ${session.code}`, subtitle: `${session.warehouse} Â· ${session.startDate}`, fileName: `count-${session.code}`, columns: [{ key: 'product', label: 'Product' }, { key: 'system', label: 'System quantity' }, { key: 'counted', label: 'Counted quantity' }, { key: 'variance', label: 'Variance' }, { key: 'reason', label: 'Reason' }, { key: 'notes', label: 'Notes' }], rows: items.map(item => ({ product: item.productName, system: item.systemQuantityM2, counted: item.countedQuantityM2, variance: item.varianceM2, reason: item.discrepancyReason, notes: item.notes })), permission: 'inventory.export' })} className="rounded-lg border px-3 py-1 text-xs">PDF / Print</button>
+              <button onClick={() => exportToExcel({ title: `Inventory count ${session.code}`, subtitle: `${session.warehouse} · ${session.startDate}`, fileName: `count-${session.code}`, columns: [{ key: 'product', label: 'Product' }, { key: 'system', label: 'System quantity' }, { key: 'counted', label: 'Counted quantity' }, { key: 'variance', label: 'Variance' }, { key: 'reason', label: 'Reason' }, { key: 'notes', label: 'Notes' }], rows: items.map(item => ({ product: item.productName, system: item.systemQuantityM2, counted: item.countedQuantityM2, variance: item.varianceM2, reason: item.discrepancyReason, notes: item.notes })), permission: 'inventory.export' })} className="rounded-lg border px-3 py-1 text-xs">Excel</button>
+              <button onClick={() => exportToPdf({ title: `Inventory count ${session.code}`, subtitle: `${session.warehouse} · ${session.startDate}`, fileName: `count-${session.code}`, columns: [{ key: 'product', label: 'Product' }, { key: 'system', label: 'System quantity' }, { key: 'counted', label: 'Counted quantity' }, { key: 'variance', label: 'Variance' }, { key: 'reason', label: 'Reason' }, { key: 'notes', label: 'Notes' }], rows: items.map(item => ({ product: item.productName, system: item.systemQuantityM2, counted: item.countedQuantityM2, variance: item.varianceM2, reason: item.discrepancyReason, notes: item.notes })), permission: 'inventory.export' })} className="rounded-lg border px-3 py-1 text-xs">PDF / Print</button>
             </>}
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-900 transition">
@@ -183,24 +183,24 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
         </div>
 
         <div className="p-6 flex-1 overflow-y-auto space-y-4">
-          {session.rejectionReason && session.status === 'COUNTING' && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>Ø³Ø¨Ø¨ Ø§Ù„Ø±ÙØ¶ Ø§Ù„Ø³Ø§Ø¨Ù‚:</strong> {session.rejectionReason}</div>}
+          {session.rejectionReason && session.status === 'COUNTING' && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800"><strong>سبب الرفض السابق:</strong> {session.rejectionReason}</div>}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-slate-900">{countedItems}/{items.length}</div><div className="text-[11px] text-slate-500">Ø£ØµÙ†Ø§Ù ØªÙ… Ø¬Ø±Ø¯Ù‡Ø§</div></div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-amber-600">{Math.max(0, items.length - countedItems)}</div><div className="text-[11px] text-slate-500">Ø£ØµÙ†Ø§Ù Ù…ØªØ¨Ù‚ÙŠØ©</div></div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-violet-600">{varianceItems}</div><div className="text-[11px] text-slate-500">ÙØ±ÙˆÙ‚Ø§Øª Ù…Ø³Ø¬Ù„Ø©</div></div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-slate-900">{countedItems}/{items.length}</div><div className="text-[11px] text-slate-500">أصناف تم جردها</div></div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-amber-600">{Math.max(0, items.length - countedItems)}</div><div className="text-[11px] text-slate-500">أصناف متبقية</div></div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-lg font-black text-violet-600">{varianceItems}</div><div className="text-[11px] text-slate-500">فروقات مسجلة</div></div>
           </div>
-          <div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input value={itemSearch} onChange={(e) => onItemSearchChange(e.target.value)} placeholder="Ø¨Ø­Ø« Ø¯Ø§Ø®Ù„ Ø£ØµÙ†Ø§Ù Ø§Ù„Ø¬Ø±Ø¯..." className="w-full pr-9 pl-3 py-2 bg-white border border-slate-200 rounded-xl text-sm" /></div>
+          <div className="relative"><Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input value={itemSearch} onChange={(e) => onItemSearchChange(e.target.value)} placeholder="بحث داخل أصناف الجرد..." className="w-full pr-9 pl-3 py-2 bg-white border border-slate-200 rounded-xl text-sm" /></div>
           <div className="flex items-center justify-between text-xs text-slate-500 bg-white p-3 rounded-lg border border-slate-200">
-            <div>Ø§Ù„Ù†ÙˆØ¹: <span className="text-slate-900 font-bold">{session.status === 'POSTED' ? 'Ù…Ø±Ø­Ù„ ÙˆÙ…Ø¹ØªÙ…Ø¯' : 'Ù‚ÙŠØ¯ Ø§Ù„Ø¬Ø±Ø¯ Ø§Ù„ÙØ¹Ù„ÙŠ'}</span></div>
-            <div>Ø§Ù„Ù‚Ø§Ø¦Ù… Ø¨Ø§Ù„Ø¬Ø±Ø¯: <span className="text-slate-900 font-bold">{session.countedBy}</span></div>
-            <div>Ø§Ù„ØªØ§Ø±ÙŠØ®: <span className="text-slate-900 font-bold font-mono">{session.startDate}</span></div>
+            <div>النوع: <span className="text-slate-900 font-bold">{session.status === 'POSTED' ? 'مرحل ومعتمد' : 'قيد الجرد الفعلي'}</span></div>
+            <div>القائم بالجرد: <span className="text-slate-900 font-bold">{session.countedBy}</span></div>
+            <div>التاريخ: <span className="text-slate-900 font-bold font-mono">{session.startDate}</span></div>
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-hidden">
             <table className="w-full text-xs">
               <thead className="bg-slate-50 sticky top-0">
                 <tr>
-                  {['Ø§Ø³Ù… Ø§Ù„ØµÙ†Ù', 'Ø±ØµÙŠØ¯ Ø§Ù„Ù†Ø¸Ø§Ù…', 'Ø§Ù„Ø¬Ø±Ø¯ Ø§Ù„ÙØ¹Ù„ÙŠ', 'Ø§Ù„ÙØ§Ø±Ù‚', 'Ø³Ø¨Ø¨ Ø§Ù„ÙØ§Ø±Ù‚', 'Ø³Ø¹Ø± Ø§Ù„ØªÙƒÙ„ÙØ©', 'Ø§Ù„ÙØ§Ø±Ù‚ Ø§Ù„Ù…Ø§Ù„ÙŠ', 'Ù…Ù„Ø§Ø­Ø¸Ø§Øª'].map(h => (
+                  {['اسم الصنف', 'رصيد النظام', 'الجرد الفعلي', 'الفارق', 'سبب الفارق', 'سعر التكلفة', 'الفارق المالي', 'ملاحظات'].map(h => (
                     <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
                   ))}
                 </tr>
@@ -217,7 +217,7 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                     onNoteChange={onNoteChange}
                   />
                 ))}
-                {visibleItems.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-500">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ØµÙ†Ø§Ù ØªØ·Ø§Ø¨Ù‚ Ø§Ù„Ø¨Ø­Ø«</td></tr>}
+                {visibleItems.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-slate-500">لا توجد أصناف تطابق البحث</td></tr>}
               </tbody>
             </table>
           </div>
@@ -230,17 +230,17 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                 onClick={onSaveDraft}
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition border border-slate-300"
               >
-                Ø­ÙØ¸ ÙƒÙ…Ø³ÙˆØ¯Ø©
+                حفظ كمسودة
               </button>
             )}
-            {session.status === 'COUNTING' && <button onClick={onCancelSession} className="mr-2 px-4 py-2 text-rose-600 rounded-xl text-xs font-bold border border-rose-200">Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©</button>}
+            {session.status === 'COUNTING' && <button onClick={onCancelSession} className="mr-2 px-4 py-2 text-rose-600 rounded-xl text-xs font-bold border border-rose-200">إلغاء الجلسة</button>}
           </div>
           <div className="flex gap-2">
             <button
               onClick={onClose}
               className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition border border-slate-200"
             >
-              Ø¥ØºÙ„Ø§Ù‚
+              إغلاق
             </button>
             {session.status === 'COUNTING' && (
               <button
@@ -248,12 +248,12 @@ export const SessionCountModal: React.FC<SessionCountModalProps> = ({
                 className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                Ø§Ø¹ØªÙ…Ø§Ø¯ ÙˆØªØ±Ø­ÙŠÙ„ ÙØ±ÙˆÙ‚Ø§Øª Ø§Ù„Ø¬Ø±Ø¯
+                اعتماد وترحيل فروقات الجرد
               </button>
             )}
             {session.status === 'REVIEW' && canApprove && <>
-              <button onClick={onReject} className="px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-xs font-bold border border-rose-200">Ø±ÙØ¶ ÙˆØ¥Ø¹Ø§Ø¯Ø© Ù„Ù„Ø¹Ø¯</button>
-              <button onClick={onApprove} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">Ø§Ø¹ØªÙ…Ø§Ø¯ ÙˆØªØ±Ø­ÙŠÙ„ Ø§Ù„ÙØ±ÙˆÙ‚Ø§Øª</button>
+              <button onClick={onReject} className="px-4 py-2 bg-rose-50 text-rose-700 rounded-xl text-xs font-bold border border-rose-200">رفض وإعادة للعد</button>
+              <button onClick={onApprove} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">اعتماد وترحيل الفروقات</button>
             </>}
           </div>
         </div>

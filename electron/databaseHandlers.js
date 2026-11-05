@@ -250,7 +250,7 @@ function registerDatabaseHandlers({
     }
   });
 
-  ipcMain.on('db:save-sync', (event, bytes) => {
+  if (typeof ipcMain.on === 'function') ipcMain.on('db:save-sync', (event, bytes) => {
     try {
       validateIpcSender(event);
       ensureDirs();

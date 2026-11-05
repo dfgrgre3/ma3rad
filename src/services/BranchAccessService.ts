@@ -217,6 +217,28 @@ export class BranchAccessService {
     return currentBranchId;
   }
 
+  public requireWarehouseAuthorization(warehouseId: string, user = this.actor()): void {
+    const warehouse = this.db.query<{ branchId: string | null }>(
+      'SELECT branch_id AS branchId FROM warehouses WHERE id = ? AND is_active = 1',
+      [warehouseId]
+    )[0];
+    if (!warehouse) throw new Error('المخزن المحدد غير موجود أو غير نشط.');
+
+    const branchIds = warehouse.branchId
+      ? [warehouse.branchId]
+      : this.db.query<{ branchId: string }>(
+        `SELECT branch_id AS branchId FROM branch_warehouses
+         WHERE warehouse_id = ? ORDER BY is_primary DESC, branch_id ASC`,
+        [warehouseId]
+      ).map(row => row.branchId);
+    if (!branchIds.length) throw new Error('المخزن غير مرتبط بفرع.');
+
+    const accessibleBranchIds = this.getAccessibleBranchIds(user);
+    if (accessibleBranchIds !== null && !branchIds.some((branchId) => accessibleBranchIds.includes(branchId))) {
+      throw new Error('ليس لديك صلاحية الوصول إلى هذا المخزن.');
+    }
+  }
+
   /**
    * Branch scope for tables that reach a branch through a warehouse join.
    * `warehouseAlias` must point at the joined `warehouses` row, and

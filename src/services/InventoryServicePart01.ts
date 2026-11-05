@@ -67,7 +67,8 @@ public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock
       LEFT JOIN (
         SELECT product_id, warehouse_id,
                SUM(CASE WHEN quantity_m2 > 0 THEN quantity_m2 ELSE 0 END) AS quantity_in,
-               SUM(CASE WHEN quantity_m2 < 0 THEN ABS(quantity_m2) ELSE 0 END) AS quantity_out
+               SUM(CASE WHEN quantity_m2 < 0 AND COALESCE(reference_type, '') != 'TRANSFER_LOSS'
+                        THEN ABS(quantity_m2) ELSE 0 END) AS quantity_out
         FROM inventory_transactions
         GROUP BY product_id, warehouse_id
       ) movement_totals ON movement_totals.product_id = ws.product_id

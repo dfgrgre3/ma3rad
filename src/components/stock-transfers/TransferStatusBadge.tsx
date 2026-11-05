@@ -14,6 +14,8 @@ export const TransferStatusBadge: React.FC<{ status: string }> = ({ status }) =>
       return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">مستلم بالكامل</span>;
     case 'RECEIVED_PARTIAL':
       return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-orange-100 text-orange-800 border border-orange-300">استلام جزئي (يوجد فقد/عجز)</span>;
+    case 'COMPLETED':
+      return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300">مكتمل مع فقد موثق</span>;
     case 'REJECTED':
       return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-black bg-rose-100 text-rose-800 border border-rose-300">مرفوض / ملغي</span>;
     default:

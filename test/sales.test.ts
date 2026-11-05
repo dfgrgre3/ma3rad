@@ -171,6 +171,62 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.throws(() => svc.voidInvoice(invoice3.id, 'خطأ في الإدخال'), /سندات قبض/);
   assert.equal(svc.getInvoiceById(invoice3.id)!.invoiceStatus, 'COMPLETED');
   assert.equal(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0].q, stockBeforeRejectedVoid);
+});
+
+test('sales returns allocate line and invoice discounts before applying invoice tax', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const svc = new SalesService();
+  const customer = new CustomerService().createCustomer({
+    name: 'عميل مرتجع بخصم اختبار', phone: '0122222233', customerType: 'RETAIL', creditLimit: 0,
+  });
+  seedProduct(db, 'prod_sale_return_discount');
+
+  const invoice = svc.createSale({
+    customerId: customer.id,
+    warehouseId: 'wh_main',
+    items: [
+      {
+        productId: 'prod_sale_return_discount', soldBy: 'M2', quantityM2: 10,
+        boxesCount: 0, piecesCount: 0, unitPrice: 100, discountAmount: 100,
+      },
+      {
+        productId: 'prod_sale_return_discount', soldBy: 'M2', quantityM2: 10,
+        boxesCount: 0, piecesCount: 0, unitPrice: 100,
+      },
+    ],
+    discountAmount: 100,
+    taxAmount: 270,
+    paidAmount: 2070,
+    paymentType: 'CASH',
+  });
+
+  const salesReturn = svc.returnSale(invoice.id, [{
+    productId: 'prod_sale_return_discount',
+    quantityM2: 10,
+    boxesCount: 0,
+    unitPrice: 100,
+    unitCost: 100,
+    reason: 'إرجاع بخصم',
+  }]);
+
+  assert.equal(invoice.subtotal - invoice.discountAmount, 1800);
+  assert.equal(salesReturn.totalAmount, 900);
+  const returnLine = q(
+    'SELECT total_refund AS refund FROM sales_return_items WHERE return_id = ?',
+    [salesReturn.id]
+  )[0];
+  assert.equal(returnLine.refund, 900);
+  const taxDebit = q(`
+    SELECT l.debit
+    FROM journal_entry_lines l
+    JOIN journal_entries e ON e.id = l.entry_id
+    JOIN chart_of_accounts a ON a.id = l.account_id
+    WHERE e.reference_type = 'SALES_RETURN' AND e.reference_id = ? AND a.code = '2102'
+  `, [salesReturn.id])[0]?.debit;
+  assert.equal(taxDebit, 135);
 
   const invoice4 = svc.createSale({
     customerId: customer.id, warehouseId: 'wh_main',

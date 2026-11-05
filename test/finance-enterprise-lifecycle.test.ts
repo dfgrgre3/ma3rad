@@ -25,6 +25,9 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
 
   const financeService = new FinanceEnterpriseService();
   const extrasService = new FinanceExtrasService();
+  const taxSummary = extrasService.getTaxSummary('2025-01-01', '2025-12-31');
+  assert.ok(Number.isFinite(taxSummary.netTax));
+  assert.ok(Array.isArray(extrasService.getTaxByMonth('2025-01-01', '2025-12-31')));
 
   // ──────────────────────────────────────────────────────────
   // 1. Chart of Accounts Integrity: Triggers prevent deleting used accounts

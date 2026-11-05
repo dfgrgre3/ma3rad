@@ -18,6 +18,7 @@ public dispatchTransfer(transferId: string): void {
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');
+    this.requireTransferWarehouseAuthorization(transferId, actor);
     if (!['APPROVED', 'PREPARING'].includes(transfer.status)) {
       throw new Error('لا يمكن إرسال تحويل غير معتمد أو غير قيد التجهيز.');
     }

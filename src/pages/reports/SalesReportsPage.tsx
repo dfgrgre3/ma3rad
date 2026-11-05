@@ -11,6 +11,7 @@ import { exportToExcel } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
 import { SalesFinancialReconciliation } from '../../components/reports/SalesFinancialReconciliation';
 import { BranchAccessService } from '../../services/BranchAccessService';
+import { round2 } from '../../services/financials';
 
 const db = DatabaseManager.getInstance();
 const branchAccess = new BranchAccessService();
@@ -67,7 +68,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         UNION ALL
         SELECT sr.date, NULL AS invoiceId, sr.id AS returnId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2)
             ELSE 0 END) AS revenue
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -104,7 +105,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         SELECT g.id AS groupId, COALESCE(g.name, '${emptyLabel}') AS label, NULL AS invoiceId,
           -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
             THEN ROUND(
-              sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2
+              sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2
             ) * sri.total_refund / sr.total_amount
             ELSE 0
           END AS revenue,
@@ -125,7 +126,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost);
       const profit = Number(r.profit);
-      return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
+      return { label: r.label, revenue: round2(revenue), cost: round2(cost), profit: round2(profit), count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
     });
   }
 
@@ -143,7 +144,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         SELECT p.id AS groupId, p.name AS label, NULL AS invoiceId,
           -sri.total_refund + CASE WHEN sr.total_amount > 0 AND si.total_amount > 0
             THEN ROUND(
-              sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2
+              sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2
             ) * sri.total_refund / sr.total_amount
             ELSE 0
           END AS revenue,
@@ -164,7 +165,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
     return rows.map(r => {
       const revenue = Number(r.revenue), cost = Number(r.cost);
       const profit = Number(r.profit);
-      return { label: r.label, revenue, cost, profit, count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
+      return { label: r.label, revenue: round2(revenue), cost: round2(cost), profit: round2(profit), count: Number(r.count), margin: revenue > 0 ? Math.round((profit / revenue) * 100) : 0 };
     });
   }
 
@@ -179,14 +180,14 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         UNION ALL
         SELECT cu.id AS groupId, cu.name AS label, NULL AS invoiceId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2)
             ELSE 0 END) AS revenue,
           -COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
             FROM sales_return_items sri WHERE sri.return_id = sr.id), 0) AS cost,
           COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
             FROM sales_return_items sri WHERE sri.return_id = sr.id), 0)
             - (sr.total_amount - CASE WHEN si.total_amount > 0
-              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2)
               ELSE 0 END) AS profit
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -217,7 +218,7 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         UNION ALL
         SELECT COALESCE(cu.city, 'غير محدد') AS label, cu.id AS customerId, NULL AS invoiceId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2)
             ELSE 0 END) AS revenue
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -255,14 +256,14 @@ export function loadReport(type: ReportType, from: string, to: string): SalesRow
         UNION ALL
         SELECT si.created_by AS groupId, COALESCE(u.full_name, 'غير معروف') AS label, NULL AS invoiceId,
           -(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2)
             ELSE 0 END) AS revenue,
           -COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
             FROM sales_return_items sri WHERE sri.return_id = sr.id), 0) AS cost,
           COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
             FROM sales_return_items sri WHERE sri.return_id = sr.id), 0)
             - (sr.total_amount - CASE WHEN si.total_amount > 0
-              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
+              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / MAX(0, si.subtotal - si.discount_amount), 2)
               ELSE 0 END) AS profit
         FROM sales_returns sr
         JOIN sales_invoices si ON si.id = sr.original_invoice_id

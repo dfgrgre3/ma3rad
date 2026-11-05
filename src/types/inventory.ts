@@ -74,6 +74,7 @@ export type TransferStatus =
   | 'IN_TRANSIT' 
   | 'RECEIVED_FULL' 
   | 'RECEIVED_PARTIAL' 
+  | 'COMPLETED'
   | 'REJECTED' 
   | 'CANCELLED';
 

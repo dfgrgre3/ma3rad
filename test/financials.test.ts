@@ -8,6 +8,8 @@ import {
   computeSaleTotals,
   computeWeightedAverageCost,
   computeReturnImpact,
+  calculateReturnTax,
+  returnTaxSql,
 } from '../src/services/financials.ts';
 
 test('round2 eliminates IEEE-754 drift (brief §224)', () => {
@@ -97,4 +99,14 @@ test('computeReturnImpact: no cash refund keeps full return on balance', () => {
   const r = computeReturnImpact({ invoiceTotal: 1000, invoicePaid: 1000, returnTotal: 200, refundCash: false });
   assert.equal(r.cashRefund, 0);
   assert.equal(r.balanceDelta, 200);
+});
+
+test('return tax allocation uses the discounted taxable base and excludes shipping', () => {
+  assert.equal(calculateReturnTax(900, 135, 900), 135);
+  assert.equal(calculateReturnTax(0, 135, 900), 0);
+  assert.equal(calculateReturnTax(900, 135, 0), 0);
+  assert.match(
+    returnTaxSql('sr.total_amount', 'si.subtotal', 'si.discount_amount', 'si.tax_amount'),
+    /MAX\(0, COALESCE\(si\.subtotal, 0\) - COALESCE\(si\.discount_amount, 0\)\)/
+  );
 });

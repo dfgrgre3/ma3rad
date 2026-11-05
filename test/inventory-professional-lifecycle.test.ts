@@ -221,9 +221,23 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   );
   inventoryService.receiveTransfer(transferId, [{ itemId, receivedM2: 17, lostM2: 2, notes: 'استكمال استلام التحويل' }]);
   xfer = queryOne<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId]);
-  assert.equal(xfer?.status, 'RECEIVED_PARTIAL');
+  assert.equal(xfer?.status, 'COMPLETED');
   assert.equal(xfer?.totalReceivedM2, 27);
   assert.equal(xfer?.totalLostM2, 3);
+  assert.throws(
+    () => inventoryService.receiveTransfer(transferId, [{ itemId, receivedM2: 1 }]),
+    /لا يمكن استلام تحويل/
+  );
+  assert.throws(() => inventoryService.rejectTransfer(transferId, 'مغلق'), /لا يمكن رفض تحويل/);
+
+  const sourceQuantityOut = inventoryService.getWarehouseStock(whSource)
+    .find((stock) => stock.productId === prodId)?.quantityOut;
+  assert.equal(sourceQuantityOut, 30, 'Transfer loss must not be added again to dispatched quantity out');
+  assert.equal(queryOne<{ total: number }>(
+    `SELECT SUM(ABS(quantity_m2)) AS total FROM inventory_transactions
+     WHERE reference_type = 'TRANSFER_LOSS' AND reference_id = ? AND quantity_m2 < 0`,
+    [transferId]
+  )?.total, 3, 'Transfer loss remains documented in the movement ledger');
 
   // Verify destination warehouse received 27 m2
   const destAfterReceive = queryOne<{ quantityM2: number }>(

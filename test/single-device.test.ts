@@ -22,6 +22,8 @@ function listSourceFiles(dir: string): string[] {
 
 test('single-device: the app enforces one running instance per workstation', () => {
   assert.match(mainSource, /requestSingleInstanceLock\(\)/);
+  assert.match(mainSource, /isE2EIsolated \? true : app\.requestSingleInstanceLock\(\)/);
+  assert.match(mainSource, /path\.basename\(dataDir\)\.startsWith\('ceramisys-e2e-'\)/);
   assert.match(mainSource, /second-instance/);
   // A second launch must focus the existing window instead of opening a second database.
   assert.match(mainSource, /win\.focus\(\)/);

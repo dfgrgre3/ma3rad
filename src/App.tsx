@@ -7,7 +7,11 @@ import { CentralConfigApplier } from './services/CentralConfigApplier';
 import { CentralEstablishmentService } from './services/CentralEstablishmentService';
 import { SettingsService } from './services/SettingsService';
 import { AppConfigService } from './services/AppConfigService';
-import { shouldShowFirstRunSetup, BYPASS_FIRST_RUN_SETUP } from './config/setupLifecycle';
+import {
+  shouldShowFirstRunSetup,
+  BYPASS_FIRST_RUN_ACTIVATION,
+  BYPASS_FIRST_RUN_SETUP,
+} from './config/setupLifecycle';
 import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
 import { AppRouter } from './router';
 import { LoginPage } from './pages/auth/LoginPage';
@@ -29,13 +33,13 @@ export const App: React.FC = () => {
   } = useAppStartup();
 
   const [showSetup, setShowSetup] = useState(false);
-  // وضع التشغيل المحلي: تخطي «التهيئة لمرة واحدة» (تفعيل سيراميسيس) بالكامل.
+  // وضع التطوير يتجاوز صفحة التفعيل دون تجاوز بقية خطوات الإعداد.
   const [activationComplete, setActivationComplete] = useState(
-    () => BYPASS_FIRST_RUN_SETUP || CentralLicenseService.hasCompletedFirstRunActivation()
+    () => BYPASS_FIRST_RUN_ACTIVATION || CentralLicenseService.hasCompletedFirstRunActivation()
   );
   const [licenseBlocked, setLicenseBlocked] = useState(false);
-  // في وضع التشغيل المحلي نوقف كل تفاعل مع المنصة المركزية (ترخيص/تكوين).
-  const centralActive = activationComplete && !BYPASS_FIRST_RUN_SETUP;
+  // لا نتحقق من الترخيص المركزي أثناء تجاوز التفعيل في التطوير.
+  const centralActive = activationComplete && !BYPASS_FIRST_RUN_ACTIVATION;
   const [licenseRetrying, setLicenseRetrying] = useState(false);
 
   const checkLicense = useCallback(async () => {

@@ -18,7 +18,8 @@ public rejectTransfer(transferId: string, reason: string): void {
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('التحويل غير موجود.');
-    if (['RECEIVED_FULL', 'RECEIVED_PARTIAL', 'REJECTED'].includes(transfer.status)) {
+    this.requireTransferWarehouseAuthorization(transferId, actor);
+    if (['RECEIVED_FULL', 'RECEIVED_PARTIAL', 'COMPLETED', 'REJECTED'].includes(transfer.status)) {
       throw new Error('لا يمكن رفض تحويل مستلم أو مرفوض بالفعل.');
     }
 

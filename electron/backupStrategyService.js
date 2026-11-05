@@ -5,6 +5,8 @@
 
 const path = require('path');
 const fs = require('fs/promises');
+const fsSync = require('node:fs');
+const crypto = require('node:crypto');
 const { execFile } = require('child_process');
 
 /**
@@ -72,9 +74,9 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
     }
 
     // تنظيم الوقت
-    analyzed.daily.sort((a, b) => b.readTimestamp - a.readTimestamp);
-    analyzed.weekly.sort((a, b) => b.readTimestamp - a.readTimestamp);
-    analyzed.monthly.sort((a, b) => b.readTimestamp - a.readTimestamp);
+    for (const type of ['local', 'daily', 'weekly', 'monthly', 'recovery']) {
+      analyzed[type].sort((a, b) => b.readTimestamp - a.readTimestamp);
+    }
 
     // تطبيق الاستراتيجيات:
     // daily: keep 7 days
@@ -147,14 +149,18 @@ async function apply321Strategy({
       if (typeof backupPath !== 'string' || !backupPath) {
         throw new Error('مسار النسخة المحلية المطلوبة للنسخ الخارجي غير محدد.');
       }
-      const sourceStat = await fsImpl.stat(backupPath);
+      await fsImpl.stat(backupPath);
       const destinationDirectory = path.join(usbVolume, 'CeramiSys', 'Backups');
       await fsImpl.mkdir(destinationDirectory, { recursive: true });
       const destination = path.join(destinationDirectory, path.basename(backupPath));
       await fsImpl.copyFile(backupPath, destination, fsImpl.constants.COPYFILE_EXCL);
-      const destinationStat = await fsImpl.stat(destination);
-      if (destinationStat.size !== sourceStat.size) {
-        throw new Error('حجم النسخة على قرص USB لا يطابق النسخة المحلية.');
+      const [sourceHash, destinationHash] = await Promise.all([
+        sha256File(backupPath),
+        sha256File(destination),
+      ]);
+      if (destinationHash !== sourceHash) {
+        await fsImpl.unlink(destination);
+        throw new Error('محتوى النسخة على قرص USB لا يطابق النسخة المحلية (SHA-256).');
       }
       strategy.actions.push({
         type: 'external',
@@ -187,9 +193,25 @@ async function apply321Strategy({
 /**
  * فحص وجود USB متوفر
  */
-async function checkExternalDrive({ platform = process.platform, execFileImpl = execFile } = {}) {
+async function checkExternalDrive({
+  platform = process.platform,
+  execFileImpl = execFile,
+  fsImpl = fsSync,
+} = {}) {
   if (platform === 'darwin') {
-    return runExternalDriveCommand(execFileImpl, 'diskutil', ['info', '-plist', '/Volumes'], /<key>MountPoint<\/key>\s*<string>([^<]+)<\/string>/);
+    for (const volume of fsImpl.readdirSync('/Volumes')) {
+      const mountPath = path.posix.join('/Volumes', volume);
+      const info = await runExternalDriveCommand(
+        execFileImpl,
+        'diskutil',
+        ['info', '-plist', mountPath],
+        null
+      );
+      if (info && /<key>DeviceLocation<\/key>\s*<string>External<\/string>/.test(info)) {
+        return info.match(/<key>MountPoint<\/key>\s*<string>([^<]+)<\/string>/)?.[1]?.trim() || null;
+      }
+    }
+    return null;
   }
   if (platform === 'linux') {
     return runExternalDriveCommand(execFileImpl, 'lsblk', ['-nrpo', 'MOUNTPOINT,RM'], /^(.+)\s+1$/m);
@@ -222,10 +244,18 @@ function runExternalDriveCommand(execFileImpl, command, args, matcher) {
   return new Promise((resolve, reject) => {
     execFileImpl(command, args, (error, stdout) => {
       if (error) return reject(error);
-      const match = String(stdout).match(matcher);
-      resolve(match?.[1]?.trim() || null);
+      const output = String(stdout);
+      resolve(matcher ? (output.match(matcher)?.[1]?.trim() || null) : output);
     });
   });
+}
+
+async function sha256File(filePath) {
+  const hash = crypto.createHash('sha256');
+  for await (const chunk of fsSync.createReadStream(filePath)) {
+    hash.update(chunk);
+  }
+  return hash.digest('hex');
 }
 
 /**
@@ -250,6 +280,16 @@ async function cleanupOldBackups({ BACKUP_DIR }, retention) {
       cleanupPairs.push(file.path);
     }
   }
+  const localRecoveryPolicy = { maxCount: 50, retentionDays: 90 };
+  for (const type of ['local', 'recovery']) {
+    const policy = { ...localRecoveryPolicy, ...(retention[type] || {}) };
+    const cutoff = Date.now() - policy.retentionDays * 24 * 60 * 60 * 1000;
+    for (const [index, file] of analyzed[type].entries()) {
+      if (index >= policy.maxCount || file.readTimestamp.getTime() < cutoff) {
+        cleanupPairs.push(file.path);
+      }
+    }
+  }
 
   // حذف الملفات
   for (const filePath of cleanupPairs) {
@@ -270,13 +310,13 @@ async function getBackupStrategyStats({ BACKUP_DIR }) {
   const analyzed = await analyzeBackupStrategy({ BACKUP_DIR });
 
   // حساب الحجم الكلي
-  const totalSize = analyzed.daily.reduce((sum, f) => sum + f.size, 0) +
-                    analyzed.weekly.reduce((sum, f) => sum + f.size, 0) +
-                    analyzed.monthly.reduce((sum, f) => sum + f.size, 0);
+  const backupTypes = ['local', 'daily', 'weekly', 'monthly', 'recovery'];
+  const allBackups = backupTypes.flatMap((type) => analyzed[type]);
+  const totalSize = allBackups.reduce((sum, file) => sum + file.size, 0);
 
   return {
     strategies: analyzed,
-    totalBackups: analyzed.daily.length + analyzed.weekly.length + analyzed.monthly.length,
+    totalBackups: allBackups.length,
     totalSizeBytes: totalSize,
     recommendations: generateRecommendations(analyzed)
   };

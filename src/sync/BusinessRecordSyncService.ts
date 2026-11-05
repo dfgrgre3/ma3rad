@@ -169,12 +169,19 @@ export class BusinessRecordSyncService {
   ): string | null {
     const identity = SyncPolicyService.currentIdentity();
     if (!identity || !this.policies.canSend(entityType)) return null;
-    if (operationType !== 'CREATE' && operationType !== 'UPDATE' && operationType !== 'UPSERT') {
-      throw new Error('Business record synchronization only supports immutable upsert snapshots');
+    if (operationType !== 'CREATE' && operationType !== 'UPDATE' &&
+        operationType !== 'UPSERT' && operationType !== 'DELETE') {
+      throw new Error('Business record synchronization operation is invalid');
     }
 
-    const record = this.readSnapshot(transaction, entityType, entityId);
-    if (!record) throw new Error(`Cannot synchronize missing ${entityType}: ${entityId}`);
+    let payload: { deleted: true } | { record: Record<string, unknown> };
+    if (operationType === 'DELETE') {
+      payload = { deleted: true };
+    } else {
+      const record = this.readSnapshot(transaction, entityType, entityId);
+      if (!record) throw new Error(`Cannot synchronize missing ${entityType}: ${entityId}`);
+      payload = { record };
+    }
     const version = transaction.query<{ entityVersion: number }>(
       `SELECT entity_version AS entityVersion FROM sync_entity_versions
        WHERE tenant_id=? AND entity_type=? AND entity_id=?`,
@@ -201,7 +208,7 @@ export class BusinessRecordSyncService {
       entityVersion,
       schemaVersion: 1,
       dataScope: this.policies.get(entityType).dataScope,
-      payload: { record },
+      payload,
     });
   }
 
@@ -241,9 +248,22 @@ export class BusinessRecordSyncService {
       throw new Error('Incoming business document is not authorized by the active sync policy');
     }
     if (!this.policies.canReceive(event.entityType)) return 'DEFERRED';
-    if (event.dataScope !== this.policies.get(event.entityType).dataScope ||
-        (event.operationType !== 'CREATE' && event.operationType !== 'UPDATE' && event.operationType !== 'UPSERT')) {
+    if (event.dataScope !== this.policies.get(event.entityType).dataScope) {
       throw new Error('Incoming business document is not authorized by the active sync policy');
+    }
+    if (event.operationType === 'DELETE') {
+      const payload = event.payload;
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+          Object.keys(payload).length !== 1 || (payload as Record<string, unknown>).deleted !== true) {
+        throw new Error('Incoming business document deletion marker is invalid');
+      }
+      this.db.executeTransaction((transaction) => {
+        this.policies.recordRemote(transaction, event);
+      });
+      return;
+    }
+    if (event.operationType !== 'CREATE' && event.operationType !== 'UPDATE' && event.operationType !== 'UPSERT') {
+      throw new Error('Incoming business document operation is invalid');
     }
     const envelope = event.payload as { record?: unknown };
     if (!envelope || typeof envelope !== 'object' || !envelope.record ||

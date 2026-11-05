@@ -496,6 +496,7 @@ export class CashierService {
         }
       }
       db.run('DELETE FROM expenses WHERE id = ?', [id]);
+      new BusinessRecordSyncService(db).capture(db, 'expense', id, 'DELETE');
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)
          VALUES (?, ?, ?, 'حذف مصروف', 'CASHIER', ?, ?)`,

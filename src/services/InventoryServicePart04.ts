@@ -11,6 +11,21 @@ import { InventoryServicePart03 } from './InventoryServicePart03';
 
 export class InventoryServicePart04 extends InventoryServicePart03 {
 public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string): any[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'inventory.view');
+    if (warehouseId) this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
+    const fromScope = this.branchAccess.sqlScope(
+      'w_out.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w_out.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)',
+      actor,
+      true
+    );
+    const toScope = this.branchAccess.sqlScope(
+      'w_in.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w_in.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)',
+      actor,
+      true
+    );
     let sql = `
       SELECT 
         out_tx.transaction_number as transferNumber,
@@ -37,8 +52,9 @@ public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string
       JOIN warehouses w_in ON in_tx.warehouse_id = w_in.id
       LEFT JOIN users u ON out_tx.performed_by = u.id
       WHERE out_tx.type = 'TRANSFER_OUT' AND in_tx.type = 'TRANSFER_IN'
+        AND ${fromScope.clause} AND ${toScope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...fromScope.params, ...toScope.params];
 
     if (dateFrom) {
       sql += ' AND out_tx.created_at >= ?';
@@ -59,6 +75,14 @@ public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string
   }
 
 public getTransferSummaryByWarehouse(): { warehouseId: string; warehouseName: string; unitLabel: string; totalIn: number; totalOut: number }[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'inventory.view');
+    const scope = this.branchAccess.sqlScope(
+      'w.branch_id',
+      '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)',
+      actor,
+      true
+    );
     const rows = this.db.query<any>(`
       SELECT 
         w.id as warehouseId,
@@ -69,10 +93,10 @@ public getTransferSummaryByWarehouse(): { warehouseId: string; warehouseName: st
       FROM warehouses w
       LEFT JOIN inventory_transactions it ON w.id = it.warehouse_id AND it.type IN ('TRANSFER_IN', 'TRANSFER_OUT')
       LEFT JOIN products p ON p.id = it.product_id
-      WHERE w.is_active = 1
+      WHERE w.is_active = 1 AND ${scope.clause}
       GROUP BY w.id, w.name, p.product_type, p.base_unit, p.custom_unit
       ORDER BY w.name
-    `);
+    `, scope.params);
     return rows.map((row) => ({
       ...row,
       unitLabel: row.productType ? getProductUnitLabel(row) : '',

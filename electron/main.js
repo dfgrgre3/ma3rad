@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage, session } = require('electron');
 const path = require('path');
+const os = require('node:os');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const { randomBytes } = require('node:crypto');
@@ -70,6 +71,26 @@ const APP_DATA_DIR = configuredDataDir && path.isAbsolute(configuredDataDir)
   ? path.resolve(process.env.CERAMISYS_USER_DATA_DIR)
   : path.join(app.getPath('appData'), 'CeramiSysERP');
 app.setPath('userData', APP_DATA_DIR);
+function isIsolatedE2ERun() {
+  if (process.env.CERAMISYS_E2E !== '1' || !configuredDataDir || !path.isAbsolute(configuredDataDir)) {
+    return false;
+  }
+  try {
+    if (!fsSync.existsSync(configuredDataDir)) return false;
+    const tempRoot = fsSync.realpathSync(os.tmpdir());
+    const dataDir = fsSync.realpathSync(configuredDataDir);
+    const relative = path.relative(tempRoot, dataDir);
+    return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`)
+      && !path.isAbsolute(relative) && path.basename(dataDir).startsWith('ceramisys-e2e-');
+  } catch (error) {
+    console.warn('Could not verify isolated E2E data directory; enforcing the single-instance lock.', error);
+    return false;
+  }
+}
+const isE2EIsolated = isIsolatedE2ERun();
+if (process.env.CERAMISYS_E2E && !isE2EIsolated) {
+  console.warn('CERAMISYS_E2E was ignored because CERAMISYS_USER_DATA_DIR is not an isolated temporary directory.');
+}
 const logger = createFileLogger({
   fs: fsSync,
   path,
@@ -144,7 +165,7 @@ let updateController = null;
 // E2E runs use isolated temporary data directories and may launch multiple
 // Electron instances sequentially in one worker. Keep the production single-
 // instance guarantee, but do not let a stale test process block the next case.
-const gotLock = process.env.CERAMISYS_E2E ? true : app.requestSingleInstanceLock();
+const gotLock = isE2EIsolated ? true : app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
@@ -254,7 +275,7 @@ function createWindow() {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (!app.isPackaged && devServerUrl) {
     win.loadURL(devServerUrl);
-    if (!process.env.CERAMISYS_E2E) win.webContents.openDevTools();
+    if (!isE2EIsolated) win.webContents.openDevTools();
   } else {
     win.loadFile(APP_HTML_PATH);
   }

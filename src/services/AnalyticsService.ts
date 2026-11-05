@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
-import { round2 } from './financials';
+import { calculateReturnTax, returnTaxSql, round2 } from './financials';
 import { localDateString } from '../utils/date';
 
 type ProductRevenue = { productId: string; productName: string; quantity: number; revenue: number };
@@ -65,7 +65,8 @@ export class AnalyticsService {
     this.aggregateInvoices(invoices, saleItemsByInvoice, totals);
 
     const returns = this.db.query<any>(`
-      SELECT sr.*, si.total_amount AS invoiceTotal, si.tax_amount AS invoiceTax,
+      SELECT sr.*, si.subtotal AS invoiceSubtotal, si.discount_amount AS invoiceDiscount,
+        si.tax_amount AS invoiceTax,
         c.name AS customerName
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
@@ -151,10 +152,12 @@ export class AnalyticsService {
   private aggregateReturns(returns: any[], itemsByReturn: Map<string, any[]>, totals: SalesAnalyticsTotals): void {
     for (const salesReturn of returns) {
       const returnedAmount = Number(salesReturn.totalAmount || 0);
-      const invoiceTotal = Number(salesReturn.invoiceTotal || 0);
-      const taxReduction = invoiceTotal > 0
-        ? round2(returnedAmount * Number(salesReturn.invoiceTax || 0) / invoiceTotal)
-        : 0;
+      const taxableBase = Math.max(0, Number(salesReturn.invoiceSubtotal || 0) - Number(salesReturn.invoiceDiscount || 0));
+      const taxReduction = calculateReturnTax(
+        returnedAmount,
+        Number(salesReturn.invoiceTax || 0),
+        taxableBase
+      );
       const netReturnedRevenue = returnedAmount - taxReduction;
 
       totals.totalSales -= netReturnedRevenue;
@@ -249,14 +252,13 @@ export class AnalyticsService {
       '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)',
       actor
     );
+    const returnTax = returnTaxSql('sr.total_amount', 'si.subtotal', 'si.discount_amount', 'si.tax_amount');
 
     const totalSalesToday = this.db.query<any>(`
       SELECT
         COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
           WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
-        - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
-            ELSE 0 END) FROM sales_returns sr
+        - COALESCE((SELECT SUM(sr.total_amount - ${returnTax}) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
     `, [today, ...scope.params, today, ...scope.params])[0]?.total || 0;
@@ -265,9 +267,7 @@ export class AnalyticsService {
       SELECT
         COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
           WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
-        - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2)
-            ELSE 0 END) FROM sales_returns sr
+        - COALESCE((SELECT SUM(sr.total_amount - ${returnTax}) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
     `, [monthStartStr, today, ...scope.params, monthStartStr, today, ...scope.params])[0]?.total || 0;

@@ -5,6 +5,7 @@ import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 import { BranchAccessService } from './BranchAccessService';
+import { returnTaxSql } from './financials';
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
@@ -302,26 +303,69 @@ export class FinanceExtrasService {
   }
   // ─── VAT / tax ──────────────────────────────────────────────────────────────
 
+  private taxScope(alias: string) {
+    const branch = this.branchAccess.sqlScope(
+      `${alias}.branch_id`,
+      `(SELECT w.branch_id FROM warehouses w WHERE w.id = ${alias}.warehouse_id)`
+    );
+    const company = this.branchAccess.companyScope(`${alias}.company_id`);
+    return {
+      clause: `(${branch.clause}) AND (${company.clause})`,
+      params: [...branch.params, ...company.params],
+    };
+  }
+
   getTaxSummary(dateFrom: string, dateTo: string) {
     this.requireView();
+    const salesScope = this.taxScope('si');
+    const purchaseScope = this.taxScope('pi');
+    const returnSalesScope = this.taxScope('original');
+    const returnPurchaseScope = this.taxScope('original');
+    const salesReturnTax = returnTaxSql(
+      'sr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
+    );
+    const purchaseReturnTax = returnTaxSql(
+      'pr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
+    );
     const sales = this.db.query<any>(
       `SELECT COALESCE(SUM(tax_amount), 0) AS tax, COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
-       FROM sales_invoices WHERE invoice_status != 'VOID' AND date >= ? AND date <= ?`,
-      [dateFrom, dateTo]
+       FROM sales_invoices si
+       WHERE si.invoice_status != 'VOID' AND si.date >= ? AND si.date <= ? AND ${salesScope.clause}`,
+      [dateFrom, dateTo, ...salesScope.params]
     )[0] || {};
     const purchases = this.db.query<any>(
       `SELECT COALESCE(SUM(tax_amount), 0) AS tax, COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
-       FROM purchase_invoices WHERE date >= ? AND date <= ?`,
-      [dateFrom, dateTo]
+       FROM purchase_invoices pi
+       WHERE pi.date >= ? AND pi.date <= ? AND ${purchaseScope.clause}`,
+      [dateFrom, dateTo, ...purchaseScope.params]
     )[0] || {};
-    const outputTax = round2(sales.tax || 0);
-    const inputTax = round2(purchases.tax || 0);
+    const salesReturns = this.db.query<any>(
+      `SELECT COALESCE(SUM(sr.total_amount), 0) AS net,
+              COALESCE(SUM(${salesReturnTax}), 0) AS tax
+       FROM sales_returns sr
+       JOIN sales_invoices original ON original.id = sr.original_invoice_id
+       WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
+         AND ${returnSalesScope.clause}`,
+      [dateFrom, dateTo, ...returnSalesScope.params]
+    )[0] || {};
+    const purchaseReturns = this.db.query<any>(
+      `SELECT COALESCE(SUM(pr.total_amount), 0) AS total,
+              COALESCE(SUM(${purchaseReturnTax}), 0) AS tax
+       FROM purchase_returns pr
+       JOIN purchase_invoices original ON original.id = pr.original_purchase_id
+       WHERE pr.date >= ? AND pr.date <= ? AND ${returnPurchaseScope.clause}`,
+      [dateFrom, dateTo, ...returnPurchaseScope.params]
+    )[0] || {};
+    const outputTax = round2(Number(sales.tax || 0) - Number(salesReturns.tax || 0));
+    const inputTax = round2(Number(purchases.tax || 0) - Number(purchaseReturns.tax || 0));
     return {
       outputTax,
       inputTax,
       netTax: round2(outputTax - inputTax),
-      salesTotal: round2(sales.total || 0),
-      purchasesTotal: round2(purchases.total || 0),
+      salesTotal: round2(Number(sales.total || 0) - Number(salesReturns.net || 0) - Number(salesReturns.tax || 0)),
+      purchasesTotal: round2(
+        Number(purchases.total || 0) - Number(purchaseReturns.total || 0) - Number(purchaseReturns.tax || 0)
+      ),
       salesCount: sales.count || 0,
       purchasesCount: purchases.count || 0,
     };
@@ -329,15 +373,46 @@ export class FinanceExtrasService {
 
   getTaxByMonth(dateFrom: string, dateTo: string) {
     this.requireView();
+    const salesScope = this.taxScope('si');
+    const purchaseScope = this.taxScope('pi');
+    const returnSalesScope = this.taxScope('original');
+    const returnPurchaseScope = this.taxScope('original');
+    const salesReturnTax = returnTaxSql(
+      'sr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
+    );
+    const purchaseReturnTax = returnTaxSql(
+      'pr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
+    );
     return this.db.query<{ month: string; outputTax: number; inputTax: number }>(
       `SELECT month, SUM(output_tax) AS output_tax, SUM(input_tax) AS input_tax FROM (
-         SELECT substr(date, 1, 7) AS month, tax_amount AS output_tax, 0 AS input_tax
-         FROM sales_invoices WHERE invoice_status != 'VOID' AND date >= ? AND date <= ?
+         SELECT substr(si.date, 1, 7) AS month, si.tax_amount AS output_tax, 0 AS input_tax
+         FROM sales_invoices si
+         WHERE si.invoice_status != 'VOID' AND si.date >= ? AND si.date <= ? AND ${salesScope.clause}
          UNION ALL
-         SELECT substr(date, 1, 7) AS month, 0 AS output_tax, tax_amount AS input_tax
-         FROM purchase_invoices WHERE date >= ? AND date <= ?
+         SELECT substr(sr.date, 1, 7) AS month,
+                -(${salesReturnTax}) AS output_tax,
+                0 AS input_tax
+         FROM sales_returns sr
+         JOIN sales_invoices original ON original.id = sr.original_invoice_id
+         WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'
+           AND ${returnSalesScope.clause}
+         UNION ALL
+         SELECT substr(pi.date, 1, 7) AS month, 0 AS output_tax, pi.tax_amount AS input_tax
+         FROM purchase_invoices pi
+         WHERE pi.date >= ? AND pi.date <= ? AND ${purchaseScope.clause}
+         UNION ALL
+         SELECT substr(pr.date, 1, 7) AS month, 0 AS output_tax,
+                -(${purchaseReturnTax}) AS input_tax
+         FROM purchase_returns pr
+         JOIN purchase_invoices original ON original.id = pr.original_purchase_id
+         WHERE pr.date >= ? AND pr.date <= ? AND ${returnPurchaseScope.clause}
        ) GROUP BY month ORDER BY month DESC`,
-      [dateFrom, dateTo, dateFrom, dateTo]
+      [
+        dateFrom, dateTo, ...salesScope.params,
+        dateFrom, dateTo, ...returnSalesScope.params,
+        dateFrom, dateTo, ...purchaseScope.params,
+        dateFrom, dateTo, ...returnPurchaseScope.params,
+      ]
     );
   }
 

@@ -2323,6 +2323,72 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '116_sync_expense_business_records',
+    description: 'Allow expense snapshots and deletion tombstones in business record synchronization.',
+    up: (db: Database) => {
+      db.run(
+        `INSERT OR IGNORE INTO sync_entity_policies
+          (entity_type, enabled, outbound_enabled, inbound_enabled, data_scope, managed_by_head_office)
+         VALUES ('expense', 0, 0, 0, 'TENANT', 0)`
+      );
+
+      const supportedTypes = [
+        'sales_invoice', 'sales_return', 'purchase_invoice', 'purchase_return',
+        'customer_payment', 'supplier_payment', 'stock_transfer', 'expense',
+      ];
+      const allowedTypes = supportedTypes.map((entityType) => `'${entityType}'`).join(',');
+      const rebuildRemoteTable = (
+        table: 'sync_remote_records' | 'sync_remote_entities',
+        tableDefinition: string,
+        columns: string,
+        index: string
+      ) => {
+        const sql = db.exec(
+          `SELECT sql FROM sqlite_master WHERE type='table' AND name='${table}'`
+        )[0]?.values?.[0]?.[0] as string | undefined;
+        if (!sql || supportedTypes.every((entityType) => sql.includes(`'${entityType}'`))) return;
+        db.exec(`
+          CREATE TABLE ${table}__tmp (${tableDefinition.replace('{allowedTypes}', allowedTypes)});
+          INSERT INTO ${table}__tmp (${columns})
+          SELECT ${columns} FROM ${table};
+          DROP TABLE ${table};
+          ALTER TABLE ${table}__tmp RENAME TO ${table};
+          CREATE INDEX IF NOT EXISTS ${index};
+        `);
+      };
+
+      rebuildRemoteTable(
+        'sync_remote_records',
+        `event_id TEXT PRIMARY KEY,
+         tenant_id TEXT NOT NULL,
+         source_branch_id TEXT NOT NULL,
+         entity_type TEXT NOT NULL CHECK(entity_type IN ({allowedTypes})),
+         entity_id TEXT NOT NULL,
+         entity_version INTEGER NOT NULL,
+         payload TEXT NOT NULL,
+         received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+        'event_id, tenant_id, source_branch_id, entity_type, entity_id, entity_version, payload, received_at',
+        `idx_sync_remote_records_scope
+          ON sync_remote_records(tenant_id, entity_type, source_branch_id, received_at)`
+      );
+      rebuildRemoteTable(
+        'sync_remote_entities',
+        `tenant_id TEXT NOT NULL,
+         source_branch_id TEXT NOT NULL,
+         entity_type TEXT NOT NULL CHECK(entity_type IN ({allowedTypes})),
+         entity_id TEXT NOT NULL,
+         entity_version INTEGER NOT NULL,
+         latest_event_id TEXT NOT NULL,
+         payload TEXT NOT NULL,
+         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         PRIMARY KEY (tenant_id, source_branch_id, entity_type, entity_id)`,
+        'tenant_id, source_branch_id, entity_type, entity_id, entity_version, latest_event_id, payload, updated_at',
+        `idx_sync_remote_entities_type
+          ON sync_remote_entities(tenant_id, entity_type, source_branch_id, updated_at)`
+      );
+    },
+  },
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

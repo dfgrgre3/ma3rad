@@ -27,6 +27,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');
+    this.requireTransferWarehouseAuthorization(transferId, actor);
     if (transfer.status !== 'IN_TRANSIT' && transfer.status !== 'RECEIVED_PARTIAL') {
       throw new Error('لا يمكن استلام تحويل ليس قيد النقل (IN_TRANSIT).');
     }
@@ -247,7 +248,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
       lossTransactionId, txDb.nextNumber('TX-TRF-LOSS'), productId,
       transfer.fromWarehouseId ?? transfer.from_warehouse_id, -lossQuantity,
       itemUnitCost, lossCost, transfer.id,
-      `ÙÙ‚Ø¯/ØªÙ„Ù Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ${transferNumber} - Ø§Ù„ØµÙ†Ù ${productName}`, actor.id,
+      `فقد/تلف أثناء التحويل ${transferNumber} - الصنف ${productName}`, actor.id,
     ]);
     if (lossCost <= 0) return;
 
@@ -271,8 +272,12 @@ public receiveTransfer(transferId: string, receipts: Array<{
     totals: { totalReceived: number; totalLost: number },
     actorId: string
   ): void {
-    const isFull = totals.totalLost === 0 && totals.totalReceived >= totalQuantityM2;
-    const finalStatus = isFull ? 'RECEIVED_FULL' : 'RECEIVED_PARTIAL';
+    const isSettled = totals.totalReceived + totals.totalLost >= totalQuantityM2 - 0.009;
+    const finalStatus = !isSettled
+      ? 'RECEIVED_PARTIAL'
+      : totals.totalLost > 0
+        ? 'COMPLETED'
+        : 'RECEIVED_FULL';
 
     txDb.run(`
       UPDATE stock_transfers

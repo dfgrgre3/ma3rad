@@ -3,7 +3,7 @@ import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
-import { round2 } from './financials';
+import { returnTaxSql, round2 } from './financials';
 
 export interface SalesFinancialCheck {
   key: string;
@@ -87,6 +87,7 @@ export class SalesFinancialReconciliationService {
     const invoiceScope = mergedScope('si.branch_id', 'si.company_id');
     const returnScope = mergedScope('original.branch_id', 'original.company_id');
     const ledgerScope = mergedScope('e.branch_id', 'e.company_id');
+    const returnTax = returnTaxSql('sr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount');
     const warehouseScope = this.branchAccess.sqlScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
@@ -94,11 +95,9 @@ export class SalesFinancialReconciliationService {
     const warehouseCompanyScope = this.branchAccess.companyScope('w.company_id');
 
     const netSales = Number(this.db.query<{ amount: number }>(`
-      SELECT COALESCE(SUM(si.subtotal - si.discount_amount + si.shipping_cost), 0)
+      SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0)
         - COALESCE((
-          SELECT SUM(sr.total_amount - CASE WHEN original.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(original.tax_amount, 0) / original.total_amount, 2)
-            ELSE 0 END)
+          SELECT SUM(sr.total_amount - ${returnTax})
           FROM sales_returns sr
           JOIN sales_invoices original ON original.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND original.invoice_status != 'VOID'

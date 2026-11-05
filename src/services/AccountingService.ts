@@ -2,6 +2,7 @@ import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
+import { returnTaxSql } from './financials';
 import { localDateString } from '../utils/date';
 
 function isValidDate(value: string): boolean {
@@ -72,6 +73,7 @@ export class AccountingService {
     const salesScope = this.branchScope('si.branch_id');
     const purchaseScope = this.branchScope('pi.branch_id');
     const expenseScope = this.branchScope('e.branch_id');
+    const returnTax = returnTaxSql('sr.total_amount', 'si.subtotal', 'si.discount_amount', 'si.tax_amount');
     const warehouseScope = this.branchScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
@@ -97,10 +99,8 @@ export class AccountingService {
 
     const returnStats = this.db.query<any>(`
       SELECT
-        SUM(CASE WHEN sr.date = ? THEN sr.total_amount - CASE WHEN si.total_amount > 0
-          THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2) ELSE 0 END ELSE 0 END) AS todayReturns,
-        SUM(CASE WHEN sr.date >= ? AND sr.date <= ? THEN sr.total_amount - CASE WHEN si.total_amount > 0
-          THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2) ELSE 0 END ELSE 0 END) AS monthReturns,
+        SUM(CASE WHEN sr.date = ? THEN sr.total_amount - ${returnTax} ELSE 0 END) AS todayReturns,
+        SUM(CASE WHEN sr.date >= ? AND sr.date <= ? THEN sr.total_amount - ${returnTax} ELSE 0 END) AS monthReturns,
         SUM(CASE WHEN sr.date >= ? AND sr.date <= ?
           THEN (SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0)
                 FROM sales_return_items sri WHERE sri.return_id = sr.id)
@@ -114,8 +114,7 @@ export class AccountingService {
       SELECT
         COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
           WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}), 0)
-        - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount, 0) / si.total_amount, 2) ELSE 0 END) FROM sales_returns sr
+        - COALESCE((SELECT SUM(sr.total_amount - ${returnTax}) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${salesScope.clause}), 0) AS sales
     `, [prevMonthStart, prevMonthEnd, ...salesScope.params, prevMonthStart, prevMonthEnd, ...salesScope.params])[0]?.sales || 0);
@@ -263,6 +262,7 @@ export class AccountingService {
     this.requireView('dashboard.view');
     PermissionService.require(AuthService.requireAuth(), 'sales.view', '/sales');
     const scope = this.branchScope('si.branch_id');
+    const returnTax = returnTaxSql('sr.total_amount', 'si.subtotal', 'si.discount_amount', 'si.tax_amount');
     const results: { date: string; sales: number; profit: number }[] = [];
     const now = new Date();
 
@@ -275,14 +275,12 @@ export class AccountingService {
         SELECT
           COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
             WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
-          - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
-              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END) FROM sales_returns sr
+          - COALESCE((SELECT SUM(sr.total_amount - ${returnTax}) FROM sales_returns sr
             JOIN sales_invoices si ON si.id = sr.original_invoice_id
             WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS sales,
           COALESCE((SELECT SUM(si.gross_profit) FROM sales_invoices si
             WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
-          - COALESCE((SELECT SUM(sr.total_amount - CASE WHEN si.total_amount > 0
-              THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END) FROM sales_returns sr
+          - COALESCE((SELECT SUM(sr.total_amount - ${returnTax}) FROM sales_returns sr
             JOIN sales_invoices si ON si.id = sr.original_invoice_id
             WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
           + COALESCE((SELECT SUM(sri.quantity_m2 * sri.unit_cost)
@@ -617,6 +615,7 @@ export class AccountingService {
     const prevMonthStart = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
     const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()}`;
     const scope = this.branchScope('si.branch_id');
+    const returnTax = returnTaxSql('sr.total_amount', 'si.subtotal', 'si.discount_amount', 'si.tax_amount');
 
     const loadSalesSummary = (from: string, to: string) => {
       const sales = this.db.query<any>(`
@@ -626,8 +625,7 @@ export class AccountingService {
         WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       `, [from, to, ...scope.params])[0] || {};
       const returnedRevenue = Number(this.db.query<any>(`
-        SELECT COALESCE(SUM(sr.total_amount - CASE WHEN si.total_amount > 0
-            THEN ROUND(sr.total_amount * COALESCE(si.tax_amount,0) / si.total_amount,2) ELSE 0 END),0) AS revenue
+        SELECT COALESCE(SUM(sr.total_amount - ${returnTax}),0) AS revenue
         FROM sales_returns sr JOIN sales_invoices si ON si.id=sr.original_invoice_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}
       `, [from, to, ...scope.params])[0]?.revenue || 0);

@@ -150,6 +150,135 @@ test('sync migrations: repairs an existing policy table and creates remote proje
   }
 });
 
+test('sync migrations: expense records satisfy remote projection constraints', async () => {
+  const SQL = await (globalThis as any).initSqlJs();
+  const legacyDb = new SQL.Database();
+  try {
+    legacyDb.exec(`
+      CREATE TABLE sync_entity_policies (
+        entity_type TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0,
+        outbound_enabled INTEGER NOT NULL DEFAULT 0, inbound_enabled INTEGER NOT NULL DEFAULT 0,
+        data_scope TEXT NOT NULL DEFAULT 'TENANT', managed_by_head_office INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE sync_remote_records (
+        event_id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, source_branch_id TEXT NOT NULL,
+        entity_type TEXT NOT NULL CHECK(entity_type IN ('sales_invoice','sales_return','purchase_invoice','purchase_return','customer_payment','supplier_payment','stock_transfer')),
+        entity_id TEXT NOT NULL, entity_version INTEGER NOT NULL, payload TEXT NOT NULL,
+        received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX idx_sync_remote_records_scope
+        ON sync_remote_records(tenant_id, entity_type, source_branch_id, received_at);
+      CREATE TABLE sync_remote_entities (
+        tenant_id TEXT NOT NULL, source_branch_id TEXT NOT NULL,
+        entity_type TEXT NOT NULL CHECK(entity_type IN ('sales_invoice','sales_return','purchase_invoice','purchase_return','customer_payment','supplier_payment','stock_transfer')),
+        entity_id TEXT NOT NULL, entity_version INTEGER NOT NULL, latest_event_id TEXT NOT NULL,
+        payload TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (tenant_id, source_branch_id, entity_type, entity_id)
+      );
+      CREATE INDEX idx_sync_remote_entities_type
+        ON sync_remote_entities(tenant_id, entity_type, source_branch_id, updated_at);
+      INSERT INTO sync_remote_records
+        (event_id, tenant_id, source_branch_id, entity_type, entity_id, entity_version, payload)
+      VALUES ('existing-event', 'tenant', 'branch', 'stock_transfer', 'transfer', 1, '{}');
+    `);
+    const migration = MIGRATIONS.find((item) => item.id === '116_sync_expense_business_records');
+    assert.ok(migration);
+    migration.up(legacyDb);
+
+    for (const table of ['sync_remote_records', 'sync_remote_entities']) {
+      const createSql = legacyDb.exec(
+        `SELECT sql FROM sqlite_master WHERE type='table' AND name='${table}'`
+      )[0].values[0][0] as string;
+      assert.match(createSql, /'expense'/);
+    }
+    assert.equal(
+      legacyDb.exec("SELECT entity_type FROM sync_entity_policies WHERE entity_type='expense'")[0].values.length,
+      1
+    );
+    assert.equal(
+      legacyDb.exec("SELECT event_id FROM sync_remote_records WHERE event_id='existing-event'")[0].values.length,
+      1
+    );
+    legacyDb.run(
+      `INSERT INTO sync_remote_records
+        (event_id, tenant_id, source_branch_id, entity_type, entity_id, entity_version, payload)
+       VALUES ('expense-event', 'tenant', 'branch', 'expense', 'expense', 1, '{"deleted":true}')`
+    );
+    legacyDb.run(
+      `INSERT INTO sync_remote_entities
+        (tenant_id, source_branch_id, entity_type, entity_id, entity_version, latest_event_id, payload)
+       VALUES ('tenant', 'branch', 'expense', 'expense', 1, 'expense-event', '{"deleted":true}')`
+    );
+  } finally {
+    legacyDb.close();
+  }
+});
+
+test('business record sync: expense deletion publishes and receives a tombstone', async () => {
+  const manager = await boot();
+  const identity = {
+    tenantId: `expense-sync-tenant-${uuidv4()}`,
+    branchId: `expense-sync-branch-${uuidv4()}`,
+    deviceId: `expense-sync-device-${uuidv4()}`,
+    canManagePolicies: true,
+  };
+  MasterDataSyncService.configure(identity);
+  const policies = new SyncPolicyService(manager);
+  const outbox = new OutboxRepository(manager);
+  const businessRecords = new BusinessRecordSyncService(manager);
+  try {
+    policies.update({
+      entityType: 'expense',
+      enabled: true,
+      outboundEnabled: true,
+      inboundEnabled: true,
+      dataScope: 'TENANT',
+    });
+    let deletionEventId = '';
+    manager.executeTransaction((transaction) => {
+      deletionEventId = businessRecords.capture(transaction, 'expense', 'deleted-expense', 'DELETE')!;
+    });
+    const deletionEvent = outbox.getById(deletionEventId);
+    assert.equal(deletionEvent?.operationType, 'DELETE');
+    assert.deepEqual(deletionEvent?.payload, { deleted: true });
+
+    const remoteEvent: SyncEvent = {
+      eventId: uuidv4(),
+      tenantId: identity.tenantId,
+      branchId: 'remote-branch',
+      deviceId: 'remote-device',
+      entityType: 'expense',
+      entityId: 'deleted-remotely',
+      operationType: 'DELETE',
+      entityVersion: 1,
+      schemaVersion: 1,
+      dataScope: 'TENANT',
+      payload: { deleted: true },
+      createdAt: new Date().toISOString(),
+    };
+    const dispatcher = new EventDispatcher();
+    businessRecords.registerHandler(dispatcher);
+    const pull = new PullChangesService(new InboxRepository(manager), new EventValidator(), dispatcher);
+    assert.deepEqual(await pull.applyIncoming([remoteEvent]), { applied: 1, duplicates: 0, failed: 0 });
+    const projected = manager.query<{ payload: string }>(
+      `SELECT payload FROM sync_remote_entities
+       WHERE tenant_id=? AND source_branch_id='remote-branch' AND entity_type='expense' AND entity_id='deleted-remotely'`,
+      [identity.tenantId]
+    )[0];
+    assert.deepEqual(JSON.parse(projected.payload), { deleted: true });
+  } finally {
+    policies.update({
+      entityType: 'expense',
+      enabled: false,
+      outboundEnabled: false,
+      inboundEnabled: false,
+      dataScope: 'TENANT',
+    });
+    acknowledgeTenantOutbox(manager, identity.tenantId);
+    MasterDataSyncService.configure(null);
+  }
+});
+
 test('business document sync: captures snapshots and receives them without applying local balances', async () => {
   const manager = await boot();
   const identity = {

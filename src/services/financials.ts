@@ -17,6 +17,28 @@ export function round2(amount: number): number {
   return fromMinorUnits(toMinorUnits(amount));
 }
 
+export function calculateReturnTax(
+  returnTaxableAmount: number,
+  invoiceTax: number,
+  invoiceTaxableBase: number
+): number {
+  return invoiceTaxableBase > 0
+    ? round2(returnTaxableAmount * invoiceTax / invoiceTaxableBase)
+    : 0;
+}
+
+export function returnTaxSql(
+  returnAmount: string,
+  invoiceSubtotal: string,
+  invoiceDiscount: string,
+  invoiceTax: string
+): string {
+  const taxableBase = `MAX(0, COALESCE(${invoiceSubtotal}, 0) - COALESCE(${invoiceDiscount}, 0))`;
+  return `CASE WHEN ${taxableBase} > 0
+    THEN ROUND(COALESCE(${returnAmount}, 0) * COALESCE(${invoiceTax}, 0) / ${taxableBase}, 2)
+    ELSE 0 END`;
+}
+
 export interface SaleLineInput {
   quantity: number; // in the sale's base unit (M2 here)
   unitPrice: number;

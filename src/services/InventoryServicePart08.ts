@@ -12,6 +12,9 @@ import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export class InventoryServicePart08 extends InventoryServicePart07 {
 public getTransferItems(transferId: string): any[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'inventory.view');
+    this.requireTransferWarehouseAuthorization(transferId, actor);
     return this.db.query<any>(`
       SELECT 
         sti.id, sti.transfer_id as transferId, sti.product_id as productId,
@@ -28,6 +31,17 @@ public getTransferItems(transferId: string): any[] {
     `, [transferId]);
   }
 
+protected requireTransferWarehouseAuthorization(transferId: string, actor: ReturnType<typeof AuthService.requireAuth>): void {
+    const transfer = this.db.query<{ fromWarehouseId: string; toWarehouseId: string }>(
+      `SELECT from_warehouse_id AS fromWarehouseId, to_warehouse_id AS toWarehouseId
+       FROM stock_transfers WHERE id = ?`,
+      [transferId]
+    )[0];
+    if (!transfer) throw new Error('طلب التحويل غير موجود.');
+    this.branchAccess.requireWarehouseAuthorization(transfer.fromWarehouseId, actor);
+    this.branchAccess.requireWarehouseAuthorization(transfer.toWarehouseId, actor);
+  }
+
 public createTransferRequest(input: {
     fromWarehouseId: string;
     toWarehouseId: string;
@@ -41,6 +55,8 @@ public createTransferRequest(input: {
     if (input.fromWarehouseId === input.toWarehouseId) {
       throw new Error('لا يمكن التحويل لنفس المخزن.');
     }
+    this.branchAccess.requireWarehouseAuthorization(input.fromWarehouseId, actor);
+    this.branchAccess.requireWarehouseAuthorization(input.toWarehouseId, actor);
     if (!input.items || input.items.length === 0) {
       throw new Error('يجب إضافة صنف واحد على الأقل للتحويل.');
     }
@@ -131,6 +147,7 @@ public approveTransfer(transferId: string): void {
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');
+    this.requireTransferWarehouseAuthorization(transferId, actor);
     if (transfer.status !== 'REQUESTED') throw new Error('لا يمكن اعتماد تحويل ليس في حالة الطلب.');
 
     this.db.run(`
@@ -147,6 +164,7 @@ public prepareTransfer(transferId: string): void {
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');
+    this.requireTransferWarehouseAuthorization(transferId, actor);
     if (transfer.status !== 'APPROVED') throw new Error('يجب اعتماد التحويل أولاً قبل بدء التجهيز.');
 
     this.db.run(`UPDATE stock_transfers SET status = 'PREPARING' WHERE id = ?`, [transferId]);

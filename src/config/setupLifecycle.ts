@@ -4,6 +4,8 @@ export interface FirstRunSetupEvidence {
   hasLegacyConfiguration: boolean;
 }
 
+declare const __CERAMISYS_DEV_BYPASS_ACTIVATION__: boolean;
+
 export function shouldShowFirstRunSetup(evidence: FirstRunSetupEvidence): boolean {
   return !evidence.completed
     && !evidence.hasBusinessData
@@ -11,15 +13,20 @@ export function shouldShowFirstRunSetup(evidence: FirstRunSetupEvidence): boolea
 }
 
 /**
- * وضع التشغيل المحلي (مؤقت — لا يُحذف أي كود إنتاجي):
+ * تخطي صفحة التفعيل في التطوير فقط؛ لا يُحذف أي كود إنتاجي.
+ */
+export const BYPASS_FIRST_RUN_ACTIVATION =
+  typeof __CERAMISYS_DEV_BYPASS_ACTIVATION__ !== 'undefined'
+  && __CERAMISYS_DEV_BYPASS_ACTIVATION__;
+
+/**
+ * وضع التشغيل المحلي الشامل، عند الحاجة:
  *
- * تعطيل "التهيئة لمرة واحدة" بالكامل، أي:
- * - لا تظهر صفحة «تفعيل سيراميسيس» عند بدء التشغيل.
  * - لا يظهر معالج التهيئة الأولية بعد تسجيل الدخول.
  * - لا يُطلب تغيير كلمة مرور المدير الافتراضية.
  * - لا يتم أي تفاعل مع المنصة المركزية (ترخيص/تكوين/تحديثات).
  *
- * أعِد القيمة إلى false لاستعادة السلوك الإنتاجي الكامل.
+ * يُترك معطلًا افتراضيًا.
  */
 export const BYPASS_FIRST_RUN_SETUP = false;
 

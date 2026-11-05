@@ -77,6 +77,8 @@ test('branch access enforces assigned and explicit central scopes in service que
   assert.throws(() => access.requireBranchAccess('br_scope_b'), /ليس لديك صلاحية الوصول/);
   assert.equal(access.requireWarehouseAccess('wh_scope_a'), 'br_scope_a');
   assert.throws(() => access.requireWarehouseAccess('wh_scope_b'), /ليس لديك صلاحية الوصول|الفرع النشط/);
+  access.requireWarehouseAuthorization('wh_scope_a');
+  assert.throws(() => access.requireWarehouseAuthorization('wh_scope_b'), /ليس لديك صلاحية الوصول/);
   assert.equal(access.requireRegisterAccess('cr_scope_a'), 'br_scope_a');
   assert.throws(() => access.requireRegisterAccess('cr_scope_b'), /ليس لديك صلاحية الوصول/);
   assert.throws(() => access.requireRegisterAccess('cr_scope_a', user, 'br_scope_b'), /خزينة تابعة لفرع المعاملة/);

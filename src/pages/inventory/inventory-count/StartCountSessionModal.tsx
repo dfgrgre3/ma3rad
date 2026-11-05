@@ -48,7 +48,7 @@ export const StartCountSessionModal: React.FC<StartCountSessionModalProps> = ({
         <div className="bg-slate-50 px-6 py-4 flex items-center justify-between border-b border-slate-200">
           <div className="flex items-center gap-2">
             <ScanLine className="w-5 h-5 text-violet-600" />
-            <h3 className="text-base font-black text-slate-900">Ø¨Ø¯Ø¡ Ø¬Ù„Ø³Ø© Ø¬Ø±Ø¯ Ù…Ø®Ø§Ø²Ù† Ø¬Ø¯ÙŠØ¯Ø©</h3>
+            <h3 className="text-base font-black text-slate-900">بدء جلسة جرد مخازن جديدة</h3>
           </div>
           <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-900 transition">
             <X className="w-5 h-5" />
@@ -64,7 +64,7 @@ export const StartCountSessionModal: React.FC<StartCountSessionModalProps> = ({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs text-slate-500 font-bold block">Ø§Ù„Ù…Ø®Ø²Ù† Ø§Ù„Ù…Ø±Ø§Ø¯ Ø¬Ø±Ø¯Ù‡</label>
+            <label className="text-xs text-slate-500 font-bold block">المخزن المراد جرده</label>
             <select
               value={selectedWarehouseId}
               onChange={(e) => onWarehouseChange(e.target.value)}
@@ -75,23 +75,23 @@ export const StartCountSessionModal: React.FC<StartCountSessionModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs text-slate-500 font-bold block">Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø¬Ù„Ø³Ø©</label>
-            <textarea value={notes} onChange={(e) => onNotesChange(e.target.value)} rows={2} maxLength={500} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" placeholder="Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ù„ÙØ±ÙŠÙ‚ Ø§Ù„Ø¬Ø±Ø¯" />
+            <label className="text-xs text-slate-500 font-bold block">ملاحظات الجلسة</label>
+            <textarea value={notes} onChange={(e) => onNotesChange(e.target.value)} rows={2} maxLength={500} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs" placeholder="ملاحظات لفريق الجرد" />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs text-slate-700 font-bold block">Ù†ÙˆØ¹ Ø§Ù„Ø¬Ø±Ø¯</label>
+            <label className="text-xs text-slate-700 font-bold block">نوع الجرد</label>
             <select
               value={countType}
               onChange={(e) => onCountTypeChange(e.target.value as CountType)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-violet-500 font-bold"
             >
-              <option value="FULL">Ø¬Ø±Ø¯ ÙƒÙ„ÙŠ Ø´Ø§Ù…Ù„ (Ù„ÙƒÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª)</option>
-              <option value="PERIODIC">Ø¬Ø±Ø¯ Ø¯ÙˆØ±ÙŠ Ù…Ø¬Ø¯ÙˆÙ„</option>
-              <option value="SURPRISE">Ø¬Ø±Ø¯ Ù…ÙØ§Ø¬Ø¦</option>
-              <option value="BLIND">Ø¹Ø¯Ù‘ Ø£Ø¹Ù…Ù‰ (Blind Count)</option>
-              <option value="PARTIAL">Ø¬Ø±Ø¯ Ø¬Ø²Ø¦ÙŠ</option>
-              <option value="SPOT">Ø¬Ø±Ø¯ Ø¹Ø´ÙˆØ§Ø¦ÙŠ Ø³Ø±ÙŠØ¹</option>
+              <option value="FULL">جرد كلي شامل (لكل المنتجات)</option>
+              <option value="PERIODIC">جرد دوري مجدول</option>
+              <option value="SURPRISE">جرد مفاجئ</option>
+              <option value="BLIND">عدّ أعمى (Blind Count)</option>
+              <option value="PARTIAL">جرد جزئي</option>
+              <option value="SPOT">جرد عشوائي سريع</option>
             </select>
           </div>
 
@@ -103,22 +103,22 @@ export const StartCountSessionModal: React.FC<StartCountSessionModalProps> = ({
                 onChange={(e) => onBlindCountChange(e.target.checked)}
                 className="accent-violet-600 rounded"
               />
-              <span>ØªÙØ¹ÙŠÙ„ Ø§Ù„Ø¹Ø¯ Ø§Ù„Ø£Ø¹Ù…Ù‰ (Blind Count)</span>
+              <span>تفعيل العد الأعمى (Blind Count)</span>
             </label>
             <p className="text-[10px] text-slate-500 mt-1 font-medium mr-5">
-              Ø¥Ø®ÙØ§Ø¡ ÙƒÙ…ÙŠØ§Øª Ø§Ù„Ù†Ø¸Ø§Ù… Ø§Ù„Ø¯ÙØªØ±ÙŠØ© Ø¹Ù† ÙØ±ÙŠÙ‚ Ø§Ù„Ø¬Ø±Ø¯ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø¥Ø¯Ø®Ø§Ù„ Ù„Ù…Ù†Ø¹ Ø§Ù„Ø§Ù†Ø­ÙŠØ§Ø² ÙˆØ¶Ù…Ø§Ù† Ø¯Ù‚Ø© ÙˆÙ†Ø²Ø§Ù‡Ø© Ø§Ù„Ø­ØµØ± Ø§Ù„ÙØ¹Ù„ÙŠ.
+              إخفاء كميات النظام الدفترية عن فريق الجرد أثناء الإدخال لمنع الانحياز وضمان دقة ونزاهة الحصر الفعلي.
             </p>
           </div>
 
           {countType !== 'FULL' && (
             <div className="space-y-2">
-              <label className="text-xs text-slate-700 font-bold block">Ø§Ù„Ø£ØµÙ†Ø§Ù Ø§Ù„Ù…Ø·Ù„ÙˆØ¨ Ø¬Ø±Ø¯Ù‡Ø§</label>
+              <label className="text-xs text-slate-700 font-bold block">الأصناف المطلوب جردها</label>
               <div className="relative">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   value={productSearch}
                   onChange={(e) => onProductSearchChange(e.target.value)}
-                  placeholder="Ø§Ø¨Ø­Ø« Ø¨Ø§Ø³Ù… Ø§Ù„ØµÙ†Ù Ø£Ùˆ Ø§Ù„ÙƒÙˆØ¯..."
+                  placeholder="ابحث باسم الصنف أو الكود..."
                   className="w-full pr-9 pl-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm"
                 />
               </div>
@@ -134,18 +134,18 @@ export const StartCountSessionModal: React.FC<StartCountSessionModalProps> = ({
                         className="accent-violet-600"
                       />
                       <span className="flex-1 font-semibold text-slate-800">{product.name}<span className="mr-2 text-slate-400 font-mono">{product.sku}</span></span>
-                      <span className="text-slate-500">Ø±ØµÙŠØ¯: {formatProductQuantity(Number(product.quantityM2 || 0), product)}</span>
+                      <span className="text-slate-500">رصيد: {formatProductQuantity(Number(product.quantityM2 || 0), product)}</span>
                     </label>
                   );
                 })}
-                {products.length === 0 && <p className="p-3 text-xs text-slate-500">Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ØµÙ†Ø§Ù Ù†Ø´Ø·Ø© ÙÙŠ Ø§Ù„Ù†Ø¸Ø§Ù….</p>}
+                {products.length === 0 && <p className="p-3 text-xs text-slate-500">لا توجد أصناف نشطة في النظام.</p>}
               </div>
-              <p className="text-[11px] text-slate-500">ØªÙ… Ø§Ø®ØªÙŠØ§Ø± {selectedProductIds.length} ØµÙ†Ù</p>
+              <p className="text-[11px] text-slate-500">تم اختيار {selectedProductIds.length} صنف</p>
             </div>
           )}
 
           <div className="text-xs text-slate-500 bg-violet-500/5 p-3 rounded-lg border border-violet-500/10 leading-relaxed">
-            * Ø¹Ù†Ø¯ Ø§Ù„Ø¶ØºØ· Ø¹Ù„Ù‰ "Ø¨Ø¯Ø¡ Ø§Ù„Ø¬Ø±Ø¯"ØŒ Ø³ÙŠÙ‚ÙˆÙ… Ø§Ù„Ù†Ø¸Ø§Ù… Ø¨ØªØ«Ø¨ÙŠØª ÙˆØ­ÙØ¸ Ø§Ù„Ø£Ø±ØµØ¯Ø© Ø§Ù„Ø¯ÙØªØ±ÙŠØ© Ø§Ù„Ø­Ø§Ù„ÙŠØ© Ù„Ù„Ø£ØµÙ†Ø§Ù Ù„Ù…Ù‚Ø§Ø±Ù†ØªÙ‡Ø§ Ù„Ø§Ø­Ù‚Ø§Ù‹ Ù…Ø¹ Ø§Ù„ÙƒÙ…ÙŠØ§Øª Ø§Ù„ØªÙŠ Ø³ØªÙ‚ÙˆÙ… Ø¨Ø¹Ø¯Ù‘Ù‡Ø§ ÙˆØ¥Ø¯Ø®Ø§Ù„Ù‡Ø§.
+            * عند الضغط على "بدء الجرد"، سيقوم النظام بتثبيت وحفظ الأرصدة الدفترية الحالية للأصناف لمقارنتها لاحقاً مع الكميات التي ستقوم بعدّها وإدخالها.
           </div>
         </div>
 
@@ -155,13 +155,13 @@ export const StartCountSessionModal: React.FC<StartCountSessionModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition border border-slate-200"
           >
-            Ø¥Ù„ØºØ§Ø¡
+            إلغاء
           </button>
           <button
             type="submit"
             className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition"
           >
-            ØªÙˆÙ„ÙŠØ¯ Ø¬Ù„Ø³Ø© ÙˆØ¨Ø¯Ø¡ Ø§Ù„Ø¬Ø±Ø¯
+            توليد جلسة وبدء الجرد
           </button>
         </div>
       </form>
