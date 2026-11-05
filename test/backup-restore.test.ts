@@ -27,6 +27,40 @@ async function boot(): Promise<DatabaseManager> {
   return manager;
 }
 
+test('backup import checks backup and recovery-key sizes before reading either file', async () => {
+  await boot();
+  const service = new BackupServicePart01();
+  let oversizedBackupRead = false;
+  const oversizedBackup = {
+    size: 700 * 1024 * 1024 + 1,
+    arrayBuffer: async () => {
+      oversizedBackupRead = true;
+      throw new Error('oversized backup should not be read');
+    },
+  } as unknown as File;
+  await assert.rejects(service.restoreBackupFromFile(oversizedBackup), /يتجاوز الحد المسموح/);
+  assert.equal(oversizedBackupRead, false);
+
+  const localDatabaseMagic = new Uint8Array([67, 69, 82, 65, 77, 73, 83, 89, 83, 45, 68, 66, 0, 118, 49, 0]);
+  let oversizedRecoveryKeyRead = false;
+  const localBackup = {
+    size: localDatabaseMagic.byteLength,
+    arrayBuffer: async () => localDatabaseMagic.buffer,
+  } as unknown as File;
+  const oversizedRecoveryKey = {
+    size: 16 * 1024 + 1,
+    arrayBuffer: async () => {
+      oversizedRecoveryKeyRead = true;
+      throw new Error('oversized recovery key should not be read');
+    },
+  } as unknown as File;
+  await assert.rejects(
+    service.restoreBackupFromFile(localBackup, undefined, oversizedRecoveryKey),
+    /ملف الاسترداد.*يتجاوز الحد المسموح/,
+  );
+  assert.equal(oversizedRecoveryKeyRead, false);
+});
+
 function q<T = any>(sql: string, params: any[] = []): T[] {
   return DatabaseManager.getInstance().query<T>(sql, params);
 }

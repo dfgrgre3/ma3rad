@@ -4,20 +4,11 @@ export interface FirstRunSetupEvidence {
   hasLegacyConfiguration: boolean;
 }
 
-declare const __CERAMISYS_DEV_BYPASS_ACTIVATION__: boolean;
-
 export function shouldShowFirstRunSetup(evidence: FirstRunSetupEvidence): boolean {
   return !evidence.completed
     && !evidence.hasBusinessData
     && !evidence.hasLegacyConfiguration;
 }
-
-/**
- * تخطي صفحة التفعيل في التطوير فقط؛ لا يُحذف أي كود إنتاجي.
- */
-export const BYPASS_FIRST_RUN_ACTIVATION =
-  typeof __CERAMISYS_DEV_BYPASS_ACTIVATION__ !== 'undefined'
-  && __CERAMISYS_DEV_BYPASS_ACTIVATION__;
 
 /**
  * وضع التشغيل المحلي الشامل، عند الحاجة:

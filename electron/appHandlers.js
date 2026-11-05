@@ -1,4 +1,5 @@
 const officeCrypto = require('officecrypto-tool');
+const os = require('node:os');
 
 const OLE_SIGNATURE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
 const ZIP_SIGNATURE = Buffer.from([0x50, 0x4b]);
@@ -17,7 +18,7 @@ function hasSignature(bytes, signature) {
 
 function registerAppHandlers({
   ipcMain, validateIpcSender, app, fs, shell, dialog, BrowserWindow,
-  appDataDir, DATA_DIR, BACKUP_DIR, ensureDirs, requestGracefulRestart,
+  appDataDir, DATA_DIR, BACKUP_DIR, ensureDirs, requestGracefulRestart, requestGracefulShutdown,
 }) {
   ipcMain.handle('db:encrypt-xlsx-backup', async (event, bytes, password) => {
     validateIpcSender(event);
@@ -59,11 +60,37 @@ function registerAppHandlers({
 
   ipcMain.handle('app:info', async (event) => {
     validateIpcSender(event);
+    const memory = process.memoryUsage();
+    let disk = { available: false, error: 'قياس مساحة القرص غير مدعوم على هذا النظام.' };
+    if (typeof fs.statfs === 'function') {
+      try {
+        const stats = await fs.statfs(appDataDir);
+        disk = {
+          available: true,
+          freeBytes: stats.bavail * stats.bsize,
+          totalBytes: stats.blocks * stats.bsize,
+        };
+      } catch (error) {
+        disk = { available: false, error: error.message || String(error) };
+      }
+    }
     return {
       version: app.getVersion(),
       packaged: app.isPackaged,
       dataDir: appDataDir,
       backupDir: BACKUP_DIR,
+      system: {
+        platform: process.platform,
+        arch: process.arch,
+        osRelease: os.release(),
+        cpuCount: os.cpus().length,
+        totalMemoryBytes: os.totalmem(),
+        freeMemoryBytes: os.freemem(),
+        processUptimeSeconds: process.uptime(),
+        processMemoryBytes: memory.rss,
+        processHeapUsedBytes: memory.heapUsed,
+        disk,
+      },
     };
   });
 
@@ -76,15 +103,25 @@ function registerAppHandlers({
     return { ok: true };
   });
 
+  ipcMain.handle('app:requestShutdown', async (event) => {
+    validateIpcSender(event);
+    if (typeof requestGracefulShutdown !== 'function') {
+      throw new Error('Graceful application shutdown is unavailable.');
+    }
+    requestGracefulShutdown();
+    return { ok: true };
+  });
+
   ipcMain.handle('app:openFolder', async (event, target) => {
     validateIpcSender(event);
     try {
       const resolved = target === 'backups' ? BACKUP_DIR : DATA_DIR;
       ensureDirs();
-      await shell.openPath(resolved);
+      const error = await shell.openPath(resolved);
+      if (error) return { ok: false, error };
       return { ok: true, path: resolved };
     } catch (error) {
-      return { ok: false, error: String(error) };
+      return { ok: false, error: String(error?.message || error) };
     }
   });
 

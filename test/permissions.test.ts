@@ -206,6 +206,32 @@ test('permissions: system diagnostics require independent maintenance access', a
   }
 });
 
+test('system diagnostics report measured database checks and mark unavailable desktop metrics honestly', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const service = new SystemDiagnosticsService();
+  const report = service.runDiagnostics();
+  assert.equal(report.checks.find((check) => check.key === 'sqlite_integrity')?.status, 'PASS');
+  assert.equal(report.checks.find((check) => check.key === 'core_tables')?.status, 'PASS');
+  assert.ok(report.totalTables > 0);
+  assert.ok(report.databaseSizeBytes > 0);
+  assert.ok(report.querySpeedMs >= 0);
+
+  const runtime = await service.getRuntimeDiagnostics(report.timestamp);
+  assert.equal(runtime.system, null);
+  assert.equal(runtime.databaseFile.available, false);
+  assert.equal(runtime.checks.find((check) => check.key === 'system_resources')?.status, 'WARN');
+  assert.equal(runtime.checks.find((check) => check.key === 'database_persistence')?.status, 'WARN');
+  assert.equal(runtime.checks.find((check) => check.key === 'backup_health')?.status, 'WARN');
+  assert.equal(
+    runtime.history[runtime.history.length - 1]?.checks.length,
+    report.checks.length + runtime.checks.length,
+  );
+});
+
 test('permissions: audit reads require audit.view inside the service', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

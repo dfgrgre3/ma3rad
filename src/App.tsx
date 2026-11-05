@@ -1,21 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from './database/db';
 import { AuthService } from './services/AuthService';
-import { CentralLicenseService } from './services/CentralLicenseService';
-import { CentralConfigApplier } from './services/CentralConfigApplier';
-import { CentralEstablishmentService } from './services/CentralEstablishmentService';
 import { SettingsService } from './services/SettingsService';
 import { AppConfigService } from './services/AppConfigService';
 import {
   shouldShowFirstRunSetup,
-  BYPASS_FIRST_RUN_ACTIVATION,
   BYPASS_FIRST_RUN_SETUP,
 } from './config/setupLifecycle';
 import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
 import { AppRouter } from './router';
 import { LoginPage } from './pages/auth/LoginPage';
-import { FirstRunActivationPage } from './pages/auth/FirstRunActivationPage';
 import { SetupWizard } from './components/SetupWizard';
 import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -33,93 +28,6 @@ export const App: React.FC = () => {
   } = useAppStartup();
 
   const [showSetup, setShowSetup] = useState(false);
-  // وضع التطوير يتجاوز صفحة التفعيل دون تجاوز بقية خطوات الإعداد.
-  const [activationComplete, setActivationComplete] = useState(
-    () => BYPASS_FIRST_RUN_ACTIVATION || CentralLicenseService.hasCompletedFirstRunActivation()
-  );
-  const [licenseBlocked, setLicenseBlocked] = useState(false);
-  // لا نتحقق من الترخيص المركزي أثناء تجاوز التفعيل في التطوير.
-  const centralActive = activationComplete && !BYPASS_FIRST_RUN_ACTIVATION;
-  const [licenseRetrying, setLicenseRetrying] = useState(false);
-
-  const checkLicense = useCallback(async () => {
-    if (!centralActive) return;
-    setLicenseRetrying(true);
-    try {
-      const valid = await CentralLicenseService.validate();
-      setLicenseBlocked(!valid);
-    } finally {
-      setLicenseRetrying(false);
-    }
-  }, [centralActive]);
-
-  // Revalidate at startup and periodically, but never block the local UI while
-  // a request is in flight. A rejected/expired license closes the app.
-  useEffect(() => {
-    if (!centralActive) return;
-    void checkLicense();
-    const timer = setInterval(() => void checkLicense(), 6 * 60 * 60 * 1000);
-    return () => clearInterval(timer);
-  }, [centralActive, checkLicense]);
-
-  const [centralConfigTick, setCentralConfigTick] = useState(CentralLicenseService.getConfigRevision());
-
-  // Apply any cached central config on startup
-  useEffect(() => {
-    if (!centralActive) return;
-    CentralConfigApplier.apply();
-  }, [centralActive]);
-  useEffect(() => {
-    if (!centralActive || !dbReady) return;
-    const refreshConfig = async () => {
-      const cfg = await CentralLicenseService.fetchConfig();
-      if (cfg) {
-        CentralConfigApplier.apply();
-        setCentralConfigTick(CentralLicenseService.getConfigRevision());
-      }
-    };
-    // سحب المنشأة والفروع المخصصة من منصة الإدارة المركزية (أثقل => كل ساعة).
-    const refreshEstablishment = async () => {
-      await CentralEstablishmentService.sync();
-    };
-    const refreshAll = async () => {
-      await refreshConfig();
-      await refreshEstablishment();
-    };
-
-    void refreshAll();
-    // تحديث شبه فوري: استقصاء قصير للتكوين + إعادة الجلب عند عودة التركيز للنافذة.
-    const configTimer = setInterval(() => void refreshConfig(), 60 * 1000);
-    const establishmentTimer = setInterval(() => void refreshEstablishment(), 60 * 60 * 1000);
-    // focus و visibilitychange قد يصلان معاً عند العودة للنافذة؛ نمنع الازدواج
-    // بفاصل أدنى حتى لا نُغرق المنصة المركزية بطلبات متكررة.
-    let lastRefreshAt = 0;
-    const MIN_REFRESH_INTERVAL_MS = 15 * 1000;
-    const onFocusOrVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      const now = Date.now();
-      if (now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return;
-      lastRefreshAt = now;
-      void refreshAll();
-    };
-    window.addEventListener('focus', onFocusOrVisible);
-    document.addEventListener('visibilitychange', onFocusOrVisible);
-
-    return () => {
-      clearInterval(configTimer);
-      clearInterval(establishmentTimer);
-      window.removeEventListener('focus', onFocusOrVisible);
-      document.removeEventListener('visibilitychange', onFocusOrVisible);
-    };
-  }, [centralActive, dbReady]);
-
-  // Periodic central heartbeat (device liveness)
-  useEffect(() => {
-    if (!centralActive) return;
-    void CentralLicenseService.heartbeat();
-    const timer = setInterval(() => void CentralLicenseService.heartbeat(), 30 * 60 * 1000);
-    return () => clearInterval(timer);
-  }, [centralActive]);
 
   // تهيئة الخدمات الأمنية ومؤقتات المراقبة
   useEffect(() => {
@@ -200,56 +108,6 @@ export const App: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  if (!activationComplete) {
-    return (
-      <>
-        <FirstRunActivationPage
-          onSuccess={() => {
-            setLicenseBlocked(false);
-            setActivationComplete(true);
-          }}
-        />
-        <UpdateNotification />
-      </>
-    );
-  }
-
-  if (licenseBlocked) {
-    return (
-      <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
-        <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-white p-8 text-center shadow-2xl">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-2xl font-black text-rose-700">!</div>
-          <h1 className="text-xl font-black text-slate-900">تعذر التحقق من الترخيص</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            انتهت فترة العمل دون اتصال أو رفض الخادم صلاحية هذا الجهاز. تحقق من الاتصال ثم أعد المحاولة،
-            أو أعد تفعيل الجهاز برمز جديد.
-          </p>
-          <div className="mt-6 flex flex-col gap-3">
-            <button
-              onClick={() => void checkLicense()}
-              disabled={licenseRetrying}
-              className="rounded-xl bg-sky-700 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:bg-sky-800 disabled:opacity-60"
-            >
-              {licenseRetrying ? 'جارٍ التحقق...' : 'إعادة المحاولة'}
-            </button>
-            <button
-              onClick={() => {
-                CentralLicenseService.clearActivation();
-                setLicenseBlocked(false);
-                setActivationComplete(false);
-              }}
-              disabled={licenseRetrying}
-              className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-            >
-              إعادة التفعيل برمز جديد
-            </button>
-          </div>
-        </div>
-        <UpdateNotification />
-      </main>
-    );
-  }
-
   if (!dbReady) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-100 text-slate-900 select-none px-4">
@@ -305,7 +163,7 @@ export const App: React.FC = () => {
             />
           ) : (
             <HashRouter>
-              <AppRouter key={centralConfigTick} currentUser={currentUser} onLogout={() => { AuthService.logout(); setCurrentUser(null); }} />
+              <AppRouter currentUser={currentUser} onLogout={() => { AuthService.logout(); setCurrentUser(null); }} />
             </HashRouter>
           )}
           {dbReady && currentUser && <DatabasePersistenceStatus />}

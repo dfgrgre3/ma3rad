@@ -314,6 +314,10 @@ test('sales return credit memo includes VAT for unpaid customer balances', async
   assert.equal(returned.remainingToBalance, 456);
   assert.equal(q('SELECT current_balance AS balance FROM customers WHERE id = ?', [customer.id])[0].balance, 684);
   assert.equal(q('SELECT returned_amount AS amount FROM sales_invoices WHERE id = ?', [invoice.id])[0].amount, 456);
+  assert.deepEqual(q(
+    'SELECT remaining_amount AS remaining, payment_status AS status FROM sales_invoices WHERE id = ?',
+    [invoice.id],
+  )[0], { remaining: 684, status: 'UNPAID' });
   const ledgerLines = q(`
     SELECT coa.code, jel.debit, jel.credit
     FROM journal_entries je
@@ -340,4 +344,8 @@ test('sales return credit memo includes VAT for unpaid customer balances', async
   assert.equal(finalReturn.remainingToBalance, 684);
   assert.equal(q('SELECT current_balance AS balance FROM customers WHERE id = ?', [customer.id])[0].balance, 0);
   assert.equal(q('SELECT returned_amount AS amount FROM sales_invoices WHERE id = ?', [invoice.id])[0].amount, 1140);
+  assert.deepEqual(q(
+    'SELECT remaining_amount AS remaining, payment_status AS status FROM sales_invoices WHERE id = ?',
+    [invoice.id],
+  )[0], { remaining: 0, status: 'PAID' });
 });

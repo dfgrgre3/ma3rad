@@ -89,7 +89,6 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'النسخ الاحتياطي', to: '/backup', icon: Download, perm: 'settings.backup' },
       { label: 'صحة النظام', to: '/system-health', icon: Cpu, perm: 'settings.maintenance' },
       { label: 'الإعدادات', to: '/settings', icon: Settings, anyPerms: ['settings.view', 'settings.backup'] },
-      { label: 'تفعيل المنصة المركزية', to: '/central-activation', icon: ShieldCheck, perm: 'admin.license.manage' },
       { label: 'محرك التكوين الديناميكي', to: '/settings/app-configuration', icon: SlidersHorizontal, perm: 'settings.view' },
       { label: 'استوديو التكوين', to: '/settings/configuration-studio', icon: SlidersHorizontal, perm: 'settings.view' },
     ],

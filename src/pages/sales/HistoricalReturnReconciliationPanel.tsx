@@ -8,6 +8,7 @@ import {
 type ApprovalForm = {
   cash: string;
   balance: string;
+  taxPreviouslyIncluded: '' | 'yes' | 'no';
   notes: string;
 };
 
@@ -24,10 +25,13 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [reportReviewId, setReportReviewId] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback((preserveReportReview = false) => {
     setLoading(true);
     setError(null);
-    setReportReviewId(null);
+    if (!preserveReportReview) {
+      setReportReviewId(null);
+      setForms({});
+    }
     try {
       setRows(service.listPending());
     } catch (loadError) {
@@ -41,7 +45,7 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
 
   const updateForm = (id: string, patch: Partial<ApprovalForm>) => {
     setForms((current) => {
-      const previous = current[id] || { cash: '', balance: '', notes: '' };
+      const previous = current[id] || { cash: '', balance: '', taxPreviouslyIncluded: '', notes: '' };
       return { ...current, [id]: { ...previous, ...patch } };
     });
   };
@@ -51,9 +55,9 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
       setError('احفظ تقرير الفروقات وراجعه قبل اعتماد أي تسوية.');
       return;
     }
-    const form = forms[candidate.id];
-    if (!form) {
-      setError('أدخل المبلغ النقدي والرصيد المؤكدين من مستندات أصلية، ثم اكتب ملاحظة التدقيق.');
+    const form = forms[candidate.id] || { cash: '', balance: '', taxPreviouslyIncluded: '', notes: '' };
+    if (!form.cash || !form.balance || !form.taxPreviouslyIncluded) {
+      setError('أدخل المبلغين المؤكدين وحدد هل خُصمت الضريبة سابقًا من مشتريات العميل بعد مراجعة المستندات.');
       return;
     }
     setSavingId(candidate.id);
@@ -65,16 +69,16 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
         reviewId: reportReviewId,
         confirmedCashAmount: Number(form.cash),
         confirmedBalanceAmount: Number(form.balance),
+        taxAlreadyIncludedInCustomerPurchases: form.taxPreviouslyIncluded === 'yes',
         notes: form.notes,
       });
       setNotice(`تم اعتماد تسوية ${candidate.returnNumber}. لم تُعدّل حركة النقد التاريخية.`);
-      setReportReviewId(null);
       setForms((current) => {
         const next = { ...current };
         delete next[candidate.id];
         return next;
       });
-      load();
+      load(true);
     } catch (approvalError) {
       setError(approvalError instanceof Error ? approvalError.message : String(approvalError));
     } finally {
@@ -88,6 +92,7 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
     try {
       const reviewId = service.recordReportReview();
       setRows(service.listPending());
+      setForms({});
       setReportReviewId(reviewId);
       setNotice('تم حفظ تقرير الفروقات في سجل التدقيق. راجعه قبل اعتماد أي تسوية.');
     } catch (reviewError) {
@@ -102,11 +107,11 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
           <h2 className="text-sm font-black text-slate-900">مراجعة المرتجعات التاريخية قبل التسوية</h2>
           <p className="mt-1 max-w-4xl text-[11px] leading-relaxed text-slate-600">
             الضريبة محسوبة تناسبيًا من الفاتورة الأصلية للعرض فقط. لا تُعدّل الخزينة أو الوردية أو القيد التاريخي تلقائيًا؛
-            يلزم إثبات النقد والرصيد من المستندات، ويُسجل أي قيد تصحيح في تاريخ اليوم وبعد التحقق من الفترة المفتوحة.
+            أثبت النقد والرصيد وحدد من مستندات الإصدار السابق هل خُصمت الضريبة من مشتريات العميل، ثم يُسجل أي قيد تصحيح بتاريخ اليوم.
           </p>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={load} disabled={loading} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+          <button type="button" onClick={() => load()} disabled={loading} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> تحديث
           </button>
           <button type="button" onClick={saveReportReview} disabled={loading} className="rounded-lg bg-sky-700 px-3 py-2 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-50">
@@ -124,7 +129,7 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
       ) : (
         <div className="space-y-3">
           {rows.map((row) => {
-            const form = forms[row.id] || { cash: '', balance: '', notes: '' };
+            const form = forms[row.id] || { cash: '', balance: '', taxPreviouslyIncluded: '', notes: '' };
             const ledgerMismatch = Math.abs(row.ledgerCashAmount - row.storedCashAmount) > 0.01;
             return (
               <article key={row.id} className="rounded-xl border border-slate-200 p-4">
@@ -135,7 +140,6 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
                   </div>
                   <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-800">الضريبة غير مسجلة</span>
                 </div>
-
                 <div className="grid grid-cols-2 gap-2 text-[10px] sm:grid-cols-4 lg:grid-cols-7">
                   <div><span className="text-slate-500">صافي المرتجع</span><b className="block text-slate-900">{money(row.netAmount)}</b></div>
                   <div><span className="text-slate-500">الضريبة المحسوبة للعرض</span><b className="block text-orange-700">{money(row.calculatedTax)}</b></div>
@@ -168,7 +172,7 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
                   </p>
                 )}
 
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-4">
                   <label className="text-[10px] font-bold text-slate-600">
                     النقد المؤكد فعليًا
                     <input type="number" min="0" step="0.01" value={form.cash} onChange={(event) => updateForm(row.id, { cash: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs" />
@@ -176,6 +180,23 @@ export const HistoricalReturnReconciliationPanel: React.FC = () => {
                   <label className="text-[10px] font-bold text-slate-600">
                     الرصيد المؤكد بعد مراجعة الحساب
                     <input type="number" min="0" step="0.01" value={form.balance} onChange={(event) => updateForm(row.id, { balance: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs" />
+                  </label>
+                  <label className="text-[10px] font-bold text-slate-600">
+                    هل خُصمت الضريبة مسبقًا من مشتريات العميل؟
+                    <select
+                      value={form.taxPreviouslyIncluded}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (value === '' || value === 'yes' || value === 'no') {
+                          updateForm(row.id, { taxPreviouslyIncluded: value });
+                        }
+                      }}
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
+                    >
+                      <option value="">حدد من مستندات الإصدار السابق</option>
+                      <option value="yes">نعم، خُصمت بالفعل (لا تخصمها مجددًا)</option>
+                      <option value="no">لا، لم تُخصم (اخصمها الآن)</option>
+                    </select>
                   </label>
                   <label className="text-[10px] font-bold text-slate-600">
                     ملاحظة التدقيق / مرجع المستند

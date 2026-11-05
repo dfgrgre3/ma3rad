@@ -20,6 +20,7 @@ build/*
 
 # Logs & temporary output
 *.log
+*.err
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -84,4 +85,3 @@ Microsoft/
 # UI audit (regenerable artifacts; run `npm run ui-audit:scan` and `npx playwright test e2e/ui-audit.spec.ts`)
 docs/ui-audit/manifest.json
 docs/ui-audit/smoke-report.json
-

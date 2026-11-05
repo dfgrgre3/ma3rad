@@ -11,6 +11,9 @@ import {
   hasOfficeCompoundFileSignature,
 } from './xlsxBackup';
 
+const MAX_BACKUP_FILE_SIZE = 700 * 1024 * 1024;
+const MAX_RECOVERY_KEY_FILE_SIZE = 16 * 1024;
+
 export class BackupServicePart01 {
 protected db = DatabaseManager.getInstance();
 
@@ -121,7 +124,10 @@ private async readBackupBytes(
     recoveryKeyFile?: File,
     recoveryPassword?: string
   ): Promise<Uint8Array> {
-    const fileBytes = new Uint8Array(await file.arrayBuffer());
+      if (!Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_BACKUP_FILE_SIZE) {
+        throw new Error('حجم ملف النسخة الاحتياطية فارغ أو يتجاوز الحد المسموح.');
+      }
+      const fileBytes = new Uint8Array(await file.arrayBuffer());
     if (hasOfficeCompoundFileSignature(fileBytes)) {
       let pwd: string | undefined = password;
       if (!pwd) {
@@ -155,6 +161,9 @@ private async readBackupBytes(
 
     if (isEncryptedLocalDatabase(fileBytes)) {
       if (recoveryKeyFile) {
+        if (!Number.isFinite(recoveryKeyFile.size) || recoveryKeyFile.size <= 0 || recoveryKeyFile.size > MAX_RECOVERY_KEY_FILE_SIZE) {
+          throw new Error('حجم ملف الاسترداد فارغ أو يتجاوز الحد المسموح.');
+        }
         const decryptWithRecoveryKey = window.ceramisys?.db?.decryptBackupWithRecoveryKey;
         if (!decryptWithRecoveryKey) throw new Error('استعادة النسخة بملف المفتاح تتطلب تشغيل تطبيق سطح المكتب.');
         return decryptWithRecoveryKey(

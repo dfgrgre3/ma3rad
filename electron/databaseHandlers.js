@@ -575,7 +575,37 @@ function registerDatabaseHandlers({
       ensureDirs();
       const exists = fsSync.existsSync(DB_FILE);
       const stat = exists ? await fs.stat(DB_FILE) : null;
-      return { path: DB_FILE, exists, bytes: stat ? stat.size : 0, backupDir: BACKUP_DIR };
+      let backups = { count: 0, bytes: 0, latestAt: null, latestName: null, error: null };
+      try {
+        const names = await fs.readdir(BACKUP_DIR);
+        const backupFiles = names.filter((name) =>
+          /^ceramisys_.*\.sqlite\.enc$/i.test(name)
+        );
+        const fileStats = await Promise.all(backupFiles.map(async (name) => {
+          const fileStat = await fs.stat(path.join(BACKUP_DIR, name));
+          return fileStat.isFile()
+            ? { name, bytes: fileStat.size, modifiedAt: fileStat.mtime }
+            : null;
+        }));
+        const validBackups = fileStats.filter(Boolean);
+        const latest = validBackups.sort((a, b) => b.modifiedAt - a.modifiedAt)[0] || null;
+        backups = {
+          count: validBackups.length,
+          bytes: validBackups.reduce((total, backup) => total + backup.bytes, 0),
+          latestAt: latest ? latest.modifiedAt.toISOString() : null,
+          latestName: latest ? latest.name : null,
+          error: null,
+        };
+      } catch (error) {
+        backups.error = error.message || String(error);
+      }
+      return {
+        path: DB_FILE,
+        exists,
+        bytes: stat ? stat.size : 0,
+        backupDir: BACKUP_DIR,
+        backups,
+      };
     } catch (error) {
       return { path: DB_FILE, exists: false, bytes: 0, backupDir: BACKUP_DIR, error: String(error) };
     }

@@ -37,11 +37,10 @@ function appCspPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(() => ({
   plugins: [react(), appCspPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
-    __CERAMISYS_DEV_BYPASS_ACTIVATION__: JSON.stringify(command === 'serve'),
   },
   clearScreen: false,
   logLevel: 'info',

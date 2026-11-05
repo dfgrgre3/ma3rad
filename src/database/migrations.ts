@@ -2482,6 +2482,13 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '121_record_historical_return_purchase_tax_decision',
+    description: 'Record whether historical return tax was already deducted from customer purchases.',
+    up: (db: Database) => {
+      addColumn(db, 'sales_return_reconciliations', 'customer_purchase_tax_included', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

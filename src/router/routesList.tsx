@@ -153,7 +153,6 @@ export const appRoutes: RouteDef[] = [
   { path: 'settings', element: <P.SettingsHubPage /> },
   { path: 'settings/app-configuration', element: <Navigate to="/settings?tab=appConfig" replace /> },
   { path: 'settings/configuration-studio', element: <Navigate to="/settings?tab=configStudio" replace /> },
-  { path: 'central-activation', element: <P.CentralActivationView /> },
   { path: 'users', element: <P.AdminPage initialTab="users" /> },
   { path: 'backup', element: <P.BackupPage /> },
   { path: 'system-health', element: <P.SystemHealthPage /> },

@@ -11,7 +11,7 @@ const {
 const { registerAppHandlers } = require('../electron/appHandlers');
 const { registerPrintingHandlers } = require('../electron/printing');
 
-async function createHandlers(fsImpl = fs, safeStorageOverride) {
+async function createHandlers(fsImpl = fs, safeStorageOverride, openPath = async () => '') {
   const appDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-electron-'));
   const dataDir = path.join(appDataDir, 'data');
   const backupDir = path.join(appDataDir, 'backups');
@@ -24,6 +24,7 @@ async function createHandlers(fsImpl = fs, safeStorageOverride) {
   };
   const validateIpcSender = () => true;
   let restartRequested = 0;
+  let shutdownRequested = 0;
   const ensureDirs = () => {
     fsSync.mkdirSync(dataDir, { recursive: true });
     fsSync.mkdirSync(backupDir, { recursive: true });
@@ -55,9 +56,11 @@ async function createHandlers(fsImpl = fs, safeStorageOverride) {
   });
   registerAppHandlers({
     ipcMain, validateIpcSender, app, path, fs,
-    shell: { openPath: async () => '' },
+    shell: { openPath },
     dialog: {}, BrowserWindow: {}, appDataDir, DATA_DIR: dataDir, BACKUP_DIR: backupDir,
-    ensureDirs, requestGracefulRestart: () => { restartRequested++; },
+    ensureDirs,
+    requestGracefulRestart: () => { restartRequested++; },
+    requestGracefulShutdown: () => { shutdownRequested++; },
   });
   registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir, MAX_PRINT_DATA: 1 });
 
@@ -70,6 +73,7 @@ async function createHandlers(fsImpl = fs, safeStorageOverride) {
     events,
     event: { senderFrame: { url: 'file:///index.html' } },
     getRestartRequested: () => restartRequested,
+    getShutdownRequested: () => shutdownRequested,
   };
 }
 
@@ -126,6 +130,29 @@ test('registered database handlers initialize directories and load/save within t
 
     await fs.writeFile(dbFile, Buffer.from([1, 2, 3, 4, 5]));
     await assert.rejects(handlers.get('db:load')(event), /maximum allowed size/i);
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('database info reports actual on-disk database and encrypted backup statistics', async () => {
+  const context = await createHandlers();
+  try {
+    await fs.mkdir(context.dataDir, { recursive: true });
+    await fs.mkdir(context.backupDir, { recursive: true });
+    await fs.writeFile(context.dbFile, Buffer.from([1, 2, 3]));
+    const backupName = 'ceramisys_auto_daily_test.sqlite.enc';
+    await fs.writeFile(path.join(context.backupDir, backupName), Buffer.from([4, 5, 6, 7]));
+    await fs.writeFile(path.join(context.backupDir, 'notes.txt'), Buffer.from([8, 9]));
+
+    const info = await context.handlers.get('db:info')(context.event);
+    assert.equal(info.exists, true);
+    assert.equal(info.bytes, 3);
+    assert.equal(info.backups.count, 1);
+    assert.equal(info.backups.bytes, 4);
+    assert.equal(info.backups.latestName, backupName);
+    assert.ok(Number.isFinite(Date.parse(info.backups.latestAt)));
+    assert.equal(info.backups.error, null);
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }
@@ -214,16 +241,33 @@ test('automatic database backups complete when applying the backup strategy', as
   }
 });
 
-test('network backup destination is persisted, isolated from app data, and restore-verified', async () => {
+test('network backup destination is persisted, isolated from app data, and restore-verified', async (t) => {
   const context = await createHandlers();
-  const offsiteDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-offsite-'));
+  const appRoot = path.parse(context.appDataDir).root.toLowerCase();
+  const workingRoot = path.parse(process.cwd()).root.toLowerCase();
+  const appDevice = fsSync.statSync(context.appDataDir).dev;
+  const workingDevice = fsSync.statSync(process.cwd()).dev;
+  if ((process.platform === 'win32' && appRoot === workingRoot)
+    || (process.platform !== 'win32' && appDevice === workingDevice)) {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+    t.skip('An independent writable volume is required for offsite backup validation.');
+    return;
+  }
+  const offsiteDir = await fs.mkdtemp(path.join(process.cwd(), '.ceramisys-offsite-'));
   try {
     const { handlers, event, dbFile } = context;
     await fs.mkdir(path.dirname(dbFile), { recursive: true });
-    await fs.writeFile(dbFile, Buffer.concat([
-      Buffer.from('SQLite format 3\0', 'binary'),
-      Buffer.from('test database bytes'),
-    ]));
+    const sqlJsModule = require('sql.js');
+    const initializeSqlJs = sqlJsModule.default || sqlJsModule;
+    const SQL = await initializeSqlJs({
+      locateFile: (fileName) => path.join(path.dirname(require.resolve('sql.js')), fileName),
+    });
+    const database = new SQL.Database();
+    for (const table of ['customers', 'sales_invoices', 'sales_returns', 'journal_entries']) {
+      database.run(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY)`);
+    }
+    await fs.writeFile(dbFile, Buffer.from(database.export()));
+    database.close();
 
     assert.deepEqual(await handlers.get('db:offsite-backup-dir:get')(event), { ok: true, path: null });
     assert.deepEqual(await handlers.get('db:offsite-backup-dir:set')(event, offsiteDir), {
@@ -245,7 +289,8 @@ test('network backup destination is persisted, isolated from app data, and resto
 
     const backup = await handlers.get('db:backup')(event, 'manual');
     assert.equal(backup.ok, true, backup.error);
-    assert.equal(backup.strategy.actions.find((action) => action.type === 'offsite').status, 'complete');
+    const offsiteAction = backup.strategy.actions.find((action) => action.type === 'offsite');
+    assert.equal(offsiteAction.status, 'complete', offsiteAction.description);
     const offsitePath = path.join(offsiteDir, path.basename(backup.path));
     assert.ok(fsSync.existsSync(offsitePath));
 
@@ -263,12 +308,18 @@ test('registered app and printing handlers receive their directory and size depe
   const context = await createHandlers();
   try {
     const { handlers, event, appDataDir, dataDir, backupDir } = context;
-    assert.deepEqual(await handlers.get('app:info')(event), {
-      version: 'test',
-      packaged: false,
-      dataDir: appDataDir,
-      backupDir,
-    });
+    const appInfo = await handlers.get('app:info')(event);
+    assert.deepEqual(
+      { version: appInfo.version, packaged: appInfo.packaged, dataDir: appInfo.dataDir, backupDir: appInfo.backupDir },
+      { version: 'test', packaged: false, dataDir: appDataDir, backupDir },
+    );
+    assert.equal(appInfo.system.platform, process.platform);
+    assert.equal(appInfo.system.arch, process.arch);
+    assert.ok(appInfo.system.cpuCount > 0);
+    assert.ok(appInfo.system.totalMemoryBytes > 0);
+    assert.ok(appInfo.system.freeMemoryBytes > 0);
+    assert.ok(appInfo.system.processMemoryBytes > 0);
+    assert.equal(typeof appInfo.system.disk.available, 'boolean');
     assert.deepEqual(await handlers.get('app:openFolder')(event, 'data'), {
       ok: true,
       path: dataDir,
@@ -287,11 +338,33 @@ test('registered app and printing handlers receive their directory and size depe
   }
 });
 
+test('opening a folder reports shell.openPath failures', async () => {
+  const context = await createHandlers(fs, undefined, async () => 'The folder could not be opened.');
+  try {
+    assert.deepEqual(await context.handlers.get('app:openFolder')(context.event, 'backups'), {
+      ok: false,
+      error: 'The folder could not be opened.',
+    });
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
 test('application relaunch requests graceful shutdown', async () => {
   const context = await createHandlers();
   try {
     assert.deepEqual(await context.handlers.get('app:relaunch')(context.event), { ok: true });
     assert.equal(context.getRestartRequested(), 1);
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('application shutdown requests a coordinated window close', async () => {
+  const context = await createHandlers();
+  try {
+    assert.deepEqual(await context.handlers.get('app:requestShutdown')(context.event), { ok: true });
+    assert.equal(context.getShutdownRequested(), 1);
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }

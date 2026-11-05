@@ -205,7 +205,7 @@ function createReturnInTransaction(
   const returnedServiceCost = params.trackInventory ? returnCosts.serviceCost : 0;
   const ledgerLines = buildReturnLedgerLines(params, totalReturnAmount, returnTax, impact, returnedCost, returnedServiceCost);
   updateShiftRefunds(sqliteDb, options.shiftId, impact.cashRefund);
-  updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnIncludingTax);
+  updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnIncludingTax, impact.balanceDelta);
 
   const effects: Effect[] = [
     {
@@ -542,11 +542,19 @@ function updateShiftRefunds(
 function updateInvoiceReturnedAmount(
   sqliteDb: DatabaseManager,
   invoiceId: string,
-  totalReturnAmount: number
+  totalReturnAmount: number,
+  balanceDelta: number
 ): void {
   sqliteDb.run(
-    `UPDATE sales_invoices SET returned_amount = COALESCE(returned_amount, 0) + ?,
+    `UPDATE sales_invoices SET
+     returned_amount = COALESCE(returned_amount, 0) + ?,
+     remaining_amount = MAX(0, COALESCE(remaining_amount, 0) - ?),
+     payment_status = CASE
+       WHEN MAX(0, COALESCE(remaining_amount, 0) - ?) <= 0.009 THEN 'PAID'
+       WHEN COALESCE(paid_amount, 0) > 0 THEN 'PARTIAL'
+       ELSE 'UNPAID'
+     END,
      updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [totalReturnAmount, invoiceId]
+    [totalReturnAmount, balanceDelta, balanceDelta, invoiceId]
   );
 }

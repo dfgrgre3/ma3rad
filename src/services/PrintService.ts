@@ -8,6 +8,7 @@ import { SettingsService } from './SettingsService';
 import { getEffectiveBusinessType } from './BusinessTypeService';
 import { getProfilePrintTemplate } from '../config/businessProfiles';
 import type { InvoiceSectionId, InvoiceTableColumnId } from '../types';
+import { writeAndPrintWindow } from '../utils/printWindow';
 
 export type InvoiceTemplateId = 'table' | 'classic' | 'modern' | 'compact' | 'detailed';
 export type InvoiceSizeId = 'a4' | 'a5' | 'thermal';
@@ -162,7 +163,8 @@ export class PrintService {
 
   /**
    * Returns invoice document HTML based on the requested template and paper size.
-   * Full backward compatibility: supports `getInvoiceHtml(invoice, autoPrintBool)`.
+   * Legacy autoPrint options are accepted for compatibility, but generated HTML
+   * remains script-free; callers must initiate printing from the parent window.
    */
   public getInvoiceHtml(
     invoice: SalesInvoice & { items: any[] },
@@ -173,7 +175,6 @@ export class PrintService {
       : (optionsOrAutoPrint || {});
 
     const settings = { ...this.getSettings(), ...(opts.settingsOverride || {}) };
-    const autoPrint = opts.autoPrint ?? false;
     const size: InvoiceSizeId = opts.size || (settings.defaultInvoiceSize as InvoiceSizeId) || 'a4';
     const profileTemplate = getProfilePrintTemplate(getEffectiveBusinessType(), 'sales_invoice');
     const resolvedProfileTemplate =
@@ -183,23 +184,23 @@ export class PrintService {
     const template: InvoiceTemplateId = opts.template || (settings.defaultInvoiceTemplate as InvoiceTemplateId) || resolvedProfileTemplate || 'table';
 
     if (size === 'thermal') {
-      return this.getThermalInvoiceHtml(invoice, settings, autoPrint);
+      return this.getThermalInvoiceHtml(invoice, settings);
     }
 
     if (template === 'modern') {
-      return this.getModernInvoiceHtml(invoice, settings, size, autoPrint);
+      return this.getModernInvoiceHtml(invoice, settings, size);
     }
     if (template === 'compact') {
-      return this.getCompactInvoiceHtml(invoice, settings, size, autoPrint);
+      return this.getCompactInvoiceHtml(invoice, settings, size);
     }
     if (template === 'detailed') {
-      return this.getDetailedInvoiceHtml(invoice, settings, size, autoPrint);
+      return this.getDetailedInvoiceHtml(invoice, settings, size);
     }
     if (template === 'table') {
-      return this.getTableFirstInvoiceHtml(invoice, settings, size, autoPrint);
+      return this.getTableFirstInvoiceHtml(invoice, settings, size);
     }
 
-    return this.getClassicInvoiceHtml(invoice, settings, size, autoPrint);
+    return this.getClassicInvoiceHtml(invoice, settings, size);
   }
 
   /**
@@ -359,7 +360,6 @@ export class PrintService {
     invoice: SalesInvoice & { items: any[] },
     settings: SystemSettings,
     size: 'a4' | 'a5',
-    autoPrint: boolean,
   ): string {
     const isA5 = size === 'a5';
     const primary = /^#[0-9a-f]{6}$/i.test(settings.brandPrimaryColor || '')
@@ -460,7 +460,6 @@ export class PrintService {
           </section>
           <div class="signature"><span>البائع / المحاسب</span><span>استلام العميل</span><span>اعتماد الإدارة</span></div>
           ${footer ? `<footer class="footer">${this.esc(footer)}</footer>` : ''}
-          ${autoPrint ? `<script>window.onload=function(){window.print();setTimeout(function(){window.close()},500)}</script>` : ''}
         </body>
       </html>`;
   }
@@ -468,7 +467,7 @@ export class PrintService {
   /**
    * Generates comprehensive tax breakdown HTML (Tax Details).
    */
-  private taxBreakdownHtml(invoice: SalesInvoice, isA5: boolean, currency: string): string {
+  private taxBreakdownHtml(invoice: SalesInvoice, isA5: boolean): string {
     const taxRate = invoice.taxPercentage ?? 0;
     const taxAmount = invoice.taxAmount ?? 0;
     const taxableAmount = Math.max(0, (invoice.subtotal || 0) - (invoice.discountAmount || 0));
@@ -583,7 +582,6 @@ export class PrintService {
     invoice: SalesInvoice & { items: any[] },
     settings: SystemSettings,
     size: 'a4' | 'a5',
-    autoPrint: boolean,
   ): string {
     const isA5 = size === 'a5';
     const documentTitle = this.printOverride('sales.invoice.a4', isA5 ? 'فاتورة مبيعات A5' : 'فاتورة مبيعات');
@@ -730,7 +728,7 @@ export class PrintService {
               <div class="total-row grand-total"><span>صافي الفاتورة:</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
               <div class="total-row" style="color: #16a34a; font-weight: 700; margin-top: 4px;"><span>المبلغ المسدد:</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
               ${invoice.remainingAmount > 0 ? `<div class="total-row" style="color: #dc2626; font-weight: 700;"><span>المتبقي (آجل):</span> <span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
-              ${this.taxBreakdownHtml(invoice, isA5, currency)}
+              ${this.taxBreakdownHtml(invoice, isA5)}
             </div>
           </div>
 
@@ -749,12 +747,6 @@ export class PrintService {
             ${this.esc(documentFooter)}
           </div>
 
-          ${autoPrint ? `<script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>` : ''}
         </body>
       </html>
     `;
@@ -769,7 +761,6 @@ export class PrintService {
     invoice: SalesInvoice & { items: any[] },
     settings: SystemSettings,
     size: 'a4' | 'a5',
-    autoPrint: boolean,
   ): string {
     const isA5 = size === 'a5';
     const documentFooter = this.printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
@@ -911,7 +902,7 @@ export class PrintService {
               <div class="grand-sum"><span>صافي الفاتورة</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
               <div class="sum-row" style="margin-top: 6px; font-weight: 700; color: #16a34a;"><span>المبلغ المسدد</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
               ${invoice.remainingAmount > 0 ? `<div class="sum-row" style="font-weight: 700; color: #e11d48;"><span>المتبقي (آجل)</span> <span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
-              ${this.taxBreakdownHtml(invoice, isA5, currency)}
+              ${this.taxBreakdownHtml(invoice, isA5)}
             </div>
           </div>
 
@@ -930,12 +921,6 @@ export class PrintService {
             ${this.esc(documentFooter)}
           </div>
 
-          ${autoPrint ? `<script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>` : ''}
         </body>
       </html>
     `;
@@ -950,7 +935,6 @@ export class PrintService {
     invoice: SalesInvoice & { items: any[] },
     settings: SystemSettings,
     size: 'a4' | 'a5',
-    autoPrint: boolean,
   ): string {
     const isA5 = size === 'a5';
     const documentFooter = this.printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
@@ -1052,7 +1036,7 @@ export class PrintService {
               </div>
               <div class="tot-line" style="color: #16a34a; font-weight: 700;"><span>المسدد:</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
               ${invoice.remainingAmount > 0 ? `<div class="tot-line" style="color: #dc2626; font-weight: 700;"><span>المتبقي:</span> <span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
-              ${this.taxBreakdownHtml(invoice, isA5, currency)}
+              ${this.taxBreakdownHtml(invoice, isA5)}
             </div>
           </div>
 
@@ -1068,12 +1052,6 @@ export class PrintService {
 
           <div class="footer">${this.esc(documentFooter)}</div>
 
-          ${autoPrint ? `<script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>` : ''}
         </body>
       </html>
     `;
@@ -1088,7 +1066,6 @@ export class PrintService {
     invoice: SalesInvoice & { items: any[] },
     settings: SystemSettings,
     size: 'a4' | 'a5',
-    autoPrint: boolean,
   ): string {
     const isA5 = size === 'a5';
     const documentFooter = this.printOverride('sales.invoice.a4.footer', settings.receiptFooter || '');
@@ -1232,7 +1209,7 @@ export class PrintService {
               <div class="tot-row grand-tot"><span>صافي القيمة:</span> <span>${CeramicMath.formatCurrency(invoice.totalAmount)}</span></div>
               <div class="tot-row" style="color: #16a34a; font-weight: 700;"><span>المبلغ المسدد:</span> <span>${CeramicMath.formatCurrency(invoice.paidAmount)}</span></div>
               ${invoice.remainingAmount > 0 ? `<div class="tot-row" style="color: #dc2626; font-weight: 700;"><span>المتبقي (آجل):</span> <span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
-              ${this.taxBreakdownHtml(invoice, isA5, currency)}
+              ${this.taxBreakdownHtml(invoice, isA5)}
             </div>
           </div>
 
@@ -1249,12 +1226,6 @@ export class PrintService {
 
           <div class="footer-detailed">${this.esc(documentFooter)}</div>
 
-          ${autoPrint ? `<script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>` : ''}
         </body>
       </html>
     `;
@@ -1266,7 +1237,6 @@ export class PrintService {
   private getThermalInvoiceHtml(
     invoice: SalesInvoice & { items: any[] },
     settings: SystemSettings,
-    autoPrint: boolean,
   ): string {
     const receiptTitle = this.printOverride('sales.invoice.receipt', 'إيصال مبيعات');
     const receiptFooter = this.printOverride('sales.invoice.receipt.footer', settings.receiptFooter || '');
@@ -1332,12 +1302,6 @@ export class PrintService {
           ${invoice.remainingAmount > 0 ? `<div class="totals-row" style="color: #b91c1c; font-weight: 700;"><span>المتبقي</span><span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
           ${this.orderedInvoiceDetails(invoice, settings, true)}
           <div class="footer">${this.esc(receiptFooter)}</div>
-          ${autoPrint ? `<script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>` : ''}
         </body>
       </html>
     `;
@@ -1353,8 +1317,11 @@ export class PrintService {
       alert('يرجى السماح بالنوافذ المنبثقة لطباعة الفاتورة');
       return;
     }
-    printWindow.document.write(this.getInvoiceHtml(invoice, { autoPrint: true, size, template }));
-    printWindow.document.close();
+    writeAndPrintWindow(
+      printWindow,
+      this.getInvoiceHtml(invoice, { size, template }),
+      true,
+    );
   }
 
   /**
@@ -1443,18 +1410,11 @@ export class PrintService {
           <div class="totals-row"><span>طريقة الدفع</span><span>${invoice.paymentType === 'CASH' ? 'نقدي' : invoice.paymentType === 'CARD' ? 'بطاقة' : invoice.paymentType === 'BANK_TRANSFER' ? 'تحويل بنكي' : invoice.paymentType === 'CHEQUE' ? 'شيك' : invoice.paymentType === 'MIXED' ? 'دفع مختلط' : 'آجل'}</span></div>
           ${invoice.remainingAmount > 0 ? `<div class="totals-row"><span>المتبقي (آجل)</span><span>${CeramicMath.formatCurrency(invoice.remainingAmount)}</span></div>` : ''}
           <div class="footer">${this.esc(receiptFooter || '')}</div>
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            }
-          </script>
         </body>
       </html>
     `;
 
-    printWindow.document.write(html);
-    printWindow.document.close();
+    writeAndPrintWindow(printWindow, html, true);
   }
 
   private async printThermalReceiptDirect(
@@ -1497,7 +1457,7 @@ export class PrintService {
       alert('يرجى السماح بالنوافذ المنبثقة للطباعة');
       return;
     }
-    win.document.write(`<!DOCTYPE html>
+    writeAndPrintWindow(win, `<!DOCTYPE html>
       <html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${this.esc(title)}</title>
       <style>
         @page { size: A4; margin: 12mm; }
@@ -1522,10 +1482,7 @@ export class PrintService {
         .notes { margin-top: 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px; white-space: pre-line; }
         .footer { margin-top: 26px; border-top: 1px dashed #cbd5e1; padding-top: 10px; text-align: center; color: #64748b; font-size: 10px; white-space: pre-line; }
         @media print { body { padding: 0; } }
-      </style></head><body>${body}
-      <script>window.onload = function () { window.print(); };</script>
-      </body></html>`);
-    win.document.close();
+      </style></head><body>${body}</body></html>`, false);
   }
 
   private header(settings: SystemSettings, title: string, docNo: string, date: string, extra = ''): string {

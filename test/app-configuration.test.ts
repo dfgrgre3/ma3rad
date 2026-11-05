@@ -138,7 +138,8 @@ test('app configuration overrides printed document titles and footers', async ()
   }, 'اختبار الطباعة', admin);
 
   assert.equal(AppConfigService.getPrintTemplate('sales.invoice.a4', 'افتراضي'), 'فاتورة معرض خاصة');
-  const html = new PrintService().getInvoiceHtml({
+  const service = new PrintService();
+  const invoice = {
     invoiceNumber: 'INV-TEST-1',
     date: '2026-10-30',
     items: [],
@@ -155,9 +156,21 @@ test('app configuration overrides printed document titles and footers', async ()
     customerPhone: '',
     warehouseName: '',
     notes: '',
-  } as any);
+  } as any;
+  const html = service.getInvoiceHtml(invoice);
   assert.match(html, /فاتورة معرض خاصة/);
   assert.match(html, /شكرًا لتعاملكم معنا/);
+  const autoPrintOptions = [
+    { autoPrint: true, template: 'table' },
+    { autoPrint: true, template: 'classic' },
+    { autoPrint: true, template: 'modern' },
+    { autoPrint: true, template: 'compact' },
+    { autoPrint: true, template: 'detailed' },
+    { autoPrint: true, size: 'thermal' },
+  ] as const;
+  for (const options of autoPrintOptions) {
+    assert.doesNotMatch(service.getInvoiceHtml(invoice, options), /<script\b|onload=/i);
+  }
 });
 
 test('table-first invoices keep optional details hidden and honor section and column settings', async () => {

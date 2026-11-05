@@ -318,12 +318,36 @@ test('historical return reconciliation requires verified values and leaves histo
       { accountCode: '1103', debit: 0, credit: 100 },
     ],
   });
+  const legacyV4ReturnId = 'ret_historical_reconcile_v4_test';
+  db.run(
+    `INSERT INTO sales_returns (
+       id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
+       date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason,
+       refund_method, created_by
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 50, NULL, 0, 50, 'legacy v4 return', 'BALANCE', ?)`,
+    [legacyV4ReturnId, 'RET-HIST-RECONCILE-V4', invoice.id, invoice.invoiceNumber, customer.id, 'wh_main',
+      localDateString(), 'usr_admin'],
+  );
+  postLedgerEntry(db.getDatabase(), {
+    date: localDateString(),
+    description: 'Legacy v4 return journal entry without a separate tax line',
+    referenceType: 'SALES_RETURN',
+    referenceId: legacyV4ReturnId,
+    createdBy: 'usr_admin',
+    lines: [
+      { accountCode: '4101', debit: 50, credit: 0 },
+      { accountCode: '1103', debit: 0, credit: 50 },
+    ],
+  });
 
   const service = new HistoricalReturnReconciliationService();
   const candidate = service.listPending().find((row) => row.id === returnId);
+  const legacyV4Candidate = service.listPending().find((row) => row.id === legacyV4ReturnId);
   assert.ok(candidate);
+  assert.ok(legacyV4Candidate);
   assert.equal(candidate.calculatedTax, 15);
   assert.equal(candidate.grossAmount, 115);
+  assert.equal(legacyV4Candidate.calculatedTax, 7.5);
   const reviewId = service.recordReportReview();
 
   const cashBefore = db.query<{ balance: number }>(
@@ -332,7 +356,10 @@ test('historical return reconciliation requires verified values and leaves histo
      WHERE coa.code IN ('1101','1102','1105','1106')`,
   )[0].balance;
   assert.throws(
-    () => service.approve({ returnId, reviewId, confirmedCashAmount: 0, confirmedBalanceAmount: 100, notes: 'verified source records' }),
+    () => service.approve({
+      returnId, reviewId, confirmedCashAmount: 0, confirmedBalanceAmount: 100,
+      taxAlreadyIncludedInCustomerPurchases: true, notes: 'verified source records',
+    }),
     /مجموع النقد المؤكد والرصيد المؤكد/
   );
   assert.equal(db.query<{ returnTaxAmount: number | null }>(
@@ -344,6 +371,7 @@ test('historical return reconciliation requires verified values and leaves histo
     reviewId,
     confirmedCashAmount: 0,
     confirmedBalanceAmount: 115,
+    taxAlreadyIncludedInCustomerPurchases: true,
     notes: 'verified customer ledger and invoice',
   });
 
@@ -354,7 +382,7 @@ test('historical return reconciliation requires verified values and leaves histo
   )[0];
   assert.deepEqual(correctedReturn, { tax: 15, cash: 0, balance: 115 });
   assert.equal(db.query<{ balance: number }>('SELECT current_balance AS balance FROM customers WHERE id = ?', [customer.id])[0].balance, 185);
-  assert.equal(db.query<{ purchases: number }>('SELECT total_purchases AS purchases FROM customers WHERE id = ?', [customer.id])[0].purchases, 485);
+  assert.equal(db.query<{ purchases: number }>('SELECT total_purchases AS purchases FROM customers WHERE id = ?', [customer.id])[0].purchases, 500);
   assert.equal(db.query<{ remaining: number }>('SELECT remaining_amount AS remaining FROM sales_invoices WHERE id = ?', [invoice.id])[0].remaining, 85);
   assert.equal(db.query<{ count: number }>(
     'SELECT COUNT(*) AS count FROM sales_return_reconciliations WHERE return_id = ?', [returnId]
@@ -365,4 +393,30 @@ test('historical return reconciliation requires verified values and leaves histo
      WHERE coa.code IN ('1101','1102','1105','1106')`,
   )[0].balance;
   assert.equal(cashAfter, cashBefore);
+
+  service.approve({
+    returnId: legacyV4ReturnId,
+    reviewId,
+    confirmedCashAmount: 0,
+    confirmedBalanceAmount: 57.5,
+    taxAlreadyIncludedInCustomerPurchases: false,
+    notes: 'verified v4 customer ledger',
+  });
+  assert.equal(db.query<{ purchases: number }>(
+    'SELECT total_purchases AS purchases FROM customers WHERE id = ?', [customer.id]
+  )[0].purchases, 492.5);
+  assert.equal(db.query<{ remaining: number }>(
+    'SELECT remaining_amount AS remaining FROM sales_invoices WHERE id = ?', [invoice.id]
+  )[0].remaining, 77.5);
+  assert.equal(db.query<{ usedAt: string | null }>(
+    'SELECT used_at AS usedAt FROM sales_return_reconciliation_reviews WHERE id = ?', [reviewId]
+  )[0].usedAt, null);
+  assert.deepEqual(db.query<{ taxIncluded: number }>(
+    'SELECT customer_purchase_tax_included AS taxIncluded FROM sales_return_reconciliations WHERE return_id = ?',
+    [returnId],
+  )[0], { taxIncluded: 1 });
+  assert.deepEqual(db.query<{ taxIncluded: number }>(
+    'SELECT customer_purchase_tax_included AS taxIncluded FROM sales_return_reconciliations WHERE return_id = ?',
+    [legacyV4ReturnId],
+  )[0], { taxIncluded: 0 });
 });

@@ -7,9 +7,10 @@ const projectRoot = path.resolve(__dirname, '..');
 const packageJson = require(path.join(projectRoot, 'package.json'));
 const builderCli = require.resolve('electron-builder/cli.js');
 
-function runBuilder(args) {
+function runBuilder(args, env = process.env) {
   const child = spawnSync(process.execPath, [builderCli, ...args], {
     cwd: projectRoot,
+    env,
     stdio: 'inherit',
   });
 
@@ -28,7 +29,8 @@ function runBuilder(args) {
 
 function buildWithTemporaryOutput(args) {
   const legacyWin7 = args.includes('--legacy-win7');
-  args = args.filter((arg) => arg !== '--legacy-win7');
+  const unsignedBuild = args.includes('--unsigned');
+  args = args.filter((arg) => arg !== '--legacy-win7' && arg !== '--unsigned');
 
   if (args.includes('--version') || args.includes('--help') || args.includes('-h')) {
     runBuilder(args);
@@ -37,10 +39,19 @@ function buildWithTemporaryOutput(args) {
 
   const windowsBuild = args.includes('--win');
   const publisherName = process.env.CERAMISYS_PUBLISHER_NAME?.trim();
-  if (windowsBuild && !publisherName) {
+  if (windowsBuild && !unsignedBuild && !publisherName) {
     throw new Error(
       'CERAMISYS_PUBLISHER_NAME must match the Windows signing certificate publisher for signed builds and update verification.',
     );
+  }
+
+  const builderEnvironment = { ...process.env };
+  if (unsignedBuild) {
+    delete builderEnvironment.CSC_LINK;
+    delete builderEnvironment.CSC_KEY_PASSWORD;
+    delete builderEnvironment.WIN_CSC_LINK;
+    delete builderEnvironment.WIN_CSC_KEY_PASSWORD;
+    builderEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
   }
 
   const temporaryOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-electron-builder-'));
@@ -50,7 +61,11 @@ function buildWithTemporaryOutput(args) {
   try {
     const windowsBuildConfig = {
       ...packageJson.build.win,
-      ...(windowsBuild ? { publisherName } : {}),
+      ...(windowsBuild && unsignedBuild
+        ? { forceCodeSigning: false, verifyUpdateCodeSignature: false }
+        : windowsBuild
+          ? { publisherName }
+          : {}),
       ...(legacyWin7
         ? {
             target: [{ target: 'nsis', arch: ['ia32'] }],
@@ -69,7 +84,7 @@ function buildWithTemporaryOutput(args) {
     };
     fs.writeFileSync(temporaryConfig, JSON.stringify(buildConfig, null, 2));
 
-    if (!runBuilder(['--config', temporaryConfig, ...args])) {
+    if (!runBuilder(['--config', temporaryConfig, ...args], builderEnvironment)) {
       return;
     }
 

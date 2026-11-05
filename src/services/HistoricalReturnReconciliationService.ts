@@ -44,6 +44,7 @@ export interface HistoricalReturnApproval {
   reviewId: string;
   confirmedCashAmount: number;
   confirmedBalanceAmount: number;
+  taxAlreadyIncludedInCustomerPurchases: boolean;
   notes: string;
 }
 
@@ -164,8 +165,9 @@ export class HistoricalReturnReconciliationService {
     const confirmedBalanceAmount = round2(Number(input.confirmedBalanceAmount));
     const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
     if (!input.returnId || !input.reviewId || !Number.isFinite(confirmedCashAmount) || confirmedCashAmount < 0 ||
-        !Number.isFinite(confirmedBalanceAmount) || confirmedBalanceAmount < 0 || notes.length < 5) {
-      throw new Error('أدخل مبالغ مؤكدة صحيحة وملاحظة تدقيق لا تقل عن 5 أحرف.');
+        !Number.isFinite(confirmedBalanceAmount) || confirmedBalanceAmount < 0 ||
+        typeof input.taxAlreadyIncludedInCustomerPurchases !== 'boolean' || notes.length < 5) {
+      throw new Error('أدخل مبالغ مؤكدة صحيحة، وحدد معالجة الضريبة السابقة، واكتب ملاحظة تدقيق لا تقل عن 5 أحرف.');
     }
 
     const candidateRow = this.pendingRows(input.returnId)[0];
@@ -202,6 +204,7 @@ export class HistoricalReturnReconciliationService {
     const recordedCredits = round2(candidate.storedCashAmount + candidate.storedBalanceAmount);
     const invoiceReturnDelta = round2(candidate.grossAmount - recordedCredits);
     const taxReduction = candidate.calculatedTax;
+    const customerPurchaseTaxReduction = input.taxAlreadyIncludedInCustomerPurchases ? 0 : taxReduction;
 
     const correctionEntryId = this.db.executeTransaction((tx) => {
       const fresh = this.pendingRows(input.returnId, tx.getDatabase())[0];
@@ -237,7 +240,7 @@ export class HistoricalReturnReconciliationService {
              total_purchases = COALESCE(total_purchases, 0) - ?,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        [balanceDelta, taxReduction, fresh.customer_id]
+        [balanceDelta, customerPurchaseTaxReduction, fresh.customer_id]
       );
       tx.run(
         `UPDATE sales_invoices
@@ -256,19 +259,16 @@ export class HistoricalReturnReconciliationService {
         `INSERT INTO sales_return_reconciliations (
            id, return_id, invoice_returned_amount_before, stored_cash_amount, stored_balance_amount,
            calculated_tax_amount, confirmed_cash_amount, confirmed_balance_amount,
-           existing_ledger_summary, correction_entry_id, approved_by, approved_at, notes
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           customer_purchase_tax_included, existing_ledger_summary, correction_entry_id,
+           approved_by, approved_at, notes
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           reconciliationId, input.returnId, freshCandidate.invoiceReturnedAmount,
           freshCandidate.storedCashAmount, freshCandidate.storedBalanceAmount, taxReduction,
-          confirmedCashAmount, confirmedBalanceAmount, ledgerSummary, entryId,
+          confirmedCashAmount, confirmedBalanceAmount,
+          input.taxAlreadyIncludedInCustomerPurchases ? 1 : 0, ledgerSummary, entryId,
           actor.id, new Date().toISOString(), notes,
         ]
-      );
-      tx.run(
-        `UPDATE sales_return_reconciliation_reviews SET used_at = ?
-         WHERE id = ? AND reviewed_by = ? AND used_at IS NULL`,
-        [new Date().toISOString(), input.reviewId, actor.id]
       );
       return entryId;
     });
@@ -288,6 +288,7 @@ export class HistoricalReturnReconciliationService {
         cash: confirmedCashAmount,
         balance: confirmedBalanceAmount,
         tax: taxReduction,
+        taxAlreadyIncludedInCustomerPurchases: input.taxAlreadyIncludedInCustomerPurchases,
         correctionEntryId,
         notes,
       }),
@@ -300,13 +301,13 @@ export class HistoricalReturnReconciliationService {
     candidate: HistoricalReturnCandidate,
     database = this.db.getDatabase()
   ): void {
-    const review = queryLedgerRows<{ reviewed_by: string; snapshot_json: string; used_at: string | null }>(
+    const review = queryLedgerRows<{ reviewed_by: string; snapshot_json: string }>(
       database,
-      `SELECT reviewed_by, snapshot_json, used_at
+      `SELECT reviewed_by, snapshot_json
        FROM sales_return_reconciliation_reviews WHERE id = ?`,
       [reviewId]
     )[0];
-    if (!review || review.reviewed_by !== actorId || review.used_at) {
+    if (!review || review.reviewed_by !== actorId) {
       throw new Error('احفظ تقرير الفروقات الحالي وراجعه قبل اعتماد أي تسوية.');
     }
     let candidates: HistoricalReturnCandidate[];
@@ -318,7 +319,6 @@ export class HistoricalReturnReconciliationService {
     const reviewed = candidates.find((item) => item.id === candidate.id);
     const comparedFields: Array<keyof HistoricalReturnCandidate> = [
       'netAmount', 'calculatedTax', 'grossAmount', 'storedCashAmount', 'storedBalanceAmount',
-      'invoiceReturnedAmount', 'customerBalance', 'customerTotalPurchases', 'invoiceRemainingAmount',
       'registerId', 'shiftId', 'cashRegisterBalance', 'shiftTotalRefunds', 'ledgerEntryIds',
       'ledgerEntryNumbers', 'ledgerLinesSummary', 'ledgerEntryCount', 'ledgerCashAmount',
       'ledgerRevenueAmount', 'ledgerTaxAmount', 'ledgerBalanceAmount',

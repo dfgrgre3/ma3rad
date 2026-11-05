@@ -34,7 +34,7 @@ function safeName(name: string): string {
  */
 export function buildExportHtml(
   { title, subtitle, columns, rows, kpis, notes, permission }: ExportOptions,
-  autoPrint = false
+  _autoPrint = false
 ): string {
   if (permission) ExportService.assertAllowed(permission);
   const esc = (s: unknown) =>
@@ -213,7 +213,6 @@ export function buildExportHtml(
     <div>تاريخ وموعد الطباعة: ${stamp()}</div>
   </div>
 
-  ${autoPrint ? '<script>window.onload = function () { window.print(); };</script>' : ''}
 </body>
 </html>`;
 }
@@ -267,7 +266,7 @@ export async function downloadPdf(html: string, fileName: string): Promise<void>
     await bridge.savePdf(html, fileName, landscape);
     return;
   }
-  printHtml(html.replace('<body>', '<body onload="window.print()">'));
+  printHtml(html);
 }
 
 export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, permission }: ExportOptions): void {

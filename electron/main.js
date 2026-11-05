@@ -114,7 +114,6 @@ app.disableHardwareAcceleration();
 
 // تحسينات استهلاك الموارد للأجهزة الضعيفة والقديمة (Low-spec optimizations)
 app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
@@ -159,6 +158,7 @@ let syncClientConfigSource = 'none';
 let syncRelay = null;
 let syncStartupError = null;
 let restartAfterGracefulClose = false;
+let shutdownAfterGracefulClose = false;
 let pendingUpdateInstall = false;
 let updateController = null;
 
@@ -262,12 +262,18 @@ function createWindow() {
         pendingUpdateInstall = false;
         return;
       }
+      if (shutdownAfterGracefulClose) {
+        shutdownAfterGracefulClose = false;
+        app.quit();
+        return;
+      }
       if (!restartAfterGracefulClose) return;
       restartAfterGracefulClose = false;
       app.relaunch();
     },
     onCancelledClose: () => {
       restartAfterGracefulClose = false;
+      shutdownAfterGracefulClose = false;
       pendingUpdateInstall = false;
     },
   });
@@ -327,6 +333,15 @@ registerAppHandlers({
     restartAfterGracefulClose = true;
     win.close();
   },
+  requestGracefulShutdown: () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (!win) {
+      app.quit();
+      return;
+    }
+    shutdownAfterGracefulClose = true;
+    win.close();
+  },
 });
 registerDocumentHandlers({
   ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, appDataDir: APP_DATA_DIR,
@@ -341,7 +356,7 @@ registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = 'cd420a4bc152972704afa97cc5c39d1ad851c60b1e16f5d19f529caa778be599';
+const PRELOAD_INTEGRITY_SHA256 = '68e8af6cb8a356cae306ec46521b93e161229ca8623af7d173d7863ea29d5860';
 ipcMain.handle('security:check-integrity', async (event) => {
   validateIpcSender(event);
   return integrityChecker.verifyManifest({
@@ -631,12 +646,4 @@ app.on('before-quit', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
-});
-
-// Handle graceful shutdown - allow renderer to request controlled close
-ipcMain.handle('app:requestShutdown', async (event) => {
-  validateIpcSender(event);
-  // In a real implementation, this would coordinate with the renderer
-  // to ensure all data is flushed before closing
-  return { ok: true };
 });

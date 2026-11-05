@@ -86,6 +86,7 @@ async function build() {
     throw new Error('The Windows 7 / ia32 installer must be built on Windows.');
   }
 
+  const unsignedBuild = process.argv.includes('--unsigned');
   findBytecode(electronDirectory);
   const electronPath = await downloadLegacyElectron();
   const legacyEnvironment = {
@@ -132,6 +133,7 @@ async function build() {
   run(process.execPath, [
     path.join(__dirname, 'electron-builder-with-temp-output.cjs'),
     '--legacy-win7',
+    ...(unsignedBuild ? ['--unsigned'] : []),
     '--win',
     'nsis',
     '--ia32',

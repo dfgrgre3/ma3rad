@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const electronDir = path.join(__dirname, '../electron');
+const defaultElectronDir = path.join(__dirname, '../electron');
 
 // قائمة الملفات التي يجب حذف نسختها النصية .js إذا وُجدت نسخة .jsc المترجمة
 const compiledFiles = [
@@ -19,22 +19,36 @@ const compiledFiles = [
   'gracefulShutdown',
   'autoUpdater',
   'safeStorageCompat',
+  'security/crypto',
+  'security/licenseValidator',
+  'security/fileIntegrity',
+  'security/ipcGuard',
+  'security/auditLogger',
+  'security/index',
 ];
 
-console.log('🛡️ Cleaning plain JS files to keep only compiled V8 bytecode in release bundle...');
+function prepareProductionBundle(electronDir = defaultElectronDir) {
+  console.log('🛡️ Cleaning plain JS files to keep only compiled V8 bytecode in release bundle...');
 
-for (const name of compiledFiles) {
-  const jsc = path.join(electronDir, `${name}.jsc`);
-  const js = path.join(electronDir, `${name}.js`);
-  const backupJs = path.join(electronDir, `${name}.js.bak`);
+  for (const name of compiledFiles) {
+    const sourcePath = path.join(electronDir, `${name}.js`);
+    const bytecodePath = path.join(electronDir, `${name}.jsc`);
+    const backupPath = `${sourcePath}.bak`;
 
-  if (fs.existsSync(jsc) && fs.existsSync(js)) {
-    // نأخذ نسخة احتياطية .bak حتى لا نفقد الكود أثناء التطوير
-    fs.copyFileSync(js, backupJs);
-    // إفراغ أو إزالة محتوى ملف الـ js بحيث لا يحتوي على أي كود أصلي داخل حزمة الإنتاج
-    fs.writeFileSync(js, `// Protected binary code\nmodule.exports = require('./${name}.jsc');\n`);
-    console.log(`  ✓ Protected: ${name}.js replaced with binary bytecode loader`);
+    if (fs.existsSync(bytecodePath) && fs.existsSync(sourcePath)) {
+      const source = fs.readFileSync(sourcePath, 'utf8');
+      if (source.includes('// Protected binary code')) continue;
+
+      if (!fs.existsSync(backupPath)) fs.copyFileSync(sourcePath, backupPath);
+      const loaderPath = `./${path.basename(name)}.jsc`;
+      fs.writeFileSync(sourcePath, `// Protected binary code\nmodule.exports = require('${loaderPath}');\n`);
+      console.log(`  ✓ Protected: ${name}.js replaced with binary bytecode loader`);
+    }
   }
+
+  console.log('✅ Production bundle ready: All business logic is compiled to binary.');
 }
 
-console.log('✅ Production bundle ready: All business logic is compiled to binary.');
+if (require.main === module) prepareProductionBundle();
+
+module.exports = { prepareProductionBundle, compiledFiles };

@@ -2,7 +2,16 @@ import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { CashShift } from '../../types';
 import type { CashierService } from '../../services/CashierService';
 import { CeramicMath } from '../../utils/ceramicMath';
+import { writeAndPrintWindow } from '../../utils/printWindow';
 import type { Toast } from './types';
+
+const escapeHtml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[character] || character));
 
 interface UsePosShiftActionsOptions {
   can: (permission: string) => boolean;
@@ -93,12 +102,13 @@ export const usePosShiftActions = ({
       notify('يرجى السماح بالنوافذ المنبثقة', 'error');
       return;
     }
+    const shiftNumber = escapeHtml(activeShift.shiftNumber);
     const html = `
-      <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>Z-Report ${activeShift.shiftNumber}</title>
+      <!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>Z-Report ${shiftNumber}</title>
       <style>body{font-family:Tahoma,sans-serif;width:76mm;margin:0 auto;padding:6px;font-size:12px;} .c{text-align:center;} .b{font-weight:800;} .row{display:flex;justify-content:space-between;} .div{border-top:1px dashed #000;margin:6px 0;}</style></head><body>
       <div class="c b">${activeShift.shiftNumber ? 'تقرير Z - إقفال الوردية' : ''}</div>
       <div class="div"></div>
-      <div class="row"><span>رقم الوردية</span><span>${activeShift.shiftNumber}</span></div>
+      <div class="row"><span>رقم الوردية</span><span>${shiftNumber}</span></div>
       <div class="row"><span>الافتتاحي</span><span>${CeramicMath.formatCurrency(activeShift.openingBalance)}</span></div>
       <div class="row"><span>مبيعات نقدية</span><span>${CeramicMath.formatCurrency(activeShift.totalSalesCash)}</span></div>
       <div class="row"><span>تحصيلات العملاء</span><span>${CeramicMath.formatCurrency(activeShift.totalCustomerPayments)}</span></div>
@@ -108,10 +118,8 @@ export const usePosShiftActions = ({
       <div class="row"><span>الفرق</span><span>${CeramicMath.formatCurrency(closingCash - expectedClosingCash)}</span></div>
       <div class="div"></div>
       <div class="c" style="font-size:10px;">${new Date().toLocaleString('ar')}</div>
-      <script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);}</script>
       </body></html>`;
-    reportWindow.document.write(html);
-    reportWindow.document.close();
+    writeAndPrintWindow(reportWindow, html, true);
   }, [activeShift, expectedClosingCash, closingCash, notify]);
 
   return { handleOpenShift, handleCloseShift, printZReport };

@@ -6,6 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const bytenode = require('bytenode');
 const packageConfig = require('../package.json');
+const { prepareProductionBundle } = require('../scripts/prepare-production-bundle.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
 
@@ -57,7 +58,52 @@ test('distribution and publish commands compile Electron bytecode before packagi
 
   const compiler = fs.readFileSync(path.join(projectRoot, 'scripts', 'compile-bytenode.cjs'), 'utf8');
   assert.match(compiler, /'main\.js'/);
+  assert.match(compiler, /'security\/crypto\.js'/);
   assert.ok(packageConfig.build.files.includes('electron/**/*'), 'the packaged files must include generated .jsc files');
+});
+
+test('production preparation protects nested security modules with relative bytecode loaders', (t) => {
+  const electronDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-protected-electron-'));
+  t.after(() => fs.rmSync(electronDir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(electronDir, 'security'));
+  fs.writeFileSync(path.join(electronDir, 'security', 'crypto.js'), 'module.exports = "source";\n');
+  fs.writeFileSync(path.join(electronDir, 'security', 'crypto.jsc'), 'compiled');
+
+  prepareProductionBundle(electronDir);
+
+  assert.equal(
+    fs.readFileSync(path.join(electronDir, 'security', 'crypto.js.bak'), 'utf8'),
+    'module.exports = "source";\n',
+  );
+  assert.equal(
+    fs.readFileSync(path.join(electronDir, 'security', 'crypto.js'), 'utf8'),
+    "// Protected binary code\nmodule.exports = require('./crypto.jsc');\n",
+  );
+});
+
+test('package scripts do not reference missing local script files', () => {
+  const missingScripts = [];
+  for (const [name, command] of Object.entries(packageConfig.scripts)) {
+    const matches = command.matchAll(/\bnode\s+(?:(?:--[^\s]+\s+))*((?:scripts)\/[^\s&]+)/g);
+    for (const match of matches) {
+      if (!fs.existsSync(path.join(projectRoot, match[1]))) missingScripts.push(`${name}: ${match[1]}`);
+    }
+  }
+  assert.deepEqual(missingScripts, []);
+});
+
+test('unsigned Windows distribution commands do not require a signing certificate', () => {
+  for (const scriptName of [
+    'electron:dist:x64:unsigned',
+    'electron:dist:ia32:unsigned',
+    'electron:dist:all:unsigned',
+  ]) {
+    assert.ok(packageConfig.scripts[scriptName], `missing ${scriptName}`);
+  }
+
+  assert.match(packageConfig.scripts['electron:dist:x64:unsigned'], /--unsigned/);
+  assert.match(packageConfig.scripts['electron:dist:ia32:unsigned'], /--unsigned/);
+  assert.match(packageConfig.scripts['electron:dist:all:unsigned'], /electron:dist:x64:unsigned.*electron:dist:ia32:unsigned/);
 });
 
 test('bytenode output executes the exact source passed to the compiler', async (t) => {

@@ -32,7 +32,20 @@ declare global {
         removeBackup?: (fileName: string) => Promise<{ ok: boolean; deleted: boolean; error?: string }>;
         preserveCorrupt?: () => Promise<{ path: string; bytes: number }>;
         createFreshAfterRecovery?: () => Promise<{ ok: boolean; path?: string }>;
-        info?: () => Promise<{ path: string; exists: boolean; bytes: number; backupDir: string; error?: string }>;
+        info?: () => Promise<{
+          path: string;
+          exists: boolean;
+          bytes: number;
+          backupDir: string;
+          error?: string;
+          backups?: {
+            count: number;
+            bytes: number;
+            latestAt: string | null;
+            latestName: string | null;
+            error: string | null;
+          };
+        }>;
       };
       credentials?: {
         get?: () => Promise<{ username: string; password: string; consented: true } | null>;
@@ -127,7 +140,24 @@ declare global {
         disconnect?: () => Promise<{ ok: boolean; stdout?: string; error?: string }>;
       };
       app?: {
-        info?: () => Promise<{ version: string; packaged: boolean; dataDir: string; backupDir: string }>;
+        info?: () => Promise<{
+          version: string;
+          packaged: boolean;
+          dataDir: string;
+          backupDir: string;
+          system?: {
+            platform: string;
+            arch: string;
+            osRelease: string;
+            cpuCount: number;
+            totalMemoryBytes: number;
+            freeMemoryBytes: number;
+            processUptimeSeconds: number;
+            processMemoryBytes: number;
+            processHeapUsedBytes: number;
+            disk: { available: true; freeBytes: number; totalBytes: number } | { available: false; error: string };
+          };
+        }>;
         openFolder?: (target?: 'data' | 'backups') => Promise<{ ok: boolean; path?: string; error?: string }>;
         relaunch?: () => Promise<{ ok: boolean }>;
         onBeforeClose?: (callback: (requestId: number) => void | Promise<void>) => () => void;

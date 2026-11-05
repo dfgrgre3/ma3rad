@@ -165,7 +165,6 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/settings', any: ['settings.view', 'settings.backup'] },
   { path: '/settings/app-configuration', any: ['settings.app_config.view', 'settings.view'] },
   { path: '/settings/configuration-studio', any: ['settings.config_studio.view', 'settings.view'] },
-  { path: '/central-activation', all: ['admin.license.manage'] },
   { path: '/users', all: ['users.view'] },
   { path: '/backup', all: ['settings.backup'] },
   { path: '/system-health', any: ['settings.health.view', 'settings.maintenance'] },
