@@ -51,6 +51,7 @@ public transferStock(
       // `inventory_transactions.id`, not the human-readable number.
       const outTxId = `tx_${uuidv4().substring(0, 8)}`;
       const inTxId = `tx_${uuidv4().substring(0, 8)}`;
+      const transferId = `trf_${uuidv4().substring(0, 8)}`;
 
       // 2. Decrease source warehouse
       sqliteDb.run(`
@@ -79,24 +80,24 @@ public transferStock(
       sqliteDb.run(`
         INSERT INTO inventory_transactions (
           id, transaction_number, type, product_id, warehouse_id,
-          quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+          quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
           notes, performed_by
-        ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?)
+        ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?, ?)
       `, [
         outTxId, refOut, productId, fromWarehouseId,
-        -quantityM2, -boxes, unitCost, quantityM2 * unitCost,
+        -quantityM2, -boxes, unitCost, quantityM2 * unitCost, transferId,
         `تحويل مخزني صادر إلى ${toWarehouseId}. ${notes}`, performedBy2
       ]);
 
       sqliteDb.run(`
         INSERT INTO inventory_transactions (
           id, transaction_number, type, product_id, warehouse_id,
-          quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+          quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
           notes, performed_by
-        ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?)
+        ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?, ?)
       `, [
         inTxId, refIn, productId, toWarehouseId,
-        quantityM2, boxes, unitCost, quantityM2 * unitCost,
+        quantityM2, boxes, unitCost, quantityM2 * unitCost, transferId,
         `تحويل مخزني وارد من ${fromWarehouseId}. ${notes}`, performedBy2
       ]);
 

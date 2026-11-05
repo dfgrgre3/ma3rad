@@ -32,7 +32,7 @@ const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   TRANSFER_OUT:     { label: 'تحويل صادر', color: 'text-orange-600' },
   ADJUSTMENT:       { label: 'تسوية', color: 'text-yellow-400' },
   OPENING_BALANCE:  { label: 'رصيد افتتاحي', color: 'text-slate-500' },
-  DAMAGED:          { label: 'تالف', color: 'text-rose-600' },
+  DAMAGE:           { label: 'تالف', color: 'text-rose-600' },
 };
 
 const branchAccess = new BranchAccessService();
@@ -75,7 +75,8 @@ export const StockLedgerPage: React.FC = () => {
                p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
                w.name as warehouse, it.type,
                CASE WHEN it.quantity_m2 > 0 THEN it.quantity_m2 ELSE 0 END as qty_in,
-               CASE WHEN it.quantity_m2 < 0 THEN ABS(it.quantity_m2) ELSE 0 END as qty_out,
+               CASE WHEN it.quantity_m2 < 0 AND COALESCE(it.reference_type, '') != 'TRANSFER_LOSS'
+                    THEN ABS(it.quantity_m2) ELSE 0 END as qty_out,
                0 as balance,
                COALESCE(it.transaction_number,'') as ref,
                COALESCE(u.full_name,'النظام') as user,

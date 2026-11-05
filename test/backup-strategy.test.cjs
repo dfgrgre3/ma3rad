@@ -69,7 +69,63 @@ test('3-2-1 strategy reports when an external drive is unavailable', async () =>
     checkExternalDriveImpl: async () => null,
   }, 'daily');
   assert.equal(strategy.actions.find((action) => action.type === 'external').status, 'unavailable');
+  assert.equal(strategy.actions.find((action) => action.type === 'offsite').status, 'unavailable');
   assert.ok(strategy.recommendations.some((recommendation) => recommendation.type === 'external'));
+  assert.ok(strategy.recommendations.some((recommendation) => recommendation.type === 'offsite'));
+});
+
+test('offsite backup is copied and its restore-verification hook must pass', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-backup-offsite-'));
+  try {
+    const backupPath = path.join(root, 'ceramisys_daily_offsite.sqlite.enc');
+    const offsiteBackupDir = path.join(root, 'network-share');
+    const bytes = Buffer.from('encrypted sqlite backup');
+    await fs.writeFile(backupPath, bytes);
+    const restoredPaths = [];
+    const strategy = await apply321Strategy({
+      BACKUP_DIR: path.join(root, 'local-backups'),
+      backupPath,
+      offsiteBackupDir,
+      checkExternalDriveImpl: async () => null,
+      verifyRestoreImpl: async (target) => {
+        restoredPaths.push(target);
+        assert.deepEqual(await fs.readFile(target), bytes);
+      },
+    }, 'daily');
+
+    const offsiteAction = strategy.actions.find((action) => action.type === 'offsite');
+    assert.equal(offsiteAction.status, 'complete');
+    assert.equal(restoredPaths.length, 1);
+    assert.deepEqual(await fs.readFile(offsiteAction.target), bytes);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('offsite restore-verification failures are reported', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-backup-offsite-'));
+  try {
+    const backupPath = path.join(root, 'ceramisys_daily_restore_failure.sqlite.enc');
+    await fs.writeFile(backupPath, Buffer.from('encrypted backup'));
+    const strategy = await apply321Strategy({
+      BACKUP_DIR: path.join(root, 'local-backups'),
+      backupPath,
+      offsiteBackupDir: path.join(root, 'network-share'),
+      checkExternalDriveImpl: async () => null,
+      verifyRestoreImpl: async () => {
+        throw new Error('restore test failed');
+      },
+    }, 'daily');
+
+    const offsiteAction = strategy.actions.find((action) => action.type === 'offsite');
+    assert.equal(offsiteAction.status, 'failed');
+    assert.match(offsiteAction.description, /restore test failed/);
+    await assert.rejects(fs.stat(path.join(root, 'network-share', path.basename(backupPath))), {
+      code: 'ENOENT',
+    });
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
 });
 
 test('backup strategy rejects a same-size copy with different content', async () => {

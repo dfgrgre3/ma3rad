@@ -53,13 +53,15 @@ export function fetchInvoicesFiltered(
   ctx: SalesContext,
   filters: InvoiceFilters = {},
   includeVoid = true
-): (SalesInvoice & { returnedAmount?: number; itemsCount?: number })[] {
+): (SalesInvoice & { returnedAmount?: number; returnBalanceCredit?: number; itemsCount?: number })[] {
   AuthService.requireAuth();
   const { where, params } = buildInvoiceWhere(ctx.branchAccess, filters, includeVoid);
-  return ctx.db.query<SalesInvoice & { returnedAmount?: number; itemsCount?: number }>(
+  return ctx.db.query<SalesInvoice & { returnedAmount?: number; returnBalanceCredit?: number; itemsCount?: number }>(
     `SELECT si.*, c.name as customerName, c.phone as customerPhone, c.address as customerAddress,
             w.name as warehouseName, u.full_name as createdByName,
-            (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount
+            (SELECT COUNT(*) FROM sales_invoice_items sii WHERE sii.invoice_id = si.id) AS itemsCount,
+            (SELECT COALESCE(SUM(sr.remaining_to_balance), 0) FROM sales_returns sr
+             WHERE sr.original_invoice_id = si.id) AS returnBalanceCredit
      FROM sales_invoices si
      JOIN customers c ON si.customer_id = c.id
      JOIN warehouses w ON si.warehouse_id = w.id

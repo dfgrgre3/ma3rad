@@ -5,6 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { CustomerService } from '../src/services/CustomerService.ts';
+import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
 import { PrintService } from '../src/services/PrintService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { runMigrations } from '../src/database/migrations.ts';
@@ -182,6 +183,9 @@ test('sales returns allocate line and invoice discounts before applying invoice 
   const customer = new CustomerService().createCustomer({
     name: 'عميل مرتجع بخصم اختبار', phone: '0122222233', customerType: 'RETAIL', creditLimit: 0,
   });
+  const taxReports = new FinanceExtrasService();
+  const taxSummaryBefore = taxReports.getTaxSummary('2000-01-01', '2999-12-31');
+
   seedProduct(db, 'prod_sale_return_discount');
 
   const invoice = svc.createSale({
@@ -214,6 +218,8 @@ test('sales returns allocate line and invoice discounts before applying invoice 
 
   assert.equal(invoice.subtotal - invoice.discountAmount, 1800);
   assert.equal(salesReturn.totalAmount, 900);
+  assert.equal(salesReturn.refundedAmount, 1035);
+  assert.equal(salesReturn.remainingToBalance, 0);
   const returnLine = q(
     'SELECT total_refund AS refund FROM sales_return_items WHERE return_id = ?',
     [salesReturn.id]
@@ -227,6 +233,23 @@ test('sales returns allocate line and invoice discounts before applying invoice 
     WHERE e.reference_type = 'SALES_RETURN' AND e.reference_id = ? AND a.code = '2102'
   `, [salesReturn.id])[0]?.debit;
   assert.equal(taxDebit, 135);
+  const revenueDebit = q(`
+    SELECT l.debit
+    FROM journal_entry_lines l
+    JOIN journal_entries e ON e.id = l.entry_id
+    JOIN chart_of_accounts a ON a.id = l.account_id
+    WHERE e.reference_type = 'SALES_RETURN' AND e.reference_id = ? AND a.code = '4101'
+  `, [salesReturn.id])[0]?.debit;
+  assert.equal(revenueDebit, 900);
+  const returnCustomer = q(
+    'SELECT current_balance AS balance, total_purchases AS purchases FROM customers WHERE id = ?',
+    [customer.id]
+  )[0];
+  assert.equal(returnCustomer.balance, 0);
+  assert.equal(returnCustomer.purchases, 1035);
+  const taxSummaryAfter = taxReports.getTaxSummary('2000-01-01', '2999-12-31');
+  assert.equal(taxSummaryAfter.outputTax - taxSummaryBefore.outputTax, 135);
+  assert.equal(taxSummaryAfter.salesTotal - taxSummaryBefore.salesTotal, 1035);
 
   const invoice4 = svc.createSale({
     customerId: customer.id, warehouseId: 'wh_main',
@@ -253,4 +276,68 @@ test('sales returns allocate line and invoice discounts before applying invoice 
   }]);
   assert.equal(exchange.return.originalInvoiceId, invoice4.id);
   assert.equal(exchange.invoice.customerId, customer.id);
+});
+
+test('sales return credit memo includes VAT for unpaid customer balances', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const customer = new CustomerService().createCustomer({
+    name: 'عميل مرتجع ضريبي آجل', phone: '0122222244', customerType: 'RETAIL', creditLimit: 0,
+  });
+  seedProduct(db, 'prod_sale_return_tax_credit');
+  const sales = new SalesService();
+  const invoice = sales.createSale({
+    customerId: customer.id,
+    warehouseId: 'wh_main',
+    items: [{
+      productId: 'prod_sale_return_tax_credit', soldBy: 'M2', quantityM2: 10,
+      boxesCount: 0, piecesCount: 0, unitPrice: 100,
+    }],
+    paidAmount: 0,
+    paymentType: 'CREDIT',
+    taxAmount: 140,
+  });
+
+  const returned = sales.returnSale(invoice.id, [{
+    productId: 'prod_sale_return_tax_credit',
+    quantityM2: 4,
+    boxesCount: 0,
+    unitPrice: 100,
+    unitCost: 100,
+    reason: 'إرجاع آجل شامل الضريبة',
+  }]);
+
+  assert.equal(returned.totalAmount, 400);
+  assert.equal(returned.refundedAmount, 0);
+  assert.equal(returned.remainingToBalance, 456);
+  assert.equal(q('SELECT current_balance AS balance FROM customers WHERE id = ?', [customer.id])[0].balance, 684);
+  assert.equal(q('SELECT returned_amount AS amount FROM sales_invoices WHERE id = ?', [invoice.id])[0].amount, 456);
+  const ledgerLines = q(`
+    SELECT coa.code, jel.debit, jel.credit
+    FROM journal_entries je
+    JOIN journal_entry_lines jel ON jel.entry_id = je.id
+    JOIN chart_of_accounts coa ON coa.id = jel.account_id
+    WHERE je.reference_type = 'SALES_RETURN' AND je.reference_id = ?
+  `, [returned.id]);
+  assert.equal(ledgerLines.find((line) => line.code === '4101')?.debit, 400);
+  assert.equal(ledgerLines.find((line) => line.code === '2102')?.debit, 56);
+  assert.equal(ledgerLines.find((line) => line.code === '1103')?.credit, 456);
+  const statement = new CustomerService().getCustomerStatement(customer.id);
+  const returnTransaction = statement.transactions.find((transaction: any) => transaction.docNumber === returned.returnNumber);
+  assert.equal(returnTransaction?.credit, 456);
+
+  const finalReturn = sales.returnSale(invoice.id, [{
+    productId: 'prod_sale_return_tax_credit',
+    quantityM2: 6,
+    boxesCount: 0,
+    unitPrice: 100,
+    unitCost: 100,
+    reason: 'إكمال المرتجع الآجل شامل الضريبة',
+  }]);
+  assert.equal(finalReturn.totalAmount, 600);
+  assert.equal(finalReturn.remainingToBalance, 684);
+  assert.equal(q('SELECT current_balance AS balance FROM customers WHERE id = ?', [customer.id])[0].balance, 0);
+  assert.equal(q('SELECT returned_amount AS amount FROM sales_invoices WHERE id = ?', [invoice.id])[0].amount, 1140);
 });

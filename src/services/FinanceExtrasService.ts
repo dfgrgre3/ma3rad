@@ -5,7 +5,7 @@ import { PermissionService } from './PermissionService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
 import { BranchAccessService } from './BranchAccessService';
-import { returnTaxSql } from './financials';
+import { inclusiveReturnTaxSql, returnTaxSql } from './financials';
 
 export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
 
@@ -324,7 +324,7 @@ export class FinanceExtrasService {
     const salesReturnTax = returnTaxSql(
       'sr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
     );
-    const purchaseReturnTax = returnTaxSql(
+    const purchaseReturnTax = inclusiveReturnTaxSql(
       'pr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
     );
     const sales = this.db.query<any>(
@@ -364,7 +364,7 @@ export class FinanceExtrasService {
       netTax: round2(outputTax - inputTax),
       salesTotal: round2(Number(sales.total || 0) - Number(salesReturns.net || 0) - Number(salesReturns.tax || 0)),
       purchasesTotal: round2(
-        Number(purchases.total || 0) - Number(purchaseReturns.total || 0) - Number(purchaseReturns.tax || 0)
+        Number(purchases.total || 0) - Number(purchaseReturns.total || 0)
       ),
       salesCount: sales.count || 0,
       purchasesCount: purchases.count || 0,
@@ -380,11 +380,11 @@ export class FinanceExtrasService {
     const salesReturnTax = returnTaxSql(
       'sr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
     );
-    const purchaseReturnTax = returnTaxSql(
+    const purchaseReturnTax = inclusiveReturnTaxSql(
       'pr.total_amount', 'original.subtotal', 'original.discount_amount', 'original.tax_amount'
     );
     return this.db.query<{ month: string; outputTax: number; inputTax: number }>(
-      `SELECT month, SUM(output_tax) AS output_tax, SUM(input_tax) AS input_tax FROM (
+      `SELECT month, SUM(output_tax) AS outputTax, SUM(input_tax) AS inputTax FROM (
          SELECT substr(si.date, 1, 7) AS month, si.tax_amount AS output_tax, 0 AS input_tax
          FROM sales_invoices si
          WHERE si.invoice_status != 'VOID' AND si.date >= ? AND si.date <= ? AND ${salesScope.clause}

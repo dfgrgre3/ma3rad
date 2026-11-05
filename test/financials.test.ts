@@ -9,6 +9,9 @@ import {
   computeWeightedAverageCost,
   computeReturnImpact,
   calculateReturnTax,
+  calculateInclusiveReturnTax,
+  calculateDiscountedReturnAmount,
+  inclusiveReturnTaxSql,
   returnTaxSql,
 } from '../src/services/financials.ts';
 
@@ -109,4 +112,22 @@ test('return tax allocation uses the discounted taxable base and excludes shippi
     returnTaxSql('sr.total_amount', 'si.subtotal', 'si.discount_amount', 'si.tax_amount'),
     /MAX\(0, COALESCE\(si\.subtotal, 0\) - COALESCE\(si\.discount_amount, 0\)\)/
   );
+});
+
+test('inclusive purchase-return tax is extracted from the gross returned amount', () => {
+  assert.equal(calculateInclusiveReturnTax(1035, 270, 1800), 135);
+  assert.equal(calculateInclusiveReturnTax(0, 270, 1800), 0);
+  assert.equal(calculateInclusiveReturnTax(100, 0, 0), 0);
+  assert.match(
+    inclusiveReturnTaxSql('pr.total_amount', 'pi.subtotal', 'pi.discount_amount', 'pi.tax_amount'),
+    /MAX\(0, COALESCE\(pr\.total_amount, 0\)\)/
+  );
+});
+
+test('sales-return preview and posting share line and invoice discount allocation', () => {
+  const amount = calculateDiscountedReturnAmount(10, [
+    { quantity: 10, totalPrice: 900, unitPrice: 100, discountAmount: 100 },
+    { quantity: 10, totalPrice: 1000, unitPrice: 100, discountAmount: 0 },
+  ], 2000, 100);
+  assert.equal(amount, 902.5);
 });

@@ -12,7 +12,7 @@ import { InventoryServicePart03 } from './InventoryServicePart03';
 export class InventoryServicePart04 extends InventoryServicePart03 {
 public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string): any[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'inventory.transfer');
     if (warehouseId) this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
     const fromScope = this.branchAccess.sqlScope(
       'w_out.branch_id',
@@ -42,16 +42,32 @@ public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string
         out_tx.total_cost as totalCost,
         u.full_name as performedByName
       FROM inventory_transactions out_tx
-      JOIN inventory_transactions in_tx 
+      JOIN (
+        SELECT reference_id, product_id, warehouse_id, quantity_m2, unit_cost,
+               created_at, performed_by, notes
+        FROM inventory_transactions
+        WHERE reference_type = 'TRANSFER'
+          AND type = 'TRANSFER_IN'
+      ) in_tx
         ON out_tx.reference_type = 'TRANSFER' 
-        AND in_tx.reference_type = 'TRANSFER'
         AND out_tx.product_id = in_tx.product_id
-        AND out_tx.notes LIKE '%' || in_tx.warehouse_id || '%'
+        AND (
+          (out_tx.reference_id IS NOT NULL AND in_tx.reference_id = out_tx.reference_id)
+          OR (
+            out_tx.reference_id IS NULL AND in_tx.reference_id IS NULL
+            AND out_tx.quantity_m2 = -in_tx.quantity_m2
+            AND out_tx.unit_cost = in_tx.unit_cost
+            AND out_tx.created_at = in_tx.created_at
+            AND out_tx.performed_by = in_tx.performed_by
+            AND out_tx.notes LIKE '% إلى ' || in_tx.warehouse_id || '.%'
+            AND in_tx.notes LIKE '% من ' || out_tx.warehouse_id || '.%'
+          )
+        )
       JOIN products p ON out_tx.product_id = p.id
       JOIN warehouses w_out ON out_tx.warehouse_id = w_out.id
       JOIN warehouses w_in ON in_tx.warehouse_id = w_in.id
       LEFT JOIN users u ON out_tx.performed_by = u.id
-      WHERE out_tx.type = 'TRANSFER_OUT' AND in_tx.type = 'TRANSFER_IN'
+      WHERE out_tx.type = 'TRANSFER_OUT'
         AND ${fromScope.clause} AND ${toScope.clause}
     `;
     const params: any[] = [...fromScope.params, ...toScope.params];
@@ -69,14 +85,14 @@ public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string
       params.push(warehouseId, warehouseId);
     }
 
-    sql += ' ORDER BY out_tx.created_at DESC LIMIT 200';
+    sql += ' GROUP BY out_tx.id, in_tx.warehouse_id ORDER BY out_tx.created_at DESC LIMIT 200';
 
     return this.db.query(sql, params);
   }
 
 public getTransferSummaryByWarehouse(): { warehouseId: string; warehouseName: string; unitLabel: string; totalIn: number; totalOut: number }[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'inventory.transfer');
     const scope = this.branchAccess.sqlScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)',

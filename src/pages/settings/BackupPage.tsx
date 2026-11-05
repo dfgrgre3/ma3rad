@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Download, Upload, HardDrive, ShieldCheck, CheckCircle2,
   AlertTriangle, RefreshCw, FileText, Lock, X, Eye, EyeOff, Key
@@ -12,6 +12,8 @@ export const BackupPage: React.FC = () => {
   const [history, setHistory] = useState<any[]>([]);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [offsiteBackupDir, setOffsiteBackupDir] = useState('');
+  const [isSavingOffsiteDir, setIsSavingOffsiteDir] = useState(false);
   const [message, setMessage] = useState<{ text: string; isError?: boolean } | null>(null);
 
   // Export Modal state
@@ -28,20 +30,50 @@ export const BackupPage: React.FC = () => {
   const [showRestorePassword, setShowRestorePassword] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
-  const backupService = new BackupService();
+  const backupService = useMemo(() => new BackupService(), []);
 
-  const loadHistory = () => {
+  const loadHistory = useCallback(() => {
     try {
       const rows = backupService.getBackupHistory();
       setHistory(rows || []);
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [backupService]);
 
   useEffect(() => {
     loadHistory();
-  }, []);
+    void window.ceramisys?.db?.getOffsiteBackupDir?.()
+      .then((result) => {
+        if (result?.ok) setOffsiteBackupDir(result.path || '');
+      })
+      .catch((error) => {
+        setMessage({ text: error instanceof Error ? error.message : String(error), isError: true });
+      });
+  }, [loadHistory]);
+
+  const handleSaveOffsiteBackupDir = async () => {
+    if (!canManage) return;
+    const savePath = window.ceramisys?.db?.setOffsiteBackupDir;
+    if (!savePath) {
+      setMessage({ text: 'إعداد الوجهة الخارجية متاح من تطبيق سطح المكتب فقط.', isError: true });
+      return;
+    }
+    setIsSavingOffsiteDir(true);
+    try {
+      const result = await savePath(offsiteBackupDir.trim());
+      setOffsiteBackupDir(result.path || '');
+      setMessage({
+        text: result.path
+          ? 'تم حفظ وجهة الشبكة. سيُختبر فك النسخة وقراءتها بعد كل نسخ احتياطي.'
+          : 'تم تعطيل النسخ إلى الوجهة الخارجية.',
+      });
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : String(error), isError: true });
+    } finally {
+      setIsSavingOffsiteDir(false);
+    }
+  };
 
   const openExportModal = () => {
     if (!canManage) return;
@@ -276,6 +308,38 @@ export const BackupPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {canManage && (
+        <section className="mx-6 mb-6 rounded-2xl border border-sky-200 bg-white p-6">
+          <div className="mb-4">
+            <h2 className="text-sm font-bold text-slate-900">نسخة خارج الموقع على مشاركة شبكة</h2>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              أدخل مسار مشاركة شبكة مستقلة مكانيًا عن هذا الجهاز (مثل مسار UNC في Windows).
+              بعد كل نسخة، ينسخ النظام الملف المشفر إليها ويتحقق من SHA-256 ثم يختبر استعادته وفك تشفيره.
+              تنبيه: مفتاح التشفير مرتبط بمخزن النظام الآمن على هذا الجهاز؛ النسخة الخارجية وحدها لا تكفي للاستعادة بعد فقد الجهاز أو مفتاحه.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={offsiteBackupDir}
+              onChange={(event) => setOffsiteBackupDir(event.target.value)}
+              placeholder="\\\\server\\share\\CeramiSys-Backups"
+              disabled={isSavingOffsiteDir}
+              dir="ltr"
+              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+            />
+            <button
+              type="button"
+              onClick={() => void handleSaveOffsiteBackupDir()}
+              disabled={isSavingOffsiteDir}
+              className="rounded-xl bg-sky-700 px-5 py-2 text-xs font-bold text-white transition hover:bg-sky-800 disabled:opacity-50"
+            >
+              {isSavingOffsiteDir ? 'جارٍ الحفظ...' : 'حفظ الوجهة'}
+            </button>
+          </div>
+        </section>
+      )}
 
       <BackupHistoryTable history={history} formatSize={formatSize} />
 

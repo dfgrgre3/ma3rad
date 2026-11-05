@@ -18,7 +18,7 @@ import { formatProductQuantity } from '../../utils/productUnits';
 import {
   convertQuantity, fromBaseQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
 } from '../../utils/uom';
-import { computeReturnImpact, round2 } from '../../services/financials';
+import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../../services/financials';
 
 const PAGE_SIZE = 15;
 
@@ -190,17 +190,35 @@ export const ReturnsPage: React.FC = () => {
     setLine(idx, { quantityM2: base });
   };
 
-  const total = round2(lines.reduce((s, l) => s + l.quantityM2 * l.unitPrice, 0));
+  const total = round2(lines.reduce((sum, line) => {
+    const soldLines = (invoiceInfo?.items || [])
+      .filter((item) => item.productId === line.productId)
+      .map((item) => ({
+        quantity: item.quantityM2,
+        totalPrice: item.totalPrice,
+        unitPrice: item.unitPrice,
+        discountAmount: item.discountAmount,
+      }));
+    return sum + calculateDiscountedReturnAmount(
+      line.quantityM2,
+      soldLines,
+      invoiceInfo?.subtotal || 0,
+      invoiceInfo?.discountAmount || 0
+    );
+  }, 0));
+  const taxableBase = Math.max(0, (invoiceInfo?.subtotal || 0) - (invoiceInfo?.discountAmount || 0));
+  const returnTax = calculateReturnTax(total, invoiceInfo?.taxAmount || 0, taxableBase);
+  const totalIncludingTax = round2(total + returnTax);
   const refundPreview = useMemo(() => {
     if (!invoiceInfo) return { cash: 0, balance: 0 };
     const impact = computeReturnImpact({
       invoiceTotal: Number(invoiceInfo.totalAmount || 0),
       invoicePaid: Number(invoiceInfo.paidAmount || 0),
-      returnTotal: total,
+      returnTotal: totalIncludingTax,
       refundCash: refundCash && refundMethod !== 'BALANCE',
     });
     return { cash: impact.cashRefund, balance: impact.balanceDelta };
-  }, [invoiceInfo, total, refundCash, refundMethod]);
+  }, [invoiceInfo, totalIncludingTax, refundCash, refundMethod]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -544,8 +562,8 @@ export const ReturnsPage: React.FC = () => {
             </datalist>
 
             <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
-              <span className="text-xs font-bold text-rose-700 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> إجمالي المرتجع</span>
-              <span className="text-lg font-black text-rose-600">{fmt(total)}</span>
+              <span className="text-xs font-bold text-rose-700 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> الإجمالي قبل الضريبة + الضريبة = شامل الضريبة</span>
+              <span className="text-lg font-black text-rose-600">{fmt(total)} + {fmt(returnTax)} = {fmt(totalIncludingTax)}</span>
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">

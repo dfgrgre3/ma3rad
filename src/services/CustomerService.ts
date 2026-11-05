@@ -428,7 +428,8 @@ export class CustomerService {
     `, [customerId, ...paymentScope.params]);
 
     const returns = PermissionService.can(actor, 'returns.view') ? this.db.query<any>(`
-      SELECT sr.id, sr.date, sr.return_number as docNumber, sr.total_amount as credit, sr.created_at, sr.reason
+      SELECT sr.id, sr.date, sr.return_number as docNumber,
+        sr.remaining_to_balance AS credit, sr.created_at, sr.reason
       FROM sales_returns sr
       WHERE sr.customer_id = ? AND ${returnScope.clause}
     `, [customerId, ...returnScope.params]) : [];

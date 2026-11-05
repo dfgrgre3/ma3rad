@@ -27,6 +27,40 @@ export function calculateReturnTax(
     : 0;
 }
 
+export function calculateInclusiveReturnTax(
+  returnAmountIncludingTax: number,
+  invoiceTax: number,
+  invoiceTaxableBase: number
+): number {
+  const taxableBase = Math.max(0, invoiceTaxableBase);
+  const tax = Math.max(0, invoiceTax);
+  return taxableBase + tax > 0
+    ? round2(Math.max(0, returnAmountIncludingTax) * tax / (taxableBase + tax))
+    : 0;
+}
+
+export function calculateDiscountedReturnAmount(
+  quantity: number,
+  soldLines: { quantity: number; totalPrice?: number | null; unitPrice: number; discountAmount: number }[],
+  invoiceSubtotal: number,
+  invoiceDiscount: number
+): number {
+  const soldQuantity = soldLines.reduce((sum, line) => sum + Math.max(0, Number(line.quantity) || 0), 0);
+  if (soldQuantity <= 0) return 0;
+  const subtotal = Math.max(0, Number(invoiceSubtotal) || 0);
+  const discount = Math.max(0, Number(invoiceDiscount) || 0);
+  const netAmount = soldLines.reduce((sum, line) => {
+    const lineQuantity = Math.max(0, Number(line.quantity) || 0);
+    if (lineQuantity === 0) return sum;
+    const lineAmount = line.totalPrice != null && Number.isFinite(Number(line.totalPrice))
+      ? Number(line.totalPrice)
+      : Math.max(0, (Number(line.unitPrice) || 0) * lineQuantity - (Number(line.discountAmount) || 0));
+    const invoiceDiscountShare = subtotal > 0 ? discount * lineAmount / subtotal : 0;
+    return sum + Math.max(0, lineAmount - invoiceDiscountShare);
+  }, 0);
+  return round2(Math.max(0, Number(quantity) || 0) * netAmount / soldQuantity);
+}
+
 export function returnTaxSql(
   returnAmount: string,
   invoiceSubtotal: string,
@@ -36,6 +70,19 @@ export function returnTaxSql(
   const taxableBase = `MAX(0, COALESCE(${invoiceSubtotal}, 0) - COALESCE(${invoiceDiscount}, 0))`;
   return `CASE WHEN ${taxableBase} > 0
     THEN ROUND(COALESCE(${returnAmount}, 0) * COALESCE(${invoiceTax}, 0) / ${taxableBase}, 2)
+    ELSE 0 END`;
+}
+
+export function inclusiveReturnTaxSql(
+  returnAmount: string,
+  invoiceSubtotal: string,
+  invoiceDiscount: string,
+  invoiceTax: string
+): string {
+  const taxableBase = `MAX(0, COALESCE(${invoiceSubtotal}, 0) - COALESCE(${invoiceDiscount}, 0))`;
+  const tax = `MAX(0, COALESCE(${invoiceTax}, 0))`;
+  return `CASE WHEN (${taxableBase} + ${tax}) > 0
+    THEN ROUND(MAX(0, COALESCE(${returnAmount}, 0)) * ${tax} / (${taxableBase} + ${tax}), 2)
     ELSE 0 END`;
 }
 

@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('ceramisys', {
     encryptXlsxBackup: (bytes, password) => ipcRenderer.invoke('db:encrypt-xlsx-backup', bytes, password),
     decryptXlsxBackup: (bytes, password) => ipcRenderer.invoke('db:decrypt-xlsx-backup', bytes, password),
     backup: (label) => ipcRenderer.invoke('db:backup', label),
+    getOffsiteBackupDir: () => ipcRenderer.invoke('db:offsite-backup-dir:get'),
+    setOffsiteBackupDir: (directory) => ipcRenderer.invoke('db:offsite-backup-dir:set', directory),
     removeBackup: (fileName) => ipcRenderer.invoke('db:remove-backup', fileName),
     preserveCorrupt: () => ipcRenderer.invoke('db:preserve-corrupt'),
     createFreshAfterRecovery: () => ipcRenderer.invoke('db:create-fresh-after-recovery'),

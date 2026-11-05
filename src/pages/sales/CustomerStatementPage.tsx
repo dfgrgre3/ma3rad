@@ -133,7 +133,7 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
   const salesService = useMemo(() => new SalesService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const [rows, setRows] = useState<CustomerStatementRow[]>([]);
-  const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
+  const [invoices, setInvoices] = useState<Array<SalesInvoice & { returnBalanceCredit?: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 3);
@@ -183,15 +183,16 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
         }
 
         // Return rows (credit)
-        if ((inv.returnedAmount ?? 0) > 0) {
-          runningBalance -= (inv.returnedAmount ?? 0);
+        const returnCredit = inv.returnBalanceCredit ?? 0;
+        if (returnCredit > 0) {
+          runningBalance -= returnCredit;
           stRows.push({
             date: inv.date,
             type: 'return',
             reference: inv.invoiceNumber,
             description: `مرتجعات على الفاتورة ${inv.invoiceNumber}`,
             debit: 0,
-            credit: inv.returnedAmount ?? 0,
+            credit: returnCredit,
             balance: runningBalance,
           });
         }

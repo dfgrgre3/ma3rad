@@ -113,8 +113,10 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
 async function apply321Strategy({
   BACKUP_DIR,
   backupPath,
+  offsiteBackupDir,
   fsImpl = fs,
   checkExternalDriveImpl = checkExternalDrive,
+  verifyRestoreImpl,
 }, backupType = 'full') {
   const strategy = {
     correctType: backupType,
@@ -178,6 +180,70 @@ async function apply321Strategy({
       strategy.recommendations.push({
         type: 'external',
         action: 'تحقق من مساحة قرص USB وصلاحيته ثم أعد النسخ الاحتياطي.'
+      });
+    }
+  }
+
+  if (!offsiteBackupDir) {
+    strategy.actions.push({
+      type: 'offsite',
+      target: null,
+      status: 'unavailable',
+      description: 'لم يتم إعداد وجهة شبكة خارج الموقع.'
+    });
+    strategy.recommendations.push({
+      type: 'offsite',
+      action: 'أدخل مسار مشاركة شبكة مستقلة عن موقع الجهاز في إعدادات النسخ الاحتياطي.'
+    });
+  } else {
+    let destination;
+    let destinationCreated = false;
+    try {
+      if (typeof backupPath !== 'string' || !backupPath) {
+        throw new Error('مسار النسخة المحلية المطلوبة للنسخ الخارجي غير محدد.');
+      }
+      await fsImpl.stat(backupPath);
+      await fsImpl.mkdir(offsiteBackupDir, { recursive: true });
+      destination = path.join(offsiteBackupDir, path.basename(backupPath));
+      await fsImpl.copyFile(backupPath, destination, fsImpl.constants.COPYFILE_EXCL);
+      destinationCreated = true;
+      const [sourceHash, destinationHash] = await Promise.all([
+        sha256File(backupPath),
+        sha256File(destination),
+      ]);
+      if (destinationHash !== sourceHash) {
+        await fsImpl.unlink(destination);
+        destinationCreated = false;
+        throw new Error('محتوى النسخة على وجهة الشبكة لا يطابق النسخة المحلية (SHA-256).');
+      }
+      if (typeof verifyRestoreImpl !== 'function') {
+        throw new Error('اختبار الاستعادة من الوجهة الخارجية غير مُعد.');
+      }
+      await verifyRestoreImpl(destination);
+      strategy.actions.push({
+        type: 'offsite',
+        target: destination,
+        status: 'complete',
+        description: `تم نسخ النسخة إلى الوجهة الخارجية واجتازت اختبار الاستعادة: ${destination}`
+      });
+    } catch (error) {
+      let description = `تعذر حفظ النسخة أو التحقق من استعادتها من الوجهة الخارجية: ${error.message || error}`;
+      if (destinationCreated) {
+        try {
+          await fsImpl.unlink(destination);
+        } catch (cleanupError) {
+          description += ` تعذر حذف النسخة غير المتحقق منها: ${cleanupError.message || cleanupError}`;
+        }
+      }
+      strategy.actions.push({
+        type: 'offsite',
+        target: offsiteBackupDir,
+        status: 'failed',
+        description
+      });
+      strategy.recommendations.push({
+        type: 'offsite',
+        action: 'تحقق من اتصال مشاركة الشبكة وصلاحياتها ثم أعد النسخ الاحتياطي.'
       });
     }
   }

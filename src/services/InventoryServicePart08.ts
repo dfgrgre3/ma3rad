@@ -13,7 +13,7 @@ import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 export class InventoryServicePart08 extends InventoryServicePart07 {
 public getTransferItems(transferId: string): any[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'inventory.transfer');
     this.requireTransferWarehouseAuthorization(transferId, actor);
     return this.db.query<any>(`
       SELECT 

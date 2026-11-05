@@ -1,9 +1,11 @@
 const { createCipheriv, createDecipheriv, randomBytes } = require('node:crypto');
 const path = require('node:path');
+const os = require('node:os');
 const backupStrategyService = require('./backupStrategyService');
 const safeStorageCompat = require('./safeStorageCompat');
 
 const DB_MAGIC = Buffer.from('CERAMISYS-DB\0v1\0', 'utf8');
+const SQLITE_HEADER = Buffer.from('SQLite format 3\0', 'binary');
 const DB_KEY_FILE = 'database-key.enc';
 
 async function decryptStoredString(safeStorage, encrypted) {
@@ -172,6 +174,31 @@ function registerDatabaseHandlers({
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
 }) {
   const getKey = () => readOrCreateDatabaseKey({ appDataDir: APP_DATA_DIR, fs, fsSync, safeStorage, path });
+  const offsiteBackupConfig = path.join(APP_DATA_DIR, 'offsite-backup.json');
+
+  const getOffsiteBackupDir = async () => {
+    try {
+      const config = JSON.parse(await fs.readFile(offsiteBackupConfig, 'utf8'));
+      return typeof config.path === 'string' ? validateOffsiteBackupDir(config.path) : null;
+    } catch (error) {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
+  };
+
+  const validateOffsiteBackupDir = (directory) => {
+    if (typeof directory !== 'string' || !directory.trim() || !path.isAbsolute(directory)) {
+      throw new Error('يجب إدخال مسار مطلق لمشاركة الشبكة الخارجية.');
+    }
+    const resolved = path.resolve(directory.trim());
+    const relative = path.relative(path.resolve(APP_DATA_DIR), resolved);
+    const isInsideAppData = relative === ''
+      || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+    if (isInsideAppData) {
+      throw new Error('يجب أن تكون وجهة النسخ الخارجية مستقلة عن مجلد بيانات التطبيق.');
+    }
+    return resolved;
+  };
 
   ipcMain.handle('db:load', async (event) => {
     validateIpcSender(event);
@@ -309,6 +336,21 @@ function registerDatabaseHandlers({
         DATA_DIR,
         APP_DATA_DIR,
         backupPath: target,
+        offsiteBackupDir: await getOffsiteBackupDir(),
+        verifyRestoreImpl: async (offsitePath) => {
+          const restoreDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-restore-check-'));
+          try {
+            const restoredPath = path.join(restoreDir, path.basename(offsitePath));
+            await fs.copyFile(offsitePath, restoredPath);
+            const restoredBytes = await fs.readFile(restoredPath);
+            const plaintext = decryptDatabaseBytes(restoredBytes, await getKey());
+            if (!plaintext.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
+              throw new Error('الملف المستعاد لا يحتوي على قاعدة SQLite صالحة.');
+            }
+          } finally {
+            await fs.rm(restoreDir, { recursive: true, force: true });
+          }
+        },
       }, label === 'daily' ? 'daily' : 'full');
 
       return {
@@ -340,6 +382,30 @@ function registerDatabaseHandlers({
       if (error.code === 'ENOENT') return { ok: true, deleted: false };
       throw error;
     }
+  });
+
+  ipcMain.handle('db:offsite-backup-dir:get', async (event) => {
+    validateIpcSender(event);
+    return { ok: true, path: await getOffsiteBackupDir() };
+  });
+
+  ipcMain.handle('db:offsite-backup-dir:set', async (event, directory) => {
+    validateIpcSender(event);
+    ensureDirs();
+    const configPath = offsiteBackupConfig;
+    if (directory === '') {
+      try {
+        await fs.unlink(configPath);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+      }
+      return { ok: true, path: null };
+    }
+    const resolved = validateOffsiteBackupDir(directory);
+    const temporaryPath = `${configPath}.tmp`;
+    await fs.writeFile(temporaryPath, JSON.stringify({ path: resolved }), { mode: 0o600 });
+    await fs.rename(temporaryPath, configPath);
+    return { ok: true, path: resolved };
   });
 
   ipcMain.handle('db:info', async (event) => {

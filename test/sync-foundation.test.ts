@@ -241,6 +241,8 @@ test('business record sync: expense deletion publishes and receives a tombstone'
     const deletionEvent = outbox.getById(deletionEventId);
     assert.equal(deletionEvent?.operationType, 'DELETE');
     assert.deepEqual(deletionEvent?.payload, { deleted: true });
+    assert.ok(outbox.listPending(100, SyncPolicyService.pushGate())
+      .some((event) => event.eventId === deletionEventId));
 
     const remoteEvent: SyncEvent = {
       eventId: uuidv4(),

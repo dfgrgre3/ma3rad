@@ -1395,14 +1395,17 @@ export class PermissionService {
 
   /** Server-side (service-layer) enforcement — never trust the UI. */
   public static require(user: User | null, required: string, scope?: string): void {
-    if (!user || !PermissionService.can(user, required, scope)) {
+    const locallyAllowed = PermissionService.hasRoleGrant(user, required);
+    const centrallyDisabled = CentralFeaturePermissionService.isPermissionDisabled(required);
+    const pageAllowed = scope === undefined || CentralFeaturePermissionService.allowsPermission(required, scope);
+    if (!locallyAllowed || centrallyDisabled || !pageAllowed) {
       PermissionService.audit(
         user,
         'محاولة وصول مرفوضة',
         'SECURITY',
         `perm:${required}`,
         null,
-        { required, path: scope ?? CentralFeaturePermissionService.getCurrentPath() }
+        { required, path: scope ?? null }
       );
       throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${required}).`);
     }
@@ -1411,7 +1414,12 @@ export class PermissionService {
   /** Require any one of several permission codes (least-privilege alternatives). */
   public static requireAny(user: User | null, required: string[], scope?: string): void {
     if (required.length === 0) throw new Error('لم تُحدد صلاحية مطلوبة.');
-    if (!PermissionService.canAny(user, required, scope)) {
+    const allowed = required.some((code) =>
+      PermissionService.hasRoleGrant(user, code)
+      && !CentralFeaturePermissionService.isPermissionDisabled(code)
+      && (scope === undefined || CentralFeaturePermissionService.allowsPermission(code, scope))
+    );
+    if (!allowed) {
       const codes = required.join(' أو ');
       PermissionService.audit(
         user,
@@ -1419,7 +1427,7 @@ export class PermissionService {
         'SECURITY',
         `perm:${codes}`,
         null,
-        { required: codes, path: scope ?? CentralFeaturePermissionService.getCurrentPath() }
+        { required: codes, path: scope ?? null }
       );
       throw new Error(`غير مصرح لك بتنفيذ هذا الإجراء (الصلاحية المطلوبة: ${codes}).`);
     }

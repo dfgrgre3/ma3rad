@@ -653,14 +653,18 @@ export class ReportCenterService {
     `, [from, to, ...scope.params])[0] || {};
     const returnScope = this.salesScope();
     const returnRow = this.db.query<any>(`
-      SELECT COALESCE(SUM(sr.total_amount), 0) AS returns
+      SELECT COALESCE(SUM(sr.total_amount), 0) AS returns,
+        COALESCE(SUM((
+          SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+          FROM sales_return_items sri WHERE sri.return_id = sr.id
+        )), 0) AS returnedCost
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
       WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${returnScope.clause}
     `, [from, to, ...returnScope.params])[0] || {};
     return {
       sales: num(invoiceRow.sales) - num(returnRow.returns),
-      profit: num(invoiceRow.profit),
+      profit: num(invoiceRow.profit) - num(returnRow.returns) + num(returnRow.returnedCost),
       invoices: num(invoiceRow.invoices),
       customers: num(invoiceRow.customers),
     };
@@ -1466,7 +1470,11 @@ export class ReportCenterService {
           AND (si.branch_id = ? OR (si.branch_id IS NULL AND (SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id) = ?))
       `, [previous.from, previous.to, branch.id, branch.id])[0]?.sales || 0;
       const returns = this.db.query<any>(`
-        SELECT COALESCE(SUM(sr.total_amount), 0) AS returns
+        SELECT COALESCE(SUM(sr.total_amount), 0) AS returns,
+          COALESCE(SUM((
+            SELECT SUM(sri.quantity_m2 * sri.unit_cost)
+            FROM sales_return_items sri WHERE sri.return_id = sr.id
+          )), 0) AS returnedCost
         FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
           AND (si.branch_id = ? OR (si.branch_id IS NULL AND (SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id) = ?))
@@ -1493,7 +1501,7 @@ export class ReportCenterService {
         netSales: round2(salesValue - num(returns)),
         invoices: num(sales.invoices),
         averageInvoice: num(sales.invoices) ? round2(salesValue / num(sales.invoices)) : 0,
-        profit: round2(num(sales.profit)),
+        profit: round2(num(sales.profit) - num(returns.returns) + num(returns.returnedCost)),
         margin: salesValue ? round2((num(sales.profit) / salesValue) * 100) : 0,
         expenses: round2(num(expenses)),
         collections: round2(num(collections)),

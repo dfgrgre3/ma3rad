@@ -9,6 +9,7 @@ import { PurchaseService } from '../src/services/PurchaseService.ts';
 import { PurchaseOrderService } from '../src/services/PurchaseOrderService.ts';
 import { PurchaseReturnService } from '../src/services/PurchaseReturnService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
+import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
 
 test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matching, and Supplier Scorecard', async () => {
   const db = DatabaseManager.getInstance();
@@ -246,6 +247,10 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
   assert.equal(priceHistory[0].productId, prodId);
   assert.equal(priceHistory[0].unitCost, 95);
 
+  const taxReportService = new FinanceExtrasService();
+  const taxReportBefore = taxReportService.getTaxSummary('2000-01-01', '2999-12-31');
+  const taxByMonthBefore = taxReportService.getTaxByMonth('2000-01-01', '2999-12-31')
+    .reduce((sum, month) => sum + Number(month.inputTax || 0), 0);
   const taxableInvoice = purchaseService.createPurchase({
     supplierId: supAId,
     warehouseId: 'wh_main',
@@ -271,4 +276,10 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
   assert.equal(returnLedger.find((line) => line.code === '1201')?.credit, 14);
   assert.equal(returnLedger.find((line) => line.code === '1104')?.credit, 200);
   assert.equal(returnLedger.find((line) => line.code === '2101')?.debit, 214);
+  const taxReportAfter = taxReportService.getTaxSummary('2000-01-01', '2999-12-31');
+  const taxByMonthAfter = taxReportService.getTaxByMonth('2000-01-01', '2999-12-31')
+    .reduce((sum, month) => sum + Number(month.inputTax || 0), 0);
+  assert.equal(taxReportAfter.inputTax - taxReportBefore.inputTax, 0);
+  assert.equal(taxReportAfter.purchasesTotal - taxReportBefore.purchasesTotal, 0);
+  assert.equal(taxByMonthAfter - taxByMonthBefore, 0);
 });

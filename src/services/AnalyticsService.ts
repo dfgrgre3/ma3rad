@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
-import { calculateReturnTax, returnTaxSql, round2 } from './financials';
+import { round2 } from './financials';
 import { localDateString } from '../utils/date';
 
 type ProductRevenue = { productId: string; productName: string; quantity: number; revenue: number };
@@ -152,39 +152,27 @@ export class AnalyticsService {
   private aggregateReturns(returns: any[], itemsByReturn: Map<string, any[]>, totals: SalesAnalyticsTotals): void {
     for (const salesReturn of returns) {
       const returnedAmount = Number(salesReturn.totalAmount || 0);
-      const taxableBase = Math.max(0, Number(salesReturn.invoiceSubtotal || 0) - Number(salesReturn.invoiceDiscount || 0));
-      const taxReduction = calculateReturnTax(
-        returnedAmount,
-        Number(salesReturn.invoiceTax || 0),
-        taxableBase
-      );
-      const netReturnedRevenue = returnedAmount - taxReduction;
-
-      totals.totalSales -= netReturnedRevenue;
-      this.addDailySales(totals, salesReturn.date, -netReturnedRevenue, 0);
+      totals.totalSales -= returnedAmount;
+      this.addDailySales(totals, salesReturn.date, -returnedAmount, 0);
       this.addCustomerSpend(
         totals,
         salesReturn.customerId,
         salesReturn.customerName || 'غير معروف',
-        -netReturnedRevenue,
+        -returnedAmount,
         0,
       );
 
       for (const item of itemsByReturn.get(salesReturn.id) || []) {
-        this.aggregateReturnItem(item, returnedAmount, taxReduction, totals);
+        this.aggregateReturnItem(item, totals);
       }
     }
   }
 
-  private aggregateReturnItem(item: any, returnedAmount: number, taxReduction: number, totals: SalesAnalyticsTotals): void {
+  private aggregateReturnItem(item: any, totals: SalesAnalyticsTotals): void {
     const itemRefund = Number(item.totalRefund || 0);
-    const itemTaxReduction = returnedAmount > 0
-      ? round2(taxReduction * itemRefund / returnedAmount)
-      : 0;
-    const netRevenue = itemRefund - itemTaxReduction;
     const quantity = Number(item.quantityM2 || 0);
-    totals.totalProfit += Number(item.unitCost || 0) * quantity - netRevenue;
-    this.addProductRevenue(totals, item.productId, item.productName, -quantity, -netRevenue);
+    totals.totalProfit += Number(item.unitCost || 0) * quantity - itemRefund;
+    this.addProductRevenue(totals, item.productId, item.productName, -quantity, -itemRefund);
   }
 
   private addDailySales(totals: SalesAnalyticsTotals, date: string, amount: number, count: number): void {
@@ -252,13 +240,12 @@ export class AnalyticsService {
       '(SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id)',
       actor
     );
-    const returnTax = returnTaxSql('sr.total_amount', 'si.subtotal', 'si.discount_amount', 'si.tax_amount');
 
     const totalSalesToday = this.db.query<any>(`
       SELECT
         COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
           WHERE si.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
-        - COALESCE((SELECT SUM(sr.total_amount - ${returnTax}) FROM sales_returns sr
+        - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.date = ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
     `, [today, ...scope.params, today, ...scope.params])[0]?.total || 0;
@@ -267,7 +254,7 @@ export class AnalyticsService {
       SELECT
         COALESCE((SELECT SUM(si.subtotal - si.discount_amount) FROM sales_invoices si
           WHERE si.date >= ? AND si.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0)
-        - COALESCE((SELECT SUM(sr.total_amount - ${returnTax}) FROM sales_returns sr
+        - COALESCE((SELECT SUM(sr.total_amount) FROM sales_returns sr
           JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID' AND ${scope.clause}), 0) AS total
     `, [monthStartStr, today, ...scope.params, monthStartStr, today, ...scope.params])[0]?.total || 0;

@@ -8,7 +8,7 @@ import { localDateString } from '../../utils/date';
 import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
 import { convertQuantity } from '../../utils/uom';
 import { paymentAccountCode } from '../../database/ledger';
-import { calculateReturnTax, computeReturnImpact, round2 } from '../financials';
+import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../financials';
 import type { SalesReturn } from '../../types';
 import type { DatabaseManager } from '../../database/db';
 import type { InvoiceWithItems, SalesContext } from './context';
@@ -181,27 +181,30 @@ function createReturnInTransaction(
   const authoritativeItems = getAuthoritativeReturnItems(inv, items);
   const returnNumber = sqliteDb.nextNumber('RET');
   const totalReturnAmount = round2(authoritativeItems.reduce((sum, item) => sum + item.returnAmount, 0));
+  const taxableInvoiceBase = Math.max(0, Number(inv.subtotal || 0) - Number(inv.discountAmount || 0));
+  const returnTax = calculateReturnTax(totalReturnAmount, Number(inv.taxAmount || 0), taxableInvoiceBase);
+  const totalReturnIncludingTax = round2(totalReturnAmount + returnTax);
   const refundMethod = options.refundMethod || 'CASH';
   const impact = computeReturnImpact({
     invoiceTotal: inv.totalAmount,
     invoicePaid: inv.paidAmount,
-    returnTotal: totalReturnAmount,
+    returnTotal: totalReturnIncludingTax,
     refundCash: refundMethod === 'BALANCE' ? false : refundCash,
   });
 
   insertSalesReturn(sqliteDb, params, authoritativeItems, returnNumber, totalReturnAmount, refundMethod, impact);
   const fifoEnabled = params.trackInventory && SettingsService.getSettings().costingMethod === 'FIFO';
   const returnCosts = processReturnItems(sqliteDb, params, authoritativeItems, fifoEnabled);
-  updateCustomerAfterReturn(sqliteDb, inv.customerId, impact.balanceDelta, totalReturnAmount);
+  updateCustomerAfterReturn(sqliteDb, inv.customerId, impact.balanceDelta, totalReturnIncludingTax);
   updateCashRegisterAfterReturn(sqliteDb, options, refundMethod, impact.cashRefund);
 
   // No stock was relieved when the sale was created, so a return must not
   // restore inventory value to the ledger.
   const returnedCost = params.trackInventory ? returnCosts.inventoryCost : 0;
   const returnedServiceCost = params.trackInventory ? returnCosts.serviceCost : 0;
-  const ledgerLines = buildReturnLedgerLines(params, returnId, returnNumber, totalReturnAmount, impact, returnedCost, returnedServiceCost);
+  const ledgerLines = buildReturnLedgerLines(params, totalReturnAmount, returnTax, impact, returnedCost, returnedServiceCost);
   updateShiftRefunds(sqliteDb, options.shiftId, impact.cashRefund);
-  updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnAmount);
+  updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnIncludingTax);
 
   const effects: Effect[] = [
     {
@@ -287,27 +290,21 @@ function getAuthoritativeReturnItems(
     const weightedPrice = (key: 'unitPrice' | 'unitCost') => soldQuantity > 0
       ? soldLines.reduce((sum, line) => sum + Number(line[key] || 0) * Number(line.quantityM2 || 0), 0) / soldQuantity
       : 0;
-    const invoiceSubtotal = Math.max(0, Number(inv.subtotal || 0));
-    const invoiceDiscount = Math.max(0, Number(inv.discountAmount || 0));
-    const discountedUnitValue = soldQuantity > 0
-      ? soldLines.reduce((sum, line) => {
-        const quantity = Math.max(0, Number(line.quantityM2 || 0));
-        if (quantity === 0) return sum;
-        const lineAmount = Number.isFinite(Number(line.totalPrice))
-          ? Number(line.totalPrice)
-          : Math.max(0, Number(line.unitPrice || 0) * quantity - Number(line.discountAmount || 0));
-        const invoiceDiscountShare = invoiceSubtotal > 0
-          ? invoiceDiscount * lineAmount / invoiceSubtotal
-          : 0;
-        const lineNet = Math.max(0, lineAmount - invoiceDiscountShare);
-        return sum + lineNet;
-      }, 0) / soldQuantity
-      : 0;
     return {
       ...item,
       unitPrice: round2(weightedPrice('unitPrice')),
       unitCost: round2(weightedPrice('unitCost')),
-      returnAmount: round2(item.quantityM2 * discountedUnitValue),
+      returnAmount: calculateDiscountedReturnAmount(
+        item.quantityM2,
+        soldLines.map((line) => ({
+          quantity: Number(line.quantityM2 || 0),
+          totalPrice: Number(line.totalPrice || 0),
+          unitPrice: Number(line.unitPrice || 0),
+          discountAmount: Number(line.discountAmount || 0),
+        })),
+        Number(inv.subtotal || 0),
+        Number(inv.discountAmount || 0)
+      ),
     };
   });
 }
@@ -503,19 +500,15 @@ function updateCashRegisterAfterReturn(
 
 function buildReturnLedgerLines(
   params: ReturnTransactionParams,
-  returnId: string,
-  returnNumber: string,
   totalReturnAmount: number,
+  taxReduction: number,
   impact: ReturnType<typeof computeReturnImpact>,
   returnedCost: number,
   returnedServiceCost = 0
 ): any[] {
-  const { inv } = params;
-  const taxableInvoiceBase = Math.max(0, Number(inv.subtotal || 0) - Number(inv.discountAmount || 0));
-  const taxReduction = calculateReturnTax(totalReturnAmount, Number(inv.taxAmount || 0), taxableInvoiceBase);
   const refundAccount = impact.cashRefund > 0 ? paymentAccountCode(params.options.refundMethod || 'CASH') : undefined;
   const lines = [
-    { accountCode: '4101', debit: round2(totalReturnAmount - taxReduction), credit: 0 },
+    { accountCode: '4101', debit: totalReturnAmount, credit: 0 },
   ];
   if (taxReduction > 0) lines.push({ accountCode: '2102', debit: taxReduction, credit: 0 });
   if (impact.balanceDelta > 0) lines.push({ accountCode: '1103', debit: 0, credit: impact.balanceDelta });

@@ -487,13 +487,30 @@ ipcMain.handle('tailscale:status', async (event) => {
   return tailscaleService.getStatus();
 });
 
-ipcMain.handle('tailscale:connect', async (event, authKey) => {
+async function authorizeTailscaleChange(event, message) {
   validateIpcSender(event);
+  const owner = BrowserWindow.fromWebContents(event.sender);
+  if (!owner || owner.isDestroyed()) throw new Error('The application window is not available.');
+  const { response } = await dialog.showMessageBox(owner, {
+    type: 'warning',
+    title: 'تأكيد تغيير اتصال Tailscale',
+    message,
+    detail: 'سيتم تشغيل أمر Tailscale بصلاحيات المستخدم الحالي.',
+    buttons: ['إلغاء', 'متابعة'],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  });
+  if (response !== 1) throw new Error('Tailscale operation was not authorized.');
+}
+
+ipcMain.handle('tailscale:connect', async (event, authKey) => {
+  await authorizeTailscaleChange(event, 'هل تسمح بالاتصال بشبكة Tailscale على هذا الجهاز؟');
   return tailscaleService.connect(authKey);
 });
 
 ipcMain.handle('tailscale:disconnect', async (event) => {
-  validateIpcSender(event);
+  await authorizeTailscaleChange(event, 'هل تسمح بفصل هذا الجهاز عن شبكة Tailscale؟');
   return tailscaleService.disconnect();
 });
 

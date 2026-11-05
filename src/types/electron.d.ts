@@ -21,6 +21,8 @@ declare global {
             recommendations: Array<{ type: string; action: string }>;
           };
         }>;
+        getOffsiteBackupDir?: () => Promise<{ ok: boolean; path: string | null }>;
+        setOffsiteBackupDir?: (directory: string) => Promise<{ ok: boolean; path: string | null }>;
         removeBackup?: (fileName: string) => Promise<{ ok: boolean; deleted: boolean; error?: string }>;
         preserveCorrupt?: () => Promise<{ path: string; bytes: number }>;
         createFreshAfterRecovery?: () => Promise<{ ok: boolean; path?: string }>;

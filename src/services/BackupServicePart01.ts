@@ -313,7 +313,8 @@ public async runAutoBackupIfDue(intervalHours: number): Promise<{
     try {
       if (!this.isBackupDue(intervalHours)) return { created: false };
       const result = await this.createLocalSnapshot('auto');
-      const externalAction = result.strategy?.actions.find((action) => action.type === 'external');
+      const externalAction = result.strategy?.actions.find((action) => action.type === 'offsite')
+        || result.strategy?.actions.find((action) => action.type === 'external');
       return {
         created: Boolean(result.ok),
         path: result.path,

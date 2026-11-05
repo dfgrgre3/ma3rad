@@ -22,6 +22,10 @@ const {
   isAllowedNetworkPrinterPort,
   isValidPrintBytes,
 } = require('../electron/printing.js');
+const {
+  TailscaleService,
+  isValidTailscaleAuthKey,
+} = require('../electron/tailscaleService.js');
 
 const origins = new Set(['http://localhost:5173', 'http://127.0.0.1:5173']);
 
@@ -112,6 +116,40 @@ test('network printing validates byte arrays and caps their size', () => {
   assert.equal(isValidPrintBytes([0, -1], 3), false);
   assert.equal(isValidPrintBytes([0, 1], 1), false);
   assert.equal(isValidPrintBytes(new Uint8Array([0, 1]), 3), false);
+});
+
+test('Tailscale accepts only bounded auth keys and passes CLI arguments separately', async () => {
+  const validKey = `tskey-auth-${'a'.repeat(32)}`;
+  assert.equal(isValidTailscaleAuthKey(validKey), true);
+  for (const invalidKey of [
+    `tskey-auth-${'a'.repeat(19)}`,
+    `tskey-auth-${'a'.repeat(129)}`,
+    `${validKey} & another-command`,
+    `${validKey} `,
+    `tskey-api-${'a'.repeat(32)}`,
+  ]) {
+    assert.equal(isValidTailscaleAuthKey(invalidKey), false, invalidKey);
+  }
+
+  const service = new TailscaleService();
+  const commands: string[][] = [];
+  service.runCommand = async (args: string[]) => {
+    commands.push(args);
+    return { ok: true };
+  };
+
+  assert.deepEqual(await service.connect(validKey), { ok: true });
+  assert.deepEqual(await service.connect(), { ok: true });
+  assert.deepEqual(await service.disconnect(), { ok: true });
+  assert.deepEqual(await service.connect(`${validKey}&whoami`), {
+    ok: false,
+    error: 'Invalid Tailscale auth key.',
+  });
+  assert.deepEqual(commands, [
+    ['up', '--unattended', '--authkey', validKey],
+    ['up', '--unattended'],
+    ['down'],
+  ]);
 });
 
 test('route guards use the same permissions as navigation entries', async () => {

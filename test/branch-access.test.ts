@@ -13,6 +13,7 @@ import { ProcurementService } from '../src/services/ProcurementService.ts';
 import { CashierService } from '../src/services/CashierService.ts';
 import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
 import { OperationsService } from '../src/services/OperationsService.ts';
+import { InventoryService } from '../src/services/InventoryService.ts';
 import type { User } from '../src/types/identity.ts';
 
 test('branch access enforces assigned and explicit central scopes in service queries', async () => {
@@ -69,7 +70,8 @@ test('branch access enforces assigned and explicit central scopes in service que
             ('usr_scope', 'purchases.view', 'GRANT'),
             ('usr_scope', 'purchases.approve', 'GRANT'),
             ('usr_scope', 'cashier.view', 'GRANT'),
-            ('usr_scope', 'cashier.expense', 'GRANT')`
+            ('usr_scope', 'cashier.expense', 'GRANT'),
+            ('usr_scope', 'inventory.transfer', 'GRANT')`
   );
   PermissionService.invalidate(user);
   assert.deepEqual(access.getAccessibleBranchIds(), ['br_scope_a']);
@@ -79,6 +81,15 @@ test('branch access enforces assigned and explicit central scopes in service que
   assert.throws(() => access.requireWarehouseAccess('wh_scope_b'), /ليس لديك صلاحية الوصول|الفرع النشط/);
   access.requireWarehouseAuthorization('wh_scope_a');
   assert.throws(() => access.requireWarehouseAuthorization('wh_scope_b'), /ليس لديك صلاحية الوصول/);
+  db.run(
+    `INSERT INTO stock_transfers
+      (id, transfer_number, date, from_warehouse_id, to_warehouse_id, status, total_quantity_m2, created_by)
+     VALUES ('trf_scope_a_to_b', 'TRF-SCOPE-A-B', '2026-01-01', 'wh_scope_a', 'wh_scope_b', 'REQUESTED', 0, 'usr_scope')`
+  );
+  const inventory = new InventoryService();
+  assert.throws(() => inventory.getTransferItems('trf_scope_a_to_b'), /ليس لديك صلاحية الوصول/);
+  assert.equal(inventory.getTransfersList().length, 0);
+  assert.ok(inventory.getTransferSummaryByWarehouse().every((row) => row.warehouseId !== 'wh_scope_b'));
   assert.equal(access.requireRegisterAccess('cr_scope_a'), 'br_scope_a');
   assert.throws(() => access.requireRegisterAccess('cr_scope_b'), /ليس لديك صلاحية الوصول/);
   assert.throws(() => access.requireRegisterAccess('cr_scope_a', user, 'br_scope_b'), /خزينة تابعة لفرع المعاملة/);

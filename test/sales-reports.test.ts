@@ -48,20 +48,17 @@ test('sales reports net sales, profit and daily revenue against returns by retur
   const salesReturn = new SalesService().returnSale(invoice.id, [{
     productId, quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'report test',
   }]);
-  const returnedTax = Number((salesReturn.totalAmount * invoice.taxAmount /
-    (invoice.subtotal - invoice.discountAmount)).toFixed(2));
-  const returnedNetRevenue = salesReturn.totalAmount - returnedTax;
-  const expectedNetSales = invoice.subtotal - invoice.discountAmount - returnedNetRevenue;
+  const expectedNetSales = invoice.subtotal - invoice.discountAmount - salesReturn.totalAmount;
   const dashboardAfter = analyticsService.getDashboardMetrics();
   const dashboardSales = (metrics: ReturnType<typeof analyticsService.getDashboardMetrics>, name: string) =>
     metrics.find((metric) => metric.name === name)!.value;
   assert.equal(
     dashboardSales(dashboardAfter, 'المبيعات اليوم') - dashboardSales(dashboardBefore, 'المبيعات اليوم'),
-    -returnedNetRevenue,
+    -salesReturn.totalAmount,
   );
   assert.equal(
     dashboardSales(dashboardAfter, 'المبيعات هذا الشهر') - dashboardSales(dashboardBefore, 'المبيعات هذا الشهر'),
-    -returnedNetRevenue,
+    -salesReturn.totalAmount,
   );
 
   const today = localDateString();
@@ -71,15 +68,15 @@ test('sales reports net sales, profit and daily revenue against returns by retur
   assert.equal(analytics.totalSales, expectedNetSales);
   assert.equal(analytics.totalOrders, 1);
   assert.equal(analytics.averageOrderValue, expectedNetSales);
-  assert.equal(analytics.totalProfit, 1260);
+  assert.equal(analytics.totalProfit, 1200);
   assert.deepEqual(analytics.salesByDay, [
     { date: invoice.date, amount: invoice.subtotal - invoice.discountAmount, count: 1 },
-    { date: returnDate, amount: -returnedNetRevenue, count: 0 },
+    { date: returnDate, amount: -salesReturn.totalAmount, count: 0 },
   ]);
   const analyticsProduct = analytics.topProducts.find((row) => row.productId === productId);
   assert.ok(analyticsProduct);
   assert.equal(analyticsProduct.quantity, 6);
-  assert.equal(analyticsProduct.revenue, 1860);
+  assert.equal(analyticsProduct.revenue, 1800);
   const analyticsCustomer = analytics.topCustomers.find((row) => row.customerId === customer.id);
   assert.ok(analyticsCustomer);
   assert.equal(analyticsCustomer.totalSpent, expectedNetSales);
@@ -90,29 +87,29 @@ test('sales reports net sales, profit and daily revenue against returns by retur
   }>;
   const product = productRows.find((row) => row.label === 'Sales report return product');
   assert.ok(product);
-  assert.equal(product.revenue, 1860);
+  assert.equal(product.revenue, 1800);
   assert.equal(product.cost, 600);
-  assert.equal(product.profit, 1260);
+  assert.equal(product.profit, 1200);
   assert.equal(product.count, 1);
 
   const categoryRows = loadReport('by_category', today, returnDate) as typeof productRows;
   const categoryName = db.query<{ name: string }>('SELECT name FROM categories WHERE id = ?', ['cat_floor'])[0].name;
   const categoryRow = categoryRows.find((row) => row.label === categoryName);
   assert.ok(categoryRow);
-  assert.equal(categoryRow.revenue, 1860);
-  assert.equal(categoryRow.profit, 1260);
+  assert.equal(categoryRow.revenue, 1800);
+  assert.equal(categoryRow.profit, 1200);
 
   const customerRows = loadReport('by_customer', today, returnDate) as typeof productRows;
   const customerRow = customerRows.find((row) => row.label === customer.name);
   assert.ok(customerRow);
-  assert.equal(customerRow.revenue, 1860);
+  assert.equal(customerRow.revenue, 1800);
   assert.equal(customerRow.cost, 600);
-  assert.equal(customerRow.profit, 1260);
+  assert.equal(customerRow.profit, 1200);
 
   const userRows = loadReport('by_user', today, returnDate) as typeof productRows;
-  const userRow = userRows.find((row) => row.revenue === 1860);
+  const userRow = userRows.find((row) => row.revenue === 1800);
   assert.ok(userRow);
-  assert.equal(userRow.profit, 1260);
+  assert.equal(userRow.profit, 1200);
 
   const dailyRows = loadReport('daily', today, returnDate) as Array<{
     date: string; revenue: number; invoiceCount: number; returnCount: number;
@@ -128,7 +125,7 @@ test('sales reports net sales, profit and daily revenue against returns by retur
   }>;
   assert.deepEqual(returnDayRows, [{
     date: returnDate,
-    revenue: -1143.75,
+    revenue: -1200,
     invoiceCount: 0,
     returnCount: 1,
   }]);
@@ -137,14 +134,14 @@ test('sales reports net sales, profit and daily revenue against returns by retur
     label: string; revenue: number; count: number; customers: number; margin: number;
   }>;
   assert.equal(cityRows.length, 1);
-  assert.equal(cityRows[0].revenue, -1143.75);
+  assert.equal(cityRows[0].revenue, -1200);
   assert.equal(cityRows[0].count, 0);
   assert.equal(cityRows[0].customers, 1);
   assert.equal(cityRows[0].margin, 0);
   db.run('UPDATE sales_returns SET date = ? WHERE original_invoice_id = ?', [today, invoice.id]);
 });
 
-test('product reports allocate each return tax once across returned items', async () => {
+test('product reports subtract the stored pre-tax return amounts by item', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
@@ -191,12 +188,14 @@ test('product reports allocate each return tax once across returned items', asyn
   assert.ok(customerRow);
   const returnedProductRows = productRows.filter((row) => productIds.includes(row.label));
   assert.equal(returnedProductRows.reduce((sum, row) => sum + row.revenue, 0), customerRow.revenue);
-  assert.equal(customerRow.revenue, 2727.27);
+  assert.equal(customerRow.revenue, 2700);
 
   const reconciliation = new SalesFinancialReconciliationService();
   const checks = reconciliation.getReconciliation(today, today);
-  assert.equal(checks.find((check) => check.key === 'sales')?.status, 'MATCH');
-  assert.equal(checks.find((check) => check.key === 'cost')?.status, 'MATCH');
+  assert.equal(checks.find((check) => check.key === 'sales')?.status, 'MATCH',
+    JSON.stringify(checks.find((check) => check.key === 'sales')));
+  assert.equal(checks.find((check) => check.key === 'cost')?.status, 'MATCH',
+    JSON.stringify(checks.find((check) => check.key === 'cost')));
 
   const reasons = Object.fromEntries(checks
     .filter((check) => check.status === 'DIFFERENCE')

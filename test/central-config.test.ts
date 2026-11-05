@@ -132,7 +132,14 @@ test('central feature permissions are enforced by both UI and service-layer chec
 
   // UI-level check honors the central restriction…
   assert.equal(PermissionService.can(admin, 'sales.create'), false);
-  // The service layer applies the same central restriction as the UI.
+  // Service checks are independent of the current UI page unless scoped explicitly.
+  assert.doesNotThrow(() => PermissionService.require(admin, 'sales.create'));
+  assert.throws(() => PermissionService.require(admin, 'sales.create', '/sales'));
+
+  setCentralConfig({
+    disabledPermissions: ['sales.create'],
+    featurePermissions: [{ pageUrl: '/sales', pageVisible: true, allowViewOnly: true }],
+  });
   assert.throws(() => PermissionService.require(admin, 'sales.create'));
 
   clearCentralConfig();

@@ -238,6 +238,26 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
      WHERE reference_type = 'TRANSFER_LOSS' AND reference_id = ? AND quantity_m2 < 0`,
     [transferId]
   )?.total, 3, 'Transfer loss remains documented in the movement ledger');
+  db.run(`INSERT INTO inventory_transactions (
+    id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count,
+    unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at
+  ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, -30, -2, 150, 4500, 'TRANSFER', ?, ?, ?, CURRENT_TIMESTAMP)`, [
+    'tx_inv_pair_out', 'TX-INV-PAIR-OUT', prodId, whSource, 'trf_similar_01',
+    `إرسال تحويل مخزني (TRF-SIMILAR) إلى ${whDest}`, adminId,
+  ]);
+  db.run(`INSERT INTO inventory_transactions (
+    id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count,
+    unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at
+  ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, 30, 2, 150, 4500, 'TRANSFER', ?, ?, ?, CURRENT_TIMESTAMP)`, [
+    'tx_inv_pair_in', 'TX-INV-PAIR-IN', prodId, whDest, 'trf_similar_01',
+    `استلام تحويل مخزني (TRF-SIMILAR) من ${whSource}`, adminId,
+  ]);
+  assert.equal(
+    inventoryService.getTransfersList(undefined, undefined, whSource)
+      .filter((row) => row.productSku === 'SKU-INV-TILE').length,
+    2,
+    'Transfers for the same product and warehouse pair must remain separate'
+  );
 
   // Verify destination warehouse received 27 m2
   const destAfterReceive = queryOne<{ quantityM2: number }>(

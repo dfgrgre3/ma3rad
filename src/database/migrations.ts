@@ -2389,6 +2389,20 @@ export const MIGRATIONS: Migration[] = [
       );
     },
   },
+  {
+    id: '117_sales_return_customer_credits',
+    description: 'Align invoice return totals with the actual customer credit including VAT.',
+    up: (db: Database) => {
+      db.exec(`
+        UPDATE sales_invoices
+        SET returned_amount = COALESCE((
+          SELECT SUM(COALESCE(sr.refunded_amount, 0) + COALESCE(sr.remaining_to_balance, 0))
+          FROM sales_returns sr
+          WHERE sr.original_invoice_id = sales_invoices.id
+        ), 0)
+      `);
+    },
+  },
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

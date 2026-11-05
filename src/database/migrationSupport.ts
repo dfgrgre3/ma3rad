@@ -44,8 +44,8 @@ export function backfillReturnLedgerEntries(db: Database): void {
 
 type SalesReturnLedgerRow = {
   id: string; date: string; return_number: string; total_amount: number; refunded_amount: number;
-  remaining_to_balance: number; refund_method: string; created_by: string; total_invoice: number;
-  invoice_tax: number;
+  remaining_to_balance: number; refund_method: string; created_by: string; invoice_subtotal: number;
+  invoice_discount: number; invoice_tax: number;
 };
 
 function backfillSalesReturnLedgerEntries(db: Database, actorId: string): void {
@@ -53,7 +53,8 @@ function backfillSalesReturnLedgerEntries(db: Database, actorId: string): void {
     db,
     `SELECT sr.id, sr.date, sr.return_number, sr.total_amount, sr.refunded_amount,
             sr.remaining_to_balance, sr.refund_method, sr.created_by,
-            si.total_amount AS total_invoice, si.tax_amount AS invoice_tax
+            si.subtotal AS invoice_subtotal, si.discount_amount AS invoice_discount,
+            si.tax_amount AS invoice_tax
      FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
      ORDER BY sr.date, sr.created_at, sr.id`
   );
@@ -72,9 +73,12 @@ function postSalesReturnLedgerEntry(
     'SELECT COALESCE(SUM(quantity_m2 * unit_cost), 0) AS total_cost FROM sales_return_items WHERE return_id = ?',
     [returned.id]
   )[0]?.total_cost || 0;
-  const taxReduction = Number(returned.total_invoice) > 0
-    ? Math.round(Number(returned.total_amount) * Number(returned.invoice_tax || 0) / Number(returned.total_invoice) * 100) / 100
+  const taxableBase = Math.max(0, Number(returned.invoice_subtotal) - Number(returned.invoice_discount));
+  const taxReduction = taxableBase > 0
+    ? Math.round(Number(returned.total_amount) * Number(returned.invoice_tax || 0) / taxableBase * 100) / 100
     : 0;
+  const returnCredits = Number(returned.refunded_amount) + Number(returned.remaining_to_balance);
+  const creditsIncludeTax = returnCredits >= Number(returned.total_amount) + taxReduction - 0.01;
   postLedgerEntry(db, {
     date: returned.date,
     description: `Sales return ${returned.return_number}`,
@@ -82,7 +86,7 @@ function postSalesReturnLedgerEntry(
     referenceId: returned.id,
     createdBy: returned.created_by || actorId,
     lines: [
-      { accountCode: '4101', debit: Number(returned.total_amount) - taxReduction, credit: 0 },
+      { accountCode: '4101', debit: creditsIncludeTax ? Number(returned.total_amount) : Number(returned.total_amount) - taxReduction, credit: 0 },
       ...(taxReduction > 0 ? [{ accountCode: '2102', debit: taxReduction, credit: 0 }] : []),
       ...(Number(returned.remaining_to_balance) > 0 ? [{
         accountCode: '1103',

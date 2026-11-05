@@ -63,7 +63,7 @@ export class SalesService {
   public getInvoicesFiltered(
     filters: InvoiceFilters = {},
     includeVoid = true
-  ): (SalesInvoice & { returnedAmount?: number; itemsCount?: number })[] {
+  ): (SalesInvoice & { returnedAmount?: number; returnBalanceCredit?: number; itemsCount?: number })[] {
     this.requireSalesView();
     return fetchInvoicesFiltered(this.context(), filters, includeVoid);
   }

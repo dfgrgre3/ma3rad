@@ -214,6 +214,51 @@ test('automatic database backups complete when applying the backup strategy', as
   }
 });
 
+test('network backup destination is persisted, isolated from app data, and restore-verified', async () => {
+  const context = await createHandlers();
+  const offsiteDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-offsite-'));
+  try {
+    const { handlers, event, dbFile } = context;
+    await fs.mkdir(path.dirname(dbFile), { recursive: true });
+    await fs.writeFile(dbFile, Buffer.concat([
+      Buffer.from('SQLite format 3\0', 'binary'),
+      Buffer.from('test database bytes'),
+    ]));
+
+    assert.deepEqual(await handlers.get('db:offsite-backup-dir:get')(event), { ok: true, path: null });
+    assert.deepEqual(await handlers.get('db:offsite-backup-dir:set')(event, offsiteDir), {
+      ok: true,
+      path: offsiteDir,
+    });
+    await assert.rejects(
+      handlers.get('db:offsite-backup-dir:set')(event, context.appDataDir),
+      /independent|مستقلة/i,
+    );
+    await assert.rejects(
+      handlers.get('db:offsite-backup-dir:set')(event, path.join(context.appDataDir, 'nested')),
+      /independent|مستقلة/i,
+    );
+    assert.deepEqual(await handlers.get('db:offsite-backup-dir:get')(event), {
+      ok: true,
+      path: offsiteDir,
+    });
+
+    const backup = await handlers.get('db:backup')(event, 'manual');
+    assert.equal(backup.ok, true, backup.error);
+    assert.equal(backup.strategy.actions.find((action) => action.type === 'offsite').status, 'complete');
+    const offsitePath = path.join(offsiteDir, path.basename(backup.path));
+    assert.ok(fsSync.existsSync(offsitePath));
+
+    assert.deepEqual(await handlers.get('db:offsite-backup-dir:set')(event, ''), {
+      ok: true,
+      path: null,
+    });
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+    await fs.rm(offsiteDir, { recursive: true, force: true });
+  }
+});
+
 test('registered app and printing handlers receive their directory and size dependencies', async () => {
   const context = await createHandlers();
   try {

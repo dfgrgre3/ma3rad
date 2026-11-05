@@ -450,6 +450,16 @@ test('inventory and accounting audit: movements, reservations, transfers and led
     ['TRANSFER_IN', 'TRANSFER_OUT']
   );
   assert.equal(transferTypes.reduce((sum, row) => sum + Number(row.quantity), 0), 0, 'transfer legs must cancel out');
+  const transferReferenceIds = q<{ referenceId: string }>(
+    `SELECT reference_id AS referenceId FROM inventory_transactions
+     WHERE product_id = ? AND reference_type = 'TRANSFER' ORDER BY created_at DESC, rowid DESC LIMIT 2`,
+    [productId]
+  );
+  assert.equal(transferReferenceIds[0].referenceId, transferReferenceIds[1].referenceId);
+  const transferReportRows = inventory.getTransfersList(undefined, undefined, 'wh_main')
+    .filter((row: any) => String(row.transferNotes).includes('تدقيق تحويل'));
+  assert.equal(transferReportRows.length, 1);
+  assert.equal(transferReportRows[0].quantityM2, 5);
 
   // ── Reservations never exceed on-hand and release cleanly ────────────────
   const reservations = new ReservationService();
