@@ -7,6 +7,7 @@ import { PermissionService } from '../src/services/PermissionService.ts';
 import { CustomerService } from '../src/services/CustomerService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { BackupService } from '../src/services/BackupService.ts';
+import { BackupServicePart01 } from '../src/services/BackupServicePart01.ts';
 import officeCrypto from 'officecrypto-tool';
 import { createXlsxBackupWorkbook } from '../src/services/xlsxBackup.ts';
 import { encryptExternalBackup } from '../src/services/backupEncryption.ts';
@@ -60,11 +61,30 @@ function stubDesktopBackupApi(): { snapshots: Array<{ label: string; bytes: numb
         return { ok: true, path: `C:\\backups\\${label}_snapshot.sqlite`, bytes: 1024 };
       },
       decryptXlsxBackup: async (bytes: Uint8Array, password: string) =>
-        new Uint8Array(await officeCrypto.decrypt(Buffer.from(bytes), { password })),
+        new Uint8Array(await officeCrypto.decrypt(bytes, { password })),
     },
   };
   return { snapshots };
 }
+
+test('automatic backup warning includes every failed secondary destination', async () => {
+  const service = new BackupServicePart01();
+  service.isBackupDue = () => true;
+  service.createLocalSnapshot = async () => ({
+    ok: true,
+    path: 'C:\\backups\\snapshot.sqlite.enc',
+    strategy: {
+      actions: [
+        { type: 'offsite', target: '\\\\server\\share\\snapshot.sqlite.enc', status: 'complete', description: 'network completed' },
+        { type: 'external', target: 'E:\\backups\\snapshot.sqlite.enc', status: 'failed', description: 'USB copy failed' },
+      ],
+      recommendations: [],
+    },
+  });
+  const result = await service.runAutoBackupIfDue(24);
+  assert.equal(result.created, true);
+  assert.match(result.externalBackupWarning || '', /USB copy failed/);
+});
 
 test('migration 118 recalculates legacy sales return credits including VAT', async () => {
   const manager = await boot();
@@ -114,11 +134,19 @@ test('migration 118 recalculates legacy sales return credits including VAT', asy
 
   const migration = MIGRATIONS.find((item) => item.id === '118_sales_return_customer_credit_vat');
   assert.ok(migration);
-  migration.up(manager.getDatabase());
+  migration!.up(manager.getDatabase());
 
   assert.equal(
     Number(one<{ amount: number }>('SELECT returned_amount AS amount FROM sales_invoices WHERE id = ?', [invoice.id]).amount),
     115
+  );
+
+  const reviewFirstMigration = MIGRATIONS.find((item) => item.id === '120_restore_recorded_sales_return_credits');
+  assert.ok(reviewFirstMigration);
+  reviewFirstMigration!.up(manager.getDatabase());
+  assert.equal(
+    Number(one<{ amount: number }>('SELECT returned_amount AS amount FROM sales_invoices WHERE id = ?', [invoice.id]).amount),
+    100
   );
 });
 
@@ -176,7 +204,7 @@ test('restoring a production backup replaces live data only after a verified sna
   (globalThis as any).window.prompt = () => 'unused-password';
 
   const restored = await new BackupService().restoreBackupFromFile(
-    new File([productionBytes], 'ceramisys_backup_production.ceramisys-backup', { type: 'application/octet-stream' })
+    new File([Uint8Array.from(productionBytes).buffer], 'ceramisys_backup_production.ceramisys-backup', { type: 'application/octet-stream' })
   );
 
   // 1. A pre-restore snapshot was taken before touching the live database.
@@ -251,7 +279,7 @@ test('an encrypted external backup restores as an integrity-checked SQLite datab
   const { snapshots } = stubDesktopBackupApi();
 
   const restored = await new BackupService().restoreBackupFromFile(
-    new File([encryptedBytes], 'ceramisys_backup_external.ceramisys-backup', {
+    new File([new Uint8Array(encryptedBytes).buffer], 'ceramisys_backup_external.ceramisys-backup', {
       type: 'application/octet-stream',
     }),
     password
@@ -269,7 +297,7 @@ test('an encrypted XLSX workbook restores the complete SQLite backup through the
   const databaseBytes = manager.exportDatabaseBinary();
   const password = 'correct horse battery';
   const workbookBytes = createXlsxBackupWorkbook(databaseBytes);
-  const encryptedWorkbook = officeCrypto.encrypt(Buffer.from(workbookBytes), { password });
+  const encryptedWorkbook = officeCrypto.encrypt(new Uint8Array(workbookBytes), { password });
   const { snapshots } = stubDesktopBackupApi();
   (globalThis as any).window.prompt = () => password;
 

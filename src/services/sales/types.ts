@@ -77,10 +77,15 @@ export interface ReturnableItem {
 export interface ReturnStats {
   count: number;
   totalAmount: number;
+  taxAmount: number;
+  grossAmount: number;
+  returnsWithoutRecordedTax: number;
   cashRefunded: number;
   creditedToBalance: number;
   todayCount: number;
   todayAmount: number;
+  todayTaxAmount: number;
+  todayGrossAmount: number;
 }
 
 export interface ReturnRequestItem {

@@ -64,23 +64,33 @@ export function fetchReturnStats(ctx: SalesContext): ReturnStats {
   const row = ctx.db.query<any>(
     `SELECT COUNT(*) AS count,
             COALESCE(SUM(total_amount), 0) AS totalAmount,
+            COALESCE(SUM(return_tax_amount), 0) AS taxAmount,
+            COALESCE(SUM(total_amount + COALESCE(return_tax_amount, 0)), 0) AS grossAmount,
+            COALESCE(SUM(CASE WHEN return_tax_amount IS NULL THEN 1 ELSE 0 END), 0) AS returnsWithoutRecordedTax,
             COALESCE(SUM(refunded_amount), 0) AS cashRefunded,
             COALESCE(SUM(remaining_to_balance), 0) AS creditedToBalance,
             COALESCE(SUM(CASE WHEN date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
-            COALESCE(SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END), 0) AS todayAmount
+            COALESCE(SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END), 0) AS todayAmount,
+            COALESCE(SUM(CASE WHEN date = ? THEN COALESCE(return_tax_amount, 0) ELSE 0 END), 0) AS todayTaxAmount,
+            COALESCE(SUM(CASE WHEN date = ? THEN total_amount + COALESCE(return_tax_amount, 0) ELSE 0 END), 0) AS todayGrossAmount
      FROM sales_returns sr
      JOIN sales_invoices si ON si.id = sr.original_invoice_id
      JOIN warehouses w ON w.id = si.warehouse_id
      WHERE ${scope.clause}`,
-    [today, today, ...scope.params]
+    [today, today, today, today, ...scope.params]
   )[0] || {};
   return {
     count: Number(row.count || 0),
     totalAmount: Number(row.totalAmount || 0),
+    taxAmount: Number(row.taxAmount || 0),
+    grossAmount: Number(row.grossAmount || 0),
+    returnsWithoutRecordedTax: Number(row.returnsWithoutRecordedTax || 0),
     cashRefunded: Number(row.cashRefunded || 0),
     creditedToBalance: Number(row.creditedToBalance || 0),
     todayCount: Number(row.todayCount || 0),
     todayAmount: Number(row.todayAmount || 0),
+    todayTaxAmount: Number(row.todayTaxAmount || 0),
+    todayGrossAmount: Number(row.todayGrossAmount || 0),
   };
 }
 

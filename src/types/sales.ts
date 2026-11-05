@@ -111,6 +111,7 @@ export interface SalesReturn {
   warehouseId: string;
   date: string;
   totalAmount: number;
+  returnTaxAmount?: number | null;
   refundedAmount: number;
   remainingToBalance: number; // تم إضافته لرصيد العميل
   reason: string;

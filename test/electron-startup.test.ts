@@ -6,10 +6,57 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { DatabaseManager } from '../src/database/db.ts';
 
 const require = createRequire(import.meta.url);
-const { registerDatabaseHandlers } = require('../electron/databaseHandlers.js');
+const {
+  registerDatabaseHandlers, encryptRecoveryKey, decryptRecoveryKey,
+  encryptDatabaseBytes, decryptDatabaseBytes, verifySQLiteDatabaseBytes,
+} = require('../electron/databaseHandlers.js');
+
+test('recovery key is portable and restore validation checks SQLite integrity and foreign keys', async () => {
+  const key = randomBytes(32);
+  const recoveryFile = await encryptRecoveryKey(key, 'safe-recovery-password');
+  const recoveredKey = await decryptRecoveryKey(recoveryFile, 'safe-recovery-password');
+  assert.deepEqual(recoveredKey, key);
+  await assert.rejects(
+    () => decryptRecoveryKey(recoveryFile, 'wrong-recovery-password'),
+    /تعذر فتح ملف الاسترداد/
+  );
+
+  const initializeSqlJs = require('sql.js');
+  const SQL = await initializeSqlJs({
+    locateFile: (fileName: string) => path.join(path.dirname(require.resolve('sql.js')), fileName),
+  });
+  const database = new SQL.Database();
+  database.exec(`
+    CREATE TABLE customers (id TEXT PRIMARY KEY);
+    CREATE TABLE sales_invoices (id TEXT PRIMARY KEY);
+    CREATE TABLE sales_returns (id TEXT PRIMARY KEY);
+    CREATE TABLE journal_entries (id TEXT PRIMARY KEY);
+  `);
+  const plaintext = Buffer.from(database.export());
+  database.close();
+  const encrypted = encryptDatabaseBytes(plaintext, recoveredKey);
+  const restored = decryptDatabaseBytes(encrypted, recoveredKey);
+  assert.deepEqual(restored, plaintext);
+  await verifySQLiteDatabaseBytes(restored);
+
+  const corrupt = new SQL.Database();
+  corrupt.exec(`
+    PRAGMA foreign_keys = OFF;
+    CREATE TABLE customers (id TEXT PRIMARY KEY);
+    CREATE TABLE sales_invoices (id TEXT PRIMARY KEY);
+    CREATE TABLE sales_returns (id TEXT PRIMARY KEY);
+    CREATE TABLE journal_entries (id TEXT PRIMARY KEY);
+    CREATE TABLE dependent (customer_id TEXT REFERENCES customers(id));
+    INSERT INTO dependent VALUES ('missing-customer');
+  `);
+  const corruptBytes = Buffer.from(corrupt.export());
+  corrupt.close();
+  await assert.rejects(() => verifySQLiteDatabaseBytes(corruptBytes), /foreign_key_check/);
+});
 
 test('Electron database initialization loads and persists through the registered IPC handlers', async () => {
   const appDataDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'ceramisys-startup-'));
@@ -75,6 +122,10 @@ test('Electron database initialization loads and persists through the registered
   };
 
   try {
+    await assert.rejects(
+      () => handlers.get('db:offsite-backup-dir:set')!(event, path.join(path.dirname(appDataDir), 'same-volume-backups')),
+      /وحدة تخزين مستقلة/
+    );
     const database = await DatabaseManager.getInstance().initialize();
     assert.ok(database);
     assert.equal(calls.load, 1, 'startup reads the database through db:load');

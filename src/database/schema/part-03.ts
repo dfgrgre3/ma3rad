@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS sales_returns (
   warehouse_id TEXT NOT NULL,
   date TEXT NOT NULL,
   total_amount REAL NOT NULL,
+  return_tax_amount REAL,
   refunded_amount REAL NOT NULL DEFAULT 0,
   remaining_to_balance REAL NOT NULL DEFAULT 0,
   reason TEXT NOT NULL,

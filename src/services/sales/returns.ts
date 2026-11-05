@@ -76,7 +76,7 @@ export function createSaleReturn(
   if (idempotencyKey) {
     const prior = ctx.db.query<any>(
       `SELECT id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
-              date, total_amount, refunded_amount, remaining_to_balance, reason, refund_method, created_by, created_at
+              date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason, refund_method, created_by, created_at
        FROM sales_returns WHERE idempotency_key = ?`,
       [idempotencyKey]
     )[0];
@@ -93,6 +93,7 @@ export function createSaleReturn(
         warehouseId: prior.warehouse_id,
         date: prior.date,
         totalAmount: Number(prior.total_amount),
+        returnTaxAmount: prior.return_tax_amount == null ? null : Number(prior.return_tax_amount),
         refundedAmount: Number(prior.refunded_amount),
         remainingToBalance: Number(prior.remaining_to_balance),
         reason: prior.reason,
@@ -192,7 +193,7 @@ function createReturnInTransaction(
     refundCash: refundMethod === 'BALANCE' ? false : refundCash,
   });
 
-  insertSalesReturn(sqliteDb, params, authoritativeItems, returnNumber, totalReturnAmount, refundMethod, impact);
+  insertSalesReturn(sqliteDb, params, authoritativeItems, returnNumber, totalReturnAmount, returnTax, refundMethod, impact);
   const fifoEnabled = params.trackInventory && SettingsService.getSettings().costingMethod === 'FIFO';
   const returnCosts = processReturnItems(sqliteDb, params, authoritativeItems, fifoEnabled);
   updateCustomerAfterReturn(sqliteDb, inv.customerId, impact.balanceDelta, totalReturnIncludingTax);
@@ -250,6 +251,7 @@ function createReturnInTransaction(
     warehouseId: inv.warehouseId,
     date: today,
     totalAmount: totalReturnAmount,
+    returnTaxAmount: returnTax,
     refundedAmount: impact.cashRefund,
     remainingToBalance: impact.balanceDelta,
     reason: authoritativeItems[0]?.reason || 'مرتجع',
@@ -315,6 +317,7 @@ function insertSalesReturn(
   items: ReturnRequestItem[],
   returnNumber: string,
   totalReturnAmount: number,
+  returnTaxAmount: number,
   refundMethod: NonNullable<ReturnOptions['refundMethod']>,
   impact: ReturnType<typeof computeReturnImpact>
 ): void {
@@ -322,12 +325,12 @@ function insertSalesReturn(
   sqliteDb.run(`
     INSERT INTO sales_returns (
       id, return_number, original_invoice_id, original_invoice_number, customer_id,
-      warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason,
+      warehouse_id, date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason,
       register_id, shift_id, refund_method, created_by, idempotency_key
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
-    inv.warehouseId, today, totalReturnAmount, impact.cashRefund, impact.balanceDelta,
+    inv.warehouseId, today, totalReturnAmount, returnTaxAmount, impact.cashRefund, impact.balanceDelta,
     items[0]?.reason || 'مرتجع سيراميك',
     impact.cashRefund > 0 && refundMethod === 'CASH' ? options.registerId : null,
     options.shiftId || null, refundMethod, actor.id, options.idempotencyKey || null,

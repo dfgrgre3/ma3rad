@@ -1478,7 +1478,7 @@ export class ReportCenterService {
         FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
         WHERE sr.date >= ? AND sr.date <= ? AND si.invoice_status != 'VOID'
           AND (si.branch_id = ? OR (si.branch_id IS NULL AND (SELECT w.branch_id FROM warehouses w WHERE w.id = si.warehouse_id) = ?))
-      `, [from, to, branch.id, branch.id])[0]?.returns || 0;
+      `, [from, to, branch.id, branch.id])[0] || {};
       const expenses = this.db.query<any>(`
         SELECT COALESCE(SUM(amount), 0) AS total FROM expenses
         WHERE date >= ? AND date <= ? AND branch_id = ?
@@ -1494,15 +1494,18 @@ export class ReportCenterService {
         WHERE w.branch_id = ?
       `, [branch.id])[0]?.value || 0;
       const salesValue = round2(num(sales.sales));
+      const returnsValue = round2(num(returns.returns));
+      const netSales = round2(salesValue - returnsValue);
+      const adjustedProfit = round2(num(sales.profit) - returnsValue + num(returns.returnedCost));
       return {
         branch: branch.name,
         sales: salesValue,
-        returns: round2(num(returns)),
-        netSales: round2(salesValue - num(returns)),
+        returns: returnsValue,
+        netSales,
         invoices: num(sales.invoices),
         averageInvoice: num(sales.invoices) ? round2(salesValue / num(sales.invoices)) : 0,
-        profit: round2(num(sales.profit) - num(returns.returns) + num(returns.returnedCost)),
-        margin: salesValue ? round2((num(sales.profit) / salesValue) * 100) : 0,
+        profit: adjustedProfit,
+        margin: netSales ? round2((adjustedProfit / netSales) * 100) : 0,
         expenses: round2(num(expenses)),
         collections: round2(num(collections)),
         stockValue: round2(num(stock)),

@@ -1649,9 +1649,11 @@ export class PrintService {
         <tbody>${items || '<tr><td colspan="7">لا توجد بنود</td></tr>'}</tbody>
       </table>
       <div class="totals">
-        <div class="row"><span>إجمالي قيمة المرتجع</span><span>${CeramicMath.formatCurrency(salesReturn.totalAmount || 0)}</span></div>
-        <div class="row"><span>المسترد نقداً</span><span>${CeramicMath.formatCurrency(salesReturn.refundedAmount || 0)}</span></div>
-        <div class="row grand"><span>خصم من رصيد العميل</span><span>${CeramicMath.formatCurrency(salesReturn.remainingToBalance || 0)}</span></div>
+        <div class="row"><span>صافي المرتجع قبل الضريبة</span><span>${CeramicMath.formatCurrency(salesReturn.totalAmount || 0)}</span></div>
+        <div class="row"><span>ضريبة المرتجع</span><span>${salesReturn.returnTaxAmount == null ? 'غير مسجلة تاريخيًا' : CeramicMath.formatCurrency(salesReturn.returnTaxAmount)}</span></div>
+        <div class="row"><span>الإجمالي شامل الضريبة</span><span>${salesReturn.returnTaxAmount == null ? 'غير معلوم تاريخيًا' : CeramicMath.formatCurrency(Number(salesReturn.totalAmount || 0) + Number(salesReturn.returnTaxAmount || 0))}</span></div>
+        <div class="row"><span>المسترد نقداً (شامل الضريبة)</span><span>${CeramicMath.formatCurrency(salesReturn.refundedAmount || 0)}</span></div>
+        <div class="row grand"><span>المضاف إلى رصيد العميل (شامل الضريبة)</span><span>${CeramicMath.formatCurrency(salesReturn.remainingToBalance || 0)}</span></div>
       </div>
       <div class="sign"><div>توقيع العميل</div><div>إدارة المبيعات</div></div>
       <div class="footer">${this.esc(settings.receiptFooter)}</div>

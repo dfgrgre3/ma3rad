@@ -1,4 +1,5 @@
-const { createCipheriv, createDecipheriv, randomBytes } = require('node:crypto');
+const { createCipheriv, createDecipheriv, randomBytes, scrypt } = require('node:crypto');
+const { promisify } = require('node:util');
 const path = require('node:path');
 const os = require('node:os');
 const backupStrategyService = require('./backupStrategyService');
@@ -7,11 +8,108 @@ const safeStorageCompat = require('./safeStorageCompat');
 const DB_MAGIC = Buffer.from('CERAMISYS-DB\0v1\0', 'utf8');
 const SQLITE_HEADER = Buffer.from('SQLite format 3\0', 'binary');
 const DB_KEY_FILE = 'database-key.enc';
+const RECOVERY_FILE_FORMAT = 'CERAMISYS-RECOVERY-KEY';
+const RECOVERY_SCRYPT_OPTIONS = { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+const deriveRecoveryKey = promisify(scrypt);
+let sqliteInitializer;
 
 async function decryptStoredString(safeStorage, encrypted) {
   // shouldReEncrypt is a signal to migrate the ciphertext, not to decrypt the
   // same bytes again. Repeating that call can loop forever on some platforms.
   return safeStorageCompat.decryptString(safeStorage, encrypted);
+}
+
+async function encryptRecoveryKey(key, password) {
+  if (!Buffer.isBuffer(key) || key.length !== 32) throw new Error('Invalid database encryption key.');
+  if (typeof password !== 'string' || password.length < 12 || password.length > 255) {
+    throw new Error('يجب أن تتراوح كلمة مرور ملف الاسترداد بين 12 و255 حرفًا.');
+  }
+  const salt = randomBytes(16);
+  const iv = randomBytes(12);
+  const wrappingKey = await deriveRecoveryKey(password, salt, 32, RECOVERY_SCRYPT_OPTIONS);
+  const cipher = createCipheriv('aes-256-gcm', wrappingKey, iv);
+  const ciphertext = Buffer.concat([cipher.update(key), cipher.final()]);
+  return Buffer.from(JSON.stringify({
+    format: RECOVERY_FILE_FORMAT,
+    version: 1,
+    kdf: 'scrypt',
+    salt: salt.toString('base64'),
+    iv: iv.toString('base64'),
+    tag: cipher.getAuthTag().toString('base64'),
+    ciphertext: ciphertext.toString('base64'),
+  }), 'utf8');
+}
+
+async function decryptRecoveryKey(bytes, password) {
+  if (!Buffer.isBuffer(bytes) && !(bytes instanceof Uint8Array)) throw new Error('ملف الاسترداد غير صالح.');
+  const payloadBytes = Buffer.from(bytes);
+  if (payloadBytes.length === 0 || payloadBytes.length > 16 * 1024) throw new Error('حجم ملف الاسترداد غير صالح.');
+  if (typeof password !== 'string' || password.length < 12 || password.length > 255) {
+    throw new Error('كلمة مرور ملف الاسترداد غير صالحة.');
+  }
+  let payload;
+  try { payload = JSON.parse(payloadBytes.toString('utf8')); }
+  catch { throw new Error('ملف الاسترداد تالف أو غير صالح.'); }
+  if (!payload || payload.format !== RECOVERY_FILE_FORMAT || payload.version !== 1 || payload.kdf !== 'scrypt') {
+    throw new Error('صيغة ملف الاسترداد غير مدعومة.');
+  }
+  const decodeField = (value, expectedLength, label) => {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) {
+      throw new Error(`حقل ${label} في ملف الاسترداد غير صالح.`);
+    }
+    const decoded = Buffer.from(value, 'base64');
+    if (decoded.length !== expectedLength) throw new Error(`حقل ${label} في ملف الاسترداد غير صالح.`);
+    return decoded;
+  };
+  const salt = decodeField(payload.salt, 16, 'salt');
+  const iv = decodeField(payload.iv, 12, 'iv');
+  const tag = decodeField(payload.tag, 16, 'tag');
+  const ciphertext = decodeField(payload.ciphertext, 32, 'ciphertext');
+  const wrappingKey = await deriveRecoveryKey(password, salt, 32, RECOVERY_SCRYPT_OPTIONS);
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', wrappingKey, iv);
+    decipher.setAuthTag(tag);
+    const key = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    if (key.length !== 32) throw new Error('Invalid database encryption key.');
+    return key;
+  } catch {
+    throw new Error('تعذر فتح ملف الاسترداد. تحقق من كلمة المرور أو سلامة الملف.');
+  }
+}
+
+async function verifySQLiteDatabaseBytes(bytes) {
+  if (!sqliteInitializer) {
+    const loaded = require('sql.js');
+    const initialize = loaded && loaded.default ? loaded.default : loaded;
+    sqliteInitializer = initialize({
+      locateFile: (fileName) => path.join(path.dirname(require.resolve('sql.js')), fileName),
+    });
+  }
+  const SQL = await sqliteInitializer;
+  const database = new SQL.Database(Buffer.from(bytes));
+  try {
+    const integrityRows = database.exec('PRAGMA integrity_check');
+    if (integrityRows.length !== 1 || integrityRows[0].values.length !== 1 ||
+        integrityRows[0].values[0][0] !== 'ok') {
+      throw new Error('فشل PRAGMA integrity_check على قاعدة البيانات المستعادة.');
+    }
+    if (database.exec('PRAGMA foreign_key_check').some((result) => result.values.length > 0)) {
+      throw new Error('فشل PRAGMA foreign_key_check على قاعدة البيانات المستعادة.');
+    }
+    const requiredTables = ['customers', 'sales_invoices', 'sales_returns', 'journal_entries'];
+    for (const tableName of requiredTables) {
+      const exists = database.exec(
+        'SELECT 1 FROM sqlite_master WHERE type = ? AND name = ? LIMIT 1',
+        ['table', tableName]
+      );
+      if (!exists.length || !exists[0].values.length) {
+        throw new Error(`جدول ${tableName} الأساسي غير موجود في قاعدة البيانات المستعادة.`);
+      }
+      database.exec(`SELECT COUNT(*) FROM "${tableName}"`);
+    }
+  } finally {
+    database.close();
+  }
 }
 
 function hasDatabaseMagic(bytes) {
@@ -197,6 +295,25 @@ function registerDatabaseHandlers({
     if (isInsideAppData) {
       throw new Error('يجب أن تكون وجهة النسخ الخارجية مستقلة عن مجلد بيانات التطبيق.');
     }
+    let existingPath = resolved;
+    while (!fsSync.existsSync(existingPath)) {
+      const parent = path.dirname(existingPath);
+      if (parent === existingPath) throw new Error('تعذر العثور على وحدة تخزين وجهة النسخ.');
+      existingPath = parent;
+    }
+    const targetStat = fsSync.statSync(existingPath);
+    if (!targetStat.isDirectory()) throw new Error('يجب أن تكون وجهة النسخ مجلدًا صالحًا.');
+    const appStat = fsSync.statSync(APP_DATA_DIR);
+    if (process.platform === 'win32') {
+      const root = path.parse(resolved).root.toLowerCase();
+      const appRoot = path.parse(path.resolve(APP_DATA_DIR)).root.toLowerCase();
+      const isUncShare = /^\\\\[^\\]+\\[^\\]+\\/.test(resolved);
+      if (!isUncShare && root === appRoot) {
+        throw new Error('يجب أن تكون الوجهة مشاركة شبكة أو على وحدة تخزين مستقلة عن وحدة بيانات التطبيق.');
+      }
+    } else if (targetStat.dev === appStat.dev) {
+      throw new Error('يجب أن تكون الوجهة مشاركة شبكة أو على وحدة تخزين مستقلة عن وحدة بيانات التطبيق.');
+    }
     return resolved;
   };
 
@@ -214,6 +331,31 @@ function registerDatabaseHandlers({
         }))
       : fileBytes;
     if (plaintext.length > MAX_DB_SIZE) throw new Error('Database file exceeds maximum allowed size');
+    return new Uint8Array(plaintext);
+  });
+
+  ipcMain.handle('db:export-recovery-key', async (event, password) => {
+    validateIpcSender(event);
+    if (!(await databaseFileExists())) throw new Error('أنشئ قاعدة بيانات ونسخة احتياطية قبل تصدير مفتاح الاسترداد.');
+    const key = await readOrCreateDatabaseKey({
+      appDataDir: APP_DATA_DIR, fs, safeStorage, path, createIfMissing: false,
+    });
+    const recoveryFile = await encryptRecoveryKey(key, password);
+    return new Uint8Array(recoveryFile);
+  });
+
+  ipcMain.handle('db:decrypt-backup-with-recovery-key', async (event, backupBytes, recoveryFileBytes, password) => {
+    validateIpcSender(event);
+    const encrypted = Buffer.from(backupBytes || []);
+    if (encrypted.length > MAX_DB_SIZE + 64 || !hasDatabaseMagic(encrypted)) {
+      throw new Error('ملف النسخة المشفر غير صالح.');
+    }
+    const key = await decryptRecoveryKey(recoveryFileBytes, password);
+    const plaintext = decryptDatabaseBytes(encrypted, key);
+    if (plaintext.length > MAX_DB_SIZE || !plaintext.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
+      throw new Error('الملف المستعاد لا يحتوي على قاعدة SQLite صالحة.');
+    }
+    await verifySQLiteDatabaseBytes(plaintext);
     return new Uint8Array(plaintext);
   });
 
@@ -331,12 +473,19 @@ function registerDatabaseHandlers({
       await atomicCreate(fs, target, protectedBytes);
 
       // تطبيق استراتيجية 3-2-1
+      let offsiteBackupDir = null;
+      let offsiteConfigError = null;
+      try {
+        offsiteBackupDir = await getOffsiteBackupDir();
+      } catch (error) {
+        offsiteConfigError = error;
+      }
       const strategy = await backupStrategyService.apply321Strategy({
         BACKUP_DIR,
         DATA_DIR,
         APP_DATA_DIR,
         backupPath: target,
-        offsiteBackupDir: await getOffsiteBackupDir(),
+        offsiteBackupDir,
         verifyRestoreImpl: async (offsitePath) => {
           const restoreDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-restore-check-'));
           try {
@@ -347,11 +496,23 @@ function registerDatabaseHandlers({
             if (!plaintext.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
               throw new Error('الملف المستعاد لا يحتوي على قاعدة SQLite صالحة.');
             }
+            await verifySQLiteDatabaseBytes(plaintext);
           } finally {
             await fs.rm(restoreDir, { recursive: true, force: true });
           }
         },
       }, label === 'daily' ? 'daily' : 'full');
+      if (offsiteConfigError) {
+        const action = strategy.actions.find((item) => item.type === 'offsite');
+        if (action) {
+          action.status = 'failed';
+          action.description = `تعذر استخدام وجهة النسخ الخارجية المحفوظة: ${offsiteConfigError.message || offsiteConfigError}`;
+        }
+        strategy.recommendations.push({
+          type: 'offsite',
+          action: 'افتح إعدادات النسخ الاحتياطي واختر مشاركة شبكة أو وحدة تخزين مستقلة صالحة.',
+        });
+      }
 
       return {
         ok: true,
@@ -493,4 +654,12 @@ ipcMain.handle('db:cleanup-backups', async (event, retention = {}) => {
   });
 }
 
-module.exports = { registerDatabaseHandlers, encryptDatabaseBytes, decryptDatabaseBytes, hasDatabaseMagic };
+module.exports = {
+  registerDatabaseHandlers,
+  encryptDatabaseBytes,
+  decryptDatabaseBytes,
+  decryptRecoveryKey,
+  encryptRecoveryKey,
+  hasDatabaseMagic,
+  verifySQLiteDatabaseBytes,
+};

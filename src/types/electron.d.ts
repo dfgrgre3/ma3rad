@@ -9,6 +9,12 @@ declare global {
         save?: (bytes: Uint8Array) => Promise<{ ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string }>;
         saveSync?: (bytes: Uint8Array) => { ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string };
         decryptLocalBackup?: (bytes: Uint8Array) => Promise<Uint8Array>;
+        exportRecoveryKey?: (password: string) => Promise<Uint8Array>;
+        decryptBackupWithRecoveryKey?: (
+          backupBytes: Uint8Array,
+          recoveryFileBytes: Uint8Array,
+          password: string
+        ) => Promise<Uint8Array>;
         encryptXlsxBackup?: (bytes: Uint8Array, password: string) => Promise<Uint8Array>;
         decryptXlsxBackup?: (bytes: Uint8Array, password: string) => Promise<Uint8Array>;
         backup?: (label?: string) => Promise<{

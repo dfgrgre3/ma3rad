@@ -22,11 +22,18 @@ export const BackupPage: React.FC = () => {
   const [exportPasswordConfirm, setExportPasswordConfirm] = useState('');
   const [showExportPassword, setShowExportPassword] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [isRecoveryExportOpen, setIsRecoveryExportOpen] = useState(false);
+  const [recoveryExportPassword, setRecoveryExportPassword] = useState('');
+  const [recoveryExportPasswordConfirm, setRecoveryExportPasswordConfirm] = useState('');
+  const [recoveryExportError, setRecoveryExportError] = useState<string | null>(null);
+  const [isExportingRecoveryKey, setIsExportingRecoveryKey] = useState(false);
 
   // Restore Modal state
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [restorePassword, setRestorePassword] = useState('');
+  const [recoveryKeyFile, setRecoveryKeyFile] = useState<File | null>(null);
+  const [recoveryKeyPassword, setRecoveryKeyPassword] = useState('');
   const [showRestorePassword, setShowRestorePassword] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
@@ -83,6 +90,32 @@ export const BackupPage: React.FC = () => {
     setIsExportModalOpen(true);
   };
 
+  const handleConfirmRecoveryKeyExport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canManage) return;
+    if (recoveryExportPassword.length < 12 || recoveryExportPassword.length > 255) {
+      setRecoveryExportError('يجب أن تتراوح كلمة المرور بين 12 و255 حرفًا.');
+      return;
+    }
+    if (recoveryExportPassword !== recoveryExportPasswordConfirm) {
+      setRecoveryExportError('كلمتا المرور غير متطابقتين.');
+      return;
+    }
+    setIsExportingRecoveryKey(true);
+    setRecoveryExportError(null);
+    try {
+      await backupService.exportRecoveryKeyFile(recoveryExportPassword);
+      setIsRecoveryExportOpen(false);
+      setRecoveryExportPassword('');
+      setRecoveryExportPasswordConfirm('');
+      setMessage({ text: 'تم تنزيل ملف استرداد المفتاح. احفظه خارج هذا الجهاز واحتفظ بكلمة مروره منفصلة.' });
+    } catch (error) {
+      setRecoveryExportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingRecoveryKey(false);
+    }
+  };
+
   const handleConfirmExport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManage) return;
@@ -118,14 +151,19 @@ export const BackupPage: React.FC = () => {
     }
   };
 
-  const executeRestore = async (file: File, password?: string) => {
+  const executeRestore = async (
+    file: File,
+    password?: string,
+    keyFile?: File,
+    keyPassword?: string
+  ) => {
     if (!canManage) return;
     setIsRestoring(true);
     setRestoreError(null);
     setMessage(null);
 
     try {
-      await backupService.restoreBackupFromFile(file, password);
+      await backupService.restoreBackupFromFile(file, password, keyFile, keyPassword);
       setIsRestoreModalOpen(false);
       setMessage({ text: 'تمت استعادة قاعدة البيانات بنجاح! سيتم تحديث الصفحة لتطبيق التغييرات.' });
       setTimeout(() => {
@@ -152,6 +190,8 @@ export const BackupPage: React.FC = () => {
       if (isEncrypted) {
         setSelectedFile(file);
         setRestorePassword('');
+        setRecoveryKeyFile(null);
+        setRecoveryKeyPassword('');
         setRestoreError(null);
         setIsRestoreModalOpen(true);
       } else {
@@ -169,11 +209,16 @@ export const BackupPage: React.FC = () => {
   const handleConfirmRestore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManage || !selectedFile) return;
-    if (!restorePassword) {
+    const isLocalDatabaseBackup = selectedFile.name.toLowerCase().endsWith('.sqlite.enc');
+    if (!restorePassword && !isLocalDatabaseBackup) {
       setRestoreError('يرجى إدخال كلمة مرور النسخة الاحتياطية.');
       return;
     }
-    await executeRestore(selectedFile, restorePassword);
+    if (recoveryKeyFile && !recoveryKeyPassword) {
+      setRestoreError('أدخل كلمة مرور ملف الاسترداد.');
+      return;
+    }
+    await executeRestore(selectedFile, restorePassword, recoveryKeyFile || undefined, recoveryKeyPassword);
   };
 
   const handleOpenBackupFolder = async () => {
@@ -248,7 +293,7 @@ export const BackupPage: React.FC = () => {
       )}
 
       {/* Cards Grid */}
-      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Export Card */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between">
           <div>
@@ -307,6 +352,33 @@ export const BackupPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        <div className="bg-white border border-emerald-200 rounded-2xl p-6 flex flex-col justify-between">
+          <div>
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-700 mb-4">
+              <Key className="w-6 h-6" />
+            </div>
+            <h2 className="text-base font-bold text-slate-900 mb-1.5">استرداد النسخ على جهاز بديل</h2>
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              نزّل ملفًا يحمي مفتاح قاعدة البيانات بكلمة مرور تختارها. احتفظ بالملف وكلمة المرور منفصلين عن الجهاز؛ يلزم كلاهما لفك نسخة الجهاز المشفرة.
+            </p>
+          </div>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
+                setRecoveryExportPassword('');
+                setRecoveryExportPasswordConfirm('');
+                setRecoveryExportError(null);
+                setIsRecoveryExportOpen(true);
+              }}
+              className="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold border border-emerald-200 flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              تنزيل ملف مفتاح الاسترداد
+            </button>
+          )}
+        </div>
       </div>
 
       {canManage && (
@@ -316,7 +388,7 @@ export const BackupPage: React.FC = () => {
             <p className="mt-1 text-xs leading-relaxed text-slate-600">
               أدخل مسار مشاركة شبكة مستقلة مكانيًا عن هذا الجهاز (مثل مسار UNC في Windows).
               بعد كل نسخة، ينسخ النظام الملف المشفر إليها ويتحقق من SHA-256 ثم يختبر استعادته وفك تشفيره.
-              تنبيه: مفتاح التشفير مرتبط بمخزن النظام الآمن على هذا الجهاز؛ النسخة الخارجية وحدها لا تكفي للاستعادة بعد فقد الجهاز أو مفتاحه.
+              احفظ ملف مفتاح الاسترداد وكلمة مروره خارج الجهاز وبشكل منفصل؛ من دونهما لا يمكن فك النسخ المشفرة على جهاز بديل.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -505,7 +577,9 @@ export const BackupPage: React.FC = () => {
             <form onSubmit={handleConfirmRestore} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  أدخل كلمة مرور ملف النسخة الاحتياطية
+                  {selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')
+                    ? 'نسخة مشفرة بمفتاح الجهاز (لا تحتاج كلمة مرور هنا)'
+                    : 'أدخل كلمة مرور ملف النسخة الاحتياطية'}
                 </label>
                 <div className="relative">
                   <input
@@ -513,9 +587,9 @@ export const BackupPage: React.FC = () => {
                     value={restorePassword}
                     onChange={(e) => setRestorePassword(e.target.value)}
                     placeholder="••••••••••••"
-                    required
-                    autoFocus
-                    disabled={isRestoring}
+                    required={!selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')}
+                    autoFocus={!selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')}
+                    disabled={isRestoring || selectedFile?.name.toLowerCase().endsWith('.sqlite.enc')}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 pl-10"
                   />
                   <button
@@ -527,6 +601,30 @@ export const BackupPage: React.FC = () => {
                     {showRestorePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+
+              <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 space-y-2">
+                <label className="block text-xs font-bold text-slate-700">
+                  عند الاستعادة على جهاز بديل: اختر ملف مفتاح الاسترداد وكلمة مروره
+                </label>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(event) => setRecoveryKeyFile(event.target.files?.[0] || null)}
+                  disabled={isRestoring}
+                  className="block w-full text-xs text-slate-600"
+                />
+                <input
+                  type="password"
+                  value={recoveryKeyPassword}
+                  onChange={(event) => setRecoveryKeyPassword(event.target.value)}
+                  placeholder="كلمة مرور ملف الاسترداد"
+                  disabled={isRestoring || !recoveryKeyFile}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                />
+                <p className="text-[10px] leading-relaxed text-slate-600">
+                  عند اختيار الملف، سيُستخدم مفتاحه لفك النسخة بدل مفتاح الجهاز الحالي. لا يُستبدل مفتاح الجهاز ولا تُحفظ كلمة المرور.
+                </p>
               </div>
 
               <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-[11px] text-rose-800 flex items-start gap-2">
@@ -553,6 +651,7 @@ export const BackupPage: React.FC = () => {
                       <span>تأكيد واستعادة البيانات</span>
                     </>
                   )}
+
                 </button>
                 <button
                   type="button"
@@ -565,6 +664,51 @@ export const BackupPage: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {canManage && isRecoveryExportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" dir="rtl">
+          <form onSubmit={handleConfirmRecoveryKeyExport} className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900">تصدير ملف مفتاح الاسترداد</h3>
+              <button type="button" onClick={() => setIsRecoveryExportOpen(false)} className="p-1 text-slate-500"><X className="w-5 h-5" /></button>
+            </div>
+            {recoveryExportError && <p className="rounded-lg bg-rose-50 p-3 text-xs text-rose-700">{recoveryExportError}</p>}
+            <p className="text-xs leading-relaxed text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              كلمة المرور لا يمكن استعادتها من التطبيق. احفظ ملف المفتاح واحتفظ بكلمة المرور في مكان منفصل وآمن.
+            </p>
+            <input
+              type="password"
+              value={recoveryExportPassword}
+              onChange={(event) => setRecoveryExportPassword(event.target.value)}
+              placeholder="كلمة مرور قوية (12 حرفًا على الأقل)"
+              required
+              minLength={12}
+              maxLength={255}
+              disabled={isExportingRecoveryKey}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs"
+            />
+            <input
+              type="password"
+              value={recoveryExportPasswordConfirm}
+              onChange={(event) => setRecoveryExportPasswordConfirm(event.target.value)}
+              placeholder="أعد كلمة المرور"
+              required
+              minLength={12}
+              maxLength={255}
+              disabled={isExportingRecoveryKey}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs"
+            />
+            <div className="flex gap-2">
+              <button type="submit" disabled={isExportingRecoveryKey} className="flex-1 rounded-xl bg-emerald-700 py-2.5 text-xs font-bold text-white disabled:opacity-50">
+                {isExportingRecoveryKey ? 'جارٍ التشفير والتنزيل...' : 'تشفير وتنزيل المفتاح'}
+              </button>
+              <button type="button" onClick={() => setIsRecoveryExportOpen(false)} disabled={isExportingRecoveryKey} className="rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-bold text-slate-700">
+                إلغاء
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

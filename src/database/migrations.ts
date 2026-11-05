@@ -2429,6 +2429,59 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '119_sales_return_tax_and_reconciliation',
+    description: 'Store sales return tax separately and add an auditable historical reconciliation workflow.',
+    up: (db: Database) => {
+      addColumn(db, 'sales_returns', 'return_tax_amount', 'REAL');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sales_return_reconciliations (
+          id TEXT PRIMARY KEY,
+          return_id TEXT NOT NULL UNIQUE,
+          invoice_returned_amount_before REAL NOT NULL,
+          stored_cash_amount REAL NOT NULL,
+          stored_balance_amount REAL NOT NULL,
+          calculated_tax_amount REAL NOT NULL,
+          confirmed_cash_amount REAL NOT NULL,
+          confirmed_balance_amount REAL NOT NULL,
+          existing_ledger_summary TEXT NOT NULL,
+          correction_entry_id TEXT,
+          approved_by TEXT NOT NULL,
+          approved_at TEXT NOT NULL,
+          notes TEXT NOT NULL,
+          FOREIGN KEY (return_id) REFERENCES sales_returns(id),
+          FOREIGN KEY (approved_by) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_sales_return_reconciliations_return
+          ON sales_return_reconciliations(return_id);
+        CREATE TABLE IF NOT EXISTS sales_return_reconciliation_reviews (
+          id TEXT PRIMARY KEY,
+          reviewed_by TEXT NOT NULL,
+          reviewed_at TEXT NOT NULL,
+          candidate_count INTEGER NOT NULL,
+          snapshot_json TEXT NOT NULL,
+          used_at TEXT,
+          FOREIGN KEY (reviewed_by) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_sales_return_reconciliation_reviews_user
+          ON sales_return_reconciliation_reviews(reviewed_by, reviewed_at);
+      `);
+    },
+  },
+  {
+    id: '120_restore_recorded_sales_return_credits',
+    description: 'Keep invoice return totals at recorded cash and customer-credit amounts until historical review.',
+    up: (db: Database) => {
+      db.exec(`
+        UPDATE sales_invoices
+        SET returned_amount = COALESCE((
+          SELECT SUM(COALESCE(sr.refunded_amount, 0) + COALESCE(sr.remaining_to_balance, 0))
+          FROM sales_returns sr
+          WHERE sr.original_invoice_id = sales_invoices.id
+        ), 0)
+      `);
+    },
+  },
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

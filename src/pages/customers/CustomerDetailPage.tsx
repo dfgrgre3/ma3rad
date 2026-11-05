@@ -24,6 +24,7 @@ type CustomerDetailRow = {
   n1?: string;
   date?: string | null;
   amount?: number | null;
+  returnTaxAmount?: number | null;
   paid?: number | null;
   remaining?: number | null;
   status?: string | null;
@@ -213,7 +214,8 @@ export const CustomerDetailPage: React.FC = () => {
       if (can('finance.debts.view')) availableLists.payments = db.query<CustomerDetailRow>(`SELECT cp.receipt_number AS n1, cp.date, cp.amount, cp.payment_type AS kind,
           COALESCE(cp.notes, '') AS notes FROM customer_payments cp
           WHERE cp.customer_id = ? AND ${paymentScope.clause} ORDER BY cp.date DESC`, [id, ...paymentScope.params]);
-      if (can('returns.view')) availableLists.returns = db.query<CustomerDetailRow>(`SELECT sr.return_number AS n1, sr.date, sr.total_amount AS amount, sr.reason AS notes
+      if (can('returns.view')) availableLists.returns = db.query<CustomerDetailRow>(`SELECT sr.return_number AS n1, sr.date,
+          sr.total_amount AS amount, sr.return_tax_amount AS returnTaxAmount, sr.reason AS notes
           FROM sales_returns sr
           LEFT JOIN sales_invoices si ON si.id = sr.original_invoice_id
           WHERE sr.customer_id = ? AND ${invoiceScope.clause} ORDER BY sr.date DESC`, [id, ...invoiceScope.params]);
@@ -519,8 +521,14 @@ export const CustomerDetailPage: React.FC = () => {
         )}
 
         {tab === 'returns' && can('returns.view') && (
-          <DataTable headers={['رقم المرتجع', 'التاريخ', 'القيمة', 'السبب']} empty="لا توجد مرتجعات"
-            rows={L('returns').map((r) => [<span className="font-mono text-rose-600">{r.n1}</span>, date(r.date), <b className="text-rose-600">{fmt(r.amount)}</b>, r.notes])} />
+          <DataTable headers={['رقم المرتجع', 'التاريخ', 'صافي قبل الضريبة', 'الضريبة', 'الإجمالي شامل الضريبة', 'السبب']} empty="لا توجد مرتجعات"
+            rows={L('returns').map((r) => [
+              <span className="font-mono text-rose-600">{r.n1}</span>, date(r.date),
+              <b className="text-rose-600">{fmt(r.amount)}</b>,
+              r.returnTaxAmount == null ? 'غير مسجلة' : fmt(r.returnTaxAmount),
+              r.returnTaxAmount == null ? 'غير معلوم' : fmt(Number(r.amount || 0) + Number(r.returnTaxAmount)),
+              r.notes,
+            ])} />
         )}
 
         {tab === 'debts' && can('finance.debts.view') && (

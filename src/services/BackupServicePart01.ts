@@ -80,16 +80,47 @@ public async exportBackupFile(password?: string): Promise<void> {
     });
   }
 
+  public async exportRecoveryKeyFile(password: string): Promise<void> {
+    const user = this.require();
+    if (password.length < 12 || password.length > 255) {
+      throw new Error('يجب أن تتراوح كلمة مرور ملف الاسترداد بين 12 و255 حرفًا.');
+    }
+    const exportRecoveryKey = window.ceramisys?.db?.exportRecoveryKey;
+    if (!exportRecoveryKey) throw new Error('تصدير ملف الاسترداد يتطلب تشغيل تطبيق سطح المكتب.');
+    const bytes = await exportRecoveryKey(password);
+    const blobBytes = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(blobBytes).set(bytes);
+    const blob = new Blob([blobBytes], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ceramisys-recovery-key-${localDateString()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    new AuditService().log({
+      userId: user.id,
+      userName: user.fullName,
+      action: 'تصدير ملف استرداد مفتاح النسخ',
+      module: 'SYSTEM',
+      newValues: JSON.stringify({ encryption: 'scrypt + AES-256-GCM' }),
+    });
+  }
+
 public async isEncryptedBackupFile(file: File): Promise<boolean> {
     const headerBytes = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
-    return hasOfficeCompoundFileSignature(headerBytes) || isEncryptedBackup(headerBytes);
+    return hasOfficeCompoundFileSignature(headerBytes) || isEncryptedBackup(headerBytes) || isEncryptedLocalDatabase(headerBytes);
   }
 
 public verifyBackupFile(bytes: Uint8Array) {
     return this.db.inspectDatabaseBinary(bytes);
   }
 
-private async readBackupBytes(file: File, password?: string): Promise<Uint8Array> {
+private async readBackupBytes(
+    file: File,
+    password?: string,
+    recoveryKeyFile?: File,
+    recoveryPassword?: string
+  ): Promise<Uint8Array> {
     const fileBytes = new Uint8Array(await file.arrayBuffer());
     if (hasOfficeCompoundFileSignature(fileBytes)) {
       let pwd: string | undefined = password;
@@ -123,6 +154,15 @@ private async readBackupBytes(file: File, password?: string): Promise<Uint8Array
     }
 
     if (isEncryptedLocalDatabase(fileBytes)) {
+      if (recoveryKeyFile) {
+        const decryptWithRecoveryKey = window.ceramisys?.db?.decryptBackupWithRecoveryKey;
+        if (!decryptWithRecoveryKey) throw new Error('استعادة النسخة بملف المفتاح تتطلب تشغيل تطبيق سطح المكتب.');
+        return decryptWithRecoveryKey(
+          fileBytes,
+          new Uint8Array(await recoveryKeyFile.arrayBuffer()),
+          recoveryPassword || ''
+        );
+      }
       const decryptLocal = typeof window !== 'undefined' ? window.ceramisys?.db?.decryptLocalBackup : undefined;
       if (!decryptLocal) throw new Error('هذه نسخة محلية مرتبطة بمفتاح هذا الجهاز؛ استعدها من تطبيق سطح المكتب الذي أنشأها.');
       return decryptLocal(fileBytes);
@@ -158,14 +198,19 @@ private async verifyRestoredDatabase(currentSnapshot: Uint8Array): Promise<void>
     }
   }
 
-public async restoreBackupFromFile(file: File, password?: string): Promise<{
+public async restoreBackupFromFile(
+    file: File,
+    password?: string,
+    recoveryKeyFile?: File,
+    recoveryPassword?: string
+  ): Promise<{
     productsCount: number;
     invoicesCount: number;
     customersCount: number;
     journalEntriesCount: number;
   }> {
     const user = this.require();
-    const bytes = await this.readBackupBytes(file, password);
+    const bytes = await this.readBackupBytes(file, password, recoveryKeyFile, recoveryPassword);
 
     // Validate integrity and inspect contents before replacing live database
     const inspection = this.verifyBackupFile(bytes);
@@ -313,14 +358,16 @@ public async runAutoBackupIfDue(intervalHours: number): Promise<{
     try {
       if (!this.isBackupDue(intervalHours)) return { created: false };
       const result = await this.createLocalSnapshot('auto');
-      const externalAction = result.strategy?.actions.find((action) => action.type === 'offsite')
-        || result.strategy?.actions.find((action) => action.type === 'external');
+      const externalActions = result.strategy?.actions.filter(
+        (action) => action.type === 'offsite' || action.type === 'external'
+      ) || [];
+      const failedExternalActions = externalActions.filter((action) => action.status !== 'complete');
       return {
         created: Boolean(result.ok),
         path: result.path,
         error: result.error,
-        externalBackupWarning: externalAction && externalAction.status !== 'complete'
-          ? externalAction.description
+        externalBackupWarning: failedExternalActions.length
+          ? failedExternalActions.map((action) => action.description).join(' ')
           : undefined,
       };
     } catch (e) {

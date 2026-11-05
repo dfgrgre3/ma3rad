@@ -17,6 +17,7 @@ interface LedgerEntry {
   type: string;
   qtyIn: number;
   qtyOut: number;
+  qtyLoss: number;
   balance: number;
   ref: string;
   user: string;
@@ -77,6 +78,8 @@ export const StockLedgerPage: React.FC = () => {
                CASE WHEN it.quantity_m2 > 0 THEN it.quantity_m2 ELSE 0 END as qty_in,
                CASE WHEN it.quantity_m2 < 0 AND COALESCE(it.reference_type, '') != 'TRANSFER_LOSS'
                     THEN ABS(it.quantity_m2) ELSE 0 END as qty_out,
+               CASE WHEN it.quantity_m2 < 0 AND COALESCE(it.reference_type, '') = 'TRANSFER_LOSS'
+                    THEN ABS(it.quantity_m2) ELSE 0 END as qty_loss,
                0 as balance,
                COALESCE(it.transaction_number,'') as ref,
                COALESCE(u.full_name,'النظام') as user,
@@ -116,6 +119,7 @@ export const StockLedgerPage: React.FC = () => {
         type: r.type,
         qtyIn: r.qtyIn || 0,
         qtyOut: r.qtyOut || 0,
+        qtyLoss: r.qtyLoss || 0,
         balance: r.balance || 0,
         ref: r.ref,
         user: r.user,
@@ -200,7 +204,7 @@ export const StockLedgerPage: React.FC = () => {
           <table className="w-full text-xs min-w-[900px]">
             <thead className="bg-white sticky top-0 z-10">
               <tr>
-                {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد', 'صادر', 'المرجع', 'المستخدم'].map(h => (
+                {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد', 'صادر', 'فقد / تلف', 'المرجع', 'المستخدم'].map(h => (
                   <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
                 ))}
               </tr>
@@ -221,6 +225,9 @@ export const StockLedgerPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-rose-600 font-bold">
                       {r.qtyOut > 0 ? `-${formatProductQuantity(r.qtyOut, r)}` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-amber-600 font-bold">
+                      {r.qtyLoss > 0 ? `-${formatProductQuantity(r.qtyLoss, r)}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-slate-500 font-mono">{r.ref || '—'}</td>
                     <td className="px-4 py-3 text-slate-500">{r.user}</td>

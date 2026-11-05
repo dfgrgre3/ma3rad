@@ -19,6 +19,7 @@ import {
   convertQuantity, fromBaseQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
 } from '../../utils/uom';
 import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../../services/financials';
+import { HistoricalReturnReconciliationPanel } from './HistoricalReturnReconciliationPanel';
 
 const PAGE_SIZE = 15;
 
@@ -61,6 +62,7 @@ export const ReturnsPage: React.FC = () => {
   const printService = useMemo(() => new PrintService(), []);
   const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'returns.create');
   const canApproveReturn = PermissionService.can(AuthService.getCurrentUser(), 'returns.approve');
+  const [showHistoricalReconciliation, setShowHistoricalReconciliation] = useState(false);
 
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -268,22 +270,26 @@ export const ReturnsPage: React.FC = () => {
   const doExport = (kind: 'excel' | 'pdf') => {
     const options = {
       title: 'سجل مرتجعات المبيعات',
-      subtitle: `عدد المرتجعات: ${returns.length} • إجمالي القيمة: ${fmt(stats?.totalAmount ?? 0)}`,
+      subtitle: `عدد المرتجعات: ${returns.length} • صافي المرتجعات: ${fmt(stats?.totalAmount ?? 0)} • الضريبة المسجلة: ${fmt(stats?.taxAmount ?? 0)} • الإجمالي المحسوب من الضريبة المسجلة: ${fmt(stats?.grossAmount ?? 0)} • ضريبة غير مسجلة في ${stats?.returnsWithoutRecordedTax ?? 0} مرتجع`,
       columns: [
         { key: 'returnNumber', label: 'رقم المرتجع' },
         { key: 'invoiceNumber', label: 'الفاتورة الأصلية' },
         { key: 'customerName', label: 'العميل' },
         { key: 'date', label: 'التاريخ' },
         { key: 'reason', label: 'السبب' },
-        { key: 'totalAmount', label: 'القيمة' },
-        { key: 'refundedAmount', label: 'نقدي' },
-        { key: 'remainingToBalance', label: 'على الرصيد' },
+        { key: 'totalAmount', label: 'صافي المرتجع قبل الضريبة' },
+        { key: 'returnTaxAmount', label: 'ضريبة المرتجع' },
+        { key: 'grossAmount', label: 'الإجمالي شامل الضريبة' },
+        { key: 'refundedAmount', label: 'نقدي (شامل الضريبة)' },
+        { key: 'remainingToBalance', label: 'على الرصيد (شامل الضريبة)' },
         { key: 'refundMethod', label: 'طريقة التعويض' },
       ],
       rows: returns.map((r) => ({
         returnNumber: r.returnNumber, invoiceNumber: r.invoiceNumber || r.originalInvoiceNumber,
         customerName: r.customerName, date: r.date, reason: r.reason,
-        totalAmount: r.totalAmount, refundedAmount: r.refundedAmount, remainingToBalance: r.remainingToBalance,
+        totalAmount: r.totalAmount, returnTaxAmount: r.returnTaxAmount ?? null,
+        grossAmount: r.returnTaxAmount == null ? null : Number(r.totalAmount) + Number(r.returnTaxAmount),
+        refundedAmount: r.refundedAmount, remainingToBalance: r.remainingToBalance,
         refundMethod: REFUND_LABEL[r.refundMethod || 'CASH'] || 'نقدي',
       })),
       fileName: 'sales-returns',
@@ -314,24 +320,39 @@ export const ReturnsPage: React.FC = () => {
           {canRefund && (
             <button onClick={() => openModal()} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition"><Plus className="w-4 h-4" /> تسجيل مرتجع</button>
           )}
+          {canApproveReturn && (
+            <button
+              onClick={() => setShowHistoricalReconciliation((value) => !value)}
+              className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100"
+            >
+              مراجعة التسويات التاريخية
+            </button>
+          )}
         </div>
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <Stat label="إجمالي المرتجعات" value={String(stats?.count ?? 0)} icon={RotateCcw} tone="text-slate-700 bg-slate-50 border-slate-200" />
-          <Stat label="إجمالي القيمة" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingDown} tone="text-rose-700 bg-rose-50 border-rose-200" />
-          <Stat label="استُردت نقداً" value={fmt(stats?.cashRefunded ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />
-          <Stat label="على الرصيد" value={fmt(stats?.creditedToBalance ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />
-          <Stat label="مرتجعات اليوم" value={`${stats?.todayCount ?? 0} • ${fmt(stats?.todayAmount ?? 0)}`} icon={CheckCircle2} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
+          <Stat label="صافي المرتجعات قبل الضريبة" value={fmt(stats?.totalAmount ?? 0)} icon={TrendingDown} tone="text-rose-700 bg-rose-50 border-rose-200" />
+          <Stat label="ضريبة المرتجعات المسجلة" value={fmt(stats?.taxAmount ?? 0)} icon={TrendingDown} tone="text-orange-700 bg-orange-50 border-orange-200" />
+          <Stat label="الإجمالي بحسب الضريبة المسجلة" value={fmt(stats?.grossAmount ?? 0)} icon={TrendingDown} tone="text-rose-700 bg-rose-50 border-rose-200" />
+          <Stat label="استُردت نقداً (شامل الضريبة)" value={fmt(stats?.cashRefunded ?? 0)} icon={Banknote} tone="text-amber-700 bg-amber-50 border-amber-200" />
+          <Stat label="على الرصيد (شامل الضريبة)" value={fmt(stats?.creditedToBalance ?? 0)} icon={Wallet} tone="text-sky-700 bg-sky-50 border-sky-200" />
+          <Stat label="مرتجعات اليوم (صافي / ضريبة / شامل)" value={`${stats?.todayCount ?? 0} • ${fmt(stats?.todayAmount ?? 0)} / ${fmt(stats?.todayTaxAmount ?? 0)} / ${fmt(stats?.todayGrossAmount ?? 0)}`} icon={CheckCircle2} tone="text-emerald-700 bg-emerald-50 border-emerald-200" />
         </div>
+        {!!stats?.returnsWithoutRecordedTax && (
+          <p className="text-[11px] font-semibold text-amber-700">
+            ضريبة {stats.returnsWithoutRecordedTax} مرتجعًا تاريخيًا غير مسجلة صراحةً؛ الإجماليات أعلاه لا تستنتجها تلقائيًا. راجع التسوية التاريخية قبل المطابقة.
+          </p>
+        )}
 
         {topReasons.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-bold text-slate-400">أكثر أسباب الإرجاع:</span>
             {topReasons.map((r) => (
               <span key={r.reason} className="text-[10px] font-bold px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700">
-                {r.reason} <span className="text-rose-400">×{r.count}</span> — {fmt(r.amount)}
+                {r.reason} <span className="text-rose-400">×{r.count}</span> — صافي {fmt(r.amount)}
               </span>
             ))}
           </div>
@@ -355,6 +376,7 @@ export const ReturnsPage: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
+        {showHistoricalReconciliation && canApproveReturn && <HistoricalReturnReconciliationPanel />}
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-7 h-7 animate-spin text-rose-500" /></div> : (
           <>
@@ -367,7 +389,9 @@ export const ReturnsPage: React.FC = () => {
                     <th className="px-4 py-3">العميل</th>
                     <th className="px-4 py-3">التاريخ</th>
                     <th className="px-4 py-3">السبب</th>
-                    <th className="px-4 py-3">القيمة</th>
+                    <th className="px-4 py-3">صافي قبل الضريبة</th>
+                    <th className="px-4 py-3">الضريبة</th>
+                    <th className="px-4 py-3">الإجمالي شامل الضريبة</th>
                     <th className="px-4 py-3">نقدي / رصيد</th>
                     <th className="px-4 py-3 text-left">إجراءات</th>
                   </tr>
@@ -381,6 +405,8 @@ export const ReturnsPage: React.FC = () => {
                       <td className="px-4 py-3 text-slate-600"><span className="inline-flex items-center gap-1"><Calendar className="w-3 h-3" />{r.date || '—'}</span></td>
                       <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{r.reason}</td>
                       <td className="px-4 py-3 font-black text-rose-600">{fmt(r.totalAmount)}</td>
+                      <td className="px-4 py-3 text-orange-700">{r.returnTaxAmount == null ? 'غير مسجلة' : fmt(r.returnTaxAmount)}</td>
+                      <td className="px-4 py-3 font-bold text-rose-700">{r.returnTaxAmount == null ? 'غير معلوم' : fmt(Number(r.totalAmount) + Number(r.returnTaxAmount))}</td>
                       <td className="px-4 py-3 text-[10px] text-slate-500">
                         <div>نقدي: {fmt(r.refundedAmount)}</div>
                         <div>على الرصيد: {fmt(r.remainingToBalance)}</div>
@@ -394,7 +420,7 @@ export const ReturnsPage: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-                  {returns.length === 0 && <tr><td colSpan={8} className="py-16 text-center text-slate-400">لا توجد مرتجعات مسجلة</td></tr>}
+                  {returns.length === 0 && <tr><td colSpan={10} className="py-16 text-center text-slate-400">لا توجد مرتجعات مسجلة</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -583,9 +609,11 @@ export const ReturnsPage: React.FC = () => {
             </div>
             <button onClick={() => setDetail(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
           </div>
-          <div className="grid grid-cols-1  sm:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
             <Info label="العميل" value={detail.customerName || '—'} />
-            <Info label="القيمة" value={fmt(detail.totalAmount)} />
+            <Info label="صافي المرتجع قبل الضريبة" value={fmt(detail.totalAmount)} />
+            <Info label="ضريبة المرتجع" value={detail.returnTaxAmount == null ? 'غير مسجلة تاريخيًا' : fmt(detail.returnTaxAmount)} />
+            <Info label="الإجمالي شامل الضريبة" value={detail.returnTaxAmount == null ? 'غير معلوم تاريخيًا' : fmt(Number(detail.totalAmount) + Number(detail.returnTaxAmount))} />
             <Info label="نقدي / رصيد" value={`${fmt(detail.refundedAmount)} / ${fmt(detail.remainingToBalance)}`} />
             <Info label="طريقة التعويض" value={REFUND_LABEL[detail.refundMethod || 'CASH'] || 'نقدي'} />
           </div>
