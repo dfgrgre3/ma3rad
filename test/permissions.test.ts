@@ -321,7 +321,7 @@ test('auth: PIN hashes stay private, actor arguments are ignored, and own-passwo
   const auth = new AuthService();
   const created = auth.createUser({
     username: 'pin_hash_test',
-    password: 'TestPass123',
+    password: 'TestPass123!',
     fullName: 'PIN hash test',
     role: 'CASHIER',
     pinCode: '2468',
@@ -342,7 +342,7 @@ test('auth: PIN hashes stay private, actor arguments are ignored, and own-passwo
   assert.throws(
     () => auth.createUser({
       username: 'forged_actor_test',
-      password: 'TestPass123',
+      password: 'TestPass123!',
       fullName: 'forged actor',
       role: 'CASHIER',
     }, 'usr_admin', forgedAdmin),

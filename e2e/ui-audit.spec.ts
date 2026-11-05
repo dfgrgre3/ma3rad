@@ -32,7 +32,7 @@ const HIGH_RISK_ROUTES = [
 ] as const;
 
 test('high-risk routes render without uncaught page errors (single app session)', async () => {
-  const { app, page } = await launchAuthenticatedApp();
+  const { app, page, closeMockServer } = await launchAuthenticatedApp();
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
@@ -54,11 +54,11 @@ test('high-risk routes render without uncaught page errors (single app session)'
       const status: 'PASS' | 'BROKEN' = interactive > 0 && newErrors.length === 0 ? 'PASS' : 'BROKEN';
       results.push({ route, interactive, errors: newErrors, status });
 
-      // eslint-disable-next-line no-console
       console.log(`AUDIT ${status.padEnd(6)} #/${route} (interactive=${interactive}, newErrors=${newErrors.length})`);
     }
   } finally {
     await app.close();
+    await closeMockServer();
   }
 
   const reportPath = path.join(process.cwd(), 'docs', 'ui-audit', 'smoke-report.json');

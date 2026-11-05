@@ -6,6 +6,7 @@ export async function maintainAutomaticBackups(backupService: BackupService, int
   try {
     const result = await backupService.runAutoBackupIfDue(interval);
     if (result.error) console.warn('Auto backup failed:', result.error);
+    if (result.externalBackupWarning) console.warn('External backup was not completed:', result.externalBackupWarning);
     const retention = backupService.getRetentionSettings();
     const cleanup = await backupService.cleanupOldBackups(retention.retentionDays, retention.maxBackups);
     if (cleanup.errors.length > 0) {

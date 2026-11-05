@@ -110,32 +110,72 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
  * - استخدام وسيطين تخزين: القرص المحلي + USB (اختياري)
  * - نسخة خارجية: (اختياري) مخزنة خارج الموقع
  */
-async function apply321Strategy({ BACKUP_DIR }, backupType = 'full') {
+async function apply321Strategy({
+  BACKUP_DIR,
+  backupPath,
+  fsImpl = fs,
+  checkExternalDriveImpl = checkExternalDrive,
+}, backupType = 'full') {
   const strategy = {
     correctType: backupType,
     actions: [],
     recommendations: []
   };
 
-  // تحقق من وجود مساحة تخزين
-  // 1. النسخة الحية (الantoDB) - موجودة
-  // 2. النسخة المحلية -_BACKUP_DIR
-  // 3. النسخة الخارجية - من USB
-
-  // إذا كان USB متصلًا، قم بإنشاء نسخة عليه
-  const usbVolume = await checkExternalDrive();
-  if (usbVolume) {
+  let usbVolume = null;
+  let driveCheckError = null;
+  try {
+    usbVolume = await checkExternalDriveImpl();
+  } catch (error) {
+    driveCheckError = error;
+  }
+  if (!usbVolume) {
     strategy.actions.push({
       type: 'external',
-      target: usbVolume,
-      status: 'pending',
-      description: `سيتم حفظ نسخة احتياطية على USB: ${usbVolume}`
+      target: null,
+      status: driveCheckError ? 'failed' : 'unavailable',
+      description: driveCheckError
+        ? `تعذر فحص وحدات USB: ${driveCheckError.message || driveCheckError}`
+        : 'لم يتم العثور على قرص USB قابل للإزالة؛ النسخة الخارجية غير متاحة.'
     });
-
     strategy.recommendations.push({
-      type: 'git',
-      action: 'Send to remote (if available)'
+      type: 'external',
+      action: driveCheckError
+        ? 'تحقق من إمكانية فحص وحدات USB ثم أعد محاولة النسخ.'
+        : 'وصّل قرص USB لإنشاء نسخة خارجية.'
     });
+  } else {
+    try {
+      if (typeof backupPath !== 'string' || !backupPath) {
+        throw new Error('مسار النسخة المحلية المطلوبة للنسخ الخارجي غير محدد.');
+      }
+      const sourceStat = await fsImpl.stat(backupPath);
+      const destinationDirectory = path.join(usbVolume, 'CeramiSys', 'Backups');
+      await fsImpl.mkdir(destinationDirectory, { recursive: true });
+      const destination = path.join(destinationDirectory, path.basename(backupPath));
+      await fsImpl.copyFile(backupPath, destination, fsImpl.constants.COPYFILE_EXCL);
+      const destinationStat = await fsImpl.stat(destination);
+      if (destinationStat.size !== sourceStat.size) {
+        throw new Error('حجم النسخة على قرص USB لا يطابق النسخة المحلية.');
+      }
+      strategy.actions.push({
+        type: 'external',
+        target: destination,
+        status: 'complete',
+        description: `تم حفظ نسخة خارجية على USB: ${destination}`
+      });
+    } catch (error) {
+      strategy.actions.push({
+        type: 'external',
+        target: usbVolume,
+        status: 'failed',
+        description: `تعذر حفظ النسخة على USB: ${error.message || error}`
+      });
+      strategy.recommendations.push({
+        type: 'external',
+        action: 'تحقق من مساحة قرص USB وصلاحيته ثم أعد النسخ الاحتياطي.'
+      });
+    }
   }
 
   // تنظيف النسخة القديمة
@@ -149,26 +189,28 @@ async function apply321Strategy({ BACKUP_DIR }, backupType = 'full') {
 /**
  * فحص وجود USB متوفر
  */
-async function checkExternalDrive() {
+async function checkExternalDrive({ platform = process.platform, execFileImpl = execFile } = {}) {
+  if (platform !== 'win32') return null;
   try {
     // томаيز في ويندوز
     // يوجد طريق لفحص الأقراص الخارجية المتاحة
-    const result = await new Promise((resolve) => {
+    const result = await new Promise((resolve, reject) => {
       // هذا يتم تنفيذها على Windows
-      execFile('powershell', ['-Command', 'Get-Volume | Where-Object {$_.DriveType -eq "Removable"} | Select-Object –ExpandProperty DriveLetter'], (error, stdout) => {
+      execFileImpl('powershell', ['-NoProfile', '-NonInteractive', '-Command', 'Get-Volume | Where-Object {$_.DriveType -eq "Removable"} | Select-Object -ExpandProperty DriveLetter'], (error, stdout) => {
         if (error) {
-          resolve(null);
+          reject(error);
           return;
         }
         // استخراج الحروف
-        const letters = stdout.trim().split('\n').filter(l => l.length === 1);
-        resolve(letters.length > 0 ? `E:\\external_backups\\` : null);
+        const driveLetter = String(stdout).split(/\r?\n/).map((letter) => letter.trim())
+          .find((letter) => /^[A-Za-z]$/.test(letter));
+        resolve(driveLetter ? `${driveLetter.toUpperCase()}:\\` : null);
       });
     });
     return result;
   } catch (error) {
     console.error('فحص USB فاشلة:', error);
-    return null;
+    throw error;
   }
 }
 

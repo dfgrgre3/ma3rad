@@ -52,9 +52,38 @@ function isAllowedIpcSender(event, options) {
   return isAllowedAppUrl(frame.url, options);
 }
 
+function getAllowedExternalUrl(value) {
+  try {
+    const url = new URL(value);
+    if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) {
+      return null;
+    }
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function openExternalUrl(shell, value, logger = console) {
+  const url = getAllowedExternalUrl(value);
+  if (!url) return false;
+
+  try {
+    Promise.resolve(shell.openExternal(url)).catch((error) => {
+      logger.error('Failed to open external link:', error);
+    });
+    return true;
+  } catch (error) {
+    logger.error('Failed to open external link:', error);
+    return false;
+  }
+}
+
 module.exports = {
+  getAllowedExternalUrl,
   isAllowedAppUrl,
   isAllowedIpcSender,
+  openExternalUrl,
   sameLocalFileUrl,
   get crypto() { return require('./security/crypto'); },
   get licenseValidator() { return require('./security/licenseValidator'); },

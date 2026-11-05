@@ -17,8 +17,10 @@ async function createHandlers(fsImpl = fs, safeStorageOverride) {
   const backupDir = path.join(appDataDir, 'backups');
   const dbFile = path.join(dataDir, 'ceramisys.sqlite');
   const handlers = new Map();
+  const events = new Map();
   const ipcMain = {
     handle: (name, handler) => handlers.set(name, handler),
+    on: (name, handler) => events.set(name, handler),
   };
   const validateIpcSender = () => true;
   let restartRequested = 0;
@@ -37,6 +39,9 @@ async function createHandlers(fsImpl = fs, safeStorageOverride) {
   };
   const app = { getVersion: () => 'test', isPackaged: false };
   const safeStorage = safeStorageOverride || {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString(),
     isAsyncEncryptionAvailable: async () => true,
     encryptStringAsync: async (value) => Buffer.from(value),
     decryptStringAsync: async (value) => ({ result: value.toString(), shouldReEncrypt: false }),
@@ -62,10 +67,28 @@ async function createHandlers(fsImpl = fs, safeStorageOverride) {
     backupDir,
     dbFile,
     handlers,
+    events,
     event: { senderFrame: { url: 'file:///index.html' } },
     getRestartRequested: () => restartRequested,
   };
 }
+
+test('synchronous database saves persist encrypted bytes before returning', async () => {
+  const context = await createHandlers();
+  try {
+    const event = { senderFrame: { url: 'file:///index.html' }, returnValue: undefined };
+    context.events.get('db:save-sync')(event, new Uint8Array([1, 2, 3, 4]));
+    assert.equal(event.returnValue.ok, true);
+    assert.equal(event.returnValue.path, context.dbFile);
+    assert.equal(fsSync.existsSync(context.dbFile), true);
+    assert.deepEqual(
+      Array.from(await context.handlers.get('db:load')(context.event)),
+      [1, 2, 3, 4],
+    );
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
 
 test('registered database handlers initialize directories and load/save within the size limit', async () => {
   const context = await createHandlers();

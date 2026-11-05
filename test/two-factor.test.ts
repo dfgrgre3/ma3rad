@@ -69,10 +69,13 @@ test('2FA secrets live per user and verification rejects wrong, replayed, and re
     assert.equal(await twoFactorAuth.verify2FA(userId, setup.recoveryCodes[0], 'recovery'), true);
     assert.equal(await twoFactorAuth.verify2FA(userId, setup.recoveryCodes[0], 'recovery'), false);
 
-    await twoFactorAuth.enable2FA(userId, 'TOTP');
+    await assert.rejects(twoFactorAuth.enable2FA(userId, 'TOTP'), /رمز التحقق/);
+    const activationCode = twoFactorAuth.generateTestCode(userId, Math.floor(Date.now() / 30_000) + 1);
+    await twoFactorAuth.enable2FA(userId, 'TOTP', activationCode);
     assert.equal(twoFactorAuth.isEnabled(userId), true);
+    await twoFactorAuth.disable2FA(userId, setup.recoveryCodes[1]);
+    assert.equal(twoFactorAuth.isEnabled(userId), false);
   } finally {
-    await twoFactorAuth.disable2FA(userId);
     db.run(`DELETE FROM user_2fa WHERE user_id = ?`, [userId]);
   }
 });
@@ -82,6 +85,7 @@ test('login requires a valid second factor once 2FA is enabled', async () => {
   await db.initialize();
   const userId = await adminId(db);
   const secret = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+  const recoveryCode = 'abcde-12345';
 
   db.run(`UPDATE system_settings SET value = '5' WHERE key = 'maxFailedLoginAttempts'`);
   db.run(`DELETE FROM login_history WHERE username_attempted = 'admin'`);
@@ -90,9 +94,11 @@ test('login requires a valid second factor once 2FA is enabled', async () => {
     db.run(
       `INSERT INTO user_2fa
          (user_id, secret, algorithm, period, counter, enabled, recovery_codes, setup_date, last_used_counter, created_at, updated_at)
-       VALUES (?, ?, 'TOTP', 30, 0, 1, '[]', ?, NULL, ?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET enabled = 1, secret = excluded.secret, last_used_counter = NULL`,
-      [userId, secret, new Date().toISOString(), new Date().toISOString(), new Date().toISOString()]
+       VALUES (?, ?, 'TOTP', 30, 0, 1, ?, ?, NULL, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET enabled = 1, secret = excluded.secret,
+         recovery_codes = excluded.recovery_codes, last_used_counter = NULL`,
+      [userId, secret, JSON.stringify([bcrypt.hashSync(recoveryCode, 10)]),
+        new Date().toISOString(), new Date().toISOString(), new Date().toISOString()]
     );
 
     assert.throws(
@@ -105,6 +111,11 @@ test('login requires a valid second factor once 2FA is enabled', async () => {
     const user = AuthService.login('admin', 'admin123', generateTOTP(secret));
     assert.equal(user.username, 'admin');
     AuthService.logout();
+
+    const recoveryLogin = AuthService.login('admin', 'admin123', recoveryCode);
+    assert.equal(recoveryLogin.username, 'admin');
+    AuthService.logout();
+    assert.throws(() => AuthService.login('admin', 'admin123', recoveryCode), /رمز التحقق الثنائي غير صحيح/);
   } finally {
     db.run(`DELETE FROM user_2fa WHERE user_id = ?`, [userId]);
     db.run(`DELETE FROM login_history WHERE username_attempted = 'admin'`);
@@ -146,9 +157,9 @@ test('active users cannot share a PIN', async () => {
 
   try {
     db.run(`DELETE FROM users WHERE id IN (?, ?)`, [firstId, secondId]);
-    auth.createUser({ username: firstId, password: 'Test1234', fullName: 'PIN A', role: 'CASHIER', pinCode: '9876' }, 'usr_admin', admin);
+    auth.createUser({ username: firstId, password: 'Test1234!', fullName: 'PIN A', role: 'CASHIER', pinCode: '9876' }, 'usr_admin', admin);
     assert.throws(
-      () => auth.createUser({ username: secondId, password: 'Test1234', fullName: 'PIN B', role: 'CASHIER', pinCode: '9876' }, 'usr_admin', admin),
+      () => auth.createUser({ username: secondId, password: 'Test1234!', fullName: 'PIN B', role: 'CASHIER', pinCode: '9876' }, 'usr_admin', admin),
       /رمز PIN مخصص لمستخدم نشط آخر/
     );
   } finally {

@@ -6,8 +6,8 @@ import {
 import { SecurityService, ActiveSession, LoginRecord, SecurityOverview } from '../../services/SecurityService';
 import { AuthService } from '../../services/AuthService';
 import { useToast } from '../../components/ui/Toast';
-import { PermissionService } from '../../services/PermissionService';
 import { usePermission } from '../../hooks/usePermission';
+import type { TwoFactorSetup } from '../../services/twoFactorAuth';
 
 const fmtDate = (value?: string | null) => {
   if (!value) return '—';
@@ -20,6 +20,8 @@ export const SecurityCenterPage: React.FC = () => {
   const can = usePermission();
   const canManageSessions = can('sessions.manage');
   const canViewSecurity = can('security.view');
+  const currentUserId = AuthService.requireAuth().id;
+  const passwordPolicy = service.getPasswordPolicy();
   const toast = useToast();
   const [overview, setOverview] = useState<SecurityOverview | null>(null);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -27,6 +29,10 @@ export const SecurityCenterPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [onlyFailed, setOnlyFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [twoFactorSetup, setTwoFactorSetup] = useState<TwoFactorSetup | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorBusy, setTwoFactorBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -34,6 +40,7 @@ export const SecurityCenterPage: React.FC = () => {
       setOverview(service.getOverview());
       setSessions(service.getActiveSessions());
       setHistory(service.getLoginHistory({ search, onlyFailed, limit: 150 }));
+      setTwoFactorEnabled(service.getSecurityStatus().twoFactorEnabled);
     } catch (e: any) {
       toast.error(e?.message || 'تعذر تحميل بيانات الأمان.');
     } finally {
@@ -71,6 +78,56 @@ export const SecurityCenterPage: React.FC = () => {
       load();
     } catch (e: any) {
       toast.error(e?.message || 'تعذر إنهاء الجلسات.');
+    }
+  };
+
+  const beginTwoFactorSetup = async () => {
+    setTwoFactorBusy(true);
+    try {
+      const setup = await service.setupTwoFactorAuth(currentUserId);
+      setTwoFactorSetup(setup);
+      setTwoFactorCode('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر بدء إعداد التحقق الثنائي.');
+    } finally {
+      setTwoFactorBusy(false);
+    }
+  };
+
+  const confirmTwoFactorSetup = async () => {
+    if (!twoFactorCode.trim()) {
+      toast.error('أدخل الرمز الظاهر في تطبيق المصادقة.');
+      return;
+    }
+    setTwoFactorBusy(true);
+    try {
+      await service.confirmTwoFactorAuth(currentUserId, twoFactorCode);
+      setTwoFactorEnabled(true);
+      setTwoFactorCode('');
+      toast.success('تم تفعيل التحقق الثنائي. احتفظ برموز الاسترداد في مكان آمن.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تأكيد التحقق الثنائي.');
+    } finally {
+      setTwoFactorBusy(false);
+    }
+  };
+
+  const disableTwoFactor = async () => {
+    if (!twoFactorCode.trim()) {
+      toast.error('أدخل رمز التحقق الحالي أو رمز استرداد.');
+      return;
+    }
+    setTwoFactorBusy(true);
+    try {
+      await service.disableTwoFactorAuth(currentUserId, twoFactorCode);
+      setTwoFactorEnabled(false);
+      setTwoFactorSetup(null);
+      setTwoFactorCode('');
+      toast.success('تم إيقاف التحقق الثنائي.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إيقاف التحقق الثنائي.');
+    } finally {
+      setTwoFactorBusy(false);
     }
   };
 
@@ -117,6 +174,117 @@ export const SecurityCenterPage: React.FC = () => {
               ))}
             </div>
 
+            {canViewSecurity && (
+              <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-black flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" /> التحقق الثنائي لحسابي
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      الحالة: {twoFactorEnabled ? 'مفعّل' : 'غير مفعّل'}
+                    </p>
+                  </div>
+                  {twoFactorEnabled && (
+                    <span className="text-[10px] px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold">
+                      محمي
+                    </span>
+                  )}
+                </div>
+
+                {!twoFactorEnabled && !twoFactorSetup && (
+                  <button
+                    type="button"
+                    onClick={() => void beginTwoFactorSetup()}
+                    disabled={twoFactorBusy}
+                    className="px-3 py-2 rounded-lg bg-sky-600 text-white text-xs font-bold disabled:opacity-50"
+                  >
+                    {twoFactorBusy ? 'جارٍ الإعداد...' : 'إعداد تطبيق المصادقة'}
+                  </button>
+                )}
+
+                {twoFactorSetup && !twoFactorEnabled && (
+                  <div className="space-y-3">
+                    <p className="text-xs leading-5 text-slate-600">
+                      أضف المفتاح التالي يدويًا إلى تطبيق مصادقة، ثم أدخل الرمز الحالي لإثبات الإعداد.
+                    </p>
+                    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
+                      <p className="text-[10px] font-bold text-slate-500 mb-1">مفتاح الإعداد</p>
+                      <code dir="ltr" className="block break-all text-sm font-bold tracking-wider text-slate-900">
+                        {twoFactorSetup.secret}
+                      </code>
+                    </div>
+                    <label className="block text-xs font-bold" htmlFor="security-2fa-code">رمز تطبيق المصادقة</label>
+                    <input
+                      id="security-2fa-code"
+                      value={twoFactorCode}
+                      onChange={(event) => setTwoFactorCode(event.target.value)}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      dir="ltr"
+                      maxLength={12}
+                      className="win-input w-full max-w-xs px-3 text-center font-mono"
+                    />
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => void confirmTwoFactorSetup()}
+                        disabled={twoFactorBusy}
+                        className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold disabled:opacity-50"
+                      >
+                        تأكيد وتفعيل
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {twoFactorEnabled && twoFactorSetup && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-black text-amber-900">رموز الاسترداد — تظهر مرة واحدة</p>
+                    <p className="text-[11px] leading-5 text-amber-800">
+                      احفظ هذه الرموز في مكان آمن. كل رمز صالح لاستخدام واحد فقط.
+                    </p>
+                    <div dir="ltr" className="mt-2 grid grid-cols-2 gap-1 font-mono text-xs font-bold">
+                      {twoFactorSetup.recoveryCodes.map((code) => <code key={code}>{code}</code>)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setTwoFactorSetup(null)}
+                      className="mt-3 text-[11px] font-bold text-amber-900 underline"
+                    >
+                      أخفيت الرموز وحفظتها
+                    </button>
+                  </div>
+                )}
+
+                {twoFactorEnabled && (
+                  <div className="flex flex-col sm:flex-row sm:items-end gap-2 border-t border-slate-100 pt-3">
+                    <div>
+                      <label className="block text-[11px] font-bold mb-1" htmlFor="security-2fa-disable-code">
+                        رمز حالي أو رمز استرداد لإيقاف الميزة
+                      </label>
+                      <input
+                        id="security-2fa-disable-code"
+                        value={twoFactorCode}
+                        onChange={(event) => setTwoFactorCode(event.target.value)}
+                        dir="ltr"
+                        autoComplete="one-time-code"
+                        className="win-input w-full sm:w-64 px-3 text-center font-mono"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void disableTwoFactor()}
+                      disabled={twoFactorBusy}
+                      className="px-3 py-2 rounded-lg border border-rose-200 text-rose-700 text-xs font-bold disabled:opacity-50"
+                    >
+                      إيقاف التحقق الثنائي
+                    </button>
+                  </div>
+                )}
+              </section>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
@@ -157,6 +325,12 @@ export const SecurityCenterPage: React.FC = () => {
                 <div className="p-4 space-y-3 text-xs">
                   <div className="flex items-center justify-between"><span className="text-slate-500 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> مهلة الخمول</span><span className="font-black">{overview?.sessionTimeoutMinutes ?? 480} دقيقة</span></div>
                   <div className="flex items-center justify-between"><span className="text-slate-500 flex items-center gap-1"><KeyRound className="w-3.5 h-3.5" /> حد محاولات الدخول</span><span className="font-black">{overview?.maxFailedAttempts ?? 5}</span></div>
+                  <div className="flex items-center justify-between"><span className="text-slate-500">الحد الأدنى لكلمة المرور</span><span className="font-black">{passwordPolicy.minLength} أحرف</span></div>
+                  <div className="flex items-center justify-between gap-2"><span className="text-slate-500">المتطلبات الإضافية</span><span className="text-left text-[10px] font-bold">{[
+                    passwordPolicy.requireUppercase && 'حرف كبير',
+                    passwordPolicy.requireNumbers && 'رقم',
+                    passwordPolicy.requireSpecialChars && 'رمز خاص',
+                  ].filter(Boolean).join('، ') || 'لا توجد'}</span></div>
                   <div className="flex items-center justify-between"><span className="text-slate-500 flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> حسابات مقفلة مؤقتًا</span><span className={`font-black ${(overview?.lockedAccounts || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{overview?.lockedAccounts ?? 0}</span></div>
                   <div className="flex items-center justify-between"><span className="text-slate-500">آخر نسخة احتياطية</span><span className="font-bold text-[10px]">{fmtDate(overview?.lastBackupAt)}</span></div>
                   <p className="pt-2 border-t border-slate-100 text-[10px] leading-5 text-slate-400">يمكن تعديل مهلة الجلسة وحد المحاولات من إعدادات النظام ← الأمان.</p>

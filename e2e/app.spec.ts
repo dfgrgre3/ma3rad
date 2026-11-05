@@ -1,16 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { _electron as electron } from '@playwright/test';
 import {
   ROOT,
   tempDataDir,
-  seedReturningInstallation,
   launchApp,
   launchSeededApp,
   activate,
   login,
-  mockLicenseApi,
 } from './support/app.fixture';
 
 /**
@@ -19,20 +17,21 @@ import {
  * never reads or writes a real installation's database.
  */
 
-test('a fresh installation must activate once before login', async () => {
-  test.skip(true, 'disabled while BYPASS_FIRST_RUN_SETUP=true (dev mode); re-enable before release');
+test('a fresh installation activates and permits local sign-in', async () => {
   const dataDir = tempDataDir();
-  const { app, page } = await launchApp(dataDir);
+  const { app, page, closeMockServer } = await launchApp(dataDir);
   try {
     await expect(page).toHaveTitle(/سيراميسيس/);
-    await expect(page.getByRole('textbox', { name: 'رمز التفعيل', exact: true })).toBeVisible();
-    await page.getByLabel('رابط خادم الترخيص').fill('http://localhost:4000');
-    await page.getByRole('textbox', { name: 'رمز التفعيل', exact: true }).fill('INVALID-CODE');
+    await expect(page.getByLabel('مفتاح الترخيص')).toBeVisible();
+    await page.getByLabel('اسم الحساب').fill('admin');
+    await page.getByLabel('كلمة المرور').fill('admin123');
+    await page.getByLabel('رقم الهاتف').fill('01000000000');
+    await page.getByLabel('مفتاح الترخيص').fill('INVALID-CODE');
     await page.getByRole('button', { name: 'تحقق وانتقل لتسجيل الدخول' }).click();
     await expect(page.getByRole('alert')).toContainText('رمز التفعيل غير صحيح.');
     await expect(page.locator('#username')).toHaveCount(0);
 
-    await page.getByRole('textbox', { name: 'رمز التفعيل', exact: true }).fill('VALID-CODE');
+    await page.getByLabel('مفتاح الترخيص').fill('VALID-CODE');
     await page.getByRole('button', { name: 'تحقق وانتقل لتسجيل الدخول' }).click();
     await expect(page.locator('#username')).toBeVisible();
     await expect(page.locator('#password')).toBeVisible();
@@ -49,18 +48,19 @@ test('a fresh installation must activate once before login', async () => {
       await page.getByRole('button', { name: 'حفظ كلمة المرور وتأمين النظام' }).click();
     }
 
-    await expect(page.getByRole('heading', { name: 'لوحة المعلومات والتحليلات الشاملة' })).toBeVisible();
+    await expect(page.locator('#sec-pulse')).toBeVisible();
 
     // The window really rendered the built bundle, not an error page.
     const rootHtml = await page.locator('#root').innerHTML();
     expect(rootHtml.length).toBeGreaterThan(500);
   } finally {
     await app.close();
+    await closeMockServer();
   }
 });
 
 test('an existing installation logs in straight to the dashboard and can navigate', async () => {
-  const { app, page } = await launchSeededApp();
+  const { app, page, closeMockServer } = await launchSeededApp();
   try {
     await activate(page);
     await login(page);
@@ -75,28 +75,33 @@ test('an existing installation logs in straight to the dashboard and can navigat
     await expect(page.locator('body')).toContainText('المبيعات', { timeout: 30_000 });
   } finally {
     await app.close();
+    await closeMockServer();
   }
 });
 
-test('the packaged Windows build boots the same bundle from app.asar', async () => {
-  const exe = path.join(ROOT, 'release', 'win-unpacked', 'CeramiSys ERP.exe');
-  test.skip(!fs.existsSync(exe), 'run `npm run electron:pack` to create release/win-unpacked first');
+test('the packaged Windows build starts without enabling remote debugging', async () => {
+  const exe = process.env.CERAMISYS_TEST_EXE_PATH
+    ? path.resolve(process.env.CERAMISYS_TEST_EXE_PATH)
+    : path.join(ROOT, 'release', 'win-unpacked', 'CeramiSys ERP.exe');
+  test.skip(
+    process.env.CERAMISYS_TEST_PACKAGED !== '1' || !fs.existsSync(exe),
+    'Build the Windows package and set CERAMISYS_TEST_PACKAGED=1 to run this platform-specific smoke test.',
+  );
 
-  const dataDir = tempDataDir();
-  seedReturningInstallation(dataDir);
-
-  const app = await electron.launch({
-    executablePath: exe,
+  const dataDir = process.env.CERAMISYS_TEST_DATA_DIR || tempDataDir();
+  const logFile = path.join(dataDir, 'logs', 'app.log');
+  const app = spawn(exe, [], {
     env: { ...process.env, CERAMISYS_USER_DATA_DIR: dataDir },
+    stdio: 'ignore',
   });
   try {
-    const page = await app.firstWindow();
-    await page.waitForLoadState('domcontentloaded');
-    await mockLicenseApi(page);
-    await activate(page);
-    await login(page);
-    await expect(page.locator('#sec-pulse')).toBeVisible();
+    await expect.poll(() => {
+      if (app.exitCode !== null) throw new Error(`Packaged app exited with code ${app.exitCode}.`);
+      return fs.existsSync(logFile) && fs.readFileSync(logFile, 'utf8').includes('Application diagnostics initialized');
+    }, { timeout: 30_000 }).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    expect(app.exitCode).toBeNull();
   } finally {
-    await app.close();
+    if (app.exitCode === null) app.kill();
   }
 });

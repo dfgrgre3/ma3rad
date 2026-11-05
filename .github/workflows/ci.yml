@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24.15.0
           cache: npm
 
       - name: Install dependencies
@@ -47,3 +47,82 @@ jobs:
       - name: Build signed Windows installer
         if: ${{ env.CSC_LINK != '' && env.CERAMISYS_PUBLISHER_NAME != '' }}
         run: npm run electron:pack:x64
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Electron runtime dependencies
+        run: npx playwright install-deps chromium
+
+      - name: Run Electron end-to-end tests
+        run: xvfb-run --auto-servernum npm run e2e
+
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      CERAMISYS_PUBLISHER_NAME: ${{ secrets.CERAMISYS_PUBLISHER_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build signed Windows installer
+        if: ${{ env.CSC_LINK != '' && env.CERAMISYS_PUBLISHER_NAME != '' }}
+        run: npm run electron:pack:x64
+
+      - name: Install, launch, and verify user data survives uninstall
+        if: ${{ env.CSC_LINK != '' && env.CERAMISYS_PUBLISHER_NAME != '' }}
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem release\CeramiSys-Setup-*-x64.exe | Select-Object -First 1
+          if (-not $installer) { throw 'The signed x64 installer was not produced.' }
+
+          $installDir = Join-Path $env:RUNNER_TEMP 'ceramisys-installed'
+          $appDataDir = Join-Path $env:RUNNER_TEMP 'ceramisys-user-data'
+          $env:APPDATA = $appDataDir
+          $marker = Join-Path $appDataDir 'CeramiSysERP\data\preserve-after-uninstall.marker'
+          New-Item -ItemType Directory -Force -Path (Split-Path $marker) | Out-Null
+          Set-Content -Path $marker -Value 'preserve'
+
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer exited with code $($install.ExitCode)." }
+
+          $appExe = Join-Path $installDir 'CeramiSys ERP.exe'
+          if (-not (Test-Path $appExe)) { throw "Installed executable was not found: $appExe" }
+          $env:CERAMISYS_TEST_PACKAGED = '1'
+          $env:CERAMISYS_TEST_EXE_PATH = $appExe
+          $env:CERAMISYS_TEST_DATA_DIR = Join-Path $appDataDir 'CeramiSysERP'
+          npx playwright test e2e/app.spec.ts --grep "packaged Windows build"
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged application smoke test failed.' }
+
+          $uninstaller = Get-ChildItem $installDir -Filter 'Uninstall*.exe' | Select-Object -First 1
+          if (-not $uninstaller) { throw 'Uninstaller was not found in the installation directory.' }
+          $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstaller exited with code $($uninstall.ExitCode)." }
+          if (-not (Test-Path $marker)) { throw 'Uninstall removed the user data directory.' }

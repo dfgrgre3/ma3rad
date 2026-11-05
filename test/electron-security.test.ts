@@ -6,11 +6,17 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { DatabaseManager } from '../src/database/db.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
+import { AuthService } from '../src/services/AuthService.ts';
 import { NavigationService } from '../src/services/NavigationService.ts';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from '../src/config/routePermissions.ts';
 
 const require = createRequire(import.meta.url);
-const { isAllowedAppUrl, isAllowedIpcSender } = require('../electron/security.js');
+const {
+  getAllowedExternalUrl,
+  isAllowedAppUrl,
+  isAllowedIpcSender,
+  openExternalUrl,
+} = require('../electron/security.js');
 const {
   isAllowedNetworkPrinterAddress,
   isAllowedNetworkPrinterPort,
@@ -18,6 +24,52 @@ const {
 } = require('../electron/printing.js');
 
 const origins = new Set(['http://localhost:5173', 'http://127.0.0.1:5173']);
+
+test('password validation enforces the active configured policy', () => {
+  const previous = localStorage.getItem('security_config');
+  localStorage.setItem('security_config', JSON.stringify({
+    passwordPolicy: {
+      minLength: 10,
+      requireUppercase: true,
+      requireNumbers: true,
+      requireSpecialChars: true,
+    },
+  }));
+  try {
+    assert.doesNotThrow(() => AuthService.validatePasswordPolicy('StrongPass123!'));
+    assert.throws(() => AuthService.validatePasswordPolicy('strongpass123!'), /حرف إنجليزي كبير/);
+    assert.throws(() => AuthService.validatePasswordPolicy('StrongPassword!'), /رقم/);
+    assert.throws(() => AuthService.validatePasswordPolicy('StrongPass123'), /رمز خاص/);
+    assert.throws(() => AuthService.validatePasswordPolicy('Short1!'), /10/);
+  } finally {
+    if (previous === null) localStorage.removeItem('security_config');
+    else localStorage.setItem('security_config', previous);
+  }
+});
+
+test('external links allow web URLs only and report browser launch failures', async () => {
+  assert.equal(getAllowedExternalUrl('https://example.com/path'), 'https://example.com/path');
+  assert.equal(getAllowedExternalUrl('http://example.com'), 'http://example.com/');
+  assert.equal(getAllowedExternalUrl('javascript:alert(1)'), null);
+  assert.equal(getAllowedExternalUrl('https://user:password@example.com'), null);
+  assert.equal(getAllowedExternalUrl('not a URL'), null);
+
+  const opened: string[] = [];
+  const errors = [];
+  const logger = { error: (...args: unknown[]) => errors.push(args) };
+  assert.equal(openExternalUrl({ openExternal: (url: string) => { opened.push(url); } },
+    'https://example.com', logger), true);
+  assert.deepEqual(opened, ['https://example.com/']);
+  assert.equal(openExternalUrl({ openExternal: () => { throw new Error('launch failed'); } },
+    'https://example.com', logger), false);
+  assert.equal(openExternalUrl({ openExternal: () => Promise.reject(new Error('launch failed')) },
+    'https://example.com', logger), true);
+  assert.equal(openExternalUrl({ openExternal: () => { throw new Error('must not run'); } },
+    'javascript:alert(1)', logger), false);
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(errors.length, 2);
+});
 
 test('IPC security: production IPC only accepts the exact packaged app main frame', () => {
   const appHtmlPath = path.resolve('dist', 'index.html');

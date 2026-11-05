@@ -1,5 +1,6 @@
 import { expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { createServer, type Server } from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,49 +29,132 @@ export function seedReturningInstallation(dataDir: string): void {
   );
 }
 
-export async function mockLicenseApi(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const originalFetch = window.fetch.bind(window);
-    window.fetch = async (input, init) => {
-      const requestUrl = typeof input === 'string'
-        ? input
-        : input instanceof URL ? input.href : input.url;
-      if (!requestUrl.endsWith('/api/v1/licensing/activate')) return originalFetch(input, init);
+export async function startMockLicenseServer(): Promise<{ origin: string; close: () => Promise<void> }> {
+  const server: Server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', (chunk: Buffer) => chunks.push(chunk));
+    request.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8');
+      const send = (status: number, value: unknown) => {
+        response.writeHead(status, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify(value));
+      };
 
-      const request = JSON.parse(String(init?.body || '{}')) as { activationCode?: string };
-      const valid = request.activationCode === 'VALID-CODE';
-      return new Response(JSON.stringify(valid
-        ? { deviceCredential: 'test-device-credential' }
-        : { message: 'رمز التفعيل غير صحيح.' }), {
-        status: valid ? 200 : 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    };
+      if (request.url === '/api/v1/licensing/activate' && request.method === 'POST') {
+        let payload: { activationCode?: string };
+        try {
+          payload = JSON.parse(body) as { activationCode?: string };
+        } catch {
+          send(400, { message: 'Invalid request.' });
+          return;
+        }
+        if (payload.activationCode !== 'VALID-CODE') {
+          send(401, { message: 'رمز التفعيل غير صحيح.' });
+          return;
+        }
+        send(200, {
+          deviceCredential: 'test-device-credential',
+          localAccount: {
+            username: 'admin',
+            fullName: 'Administrator',
+            role: 'admin',
+            phone: '01000000000',
+          },
+        });
+        return;
+      }
+
+      if (request.url === '/api/v1/licensing/validate' && request.method === 'POST') {
+        send(200, { valid: true });
+        return;
+      }
+      if (request.method === 'GET') {
+        send(200, request.url === '/api/v1/releases' ? [] : {});
+        return;
+      }
+      if (request.method === 'POST') {
+        send(200, {});
+        return;
+      }
+      send(404, { message: 'Not found.' });
+    });
   });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    throw new Error('Mock licensing server did not bind to a TCP port.');
+  }
+  return {
+    origin: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    }),
+  };
 }
 
-export async function launchApp(dataDir: string): Promise<{ app: ElectronApplication; page: Page }> {
-  const app = await electron.launch({
-    args: [ROOT],
-    cwd: ROOT,
-    env: {
-      ...process.env,
-      CERAMISYS_E2E: '1',
-      CERAMISYS_USER_DATA_DIR: dataDir,
-      VITE_DEV_SERVER_URL: APP_HTML,
-    },
-  });
-  const page = await app.firstWindow();
-  await page.waitForLoadState('domcontentloaded');
-  await mockLicenseApi(page);
-  return { app, page };
+async function setLicenseServer(page: Page, origin: string): Promise<void> {
+  await page.evaluate((serverOrigin) => {
+    localStorage.setItem('central_server_url', serverOrigin);
+  }, origin);
 }
 
-export async function launchSeededApp(): Promise<{ app: ElectronApplication; page: Page; dataDir: string }> {
+export async function launchApp(dataDir: string): Promise<{
+  app: ElectronApplication;
+  page: Page;
+  closeMockServer: () => Promise<void>;
+}> {
+  const mockServer = await startMockLicenseServer();
+  let app: ElectronApplication;
+  const launchEnv = { ...process.env };
+  // Some IDE/automation shells set this flag globally. It makes the Electron
+  // executable run as plain Node, which breaks Playwright's Electron launcher.
+  delete launchEnv.ELECTRON_RUN_AS_NODE;
+  try {
+    app = await electron.launch({
+      args: [ROOT],
+      cwd: ROOT,
+      env: {
+        ...launchEnv,
+        CERAMISYS_E2E: '1',
+        CERAMISYS_USER_DATA_DIR: dataDir,
+        CENTRAL_API_URL: mockServer.origin,
+        VITE_DEV_SERVER_URL: APP_HTML,
+      },
+    });
+  } catch (error) {
+    await mockServer.close();
+    throw error;
+  }
+  try {
+    // Seeded databases may run migrations and create an encrypted backup before
+    // the first BrowserWindow is created. Keep the launcher timeout separate
+    // from Playwright's default 30-second assertion timeout.
+    const page = await app.firstWindow({ timeout: 90_000 });
+    await page.waitForLoadState('domcontentloaded');
+    await setLicenseServer(page, mockServer.origin);
+    return { app, page, closeMockServer: mockServer.close };
+  } catch (error) {
+    await app.close();
+    await mockServer.close();
+    throw error;
+  }
+}
+
+export async function launchSeededApp(): Promise<{
+  app: ElectronApplication;
+  page: Page;
+  dataDir: string;
+  closeMockServer: () => Promise<void>;
+}> {
   const dataDir = tempDataDir();
   seedReturningInstallation(dataDir);
-  const { app, page } = await launchApp(dataDir);
-  return { app, page, dataDir };
+  const { app, page, closeMockServer } = await launchApp(dataDir);
+  return { app, page, dataDir, closeMockServer };
 }
 
 export async function activate(page: Page): Promise<void> {
@@ -79,14 +163,16 @@ export async function activate(page: Page): Promise<void> {
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     if (await page.locator('#username').isVisible().catch(() => false)) return;
-    if (await page.getByLabel('رابط خادم الترخيص').isVisible().catch(() => false)) break;
+    if (await page.getByLabel('اسم الحساب').isVisible().catch(() => false)) break;
     await page.waitForTimeout(250);
   }
   if (await page.locator('#username').isVisible().catch(() => false)) return;
 
-  await expect(page.getByLabel('رابط خادم الترخيص')).toBeVisible();
-  await page.getByLabel('رابط خادم الترخيص').fill('http://localhost:4000');
-  await page.getByRole('textbox', { name: 'رمز التفعيل', exact: true }).fill('VALID-CODE');
+  await expect(page.getByLabel('اسم الحساب')).toBeVisible();
+  await page.getByLabel('اسم الحساب').fill('admin');
+  await page.getByLabel('كلمة المرور').fill('admin123');
+  await page.getByLabel('رقم الهاتف').fill('01000000000');
+  await page.getByLabel('مفتاح الترخيص').fill('VALID-CODE');
   await page.getByRole('button', { name: 'تحقق وانتقل لتسجيل الدخول' }).click();
   await expect(page.locator('#username')).toBeVisible();
 }

@@ -38,6 +38,8 @@ export function UpdateNotification() {
   }, []);
 
   if (!update || ['idle', 'checking', 'not-available'].includes(update.status)) return null;
+  const isError = update.status === 'error';
+  const hasRelease = Boolean(update.version || update.releaseName);
   const optional = !update.mandatory;
   const title = update.releaseName || `الإصدار ${update.version || 'الجديد'}`;
 
@@ -67,9 +69,12 @@ export function UpdateNotification() {
         <div className="flex items-start justify-between gap-3 bg-sky-700 px-4 py-3 text-white">
           <div>
             <div className="text-sm font-black">
-              {update.mandatory ? 'تحديث إلزامي متاح' : 'يتوفر تحديث جديد'} · v{update.version}
+              {isError
+                ? 'تعذر التحقق من التحديث'
+                : update.mandatory ? 'تحديث إلزامي متاح' : 'يتوفر تحديث جديد'}
+              {update.version && ` · v${update.version}`}
             </div>
-            {title !== `الإصدار ${update.version || 'الجديد'}` && (
+            {hasRelease && title !== `الإصدار ${update.version || 'الجديد'}` && (
               <div className="mt-1 text-xs text-sky-100">{title}</div>
             )}
           </div>
@@ -83,7 +88,7 @@ export function UpdateNotification() {
           <p className="text-xs text-slate-500 dark:text-slate-400">
             الإصدار الحالي {update.currentVersion} · الإصدار الأحدث {update.version}
           </p>
-          {update.releaseNotes && (
+          {!isError && update.releaseNotes && (
             <div className="max-h-28 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
               {update.releaseNotes}
             </div>
@@ -97,7 +102,7 @@ export function UpdateNotification() {
               <progress className="h-2 w-full accent-sky-600" max={100} value={update.progress || 0} />
             </div>
           )}
-          {update.status === 'error' && (
+          {isError && (
             <div className="space-y-2" role="alert">
               <p className="text-xs text-rose-700 dark:text-rose-300">
                 تعذر فحص التحديث أو تنزيله. تحقق من اتصال الإنترنت وحاول مجدداً.
@@ -137,7 +142,7 @@ export function UpdateNotification() {
               </button>
             </div>
           )}
-          {update.mandatory && (
+          {!isError && update.mandatory && (
             <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
               هذا التحديث إلزامي؛ لا يمكن استخدام البرنامج قبل تثبيته.
             </p>

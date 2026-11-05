@@ -224,6 +224,29 @@ test('SECURITY 07: File integrity checker detects modified or missing files', ()
   }
 });
 
+test('SECURITY 07b: packaged preload integrity uses a pinned expected hash', () => {
+  const sourceRoot = path.resolve('.');
+  const mainSource = fs.readFileSync(path.join(sourceRoot, 'electron', 'main.js'), 'utf8');
+  const expectedHash = mainSource.match(/PRELOAD_INTEGRITY_SHA256 = '([a-f0-9]{64})'/)?.[1];
+  assert.ok(expectedHash, 'main process contains a fixed preload hash');
+
+  const checker = new FileIntegrityChecker(sourceRoot);
+  assert.equal(checker.verifyManifest({ 'electron/preload.js': expectedHash }).valid, true);
+
+  const tamperedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'preload_integrity_test_'));
+  try {
+    fs.mkdirSync(path.join(tamperedRoot, 'electron'), { recursive: true });
+    fs.writeFileSync(path.join(tamperedRoot, 'electron', 'preload.js'), 'tampered preload', 'utf8');
+    assert.equal(
+      new FileIntegrityChecker(tamperedRoot)
+        .verifyManifest({ 'electron/preload.js': expectedHash }).valid,
+      false,
+    );
+  } finally {
+    fs.rmSync(tamperedRoot, { recursive: true, force: true });
+  }
+});
+
 // 8. اختبار صلاحيات وسياق مرسل IPC (IPC Security Test)
 test('SECURITY 08: IPC sender verification rejects unauthorized frames', () => {
   const appHtmlPath = path.resolve('dist', 'index.html');
@@ -377,4 +400,3 @@ test('SECURITY 15: Core database operations and schema integrity remain fully op
   // Clean up
   db.run('DELETE FROM products WHERE id = ?', [testId]);
 });
-

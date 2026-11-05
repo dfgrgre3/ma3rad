@@ -332,7 +332,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   assert.ok(myLog, 'Reconciliation log must exist for the test warehouse');
 
   // 9. Stocktake review requires a different authorized reviewer.
-  new AuthService().createUser({ username: 'inventory_reviewer_test', password: 'reviewer-pass-123', fullName: 'Inventory Reviewer', role: 'MANAGER' });
+  new AuthService().createUser({ username: 'inventory_reviewer_test', password: 'Reviewer-pass-123!', fullName: 'Inventory Reviewer', role: 'MANAGER' });
   startCountSession({ warehouseId: whSource, countType: 'PARTIAL', selectedProductIds: [prodId], isBlindCount: false, notes: 'approval workflow test' });
   const reviewSession = loadBranchCountSessions().find((session) => session.warehouseId === whSource && session.status === 'COUNTING');
   assert.ok(reviewSession, 'Count session should be created');
@@ -341,7 +341,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   submitCountSession(reviewSession!, reviewItems);
   assert.equal(queryOne<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [reviewSession!.id])?.status, 'REVIEW');
   assert.throws(() => approveCountSession(reviewSession!), 'Creator cannot approve their own count');
-  AuthService.login('inventory_reviewer_test', 'reviewer-pass-123');
+  AuthService.login('inventory_reviewer_test', 'Reviewer-pass-123!');
   approveCountSession(reviewSession!);
   assert.equal(queryOne<{ status: string; approvalStatus: string }>('SELECT status, approval_status AS approvalStatus FROM stock_counts WHERE id = ?', [reviewSession!.id])?.status, 'POSTED');
   assert.equal(queryOne<{ approvalStatus: string }>('SELECT approval_status AS approvalStatus FROM stock_counts WHERE id = ?', [reviewSession!.id])?.approvalStatus, 'APPROVED');

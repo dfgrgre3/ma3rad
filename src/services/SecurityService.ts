@@ -12,7 +12,9 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import bcrypt from 'bcryptjs';
 import { decryptExternalBackup, encryptExternalBackup } from './backupEncryption';
+import { DEFAULT_PASSWORD_POLICY, type PasswordPolicy } from './passwordPolicy';
 import type { ActiveSession, LoginRecord, SecurityOverview } from './types';
+import type { TwoFactorSetup } from './twoFactorAuth';
 
 export type { ActiveSession, LoginRecord, SecurityOverview };
 
@@ -37,13 +39,7 @@ interface SecurityConfig {
   auditLogging: boolean;
   performanceMonitoring: boolean;
   accessControl: 'strict' | 'moderate';
-  twoFactorEnabled: boolean;
-  passwordPolicy: {
-    minLength: number;
-    requireUppercase: boolean;
-    requireNumbers: boolean;
-    requireSpecialChars: boolean;
-  };
+  passwordPolicy: PasswordPolicy;
 }
 
 interface SecurityMetrics {
@@ -108,13 +104,7 @@ export class SecurityService {
       auditLogging: true,
       performanceMonitoring: true,
       accessControl: 'strict',
-      twoFactorEnabled: false,
-      passwordPolicy: {
-        minLength: 8,
-        requireUppercase: true,
-        requireNumbers: true,
-        requireSpecialChars: true,
-      },
+      passwordPolicy: { ...DEFAULT_PASSWORD_POLICY },
     };
   }
 
@@ -129,10 +119,10 @@ export class SecurityService {
       (candidate.backupEncryption === undefined || typeof candidate.backupEncryption === 'boolean') &&
       (candidate.auditLogging === undefined || typeof candidate.auditLogging === 'boolean') &&
       (candidate.performanceMonitoring === undefined || typeof candidate.performanceMonitoring === 'boolean') &&
-      (candidate.twoFactorEnabled === undefined || typeof candidate.twoFactorEnabled === 'boolean') &&
       !!policy && typeof policy === 'object' &&
-      (policy as Record<string, unknown>).minLength !== undefined &&
-      typeof (policy as Record<string, unknown>).minLength === 'number' &&
+      Number.isInteger((policy as Record<string, unknown>).minLength) &&
+      Number((policy as Record<string, unknown>).minLength) >= 8 &&
+      Number((policy as Record<string, unknown>).minLength) <= 128 &&
       typeof (policy as Record<string, unknown>).requireUppercase === 'boolean' &&
       typeof (policy as Record<string, unknown>).requireNumbers === 'boolean' &&
       typeof (policy as Record<string, unknown>).requireSpecialChars === 'boolean'
@@ -354,12 +344,36 @@ export class SecurityService {
     }
   }
 
-  async setTwoFactorAuth(userId: string, enabled: boolean): Promise<void> {
+  async setTwoFactorAuth(userId: string, enabled: boolean, code?: string): Promise<void> {
+    const user = AuthService.requireAuth();
+    PermissionService.require(user, 'security.view');
+    if (user.id !== userId) throw new Error('يمكنك تعديل التحقق الثنائي لحسابك الحالي فقط.');
+    if (!code?.trim()) throw new Error('أدخل رمز التحقق الثنائي لتأكيد هذا الإجراء.');
     if (enabled) {
-      await twoFactorAuth.enable2FA(userId, 'TOTP');
+      await twoFactorAuth.enable2FA(userId, 'TOTP', code);
     } else {
-      await twoFactorAuth.disable2FA(userId);
+      await twoFactorAuth.disable2FA(userId, code);
     }
+  }
+
+  async setupTwoFactorAuth(userId: string): Promise<TwoFactorSetup> {
+    const user = AuthService.requireAuth();
+    PermissionService.require(user, 'security.view');
+    if (user.id !== userId) throw new Error('يمكنك إعداد التحقق الثنائي لحسابك الحالي فقط.');
+    if (twoFactorAuth.isEnabled(userId)) throw new Error('التحقق الثنائي مفعّل بالفعل.');
+    return twoFactorAuth.setup2FA(userId, 'TOTP');
+  }
+
+  async confirmTwoFactorAuth(userId: string, code: string): Promise<void> {
+    await this.setTwoFactorAuth(userId, true, code);
+  }
+
+  async disableTwoFactorAuth(userId: string, code: string): Promise<void> {
+    await this.setTwoFactorAuth(userId, false, code);
+  }
+
+  getPasswordPolicy(): PasswordPolicy {
+    return { ...this.config.passwordPolicy };
   }
 
   getSecurityStatus(): {
@@ -371,7 +385,7 @@ export class SecurityService {
   } {
     return {
       encryptionEnabled: this.config.encryptionAlgorithm === 'aes-256-gcm' || this.config.encryptionAlgorithm === 'aes-256-ctr',
-      twoFactorEnabled: this.config.twoFactorEnabled,
+      twoFactorEnabled: this.isCurrentUserTwoFactorEnabled(),
       auditLoggingEnabled: this.config.auditLogging,
       performanceMonitoringEnabled: this.config.performanceMonitoring,
       securityRanking: this.calculateSecurityRanking()
@@ -401,23 +415,23 @@ export class SecurityService {
       backupEvents: auditLogger.getLogs({ action: 'backup' }).length,
       auditEvents: auditLogger.getLogs({ limit: 100 }).length,
       performanceAlerts: performanceMonitor.getAlerts().length,
-      twoFactorEnabled: this.config.twoFactorEnabled,
+      twoFactorEnabled: this.isCurrentUserTwoFactorEnabled(),
       securityRanking: this.calculateSecurityRanking()
     };
 
     const report = {
       timestamp: new Date().toISOString(),
       metrics,
-      recommendations: this.generateRecommendations()
+      recommendations: this.generateRecommendations(metrics.twoFactorEnabled)
     };
 
     return JSON.stringify(report, null, 2);
   }
 
-  private generateRecommendations(): string[] {
+  private generateRecommendations(twoFactorEnabled: boolean): string[] {
     const recs = [];
 
-    if (!this.config.twoFactorEnabled) {
+    if (!twoFactorEnabled) {
       recs.push('قم بتفعيل المعرف ثنائي المزيد من الأمان (2FA)');
     }
 
@@ -425,15 +439,26 @@ export class SecurityService {
       recs.push('قم بتفعيل سجلات التدقيق لرصد النشاط الأمني');
     }
 
-    if (this.config.accessControl === 'moderate' && this.config.twoFactorEnabled) {
+    if (this.config.accessControl === 'moderate' && twoFactorEnabled) {
       recs.push('النظام الأمني متقدم جداً - قد يتطلب صلاحيات خاصة');
     }
 
     return recs;
   }
 
+  private isCurrentUserTwoFactorEnabled(): boolean {
+    const user = AuthService.getCurrentUser();
+    return user ? twoFactorAuth.isEnabled(user.id) : false;
+  }
+
   updateConfig(config: Partial<SecurityConfig>): void {
-    this.config = { ...this.config, ...config };
+    const updated = {
+      ...this.config,
+      ...config,
+      passwordPolicy: { ...this.config.passwordPolicy, ...config.passwordPolicy },
+    };
+    if (!this.isValidConfig(updated)) throw new Error('إعدادات الأمان الجديدة غير صالحة.');
+    this.config = updated;
     this.saveConfig();
 
     if (config.auditLogging !== undefined) {
@@ -698,6 +723,3 @@ export class SecurityService {
 }
 
 export const securityService = SecurityService.getInstance();
-
-
-

@@ -1,0 +1,48 @@
+name: Publish Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      CERAMISYS_PUBLISHER_NAME: ${{ secrets.CERAMISYS_PUBLISHER_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: npm
+
+      - name: Verify tag matches package version
+        run: node -e "const version = require('./package.json').version; if (process.env.GITHUB_REF_NAME !== 'v' + version) throw new Error('Tag must match package.json version: v' + version)"
+
+      - name: Require signing secrets
+        run: |
+          if (-not $env:CSC_LINK -or -not $env:CERAMISYS_PUBLISHER_NAME) {
+            throw 'Set CSC_LINK, CSC_KEY_PASSWORD, and CERAMISYS_PUBLISHER_NAME in GitHub Actions secrets.'
+          }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish signed Windows x64 installer
+        run: npm run electron:publish:x64

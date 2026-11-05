@@ -261,7 +261,15 @@ public async restoreBackupFromFile(file: File, password?: string): Promise<{
       return this.db.readImportTablesBinary(bytes);
     }
 
-  public async createLocalSnapshot(label = 'manual', actor?: { id: string; fullName: string }): Promise<{ ok: boolean; path?: string; error?: string }> {
+  public async createLocalSnapshot(label = 'manual', actor?: { id: string; fullName: string }): Promise<{
+    ok: boolean;
+    path?: string;
+    error?: string;
+    strategy?: {
+      actions: Array<{ type: string; target: string | null; status: string; description: string }>;
+      recommendations: Array<{ type: string; action: string }>;
+    };
+  }> {
     const api = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
     if (!api?.backup) return { ok: false, error: 'النسخ التلقائي متاح داخل تطبيق سطح المكتب فقط' };
 
@@ -296,11 +304,24 @@ public async restoreBackupFromFile(file: File, password?: string): Promise<{
     return result;
   }
 
-public async runAutoBackupIfDue(intervalHours: number): Promise<{ created: boolean; path?: string; error?: string }> {
+public async runAutoBackupIfDue(intervalHours: number): Promise<{
+  created: boolean;
+  path?: string;
+  error?: string;
+  externalBackupWarning?: string;
+}> {
     try {
       if (!this.isBackupDue(intervalHours)) return { created: false };
       const result = await this.createLocalSnapshot('auto');
-      return { created: Boolean(result.ok), path: result.path, error: result.error };
+      const externalAction = result.strategy?.actions.find((action) => action.type === 'external');
+      return {
+        created: Boolean(result.ok),
+        path: result.path,
+        error: result.error,
+        externalBackupWarning: externalAction && externalAction.status !== 'complete'
+          ? externalAction.description
+          : undefined,
+      };
     } catch (e) {
       return { created: false, error: e instanceof Error ? e.message : String(e) };
     }

@@ -606,7 +606,34 @@ export class DatabaseManager {
       console.error('Failed to export SQLite database snapshot', e);
       return;
     }
+    if (this.persistSnapshotSynchronously(snapshot)) return;
     this.persist(snapshot);
+  }
+
+  private persistSnapshotSynchronously(snapshot: Uint8Array): boolean {
+    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    if (!fileApi?.saveSync) return false;
+
+    try {
+      const result = fileApi.saveSync(snapshot);
+      if (!result?.ok) {
+        throw new AppError(result?.error || 'تعذر حفظ قاعدة البيانات على القرص.',
+          result?.code || 'DATABASE_SAVE_FAILED', result?.retryable !== false);
+      }
+      this.storageBackend = 'file';
+      this.lastPersistError = null;
+      this.lastPersistErrorCode = null;
+      if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
+        try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* keep the migrated copy if cleanup is blocked */ }
+        this.migratedLegacyStorage = false;
+      }
+    } catch (error) {
+      const failure = toAppError(error, 'DATABASE_PERSIST_FAILED', 'تعذر حفظ قاعدة البيانات.');
+      this.lastPersistError = persistenceErrorMessage(error, failure.code);
+      this.lastPersistErrorCode = failure.code;
+      console.error('Failed to synchronously persist SQLite database', error);
+    }
+    return true;
   }
 
   /**
@@ -765,6 +792,13 @@ export class DatabaseManager {
   }
 
   public executeTransaction<T>(callback: (db: DatabaseManager) => T): T {
+    if (this.transactionDepth === 0 && this.lastPersistError) {
+      throw new AppError(
+        `توقفت المعاملات لأن آخر عملية لم تُحفظ على القرص: ${this.lastPersistError}`,
+        'DATABASE_PERSIST_FAILED',
+        true,
+      );
+    }
     const db = this.getDatabase();
     const depth = this.transactionDepth;
     const isOuterTransaction = depth === 0;
@@ -773,22 +807,30 @@ export class DatabaseManager {
     else db.exec(`SAVEPOINT ${savepoint};`);
     this.transactionDepth++;
     let depthReleased = false;
+    let committed = false;
     try {
       const result = callback(this);
       this.transactionDepth--;
       depthReleased = true;
       if (isOuterTransaction) {
         db.exec('COMMIT;');
+        committed = true;
         this.clearQueryCache();
         this.saveToStorage();
+        if (this.lastPersistError) {
+          throw new AppError(`تعذر تثبيت المعاملة على القرص: ${this.lastPersistError}`,
+            'DATABASE_PERSIST_FAILED', true);
+        }
       } else {
         db.exec(`RELEASE SAVEPOINT ${savepoint};`);
       }
       return result;
     } catch (error) {
       if (!depthReleased) this.transactionDepth--;
-      this.rollbackTransaction(db, isOuterTransaction, savepoint);
-      console.error('Transaction rolled back due to error:', error);
+      if (!committed) this.rollbackTransaction(db, isOuterTransaction, savepoint);
+      console.error(committed
+        ? 'Transaction committed in memory but could not be persisted:'
+        : 'Transaction rolled back due to error:', error);
       throw toAppError(error, 'DATABASE_TRANSACTION_FAILED');
     }
   }

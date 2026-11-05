@@ -12,7 +12,7 @@ const { registerPrintingHandlers } = require('./printing');
 const { registerDatabaseHandlers } = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
 const { registerDocumentHandlers } = require('./documentHandlers');
-const { isAllowedAppUrl, isAllowedIpcSender } = require('./security');
+const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl } = require('./security');
 const { installGracefulClose } = require('./gracefulShutdown');
 const { createHttpSyncClient, createSyncRelay } = require('./syncRelay');
 const { resolveCentralRequest, sanitizeCentralHeaders } = require('./centralApi');
@@ -201,14 +201,22 @@ function createWindow() {
 
   // Security: Prevent arbitrary new windows, open approved external web links in OS browser
   win.webContents.setWindowOpenHandler(({ url }) => {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        shell.openExternal(url);
-      }
-    } catch {
-      // Invalid URL ignored
+    if (url === 'about:blank') {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          webPreferences: {
+            preload: path.join(__dirname, 'print-preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+            webSecurity: true,
+            allowRunningInsecureContent: false,
+          },
+        },
+      };
     }
+    openExternalUrl(shell, url);
     return { action: 'deny' };
   });
 
@@ -309,10 +317,11 @@ registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
+const PRELOAD_INTEGRITY_SHA256 = 'cd420a4bc152972704afa97cc5c39d1ad851c60b1e16f5d19f529caa778be599';
 ipcMain.handle('security:check-integrity', async (event) => {
   validateIpcSender(event);
   return integrityChecker.verifyManifest({
-    'electron/preload.js': integrityChecker.hashFile('electron/preload.js'),
+    'electron/preload.js': PRELOAD_INTEGRITY_SHA256,
   });
 });
 registerSyncClientConfigHandlers({

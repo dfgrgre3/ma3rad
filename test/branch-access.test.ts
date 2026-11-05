@@ -203,7 +203,7 @@ test('migration assigns existing local users a safe branch and keeps admins cent
   assert.equal(branchRegister.branchId, branch.id);
   const created = new AuthService().createUser({
     username: 'branch-scope-new-user',
-    password: 'TestPass123',
+    password: 'TestPass123!',
     fullName: 'Branch Scope User',
     role: 'CASHIER',
   });

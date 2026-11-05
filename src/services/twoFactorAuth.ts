@@ -374,6 +374,16 @@ class TwoFactorAuthService {
     return false;
   }
 
+  verifyLoginCodeSync(userId: string, code: string): boolean {
+    const normalized = String(code ?? '').replace(/\s+/g, '');
+    if (/^[a-f\d]{5}-?[a-f\d]{5}$/i.test(normalized)) {
+      return this.verify2FASync(userId, normalized.toLowerCase(), 'recovery');
+    }
+    const row = this.getRow(userId);
+    if (!row) return false;
+    return this.verify2FASync(userId, normalized, row.algorithm === 'HOTP' ? 'hotp' : 'totp');
+  }
+
   /** Accept a recovery code once, then remove its hash. */
   private consumeRecoveryCode(row: TwoFactorRow, code: string): boolean {
     if (!code) return false;
@@ -400,7 +410,10 @@ class TwoFactorAuthService {
     return true;
   }
 
-  async disable2FA(userId: string): Promise<void> {
+  async disable2FA(userId: string, code: string): Promise<void> {
+    if (!this.verifyLoginCodeSync(userId, code)) {
+      throw new Error('رمز التحقق الثنائي غير صحيح.');
+    }
     this.db().run(`UPDATE user_2fa SET enabled = 0, updated_at = ? WHERE user_id = ?`, [
       new Date().toISOString(),
       userId,
@@ -408,19 +421,15 @@ class TwoFactorAuthService {
   }
 
   /**
-   * Enable 2FA for a user. When `code` is supplied the pending secret must be
-   * proven first; otherwise the caller is responsible for having verified it.
+   * Enable 2FA only after proving control of the pending authenticator secret.
    */
   async enable2FA(userId: string, algorithm: 'TOTP' | 'HOTP' = 'TOTP', code?: string): Promise<void> {
-    let row = this.getRow(userId);
-    if (!row) {
-      await this.setup2FA(userId, algorithm);
-      row = this.getRow(userId);
-      if (!row) throw new Error('تعذر إعداد التحقق الثنائي.');
-      if (code && !this.verifyCode(row, code, algorithm)) {
-        throw new Error('رمز التحقق الثنائي غير صحيح.');
-      }
-    } else if (code && !this.verifyCode(row, code, row.algorithm)) {
+    const row = this.getRow(userId);
+    if (!row) throw new Error('ابدأ إعداد التحقق الثنائي قبل تأكيده.');
+    if (Number(row.enabled) === 1) throw new Error('التحقق الثنائي مفعّل بالفعل.');
+    if (row.algorithm !== algorithm) throw new Error('نوع تطبيق المصادقة لا يطابق الإعداد المعلّق.');
+    const type = algorithm === 'HOTP' ? 'hotp' : 'totp';
+    if (!code || !this.verify2FASync(userId, code, type)) {
       throw new Error('رمز التحقق الثنائي غير صحيح.');
     }
 
@@ -429,19 +438,6 @@ class TwoFactorAuthService {
       `UPDATE user_2fa SET enabled = 1, algorithm = ?, period = ?, setup_date = COALESCE(setup_date, ?), updated_at = ? WHERE user_id = ?`,
       [algorithm, algorithm === 'TOTP' ? DEFAULT_PERIOD : 0, now, now, userId]
     );
-  }
-
-  private verifyCode(row: TwoFactorRow, code: string, algorithm: 'TOTP' | 'HOTP'): boolean {
-    const normalized = String(code ?? '').replace(/\s+/g, '');
-    if (algorithm === 'HOTP') {
-      return safeEqual(generateHOTP(row.secret, Number(row.counter) || 0), normalized);
-    }
-    const period = Number(row.period) || DEFAULT_PERIOD;
-    const counter = Math.floor(Date.now() / 1000 / period);
-    for (let drift = -TOTP_DRIFT_STEPS; drift <= TOTP_DRIFT_STEPS; drift += 1) {
-      if (safeEqual(generateTOTP(row.secret, (counter + drift) * period, period), normalized)) return true;
-    }
-    return false;
   }
 
   async getStatus(userId: string): Promise<{ enabled: boolean; setupDate?: string; algorithm: TwoFactorConfig['algorithm'] }> {

@@ -136,6 +136,18 @@ test('desktop release builds require signing and target configured update channe
   assert.equal(packageConfig.build.win.verifyUpdateCodeSignature, true);
   assert.equal(packageConfig.build.mac.forceCodeSigning, true);
   assert.equal(packageConfig.build.publish[0].provider, 'github');
+  for (const scriptName of [
+    'electron:publish:x64',
+    'electron:publish:mac',
+    'electron:publish:linux',
+  ]) {
+    const script = packageConfig.scripts[scriptName];
+    assert.ok(script.indexOf('bundle:secure') >= 0, `${scriptName} must regenerate bytecode`);
+    assert.ok(
+      script.indexOf('bundle:secure') < script.indexOf('--publish always'),
+      `${scriptName} must generate bytecode before publishing`,
+    );
+  }
   assert.match(packageConfig.scripts['electron:publish:mac'], /--mac --publish always/);
   assert.match(packageConfig.scripts['electron:publish:linux'], /--linux --publish always/);
 });

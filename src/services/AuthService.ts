@@ -6,6 +6,7 @@ import { PermissionService } from './PermissionService';
 import { CentralUsageLimitService } from './CentralUsageLimitService';
 import { BranchAccessService } from './BranchAccessService';
 import { twoFactorAuth } from './twoFactorAuth';
+import { getConfiguredPasswordPolicy } from './passwordPolicy';
 
 /** Raised when the password was correct but a second factor is required. */
 export class TwoFactorRequiredError extends Error {
@@ -252,8 +253,9 @@ export class AuthService {
   }
 
   public static validatePasswordPolicy(password: string, username?: string): void {
-    if (!password || password.length < 8) {
-      throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+    const policy = getConfiguredPasswordPolicy();
+    if (!password || password.length < policy.minLength) {
+      throw new Error(`كلمة المرور يجب أن تكون ${policy.minLength} أحرف على الأقل.`);
     }
     if (password === 'admin123') {
       throw new Error('لا يمكن استخدام كلمة المرور الافتراضية.');
@@ -261,10 +263,17 @@ export class AuthService {
     if (username && password.toLowerCase() === username.toLowerCase()) {
       throw new Error('لا يمكن أن تطابق كلمة المرور اسم المستخدم.');
     }
-    const hasLetter = /[a-zA-Z\u0600-\u06FF]/.test(password);
-    const hasDigit = /[0-9]/.test(password);
-    if (!hasLetter || !hasDigit) {
-      throw new Error('يجب أن تحتوي كلمة المرور على أحرف وأرقام معاً.');
+    if (!/[a-zA-Z\u0600-\u06FF]/.test(password)) {
+      throw new Error('يجب أن تحتوي كلمة المرور على حرف واحد على الأقل.');
+    }
+    if (policy.requireUppercase && !/[A-Z]/.test(password)) {
+      throw new Error('يجب أن تحتوي كلمة المرور على حرف إنجليزي كبير واحد على الأقل.');
+    }
+    if (policy.requireNumbers && !/[0-9]/.test(password)) {
+      throw new Error('يجب أن تحتوي كلمة المرور على رقم واحد على الأقل.');
+    }
+    if (policy.requireSpecialChars && !/[^a-zA-Z0-9\u0600-\u06FF\s]/.test(password)) {
+      throw new Error('يجب أن تحتوي كلمة المرور على رمز خاص واحد على الأقل.');
     }
   }
 
@@ -422,7 +431,8 @@ export class AuthService {
       if (!code) {
         throw new TwoFactorRequiredError(username);
       }
-      if (!twoFactorAuth.verify2FASync(userRecord.id, code, 'totp')) {
+      const normalizedCode = code.replace(/\s+/g, '');
+      if (!twoFactorAuth.verifyLoginCodeSync(userRecord.id, normalizedCode)) {
         AuthService.recordLogin(userRecord.id, username, false, 'TWO_FACTOR_FAILED');
         const updated = AuthService.getLoginGuardStatus(username);
         if (updated.isLocked) {

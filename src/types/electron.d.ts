@@ -7,10 +7,20 @@ declare global {
       db?: {
         load?: () => Promise<Uint8Array | null>;
         save?: (bytes: Uint8Array) => Promise<{ ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string }>;
+        saveSync?: (bytes: Uint8Array) => { ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string };
         decryptLocalBackup?: (bytes: Uint8Array) => Promise<Uint8Array>;
         encryptXlsxBackup?: (bytes: Uint8Array, password: string) => Promise<Uint8Array>;
         decryptXlsxBackup?: (bytes: Uint8Array, password: string) => Promise<Uint8Array>;
-        backup?: (label?: string) => Promise<{ ok: boolean; path?: string; bytes?: number; error?: string }>;
+        backup?: (label?: string) => Promise<{
+          ok: boolean;
+          path?: string;
+          bytes?: number;
+          error?: string;
+          strategy?: {
+            actions: Array<{ type: string; target: string | null; status: string; description: string }>;
+            recommendations: Array<{ type: string; action: string }>;
+          };
+        }>;
         removeBackup?: (fileName: string) => Promise<{ ok: boolean; deleted: boolean; error?: string }>;
         preserveCorrupt?: () => Promise<{ path: string; bytes: number }>;
         createFreshAfterRecovery?: () => Promise<{ ok: boolean; path?: string }>;
