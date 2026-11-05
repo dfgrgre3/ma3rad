@@ -21,6 +21,7 @@ const filesToCompile = [
   'syncClientConfig.js',
   'syncRelay.js',
   'gracefulShutdown.js',
+  'autoUpdater.js',
   'safeStorageCompat.js',
   'security/crypto.js',
   'security/licenseValidator.js',

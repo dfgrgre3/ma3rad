@@ -70,9 +70,32 @@ const previousRange = (from: string, to: string): { from: string; to: string } =
  * Read-only data source for the report center. Every method is branch scoped
  * through BranchAccessService and enforces the reports.view permission.
  */
+// Report query cache with TTL to accelerate heavy multi-table aggregations
+interface CacheEntry {
+  expiresAt: number;
+  result: ReportResult;
+}
+const reportCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 15_000; // 15 seconds cache window
+
 export class ReportCenterService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+
+  public static clearCache(): void {
+    reportCache.clear();
+  }
+
+  private withCache(key: string, compute: () => ReportResult): ReportResult {
+    const now = Date.now();
+    const hit = reportCache.get(key);
+    if (hit && hit.expiresAt > now) {
+      return hit.result;
+    }
+    const result = compute();
+    reportCache.set(key, { expiresAt: now + CACHE_TTL_MS, result });
+    return result;
+  }
 
   private actor() {
     const actor = AuthService.requireAuth();
@@ -1896,6 +1919,176 @@ export class ReportCenterService {
       rows: result,
       notes: ['استخدم هذه الأزواج في عروض «اشتري ده وخد ده» وترتيب الرفوف.'],
     };
+  }
+
+  // --------------------------------------------------------------------------
+  // New Enhanced Reports: Cash Flow Detailed & Sales Rep Performance
+  // --------------------------------------------------------------------------
+
+  public cashFlowDetailed(params: ReportParams): ReportResult {
+    return this.withCache(`cashFlowDetailed:${params.from}:${params.to}:${params.registerId || 'all'}`, () => {
+      this.actor();
+      const scope = this.allBranchesScope();
+      const regFilter = params.registerId ? 'AND crt.register_id = ?' : '';
+      const queryParams = params.registerId
+        ? [params.from, params.to, params.registerId, ...scope.params]
+        : [params.from, params.to, ...scope.params];
+
+      let rows: any[] = [];
+      try {
+        rows = this.db.query<any>(
+          `SELECT
+             crt.created_at AS transDate,
+             crt.type AS transType,
+             crt.category AS category,
+             crt.amount AS amount,
+             crt.description AS description,
+             crt.reference_type AS refType,
+             crt.reference_id AS refId,
+             cr.name AS registerName,
+             u.name AS userName
+           FROM cash_register_transactions crt
+           LEFT JOIN cash_registers cr ON cr.id = crt.register_id
+           LEFT JOIN users u ON u.id = crt.created_by
+           WHERE date(crt.created_at) BETWEEN ? AND ?
+             ${regFilter}
+             AND ${scope.clause}
+           ORDER BY crt.created_at DESC`,
+          queryParams
+        );
+      } catch {
+        rows = [];
+      }
+
+      let totalIn = 0;
+      let totalOut = 0;
+
+      const formattedRows = rows.map((r) => {
+        const amt = num(r.amount);
+        const isIn = r.transType === 'IN' || amt > 0;
+        const absAmt = Math.abs(amt);
+        if (isIn) {
+          totalIn += absAmt;
+        } else {
+          totalOut += absAmt;
+        }
+
+        return {
+          transDate: String(r.transDate || '').slice(0, 16).replace('T', ' '),
+          registerName: r.registerName || 'الخزينة العامة',
+          category: r.category || (isIn ? 'مقبوضات' : 'مدفوعات'),
+          description: r.description || (isIn ? 'تحصيل نقدي' : 'صرف نقدي'),
+          inflow: isIn ? round2(absAmt) : 0,
+          outflow: !isIn ? round2(absAmt) : 0,
+          userName: r.userName || '—',
+          status: isIn ? 'وارد' : 'منصرف',
+        };
+      });
+
+      const netCash = round2(totalIn - totalOut);
+
+      return {
+        kpis: [
+          { label: 'إجمالي المقبوضات (وارد)', value: round2(totalIn), tone: 'success' },
+          { label: 'إجمالي المصروفات (منصرف)', value: round2(totalOut), tone: 'danger' },
+          { label: 'صافي التدفق النقدي', value: netCash, tone: netCash >= 0 ? 'success' : 'danger' },
+          { label: 'عدد العمليات النقدية', value: rows.length, tone: 'neutral' },
+        ],
+        columns: [
+          { key: 'transDate', label: 'التاريخ والوقت', type: 'text' },
+          { key: 'registerName', label: 'الخزينة' },
+          { key: 'category', label: 'التصنيف' },
+          { key: 'description', label: 'البيان / الوصف' },
+          { key: 'inflow', label: 'وارد (+)', type: 'currency' },
+          { key: 'outflow', label: 'منصرف (-)', type: 'currency' },
+          { key: 'userName', label: 'المستخدم' },
+          { key: 'status', label: 'الحركة', type: 'badge' },
+        ],
+        rows: formattedRows,
+        notes: ['تقرير التدفق النقدي التفصيلي يوضح كل حركة نقدية صادرة وواردة ومصدرها خلال الفترة.'],
+      };
+    });
+  }
+
+  public salesRepPerformance(params: ReportParams): ReportResult {
+    return this.withCache(`salesRepPerformance:${params.from}:${params.to}`, () => {
+      this.actor();
+      const scope = this.salesScope();
+      let rows: any[] = [];
+      try {
+        rows = this.db.query<any>(
+          `SELECT
+             COALESCE(u.name, 'غير محدد') AS repName,
+             COALESCE(u.email, '') AS repEmail,
+             COUNT(si.id) AS invoiceCount,
+             COALESCE(SUM(si.grand_total), 0) AS totalSales,
+             COALESCE(SUM(si.paid_amount), 0) AS totalCollected,
+             COALESCE(SUM(si.grand_total - si.paid_amount), 0) AS totalPending,
+             COALESCE(SUM(
+               (SELECT SUM(sii.subtotal - (sii.quantity * COALESCE(p.cost_price, 0)))
+                FROM sale_invoice_items sii
+                LEFT JOIN products p ON p.id = sii.product_id
+                WHERE sii.invoice_id = si.id)
+             ), 0) AS estimatedProfit
+           FROM sale_invoices si
+           LEFT JOIN users u ON u.id = si.created_by
+           WHERE date(si.invoice_date) BETWEEN ? AND ?
+             AND si.status != 'CANCELLED'
+             AND ${scope.clause}
+           GROUP BY u.id, u.name
+           ORDER BY totalSales DESC`,
+          [params.from, params.to, ...scope.params]
+        );
+      } catch {
+        rows = [];
+      }
+
+      const totalSalesAll = sum(rows, 'totalSales');
+      const totalCollectedAll = sum(rows, 'totalCollected');
+      const totalProfitAll = sum(rows, 'estimatedProfit');
+
+      const mapped = rows.map((r) => {
+        const sales = num(r.totalSales);
+        const col = num(r.totalCollected);
+        const profit = num(r.estimatedProfit);
+        const colRate = sales > 0 ? round2((col / sales) * 100) : 0;
+        const margin = sales > 0 ? round2((profit / sales) * 100) : 0;
+
+        return {
+          repName: r.repName,
+          invoiceCount: num(r.invoiceCount),
+          totalSales: round2(sales),
+          totalCollected: round2(col),
+          totalPending: round2(num(r.totalPending)),
+          collectionRate: colRate,
+          estimatedProfit: round2(profit),
+          profitMargin: margin,
+          performanceBadge: colRate >= 80 ? 'ممتاز' : colRate >= 50 ? 'متوسط' : 'يحتاج متابعة',
+        };
+      });
+
+      return {
+        kpis: [
+          { label: 'إجمالي مبيعات الفريق', value: round2(totalSalesAll), tone: 'info' },
+          { label: 'إجمالي التحصيلات', value: round2(totalCollectedAll), tone: 'success' },
+          { label: 'إجمالي الأرباح المقدرة', value: round2(totalProfitAll), tone: 'success' },
+          { label: 'مندوب الصدارة', value: mapped[0]?.totalSales || 0, hint: mapped[0]?.repName || '—', tone: 'neutral' },
+        ],
+        columns: [
+          { key: 'repName', label: 'المندوب / المسؤول' },
+          { key: 'invoiceCount', label: 'عدد الفواتير', type: 'number' },
+          { key: 'totalSales', label: 'إجمالي المبيعات', type: 'currency' },
+          { key: 'totalCollected', label: 'المحصل', type: 'currency' },
+          { key: 'totalPending', label: 'المتبقي / آجل', type: 'currency' },
+          { key: 'collectionRate', label: 'نسبة التحصيل', type: 'percent' },
+          { key: 'estimatedProfit', label: 'الأرباح التقديرية', type: 'currency' },
+          { key: 'profitMargin', label: 'هامش الربح', type: 'percent' },
+          { key: 'performanceBadge', label: 'التقييم', type: 'badge' },
+        ],
+        rows: mapped,
+        notes: ['يقيس التقرير إنتاجية ونشاط مندوبي المبيعات ونسبة التحصيل والربحية التقديرية لكل موظف.'],
+      };
+    });
   }
 
   public demandForecast({ to }: ReportParams): ReportResult {

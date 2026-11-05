@@ -37,6 +37,7 @@ class PerformanceMonitorService {
   private metricsBuffer: PerformanceMetrics[] = [];
   private alerts: Alert[] = [];
   private readonly maxBuffer = 1000;
+  private monitoringTimer: ReturnType<typeof setInterval> | null = null;
   private thresholds: PerformanceThresholds = {
     maxDbAccessTimeMs: 500,
     maxDbSizeMB: 500,
@@ -45,9 +46,7 @@ class PerformanceMonitorService {
     maxErrorRate: 5 // percentage
   };
 
-  private constructor() {
-    this.startMonitoring();
-  }
+  private constructor() {}
 
   static getInstance(): PerformanceMonitorService {
     if (!PerformanceMonitorService.instance) {
@@ -57,14 +56,16 @@ class PerformanceMonitorService {
   }
 
   async startMonitoring(): Promise<void> {
-    if (this.initialized) return;
-    this.initialized = true;
+    if (this.monitoringTimer) return;
 
     // مراقبة كل 10 دقائق
-    setInterval(async () => {
-      const metrics = await this.collectMetrics();
-      this.recordMetric(metrics);
-      this.checkThresholds(metrics);
+    this.monitoringTimer = setInterval(() => {
+      void this.collectMetrics()
+        .then((metrics) => {
+          this.recordMetric(metrics);
+          this.checkThresholds(metrics);
+        })
+        .catch((error) => console.error('Performance monitoring failed:', error));
     }, 10 * 60 * 1000);
 
     // جمع أولي
@@ -72,7 +73,10 @@ class PerformanceMonitorService {
     this.recordMetric(initialMetrics);
   }
 
-  private initialized = false;
+  stopMonitoring(): void {
+    if (this.monitoringTimer) clearInterval(this.monitoringTimer);
+    this.monitoringTimer = null;
+  }
 
   private async collectMetrics(): Promise<PerformanceMetrics> {
     // يمكن استخدام `measure` API

@@ -73,7 +73,7 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
       ) : (
         cart.map((item, index) => (
           <CartLine
-            key={item.product.id}
+            key={`${item.product.id}-${index}`}
             item={item}
             index={index}
             enableNegativeStock={enableNegativeStock}

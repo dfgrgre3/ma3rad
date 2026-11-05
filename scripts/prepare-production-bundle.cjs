@@ -17,6 +17,7 @@ const compiledFiles = [
   'syncClientConfig',
   'syncRelay',
   'gracefulShutdown',
+  'autoUpdater',
   'safeStorageCompat',
 ];
 

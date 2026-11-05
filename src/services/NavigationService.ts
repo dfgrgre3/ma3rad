@@ -11,6 +11,7 @@ import { AppConfigService } from './AppConfigService';
 import { CentralLicenseService } from './CentralLicenseService';
 import { CentralFeaturePermissionService } from './CentralFeaturePermissionService';
 import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
+import { ROUTE_PERMISSIONS } from '../config/routePermissions';
 
 export interface NavOverrides {
   hidden: string[];
@@ -48,50 +49,7 @@ export class NavigationService {
   };
 
   private static readonly routePermissions: Array<{ path: string; all?: string[]; any?: string[] }> = [
-    { path: '/admin/data-deletion', all: ['admin.data.delete'] },
-    { path: '/admin/sync-conflicts', all: ['admin.view'] },
-    { path: '/central-activation', all: ['admin.license.manage'] },
-    { path: '/data-import/types', all: ['settings.view'] },
-    { path: '/products/catalog', any: ['products.view', 'categories.view', 'brands.view'] },
-    { path: '/products', all: ['products.view'] },
-    { path: '/categories', all: ['categories.view'] },
-    { path: '/brands', all: ['brands.view'] },
-    { path: '/crm/hub', any: ['crm.view', 'customers.view'] },
-    { path: '/crm/dashboard', all: ['crm.view'] },
-    { path: '/crm/leads', all: ['crm.view'] },
-    { path: '/crm/pipeline', all: ['crm.view'] },
-    { path: '/crm/activities', all: ['crm.view'] },
-    { path: '/crm/campaigns', all: ['crm.view'] },
-    { path: '/customers/imported-products', all: ['sales.view'] },
-    { path: '/customers/ready-deliveries', all: ['sales.view'] },
-    { path: '/customers', all: ['customers.view'] },
-    { path: '/purchases/returns', all: ['purchases.return'] },
-    { path: '/purchases/statement', all: ['finance.debts.view'] },
-    { path: '/purchases', all: ['purchases.view'] },
-    { path: '/suppliers', all: ['suppliers.view'] },
-    { path: '/inventory/hub', any: ['inventory.view', 'inventory.transfer', 'inventory.count', 'inventory.adjust'] },
-    { path: '/inventory/warehouse-stock', all: ['inventory.view'] },
-    { path: '/inventory/showroom-stock', all: ['inventory.view'] },
-    { path: '/inventory/ledger', all: ['inventory.view'] },
-    { path: '/inventory/transfers', all: ['inventory.transfer'] },
-    { path: '/inventory/counts', all: ['inventory.count'] },
-    { path: '/inventory/valuation', all: ['inventory.view'] },
-    { path: '/inventory/adjustments', all: ['inventory.adjust'] },
-    { path: '/inventory/stock-reservations', all: ['inventory.view'] },
-    { path: '/inventory/reorder-planning', all: ['inventory.view'] },
-    { path: '/inventory/locations', all: ['inventory.view'] },
-    { path: '/inventory/damage-quarantine', all: ['inventory.adjust'] },
-    { path: '/inventory/reconciliation', all: ['inventory.view'] },
-    { path: '/inventory', all: ['inventory.view'] },
-    { path: '/contracts', all: ['contracts.view'] },
-    { path: '/documents', any: ['documents.view', 'contracts.view'] },
-    { path: '/finance/debts', all: ['finance.debts.view'] },
-    { path: '/finance/receivables', any: ['finance.debts.view', 'finance.receivables.view', 'finance.installments.view', 'finance.installments.manage'] },
-    { path: '/finance/other-receivables', any: ['finance.view', 'finance.receivables.view'] },
-    { path: '/finance/installments', all: ['finance.view'] },
-    { path: '/crm', any: ['crm.view', 'customers.view'] },
-    { path: '/dashboard/executive', all: ['dashboard.view'] },
-    { path: '/tools', all: ['dashboard.view'] },
+    ...ROUTE_PERMISSIONS,
   ];
 
   public static getRequiredPermission(pathname: string): string | null {

@@ -5,7 +5,10 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { MIGRATIONS } from '../src/database/migrations.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
+import { CustomerService } from '../src/services/CustomerService.ts';
+import { LoyaltyService } from '../src/services/LoyaltyService.ts';
 import { PricingService, type PromotionCartItem } from '../src/services/PricingService.ts';
+import { SalesService } from '../src/services/SalesService.ts';
 import { localDateString } from '../src/utils/date.ts';
 
 test('promotions created in pricing evaluate to the same discounts POS applies', async () => {
@@ -64,4 +67,58 @@ test('promotions created in pricing evaluate to the same discounts POS applies',
   canonicalize.up(manager.getDatabase());
   assert.equal(pricing.evaluatePromotions(cart)?.promotionId, 'legacy-promo');
   assert.equal(pricing.evaluatePromotions(cart)?.discountAmount, 5);
+});
+
+test('sales reject POS discounts that exceed the net item subtotal', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const customer = new CustomerService().createCustomer({
+    name: 'عميل حد خصم نقطة البيع',
+    phone: '0122222399',
+    customerType: 'RETAIL',
+    creditLimit: 0,
+  });
+  db.run(
+    `INSERT INTO products (id, sku, barcode, name, category_id, brand_id, grade, size,
+       base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2,
+       wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active)
+     VALUES ('prod_pos_discount_limit', 'SKU-POS-DISCOUNT', 'BAR-POS-DISCOUNT', 'صنف اختبار الخصم',
+       'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 10, 1)`
+  );
+  db.run(
+    `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+     VALUES ('stk_pos_discount_limit', 'wh_main', 'prod_pos_discount_limit', 10, 0)`
+  );
+
+  assert.throws(
+    () => new SalesService().createSale({
+      customerId: customer.id,
+      warehouseId: 'wh_main',
+      items: [{
+        productId: 'prod_pos_discount_limit',
+        soldBy: 'M2',
+        quantityM2: 1,
+        boxesCount: 1,
+        piecesCount: 0,
+        unitPrice: 300,
+      }],
+      discountAmount: 301,
+      paidAmount: 0,
+      paymentType: 'CASH',
+    }),
+    /إجمالي الخصم يتجاوز صافي قيمة الأصناف/
+  );
+
+  const loyalty = new LoyaltyService();
+  loyalty.initializeCustomerLoyalty(customer.id);
+  loyalty.earnPoints({
+    customerId: customer.id,
+    points: 15,
+    referenceType: 'SALES_INVOICE',
+    referenceId: 'invoice-loyalty-test',
+  });
+  assert.equal(loyalty.getRedeemablePointBalance(customer.id), 15);
 });

@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { ProductService } from '../../services/ProductService';
 import { SettingsService } from '../../services/SettingsService';
+import { usePermission } from '../../hooks/usePermission';
 import { Product } from '../../types';
 
 interface LabelSettings {

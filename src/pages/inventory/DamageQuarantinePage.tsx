@@ -8,11 +8,13 @@ import { InventoryService } from '../../services/InventoryService';
 import { ProductService } from '../../services/ProductService';
 import { useToast } from '../../components/ui/Toast';
 import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel } from '../../utils/productUnits';
+import { usePermission } from '../../hooks/usePermission';
 
 export const DamageQuarantinePage: React.FC = () => {
   const inventoryService = new InventoryService();
   const productService = new ProductService();
   const toast = useToast();
+  const canManage = usePermission()('inventory.damage.manage');
 
   const [items, setItems] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
@@ -70,6 +72,7 @@ export const DamageQuarantinePage: React.FC = () => {
   }, [selectedWarehouseId, categoryFilter, statusFilter]);
 
   const handleOpenCreate = () => {
+    if (!canManage) return;
     setCreateForm({
       warehouseId: selectedWarehouseId || warehouses[0]?.id || '',
       productId: allProducts[0]?.id || '',
@@ -82,6 +85,7 @@ export const DamageQuarantinePage: React.FC = () => {
 
   const handleCreateSpecial = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (Number(createForm.quantityM2) <= 0) {
       toast.error('الكمية يجب أن تكون أكبر من صفر.');
       return;
@@ -104,7 +108,7 @@ export const DamageQuarantinePage: React.FC = () => {
 
   const handleInspectSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inspectingItem) return;
+    if (!canManage || !inspectingItem) return;
     try {
       inventoryService.inspectSpecialStock(inspectingItem.id, inspectionNotes);
       toast.success('تم توثيق تقرير الفحص الفني والجودة.');
@@ -117,7 +121,7 @@ export const DamageQuarantinePage: React.FC = () => {
 
   const handleResolveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resolvingItem) return;
+    if (!canManage || !resolvingItem) return;
     try {
       inventoryService.resolveSpecialStock(resolvingItem.id, resolutionAction, resolutionNotes);
       toast.success(
@@ -196,13 +200,15 @@ export const DamageQuarantinePage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/20 transition active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            تسجيل كسر / تالف / حجر
-          </button>
+          {canManage && (
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/20 transition active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              تسجيل كسر / تالف / حجر
+            </button>
+          )}
 
           <button
             onClick={loadData}
@@ -359,7 +365,7 @@ export const DamageQuarantinePage: React.FC = () => {
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <div className="flex items-center justify-center gap-1.5">
-                      {row.status === 'RECORDED' && (
+                      {canManage && row.status === 'RECORDED' && (
                         <button
                           onClick={() => {
                             setInspectingItem(row);
@@ -372,7 +378,7 @@ export const DamageQuarantinePage: React.FC = () => {
                         </button>
                       )}
 
-                      {!['WRITTEN_OFF', 'RESTORED_TO_STOCK'].includes(row.status) && (
+                      {canManage && !['WRITTEN_OFF', 'RESTORED_TO_STOCK'].includes(row.status) && (
                         <button
                           onClick={() => {
                             setResolvingItem(row);
@@ -402,7 +408,7 @@ export const DamageQuarantinePage: React.FC = () => {
       </div>
 
       {/* Record Damage / Quarantine Modal */}
-      {showCreateModal && (
+      {canManage && showCreateModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
             <h3 className="font-black text-slate-900 text-sm mb-3">تسجيل بضاعة تالفة / كسر / حجر صحي</h3>
@@ -500,7 +506,7 @@ export const DamageQuarantinePage: React.FC = () => {
       )}
 
       {/* Inspect Modal */}
-      {inspectingItem && (
+      {canManage && inspectingItem && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100">
             <h3 className="font-black text-slate-900 text-sm mb-2">فحص ومعاينة البضاعة المعزولة</h3>
@@ -540,7 +546,7 @@ export const DamageQuarantinePage: React.FC = () => {
       )}
 
       {/* Resolution Modal */}
-      {resolvingItem && (
+      {canManage && resolvingItem && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100">
             <h3 className="font-black text-slate-900 text-sm mb-2">معالجة واتخاذ قرار بشأن التالف</h3>

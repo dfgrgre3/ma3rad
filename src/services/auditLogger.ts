@@ -67,6 +67,7 @@ class AuditLoggerService {
   private logs: AuditLog[] = [];
   private maxLogs: number = 10000;  // الحد الأقصى للسجلات
   private flushInterval: number = 5 * 60 * 1000;  // كل 5 دقائق
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
 
   private constructor() {
     this.loadLogs();
@@ -82,6 +83,7 @@ class AuditLoggerService {
 
   private loadLogs(): void {
     try {
+      if (typeof localStorage === 'undefined') return;
       const stored = localStorage.getItem('audit_logs');
       if (stored) {
         this.logs = JSON.parse(stored);
@@ -94,6 +96,7 @@ class AuditLoggerService {
 
   private saveLogs(): void {
     try {
+      if (typeof localStorage === 'undefined') return;
       localStorage.setItem('audit_logs', JSON.stringify(this.logs.slice(-this.maxLogs)));
     } catch (error) {
       console.error('فشل حفظ سجلات التدقيق:', error);
@@ -106,7 +109,13 @@ class AuditLoggerService {
   }
 
   private startScheduledFlush(): void {
-    setInterval(() => this.saveLogs(), this.flushInterval);
+    if (this.flushTimer) return;
+    this.flushTimer = setInterval(() => this.saveLogs(), this.flushInterval);
+  }
+
+  stopScheduledFlush(): void {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    this.flushTimer = null;
   }
 
   /**
@@ -166,6 +175,7 @@ class AuditLoggerService {
 
   private emitAlert(logEntry: AuditLog): void {
     // إشعار النظام بالتفاعل مع المشاكل
+    if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
     const event = new CustomEvent('audit-alert', { detail: logEntry });
     window.dispatchEvent(event);
   }

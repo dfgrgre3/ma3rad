@@ -21,11 +21,11 @@ export function shouldShowFirstRunSetup(evidence: FirstRunSetupEvidence): boolea
  *
  * أعِد القيمة إلى false لاستعادة السلوك الإنتاجي الكامل.
  */
-export const BYPASS_FIRST_RUN_SETUP = true;
+export const BYPASS_FIRST_RUN_SETUP = false;
 
 /**
  * فتح كل الصفحات بعد تسجيل الدخول: تجاوز بوابات الوحدات المفعّلة، وإعدادات
  * المظهر، والقوائم/الصفحات المخفية من المنصة المركزية.
  * أعِد القيمة إلى false لاستعادة التقييد الطبيعي.
  */
-export const OPEN_ALL_PAGES = true;
+export const OPEN_ALL_PAGES = false;

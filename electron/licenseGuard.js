@@ -4,6 +4,7 @@ const fsSync = require('fs');
 const { safeStorage } = require('electron');
 const { getHardwareId } = require('./hardwareId');
 const { LicenseValidator } = require('./security/licenseValidator');
+const safeStorageCompat = require('./safeStorageCompat');
 
 class LicenseGuard {
   constructor(appDataDir, options = {}) {
@@ -31,14 +32,16 @@ class LicenseGuard {
    */
   async verifySystemClock() {
     try {
+      if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+        return { valid: false, reason: 'secure_storage_unavailable' };
+      }
       const now = Date.now();
       if (fsSync.existsSync(this.timeCheckFile)) {
         const encrypted = await fs.readFile(this.timeCheckFile);
         let lastTime = 0;
-        if (safeStorage.isEncryptionAvailable()) {
-          lastTime = Number(safeStorage.decryptString(encrypted));
-        } else {
-          lastTime = Number(Buffer.from(encrypted.toString(), 'base64').toString('utf8'));
+        lastTime = Number(await safeStorageCompat.decryptString(safeStorage, encrypted));
+        if (!Number.isFinite(lastTime) || lastTime <= 0) {
+          return { valid: false, reason: 'invalid_clock_record' };
         }
 
         // إذا كان الوقت الحالي أقل من آخر وقت مسجل بأكثر من 15 دقيقة (Clock rollback)
@@ -49,14 +52,13 @@ class LicenseGuard {
 
       // تحديث آخر وقت مسجل
       const timeStr = String(now);
-      const dataToSave = safeStorage.isEncryptionAvailable()
-        ? safeStorage.encryptString(timeStr)
-        : Buffer.from(timeStr).toString('base64');
+      let dataToSave;
+      dataToSave = await safeStorageCompat.encryptString(safeStorage, timeStr);
       await fs.writeFile(this.timeCheckFile, dataToSave);
 
       return { valid: true };
     } catch {
-      return { valid: true }; // عدم إعاقة النظام في حال خطأ عابر بالملف
+      return { valid: false, reason: 'clock_check_failed' };
     }
   }
 
@@ -86,12 +88,10 @@ class LicenseGuard {
     };
 
     const json = JSON.stringify(boundData);
-    let encrypted;
-    if (safeStorage.isEncryptionAvailable()) {
-      encrypted = safeStorage.encryptString(json);
-    } else {
-      encrypted = Buffer.from(json, 'utf8');
+    if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+      return { ok: false, error: 'secure_storage_unavailable', message: 'لا يمكن حفظ الترخيص لأن التخزين الآمن للنظام غير متاح.' };
     }
+    const encrypted = await safeStorageCompat.encryptString(safeStorage, json);
 
     await fs.writeFile(this.licenseFile, encrypted);
     return { ok: true, hwid };
@@ -115,11 +115,10 @@ class LicenseGuard {
 
       const encrypted = await fs.readFile(this.licenseFile);
       let jsonStr;
-      if (safeStorage.isEncryptionAvailable()) {
-        jsonStr = safeStorage.decryptString(encrypted);
-      } else {
-        jsonStr = encrypted.toString('utf8');
+      if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+        return { active: false, reason: 'secure_storage_unavailable', hwid: this.licenseMode === 'account' ? null : getHardwareId() };
       }
+      jsonStr = await safeStorageCompat.decryptString(safeStorage, encrypted);
 
       const license = JSON.parse(jsonStr);
       const currentHwid = options.currentHwid === undefined ? getHardwareId() : options.currentHwid;
@@ -239,8 +238,8 @@ class LicenseGuard {
   }
 }
 
-function registerLicenseHandlers({ ipcMain, validateIpcSender, appDataDir }) {
-  const guard = new LicenseGuard(appDataDir);
+function registerLicenseHandlers({ ipcMain, validateIpcSender, appDataDir, licenseMode }) {
+  const guard = new LicenseGuard(appDataDir, { licenseMode });
 
   ipcMain.handle('license:get-hwid', async (event) => {
     validateIpcSender(event);

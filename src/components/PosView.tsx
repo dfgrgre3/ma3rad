@@ -197,6 +197,8 @@ export const PosView: React.FC = () => {
     setCustomers,
     applyCustomerPricing,
     setSelectedCustomer,
+    setRedeemPoints,
+    setLoyaltyDiscount,
     name: newCustName,
     setName: setNewCustName,
     phone: newCustPhone,
@@ -287,6 +289,12 @@ export const PosView: React.FC = () => {
     setPaidAmount,
     paymentType,
     setPaymentType,
+    couponCode,
+    setCouponCode,
+    redeemPoints,
+    setRedeemPoints,
+    loyaltyDiscount,
+    setLoyaltyDiscount,
     setIsHeldModalOpen,
     notify,
   });
@@ -304,6 +312,9 @@ export const PosView: React.FC = () => {
     setShippingCost(0);
     setNotes('');
     setPaidAmount(0);
+    setCouponCode('');
+    setRedeemPoints(0);
+    setLoyaltyDiscount(0);
   };
 
   const {
@@ -333,6 +344,7 @@ export const PosView: React.FC = () => {
     setAppliedPromotion,
     couponCode,
     setCouponCode,
+    redeemPoints,
     setRedeemPoints,
     taxPercentage,
     taxAmount,
@@ -613,8 +625,19 @@ export const PosView: React.FC = () => {
           customerSearch={customerSearch}
           filteredCustomers={filteredCustomers}
           canCreateCustomer={can('customers.create')}
-          onCustomerSearchChange={(value) => { setCustomerSearch(value); setSelectedCustomer(null); }}
-          onSelectCustomer={(customer) => { setSelectedCustomer(customer); applyCustomerPricing(customer); setCustomerSearch(''); }}
+          onCustomerSearchChange={(value) => {
+            setCustomerSearch(value);
+            setSelectedCustomer(null);
+            setRedeemPoints(0);
+            setLoyaltyDiscount(0);
+          }}
+          onSelectCustomer={(customer) => {
+            setSelectedCustomer(customer);
+            applyCustomerPricing(customer);
+            setCustomerSearch('');
+            setRedeemPoints(0);
+            setLoyaltyDiscount(0);
+          }}
           onCreateNewCustomer={() => { setCustomerError(''); setIsCustomerModalOpen(true); }}
           cart={cart}
           cartQuantitySummary={cartQuantitySummary}
@@ -657,15 +680,36 @@ export const PosView: React.FC = () => {
           setCouponCode={setCouponCode}
           appliedPromotion={appliedPromotion}
           selectedCustomer={selectedCustomer}
+          canRedeemPoints={can('loyalty.redeem')}
           redeemPoints={redeemPoints}
           setRedeemPoints={setRedeemPoints}
           onRedeemPoints={() => {
-            if (!redeemPoints || redeemPoints <= 0 || !selectedCustomer) return;
+            if (!selectedCustomer) {
+              notify('اختر العميل قبل تطبيق نقاط الولاء', 'warning');
+              return;
+            }
+            if (!Number.isInteger(redeemPoints) || redeemPoints < 0) {
+              notify('أدخل عددًا صحيحًا موجبًا من النقاط، أو صفرًا لإلغاء الخصم', 'error');
+              return;
+            }
+            if (!can('loyalty.redeem')) {
+              notify('لا تملك صلاحية استبدال نقاط الولاء', 'error');
+              return;
+            }
             try {
-              loyaltyService.redeemPoints({ customerId: selectedCustomer.id, points: redeemPoints, referenceType: 'SALES_INVOICE', description: 'استبدال نقاط' });
+              if (redeemPoints === 0) {
+                setLoyaltyDiscount(0);
+                notify('تم إلغاء خصم نقاط الولاء', 'info');
+                return;
+              }
+              const availablePoints = loyaltyService.getRedeemablePointBalance(selectedCustomer.id);
+              if (redeemPoints > availablePoints) {
+                notify(`رصيد الولاء غير كافٍ: المتاح ${availablePoints} نقطة`, 'error');
+                return;
+              }
               setLoyaltyDiscount(redeemPoints);
-              notify(`تم استبدال ${redeemPoints} نقطة`, 'success');
-            } catch (e: any) { notify(e?.message || 'فشل الاستبدال', 'error'); }
+              notify(`تم تطبيق خصم ${redeemPoints} ج.م من النقاط؛ ستُخصم النقاط عند حفظ الفاتورة`, 'success');
+            } catch (e: any) { notify(e?.message || 'تعذر التحقق من رصيد نقاط الولاء', 'error'); }
           }}
           paidAmount={paidAmount}
           setPaidAmount={setPaidAmount}

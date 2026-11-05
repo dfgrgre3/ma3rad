@@ -62,6 +62,34 @@ test('successful save closes normally without force-destroying the window', asyn
   assert.equal(approvedCloseCount, 1);
 });
 
+test('failed close preparation is reported and retried before the window closes', async () => {
+  const win = createWindow();
+  const ipcMain = new EventEmitter();
+  let saveRequests = 0;
+  win.webContents.send = (_channel, request) => {
+    saveRequests++;
+    ipcMain.emit('app:close-ready', { sender: win.webContents }, { ...request, ok: true });
+  };
+  let prepareAttempts = 0;
+  const dialog = { showMessageBox: async () => ({ response: 0 }) };
+  installGracefulClose({
+    win,
+    ipcMain,
+    dialog,
+    validateIpcSender: () => {},
+    timeoutMs: 100,
+    onApprovedClose: async () => {
+      prepareAttempts++;
+      if (prepareAttempts === 1) throw new Error('rollback backup failed');
+    },
+  });
+
+  triggerClose(win);
+  await waitFor(() => win.destroyed);
+  assert.equal(saveRequests, 2);
+  assert.equal(prepareAttempts, 2);
+});
+
 test('save failure can be retried and only closes after a successful confirmation', async () => {
   const win = createWindow();
   const ipcMain = new EventEmitter();

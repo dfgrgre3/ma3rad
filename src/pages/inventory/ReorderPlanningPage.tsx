@@ -8,10 +8,14 @@ import { InventoryService } from '../../services/InventoryService';
 import { PurchaseRequestService } from '../../services/PurchaseRequestService';
 import { useToast } from '../../components/ui/Toast';
 import { getStockQuantityLabel } from '../../utils/productUnits';
+import { usePermission } from '../../hooks/usePermission';
 
 export const ReorderPlanningPage: React.FC = () => {
   const inventoryService = new InventoryService();
   const toast = useToast();
+  const can = usePermission();
+  const canManage = can('inventory.reorder.manage');
+  const canCreatePurchaseRequest = can('purchases.create') || canManage;
 
   const [items, setItems] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
@@ -67,6 +71,7 @@ export const ReorderPlanningPage: React.FC = () => {
   const totalSuggestedValue = items.reduce((sum, i) => sum + (i.suggestedOrderValue || 0), 0);
 
   const toggleSelect = (productId: string) => {
+    if (!canCreatePurchaseRequest) return;
     const next = new Set(selectedProductIds);
     if (next.has(productId)) next.delete(productId);
     else next.add(productId);
@@ -74,6 +79,7 @@ export const ReorderPlanningPage: React.FC = () => {
   };
 
   const selectAllCritical = () => {
+    if (!canCreatePurchaseRequest) return;
     const criticalIds = items
       .filter(i => i.stockStatus === 'OUT_OF_STOCK' || i.stockStatus === 'CRITICAL' || i.stockStatus === 'REORDER_NEEDED')
       .map(i => i.productId);
@@ -81,6 +87,7 @@ export const ReorderPlanningPage: React.FC = () => {
   };
 
   const handleEditThresholds = (item: any) => {
+    if (!canManage) return;
     setEditItem(item);
     setEditForm({
       reorderPoint: item.reorderPoint,
@@ -93,7 +100,7 @@ export const ReorderPlanningPage: React.FC = () => {
 
   const handleSaveThresholds = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editItem) return;
+    if (!canManage || !editItem) return;
     try {
       inventoryService.updateProductPlanningParameters(editItem.productId, editForm);
       toast.success('تم تحديث محددات التخطيط وإعادة الطلب بنجاح.');
@@ -105,6 +112,7 @@ export const ReorderPlanningPage: React.FC = () => {
   };
 
   const handleCreatePurchaseRequest = () => {
+    if (!canCreatePurchaseRequest) return;
     const selectedItemsList = items.filter(i => selectedProductIds.has(i.productId) && i.suggestedOrderM2 > 0);
     if (selectedItemsList.length === 0) {
       toast.warning('اختر أصنافاً بها كميات إعادة طلب مقترحة.');
@@ -170,7 +178,7 @@ export const ReorderPlanningPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {selectedProductIds.size > 0 && (
+          {canCreatePurchaseRequest && selectedProductIds.size > 0 && (
             <button
               onClick={handleCreatePurchaseRequest}
               disabled={creatingPO}
@@ -181,12 +189,14 @@ export const ReorderPlanningPage: React.FC = () => {
             </button>
           )}
 
-          <button
-            onClick={selectAllCritical}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
-          >
-            تحديد الأصناف الحرجة
-          </button>
+          {canCreatePurchaseRequest && (
+            <button
+              onClick={selectAllCritical}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
+            >
+              تحديد الأصناف الحرجة
+            </button>
+          )}
 
           <button
             onClick={loadData}
@@ -307,15 +317,17 @@ export const ReorderPlanningPage: React.FC = () => {
             <thead className="bg-slate-100/70 text-[11px] font-black text-slate-500 border-b border-slate-200 sticky top-0 z-10 backdrop-blur-sm">
               <tr>
                 <th className="px-3 py-3 w-10 text-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedProductIds.size > 0 && selectedProductIds.size === filteredItems.length}
-                    onChange={(e) => {
-                      if (e.target.checked) setSelectedProductIds(new Set(filteredItems.map(i => i.productId)));
-                      else setSelectedProductIds(new Set());
-                    }}
-                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                  />
+                  {canCreatePurchaseRequest && (
+                    <input
+                      type="checkbox"
+                      checked={selectedProductIds.size > 0 && selectedProductIds.size === filteredItems.length}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedProductIds(new Set(filteredItems.map(i => i.productId)));
+                        else setSelectedProductIds(new Set());
+                      }}
+                      className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                    />
+                  )}
                 </th>
                 <th className="px-3 py-3">الصنف / الكود</th>
                 <th className="px-3 py-3">المخزن</th>
@@ -335,12 +347,14 @@ export const ReorderPlanningPage: React.FC = () => {
                 return (
                   <tr key={`${item.productId}-${item.warehouseId}`} className={`hover:bg-slate-50/80 transition ${isSelected ? 'bg-sky-50/40' : ''}`}>
                     <td className="px-3 py-2.5 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(item.productId)}
-                        className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                      />
+                      {canCreatePurchaseRequest && (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(item.productId)}
+                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        />
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="font-black text-slate-900">{item.productName}</div>
@@ -399,13 +413,15 @@ export const ReorderPlanningPage: React.FC = () => {
                       {getStatusBadge(item.stockStatus)}
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      <button
-                        onClick={() => handleEditThresholds(item)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 transition"
-                        title="تعديل الحدود ونقاط الطلب"
-                      >
-                        <SlidersHorizontal className="w-4 h-4" />
-                      </button>
+                      {canManage && (
+                        <button
+                          onClick={() => handleEditThresholds(item)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 transition"
+                          title="تعديل الحدود ونقاط الطلب"
+                        >
+                          <SlidersHorizontal className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -424,7 +440,7 @@ export const ReorderPlanningPage: React.FC = () => {
       </div>
 
       {/* Edit Thresholds Modal */}
-      {editItem && (
+      {canManage && editItem && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">

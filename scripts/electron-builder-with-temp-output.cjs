@@ -35,23 +35,33 @@ function buildWithTemporaryOutput(args) {
     return;
   }
 
+  const windowsBuild = args.includes('--win');
+  const publisherName = process.env.CERAMISYS_PUBLISHER_NAME?.trim();
+  if (windowsBuild && !publisherName) {
+    throw new Error(
+      'CERAMISYS_PUBLISHER_NAME must match the Windows signing certificate publisher for signed builds and update verification.',
+    );
+  }
+
   const temporaryOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-electron-builder-'));
   const temporaryConfig = `${temporaryOutput}.json`;
   let succeeded = false;
 
   try {
-    const buildConfig = {
-      ...packageJson.build,
+    const windowsBuildConfig = {
+      ...packageJson.build.win,
+      ...(windowsBuild ? { publisherName } : {}),
       ...(legacyWin7
         ? {
-            electronVersion: '22.3.27',
-            win: {
-              ...packageJson.build.win,
-              target: [{ target: 'nsis', arch: ['ia32'] }],
-              artifactName: 'CeramiSys-Setup-${version}-x86.${ext}',
-            },
+            target: [{ target: 'nsis', arch: ['ia32'] }],
+            artifactName: 'CeramiSys-Setup-${version}-x86.${ext}',
           }
         : {}),
+    };
+    const buildConfig = {
+      ...packageJson.build,
+      ...(legacyWin7 ? { electronVersion: '22.3.27' } : {}),
+      ...(windowsBuild ? { win: windowsBuildConfig } : {}),
       directories: {
         ...packageJson.build.directories,
         output: temporaryOutput,

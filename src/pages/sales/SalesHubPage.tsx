@@ -29,11 +29,11 @@ const TABS: WorkspaceHubTab[] = [
 
 const REQUIRED_PERMISSION: Record<string, string> = {
   invoices: 'sales.view',
-  analytics: 'sales.view',
-  cycle: 'sales.view',
-  statement: 'finance.debts.view',
-  'orders-deposits': 'sales.view',
-  'after-sales': 'sales.view',
+  analytics: 'sales.analytics.view',
+  cycle: 'sales.cycle.view',
+  statement: 'sales.statement.view',
+  'orders-deposits': 'sales.orders_deposits.view',
+  'after-sales': 'sales.after_sales.view',
   quotations: 'quotations.view',
   orders: 'orders.view',
   returns: 'returns.view',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Search, CheckSquare, Square, ShoppingCart } from 'lucide-react';
 import type { Product } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
@@ -25,6 +25,14 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
   multiSelectEnabled = false,
 }) => {
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const visibleIds = new Set(products.map((product) => product.id));
+    setSelectedProductIds((previous) => {
+      const next = new Set([...previous].filter((id) => visibleIds.has(id)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [products]);
 
   const toggleSelect = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -107,7 +115,11 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
             {products.map((p) => {
               const available = stockOf(p.id);
               const isLow = p.minStockLevel > 0 && available <= p.minStockLevel;
-              const inCart = cart.find((c) => c.product.id === p.id);
+              const inCartQuantityM2 = cart.reduce(
+                (quantity, item) => item.product.id === p.id ? quantity + item.quantityM2 : quantity,
+                0
+              );
+              const inCart = inCartQuantityM2 > 0;
               const isSelected = selectedProductIds.has(p.id);
 
               return (
@@ -138,13 +150,13 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
 
                   {inCart && !multiSelectEnabled && (
                     <span className="absolute top-0 left-0 bg-sky-600 text-white text-[10px] font-black px-2 py-0.5 rounded-br-xl">
-                      في السلة: {formatProductQuantity(inCart.quantityM2, p)}
+                      في السلة: {formatProductQuantity(inCartQuantityM2, p)}
                     </span>
                   )}
 
                   {inCart && multiSelectEnabled && (
                     <span className="absolute top-0 left-8 bg-sky-600 text-white text-[10px] font-black px-2 py-0.5 rounded-b-lg shadow-sm">
-                      في السلة: {formatProductQuantity(inCart.quantityM2, p)}
+                      في السلة: {formatProductQuantity(inCartQuantityM2, p)}
                     </span>
                   )}
 
@@ -195,7 +207,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
                     </span>
                     {inCart && (
                       <span className="text-slate-500">
-                        {formatProductQuantity(inCart.quantityM2, p)}
+                        {formatProductQuantity(inCartQuantityM2, p)}
                       </span>
                     )}
                   </div>

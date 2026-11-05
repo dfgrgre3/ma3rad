@@ -1,15 +1,32 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  BarChart2,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Loader2,
+  Printer,
   RefreshCw,
   Search,
   SlidersHorizontal,
+  Table,
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 import { localDateString } from '../../utils/date';
-import { exportToExcel } from '../../utils/export';
+import { exportToExcel, exportToPdf } from '../../utils/export';
 import { useToast } from '../../components/ui/Toast';
 import { DatabaseManager } from '../../database/db';
 import { BranchAccessService } from '../../services/BranchAccessService';
@@ -90,6 +107,10 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
+  const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
+
   const products = useMemo(() => {
     if (!definition.controls?.some((control) => control.kind === 'product')) return [];
     try {
@@ -124,7 +145,12 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
     setFilters({});
     setSort(null);
     setSearch('');
+    setCurrentPage(1);
   }, [definition.id]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filters, from, to, asOf]);
 
   useEffect(() => {
     if (definition.controls?.some((control) => control.kind === 'product') && productOptions(filters, products)) {
@@ -177,6 +203,26 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
     });
   };
 
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, currentPage, pageSize]);
+
+  // Chart data extraction (top 8 numeric entries)
+  const chartData = useMemo(() => {
+    if (!rows.length || !columns.length) return [];
+    const numCol = columns.find(c => c.type === 'currency' || c.type === 'number' || c.type === 'qty');
+    const labelCol = columns.find(c => c.type !== 'currency' && c.type !== 'number' && c.type !== 'qty' && c.type !== 'date') || columns[0];
+    if (!numCol || !labelCol) return [];
+
+    return rows.slice(0, 10).map(r => ({
+      name: String(r[labelCol.key] || 'غير محدد').slice(0, 18),
+      value: Math.abs(Number(r[numCol.key]) || 0),
+      label: numCol.label,
+    }));
+  }, [rows, columns]);
+
   const handleExport = () => {
     if (!result) return;
     try {
@@ -186,10 +232,30 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
         columns: result.columns.map((column) => ({ key: column.key, label: column.label })),
         rows,
         fileName: definition.id,
+        kpis: result.kpis?.map(k => ({ label: k.label, value: KPI_VALUE(k.value), hint: k.hint })),
+        notes: result.notes,
         permission: 'reports.export',
       });
     } catch (caught: any) {
       toast.error(caught?.message || 'تعذر تصدير التقرير.');
+    }
+  };
+
+  const handlePrint = () => {
+    if (!result) return;
+    try {
+      exportToPdf({
+        title: definition.title,
+        subtitle: `${definition.dateMode === 'range' ? `${from} إلى ${to}` : `كما في ${asOf}`}`,
+        columns: result.columns.map((column) => ({ key: column.key, label: column.label, type: column.type, align: column.align })),
+        rows,
+        fileName: definition.id,
+        kpis: result.kpis?.map(k => ({ label: k.label, value: KPI_VALUE(k.value), hint: k.hint })),
+        notes: result.notes,
+        permission: 'reports.export',
+      });
+    } catch (caught: any) {
+      toast.error(caught?.message || 'تعذر طباعة التقرير.');
     }
   };
 
@@ -216,12 +282,40 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex rounded-xl border border-slate-200 bg-slate-100 p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
+                viewMode === 'table' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Table className="h-3.5 w-3.5" /> جدول
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('chart')}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition ${
+                viewMode === 'chart' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BarChart2 className="h-3.5 w-3.5" /> رسم بياني
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setFilters((current) => ({ ...current }))}
             className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
           >
             <RefreshCw className="h-4 w-4" /> تحديث
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={!result || rows.length === 0}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Printer className="h-4 w-4" /> طباعة / PDF
           </button>
           <button
             type="button"
@@ -338,6 +432,44 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
               </div>
             ) : null}
 
+            {viewMode === 'chart' && chartData.length > 0 ? (
+              <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-5">
+                <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="text-sm font-black">تحليل بياني (أعلى العناصر)</h3>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    مقارنة: {chartData[0]?.label || ''}
+                  </span>
+                </div>
+                <div className="h-72 w-full" dir="ltr">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis
+                        dataKey="name"
+                        stroke="#64748b"
+                        fontSize={11}
+                        interval={0}
+                        angle={-25}
+                        textAnchor="end"
+                      />
+                      <YAxis stroke="#64748b" fontSize={11} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0f172a',
+                          borderRadius: '8px',
+                          color: '#fff',
+                          border: 'none',
+                          fontSize: '12px',
+                        }}
+                        formatter={(val: any) => [numberFormatter.format(Number(val) || 0), chartData[0]?.label || 'القيمة']}
+                      />
+                      <Bar dataKey="value" fill="#0d9488" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : null}
+
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
                 <h3 className="text-sm font-black">{definition.title}</h3>
@@ -345,7 +477,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                   {definition.dateMode === 'range' ? `${from} → ${to}` : definition.dateMode === 'asOf' ? `كما في ${asOf}` : 'الأرصدة الحالية'}
                 </span>
               </div>
-              <div className="max-h-[62vh] overflow-auto">
+              <div className="max-h-[60vh] overflow-auto">
                 <table className="w-full text-right text-xs">
                   <thead className="sticky top-0 z-10 bg-white shadow-sm">
                     <tr className="border-b border-slate-200">
@@ -364,7 +496,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {rows.map((row, index) => (
+                    {pagedRows.map((row, index) => (
                       <tr key={index} className="transition hover:bg-slate-50/70">
                         {columns.map((column) => {
                           const value = row[column.key];
@@ -398,6 +530,35 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                   </tbody>
                 </table>
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2.5">
+                  <div className="text-[11px] font-bold text-slate-500">
+                    عرض {((currentPage - 1) * pageSize) + 1} إلى {Math.min(currentPage * pageSize, rows.length)} من إجمالي {rows.length} سجل
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={currentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="px-2 text-xs font-bold text-slate-600">
+                      صفحة {currentPage} من {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

@@ -47,6 +47,19 @@ contextBridge.exposeInMainWorld('ceramisys', {
     },
     notifyCloseReady: (requestId, result) => ipcRenderer.send('app:close-ready', { ...result, requestId }),
   },
+  diagnostics: {
+    reportError: (report) => ipcRenderer.invoke('diagnostics:renderer-error', report),
+  },
+  updater: {
+    getStatus: () => ipcRenderer.invoke('app:update-status'),
+    check: () => ipcRenderer.invoke('app:update-check'),
+    install: () => ipcRenderer.invoke('app:update-install'),
+    onStatus: (callback) => {
+      const handler = (_event, status) => callback(status);
+      ipcRenderer.on('app:update-status', handler);
+      return () => ipcRenderer.removeListener('app:update-status', handler);
+    },
+  },
   printing: {
     listPrinters: () => ipcRenderer.invoke('print:listPrinters'),
     raw: (bytes, printerName, options) => ipcRenderer.invoke('print:raw', {

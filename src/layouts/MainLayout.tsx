@@ -12,7 +12,6 @@ import { AppConfigRuntime } from '../components/config/AppConfigRuntime';
 import { ConfigSection } from '../components/config/ConfigSection';
 import { ConfigText } from '../components/config/ConfigText';
 import { useTheme } from '../contexts/ThemeContext';
-import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 import {
   getPersistedScrollPosition,
   saveNavigationLocation,
@@ -47,8 +46,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   });
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const required = NavigationService.getRequiredPermissionGroups(location.pathname);
-  const isAllowed = OPEN_ALL_PAGES
-    || !required
+  // الصلاحيات تُطبَّق دائماً على مستوى المسار: حتى في وضع «فتح كل الصفحات»
+  // (الذي يتجاوز الوحدات/المظهر/قيود المنصة) لا يمكن تجاوز صلاحيات المستخدم.
+  const isAllowed = !required
     || required.all.every((permission) => PermissionService.can(currentUser, permission))
       && (!required.any.length || required.any.some((permission) => PermissionService.can(currentUser, permission)));
   const fallbackPath = isAllowed ? null : NavigationService.getFirstAccessiblePath(currentUser) ?? '/not-found';

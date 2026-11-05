@@ -4,11 +4,16 @@ import {
   Globe, X, CheckCircle, AlertCircle, Package, Loader2
 } from 'lucide-react';
 import { BrandService, BrandWithCount } from '../../services/BrandService';
+import { usePermission } from '../../hooks/usePermission';
 
 // Singleton instance to prevent re-creation on every render
 const brandService = new BrandService();
 
 export const BrandsPage: React.FC = () => {
+  const can = usePermission();
+  const canCreate = can('brands.create');
+  const canUpdate = can('brands.update');
+  const canDelete = can('brands.delete');
   const [brands, setBrands] = useState<BrandWithCount[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,13 +128,15 @@ export const BrandsPage: React.FC = () => {
           </h2>
           <p className="text-xs text-slate-500 mt-1">إدارة ماركات المنتجات والشركات المصنعة وتصنيفاتها</p>
         </div>
-        <button
-          onClick={handleOpenAddModal}
-          className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/20 transition-all active:scale-95 text-sm self-start md:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>إضافة ماركة جديدة</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={handleOpenAddModal}
+            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/20 transition-all active:scale-95 text-sm self-start md:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة ماركة جديدة</span>
+          </button>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -197,14 +204,14 @@ export const BrandsPage: React.FC = () => {
                   </div>
                   
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
-                    <button
+                    {canUpdate && <button
                       onClick={() => handleOpenEditModal(brand)}
                       className="p-1.5 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 transition-colors"
                       title="تعديل"
                     >
                       <Edit className="w-4 h-4" />
-                    </button>
-                    <button
+                    </button>}
+                    {canDelete && <button
                       onClick={() => handleDelete(brand)}
                       disabled={brand.productCount > 0}
                       className={`p-1.5 rounded-lg transition-colors ${
@@ -215,7 +222,7 @@ export const BrandsPage: React.FC = () => {
                       title={brand.productCount > 0 ? "لا يمكن الحذف: مرتبطة بمنتجات" : "حذف الماركة"}
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </button>}
                   </div>
                 </div>
 

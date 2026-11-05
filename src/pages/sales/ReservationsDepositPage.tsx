@@ -33,9 +33,12 @@ interface ReservationsDepositPageProps { mode?: ReservationPageMode; }
 export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = ({ mode = 'sales' }) => {
   const toast = useToast();
   const can = usePermission();
-  const canViewPage = can(mode === 'sales' ? 'sales.view' : 'inventory.view');
+  const canViewOrdersDeposits = can('sales.orders_deposits.view');
+  const canManageOrdersDeposits = can('sales.orders_deposits.manage');
+  const canConvertOrder = can('orders.convert');
+  const canViewReservations = can('inventory.reservations.view') || can('inventory.view');
+  const canViewPage = mode === 'sales' ? canViewOrdersDeposits : canViewReservations;
   const canAdjustInventory = can('inventory.adjust');
-  const canCreateSales = can('sales.create');
   const resService = useMemo(() => new ReservationService(), []);
   const orderService = useMemo(() => new OrderService(), []);
   const printService = useMemo(() => new PrintService(), []);
@@ -116,6 +119,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
 
   // Handle release reservation
   const handleRelease = (id: string) => {
+    if (!canAdjustInventory) return;
     if (!window.confirm('هل أنت متأكد من إلغاء فك حجز هذه الكمية وإعادتها للمخزون الحر؟')) return;
     try {
       resService.releaseReservation(id, 'RELEASED');
@@ -128,6 +132,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
 
   // Handle consume reservation
   const handleConsume = (id: string) => {
+    if (!canAdjustInventory) return;
     if (!window.confirm('هل تريد تأكيد صرف الكمية المحجوزة من المخزن فعلياً؟')) return;
     try {
       resService.consumeReservation(id);
@@ -141,6 +146,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   // Handle create reservation
   const handleCreateReservation = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAdjustInventory) return;
     if (!newResForm.productId || !newResForm.warehouseId || !newResForm.quantityM2) {
       toast.warning('يرجى ملء جميع الحقول الإلزامية.');
       return;
@@ -179,6 +185,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   // Handle Record Deposit
   const handleSaveDeposit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageOrdersDeposits) return;
     if (!depositModalOrder) return;
     const amount = Number(depositAmount);
     if (!amount || amount <= 0) {
@@ -207,6 +214,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
 
   // Handle Convert Order to Invoice
   const handleConvertToInvoice = (order: Order) => {
+    if (!canConvertOrder) return;
     if (order.status === 'COMPLETED') {
       toast.info('هذا الطلب تم إصدار فاتورة له مسبقاً.');
       return;
@@ -311,8 +319,8 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
         /* Orders & Deposits Table */
         <OrdersDepositsTable
           orders={orders}
-          canCreate={canCreateSales}
-          canInvoice={canCreateSales}
+          canCreate={canManageOrdersDeposits}
+          canInvoice={canConvertOrder}
           onRecordDeposit={(order) => {
             setDepositModalOrder(order);
             setDepositAmount('');
@@ -331,7 +339,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
       )}
 
       {/* Modal: Record Deposit */}
-      {mode === 'sales' && canCreateSales && depositModalOrder && (
+      {mode === 'sales' && canManageOrdersDeposits && depositModalOrder && (
         <DepositModal
           order={depositModalOrder}
           amount={depositAmount}

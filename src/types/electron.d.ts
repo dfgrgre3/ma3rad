@@ -115,6 +115,42 @@ declare global {
         onBeforeClose?: (callback: (requestId: number) => void | Promise<void>) => () => void;
         notifyCloseReady?: (requestId: number, result: { ok: boolean; error?: string }) => void;
       };
+      diagnostics?: {
+        reportError?: (report: { kind: string; message: string; stack?: string }) => Promise<{ ok: boolean }>;
+      };
+      updater?: {
+        getStatus?: () => Promise<{
+          status: 'idle' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+          currentVersion: string;
+          version?: string;
+          releaseName?: string;
+          releaseNotes?: string;
+          mandatory?: boolean;
+          progress?: number;
+          error?: string;
+        }>;
+        check?: () => Promise<{
+          status: 'idle' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+          currentVersion: string;
+          version?: string;
+          releaseName?: string;
+          releaseNotes?: string;
+          mandatory?: boolean;
+          progress?: number;
+          error?: string;
+        }>;
+        install?: () => Promise<{ ok: boolean }>;
+        onStatus?: (callback: (status: {
+          status: 'idle' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+          currentVersion: string;
+          version?: string;
+          releaseName?: string;
+          releaseNotes?: string;
+          mandatory?: boolean;
+          progress?: number;
+          error?: string;
+        }) => void) => () => void;
+      };
       printing?: {
         listPrinters?: () => Promise<{ ok: boolean; printers: string[]; error?: string }>;
         raw?: (

@@ -9,6 +9,7 @@ import { NotificationService, Notification, NotificationType } from '../../servi
 import { NotificationPreferencesService } from '../../services/NotificationPreferencesService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { usePermission } from '../../hooks/usePermission';
 
 export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,7 +21,10 @@ export const NotificationsPage: React.FC = () => {
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
   const notificationService = new NotificationService();
-  const canManageNotifications = PermissionService.can(AuthService.getCurrentUser(), 'notifications.manage');
+  const can = usePermission();
+  const canManageNotifications = can('notifications.manage');
+  const canCheckStock = can('inventory.view');
+  const canViewCustomers = can('customers.view');
   const preferencesService = new NotificationPreferencesService();
   const preferenceOptions: Array<{ key: keyof UpdateNotificationPreferencesDTO; label: string }> = [
     { key: 'lowStockAlerts', label: 'تنبيهات المخزون المنخفض والنافد' },
@@ -87,6 +91,7 @@ export const NotificationsPage: React.FC = () => {
   };
 
   const handleCheckLowStock = () => {
+    if (!canCheckStock) return;
     notificationService.checkLowStockAlerts();
     loadData();
   };
@@ -153,6 +158,7 @@ export const NotificationsPage: React.FC = () => {
           <p className="text-xs text-slate-500">تنبيهات المخزون المنخفض والمستحقات والأحداث المهمة</p>
         </div>
         <div className="flex gap-2">
+          {canCheckStock && (
           <button
             onClick={handleCheckLowStock}
             className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl flex items-center gap-2 text-sm transition"
@@ -160,6 +166,7 @@ export const NotificationsPage: React.FC = () => {
             <AlertTriangle className="w-4 h-4" />
             فحص المخزون
           </button>
+          )}
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllAsRead}
@@ -268,7 +275,7 @@ export const NotificationsPage: React.FC = () => {
                   </div>
                   <p className="text-xs text-slate-500 mt-1 line-clamp-2">{notif.message}</p>
                   <div className="text-[10px] text-slate-500 mt-2">{notif.createdAt}</div>
-                  {notif.type === 'INCOMPLETE_CUSTOMER' && notif.referenceId && (
+                  {canViewCustomers && notif.type === 'INCOMPLETE_CUSTOMER' && notif.referenceId && (
                     <button
                       onClick={() => handleNavigateToCustomer(notif)}
                       className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 px-3 py-1.5 text-[11px] font-black text-white transition"

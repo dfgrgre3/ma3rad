@@ -168,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Actions */}
       <div className="mr-auto flex shrink-0 flex-wrap items-center gap-1">
-        {branches.length > 0 && (
+        {branches.length > 1 && (
           <label className="flex h-7 w-[116px] max-w-[38vw] items-center gap-1 rounded-[2px] border border-[#a6a6a6] bg-white px-1 text-[#4d4d4d] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] sm:h-8 sm:w-auto sm:max-w-60 sm:gap-1.5 sm:px-2">
             <Building2 className="h-3.5 w-3.5 shrink-0 text-[#0078d4]" />
             <span className="hidden text-[10px] text-[#767676] lg:inline">الفرع</span>

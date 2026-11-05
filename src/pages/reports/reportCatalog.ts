@@ -463,6 +463,24 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     dateMode: 'range',
   },
 
+  {
+    id: 'sales-rep-performance',
+    title: 'أداء مندوبي وفريق المبيعات',
+    description: 'تحليل إنتاجية كل موظف ومندوب مبيعات: حجم المبيعات، نسب التحصيل، الأرباح التقديرية وتقييم الأداء.',
+    category: 'sales',
+    icon: Award,
+    dateMode: 'range',
+  },
+  {
+    id: 'cash-flow-detailed',
+    title: 'حركة التدفق النقدي التفصيلي',
+    description: 'كشف تفصيلي بكل المقبوضات والمدفوعات لجميع الخزائن وحركات النقدية مع الصافي.',
+    category: 'finance',
+    icon: DollarSign,
+    dateMode: 'range',
+    controls: [{ key: 'registerId', label: 'الخزينة', kind: 'register' }],
+  },
+
   // Forecast & analysis
   {
     id: 'demand-forecast',
@@ -560,6 +578,10 @@ export function runReport(id: string, params: ReportParams): ReportResult {
       return service.customerChurn(params);
     case 'basket':
       return service.basketAnalysis(params);
+    case 'sales-rep-performance':
+      return service.salesRepPerformance(params);
+    case 'cash-flow-detailed':
+      return service.cashFlowDetailed(params);
     default:
       throw new Error('تقرير غير معروف.');
   }

@@ -16,10 +16,14 @@ import { FinanceEnterpriseService } from '../../services/FinanceEnterpriseServic
 import type { BankAccount, BankReconciliation } from '../../types/finance';
 import { localDateString } from '../../utils/date';
 import { useToast } from '../../components/ui/Toast';
+import { usePermission } from '../../hooks/usePermission';
 
 export const BankReconciliationPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const toast = useToast();
+  const can = usePermission();
+  const canManage = can('finance.bank_reconciliation.manage');
+  const canManageAccounts = can('finance.accounts.manage');
 
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [selectedBankId, setSelectedBankId] = useState<string>('');
@@ -104,6 +108,7 @@ export const BankReconciliationPage: React.FC = () => {
   const variance = Math.round((numStatementBalance - bookBalance) * 100) / 100;
 
   const toggleCleared = (id: string) => {
+    if (!canManage) return;
     setClearedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -113,6 +118,7 @@ export const BankReconciliationPage: React.FC = () => {
   };
 
   const toggleAllCleared = () => {
+    if (!canManage) return;
     if (clearedIds.size === unreconciledItems.length) {
       setClearedIds(new Set());
     } else {
@@ -122,6 +128,7 @@ export const BankReconciliationPage: React.FC = () => {
 
   const handleCreateBank = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageAccounts) return;
     try {
       const id = service.saveBankAccount({
         accountName: bankForm.accountName,
@@ -143,7 +150,7 @@ export const BankReconciliationPage: React.FC = () => {
   };
 
   const handleReconcile = () => {
-    if (!selectedBankId) return;
+    if (!canManage || !selectedBankId) return;
     setSaving(true);
     try {
       const clearedList = unreconciledItems.filter((i) => clearedIds.has(i.id));
@@ -188,13 +195,15 @@ export const BankReconciliationPage: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => setShowBankModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>حساب بنكي جديد</span>
-          </button>
+          {canManageAccounts && (
+            <button
+              onClick={() => setShowBankModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>حساب بنكي جديد</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -264,12 +273,14 @@ export const BankReconciliationPage: React.FC = () => {
               <h2 className="text-sm font-bold text-slate-800">حركات الحساب في الدفاتر المحاسبية</h2>
               <p className="text-xs text-slate-500">حدد الحركات الظاهرة في كشف الحساب لمطابقتها</p>
             </div>
-            <button
-              onClick={toggleAllCleared}
-              className="text-xs font-semibold px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg transition"
-            >
-              {clearedIds.size === unreconciledItems.length ? 'إلغاء تحديد الكل' : 'تحديد كل الحركات'}
-            </button>
+            {canManage && (
+              <button
+                onClick={toggleAllCleared}
+                className="text-xs font-semibold px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg transition"
+              >
+                {clearedIds.size === unreconciledItems.length ? 'إلغاء تحديد الكل' : 'تحديد كل الحركات'}
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-auto max-h-[480px]">
@@ -301,14 +312,15 @@ export const BankReconciliationPage: React.FC = () => {
                       <tr
                         key={item.id}
                         onClick={() => toggleCleared(item.id)}
-                        className={`cursor-pointer transition ${isChecked ? 'bg-sky-50/60 font-semibold' : 'hover:bg-slate-50'}`}
+                        className={`transition ${canManage ? 'cursor-pointer' : ''} ${isChecked ? 'bg-sky-50/60 font-semibold' : canManage ? 'hover:bg-slate-50' : ''}`}
                       >
                         <td className="p-3 text-center">
                           <input
                             type="checkbox"
                             checked={isChecked}
+                            disabled={!canManage}
                             onChange={() => {}}
-                            className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
+                            className={`w-4 h-4 rounded text-sky-600 focus:ring-sky-500 ${canManage ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                           />
                         </td>
                         <td className="p-3 text-slate-600 font-mono">{item.date}</td>
@@ -376,13 +388,15 @@ export const BankReconciliationPage: React.FC = () => {
               />
             </div>
 
-            <button
-              onClick={handleReconcile}
-              disabled={saving}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50"
-            >
-              {saving ? 'جاري حفظ المطابقة...' : 'حفظ واعتماد المطابقة البنكية'}
-            </button>
+            {canManage && (
+              <button
+                onClick={handleReconcile}
+                disabled={saving}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition disabled:opacity-50"
+              >
+                {saving ? 'جاري حفظ المطابقة...' : 'حفظ واعتماد المطابقة البنكية'}
+              </button>
+            )}
           </div>
 
           {/* Past Reconciliations History */}
@@ -410,7 +424,7 @@ export const BankReconciliationPage: React.FC = () => {
       </div>
 
       {/* Modal: New Bank Account */}
-      {showBankModal && (
+      {canManageAccounts && showBankModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-800 mb-4">إضافة حساب بنكي جديد</h3>

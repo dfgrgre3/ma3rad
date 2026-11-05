@@ -15,10 +15,10 @@ import type { User } from '../src/types/identity.ts';
 test('reservation pages keep sales and inventory permission domains independent', () => {
   const page = fs.readFileSync(path.join(process.cwd(), 'src/pages/sales/ReservationsDepositPage.tsx'), 'utf8');
   const routes = fs.readFileSync(path.join(process.cwd(), 'src/router/routesList.tsx'), 'utf8');
-  assert.match(page, /canViewPage = can\(mode === 'sales' \? 'sales\.view' : 'inventory\.view'\)/);
+  assert.match(page, /canViewPage = mode === 'sales' \? canViewOrdersDeposits : canViewReservations/);
   assert.match(page, /if \(mode === 'inventory'\)[\s\S]*setOrders\(\[\]\)/);
   assert.match(page, /else \{[\s\S]*setReservations\(\[\]\)/);
-  assert.match(page, /canCreate=\{canCreateSales\}/);
+  assert.match(page, /canCreate=\{canManageOrdersDeposits\}/);
   assert.match(page, /canAdjust=\{canAdjustInventory\}/);
   assert.match(routes, /sales\/reservations', element: <Navigate to="\/sales\/orders-deposits"/);
   assert.match(routes, /inventory\/reservations', element: <Navigate to="\/inventory\/stock-reservations"/);

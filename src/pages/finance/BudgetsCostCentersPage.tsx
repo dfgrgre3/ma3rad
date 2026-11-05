@@ -17,11 +17,13 @@ import { FinanceEnterpriseService } from '../../services/FinanceEnterpriseServic
 import { FinanceExtrasService } from '../../services/FinanceExtrasService';
 import type { CostCenter, Budget, FiscalYear } from '../../types/finance';
 import { useToast } from '../../components/ui/Toast';
+import { usePermission } from '../../hooks/usePermission';
 
 export const BudgetsCostCentersPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const extrasService = useMemo(() => new FinanceExtrasService(), []);
   const toast = useToast();
+  const canManage = usePermission()('finance.budgets.manage');
 
   const [activeTab, setActiveTab] = useState<'budgets' | 'cost_centers' | 'variance'>('budgets');
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
@@ -87,6 +89,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
 
   const handleCreateCostCenter = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     try {
       service.saveCostCenter(costCenterForm);
       toast.success('تم إضافة مركز التكلفة بنجاح.');
@@ -100,6 +103,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
 
   const handleCreateBudget = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     try {
       const items = budgetForm.items
         .filter((i) => i.accountId && Number(i.allocatedAmount) > 0)
@@ -130,6 +134,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
   };
 
   const addBudgetItemRow = () => {
+    if (!canManage) return;
     setBudgetForm((prev) => ({
       ...prev,
       items: [...prev.items, { accountId: '', allocatedAmount: '' }],
@@ -137,6 +142,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
   };
 
   const removeBudgetItemRow = (idx: number) => {
+    if (!canManage) return;
     setBudgetForm((prev) => ({
       ...prev,
       items: prev.items.filter((_, i) => i !== idx),
@@ -173,28 +179,32 @@ export const BudgetsCostCentersPage: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => setShowCostCenterModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-          >
-            <FolderTree className="w-4 h-4" />
-            <span>مركز تكلفة جديد</span>
-          </button>
-          <button
-            onClick={() => {
-              setBudgetForm({
-                name: `موازنة ${new Date().getFullYear()}`,
-                fiscalYearId: fiscalYears[0]?.id || '',
-                costCenterId: '',
-                items: [{ accountId: chartAccounts[0]?.id || '', allocatedAmount: '50000' }],
-              });
-              setShowBudgetModal(true);
-            }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>موازنة تقديرية جديدة</span>
-          </button>
+          {canManage && (
+            <>
+              <button
+                onClick={() => setShowCostCenterModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+              >
+                <FolderTree className="w-4 h-4" />
+                <span>مركز تكلفة جديد</span>
+              </button>
+              <button
+                onClick={() => {
+                  setBudgetForm({
+                    name: `موازنة ${new Date().getFullYear()}`,
+                    fiscalYearId: fiscalYears[0]?.id || '',
+                    costCenterId: '',
+                    items: [{ accountId: chartAccounts[0]?.id || '', allocatedAmount: '50000' }],
+                  });
+                  setShowBudgetModal(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>موازنة تقديرية جديدة</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -405,7 +415,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
       )}
 
       {/* Modal: New Cost Center */}
-      {showCostCenterModal && (
+      {canManage && showCostCenterModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-800 mb-4">إضافة مركز تكلفة جديد</h3>
@@ -459,7 +469,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
       )}
 
       {/* Modal: New Budget Wizard */}
-      {showBudgetModal && (
+      {canManage && showBudgetModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
             <h3 className="text-base font-bold text-slate-800 mb-3">إعداد موازنة تقديرية جديدة</h3>

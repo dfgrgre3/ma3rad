@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck, Plus, Trash2, Pencil, Save, Search, Lock } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, Pencil, Save, Search, Lock, ListChecks, Eraser } from 'lucide-react';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { usePermission } from '../../hooks/usePermission';
@@ -26,6 +26,19 @@ export const AdminRolesTab: React.FC = () => {
 
   const catalog = useMemo(() => PermissionService.getCatalog(), []);
   const modules = useMemo(() => PermissionService.getModules(), []);
+  const moduleLabels = useMemo(() => PermissionService.getModuleLabels(), []);
+  const catalogByModule = useMemo(() => {
+    const grouped = new Map<string, typeof catalog>();
+    for (const permission of catalog) {
+      const list = grouped.get(permission.module) ?? [];
+      list.push(permission);
+      grouped.set(permission.module, list);
+    }
+    for (const list of grouped.values()) {
+      list.sort((a, b) => a.code.localeCompare(b.code));
+    }
+    return grouped;
+  }, [catalog]);
 
   const load = (keepSelection = true) => {
     try {
@@ -52,8 +65,11 @@ export const AdminRolesTab: React.FC = () => {
 
   const filteredPerms = (module: string) => {
     const term = search.trim().toLowerCase();
-    return catalog.filter(
-      (p) => p.module === module && (!term || p.name.toLowerCase().includes(term) || p.code.toLowerCase().includes(term))
+    const list = catalogByModule.get(module) ?? [];
+    return list.filter(
+      (p) => !term || p.name.toLowerCase().includes(term)
+        || p.code.toLowerCase().includes(term)
+        || moduleLabel(module).toLowerCase().includes(term)
     );
   };
 
@@ -82,6 +98,24 @@ export const AdminRolesTab: React.FC = () => {
     });
     setDirty(true);
   };
+
+  const selectAllVisible = () => {
+    if (!canManage || selected?.code === 'ADMIN') return;
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      for (const permission of catalog) next.add(permission.code);
+      return next;
+    });
+    setDirty(true);
+  };
+
+  const clearAllVisible = () => {
+    if (!canManage || selected?.code === 'ADMIN') return;
+    setSelectedCodes(new Set());
+    setDirty(true);
+  };
+
+  const moduleLabel = (module: string) => moduleLabels[module] || module;
 
   const save = () => {
     if (!selected) return;
@@ -190,6 +224,11 @@ export const AdminRolesTab: React.FC = () => {
               {isAdminRole
                 ? 'مدير النظام يملك كل الصلاحيات دائماً ولا يمكن تقييده.'
                 : 'حدد ما يستطيع هذا الدور فعله. التغييرات تُطبق على كل مستخدمي الدور.'}
+              {selected && !isAdminRole && (
+                <span className="mr-1 font-bold text-sky-600 dark:text-sky-400">
+                  ({selectedCodes.size} من {catalog.length} صلاحية)
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -204,6 +243,26 @@ export const AdminRolesTab: React.FC = () => {
                 className={`${inputCls} pr-9`}
               />
             </div>
+            {canManage && !isAdminRole && (
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                title="تحديد كل الصلاحيات في الكتالوج"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <ListChecks className="h-4 w-4 text-emerald-600" /> الكل
+              </button>
+            )}
+            {canManage && !isAdminRole && (
+              <button
+                type="button"
+                onClick={clearAllVisible}
+                title="مسح كل الصلاحيات"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                <Eraser className="h-4 w-4 text-rose-500" /> مسح
+              </button>
+            )}
             {canManage && !isAdminRole && (
               <button
                 onClick={save}
@@ -238,7 +297,10 @@ export const AdminRolesTab: React.FC = () => {
                   onClick={() => setExpanded((prev) => ({ ...prev, [module]: !open }))}
                   className="flex w-full items-center gap-2 bg-slate-50 dark:bg-slate-800/70 px-4 py-2.5 text-right text-xs font-extrabold text-slate-700 dark:text-slate-200"
                 >
-                  <span className="flex-1">{module}</span>
+                  <span className="flex-1">
+                    {moduleLabel(module)}
+                    <span className="mr-1.5 font-mono text-[9px] font-normal text-slate-400">{module}</span>
+                  </span>
                   <span className="rounded bg-slate-200/70 dark:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:text-slate-300">
                     {checked}/{perms.length}
                   </span>

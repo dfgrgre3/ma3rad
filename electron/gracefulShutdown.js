@@ -73,10 +73,15 @@ function installGracefulClose({
         });
         if (result.ok) {
           closeApproved = true;
-          closeFlowRunning = false;
-          onApprovedClose();
-          win.close();
-          return;
+          try {
+            await onApprovedClose();
+            closeFlowRunning = false;
+            if (!win.isDestroyed()) win.close();
+            return;
+          } catch (error) {
+            closeApproved = false;
+            result.error = `تعذر تجهيز التطبيق للإغلاق الآمن: ${error instanceof Error ? error.message : String(error)}`;
+          }
         }
 
         const choice = await dialog.showMessageBox(win, {
@@ -92,9 +97,14 @@ function installGracefulClose({
 
         if (choice.response === 0) continue;
         if (choice.response === 2 && !win.isDestroyed()) {
+          try {
+            await onApprovedClose();
+          } catch (error) {
+            console.error('Forced shutdown preparation failed:', error);
+            onCancelledClose();
+          }
           closeApproved = true;
           closeFlowRunning = false;
-          onApprovedClose();
           win.destroy();
           return;
         }

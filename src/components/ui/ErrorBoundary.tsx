@@ -16,15 +16,22 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     console.error('Unhandled UI error', error, info);
-    try {
-      CentralTelemetryService.reportError({
-        title: error?.name || 'UI render error',
-        description: error?.message || '',
-        stackTrace: (error?.stack || '') + '\n' + (info?.componentStack || ''),
-        issueType: 'error',
-        severity: 'high',
-      });
-    } catch { /* ignore */ }
+    const stackTrace = (error?.stack || '') + '\n' + (info?.componentStack || '');
+    const localReport = window.ceramisys?.diagnostics?.reportError?.({
+      kind: 'ui-render-error',
+      message: error?.message || 'UI render error',
+      stack: stackTrace,
+    });
+    if (localReport) {
+      void localReport.catch((reportError) => console.error('Could not persist UI error:', reportError));
+    }
+    void CentralTelemetryService.reportError({
+      title: error?.name || 'UI render error',
+      description: error?.message || '',
+      stackTrace,
+      issueType: 'error',
+      severity: 'high',
+    }).catch((reportError) => console.error('Could not report UI error telemetry:', reportError));
   }
 
   private reset = () => {

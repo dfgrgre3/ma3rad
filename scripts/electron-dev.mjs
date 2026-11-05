@@ -7,11 +7,14 @@ const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const children = new Set();
 
 function run(command, args, env = process.env) {
+  const cleanEnv = { ...env };
+  delete cleanEnv.ELECTRON_RUN_AS_NODE;
   const child = spawn(command, args, {
     cwd: process.cwd(),
-    env,
+    env: cleanEnv,
     stdio: 'inherit',
     windowsHide: true,
+    shell: process.platform === 'win32',
   });
   children.add(child);
   child.once('exit', () => children.delete(child));
@@ -48,9 +51,10 @@ process.once('SIGTERM', () => { stopAll(); process.exit(143); });
 const vite = run(npmCommand, ['run', 'dev', '--', '--host', host, '--port', String(port)]);
 try {
   await waitForVite();
-  const electron = run(npmCommand, ['exec', '--', 'electron', '.'], {
+  const electron = run(npmCommand, ['exec', '--', 'electron', '.', '--enable-logging'], {
     ...process.env,
     VITE_DEV_SERVER_URL: devUrl,
+    ELECTRON_ENABLE_LOGGING: '1',
   });
   const exitCode = await new Promise((resolve) => electron.once('exit', (code, signal) => {
     resolve(typeof code === 'number' ? code : signal ? 1 : 0);

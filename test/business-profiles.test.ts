@@ -67,10 +67,9 @@ test('first-run setup is limited to genuinely unconfigured databases', () => {
   }), false);
 });
 
-test('local mode skips first-run activation and exposes every navigation page', () => {
-  assert.equal(BYPASS_FIRST_RUN_SETUP, true);
-  assert.equal(OPEN_ALL_PAGES, true);
-  assert.deepEqual(NavigationService.getNavigationGroups(null), NAV_GROUPS);
+test('production mode keeps first-run activation and page guards enabled', () => {
+  assert.equal(BYPASS_FIRST_RUN_SETUP, false);
+  assert.equal(OPEN_ALL_PAGES, false);
 });
 
 test('all catalog activities resolve to validated shared profile templates', () => {

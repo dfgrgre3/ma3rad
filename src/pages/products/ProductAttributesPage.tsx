@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Ruler, Plus, Search, Layers, Sparkles, Tag, Shield, Compass, Loader2, X } from 'lucide-react';
 import { AttributeService, AttributeCategory } from '../../services/AttributeService';
 import type { DynamicAttributeDataType } from '../../services/dynamicAttributes';
+import { usePermission } from '../../hooks/usePermission';
 
 const ICONS: Record<string, React.ElementType> = {
   TILE_SIZES: Ruler, TILE_FINISH: Sparkles, TILE_APPLICATION: Compass,
@@ -14,6 +15,7 @@ const DATA_TYPES: Record<DynamicAttributeDataType, string> = {
 
 export const ProductAttributesPage: React.FC = () => {
   const service = new AttributeService();
+  const canManage = usePermission()('products.attributes.manage');
   const [categories, setCategories] = useState<AttributeCategory[]>([]);
   const [selectedCatId, setSelectedCatId] = useState<string>('');
   const [newValue, setNewValue] = useState('');
@@ -58,18 +60,21 @@ export const ProductAttributesPage: React.FC = () => {
 
   const handleAddValue = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!activeCategory || !newValue.trim()) return;
     try { service.addValue(activeCategory.id, newValue); setNewValue(''); load(); }
     catch (err: any) { alert(err?.message); }
   };
 
   const handleRemoveValue = (optionId: string) => {
+    if (!canManage) return;
     if (!confirm('حذف هذه القيمة؟')) return;
     try { service.removeValue(optionId); load(); } catch (err: any) { alert(err?.message); }
   };
 
   const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     setSaving(true);
     try {
       service.addCategory({
@@ -110,9 +115,11 @@ export const ProductAttributesPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">تعريف مقاسات السيراميك، التشطيبات، الفئات وأماكن الاستخدام</p>
           </div>
         </div>
-        <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-          <Plus className="w-4 h-4" /> خاصية جديدة
-        </button>
+        {canManage && (
+          <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+            <Plus className="w-4 h-4" /> خاصية جديدة
+          </button>
+        )}
       </div>
 
       {error && <div className="mx-4 mt-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
@@ -152,10 +159,12 @@ export const ProductAttributesPage: React.FC = () => {
                   </p>
                 </div>
 
-                <form onSubmit={handleAddValue} className="flex gap-2">
-                  <input value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={`أدخل قيمة جديدة لـ ${activeCategory.name}...`} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-teal-500 font-medium" />
-                  <button type="submit" className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0"><Plus className="w-4 h-4" /> إضافة</button>
-                </form>
+                {canManage && (
+                  <form onSubmit={handleAddValue} className="flex gap-2">
+                    <input value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder={`أدخل قيمة جديدة لـ ${activeCategory.name}...`} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-teal-500 font-medium" />
+                    <button type="submit" className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0"><Plus className="w-4 h-4" /> إضافة</button>
+                  </form>
+                )}
 
                 <div className="relative">
                   <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -166,7 +175,9 @@ export const ProductAttributesPage: React.FC = () => {
                   {filteredValues.map((val) => (
                     <div key={val.id} className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 flex items-center gap-2 hover:border-slate-300 transition">
                       <span>{val.label}</span>
-                      <button onClick={() => handleRemoveValue(val.id)} className="text-slate-400 hover:text-rose-600 text-xs font-mono p-0.5 transition" title="حذف">✕</button>
+                      {canManage && (
+                        <button onClick={() => handleRemoveValue(val.id)} className="text-slate-400 hover:text-rose-600 text-xs font-mono p-0.5 transition" title="حذف">✕</button>
+                      )}
                     </div>
                   ))}
                   {filteredValues.length === 0 && <span className="text-xs text-slate-400">لا توجد قيم مطابقة</span>}

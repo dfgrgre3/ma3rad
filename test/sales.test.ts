@@ -112,7 +112,9 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.equal(reopenedInvoice.id, invoice.id);
   assert.equal(reopenedInvoice.customerId, customer.id);
   assert.equal(reopenedInvoice.items[0].productId, 'prod_sale_1');
-  const reopenedHtml = new PrintService().getInvoiceHtml(reopenedInvoice);
+  const reopenedHtml = new PrintService().getInvoiceHtml(reopenedInvoice, {
+    settingsOverride: { invoiceShowItemCode: true },
+  });
   assert.match(reopenedHtml, new RegExp(invoice.invoiceNumber));
   assert.match(reopenedHtml, /SKU-prod_sale_1/);
 

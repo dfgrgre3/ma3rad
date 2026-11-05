@@ -7,6 +7,7 @@ import { SecurityService, ActiveSession, LoginRecord, SecurityOverview } from '.
 import { AuthService } from '../../services/AuthService';
 import { useToast } from '../../components/ui/Toast';
 import { PermissionService } from '../../services/PermissionService';
+import { usePermission } from '../../hooks/usePermission';
 
 const fmtDate = (value?: string | null) => {
   if (!value) return '—';
@@ -16,7 +17,9 @@ const fmtDate = (value?: string | null) => {
 
 export const SecurityCenterPage: React.FC = () => {
   const service = useMemo(() => SecurityService.getInstance(), []);
-  const canManageSessions = PermissionService.can(AuthService.getCurrentUser(), 'sessions.manage', '/security');
+  const can = usePermission();
+  const canManageSessions = can('sessions.manage');
+  const canViewSecurity = can('security.view');
   const toast = useToast();
   const [overview, setOverview] = useState<SecurityOverview | null>(null);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -43,6 +46,7 @@ export const SecurityCenterPage: React.FC = () => {
   }, [load]);
 
   const revoke = (session: ActiveSession) => {
+    if (!canManageSessions) return;
     if (!confirm(`إنهاء جلسة ${session.userName}؟`)) return;
     try {
       service.revokeSession(session.id);
@@ -59,6 +63,7 @@ export const SecurityCenterPage: React.FC = () => {
   };
 
   const revokeAllForUser = (session: ActiveSession) => {
+    if (!canManageSessions) return;
     if (!confirm(`إنهاء جميع جلسات ${session.userName}؟`)) return;
     try {
       const count = service.revokeUserSessions(session.userId);

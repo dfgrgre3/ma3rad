@@ -5,8 +5,10 @@ import {
 } from 'lucide-react';
 import { BackupService } from '../../services/BackupService';
 import { BackupHistoryTable } from './BackupHistoryTable';
+import { usePermission } from '../../hooks/usePermission';
 
 export const BackupPage: React.FC = () => {
+  const canManage = usePermission()('settings.backup');
   const [history, setHistory] = useState<any[]>([]);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -42,6 +44,7 @@ export const BackupPage: React.FC = () => {
   }, []);
 
   const openExportModal = () => {
+    if (!canManage) return;
     setExportPassword('');
     setExportPasswordConfirm('');
     setExportError(null);
@@ -50,6 +53,7 @@ export const BackupPage: React.FC = () => {
 
   const handleConfirmExport = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!exportPassword) {
       setExportError('يرجى إدخال كلمة مرور للنسخة.');
       return;
@@ -83,6 +87,7 @@ export const BackupPage: React.FC = () => {
   };
 
   const executeRestore = async (file: File, password?: string) => {
+    if (!canManage) return;
     setIsRestoring(true);
     setRestoreError(null);
     setMessage(null);
@@ -105,6 +110,7 @@ export const BackupPage: React.FC = () => {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canManage) return;
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
@@ -130,12 +136,31 @@ export const BackupPage: React.FC = () => {
 
   const handleConfirmRestore = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) return;
+    if (!canManage || !selectedFile) return;
     if (!restorePassword) {
       setRestoreError('يرجى إدخال كلمة مرور النسخة الاحتياطية.');
       return;
     }
     await executeRestore(selectedFile, restorePassword);
+  };
+
+  const handleOpenBackupFolder = async () => {
+    const openFolder = window.ceramisys?.app?.openFolder;
+    if (!openFolder) {
+      setMessage({ text: 'فتح مجلد النسخ متاح من تطبيق سطح المكتب فقط.', isError: true });
+      return;
+    }
+    try {
+      const result = await openFolder('backups');
+      setMessage(result.ok
+        ? { text: 'اختر نسخة الجهاز من مجلد النسخ لاستعادتها.' }
+        : { text: result.error || 'تعذر فتح مجلد النسخ.', isError: true });
+    } catch (error) {
+      setMessage({
+        text: error instanceof Error ? error.message : String(error),
+        isError: true,
+      });
+    }
   };
 
   const formatSize = (bytes: number) => {
@@ -159,13 +184,15 @@ export const BackupPage: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={openExportModal}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-sky-600/20 active:scale-95"
-        >
-          <Download className="w-4 h-4" />
-          تصدير وتحميل نسخة فورية الآن
-        </button>
+        {canManage && (
+          <button
+            onClick={openExportModal}
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-sky-600/20 active:scale-95"
+          >
+            <Download className="w-4 h-4" />
+            تصدير وتحميل نسخة فورية الآن
+          </button>
+        )}
       </div>
 
       {message && (
@@ -202,13 +229,15 @@ export const BackupPage: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={openExportModal}
-            className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl text-xs font-bold border border-slate-300 flex items-center justify-center gap-2 transition"
-          >
-            <Download className="w-4 h-4 text-sky-600" />
-            تحميل نسخة مشفرة بصيغة جدول بيانات (.xlsx)
-          </button>
+          {canManage && (
+            <button
+              onClick={openExportModal}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl text-xs font-bold border border-slate-300 flex items-center justify-center gap-2 transition"
+            >
+              <Download className="w-4 h-4 text-sky-600" />
+              تحميل نسخة مشفرة بصيغة جدول بيانات (.xlsx)
+            </button>
+          )}
         </div>
 
         {/* Restore Card */}
@@ -219,28 +248,39 @@ export const BackupPage: React.FC = () => {
             </div>
             <h2 className="text-base font-bold text-slate-900 mb-1.5">استرجاع قاعدة البيانات من ملف</h2>
             <p className="text-xs text-slate-500 leading-relaxed mb-4">
-              استعد بيانات النظام من نسخة XLSX مشفرة أو من نسخة ‎.ceramisys-backup‎ سابقة، أو استورد ملف SQLite قديمًا بعد تأكيد أنه غير مشفر.
+              استعد بيانات النظام من نسخة مشفرة أو ملف SQLite. يتضمن مجلد نسخ الجهاز نسخًا مشفرة تلقائيًا قبل تثبيت التحديثات.
             </p>
           </div>
 
-          <label className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
-            <Upload className="w-4 h-4" />
-            <span>{isRestoring ? 'جاري الاستيراد...' : 'اختيار ملف النسخة الاحتياطية'}</span>
-            <input
-              type="file"
-              accept=".xlsx,.ceramisys-backup,.sqlite.enc,.sqlite,.db"
-              onChange={handleFileChange}
-              disabled={isRestoring}
-              className="hidden"
-            />
-          </label>
+          {canManage && (
+            <div className="space-y-2">
+              <label className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
+                <Upload className="w-4 h-4" />
+                <span>{isRestoring ? 'جاري الاستيراد...' : 'اختيار ملف النسخة الاحتياطية'}</span>
+                <input
+                  type="file"
+                  accept=".xlsx,.ceramisys-backup,.sqlite.enc,.sqlite,.db"
+                  onChange={handleFileChange}
+                  disabled={isRestoring}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void handleOpenBackupFolder()}
+                className="w-full rounded-xl border border-slate-300 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+              >
+                فتح مجلد نسخ الجهاز
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       <BackupHistoryTable history={history} formatSize={formatSize} />
 
       {/* Export Password Modal */}
-      {isExportModalOpen && (
+      {canManage && isExportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4" dir="rtl">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
@@ -358,7 +398,7 @@ export const BackupPage: React.FC = () => {
       )}
 
       {/* Restore Password Modal */}
-      {isRestoreModalOpen && (
+      {canManage && isRestoreModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4" dir="rtl">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">

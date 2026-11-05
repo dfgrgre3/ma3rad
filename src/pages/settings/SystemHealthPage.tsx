@@ -37,6 +37,7 @@ export const SystemHealthPage: React.FC = () => {
   const financialCheck = stats?.checks.find((check) => check.key === 'financial_consistency');
 
   const handleVacuum = () => {
+    if (!canMaintain) return;
     PermissionService.require(AuthService.requireAuth(), 'settings.maintenance', '/system-health');
     try {
       new SystemDiagnosticsService().vacuum();
@@ -48,6 +49,7 @@ export const SystemHealthPage: React.FC = () => {
   };
 
   const handleReindex = () => {
+    if (!canMaintain) return;
     PermissionService.require(AuthService.requireAuth(), 'settings.maintenance', '/system-health');
     try {
       new SystemDiagnosticsService().reindex();
@@ -169,7 +171,8 @@ export const SystemHealthPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="px-6 pb-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Maintenance Actions */}
+        {/* Maintenance Actions — hidden entirely without maintenance permission */}
+        {canMaintain && (
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">
             <Wrench className="w-4 h-4 text-teal-600" />
@@ -212,7 +215,8 @@ export const SystemHealthPage: React.FC = () => {
             </div>
           </div>
         </div>
-
+        )}
+ 
         {/* Database Inventory Snapshot */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-200 pb-3">

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Percent, Plus, Search, Trash2, Loader2, X, Power } from 'lucide-react';
 import { PricingService, PriceList, PriceListItem } from '../../services/PricingService';
 import { ProductService } from '../../services/ProductService';
+import { usePermission } from '../../hooks/usePermission';
 import type { Product } from '../../types';
 
 const CATEGORY_LABELS: Record<PriceList['customerType'], { label: string; color: string }> = {
@@ -16,6 +17,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) 
 
 export const PricingPage: React.FC = () => {
   const service = new PricingService();
+  const canManage = usePermission()('pricing.update');
   const [lists, setLists] = useState<PriceList[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
@@ -51,6 +53,7 @@ export const PricingPage: React.FC = () => {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     setSaving(true);
     try {
       service.createPriceList({
@@ -71,11 +74,13 @@ export const PricingPage: React.FC = () => {
   };
 
   const toggle = (list: PriceList) => {
+    if (!canManage) return;
     try { service.togglePriceList(list.id, !list.isActive); load(); } catch (e: any) { alert(e?.message); }
   };
 
   const addItem = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!activeList || !itemForm.productId) return;
     try {
       service.addPriceListItem({
@@ -94,7 +99,7 @@ export const PricingPage: React.FC = () => {
   };
 
   const removeItem = (id: string) => {
-    if (!activeList) return;
+    if (!canManage || !activeList) return;
     try { service.deletePriceListItem(id); loadItems(activeList); load(); } catch (e: any) { alert(e?.message); }
   };
 
@@ -112,9 +117,11 @@ export const PricingPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">إعداد الخصومات وقوائم الأسعار المخصصة للمقاولين والتجار وكبار العملاء</p>
           </div>
         </div>
-        <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
-          <Plus className="w-4 h-4" /> إنشاء قائمة أسعار
-        </button>
+        {canManage && (
+          <button onClick={() => setCreateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
+            <Plus className="w-4 h-4" /> إنشاء قائمة أسعار
+          </button>
+        )}
       </div>
 
       <div className="p-4 bg-white border-b border-slate-200">
@@ -153,9 +160,11 @@ export const PricingPage: React.FC = () => {
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end gap-2">
-                    <button onClick={() => toggle(list)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${list.isActive ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'}`}>
-                      <Power className="w-3 h-3" /> {list.isActive ? 'تعطيل' : 'تفعيل'}
-                    </button>
+                    {canManage && (
+                      <button onClick={() => toggle(list)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${list.isActive ? 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100' : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'}`}>
+                        <Power className="w-3 h-3" /> {list.isActive ? 'تعطيل' : 'تفعيل'}
+                      </button>
+                    )}
                     <button onClick={() => loadItems(list)} className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 rounded-lg text-xs font-bold transition">
                       عرض الأسعار
                     </button>
@@ -173,7 +182,7 @@ export const PricingPage: React.FC = () => {
         )}
       </div>
 
-      {createOpen && (
+      {canManage && createOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-4">
@@ -227,17 +236,19 @@ export const PricingPage: React.FC = () => {
               <button onClick={() => setActiveList(null)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
             </div>
 
-            <form onSubmit={addItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 mb-4 text-xs">
-              <select required value={itemForm.productId} onChange={(e) => setItemForm({ ...itemForm, productId: e.target.value })} className="col-span-2 px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-bold">
-                <option value="">— اختر الصنف —</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-              <input required type="number" min="0.01" step="0.01" placeholder="سعر المتر" value={itemForm.priceM2} onChange={(e) => setItemForm({ ...itemForm, priceM2: e.target.value })} className="px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-mono" />
-              <input type="number" min="0" step="0.01" placeholder="سعر الكرتونة" value={itemForm.priceBox} onChange={(e) => setItemForm({ ...itemForm, priceBox: e.target.value })} className="px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-mono" />
-              <button type="submit" className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center justify-center gap-1">
-                <Plus className="w-3.5 h-3.5" /> إضافة
-              </button>
-            </form>
+            {canManage && (
+              <form onSubmit={addItem} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 mb-4 text-xs">
+                <select required value={itemForm.productId} onChange={(e) => setItemForm({ ...itemForm, productId: e.target.value })} className="col-span-2 px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-bold">
+                  <option value="">— اختر الصنف —</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <input required type="number" min="0.01" step="0.01" placeholder="سعر المتر" value={itemForm.priceM2} onChange={(e) => setItemForm({ ...itemForm, priceM2: e.target.value })} className="px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-mono" />
+                <input type="number" min="0" step="0.01" placeholder="سعر الكرتونة" value={itemForm.priceBox} onChange={(e) => setItemForm({ ...itemForm, priceBox: e.target.value })} className="px-2 py-2 bg-slate-50 rounded-lg border border-slate-200 font-mono" />
+                <button type="submit" className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center justify-center gap-1">
+                  <Plus className="w-3.5 h-3.5" /> إضافة
+                </button>
+              </form>
+            )}
 
             <div className="border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full text-right text-xs">
@@ -258,7 +269,9 @@ export const PricingPage: React.FC = () => {
                       <td className="p-2.5 font-bold text-emerald-600">{fmt(item.priceM2)}</td>
                       <td className="p-2.5 font-mono text-slate-600">{item.priceBox ? fmt(item.priceBox) : '—'}</td>
                       <td className="p-2.5">
-                        <button onClick={() => removeItem(item.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                        {canManage && (
+                          <button onClick={() => removeItem(item.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                        )}
                       </td>
                     </tr>
                   ))}

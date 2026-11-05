@@ -46,6 +46,15 @@ export class LoyaltyService {
     return this.getCustomerLoyalty(customerId);
   }
 
+  public getRedeemablePointBalance(customerId: string): number {
+    PermissionService.require(AuthService.requireAuth(), 'loyalty.redeem');
+    const row = this.db.query<{ currentPoints: number }>(
+      'SELECT current_points AS currentPoints FROM customer_loyalty WHERE customer_id = ?',
+      [customerId]
+    )[0];
+    return Number(row?.currentPoints || 0);
+  }
+
   public initializeCustomerLoyalty(customerId: string): CustomerLoyalty {
     const existing = this.getCustomerLoyalty(customerId);
     if (existing) return existing;

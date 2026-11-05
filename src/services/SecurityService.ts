@@ -76,6 +76,10 @@ export class SecurityService {
   private loadConfig(): void {
     const defaults = this.defaultConfig();
     try {
+      if (typeof localStorage === 'undefined') {
+        this.config = defaults;
+        return;
+      }
       const saved = localStorage.getItem('security_config');
       if (!saved) {
         this.config = defaults;
@@ -136,6 +140,7 @@ export class SecurityService {
   }
 
   private saveConfig(): void {
+    if (typeof localStorage === 'undefined') return;
     localStorage.setItem('security_config', JSON.stringify(this.config));
   }
 

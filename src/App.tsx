@@ -5,8 +5,6 @@ import { AuthService } from './services/AuthService';
 import { CentralLicenseService } from './services/CentralLicenseService';
 import { CentralConfigApplier } from './services/CentralConfigApplier';
 import { CentralEstablishmentService } from './services/CentralEstablishmentService';
-import { CentralTelemetryService } from './services/CentralTelemetryService';
-import type { ReleaseInfo } from './services/CentralTelemetryService';
 import { SettingsService } from './services/SettingsService';
 import { AppConfigService } from './services/AppConfigService';
 import { shouldShowFirstRunSetup, BYPASS_FIRST_RUN_SETUP } from './config/setupLifecycle';
@@ -19,6 +17,7 @@ import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal'
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { UpdateNotification } from './components/UpdateNotification';
 import { useAppStartup } from './hooks/useAppStartup';
 import { useAppSession } from './hooks/useAppSession';
 import { securityService, auditLogger, performanceMonitor, localCache, systemHealth } from './services';
@@ -35,10 +34,9 @@ export const App: React.FC = () => {
     () => BYPASS_FIRST_RUN_SETUP || CentralLicenseService.hasCompletedFirstRunActivation()
   );
   const [licenseBlocked, setLicenseBlocked] = useState(false);
-  // في وضع التشغيل المحلي نوقف كل تفاعل مع المنصة المركزية (ترخيص/تكوين/تحديثات).
+  // في وضع التشغيل المحلي نوقف كل تفاعل مع المنصة المركزية (ترخيص/تكوين).
   const centralActive = activationComplete && !BYPASS_FIRST_RUN_SETUP;
   const [licenseRetrying, setLicenseRetrying] = useState(false);
-  const [availableUpdate, setAvailableUpdate] = useState<ReleaseInfo | null>(null);
 
   const checkLicense = useCallback(async () => {
     if (!centralActive) return;
@@ -111,17 +109,6 @@ export const App: React.FC = () => {
     };
   }, [centralActive, dbReady]);
 
-  // Check for published updates on startup
-  useEffect(() => {
-    if (!centralActive) return;
-    let cancelled = false;
-    (async () => {
-      const upd = await CentralTelemetryService.checkForUpdates('1.1.3');
-      if (!cancelled) setAvailableUpdate(upd);
-    })();
-    return () => { cancelled = true; };
-  }, [centralActive]);
-
   // Periodic central heartbeat (device liveness)
   useEffect(() => {
     if (!centralActive) return;
@@ -133,12 +120,23 @@ export const App: React.FC = () => {
   // تهيئة الخدمات الأمنية ومؤقتات المراقبة
   useEffect(() => {
     // تفعيل الخدمات الأمنية
-    securityService.initialize();
+    void securityService.initialize().catch((error) => {
+      console.error('Security services could not initialize:', error);
+    });
     auditLogger.initialize();
-    performanceMonitor.startMonitoring();
-    systemHealth.startHealthCheck();
+    void performanceMonitor.startMonitoring().catch((error) => {
+      console.error('Performance monitoring could not start:', error);
+    });
+    void systemHealth.startHealthCheck().catch((error) => {
+      console.error('System health monitoring could not start:', error);
+    });
     // نظام الذاكرة السريعة
     localCache.set('app_initialized', true, 24 * 60 * 60 * 1000);
+    return () => {
+      performanceMonitor.stopMonitoring();
+      systemHealth.stopHealthCheck();
+      auditLogger.stopScheduledFlush();
+    };
   }, []);
 
   useAppSession(dbReady, currentUser, () => setCurrentUser(null));
@@ -200,12 +198,15 @@ export const App: React.FC = () => {
 
   if (!activationComplete) {
     return (
-      <FirstRunActivationPage
-        onSuccess={() => {
-          setLicenseBlocked(false);
-          setActivationComplete(true);
-        }}
-      />
+      <>
+        <FirstRunActivationPage
+          onSuccess={() => {
+            setLicenseBlocked(false);
+            setActivationComplete(true);
+          }}
+        />
+        <UpdateNotification />
+      </>
     );
   }
 
@@ -240,6 +241,7 @@ export const App: React.FC = () => {
             </button>
           </div>
         </div>
+        <UpdateNotification />
       </main>
     );
   }
@@ -268,12 +270,18 @@ export const App: React.FC = () => {
         ) : (
           <p className="text-xs text-sky-600 font-medium animate-pulse">جاري تهيئة قاعدة بيانات SQLite...</p>
         )}
+        <UpdateNotification />
       </div>
     );
   }
 
   if (!currentUser) {
-    return <LoginPage onSuccess={setCurrentUser} />;
+    return (
+      <>
+        <LoginPage onSuccess={setCurrentUser} />
+        <UpdateNotification />
+      </>
+    );
   }
 
   return (
@@ -283,15 +291,7 @@ export const App: React.FC = () => {
           {!BYPASS_FIRST_RUN_SETUP && !showSetup && currentUser?.mustChangePassword && (
             <ForcePasswordChangeModal user={currentUser} onSuccess={(u) => setCurrentUser(u)} />
           )}
-          {availableUpdate && (
-            <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-2xl bg-sky-600 px-4 py-3 text-sm font-bold text-white shadow-2xl">
-              <div>تحديث متاح: v{availableUpdate.version}</div>
-              {availableUpdate.download_url && (
-                <a href={availableUpdate.download_url} target="_blank" rel="noreferrer" className="mt-1 inline-block underline">تحميل التحديث</a>
-              )}
-              <button onClick={() => setAvailableUpdate(null)} className="ml-2 text-xs opacity-80">إغلاق</button>
-            </div>
-          )}
+          <UpdateNotification />
           {showSetup ? (
             <SetupWizard
               onComplete={(configuredAdmin) => {

@@ -11,6 +11,8 @@ interface UsePosCustomerCreationOptions {
   setCustomers: Dispatch<SetStateAction<Customer[]>>;
   applyCustomerPricing: (customer: Customer | null) => void;
   setSelectedCustomer: Dispatch<SetStateAction<Customer | null>>;
+  setRedeemPoints: Dispatch<SetStateAction<number>>;
+  setLoyaltyDiscount: Dispatch<SetStateAction<number>>;
   name: string;
   setName: Dispatch<SetStateAction<string>>;
   phone: string;
@@ -31,6 +33,8 @@ export const usePosCustomerCreation = ({
   setCustomers,
   applyCustomerPricing,
   setSelectedCustomer,
+  setRedeemPoints,
+  setLoyaltyDiscount,
   name,
   setName,
   phone,
@@ -68,6 +72,8 @@ export const usePosCustomerCreation = ({
       } as any);
       setCustomers(customerService.getAllCustomers());
       setSelectedCustomer(created);
+      setRedeemPoints(0);
+      setLoyaltyDiscount(0);
       applyCustomerPricing(created);
       setIsOpen(false);
       setError('');

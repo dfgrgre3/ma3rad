@@ -38,6 +38,7 @@ export interface PosCheckoutPanelProps {
   setCouponCode: (value: string) => void;
   appliedPromotion: AppliedPromotion | null;
   selectedCustomer: Customer | null;
+  canRedeemPoints: boolean;
   redeemPoints: number;
   setRedeemPoints: (value: number) => void;
   onRedeemPoints: () => void;
@@ -84,6 +85,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
   setCouponCode,
   appliedPromotion,
   selectedCustomer,
+  canRedeemPoints,
   redeemPoints,
   setRedeemPoints,
   onRedeemPoints,
@@ -201,10 +203,11 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
     </div>
 
     {/* Loyalty redeem */}
-    {selectedCustomer && (
+    {selectedCustomer && canRedeemPoints && (
       <div className="flex items-center gap-2">
-        <input type="number" min={0} value={redeemPoints || ''} onChange={(e) => setRedeemPoints(Number.parseFloat(e.target.value) || 0)} placeholder="استبدال نقاط" className="w-28 px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-900" />
-        <button type="button" onClick={onRedeemPoints} className="px-2 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold">استبدال</button>
+        <input type="number" min={0} step={1} value={redeemPoints || ''} onChange={(e) => setRedeemPoints(Number.parseFloat(e.target.value) || 0)} placeholder="عدد نقاط الولاء" aria-label="عدد نقاط الولاء" className="w-32 px-2 py-1.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-900" />
+        <button type="button" onClick={onRedeemPoints} className="px-2 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold">تطبيق النقاط</button>
+        {redeemPoints > 0 && <span className="text-[10px] text-slate-500">تُخصم عند حفظ الفاتورة</span>}
       </div>
     )}
 

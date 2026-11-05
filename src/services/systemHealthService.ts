@@ -5,6 +5,7 @@
 
 import { auditLogger } from './auditLogger';
 import { performanceMonitor } from './performanceMonitor';
+import { APP_VERSION } from '../config/appVersion';
 
 
 export interface HealthScore {
@@ -53,10 +54,9 @@ class SystemHealthService {
   private static instance: SystemHealthService;
   private lastSafeScore: HealthScore = { overall: 100, security: 100, performance: 100, dataIntegrity: 100, backupHealth: 100 };
   private healthHistory: { score: HealthScore; timestamp: number }[] = [];
+  private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
 
-  private constructor() {
-    this.startHealthCheck();
-  }
+  private constructor() {}
 
   static getInstance(): SystemHealthService {
     if (!SystemHealthService.instance) {
@@ -66,16 +66,26 @@ class SystemHealthService {
   }
 
   async startHealthCheck(): Promise<void> {
+    if (this.healthCheckTimer) return;
     // فحص دوري كل 5 دقائق
-    setInterval(async () => {
-      const currentScore = await this.calculateHealthScore();
-      this.recordScore(currentScore);
-      this.generateQuestions(currentScore);
+    this.healthCheckTimer = setInterval(() => {
+      void this.runHealthCheck()
+        .catch((error) => console.error('System health monitoring failed:', error));
     }, 5 * 60 * 1000);
 
     // فحص أولي
-    const initialScore = await this.calculateHealthScore();
-    this.recordScore(initialScore);
+    await this.runHealthCheck();
+  }
+
+  stopHealthCheck(): void {
+    if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
+    this.healthCheckTimer = null;
+  }
+
+  private async runHealthCheck(): Promise<void> {
+    const currentScore = await this.calculateHealthScore();
+    this.recordScore(currentScore);
+    this.generateQuestions(currentScore);
   }
 
   public async calculateHealthScore(): Promise<HealthScore> {
@@ -286,7 +296,7 @@ class SystemHealthService {
       dataIntegrity: this.lastSafeScore.dataIntegrity,
       backupHealth: this.lastSafeScore.backupHealth,
       uptime: 0,
-      version: '1.1.3',
+      version: APP_VERSION,
       environment: 'production',
       memoryUsage: { used: 0, total: 0 },
       diskUsage: { used: 0, total: 0 }

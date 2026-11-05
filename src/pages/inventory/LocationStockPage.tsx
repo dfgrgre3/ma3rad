@@ -3,6 +3,7 @@ import { Building2, Package, RefreshCw, Search, Warehouse as WarehouseIcon } fro
 import { formatProductQuantity } from '../../utils/productUnits';
 import { InventoryService } from '../../services/InventoryService';
 import { ProductService } from '../../services/ProductService';
+import { usePermission } from '../../hooks/usePermission';
 import type { Product, Warehouse } from '../../types';
 
 type LocationStockPageProps = {
@@ -32,6 +33,8 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isComparison = mode === 'showroom';
+  const can = usePermission();
+  const canView = mode === 'showroom' ? can('inventory.showroom_stock.view') : can('inventory.warehouse_stock.view');
 
   const loadData = () => {
     setLoading(true);
@@ -126,6 +129,14 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
       </div>
     );
   };
+
+  if (!canView) {
+    return (
+      <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900" dir="rtl">
+        لا تملك صلاحية عرض أرصدة المخازن.
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50 p-4 sm:p-6" dir="rtl">

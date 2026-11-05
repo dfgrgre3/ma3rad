@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { DatabaseManager } from '../src/database/db.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { NavigationService } from '../src/services/NavigationService.ts';
+import { DATA_IMPORT_ACCESS_PERMISSIONS } from '../src/config/routePermissions.ts';
 
 const require = createRequire(import.meta.url);
 const { isAllowedAppUrl, isAllowedIpcSender } = require('../electron/security.js');
@@ -108,7 +109,7 @@ test('navigation only exposes pages granted to the current user', async () => {
     username: 'route_visibility_test',
     fullName: 'اختبار الصلاحيات',
     role: 'ROUTE_VISIBILITY_TEST',
-    phone: null,
+    phone: undefined,
     isActive: true,
     createdAt: '',
     updatedAt: '',
@@ -123,5 +124,43 @@ test('navigation only exposes pages granted to the current user', async () => {
   } finally {
     PermissionService.invalidate(user);
     db.run('DELETE FROM roles WHERE code = ?', ['ROUTE_VISIBILITY_TEST']);
+  }
+});
+
+test('data import is reachable to users who can import an entity without settings.view', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  db.run(
+    'INSERT INTO roles (id, code, name) VALUES (?, ?, ?)',
+    ['role_data_import_test', 'DATA_IMPORT_TEST', 'اختبار استيراد البيانات']
+  );
+  db.run(
+    'INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+    ['DATA_IMPORT_TEST', 'customers.create']
+  );
+  const user = {
+    id: 'usr_data_import_test',
+    username: 'data_import_test',
+    fullName: 'اختبار استيراد البيانات',
+    role: 'DATA_IMPORT_TEST',
+    phone: undefined,
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+
+  try {
+    PermissionService.invalidate(user);
+    const groups = NavigationService.getAccessibleGroups(user);
+    const paths = groups.flatMap((group) => group.items.map((item) => item.to));
+    assert.ok(paths.includes('/data-import'));
+    assert.deepEqual(NavigationService.getRequiredPermissionGroups('/data-import'), {
+      all: [],
+      any: DATA_IMPORT_ACCESS_PERMISSIONS,
+    });
+  } finally {
+    PermissionService.invalidate(user);
+    db.run('DELETE FROM roles WHERE code = ?', ['DATA_IMPORT_TEST']);
   }
 });

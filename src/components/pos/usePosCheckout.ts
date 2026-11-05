@@ -32,6 +32,7 @@ interface UsePosCheckoutOptions {
   setAppliedPromotion: Dispatch<SetStateAction<AppliedPromotion | null>>;
   couponCode: string;
   setCouponCode: Dispatch<SetStateAction<string>>;
+  redeemPoints: number;
   setRedeemPoints: Dispatch<SetStateAction<number>>;
   taxPercentage: number;
   taxAmount: number;
@@ -84,6 +85,7 @@ export const usePosCheckout = ({
   setAppliedPromotion,
   couponCode,
   setCouponCode,
+  redeemPoints,
   setRedeemPoints,
   taxPercentage,
   taxAmount,
@@ -158,11 +160,14 @@ export const usePosCheckout = ({
 
   const validateStockAvailability = useCallback(() => {
     if (settings?.enableNegativeStock ?? false) return true;
+    const plannedByProduct = new Map<string, number>();
     for (const item of cart) {
       const available = stockOf(item.product.id);
-      if (item.quantityM2 > available) {
+      const planned = round2((plannedByProduct.get(item.product.id) || 0) + item.quantityM2);
+      plannedByProduct.set(item.product.id, planned);
+      if (planned > available) {
         notify(
-          `الرصيد المتاح من «${item.product.name}» ${formatProductQuantity(available, item.product)} فقط، والمطلوب ${formatProductQuantity(item.quantityM2, item.product)}`,
+          `الرصيد المتاح من «${item.product.name}» ${formatProductQuantity(available, item.product)} فقط، وإجمالي المطلوب ${formatProductQuantity(planned, item.product)}`,
           'error'
         );
         return false;
@@ -183,7 +188,8 @@ export const usePosCheckout = ({
   }, [cart, can, notify]);
 
   const validateDiscount = useCallback(() => {
-    const totalDiscount = round2(discountAmount + lineDiscountTotal);
+    const totalDiscount = round2(discountAmount + promotionDiscount + loyaltyDiscount + lineDiscountTotal);
+    const approvalDiscount = round2(discountAmount + lineDiscountTotal);
     if (totalDiscount > lineSubtotal) {
       notify('إجمالي الخصومات لا يمكن أن يتجاوز قيمة الأصناف', 'error');
       return false;
@@ -192,8 +198,8 @@ export const usePosCheckout = ({
       notify('غير مصرح لك بمنح خصم على الفاتورة', 'error');
       return false;
     }
-    if (totalDiscount > 0) {
-      const discountPercent = lineSubtotal > 0 ? (totalDiscount / lineSubtotal) * 100 : 0;
+    if (approvalDiscount > 0) {
+      const discountPercent = lineSubtotal > 0 ? (approvalDiscount / lineSubtotal) * 100 : 0;
       const configuredThreshold = settings?.discountApprovalThresholdPercent ?? 10;
       const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', configuredThreshold);
       if (discountPercent > threshold && !can('sales.approve')) {
@@ -201,8 +207,8 @@ export const usePosCheckout = ({
           const request = new ApprovalService().createRequest({
             requestType: 'DISCOUNT',
             title: `اعتماد خصم ${discountPercent.toFixed(1)}% على فاتورة بيع`,
-            description: `العميل: ${selectedCustomer?.name ?? ''} — قيمة الخصم ${totalDiscount} ج.م من إجمالي ${lineSubtotal} ج.م (الحد المسموح ${threshold}%).`,
-            requestedValue: totalDiscount,
+            description: `العميل: ${selectedCustomer?.name ?? ''} — قيمة الخصم ${approvalDiscount} ج.م من إجمالي ${lineSubtotal} ج.م (الحد المسموح ${threshold}%).`,
+            requestedValue: approvalDiscount,
             currentValue: lineSubtotal,
             priority: 'HIGH',
             referenceType: 'POS',
@@ -215,7 +221,7 @@ export const usePosCheckout = ({
       }
     }
     return true;
-  }, [discountAmount, lineDiscountTotal, can, lineSubtotal, settings, selectedCustomer, notify]);
+  }, [discountAmount, promotionDiscount, loyaltyDiscount, lineDiscountTotal, can, lineSubtotal, settings, selectedCustomer, notify]);
 
   const validateCreditLimit = useCallback(() => {
     if (selectedCustomer && remainingAmount > 0 && selectedCustomer.creditLimit > 0) {
@@ -230,6 +236,26 @@ export const usePosCheckout = ({
     }
     return true;
   }, [remainingAmount, selectedCustomer, notify]);
+
+  const validateLoyaltyRedemption = useCallback(() => {
+    if (redeemPoints === 0 && loyaltyDiscount === 0) return true;
+    if (!selectedCustomer || !Number.isInteger(redeemPoints) || redeemPoints <= 0
+      || round2(loyaltyDiscount) !== round2(redeemPoints)) {
+      notify('تحقق من تطبيق عدد صحيح من نقاط الولاء على العميل المحدد', 'error');
+      return false;
+    }
+    try {
+      const availablePoints = loyaltyService.getRedeemablePointBalance(selectedCustomer.id);
+      if (availablePoints < redeemPoints) {
+        notify(`رصيد الولاء غير كافٍ: المتاح ${availablePoints} نقطة`, 'error');
+        return false;
+      }
+      return true;
+    } catch (error: any) {
+      notify(error?.message || 'تعذر التحقق من رصيد نقاط الولاء', 'error');
+      return false;
+    }
+  }, [redeemPoints, loyaltyDiscount, selectedCustomer, loyaltyService, notify]);
 
   const confirmActiveShift = useCallback(() => {
     if (!activeShift) {
@@ -247,10 +273,11 @@ export const usePosCheckout = ({
       && validateMinimumPrices()
       && validateDiscount()
       && validateCreditLimit()
+      && validateLoyaltyRedemption()
       && confirmActiveShift()
   ), [
     validateCartAndPermissions, validateStockAvailability, validateMinimumPrices,
-    validateDiscount, validateCreditLimit, confirmActiveShift,
+    validateDiscount, validateCreditLimit, validateLoyaltyRedemption, confirmActiveShift,
   ]);
 
   const showToneMixingWarning = useCallback(() => {
@@ -311,6 +338,20 @@ export const usePosCheckout = ({
       });
 
       setSuccessInvoice(invoice);
+      let loyaltyRedemptionError: string | null = null;
+      if (redeemPoints > 0) {
+        try {
+          loyaltyService.redeemPoints({
+            customerId: selectedCustomer.id,
+            points: redeemPoints,
+            referenceType: 'SALES_INVOICE',
+            referenceId: invoice.id,
+            description: `استبدال نقاط مقابل فاتورة ${invoice.invoiceNumber}`,
+          });
+        } catch (error: any) {
+          loyaltyRedemptionError = error?.message || 'خطأ غير معروف';
+        }
+      }
       if (appliedPromotion) {
         try {
           pricingService.recordPromotionUsage(appliedPromotion.promotionId, invoice.id, couponCode || undefined, appliedPromotion.discountAmount);
@@ -347,7 +388,12 @@ export const usePosCheckout = ({
       setProducts(productService.getAllProducts());
       if (selectedWarehouseId) loadStock(selectedWarehouseId);
       setActiveShift(cashierService.getActiveShift());
-      notify(`تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح`, 'success');
+      notify(
+        loyaltyRedemptionError
+          ? `تم إصدار الفاتورة ${invoice.invoiceNumber}، لكن تعذر خصم نقاط الولاء: ${loyaltyRedemptionError}`
+          : `تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح`,
+        loyaltyRedemptionError ? 'warning' : 'success'
+      );
     } catch (error: any) {
       notify(error.message || 'خطأ أثناء حفظ الفاتورة', 'error');
     } finally {
@@ -358,6 +404,7 @@ export const usePosCheckout = ({
     salesService, selectedWarehouseId, activeShift, cart, discountAmount,
     promotionDiscount, loyaltyDiscount, taxPercentage, taxAmount, shippingCost,
     paidAmount, paymentType, splitCash, splitCard, splitBank, splitCheque, notes,
+    redeemPoints,
     performedBy, appliedPromotion, pricingService, couponCode, loyaltyService,
     setCart, setDiscountAmount, setPromotionDiscount, setLoyaltyDiscount,
     setAppliedPromotion, setCouponCode, setRedeemPoints, setShippingCost,

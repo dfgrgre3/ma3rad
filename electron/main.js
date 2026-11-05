@@ -3,6 +3,10 @@ const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const { randomBytes } = require('node:crypto');
+const { createFileLogger, registerProcessErrorHandlers } = require('./diagnostics');
+
+// Show all Chromium/Electron diagnostics in the terminal when running from CLI.
+try { app.commandLine.appendSwitch('enable-logging'); } catch { /* app may be unavailable */ }
 const safeStorageCompat = require('./safeStorageCompat');
 const { registerPrintingHandlers } = require('./printing');
 const { registerDatabaseHandlers } = require('./databaseHandlers');
@@ -18,6 +22,7 @@ const {
 } = require('./syncClientConfig');
 const tailscaleService = require('./tailscaleService');
 const { registerLicenseHandlers } = require('./licenseGuard');
+const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
 
 // ───────────────────────────── Environment ────────────────────────────────────
 //   LICENSE_MODE=account|hardwa   (default: hardwa)
@@ -65,6 +70,14 @@ const APP_DATA_DIR = configuredDataDir && path.isAbsolute(configuredDataDir)
   ? path.resolve(process.env.CERAMISYS_USER_DATA_DIR)
   : path.join(app.getPath('appData'), 'CeramiSysERP');
 app.setPath('userData', APP_DATA_DIR);
+const logger = createFileLogger({
+  fs: fsSync,
+  path,
+  logDirectory: path.join(APP_DATA_DIR, 'logs'),
+});
+logger.installConsole();
+logger.write('info', 'Application diagnostics initialized');
+registerProcessErrorHandlers(process, app, logger);
 const DATA_DIR = path.join(APP_DATA_DIR, 'data');
 const BACKUP_DIR = path.join(APP_DATA_DIR, 'backups');
 const DB_FILE = path.join(DATA_DIR, 'ceramisys.sqlite');
@@ -106,6 +119,16 @@ function validateIpcSender(event) {
   throw new Error('Unauthorized IPC caller');
 }
 
+ipcMain.handle('diagnostics:renderer-error', (event, report) => {
+  validateIpcSender(event);
+  if (!report || typeof report !== 'object') throw new Error('Invalid renderer error report.');
+  const kind = typeof report.kind === 'string' ? report.kind.slice(0, 80) : 'renderer-error';
+  const message = typeof report.message === 'string' ? report.message.slice(0, 4000) : 'Unknown renderer error';
+  const stack = typeof report.stack === 'string' ? report.stack.slice(0, 12000) : '';
+  logger.write('error', `[renderer:${kind}] ${message}`, stack);
+  return { ok: true };
+});
+
 // Security: Validate data size limits
 const MAX_DB_SIZE = 500 * 1024 * 1024; // 500MB
 const MAX_PRINT_DATA = 10 * 1024 * 1024; // 10MB for print data
@@ -115,6 +138,8 @@ let syncClientConfigSource = 'none';
 let syncRelay = null;
 let syncStartupError = null;
 let restartAfterGracefulClose = false;
+let pendingUpdateInstall = false;
+let updateController = null;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -192,13 +217,26 @@ function createWindow() {
     ipcMain,
     dialog,
     validateIpcSender,
-    onApprovedClose: () => {
+    onApprovedClose: async () => {
+      if (pendingUpdateInstall) {
+        const backupPath = await createRollbackBackup({
+          fs, path, dbFile: DB_FILE, backupDir: BACKUP_DIR, version: app.getVersion(),
+        });
+        console.info(`[updater] Created encrypted rollback backup: ${backupPath}`);
+        if (!updateController?.installNow()) {
+          console.error('[updater] Downloaded update was not ready after graceful shutdown.');
+          throw new Error('The downloaded update is no longer ready to install.');
+        }
+        pendingUpdateInstall = false;
+        return;
+      }
       if (!restartAfterGracefulClose) return;
       restartAfterGracefulClose = false;
       app.relaunch();
     },
     onCancelledClose: () => {
       restartAfterGracefulClose = false;
+      pendingUpdateInstall = false;
     },
   });
 
@@ -515,6 +553,18 @@ app.whenReady().then(async () => {
     console.error('Branch synchronization could not start; the local ERP remains available:', syncStartupError);
   }
   createWindow();
+  updateController = configureAutoUpdater({
+    app,
+    ipcMain,
+    validateIpcSender,
+    getWindow: () => BrowserWindow.getAllWindows()[0] || null,
+    onInstallRequested: () => {
+      const [win] = BrowserWindow.getAllWindows();
+      if (!win) throw new Error('The application window is not available for a safe update.');
+      pendingUpdateInstall = true;
+      win.close();
+    },
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

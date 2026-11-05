@@ -7,11 +7,13 @@ import { InventoryService } from '../../services/InventoryService';
 import { ProductService } from '../../services/ProductService';
 import { useToast } from '../../components/ui/Toast';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { usePermission } from '../../hooks/usePermission';
 
 export const WarehouseLocationsPage: React.FC = () => {
   const inventoryService = new InventoryService();
   const productService = new ProductService();
   const toast = useToast();
+  const canManage = usePermission()('inventory.locations.manage');
 
   const [locations, setLocations] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
@@ -71,6 +73,7 @@ export const WarehouseLocationsPage: React.FC = () => {
   }, [selectedWarehouseId]);
 
   const handleOpenCreate = () => {
+    if (!canManage) return;
     setEditingLocation(null);
     setFormData({
       warehouseId: selectedWarehouseId || warehouses[0]?.id || '',
@@ -86,6 +89,7 @@ export const WarehouseLocationsPage: React.FC = () => {
   };
 
   const handleOpenEdit = (loc: any) => {
+    if (!canManage) return;
     setEditingLocation(loc);
     setFormData({
       warehouseId: loc.warehouseId,
@@ -102,6 +106,7 @@ export const WarehouseLocationsPage: React.FC = () => {
 
   const handleSaveLocation = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     try {
       if (editingLocation) {
         inventoryService.updateWarehouseLocation(editingLocation.id, formData);
@@ -118,6 +123,7 @@ export const WarehouseLocationsPage: React.FC = () => {
   };
 
   const handleDeleteLocation = (id: string) => {
+    if (!canManage) return;
     if (!confirm('هل تريد حذف موقع التخزين هذا؟')) return;
     try {
       inventoryService.deleteWarehouseLocation(id);
@@ -140,6 +146,7 @@ export const WarehouseLocationsPage: React.FC = () => {
 
   const handleAssignStock = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!viewingLocation || !assignForm.productId) return;
     try {
       inventoryService.assignProductLocation(viewingLocation.id, assignForm.productId, Number(assignForm.quantityM2));
@@ -178,13 +185,15 @@ export const WarehouseLocationsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black shadow-md shadow-violet-600/20 transition active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            إضافة موقع تخزين
-          </button>
+          {canManage && (
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black shadow-md shadow-violet-600/20 transition active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              إضافة موقع تخزين
+            </button>
+          )}
           <button
             onClick={loadData}
             className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition"
@@ -306,22 +315,24 @@ export const WarehouseLocationsPage: React.FC = () => {
                     عرض البضائع ({loc.productsCount || 0})
                   </button>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEdit(loc)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition"
-                      title="تعديل الموقع"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteLocation(loc.id)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                      title="حذف الموقع"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleOpenEdit(loc)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition"
+                        title="تعديل الموقع"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLocation(loc.id)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                        title="حذف الموقع"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -338,7 +349,7 @@ export const WarehouseLocationsPage: React.FC = () => {
       </div>
 
       {/* Add / Edit Location Modal */}
-      {showModal && (
+      {canManage && showModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -487,13 +498,15 @@ export const WarehouseLocationsPage: React.FC = () => {
 
             <div className="my-4 flex justify-between items-center">
               <span className="text-xs font-bold text-slate-600">الأصناف الموجودة حالياً:</span>
-              <button
-                onClick={() => setShowAssignModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                تسكين صنف في هذا الرف
-              </button>
+              {canManage && (
+                <button
+                  onClick={() => setShowAssignModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-black"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  تسكين صنف في هذا الرف
+                </button>
+              )}
             </div>
 
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
@@ -515,18 +528,20 @@ export const WarehouseLocationsPage: React.FC = () => {
                       <td className="px-3 py-2 text-center font-mono font-black text-violet-700">{formatProductQuantity(p.quantityM2, p)}</td>
                       <td className="px-3 py-2 text-center text-[10px] text-slate-400">{p.lastMovedAt?.slice(0, 10)}</td>
                       <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => {
-                            if (confirm(`هل تريد إزالة الصنف ${p.productName} من هذا الرف؟`)) {
-                              inventoryService.assignProductLocation(viewingLocation.id, p.productId, 0);
-                              handleViewProducts(viewingLocation);
-                              loadData();
-                            }
-                          }}
-                          className="text-xs text-rose-600 hover:underline font-bold"
-                        >
-                          تفريغ
-                        </button>
+                        {canManage && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`هل تريد إزالة الصنف ${p.productName} من هذا الرف؟`)) {
+                                inventoryService.assignProductLocation(viewingLocation.id, p.productId, 0);
+                                handleViewProducts(viewingLocation);
+                                loadData();
+                              }
+                            }}
+                            className="text-xs text-rose-600 hover:underline font-bold"
+                          >
+                            تفريغ
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -554,7 +569,7 @@ export const WarehouseLocationsPage: React.FC = () => {
       )}
 
       {/* Assign Stock Modal */}
-      {showAssignModal && viewingLocation && (
+      {canManage && showAssignModal && viewingLocation && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
             <h3 className="font-black text-slate-900 text-sm mb-3">تسكين صنف في الرف</h3>

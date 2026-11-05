@@ -11,6 +11,7 @@ import { localDateString } from '../utils/date';
 import { OperationsService } from './OperationsService';
 import { DatabaseManager } from '../database/db';
 import { NotificationService } from './NotificationService';
+import { DATA_IMPORT_ACCESS_PERMISSIONS } from '../config/routePermissions';
 
 export type ImportEntity = 'customers' | 'suppliers' | 'categories' | 'brands' | 'products' | 'employees' | 'warehouses' | 'dynamic';
 type ExistingImportEntity = Exclude<ImportEntity, 'dynamic'>;
@@ -174,7 +175,7 @@ export class DataImportService {
   }
 
   canOpen(user: ReturnType<typeof AuthService.getCurrentUser>): boolean {
-    return PermissionService.can(user, 'admin.data') || (Object.values(ENTITY_META) as Array<(typeof ENTITY_META)[Exclude<ImportEntity, 'dynamic'>]>).some(meta => PermissionService.can(user, meta.permission));
+    return PermissionService.canAny(user, DATA_IMPORT_ACCESS_PERMISSIONS);
   }
 
   validate(data: ParsedImport): ImportIssue[] {

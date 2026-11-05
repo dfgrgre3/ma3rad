@@ -15,10 +15,12 @@ import { FinanceEnterpriseService } from '../../services/FinanceEnterpriseServic
 import type { PaymentGateway, PaymentGatewaySettlement, BankAccount } from '../../types/finance';
 import { localDateString } from '../../utils/date';
 import { useToast } from '../../components/ui/Toast';
+import { usePermission } from '../../hooks/usePermission';
 
 export const EPaymentSettlementPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const toast = useToast();
+  const canManage = usePermission()('finance.epayments.settle');
 
   const [activeTab, setActiveTab] = useState<'settlements' | 'gateways'>('settlements');
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
@@ -79,6 +81,7 @@ export const EPaymentSettlementPage: React.FC = () => {
 
   const handleCreateGateway = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     try {
       service.savePaymentGateway({
         name: gatewayForm.name,
@@ -106,6 +109,7 @@ export const EPaymentSettlementPage: React.FC = () => {
 
   const handleRecordSettlement = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     try {
       service.recordGatewaySettlement({
         gatewayId: settleForm.gatewayId,
@@ -172,20 +176,24 @@ export const EPaymentSettlementPage: React.FC = () => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => setShowGatewayModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>بوابة / ماكينة جديدة</span>
-          </button>
-          <button
-            onClick={() => setShowSettlementModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-            <span>تسوية وإيداع بنكي</span>
-          </button>
+          {canManage && (
+            <>
+              <button
+                onClick={() => setShowGatewayModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>بوابة / ماكينة جديدة</span>
+              </button>
+              <button
+                onClick={() => setShowSettlementModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                <span>تسوية وإيداع بنكي</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -342,7 +350,7 @@ export const EPaymentSettlementPage: React.FC = () => {
       )}
 
       {/* Modal: New Gateway */}
-      {showGatewayModal && (
+      {canManage && showGatewayModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-800 mb-4">إضافة ماكينة أو بوابة دفع</h3>
@@ -425,7 +433,7 @@ export const EPaymentSettlementPage: React.FC = () => {
       )}
 
       {/* Modal: Record Settlement */}
-      {showSettlementModal && (
+      {canManage && showSettlementModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 className="text-base font-bold text-slate-800 mb-4">تسوية رصيد بوابة وإيداع بنكي</h3>

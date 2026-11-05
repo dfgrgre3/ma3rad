@@ -27,6 +27,12 @@ interface UsePosHeldOrdersOptions {
   setPaidAmount: Dispatch<SetStateAction<number>>;
   paymentType: PaymentType;
   setPaymentType: Dispatch<SetStateAction<PaymentType>>;
+  couponCode: string;
+  setCouponCode: Dispatch<SetStateAction<string>>;
+  redeemPoints: number;
+  setRedeemPoints: Dispatch<SetStateAction<number>>;
+  loyaltyDiscount: number;
+  setLoyaltyDiscount: Dispatch<SetStateAction<number>>;
   setIsHeldModalOpen: Dispatch<SetStateAction<boolean>>;
   notify: (message: string, type?: Toast['type']) => void;
 }
@@ -54,6 +60,12 @@ export const usePosHeldOrders = ({
   setPaidAmount,
   paymentType,
   setPaymentType,
+  couponCode,
+  setCouponCode,
+  redeemPoints,
+  setRedeemPoints,
+  loyaltyDiscount,
+  setLoyaltyDiscount,
   setIsHeldModalOpen,
   notify,
 }: UsePosHeldOrdersOptions) => {
@@ -117,7 +129,10 @@ export const usePosHeldOrders = ({
       shippingCost,
       notes,
       paidAmount,
-      paymentType
+      paymentType,
+      couponCode,
+      redeemPoints,
+      loyaltyDiscount,
     };
     persistHeld((prev) => [hold, ...prev]);
     setCart([]);
@@ -126,6 +141,9 @@ export const usePosHeldOrders = ({
     setShippingCost(0);
     setNotes('');
     setPaidAmount(0);
+    setCouponCode('');
+    setRedeemPoints(0);
+    setLoyaltyDiscount(0);
     notify('تم تعليق الطلب وإمكانية استرجاعه لاحقاً', 'success');
   };
 
@@ -146,6 +164,9 @@ export const usePosHeldOrders = ({
     setNotes(order.notes || '');
     setPaidAmount(order.paidAmount || 0);
     setPaymentType(order.paymentType || 'CASH');
+    setCouponCode(order.couponCode || '');
+    setRedeemPoints(order.redeemPoints || 0);
+    setLoyaltyDiscount(order.loyaltyDiscount || 0);
     persistHeld((prev) => prev.filter((item) => item.id !== order.id));
     setIsHeldModalOpen(false);
     notify(`تم استرجاع الطلب: ${order.customerName}`, 'success');

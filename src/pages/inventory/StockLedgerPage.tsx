@@ -4,6 +4,7 @@ import { DatabaseManager } from '../../database/db';
 import { BranchAccessService } from '../../services/BranchAccessService';
 import { format } from 'date-fns';
 import { formatProductQuantity } from '../../utils/productUnits';
+import { usePermission } from '../../hooks/usePermission';
 
 interface LedgerEntry {
   id: string;
@@ -37,6 +38,7 @@ const TYPE_LABELS: Record<string, { label: string; color: string }> = {
 const branchAccess = new BranchAccessService();
 
 export const StockLedgerPage: React.FC = () => {
+  const can = usePermission();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');

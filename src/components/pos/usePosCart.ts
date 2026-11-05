@@ -108,7 +108,7 @@ export const usePosCart = ({
       }
       return [...prev, makeCartItem(product, stepM2)];
     });
-  }, [selectedCustomer, pricingService, makeCartItem]);
+  }, [selectedCustomer, pricingService, makeCartItem, allowDuplicateItems]);
 
   const addCalculatedToCart = (product: Product, quantityM2: number) => {
     addToCart(product, quantityM2);

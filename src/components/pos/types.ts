@@ -34,6 +34,9 @@ export interface HeldOrder {
   notes: string;
   paidAmount?: number;
   paymentType?: PaymentType;
+  couponCode?: string;
+  redeemPoints?: number;
+  loyaltyDiscount?: number;
 }
 
 export interface Toast {

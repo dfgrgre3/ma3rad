@@ -1,6 +1,9 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
 import path from 'path';
+
+const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'));
 
 // Content Security Policy is injected into index.html at serve/build time so the
 // packaged app can run without 'unsafe-inline' for scripts while the dev server
@@ -36,6 +39,11 @@ function appCspPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), appCspPlugin()],
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
+  clearScreen: false,
+  logLevel: 'info',
   // Electron loads the packaged renderer from file://, so root-absolute URLs
   // like /assets/... resolve outside the app bundle and leave a blank window.
   // Relative URLs also work when Vite serves the app from the LAN host root.

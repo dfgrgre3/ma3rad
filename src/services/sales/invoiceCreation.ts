@@ -260,6 +260,9 @@ function validateDiscountAndCredit(
   totalLineDiscount: number
 ): void {
   const headerDiscount = dto.discountAmount || 0;
+  if (headerDiscount > totals.subtotal) {
+    throw new Error('إجمالي الخصم يتجاوز صافي قيمة الأصناف في الفاتورة.');
+  }
   if (totalLineDiscount + headerDiscount > 0) {
     PermissionService.require(actor, 'sales.discount');
   }

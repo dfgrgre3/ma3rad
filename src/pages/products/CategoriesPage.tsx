@@ -4,8 +4,13 @@ import {
   FolderTree, Plus, Search, Edit, Trash2, Package, ChevronRight, X, Layers
 } from 'lucide-react';
 import { CategoryService, CategoryWithCount } from '../../services/CategoryService';
+import { usePermission } from '../../hooks/usePermission';
 
 export const CategoriesPage: React.FC = () => {
+  const can = usePermission();
+  const canCreate = can('categories.create');
+  const canUpdate = can('categories.update');
+  const canDelete = can('categories.delete');
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -96,7 +101,7 @@ export const CategoriesPage: React.FC = () => {
       >
         <Package className="w-3.5 h-3.5" /> المنتجات ({cat.productCount})
       </button>
-      {!cat.parentId && (
+      {canCreate && !cat.parentId && (
         <button
           onClick={() => handleOpenAddModal(cat.id)}
           className="p-1.5 rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition"
@@ -105,12 +110,16 @@ export const CategoriesPage: React.FC = () => {
           <Plus className="w-4 h-4" />
         </button>
       )}
-      <button onClick={() => handleOpenEditModal(cat)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition" title="تعديل">
-        <Edit className="w-4 h-4" />
-      </button>
-      <button onClick={() => handleDelete(cat.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="حذف">
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {canUpdate && (
+        <button onClick={() => handleOpenEditModal(cat)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition" title="تعديل">
+          <Edit className="w-4 h-4" />
+        </button>
+      )}
+      {canDelete && (
+        <button onClick={() => handleDelete(cat.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="حذف">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 
@@ -121,13 +130,15 @@ export const CategoriesPage: React.FC = () => {
           <h2 className="text-xl font-extrabold text-slate-900">أنواع المنتجات</h2>
           <p className="text-xs text-slate-500">إدارة تصنيفات المنتجات والأنواع الفرعية</p>
         </div>
-        <button
-          onClick={() => handleOpenAddModal()}
-          className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm self-start md:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>إضافة نوع جديد</span>
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => handleOpenAddModal()}
+            className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-sky-600/30 transition text-sm self-start md:self-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة نوع جديد</span>
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">

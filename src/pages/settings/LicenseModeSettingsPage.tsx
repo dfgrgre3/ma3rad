@@ -1,13 +1,17 @@
 import React, { useCallback, useState } from 'react';
 import { Shield, Globe, Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { usePermission } from '../../hooks/usePermission';
 
 export const LicenseModeSettingsPage: React.FC = () => {
+  const can = usePermission();
+  const canManage = can('admin.license.manage') || can('settings.license_mode.manage');
   const [mode, setMode] = useState<'account' | 'hardwa'>('hardwa');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const handleChange = useCallback(async (nextMode: 'account' | 'hardwa') => {
+    if (!canManage) return;
     if (loading) return;
     setLoading(true);
     setError(null);
@@ -27,7 +31,15 @@ export const LicenseModeSettingsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [loading]);
+  }, [loading, canManage]);
+
+  if (!canManage) {
+    return (
+      <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900" dir="rtl">
+        لا تملك صلاحية إدارة وضع الترخيص.
+      </div>
+    );
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50 text-slate-900 dark:bg-slate-950 p-4 lg:p-6 dir-rtl">

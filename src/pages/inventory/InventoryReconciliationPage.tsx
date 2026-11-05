@@ -6,10 +6,12 @@ import {
 } from 'lucide-react';
 import { InventoryService } from '../../services/InventoryService';
 import { useToast } from '../../components/ui/Toast';
+import { usePermission } from '../../hooks/usePermission';
 
 export const InventoryReconciliationPage: React.FC = () => {
   const inventoryService = new InventoryService();
   const toast = useToast();
+  const canManage = usePermission()('inventory.reconciliation.manage');
 
   const [reconciliation, setReconciliation] = useState<any | null>(null);
   const [historyLogs, setHistoryLogs] = useState<any[]>([]);
@@ -46,7 +48,7 @@ export const InventoryReconciliationPage: React.FC = () => {
 
   const handleSaveAuditStamp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reconciliation) return;
+    if (!canManage || !reconciliation) return;
     setReconciling(true);
     try {
       inventoryService.saveReconciliationLog({
@@ -99,13 +101,15 @@ export const InventoryReconciliationPage: React.FC = () => {
             ))}
           </select>
 
-          <button
-            onClick={() => setShowSaveModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/20 transition active:scale-95"
-          >
-            <BookmarkCheck className="w-4 h-4" />
-            توثيق محضر مطابقة دوري
-          </button>
+          {canManage && (
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md shadow-emerald-600/20 transition active:scale-95"
+            >
+              <BookmarkCheck className="w-4 h-4" />
+              توثيق محضر مطابقة دوري
+            </button>
+          )}
 
           <button
             onClick={loadData}
@@ -285,7 +289,7 @@ export const InventoryReconciliationPage: React.FC = () => {
       </div>
 
       {/* Save Audit Stamp Modal */}
-      {showSaveModal && (
+      {canManage && showSaveModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-100 animate-in fade-in zoom-in duration-150">
             <h3 className="font-black text-slate-900 text-sm mb-2">توثيق محضر مطابقة دوري رسمي</h3>

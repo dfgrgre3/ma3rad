@@ -15,10 +15,24 @@ export async function resolve(specifier, context, nextResolve) {
       }
     }
   }
-  return nextResolve(specifier, context);
+  const resolved = await nextResolve(specifier, context);
+  // Node 24 validates JSON import attributes during resolution, before the
+  // load hook can provide the source. Mark JSON as an explicitly handled
+  // module so the mixed TypeScript/CommonJS test suite remains portable.
+  if (resolved.url.endsWith('.json')) {
+    return { ...resolved, format: 'module', shortCircuit: true };
+  }
+  return resolved;
 }
 
 export async function load(url, context, nextLoad) {
+  // Node 24 enforces import attributes for JSON even when a CommonJS test
+  // reaches the file through the registered ESM hooks. Return JSON explicitly
+  // so the mixed .ts/.cjs test suite remains compatible across Node versions.
+  if (url.endsWith('.json')) {
+    const source = await readFile(fileURLToPath(url), 'utf8');
+    return { format: 'module', source: `export default ${source};`, shortCircuit: true };
+  }
   if (url.endsWith('.tsx')) {
     const source = await readFile(fileURLToPath(url), 'utf8');
     const output = ts.transpileModule(source, {

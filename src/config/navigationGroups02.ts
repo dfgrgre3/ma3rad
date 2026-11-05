@@ -5,6 +5,7 @@ import {
   Wallet, Warehouse,
 } from 'lucide-react';
 import type { NavGroupDef } from './navigationTypes';
+import { DATA_IMPORT_ACCESS_PERMISSIONS } from './routePermissions';
 
 export const NAV_GROUPS_02: NavGroupDef[] = [
 {
@@ -75,11 +76,11 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     label: 'النظام',
     icon: Settings,
     color: 'text-slate-500',
-    perm: 'settings.view',
+    anyPerms: ['settings.view', ...DATA_IMPORT_ACCESS_PERMISSIONS],
     items: [
       { label: 'مركز التحكم', to: '/admin', icon: SlidersHorizontal, highlight: true, anyPerms: ['admin.view', 'users.view'] },
       { label: 'تعارضات مزامنة الفروع', to: '/admin/sync-conflicts', icon: RefreshCw, perm: 'admin.view' },
-      { label: 'مركز استيراد البيانات', to: '/data-import', icon: FileSpreadsheet, perm: 'settings.view' },
+      { label: 'مركز استيراد البيانات', to: '/data-import', icon: FileSpreadsheet, anyPerms: DATA_IMPORT_ACCESS_PERMISSIONS },
       { label: 'الإشعارات', to: '/notifications', icon: Bell, perm: 'notifications.view' },
       { label: 'سجل التدقيق', to: '/audit', icon: ShieldCheck, perm: 'audit.view' },
       { label: 'مركز الأمان', to: '/security', icon: ShieldCheck, perm: 'sessions.view' },

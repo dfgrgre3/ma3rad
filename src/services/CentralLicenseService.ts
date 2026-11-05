@@ -5,6 +5,7 @@
 import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BYPASS_FIRST_RUN_SETUP } from '../config/setupLifecycle';
+import { APP_VERSION } from '../config/appVersion';
 
 const STORAGE_KEY = 'central_device_credential';
 const SERVER_KEY = 'central_server_url';
@@ -172,7 +173,7 @@ export class CentralLicenseService {
         deviceId: this.getDeviceId(),
         deviceName: deviceName || navigator.userAgent.slice(0, 40),
         os: navigator.platform,
-        appVersion: '1.1.3',
+        appVersion: APP_VERSION,
         deviceRole: 'standalone',
       }),
     });
@@ -292,7 +293,7 @@ export class CentralLicenseService {
       await this.request('/api/v1/licensing/heartbeat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId: this.getDeviceId(), deviceCredential: cred, appVersion: '1.1.3' }),
+        body: JSON.stringify({ deviceId: this.getDeviceId(), deviceCredential: cred, appVersion: APP_VERSION }),
       });
     } catch { /* ignore */ }
   }
