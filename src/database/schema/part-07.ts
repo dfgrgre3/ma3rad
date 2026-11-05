@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS supplier_claims (
   claim_number TEXT UNIQUE NOT NULL,
   date TEXT NOT NULL,
   supplier_id TEXT NOT NULL,
+  branch_id TEXT,
   purchase_invoice_id TEXT,
   grn_id TEXT,
   purchase_order_id TEXT,

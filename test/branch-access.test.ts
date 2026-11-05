@@ -8,6 +8,8 @@ import { BranchService } from '../src/services/BranchService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { ApprovalService } from '../src/services/ApprovalService.ts';
 import { PurchaseRequestService } from '../src/services/PurchaseRequestService.ts';
+import { PurchaseReturnService } from '../src/services/PurchaseReturnService.ts';
+import { ProcurementService } from '../src/services/ProcurementService.ts';
 import { CashierService } from '../src/services/CashierService.ts';
 import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
 import { OperationsService } from '../src/services/OperationsService.ts';
@@ -22,6 +24,9 @@ test('branch access enforces assigned and explicit central scopes in service que
     `INSERT INTO branches (id, code, name, is_main, is_active)
      VALUES ('br_scope_a', 'SCOPE-A', 'Scope A', 0, 1),
             ('br_scope_b', 'SCOPE-B', 'Scope B', 0, 1)`
+  );
+  db.run(
+    `UPDATE branches SET company_id = 'cmp_main' WHERE id IN ('br_scope_a', 'br_scope_b')`
   );
   db.run(
     `INSERT INTO warehouses (id, name, code, branch_id, is_active)
@@ -59,6 +64,8 @@ test('branch access enforces assigned and explicit central scopes in service que
             ('usr_scope', 'approvals.view', 'GRANT'),
             ('usr_scope', 'approvals.create', 'GRANT'),
             ('usr_scope', 'approvals.approve', 'GRANT'),
+            ('usr_scope', 'purchases.create', 'GRANT'),
+            ('usr_scope', 'purchases.return', 'GRANT'),
             ('usr_scope', 'purchases.view', 'GRANT'),
             ('usr_scope', 'purchases.approve', 'GRANT'),
             ('usr_scope', 'cashier.view', 'GRANT'),
@@ -75,6 +82,106 @@ test('branch access enforces assigned and explicit central scopes in service que
   assert.throws(() => access.requireRegisterAccess('cr_scope_a', user, 'br_scope_b'), /خزينة تابعة لفرع المعاملة/);
   assert.deepEqual(new CashierService().getAllRegisters().map(register => register.id), ['cr_scope_a']);
   assert.deepEqual(new OperationsService().getBranches('', true).map(branch => branch.id), ['br_scope_a']);
+  db.run(
+    `INSERT INTO suppliers (id, code, name, phone) VALUES ('sup_scope', 'SUP-SCOPE', 'Scoped supplier', '01000000000')`
+  );
+  db.run(`
+    INSERT INTO purchase_invoices (
+      id, invoice_number, date, supplier_id, warehouse_id, branch_id, company_id,
+      subtotal, total_amount, paid_amount, remaining_amount, payment_type, payment_status, created_by
+    ) VALUES
+      ('pi_scope_a', 'PI-SCOPE-A', '2026-01-01', 'sup_scope', 'wh_scope_a', 'br_scope_a', 'cmp_main', 10, 10, 0, 10, 'CREDIT', 'UNPAID', 'usr_scope'),
+      ('pi_scope_b', 'PI-SCOPE-B', '2026-01-01', 'sup_scope', 'wh_scope_b', 'br_scope_b', 'cmp_main', 10, 10, 0, 10, 'CREDIT', 'UNPAID', 'usr_scope')
+  `);
+  db.run(`
+    INSERT INTO purchase_returns (
+      id, return_number, original_purchase_id, original_invoice_number, supplier_id, warehouse_id,
+      date, total_amount, reason, created_by
+    ) VALUES
+      ('pret_scope_a', 'PRET-SCOPE-A', 'pi_scope_a', 'PI-SCOPE-A', 'sup_scope', 'wh_scope_a', '2026-01-02', 1, 'A', 'usr_scope'),
+      ('pret_scope_b', 'PRET-SCOPE-B', 'pi_scope_b', 'PI-SCOPE-B', 'sup_scope', 'wh_scope_b', '2026-01-02', 1, 'B', 'usr_scope')
+  `);
+  db.run(`INSERT INTO products (
+    id, sku, barcode, name, category_id, brand_id, grade, size, base_unit, sell_unit,
+    pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
+    min_selling_price_m2, min_stock_level, is_active
+  ) VALUES (
+    'prod_scope_return', 'SKU-SCOPE-RETURN', 'BAR-SCOPE-RETURN', 'Scoped return product',
+    'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10, 20, 15, 10, 1, 1
+  )`);
+  db.run(`
+    INSERT INTO purchase_invoice_items (
+      id, purchase_id, product_id, product_name, grade, quantity_m2, boxes_count,
+      unit_cost, total_cost, meters_per_box, pieces_per_box
+    ) VALUES ('piitem_scope_a', 'pi_scope_a', 'prod_scope_return', 'Scoped return product',
+      'GRADE_1', 1, 1, 10, 10, 1.44, 4)
+  `);
+  db.run(`
+    INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+    VALUES ('stk_scope_return', 'wh_scope_a', 'prod_scope_return', 1, 0)
+  `);
+  const purchaseReturns = new PurchaseReturnService();
+  assert.deepEqual(purchaseReturns.getAllReturns().map(row => row.id), ['pret_scope_a']);
+  assert.equal(purchaseReturns.getReturnById('pret_scope_b'), null);
+  const cashBeforeReturn = db.query<{ balance: number }>(
+    'SELECT current_balance AS balance FROM cash_registers WHERE id = ?',
+    ['cr_scope_a']
+  )[0].balance;
+  const priorCostingMethod = db.query<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = 'costingMethod'`
+  )[0]?.value;
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'AVERAGE_COST')`);
+  try {
+    purchaseReturns.createReturn({
+      purchaseId: 'pi_scope_a',
+      reason: 'Branch-scoped cash refund',
+      refundMethod: 'CASH',
+      items: [{ productId: 'prod_scope_return', quantityM2: 1 }],
+    });
+  } finally {
+    if (priorCostingMethod === undefined) {
+      db.run(`DELETE FROM system_settings WHERE key = 'costingMethod'`);
+    } else {
+      db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', ?)`, [priorCostingMethod]);
+    }
+  }
+  assert.equal(
+    db.query<{ balance: number }>('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_scope_a'])[0].balance,
+    cashBeforeReturn + 10
+  );
+  assert.equal(
+    db.query<{ balance: number }>('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_scope_b'])[0].balance,
+    0
+  );
+  const procurement = new ProcurementService();
+  const manualClaim = procurement.createClaim({
+    supplierId: 'sup_scope',
+    claimType: 'OTHER',
+    claimedAmount: 10,
+  });
+  const cashBeforeClaimRefund = db.query<{ balance: number }>(
+    'SELECT current_balance AS balance FROM cash_registers WHERE id = ?',
+    ['cr_scope_a']
+  )[0].balance;
+  procurement.settleClaim(manualClaim.id, 'REFUND', 5);
+  assert.equal(
+    db.query<{ balance: number }>('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_scope_a'])[0].balance,
+    cashBeforeClaimRefund + 5
+  );
+  assert.equal(
+    db.query<{ branchId: string }>('SELECT branch_id AS branchId FROM supplier_claims WHERE id = ?', [manualClaim.id])[0]?.branchId,
+    'br_scope_a'
+  );
+  db.run(`
+    INSERT INTO supplier_claims (
+      id, claim_number, date, supplier_id, branch_id, purchase_invoice_id, claim_type,
+      claimed_amount, created_by
+    ) VALUES ('claim_scope_b', 'CLM-SCOPE-B', '2026-01-02', 'sup_scope', 'br_scope_b', 'pi_scope_b',
+      'OTHER', 10, 'usr_scope')
+  `);
+  assert.deepEqual(procurement.getAllClaims().map(row => row.id), [manualClaim.id]);
+  assert.equal(procurement.getClaimById('claim_scope_b'), null);
+  assert.throws(() => procurement.settleClaim('claim_scope_b', 'DEBIT_NOTE', 10), /غير موجودة/);
   db.run(
     `INSERT INTO expenses (id, category, amount, register_id, branch_id, payment_type, date, description, performed_by)
      VALUES ('exp_scope_a', 'Test', 10, 'cr_scope_a', 'br_scope_a', 'CASH', '2026-01-01', 'A expense', 'usr_scope'),

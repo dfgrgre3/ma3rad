@@ -7,8 +7,11 @@ import { round2 } from './financials';
 import { postLedgerEntry } from '../database/ledger';
 import type { ReorderSuggestion, SupplierRfqRow, SupplierRfqItem, SupplierQuotationRow, SupplierQuotationItem, GoodsReceiptRow, GoodsReceiptItem, SupplierClaimRow, SupplierClaimItem, ThreeWayMatchingResult, LandedCostBreakdownItem, SupplierScorecard, ProductPriceHistoryEntry } from './procurementTypes';
 import { ProcurementServicePart04 } from './ProcurementServicePart04';
+import { BranchAccessService } from './BranchAccessService';
 
 export abstract class ProcurementServicePart05 extends ProcurementServicePart04 {
+  private branchAccess = new BranchAccessService();
+
 public calculateLandedCost(
     items: { productId: string; quantityM2: number; unitCost: number }[],
     expenses: { freight?: number; loading?: number; customsTaxes?: number; insurance?: number; other?: number },
@@ -110,6 +113,21 @@ public createClaim(dto: {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'purchases.create');
     if (Number(dto.claimedAmount) <= 0) throw new Error('يجب تحديد مبلغ المطالبة بقيمة موجبة.');
+    const branchId = this.branchAccess.getCurrentBranchId(actor);
+    const sourceReferences: Array<{ kind: string; id: string | undefined; query: string }> = [
+      { kind: 'فاتورة الشراء', id: dto.purchaseInvoiceId, query: 'SELECT warehouse_id AS warehouseId FROM purchase_invoices WHERE id = ?' },
+      { kind: 'إذن الاستلام', id: dto.grnId, query: 'SELECT warehouse_id AS warehouseId FROM goods_receipt_notes WHERE id = ?' },
+      { kind: 'أمر الشراء', id: dto.purchaseOrderId, query: 'SELECT warehouse_id AS warehouseId FROM purchase_orders WHERE id = ?' },
+    ];
+    for (const source of sourceReferences) {
+      if (!source.id) continue;
+      const record = this.db.query<{ warehouseId: string }>(source.query, [source.id])[0];
+      if (!record) throw new Error(`${source.kind} المرتبط بالمطالبة غير موجود.`);
+      const sourceBranchId = this.branchAccess.requireWarehouseAccess(record.warehouseId, actor);
+      if (sourceBranchId !== branchId) {
+        throw new Error('يجب أن تنتمي مستندات المطالبة إلى الفرع النشط نفسه.');
+      }
+    }
 
     const claimId = `sclm_${uuidv4().substring(0, 8)}`;
     const today = localDateString();
@@ -119,11 +137,11 @@ public createClaim(dto: {
 
       db.run(`
         INSERT INTO supplier_claims (
-          id, claim_number, date, supplier_id, purchase_invoice_id, grn_id, purchase_order_id,
+          id, claim_number, date, supplier_id, branch_id, purchase_invoice_id, grn_id, purchase_order_id,
           claim_type, severity, claimed_amount, agreed_amount, status, resolution_type, notes, created_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'OPEN', 'PENDING', ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'OPEN', 'PENDING', ?, ?)
       `, [
-        claimId, claimNumber, today, dto.supplierId, dto.purchaseInvoiceId || null,
+        claimId, claimNumber, today, dto.supplierId, branchId, dto.purchaseInvoiceId || null,
         dto.grnId || null, dto.purchaseOrderId || null, dto.claimType, dto.severity || 'MEDIUM',
         round2(dto.claimedAmount), dto.notes || null, actor.id,
       ]);
@@ -142,7 +160,7 @@ public createClaim(dto: {
         }
       }
 
-      return this.getClaimById(claimId)!;
+      return this.readClaimById(claimId, actor)!;
     });
   }
 }

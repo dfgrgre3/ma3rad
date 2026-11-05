@@ -171,4 +171,30 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.throws(() => svc.voidInvoice(invoice3.id, 'خطأ في الإدخال'), /سندات قبض/);
   assert.equal(svc.getInvoiceById(invoice3.id)!.invoiceStatus, 'COMPLETED');
   assert.equal(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0].q, stockBeforeRejectedVoid);
+
+  const invoice4 = svc.createSale({
+    customerId: customer.id, warehouseId: 'wh_main',
+    items: [{ productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 1, boxesCount: 1, piecesCount: 0, unitPrice: 300 }],
+    paidAmount: 0, paymentType: 'CREDIT',
+  });
+  const stockBeforeExchange = q(
+    `SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`
+  )[0].q;
+  assert.throws(() => svc.exchangeSale(invoice4.id, [{
+    productId: 'prod_sale_1', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استبدال',
+  }], [{
+    productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 500, boxesCount: 0, piecesCount: 0, unitPrice: 300,
+  }]), /غير كافٍ/);
+  assert.equal(q(`SELECT COUNT(*) AS count FROM sales_returns WHERE original_invoice_id = ?`, [invoice4.id])[0].count, 0);
+  assert.equal(q(
+    `SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`
+  )[0].q, stockBeforeExchange);
+
+  const exchange = svc.exchangeSale(invoice4.id, [{
+    productId: 'prod_sale_1', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استبدال',
+  }], [{
+    productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 1, boxesCount: 1, piecesCount: 0, unitPrice: 300,
+  }]);
+  assert.equal(exchange.return.originalInvoiceId, invoice4.id);
+  assert.equal(exchange.invoice.customerId, customer.id);
 });

@@ -194,7 +194,32 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   assert.equal(transferItems.length, 1);
   const itemId = transferItems[0].id;
 
-  inventoryService.receiveTransfer(transferId, [{ itemId, receivedM2: 27, lostM2: 3, notes: 'ÙƒØ³Ø± ÙÙŠ ÙƒØ±Ø§ØªÙŠÙ† Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ù†Ù‚Ù„' }]);
+  db.run(`
+    INSERT INTO stock_transfers (
+      id, transfer_number, date, from_warehouse_id, to_warehouse_id, status,
+      total_quantity_m2, created_by
+    ) VALUES ('trf_other_scope', 'TRF-OTHER-SCOPE', date('now'), ?, ?, 'IN_TRANSIT', 1, ?)
+  `, [whSource, whDest, adminId]);
+  db.run(`
+    INSERT INTO stock_transfer_items (
+      id, transfer_id, product_id, product_name, quantity_m2, shipped_m2, unit_cost, total_cost
+    ) VALUES ('trfi_other_scope', 'trf_other_scope', ?, 'Other transfer item', 1, 1, 150, 150)
+  `, [prodId]);
+  assert.throws(
+    () => inventoryService.receiveTransfer(transferId, [{ itemId: 'trfi_other_scope', receivedM2: 1 }]),
+    /لا ينتمي إلى التحويل/
+  );
+  assert.throws(
+    () => inventoryService.receiveTransfer(transferId, [{ itemId, receivedM2: 28, lostM2: 3 }]),
+    /يتجاوز الكمية المشحونة/
+  );
+
+  inventoryService.receiveTransfer(transferId, [{ itemId, receivedM2: 10, lostM2: 1 }]);
+  assert.throws(
+    () => inventoryService.receiveTransfer(transferId, [{ itemId, receivedM2: 20, lostM2: 1 }]),
+    /الاستلام التراكمي/
+  );
+  inventoryService.receiveTransfer(transferId, [{ itemId, receivedM2: 17, lostM2: 2, notes: 'استكمال استلام التحويل' }]);
   xfer = queryOne<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId]);
   assert.equal(xfer?.status, 'RECEIVED_PARTIAL');
   assert.equal(xfer?.totalReceivedM2, 27);

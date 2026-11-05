@@ -141,7 +141,10 @@ let restartAfterGracefulClose = false;
 let pendingUpdateInstall = false;
 let updateController = null;
 
-const gotLock = app.requestSingleInstanceLock();
+// E2E runs use isolated temporary data directories and may launch multiple
+// Electron instances sequentially in one worker. Keep the production single-
+// instance guarantee, but do not let a stale test process block the next case.
+const gotLock = process.env.CERAMISYS_E2E ? true : app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {

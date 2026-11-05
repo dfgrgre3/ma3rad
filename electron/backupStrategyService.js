@@ -80,14 +80,12 @@ async function analyzeBackupStrategy({ BACKUP_DIR }) {
     // daily: keep 7 days
     // weekly: keep 4 weeks
     // monthly: keep 12 months
-    analyzed.daily = analyzed.daily.slice(0, 7);
-    analyzed.weekly = analyzed.weekly.slice(0, 4);
-    analyzed.monthly = analyzed.monthly.slice(0, 12);
+    // Keep complete lists so cleanup and statistics can detect excess files.
 
     // إعادة ترتيب وتراص
-    analyzed.daily.forEach(f => f.isRecent = true);
-    analyzed.weekly.forEach(f => f.isRecent = true);
-    analyzed.monthly.forEach(f => f.isRecent = true);
+    analyzed.daily.slice(0, 7).forEach(f => f.isRecent = true);
+    analyzed.weekly.slice(0, 4).forEach(f => f.isRecent = true);
+    analyzed.monthly.slice(0, 12).forEach(f => f.isRecent = true);
 
     // رقم أحدث نسخة لفظية
     if (analyzed.newest) {
@@ -190,6 +188,12 @@ async function apply321Strategy({
  * فحص وجود USB متوفر
  */
 async function checkExternalDrive({ platform = process.platform, execFileImpl = execFile } = {}) {
+  if (platform === 'darwin') {
+    return runExternalDriveCommand(execFileImpl, 'diskutil', ['info', '-plist', '/Volumes'], /<key>MountPoint<\/key>\s*<string>([^<]+)<\/string>/);
+  }
+  if (platform === 'linux') {
+    return runExternalDriveCommand(execFileImpl, 'lsblk', ['-nrpo', 'MOUNTPOINT,RM'], /^(.+)\s+1$/m);
+  }
   if (platform !== 'win32') return null;
   try {
     // томаيز في ويندوز
@@ -212,6 +216,16 @@ async function checkExternalDrive({ platform = process.platform, execFileImpl = 
     console.error('فحص USB فاشلة:', error);
     throw error;
   }
+}
+
+function runExternalDriveCommand(execFileImpl, command, args, matcher) {
+  return new Promise((resolve, reject) => {
+    execFileImpl(command, args, (error, stdout) => {
+      if (error) return reject(error);
+      const match = String(stdout).match(matcher);
+      resolve(match?.[1]?.trim() || null);
+    });
+  });
 }
 
 /**

@@ -7,6 +7,7 @@ import { PermissionService } from '../src/services/PermissionService.ts';
 import { ProcurementService } from '../src/services/ProcurementService.ts';
 import { PurchaseService } from '../src/services/PurchaseService.ts';
 import { PurchaseOrderService } from '../src/services/PurchaseOrderService.ts';
+import { PurchaseReturnService } from '../src/services/PurchaseReturnService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
 
 test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matching, and Supplier Scorecard', async () => {
@@ -244,4 +245,30 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
   assert.ok(priceHistory.length >= 1);
   assert.equal(priceHistory[0].productId, prodId);
   assert.equal(priceHistory[0].unitCost, 95);
+
+  const taxableInvoice = purchaseService.createPurchase({
+    supplierId: supAId,
+    warehouseId: 'wh_main',
+    items: [{ productId: prodId, quantityM2: 2, unitCost: 100, boxesCount: 2 }],
+    paidAmount: 0,
+    paymentType: 'CREDIT',
+    taxAmount: 14,
+  });
+  const purchaseReturn = new PurchaseReturnService().createReturn({
+    purchaseId: taxableInvoice.id,
+    reason: 'إرجاع صنف خاضع للضريبة',
+    refundMethod: 'BALANCE',
+    items: [{ productId: prodId, quantityM2: 2 }],
+  });
+  assert.equal(purchaseReturn.totalAmount, 214);
+  const returnLedger = db.query<{ code: string; debit: number; credit: number }>(`
+    SELECT coa.code, jel.debit, jel.credit
+    FROM journal_entries je
+    JOIN journal_entry_lines jel ON jel.entry_id = je.id
+    JOIN chart_of_accounts coa ON coa.id = jel.account_id
+    WHERE je.reference_type = 'PURCHASE_RETURN' AND je.reference_id = ?
+  `, [purchaseReturn.id]);
+  assert.equal(returnLedger.find((line) => line.code === '1201')?.credit, 14);
+  assert.equal(returnLedger.find((line) => line.code === '1104')?.credit, 200);
+  assert.equal(returnLedger.find((line) => line.code === '2101')?.debit, 214);
 });

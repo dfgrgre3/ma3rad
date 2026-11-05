@@ -12,7 +12,8 @@ type BusinessRecordType =
   | 'purchase_return'
   | 'customer_payment'
   | 'supplier_payment'
-  | 'stock_transfer';
+  | 'stock_transfer'
+  | 'expense';
 
 type RecordSpec = {
   table: string;
@@ -125,6 +126,16 @@ const RECORD_SPECS: Record<BusinessRecordType, RecordSpec> = {
       'id', 'product_id', 'product_name', 'quantity_m2', 'boxes_count', 'received_m2',
       'shipped_m2', 'lost_m2', 'damaged_m2', 'unit_cost', 'total_cost', 'item_notes',
     ],
+  },
+  expense: {
+    table: 'expenses',
+    headerColumns: [
+      'id', 'category', 'amount', 'register_id', 'shift_id', 'branch_id',
+      'payment_type', 'date', 'recipient', 'description', 'performed_by', 'created_at',
+    ],
+    lineTable: 'expenses',
+    lineForeignKey: 'id',
+    lineColumns: [],
   },
 };
 
@@ -277,7 +288,7 @@ export class BusinessRecordSyncService {
     )[0];
     if (!header) return null;
     const lineColumns = this.availableColumns(transaction, spec.lineTable, spec.lineColumns);
-    const lines = transaction.query<Record<string, unknown>>(
+    const lines = lineColumns.length === 0 ? [] : transaction.query<Record<string, unknown>>(
       `SELECT ${lineColumns.map((column) => `"${column}"`).join(', ')}
        FROM "${spec.lineTable}" WHERE "${spec.lineForeignKey}"=? ORDER BY rowid`,
       [entityId]

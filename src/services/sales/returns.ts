@@ -62,6 +62,14 @@ export function createSaleReturn(
   if (!inv) throw new Error('الفاتورة الأصلية غير موجودة.');
   if (inv.invoiceStatus === 'VOID') throw new Error('لا يمكن مرتجعة فاتورة ملغاة.');
 
+  const refundMethod = options.refundMethod || 'CASH';
+  if (refundMethod === 'CASH' && refundCash) {
+    const branchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
+    const registerId = options.registerId || ctx.branchAccess.getDefaultRegisterId(branchId, actor);
+    ctx.branchAccess.requireRegisterAccess(registerId, actor, branchId);
+    options = { ...options, registerId };
+  }
+
   const idempotencyKey = options.idempotencyKey;
   if (idempotencyKey) {
     const prior = ctx.db.query<any>(
@@ -308,7 +316,7 @@ function insertSalesReturn(
     returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
     inv.warehouseId, today, totalReturnAmount, impact.cashRefund, impact.balanceDelta,
     items[0]?.reason || 'مرتجع سيراميك',
-    options.registerId || (impact.cashRefund > 0 && refundMethod === 'CASH' ? 'cr_main' : null),
+    impact.cashRefund > 0 && refundMethod === 'CASH' ? options.registerId : null,
     options.shiftId || null, refundMethod, actor.id, options.idempotencyKey || null,
   ]);
 }
@@ -469,9 +477,10 @@ function updateCashRegisterAfterReturn(
   cashRefund: number
 ): void {
   if (cashRefund > 0 && refundMethod === 'CASH') {
+    if (!options.registerId) throw new Error('ÙŠØ¬Ø¨ ØªØ­Ø¯ÙŠØ¯ Ø®Ø²ÙŠÙ†Ø© Ø§Ù„ÙØ±Ø¹ Ù„Ù„Ù…Ø±ØªØ¬Ø¹ Ø§Ù„Ù†Ù‚Ø¯ÙŠ.');
     sqliteDb.run(
       `UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`,
-      [cashRefund, options.registerId || 'cr_main']
+      [cashRefund, options.registerId]
     );
   }
 }
@@ -486,8 +495,9 @@ function buildReturnLedgerLines(
   returnedServiceCost = 0
 ): any[] {
   const { today, actor, inv } = params;
-  const taxReduction = inv.totalAmount > 0
-    ? round2(totalReturnAmount * Number(inv.taxAmount || 0) / inv.totalAmount)
+  const taxableInvoiceBase = Math.max(0, Number(inv.subtotal || 0) - Number(inv.discountAmount || 0));
+  const taxReduction = taxableInvoiceBase > 0
+    ? round2(totalReturnAmount * Number(inv.taxAmount || 0) / taxableInvoiceBase)
     : 0;
   const refundAccount = impact.cashRefund > 0 ? paymentAccountCode(params.options.refundMethod || 'CASH') : undefined;
   const lines = [

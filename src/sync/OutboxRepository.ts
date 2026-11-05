@@ -93,7 +93,7 @@ export class OutboxRepository {
          AND (? = 0 OR (
            (entity_type='sync_policy' AND ? = 1)
            OR (
-             entity_type IN ('category','brand','product','customer','supplier','sales_invoice','sales_return','purchase_invoice','purchase_return')
+             entity_type IN ('category','brand','product','customer','supplier','sales_invoice','sales_return','purchase_invoice','purchase_return','expense')
              AND EXISTS (
                SELECT 1 FROM sync_entity_policies policy
                WHERE policy.entity_type=sync_outbox.entity_type

@@ -2296,6 +2296,33 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '115_supplier_claim_branch_scope',
+    description: 'Scope supplier claims to the branch that owns their source documents.',
+    up: (db: Database) => {
+      addColumn(db, 'supplier_claims', 'branch_id', 'TEXT');
+      db.exec(`
+        UPDATE supplier_claims
+        SET branch_id = COALESCE(
+          (SELECT COALESCE(pi.branch_id, piw.branch_id)
+           FROM purchase_invoices pi
+           LEFT JOIN warehouses piw ON piw.id = pi.warehouse_id
+           WHERE pi.id = supplier_claims.purchase_invoice_id),
+          (SELECT grnw.branch_id
+           FROM goods_receipt_notes grn
+           JOIN warehouses grnw ON grnw.id = grn.warehouse_id
+           WHERE grn.id = supplier_claims.grn_id),
+          (SELECT pow.branch_id
+           FROM purchase_orders po
+           JOIN warehouses pow ON pow.id = po.warehouse_id
+           WHERE po.id = supplier_claims.purchase_order_id)
+        )
+        WHERE branch_id IS NULL;
+        CREATE INDEX IF NOT EXISTS idx_supplier_claims_branch
+          ON supplier_claims(branch_id, created_at DESC);
+      `);
+    },
+  },
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

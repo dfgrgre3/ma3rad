@@ -109,12 +109,18 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     if (inv.paidAmount > 0) {
       // Reverse the cash portion of the payment (including split payments).
       const cashPortion = sqliteDb.query<{ amount: number }>(
-        `SELECT COALESCE(SUM(amount), 0) AS amount FROM sales_invoice_payments WHERE invoice_id = ? AND method = 'CASH'`,
+        `SELECT COALESCE(SUM(amount), 0) AS amount
+         FROM sales_invoice_payments WHERE invoice_id = ? AND method = 'CASH'`,
         [invoiceId]
       )[0]?.amount ?? 0;
-      const reverseAmount = cashPortion > 0 ? cashPortion : (inv.paymentType === 'CASH' ? inv.paidAmount : 0);
-      if (reverseAmount > 0) {
-        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE is_default = 1`, [reverseAmount]);
+      if (cashPortion > 0) {
+        const branchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
+        const registerId = ctx.branchAccess.getDefaultRegisterId(branchId, actor);
+        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [cashPortion, registerId]);
+      } else if (inv.paymentType === 'CASH' && inv.paidAmount > 0) {
+        const branchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
+        const registerId = ctx.branchAccess.getDefaultRegisterId(branchId, actor);
+        sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [inv.paidAmount, registerId]);
       }
     }
 

@@ -7,21 +7,45 @@ import { round2 } from './financials';
 import { postLedgerEntry } from '../database/ledger';
 import type { ReorderSuggestion, SupplierRfqRow, SupplierRfqItem, SupplierQuotationRow, SupplierQuotationItem, GoodsReceiptRow, GoodsReceiptItem, SupplierClaimRow, SupplierClaimItem, ThreeWayMatchingResult, LandedCostBreakdownItem, SupplierScorecard, ProductPriceHistoryEntry } from './procurementTypes';
 import { ProcurementServicePart05 } from './ProcurementServicePart05';
+import { BranchAccessService } from './BranchAccessService';
 
 export abstract class ProcurementServicePart06 extends ProcurementServicePart05 {
+private claimBranchAccess = new BranchAccessService();
+
+private claimScope(actor: ReturnType<typeof AuthService.requireAuth>) {
+    const branchExpression = 'COALESCE(c.branch_id, pi.branch_id, piw.branch_id, grnw.branch_id, pow.branch_id)';
+    return {
+      branch: this.claimBranchAccess.sqlScope(branchExpression, undefined, actor),
+      company: this.claimBranchAccess.companyScope('COALESCE(pi.company_id, b.company_id)', actor),
+    };
+  }
+
+private claimJoins(): string {
+    return `
+      LEFT JOIN purchase_invoices pi ON pi.id = c.purchase_invoice_id
+      LEFT JOIN warehouses piw ON piw.id = pi.warehouse_id
+      LEFT JOIN goods_receipt_notes grn ON grn.id = c.grn_id
+      LEFT JOIN warehouses grnw ON grnw.id = grn.warehouse_id
+      LEFT JOIN purchase_orders po ON po.id = c.purchase_order_id
+      LEFT JOIN warehouses pow ON pow.id = po.warehouse_id
+      LEFT JOIN branches b ON b.id = COALESCE(c.branch_id, pi.branch_id, piw.branch_id, grnw.branch_id, pow.branch_id)
+    `;
+  }
+
 public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaimRow[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.view');
+    const scope = this.claimScope(actor);
     let sql = `
       SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
         pi.invoice_number AS invoiceNumber, grn.grn_number AS grnNumber, po.order_number AS orderNumber
       FROM supplier_claims c
       JOIN suppliers s ON s.id = c.supplier_id
-      LEFT JOIN purchase_invoices pi ON pi.id = c.purchase_invoice_id
-      LEFT JOIN goods_receipt_notes grn ON grn.id = c.grn_id
-      LEFT JOIN purchase_orders po ON po.id = c.purchase_order_id
+      ${this.claimJoins()}
       LEFT JOIN users u ON u.id = c.created_by
-      WHERE 1 = 1
+      WHERE ${scope.branch.clause} AND ${scope.company.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...scope.branch.params, ...scope.company.params];
     if (status !== 'ALL') {
       sql += ` AND c.status = ?`;
       params.push(status);
@@ -40,17 +64,29 @@ public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaim
   }
 
 public getClaimById(id: string): (SupplierClaimRow & { items: SupplierClaimItem[] }) | null {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'purchases.view');
+    const claim = this.readClaimById(id, actor);
+    if (!claim) return null;
+    const { branchId: _branchId, ...result } = claim;
+    return result;
+  }
+
+protected readClaimById(
+    id: string,
+    actor: ReturnType<typeof AuthService.requireAuth>
+  ): (SupplierClaimRow & { items: SupplierClaimItem[]; branchId: string | null }) | null {
+    const scope = this.claimScope(actor);
     const row = this.db.query<SupplierClaimRow>(`
       SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
+        COALESCE(c.branch_id, pi.branch_id, piw.branch_id, grnw.branch_id, pow.branch_id) AS branchId,
         pi.invoice_number AS invoiceNumber, grn.grn_number AS grnNumber, po.order_number AS orderNumber
       FROM supplier_claims c
       JOIN suppliers s ON s.id = c.supplier_id
-      LEFT JOIN purchase_invoices pi ON pi.id = c.purchase_invoice_id
-      LEFT JOIN goods_receipt_notes grn ON grn.id = c.grn_id
-      LEFT JOIN purchase_orders po ON po.id = c.purchase_order_id
+      ${this.claimJoins()}
       LEFT JOIN users u ON u.id = c.created_by
-      WHERE c.id = ?
-    `, [id])[0];
+      WHERE c.id = ? AND ${scope.branch.clause} AND ${scope.company.clause}
+    `, [id, ...scope.branch.params, ...scope.company.params])[0] as (SupplierClaimRow & { branchId: string | null }) | undefined;
     if (!row) return null;
 
     const items = this.db.query<SupplierClaimItem>(`
@@ -68,7 +104,7 @@ public settleClaim(
   ): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'purchases.approve');
-    const claim = this.getClaimById(claimId);
+    const claim = this.readClaimById(claimId, actor);
     if (!claim) throw new Error('المطالبة غير موجودة.');
     if (claim.status === 'SETTLED') throw new Error('تمت تسوية هذه المطالبة مسبقاً.');
 
@@ -100,7 +136,9 @@ public settleClaim(
 
       // If Cash Refund, increase default cash register
       if (resolutionType === 'REFUND' && value > 0) {
-        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE is_default = 1`, [value]);
+        if (!claim.branchId) throw new Error('لا يمكن تحديد فرع المطالبة لتسجيل المبلغ المسترد.');
+        const registerId = this.claimBranchAccess.getDefaultRegisterId(claim.branchId, actor);
+        db.run(`UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?`, [value, registerId]);
         postLedgerEntry(db.getDatabase(), {
           date: today,
           description: `Cash refund for Supplier Claim ${claim.claimNumber}`,

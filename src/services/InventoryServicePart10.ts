@@ -21,17 +21,23 @@ public receiveTransfer(transferId: string, receipts: Array<{
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer');
+    if (!Array.isArray(receipts) || receipts.length === 0) {
+      throw new Error('يجب تسجيل استلام بند واحد على الأقل.');
+    }
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');
-    if (transfer.status !== 'IN_TRANSIT') {
+    if (transfer.status !== 'IN_TRANSIT' && transfer.status !== 'RECEIVED_PARTIAL') {
       throw new Error('لا يمكن استلام تحويل ليس قيد النقل (IN_TRANSIT).');
     }
 
     const fromWarehouseId = transfer.fromWarehouseId ?? transfer.from_warehouse_id;
     const toWarehouseId = transfer.toWarehouseId ?? transfer.to_warehouse_id;
     const transferNumber = transfer.transferNumber ?? transfer.transfer_number ?? transfer.id;
-    const totalQuantityM2 = Number(transfer.totalQuantityM2 ?? transfer.total_quantity_m2 ?? 0);
+    const totalShippedM2 = Number(this.db.query<{ total: number }>(
+      'SELECT COALESCE(SUM(shipped_m2), 0) AS total FROM stock_transfer_items WHERE transfer_id = ?',
+      [transferId]
+    )[0]?.total || 0);
 
     this.db.executeTransaction((txDb) => {
       const totals = this.processTransferReceipts(
@@ -43,7 +49,15 @@ public receiveTransfer(transferId: string, receipts: Array<{
         transferNumber,
         actor
       );
-      this.updateTransferReceiptStatus(txDb, transferId, totalQuantityM2, totals, actor.id);
+      const cumulative = txDb.query<{ totalReceived: number; totalLost: number }>(`
+        SELECT COALESCE(SUM(received_m2), 0) AS totalReceived,
+               COALESCE(SUM(lost_m2 + damaged_m2), 0) AS totalLost
+        FROM stock_transfer_items WHERE transfer_id = ?
+      `, [transferId])[0] || totals;
+      this.updateTransferReceiptStatus(txDb, transferId, totalShippedM2, {
+        totalReceived: Number(cumulative.totalReceived) || 0,
+        totalLost: Number(cumulative.totalLost) || 0,
+      }, actor.id);
       new BusinessRecordSyncService(txDb).capture(txDb, 'stock_transfer', transferId, 'UPDATE');
     });
   }
@@ -59,10 +73,37 @@ public receiveTransfer(transferId: string, receipts: Array<{
   ): { totalReceived: number; totalLost: number } {
     let totalReceived = 0;
     let totalLost = 0;
+    const seenItems = new Set<string>();
 
     for (const receipt of receipts) {
-      const item = txDb.query<any>(`SELECT * FROM stock_transfer_items WHERE id = ?`, [receipt.itemId])[0];
-      if (!item) continue;
+      if (seenItems.has(receipt.itemId)) {
+        throw new Error('لا يمكن تسجيل استلام البند نفسه أكثر من مرة في التحويل.');
+      }
+      seenItems.add(receipt.itemId);
+
+      const item = txDb.query<any>(
+        `SELECT * FROM stock_transfer_items WHERE id = ? AND transfer_id = ?`,
+        [receipt.itemId, transfer.id]
+      )[0];
+      if (!item) throw new Error('بند الاستلام لا ينتمي إلى التحويل المحدد.');
+
+      const shipped = Number(item.shippedM2 ?? item.shipped_m2 ?? 0);
+      const receivedQuantity = Number(receipt.receivedM2);
+      const lost = Number(receipt.lostM2 || 0);
+      const damaged = Number(receipt.damagedM2 || 0);
+      if (![receivedQuantity, lost, damaged].every(Number.isFinite)
+        || receivedQuantity < 0 || lost < 0 || damaged < 0) {
+        throw new Error('كميات الاستلام والفقد والتلف يجب أن تكون أرقامًا غير سالبة.');
+      }
+      if (receivedQuantity + lost + damaged > shipped + 0.009) {
+        throw new Error(`إجمالي الكميات المسجلة يتجاوز الكمية المشحونة للبند (${shipped}).`);
+      }
+      const priorReceived = Number(item.receivedM2 ?? item.received_m2 ?? 0);
+      const priorLost = Number(item.lostM2 ?? item.lost_m2 ?? 0);
+      const priorDamaged = Number(item.damagedM2 ?? item.damaged_m2 ?? 0);
+      if (receivedQuantity + lost + damaged + priorReceived + priorLost + priorDamaged > shipped + 0.009) {
+        throw new Error(`إجمالي الاستلام التراكمي يتجاوز الكمية المشحونة للبند (${shipped}).`);
+      }
 
       const received = this.processTransferReceipt(
         txDb,
@@ -74,8 +115,9 @@ public receiveTransfer(transferId: string, receipts: Array<{
         transferNumber,
         actor
       );
-      totalReceived += received;
-      totalLost += Math.max(0, Number(receipt.lostM2 || 0)) + Math.max(0, Number(receipt.damagedM2 || 0));
+      totalReceived += priorReceived + received;
+      const lostQuantity = lost + damaged;
+      totalLost += priorLost + priorDamaged + lostQuantity;
     }
 
     return { totalReceived, totalLost };
@@ -98,19 +140,22 @@ public receiveTransfer(transferId: string, receipts: Array<{
     const received = Math.max(0, Number(receipt.receivedM2 || 0));
     const lost = Math.max(0, Number(receipt.lostM2 || 0));
     const damaged = Math.max(0, Number(receipt.damagedM2 || 0));
+    const priorReceived = Number(item.receivedM2 ?? item.received_m2 ?? 0);
+    const priorLost = Number(item.lostM2 ?? item.lost_m2 ?? 0);
+    const priorDamaged = Number(item.damagedM2 ?? item.damaged_m2 ?? 0);
 
     if (received > 0) {
       this.recordTransferReceipt(
         txDb, productId, itemUnitCost, received, transfer, toWarehouseId, fromWarehouseId, transferNumber, actor
       );
     }
-    this.recordTransferLoss(txDb, lost + damaged, itemUnitCost, productName, transfer, transferNumber, actor);
+    this.recordTransferLoss(txDb, lost + damaged, itemUnitCost, productId, productName, transfer, transferNumber, actor);
 
     txDb.run(`
       UPDATE stock_transfer_items
       SET received_m2 = ?, lost_m2 = ?, damaged_m2 = ?, item_notes = ?
       WHERE id = ?
-    `, [received, lost, damaged, receipt.notes || itemNotes || null, item.id]);
+    `, [priorReceived + received, priorLost + lost, priorDamaged + damaged, receipt.notes || itemNotes || null, item.id]);
 
     return received;
   }
@@ -183,21 +228,34 @@ public receiveTransfer(transferId: string, receipts: Array<{
     txDb: DatabaseManager,
     lossQuantity: number,
     itemUnitCost: number,
+    productId: string,
     productName: string,
     transfer: any,
     transferNumber: string,
     actor: ReturnType<typeof AuthService.requireAuth>
   ): void {
-    if (lossQuantity <= 0) return;
-
     const lossCost = Number((lossQuantity * itemUnitCost).toFixed(2));
+    if (lossQuantity <= 0) return;
+    const lossTransactionId = `tx_${uuidv4().substring(0, 8)}`;
+    txDb.run(`
+      INSERT INTO inventory_transactions (
+        id, transaction_number, type, product_id, warehouse_id, quantity_m2,
+        boxes_count, unit_cost, total_cost, reference_type, reference_id,
+        notes, performed_by, created_at
+      ) VALUES (?, ?, 'DAMAGE', ?, ?, ?, 0, ?, ?, 'TRANSFER_LOSS', ?, ?, ?, CURRENT_TIMESTAMP)
+    `, [
+      lossTransactionId, txDb.nextNumber('TX-TRF-LOSS'), productId,
+      transfer.fromWarehouseId ?? transfer.from_warehouse_id, -lossQuantity,
+      itemUnitCost, lossCost, transfer.id,
+      `ÙÙ‚Ø¯/ØªÙ„Ù Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªØ­ÙˆÙŠÙ„ ${transferNumber} - Ø§Ù„ØµÙ†Ù ${productName}`, actor.id,
+    ]);
     if (lossCost <= 0) return;
 
     postLedgerEntry(txDb.getDatabase(), {
       date: localDateString(),
       description: `فقد/تلف أثناء التحويل المخزني ${transferNumber} - الصنف ${productName}`,
       referenceType: 'TRANSFER_LOSS',
-      referenceId: transfer.id,
+      referenceId: lossTransactionId,
       createdBy: actor.id,
       lines: [
         { accountCode: '5201', debit: lossCost, credit: 0 },

@@ -173,25 +173,27 @@ export class SalesService {
     if (!inv) throw new Error('الفاتورة الأصلية غير موجودة.');
     const warehouseId = options.warehouseId || inv.warehouseId;
 
-    // 1. Return selected items, refunding to customer balance (credit).
-    const ret = createSaleReturn(ctx, invoiceId, returnItems, false, performedBy, {
-      refundMethod: 'BALANCE',
-      shiftId: options.shiftId,
-    });
+    return this.db.executeTransaction(() => {
+      // 1. Return selected items, refunding to customer balance (credit).
+      const ret = createSaleReturn(ctx, invoiceId, returnItems, false, performedBy, {
+        refundMethod: 'BALANCE',
+        shiftId: options.shiftId,
+      });
 
-    // 2. Create a new sale for the replacement items on credit.
-    const newInvoice = createSalesInvoice(ctx, {
-      customerId: inv.customerId,
-      warehouseId,
-      shiftId: options.shiftId,
-      items: newItems,
-      paidAmount: 0,
-      paymentType: 'CREDIT',
-      notes: options.notes || `استبدال من فاتورة ${inv.invoiceNumber}`,
-      performedBy,
-    });
+      // 2. Create a new sale for the replacement items on credit.
+      const newInvoice = createSalesInvoice(ctx, {
+        customerId: inv.customerId,
+        warehouseId,
+        shiftId: options.shiftId,
+        items: newItems,
+        paidAmount: 0,
+        paymentType: 'CREDIT',
+        notes: options.notes || `استبدال من فاتورة ${inv.invoiceNumber}`,
+        performedBy,
+      });
 
-    return { return: ret, invoice: newInvoice };
+      return { return: ret, invoice: newInvoice };
+    });
   }
 
   /** Void a completed sales invoice with full reversal (brief §67/§220). */

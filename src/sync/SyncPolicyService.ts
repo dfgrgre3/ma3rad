@@ -17,6 +17,7 @@ export const SUPPORTED_SYNC_ENTITIES = [
   { entityType: 'customer_payment', label: 'المدفوعات التفصيلية (نسخ تقارير)' },
   { entityType: 'supplier_payment', label: 'سداد الموردين (نسخ تقارير)' },
   { entityType: 'stock_transfer', label: 'تحويلات المخزون (نسخ تقارير)' },
+  { entityType: 'expense', label: 'المصروفات (نسخ تقارير)' },
 ] as const;
 
 export type SupportedSyncEntity = typeof SUPPORTED_SYNC_ENTITIES[number]['entityType'];
@@ -39,7 +40,7 @@ const REMOTE_BUSINESS_RECORD_TYPES = new Set([
   'purchase_return',
   'customer_payment',
   'supplier_payment',
-  'stock_transfer',
+  'stock_transfer', 'expense',
 ]);
 type PolicyIdentity = { tenantId: string; branchId: string; deviceId: string; canManagePolicies: boolean };
 

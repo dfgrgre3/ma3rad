@@ -6,6 +6,7 @@ import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
 import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../database/ledger';
+import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 
 export class CashierService {
   private db = DatabaseManager.getInstance();
@@ -358,6 +359,7 @@ export class CashierService {
          VALUES (?, ?, ?, 'تسجيل مصروف', 'CASHIER', ?, ?)`,
         [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, expId, JSON.stringify({ category, amount, description, paymentType })]
       );
+      new BusinessRecordSyncService(sqliteDb).capture(sqliteDb, 'expense', expId, 'CREATE');
 
       // 3. Update shift if active
       if (shiftId) {
@@ -452,6 +454,7 @@ export class CashierService {
           JSON.stringify({ amount: patch.amount, category: patch.category, description: patch.description }),
         ]
       );
+      new BusinessRecordSyncService(db).capture(db, 'expense', id, 'UPDATE');
     });
   }
 
