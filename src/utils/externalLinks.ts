@@ -33,5 +33,49 @@ export function openExternalShare(url: string, offlineText?: string): boolean {
 
 /** Builds a wa.me link; `phone` may be empty to let WhatsApp pick a contact. */
 export function buildWhatsAppUrl(phone: string, encodedText: string): string {
-  return phone ? `https://wa.me/${phone}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`;
+  const normalizedPhone = normalizeWhatsAppPhone(phone);
+  return normalizedPhone
+    ? `https://wa.me/${normalizedPhone}?text=${encodedText}`
+    : `https://wa.me/?text=${encodedText}`;
+}
+
+/** Converts Egyptian local mobile/landline numbers to the international 20 prefix. */
+export function normalizeWhatsAppPhone(value: string): string {
+  let phone = String(value || '').replace(/\D/g, '');
+  if (phone.startsWith('00')) phone = phone.slice(2);
+  if (phone.startsWith('0')) return `20${phone.slice(1)}`;
+  if (phone.startsWith('1') && phone.length === 10) return `20${phone}`;
+  return phone;
+}
+
+/** Opens a direct customer chat with its message prefilled. The user must press Send in WhatsApp. */
+export function openWhatsAppChat(phone: string, message: string): boolean {
+  const normalizedPhone = normalizeWhatsAppPhone(phone);
+  if (!normalizedPhone) {
+    window.alert('لا يوجد رقم هاتف صحيح لهذا العميل لفتح محادثة واتساب مباشرة.');
+    return false;
+  }
+
+  const encodedMessage = encodeURIComponent(message);
+  if (encodedMessage.length > 5000) {
+    const opened = openExternalShare(buildWhatsAppUrl(normalizedPhone, ''), message);
+    if (!opened) return false;
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(message)
+        .then(() => window.alert('نص الرسالة طويل. تم نسخه؛ الصقه في محادثة واتساب المفتوحة.'))
+        .catch((error) => {
+          console.error('Failed to copy the long WhatsApp message:', error);
+          window.prompt('نص الرسالة طويل. انسخه من هنا والصقه في محادثة واتساب:', message);
+        });
+    } else {
+      window.prompt('نص الرسالة طويل. انسخه من هنا والصقه في محادثة واتساب:', message);
+    }
+    return true;
+  }
+
+  return openExternalShare(
+    buildWhatsAppUrl(normalizedPhone, encodedMessage),
+    message,
+  );
 }

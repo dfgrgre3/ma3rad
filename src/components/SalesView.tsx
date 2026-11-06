@@ -20,7 +20,7 @@ import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { SalesModals } from './sales/SalesModals';
 import { StatCard, IconButton, Modal, InfoBox, SummaryRow } from './sales/SalesUi';
 import { localDateString } from '../utils/date';
-import { buildWhatsAppUrl, openExternalShare } from '../utils/externalLinks';
+import { openWhatsAppChat } from '../utils/externalLinks';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 
 type InvoiceRow = SalesInvoice & { itemsCount?: number; returnedAmount?: number };
@@ -330,14 +330,12 @@ export const SalesView: React.FC = () => {
   });
 
   const shareInvoiceWhatsApp = (full: SalesInvoice & { items: SalesInvoiceItem[] }) => {
-    const phone = (full.customerPhone || '').replace(/[^0-9]/g, '');
-    const text = encodeURIComponent(
+    const text =
       `فاتورة مبيعات ${full.invoiceNumber}\nالتاريخ: ${full.date}\n` +
       `الإجمالي: ${fmt(full.totalAmount)}\nالمدفوع: ${fmt(full.paidAmount)}\n` +
       (full.remainingAmount > 0 ? `المتبقي: ${fmt(full.remainingAmount)}\n` : '') +
-      `شكراً لتعاملكم معنا.`
-    );
-    openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
+      `شكراً لتعاملكم معنا.`;
+    openWhatsAppChat(full.customerPhone || '', text);
   };
 
   const openInvoicePreview = (invoice: InvoiceRow) => {

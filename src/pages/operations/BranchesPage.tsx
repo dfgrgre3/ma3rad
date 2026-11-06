@@ -21,6 +21,8 @@ interface BranchForm {
   name: string;
   code: string;
   phone: string;
+  phone2: string;
+  taxNumber: string;
   address: string;
   city: string;
   companyId: string;
@@ -34,6 +36,8 @@ const emptyForm: BranchForm = {
   name: '',
   code: '',
   phone: '',
+  phone2: '',
+  taxNumber: '',
   address: '',
   city: '',
   companyId: '',
@@ -148,6 +152,8 @@ export const BranchesPage: React.FC = () => {
       name: branch.name,
       code: branch.code,
       phone: branch.phone || '',
+      phone2: branch.phone2 || '',
+      taxNumber: branch.taxNumber || '',
       address: branch.address || '',
       city: branch.city || '',
       companyId: branch.companyId || '',
@@ -168,6 +174,8 @@ export const BranchesPage: React.FC = () => {
           name: form.name,
           code: form.code,
           phone: form.phone,
+          phone2: form.phone2,
+          taxNumber: form.taxNumber,
           address: form.address,
           city: form.city,
           managerId: form.managerId || null,
@@ -178,6 +186,8 @@ export const BranchesPage: React.FC = () => {
         const created = operations.createBranch({
           name: form.name,
           phone: form.phone,
+          phone2: form.phone2,
+          taxNumber: form.taxNumber,
           address: form.address,
           city: form.city,
           companyId: form.companyId || undefined,
@@ -461,6 +471,8 @@ export const BranchesPage: React.FC = () => {
               </FormField>
               {editing && <FormField label="كود الفرع *"><input required value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} className={inputClass} /></FormField>}
               <FormField label="رقم الهاتف"><input type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className={inputClass} /></FormField>
+              <FormField label="هاتف إضافي (اختياري)"><input type="tel" value={form.phone2} onChange={(event) => setForm({ ...form, phone2: event.target.value })} className={inputClass} /></FormField>
+              <FormField label="الرقم الضريبي (اختياري)"><input value={form.taxNumber} onChange={(event) => setForm({ ...form, taxNumber: event.target.value })} className={inputClass} /></FormField>
               <FormField label="المدينة"><input value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} className={inputClass} /></FormField>
               <FormField label="العنوان" className="sm:col-span-2"><input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className={inputClass} /></FormField>
               {!editing && canViewCompanies && (

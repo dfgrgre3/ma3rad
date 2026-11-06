@@ -51,6 +51,8 @@ export abstract class FinanceEnterpriseContract01 {
 
   public abstract getFiscalPeriods(fiscalYearId?: string): FiscalPeriod[];
 
+  public abstract getUnpostedJournalEntryCount(startDate: string, endDate: string): number;
+
   public abstract createFiscalYear(input: { yearCode: string; name: string; startDate: string; endDate: string }): string;
 
   public abstract closePeriod(periodId: string, notes?: string): void;

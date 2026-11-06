@@ -127,6 +127,8 @@ export class DatabaseManager {
   private queryCacheSizeBytes = 0;
   private queryCacheHits = 0;
   private queryCacheMisses = 0;
+  private totalQueries = 0;
+  private failedQueries = 0;
   private readonly queryCacheTtlMs = 2000;
   private readonly queryCacheMaxEntries = 300;
   private readonly queryCacheMaxEntryBytes = 512 * 1024;
@@ -746,7 +748,7 @@ export class DatabaseManager {
         get: (target, property) => {
           const value = Reflect.get(target, property, target);
           if (property === 'run' || property === 'exec') {
-            return (...args: unknown[]) => {
+            return (...args: unknown[]) => this.trackQuery(() => {
               const sql = args[0];
               if (typeof sql !== 'string' || this.isMutatingSql(sql)) this.clearQueryCache();
               if (property === 'exec' && typeof sql === 'string') {
@@ -762,7 +764,7 @@ export class DatabaseManager {
                 }
               }
               return Reflect.apply(value, target, args);
-            };
+            });
           }
           return typeof value === 'function' ? value.bind(target) : value;
         },
@@ -845,35 +847,53 @@ export class DatabaseManager {
   }
 
   public query<T = any>(sql: string, params: any[] = []): T[] {
-    const cacheKey = this.createQueryCacheKey(sql, params);
-    if (cacheKey) {
-      const cached = this.getCachedQuery<T[]>(`query:${cacheKey}`);
-      if (cached !== undefined) return cached;
-    }
-
-    const db = this.getDatabase();
-    const stmt = db.prepare(sql);
-    const results: Record<string, unknown>[] = [];
-    try {
-      stmt.bind(params);
-      while (stmt.step()) {
-        results.push(snakeToCamelKeys(stmt.getAsObject()));
+    return this.trackQuery(() => {
+      const cacheKey = this.createQueryCacheKey(sql, params);
+      if (cacheKey) {
+        const cached = this.getCachedQuery<T[]>(`query:${cacheKey}`);
+        if (cached !== undefined) return cached;
       }
-    } finally {
-      stmt.free();
-    }
-    if (cacheKey) this.setCachedQuery(`query:${cacheKey}`, results);
-    return results as T[];
+
+      const db = this.getDatabase();
+      const stmt = db.prepare(sql);
+      const results: Record<string, unknown>[] = [];
+      try {
+        stmt.bind(params);
+        while (stmt.step()) {
+          results.push(snakeToCamelKeys(stmt.getAsObject()));
+        }
+      } finally {
+        stmt.free();
+      }
+      if (cacheKey) this.setCachedQuery(`query:${cacheKey}`, results);
+      return results as T[];
+    });
   }
 
   public run(sql: string, params: any[] = []): void {
-    this.clearQueryCache();
-    const db = this.getDatabase();
-    db.run(sql, params);
-    // Debounce writes outside transactions so sequential queries don't export full snapshots repeatedly
-    if (this.transactionDepth === 0) {
-      this.scheduleDebouncedSave();
+    this.trackQuery(() => {
+      this.clearQueryCache();
+      const db = this.getDatabase();
+      db.run(sql, params);
+      // Debounce writes outside transactions so sequential queries don't export full snapshots repeatedly
+      if (this.transactionDepth === 0) {
+        this.scheduleDebouncedSave();
+      }
+    });
+  }
+
+  private trackQuery<T>(operation: () => T): T {
+    this.totalQueries++;
+    try {
+      return operation();
+    } catch (error) {
+      this.failedQueries++;
+      throw error;
     }
+  }
+
+  public getQueryStats(): { totalQueries: number; failedQueries: number } {
+    return { totalQueries: this.totalQueries, failedQueries: this.failedQueries };
   }
 
   /** Execute a bounded list query and its count query without loading all rows. */

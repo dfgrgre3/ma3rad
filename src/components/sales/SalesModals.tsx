@@ -7,6 +7,7 @@ import type { CustomerPayment, PaymentType, SalesInvoice, SalesInvoiceItem } fro
 import { CeramicMath } from '../../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
 import { DocumentPreviewModal } from '../DocumentPreviewModal';
+import { CustomerStatementWhatsAppOptions } from './CustomerStatementWhatsAppOptions';
 import { Modal, InfoBox, SummaryRow } from './SalesUi';
 
 const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
@@ -356,6 +357,11 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
             </table>
           </div>
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            {canExportCustomers && <CustomerStatementWhatsAppOptions
+              statement={statement}
+              buttonClassName="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-1.5"
+              buttonLabel="إرسال واتساب"
+            />}
             {canExportCustomers && <button
               onClick={() => {
                 const options = statementExportOptions(statement);

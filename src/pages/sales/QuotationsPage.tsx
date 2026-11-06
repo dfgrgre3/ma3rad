@@ -20,7 +20,7 @@ import { formatProductQuantity } from '../../utils/productUnits';
 import {
   basePriceFromUnitPrice, convertQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
 } from '../../utils/uom';
-import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
+import { openWhatsAppChat } from '../../utils/externalLinks';
 import { QuotationModals } from './QuotationModals';
 import { emptyForm } from './QuotationModals';
 import type { FormState, Line } from './QuotationModals';
@@ -282,13 +282,11 @@ export const QuotationsPage: React.FC = () => {
   };
 
   const shareOnWhatsApp = (quotation: Quotation) => {
-    const phone = (quotation.customerPhone || '').replace(/[^0-9]/g, '');
-    const text = encodeURIComponent(
+    const text =
       `مرحباً ${quotation.customerName || ''}\nعرض السعر رقم ${quotation.quotationNumber}\n` +
       `الإجمالي: ${fmt(quotation.totalAmount)}\nصالح حتى: ${quotation.validUntil}\n` +
-      `يسعدنا خدمتكم.`
-    );
-    openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
+      `يسعدنا خدمتكم.`;
+    openWhatsAppChat(quotation.customerPhone || '', text);
   };
 
   const openFollowUp = (quotation: Quotation) => {
@@ -612,4 +610,3 @@ const Btn: React.FC<{ onClick: () => void; tone: 'slate' | 'sky' | 'emerald'; ch
   };
   return <button onClick={onClick} className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition ${styles[tone]}`}>{children}</button>;
 };
-

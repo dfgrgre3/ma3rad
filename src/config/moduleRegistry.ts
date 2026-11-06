@@ -105,7 +105,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'اليومية والأستاذ والحسابات والصناديق والتقارير المالية.',
     dependencies: [],
     permissions: ['finance.view'],
-    paths: ['/daily/expenses', '/daily/debts', '/finance', '/finance/debts', '/finance/receivables', '/cashboxes', '/finance/expenses', '/finance/accounts', '/finance/journal', '/finance/cheques', '/finance/bank-reconciliation', '/finance/fiscal-closing', '/finance/budgets-cost-centers', '/finance/cash-forecast', '/finance/epayment-settlements', '/finance/assets', '/finance/other-receivables', '/finance/installments'],
+    paths: ['/daily/expenses', '/daily/debts', '/finance', '/finance/calendar', '/finance/debts', '/finance/receivables', '/cashboxes', '/finance/expenses', '/finance/accounts', '/finance/journal', '/finance/cheques', '/finance/bank-reconciliation', '/finance/fiscal-closing', '/finance/budgets-cost-centers', '/finance/cash-forecast', '/finance/epayment-settlements', '/finance/assets', '/finance/other-receivables', '/finance/installments', '/partners'],
     businessEvents: ['journal_entry.posted', 'journal_entry.reversed', 'fiscal_period.closed'],
     settings: [
       { key: 'fiscalYearStartMonth', label: 'شهر بداية السنة المالية', type: 'number', defaultValue: 1 },

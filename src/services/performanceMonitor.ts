@@ -1,6 +1,8 @@
+import { DatabaseManager } from '../database/db';
+
 /**
  * نظام مراقبة الأداء المحلي
- * يتتبع أداء قاعدة البيانات، الذاكرة، CPU
+ * يتتبع قياسات قاعدة البيانات والذاكرة وإحصاءات الاستعلام المتاحة
  */
 
 export interface PerformanceMetrics {
@@ -8,18 +10,17 @@ export interface PerformanceMetrics {
   dbAccessTime: number;
   dbSizeMB: number;
   cacheSizeMB: number;
-  memoryUsageMB: number;
-  cpuUsage: number;
+  memoryUsageMB: number | null;
+  cpuUsage: number | null;
   activeConnections: number;
-  queriesPerSecond: number;
-  errorRate: number;
+  queriesPerSecond: number | null;
+  errorRate: number | null;
 }
 
 interface PerformanceThresholds {
   maxDbAccessTimeMs: number;
   maxDbSizeMB: number;
   maxMemoryMB: number;
-  maxCpuUsage: number;
   maxErrorRate: number;
 }
 
@@ -38,11 +39,11 @@ class PerformanceMonitorService {
   private alerts: Alert[] = [];
   private readonly maxBuffer = 1000;
   private monitoringTimer: ReturnType<typeof setInterval> | null = null;
+  private lastQuerySample: { timestamp: number; totalQueries: number; failedQueries: number } | null = null;
   private thresholds: PerformanceThresholds = {
     maxDbAccessTimeMs: 500,
     maxDbSizeMB: 500,
     maxMemoryMB: 2048,
-    maxCpuUsage: 90,
     maxErrorRate: 5 // percentage
   };
 
@@ -71,6 +72,7 @@ class PerformanceMonitorService {
     // جمع أولي
     const initialMetrics = await this.collectMetrics();
     this.recordMetric(initialMetrics);
+    this.checkThresholds(initialMetrics);
   }
 
   stopMonitoring(): void {
@@ -79,22 +81,56 @@ class PerformanceMonitorService {
   }
 
   private async collectMetrics(): Promise<PerformanceMetrics> {
-    // يمكن استخدام `measure` API
-    // الحصول على معلومات rivolto قاعدة البيانات
-    // الحصول على استخدام الذاكرة
-    // الحصول على استخدام CPU
+    const databaseManager = DatabaseManager.getInstance();
+    const database = databaseManager.getDb();
+    const queryStartedAt = performance.now();
+    database.exec('SELECT random()');
+    const dbAccessTime = Math.max(0, performance.now() - queryStartedAt);
 
-    // fake metrics for demo
+    const pageCount = Number(database.exec('PRAGMA page_count')[0]?.values[0]?.[0]);
+    const pageSize = Number(database.exec('PRAGMA page_size')[0]?.values[0]?.[0]);
+    if (!Number.isFinite(pageCount) || !Number.isFinite(pageSize) || pageCount < 0 || pageSize < 0) {
+      throw new Error('Could not read SQLite database size.');
+    }
+
+    const runtimeInfo = typeof window !== 'undefined'
+      ? await window.ceramisys?.app?.info?.()
+      : undefined;
+    const processMemoryBytes = runtimeInfo?.system?.processMemoryBytes;
+    const memoryUsageMB = typeof processMemoryBytes === 'number' && Number.isFinite(processMemoryBytes)
+      ? processMemoryBytes / (1024 * 1024)
+      : null;
+    const queryStats = databaseManager.getQueryStats();
+    const now = Date.now();
+    const previousSample = this.lastQuerySample;
+    this.lastQuerySample = {
+      timestamp: now,
+      totalQueries: queryStats.totalQueries,
+      failedQueries: queryStats.failedQueries
+    };
+
+    let queriesPerSecond: number | null = null;
+    let errorRate: number | null = null;
+    if (previousSample) {
+      const elapsedSeconds = (now - previousSample.timestamp) / 1000;
+      const queryCount = queryStats.totalQueries - previousSample.totalQueries;
+      const failedQueryCount = queryStats.failedQueries - previousSample.failedQueries;
+      if (elapsedSeconds > 0 && queryCount >= 0 && failedQueryCount >= 0) {
+        queriesPerSecond = queryCount / elapsedSeconds;
+        if (queryCount > 0) errorRate = (failedQueryCount / queryCount) * 100;
+      }
+    }
+
     return {
       timestamp: new Date().toISOString(),
-      dbAccessTime: Math.floor(Math.random() * 100),
-      dbSizeMB: Math.floor(Math.random() * 100),
-      cacheSizeMB: Math.floor(Math.random() * 50),
-      memoryUsageMB: Math.floor(Math.random() * 1024),
-      cpuUsage: Math.floor(Math.random() * 20),
+      dbAccessTime,
+      dbSizeMB: (pageCount * pageSize) / (1024 * 1024),
+      cacheSizeMB: databaseManager.getQueryCacheStats().sizeBytes / (1024 * 1024),
+      memoryUsageMB,
+      cpuUsage: null,
       activeConnections: 1,
-      queriesPerSecond: 0,
-      errorRate: 0
+      queriesPerSecond,
+      errorRate
     };
   }
 
@@ -126,12 +162,6 @@ class PerformanceMonitorService {
         message: 'استخدام الذاكرة مرتفع'
       },
       {
-        metric: 'cpuUsage',
-        value: metrics.cpuUsage,
-        threshold: this.thresholds.maxCpuUsage,
-        message: 'استخدام وحدة المعالجة المركزية مرتفع'
-      },
-      {
         metric: 'errorRate',
         value: metrics.errorRate,
         threshold: this.thresholds.maxErrorRate,
@@ -140,7 +170,7 @@ class PerformanceMonitorService {
     ];
 
     for (const check of checks) {
-      if (check.value >= check.threshold) {
+      if (check.value !== null && check.value >= check.threshold) {
         this.recordAlert({
           timestamp: new Date().toISOString(),
           severity: check.value >= check.threshold * 1.2 ? 'critical' : 'warning',
@@ -193,18 +223,21 @@ class PerformanceMonitorService {
   }
 
   getStats(): {
-    avgDbAccessTime: number;
+    avgDbAccessTime: number | null;
     totalQueries: number;
-    peakMemory: number;
+    peakMemory: number | null;
     alertCount: number;
   } {
     const times = this.metricsBuffer.map(m => m.dbAccessTime);
-    const avgTime = times.reduce((a, b) => a + b, 0) / times.length || 0;
-    const peakMemory = Math.max(...this.metricsBuffer.map(m => m.memoryUsageMB));
+    const memoryReadings = this.metricsBuffer
+      .map((metric) => metric.memoryUsageMB)
+      .filter((value): value is number => value !== null);
+    const avgTime = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
+    const peakMemory = memoryReadings.length ? Math.max(...memoryReadings) : null;
 
     return {
-      avgDbAccessTime: Math.floor(avgTime),
-      totalQueries: 0, // يمكن جمعها من أداء الاستعلام
+      avgDbAccessTime: avgTime === null ? null : Math.floor(avgTime),
+      totalQueries: DatabaseManager.getInstance().getQueryStats().totalQueries,
       peakMemory: peakMemory,
       alertCount: this.alerts.length
     };

@@ -13,6 +13,8 @@ export interface Branch {
   code: string;
   name: string;
   phone?: string | null;
+  phone2?: string | null;
+  taxNumber?: string | null;
   address?: string | null;
   city?: string | null;
   managerId?: string | null;
@@ -144,6 +146,8 @@ export class OperationsService {
   public createBranch(input: {
     name: string;
     phone?: string;
+    phone2?: string;
+    taxNumber?: string;
     address?: string;
     city?: string;
     deviceType?: string;
@@ -209,10 +213,11 @@ export class OperationsService {
       }
       db.run(
         `INSERT INTO branches
-           (id, code, name, phone, address, city, manager_id, company_id, is_main, is_active, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+           (id, code, name, phone, phone2, tax_number, address, city, manager_id, company_id, is_main, is_active, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
         [
-          id, code, trimmedName, input.phone?.trim() || null, input.address?.trim() || null,
+          id, code, trimmedName, input.phone?.trim() || null, input.phone2?.trim() || null,
+          input.taxNumber?.trim() || null, input.address?.trim() || null,
           input.city?.trim() || null, input.managerId || null, companyId, input.isDefault ? 1 : 0, notes,
         ]
       );

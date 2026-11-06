@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, Clock3, Loader2, MapPin, MessageCircle, Packa
 import { CustomerSupplyService } from '../../services/CustomerSupplyService';
 import { usePermission } from '../../hooks/usePermission';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
-import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
+import { openWhatsAppChat, normalizeWhatsAppPhone } from '../../utils/externalLinks';
 
 type PendingItem = {
   invoiceId: string; invoiceNumber: string; invoiceDate: string; customerId: string; customerName: string;
@@ -20,14 +20,6 @@ type InvoiceGroup = {
 type Draft = { group: InvoiceGroup; fee: string; text: string };
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
-
-function normalizeEgyptianPhone(value: string): string {
-  let phone = value.replace(/\D/g, '');
-  if (phone.startsWith('00')) phone = phone.slice(2);
-  if (phone.startsWith('0')) phone = `20${phone.slice(1)}`;
-  else if (phone.startsWith('1') && phone.length === 10) phone = `20${phone}`;
-  return phone;
-}
 
 export const CustomerImportedProductsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -107,9 +99,9 @@ export const CustomerImportedProductsPage: React.FC = () => {
   const visible = groups.filter((group) => `${group.customerName} ${group.invoiceNumber} ${group.items.map((item) => item.productName).join(' ')}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const sendWhatsApp = () => {
     if (!draft) return;
-    const phone = normalizeEgyptianPhone(draft.group.phone);
+    const phone = normalizeWhatsAppPhone(draft.group.phone);
     if (!phone) return;
-    openExternalShare(buildWhatsAppUrl(phone, encodeURIComponent(draft.text)), draft.text);
+    openWhatsAppChat(phone, draft.text);
   };
 
   if (!canView) return <div className="h-full flex items-center justify-center bg-slate-50 text-rose-700" dir="rtl">ليس لديك صلاحية عرض هذه الصفحة.</div>;
@@ -127,7 +119,7 @@ export const CustomerImportedProductsPage: React.FC = () => {
         return <article key={group.invoiceId} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100"><div><button onClick={() => navigate(`/customers/${group.customerId}`)} className="font-black text-slate-900 hover:text-sky-700">{group.customerName}</button><div className="text-xs text-slate-500 mt-1">فاتورة {group.invoiceNumber} · {group.invoiceDate} · {group.warehouseName || 'المخزن'}</div><div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">{group.phone && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3"/>{group.phone}</span>}{group.address && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3"/>{group.address}</span>}</div></div><div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${ready ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{ready ? <CheckCircle2 className="w-4 h-4"/> : <Clock3 className="w-4 h-4"/>}{ready ? 'الكمية المطلوبة متوفرة' : 'بانتظار اكتمال الكمية'}</div></div>
           <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="text-right p-3">المنتج</th><th className="text-right p-3">المطلوب</th><th className="text-right p-3">المتوفر</th><th className="text-right p-3">سعر الوحدة</th><th className="text-right p-3">الإجمالي</th></tr></thead><tbody>{group.items.map((item, index) => <tr key={`${item.productId}-${index}`} className="border-t border-slate-100"><td className="p-3 font-semibold">{item.productName} {item.size && <span className="text-xs text-slate-400">({item.size})</span>}</td><td className="p-3">{formatProductQuantity(item.quantityM2, item)}</td><td className={`p-3 font-bold ${item.availableM2 >= item.quantityM2 ? 'text-emerald-700' : 'text-amber-700'}`}>{formatProductQuantity(item.availableM2, item)}</td><td className="p-3">{fmt(item.unitPrice)} ج / {getProductUnitLabel(item)}</td><td className="p-3">{fmt(item.totalPrice)} ج</td></tr>)}</tbody></table></div>
-          <div className="px-5 py-3 bg-slate-50/70 flex flex-wrap justify-between items-center gap-3"><div className="text-xs text-slate-600">التوصيل: <b>{fmt(group.shippingCost)} ج</b></div><button onClick={() => { const fee = group.shippingCost; setDraft({ group, fee: String(fee), text: buildMessage(group, fee) }); }} disabled={!normalizeEgyptianPhone(group.phone)} title={!normalizeEgyptianPhone(group.phone) ? 'أضف رقم هاتف صحيح للعميل أولاً' : undefined} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold"><MessageCircle className="w-4 h-4"/>معاينة رسالة واتساب</button></div>
+          <div className="px-5 py-3 bg-slate-50/70 flex flex-wrap justify-between items-center gap-3"><div className="text-xs text-slate-600">التوصيل: <b>{fmt(group.shippingCost)} ج</b></div><button onClick={() => { const fee = group.shippingCost; setDraft({ group, fee: String(fee), text: buildMessage(group, fee) }); }} disabled={!normalizeWhatsAppPhone(group.phone)} title={!normalizeWhatsAppPhone(group.phone) ? 'أضف رقم هاتف صحيح للعميل أولاً' : undefined} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold"><MessageCircle className="w-4 h-4"/>معاينة رسالة واتساب</button></div>
         </article>;
       })}
       {!loading && visible.length === 0 && !error && <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-12 text-center text-slate-500">لا توجد فواتير مسجلة للمتابعة. افتح بطاقة العميل ثم اختر «متابعة المنتجات الخارجية» بجوار الفاتورة.</div>}

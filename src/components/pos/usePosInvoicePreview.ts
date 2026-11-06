@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { PrintService } from '../../services/PrintService';
 import { CeramicMath } from '../../utils/ceramicMath';
 import { formatProductQuantity } from '../../utils/productUnits';
-import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
+import { openWhatsAppChat } from '../../utils/externalLinks';
 import { exportToExcel } from '../../utils/export';
 import type { InvoicePreview } from './types';
 
@@ -47,14 +47,12 @@ export const usePosInvoicePreview = ({ printService, setInvoicePreview }: UsePos
       html: printService.getInvoiceHtml(invoice),
       excel: () => exportToExcel(excel),
       whatsapp: invoice.customerPhone ? () => {
-        const phone = String(invoice.customerPhone).replace(/[^0-9]/g, '');
-        const text = encodeURIComponent(
+        const text =
           `فاتورة مبيعات ${invoice.invoiceNumber}\nالإجمالي: ${CeramicMath.formatCurrency(invoice.totalAmount)}\n` +
           `المدفوع: ${CeramicMath.formatCurrency(invoice.paidAmount)}\n` +
           (invoice.remainingAmount > 0 ? `المتبقي: ${CeramicMath.formatCurrency(invoice.remainingAmount)}\n` : '') +
-          `شكراً لتعاملكم معنا.`
-        );
-        openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
+          `شكراً لتعاملكم معنا.`;
+        openWhatsAppChat(String(invoice.customerPhone || ''), text);
       } : undefined,
     });
   };

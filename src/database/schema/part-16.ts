@@ -2,6 +2,7 @@ export const SCHEMA_PART_16 = String.raw`
 CREATE TABLE IF NOT EXISTS inventory_reconciliation_logs (
   id TEXT PRIMARY KEY,
   reconciliation_date TEXT NOT NULL,
+  branch_id TEXT,
   warehouse_id TEXT,
   total_physical_cost REAL NOT NULL,
   total_fifo_layer_cost REAL NOT NULL,
@@ -12,6 +13,7 @@ CREATE TABLE IF NOT EXISTS inventory_reconciliation_logs (
   notes TEXT,
   performed_by TEXT NOT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (branch_id) REFERENCES branches(id),
   FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
   FOREIGN KEY (performed_by) REFERENCES users(id)
 );

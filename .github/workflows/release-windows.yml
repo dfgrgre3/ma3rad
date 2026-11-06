@@ -33,7 +33,8 @@ jobs:
           cache: npm
 
       - name: Verify tag matches package version
-        run: node -e "const version = require('./package.json').version; if (process.env.GITHUB_REF_NAME !== 'v' + version) throw new Error('Tag must match package.json version: v' + version)"
+        run: |
+          node -e "const version = require('./package.json').version; if (process.env.GITHUB_REF_NAME !== 'v' + version) { throw new Error('Tag must match package.json version: v' + version); }"
 
       - name: Require signing secrets
         run: |

@@ -4,6 +4,8 @@ export interface Branch {
   name: string;
   address?: string | null;
   phone?: string | null;
+  phone2?: string | null;
+  taxNumber?: string | null;
   city?: string | null;
   managerId?: string | null;
   managerName?: string | null;
@@ -74,6 +76,8 @@ export interface CreateBranchDTO {
   code?: string;
   address?: string;
   phone?: string;
+  phone2?: string;
+  taxNumber?: string;
   city?: string;
   managerId?: string | null;
   managerName?: string;

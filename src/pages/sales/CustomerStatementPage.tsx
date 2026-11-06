@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   FileText, Search, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
   Users, DollarSign, RefreshCw, TrendingUp, TrendingDown, Calendar,
-  Receipt, CreditCard, Banknote, Eye, X, Printer, Download,
+  Receipt, CreditCard, Banknote, Eye, X, Printer, Download, MessageCircle,
   CheckCircle2, Clock, AlertCircle, Filter,
 } from 'lucide-react';
 import { SalesService } from '../../services/SalesService';
@@ -13,6 +13,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { Customer, SalesInvoice } from '../../types';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
+import { CustomerStatementWhatsAppOptions } from '../../components/sales/CustomerStatementWhatsAppOptions';
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
@@ -50,6 +51,7 @@ interface CustomerStatementRow {
 
 interface StatementModalProps {
   customer: Customer;
+  canExport: boolean;
   onClose: () => void;
 }
 
@@ -129,7 +131,8 @@ const StatementTable: React.FC<StatementTableProps> = ({
   </>
 );
 
-const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) => {
+const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, onClose }) => {
+  const customerService = useMemo(() => new CustomerService(), []);
   const salesService = useMemo(() => new SalesService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const [rows, setRows] = useState<CustomerStatementRow[]>([]);
@@ -141,6 +144,7 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
   });
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [docPreview, setDocPreview] = useState<{ title: string; fileName: string; html: string } | null>(null);
+  const [shareStatement, setShareStatement] = useState<ReturnType<CustomerService['getCustomerStatement']> | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -212,6 +216,14 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
   const totalCredit = rows.reduce((s, r) => s + r.credit, 0);
   const netBalance = totalDebit - totalCredit;
   const overdueInvoices = invoices.filter(inv => inv.paymentStatus !== 'PAID' && inv.dueDate && inv.dueDate < new Date().toISOString().split('T')[0]);
+
+  const handleShareWhatsApp = () => {
+    try {
+      setShareStatement(customerService.getCustomerStatement(customer.id));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'تعذر تحميل كشف حساب العميل.');
+    }
+  };
 
   const handlePrint = () => {
     const headers = ['التاريخ', 'المرجع', 'البيان', 'مدين', 'دائن', 'الرصيد'];
@@ -296,6 +308,9 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
               <button onClick={handlePrint} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
                 <Printer className="w-3.5 h-3.5" />طباعة
               </button>
+              {canExport && customer.phone && <button onClick={handleShareWhatsApp} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-semibold text-white transition-all">
+                <MessageCircle className="w-3.5 h-3.5" />إرسال واتساب
+              </button>}
               <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
                 <Download className="w-3.5 h-3.5" />جدول بيانات
               </button>
@@ -372,6 +387,17 @@ const StatementModal: React.FC<StatementModalProps> = ({ customer, onClose }) =>
           onClose={() => setDocPreview(null)}
         />
       )}
+      {shareStatement && (
+        <CustomerStatementWhatsAppOptions
+          key={`${shareStatement.customer.id}-${shareStatement.customer.updatedAt}`}
+          statement={shareStatement}
+          buttonClassName=""
+          buttonLabel=""
+          showTrigger={false}
+          initiallyOpen
+          onClose={() => setShareStatement(null)}
+        />
+      )}
     </>
   );
 };
@@ -385,6 +411,7 @@ export const CustomerStatementPage: React.FC = () => {
   const canView = PermissionService.can(user, 'customers.view')
     && PermissionService.can(user, 'sales.view')
     && PermissionService.can(user, 'finance.debts.view');
+  const canExport = PermissionService.can(user, 'customers.export');
 
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -600,7 +627,7 @@ export const CustomerStatementPage: React.FC = () => {
       </div>
 
       {selected && (
-        <StatementModal customer={selected} onClose={() => setSelected(null)} />
+        <StatementModal customer={selected} canExport={canExport} onClose={() => setSelected(null)} />
       )}
     </div>
   );

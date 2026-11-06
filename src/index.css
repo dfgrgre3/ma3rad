@@ -57,6 +57,24 @@ input[type=number] {
   }
 }
 
+@media print {
+  body:has(.asset-print-card) * {
+    visibility: hidden !important;
+  }
+  body:has(.asset-print-card) .asset-print-card,
+  body:has(.asset-print-card) .asset-print-card * {
+    visibility: visible !important;
+  }
+  body:has(.asset-print-card) .asset-print-card {
+    position: fixed !important;
+    inset: 20mm 15mm auto !important;
+    width: calc(100% - 30mm) !important;
+    border: 1px solid #111 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+}
+
 /* Shared CeramiSys design tokens and accessible interaction states */
 :root {
   --cerami-primary: #0078d4;

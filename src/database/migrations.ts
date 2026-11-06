@@ -16,6 +16,10 @@ import { MIGRATION_PART_12 } from './migrations/part12';
 import { MIGRATION_PART_13 } from './migrations/part13';
 import { MIGRATION_PART_14 } from './migrations/part14';
 import { MIGRATION_PART_15 } from './migrations/part15';
+import { MIGRATION_PART_16 } from './migrations/part16';
+import { MIGRATION_PART_17 } from './migrations/part17';
+import { MIGRATION_PART_18 } from './migrations/part18';
+import { MIGRATION_PART_19 } from './migrations/part19';
 import { MIGRATION_ENTERPRISE } from './migrations/enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './migrationSupport';
 
@@ -2489,6 +2493,10 @@ export const MIGRATIONS: Migration[] = [
       addColumn(db, 'sales_return_reconciliations', 'customer_purchase_tax_included', 'INTEGER NOT NULL DEFAULT 0');
     },
   },
+  ...MIGRATION_PART_16,
+  ...MIGRATION_PART_17,
+  ...MIGRATION_PART_18,
+  ...MIGRATION_PART_19,
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

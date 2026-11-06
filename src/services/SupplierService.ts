@@ -158,7 +158,9 @@ export class SupplierService {
     paymentType: PaymentType = 'CASH',
     registerId = 'cr_main',
     notes = '',
-    idempotencyKey?: string
+    idempotencyKey?: string,
+    paymentDate?: string,
+    invoiceId?: string
   ): SupplierPayment {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'suppliers.payment');
@@ -167,16 +169,35 @@ export class SupplierService {
 
     const sup = this.readSupplier(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
+    if (invoiceId) {
+      const invoice = this.db.query<{ supplierId: string; remainingAmount: number; branchId: string | null }>(`
+        SELECT pi.supplier_id AS supplierId, pi.remaining_amount AS remainingAmount,
+          COALESCE(pi.branch_id, w.branch_id) AS branchId
+        FROM purchase_invoices pi JOIN warehouses w ON w.id = pi.warehouse_id
+        WHERE pi.id = ?
+      `, [invoiceId])[0];
+      if (!invoice || invoice.supplierId !== supplierId || invoice.branchId !== branchId) {
+        throw new Error('فاتورة المورد غير موجودة أو خارج نطاق صلاحية الفرع.');
+      }
+      if (!Number.isFinite(invoice.remainingAmount) || amount > Number(invoice.remainingAmount) + 0.009) {
+        throw new Error('مبلغ السداد يتجاوز الرصيد المستحق على الفاتورة.');
+      }
+    }
 
     const paymentId = `spay_${uuidv4().substring(0, 8)}`;
-    const today = localDateString();
+    const today = paymentDate || localDateString();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(Date.parse(`${today}T00:00:00Z`)) ||
+        new Date(`${today}T00:00:00Z`).toISOString().slice(0, 10) !== today) {
+      throw new Error('تاريخ السداد غير صحيح.');
+    }
 
     return this.db.executeTransaction((sqliteDb) => {
       if (idempotencyKey) {
         const prior = sqliteDb.query<any>(`SELECT * FROM supplier_payments WHERE idempotency_key = ?`, [idempotencyKey])[0];
         if (prior) {
           if (prior.supplierId !== supplierId || Number(prior.amount) !== amount ||
-            prior.paymentType !== paymentType || (prior.registerId || 'cr_main') !== registerId || (prior.notes || '') !== notes) {
+            prior.paymentType !== paymentType || (prior.registerId || 'cr_main') !== registerId ||
+            (prior.notes || '') !== notes || prior.date !== today) {
             throw new Error('The supplier payment idempotency key was already used for a different request.');
           }
           return prior as SupplierPayment;
@@ -191,7 +212,11 @@ export class SupplierService {
       `, [paymentId, receiptNumber, supplierId, amount, idempotencyKey || null, paymentType, today, registerId, branchId, notes, actor.id]);
 
       let unapplied = amount;
-      const invoices = sqliteDb.query<any>(`SELECT id,paid_amount,remaining_amount FROM purchase_invoices WHERE supplier_id=? AND branch_id=? AND remaining_amount>0.009 ORDER BY date,created_at,id`, [supplierId, branchId]);
+      const invoices = sqliteDb.query<any>(`
+        SELECT id,paid_amount,remaining_amount FROM purchase_invoices
+        WHERE supplier_id=? AND branch_id=? AND remaining_amount>0.009
+        ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, date, created_at, id
+      `, [supplierId, branchId, invoiceId || '']);
       for (const invoice of invoices) {
         if (unapplied <= 0.009) break;
         const allocated = Math.round(Math.min(unapplied, Number(invoice.remainingAmount)) * 100) / 100;

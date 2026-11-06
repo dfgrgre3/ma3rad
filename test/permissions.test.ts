@@ -11,6 +11,7 @@ import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts'
 import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { PermissionService, ROLE_DEFAULTS } from '../src/services/PermissionService.ts';
 import { ROUTE_PERMISSIONS } from '../src/config/routePermissions.ts';
+import { NAV_GROUPS_01 } from '../src/config/navigationGroups01.ts';
 import { NAV_GROUPS_02 } from '../src/config/navigationGroups02.ts';
 import { NavigationService } from '../src/services/NavigationService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
@@ -28,6 +29,32 @@ function makeUser(db: DatabaseManager, id: string, role: string): any {
   );
   return { id, username: id, fullName: id, role, phone: null, isActive: true, createdAt: '', updatedAt: '' };
 }
+
+test('finance navigation separates calendar viewing from close access', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_finance_close_only', name: 'Finance close only test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['finance.close'], admin);
+  const closeOnly = makeUser(db, 'usr_finance_close_only_test', role.code);
+
+  try {
+    const calendarRoute = ROUTE_PERMISSIONS.find(({ path }) => path === '/finance/calendar');
+    const fiscalCloseRoute = ROUTE_PERMISSIONS.find(({ path }) => path === '/finance/fiscal-closing');
+    const financeGroupDefinition = NAV_GROUPS_01.find(({ id }) => id === 'finance');
+    const accessibleFinanceGroup = NavigationService.getAccessibleGroups(closeOnly).find(({ id }) => id === 'finance');
+
+    assert.deepEqual(calendarRoute?.all, ['finance.view']);
+    assert.deepEqual(fiscalCloseRoute?.any, ['finance.view', 'finance.close']);
+    assert.deepEqual(financeGroupDefinition?.anyPerms, ['finance.view', 'finance.close']);
+    assert.equal(accessibleFinanceGroup?.items.some(({ to }) => to === '/finance/fiscal-closing'), true);
+    assert.equal(accessibleFinanceGroup?.items.some(({ to }) => to === '/finance/calendar'), false);
+  } finally {
+    db.run('DELETE FROM users WHERE id = ?', [closeOnly.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
 
 test('permissions: admin has everything, limited role is denied, override grants and denies', async () => {
   const db = DatabaseManager.getInstance();

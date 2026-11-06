@@ -53,12 +53,6 @@ export const InventoryReconciliationPage: React.FC = () => {
     try {
       inventoryService.saveReconciliationLog({
         warehouseId: selectedWarehouseId || undefined,
-        totalPhysicalCost: reconciliation.totalPhysicalCost,
-        totalFifoLayerCost: reconciliation.totalFifoLayerCost,
-        totalGlInventoryCost: reconciliation.totalGlInventoryCost,
-        variancePhysicalVsFifo: reconciliation.variancePhysicalVsFifo,
-        varianceFifoVsGl: reconciliation.varianceFifoVsGl,
-        status: reconciliation.status,
         notes: saveNotes.trim() || undefined
       });
       toast.success('تم توثيق محضر المطابقة الدوري وسجله في سجل التدقيق المالي.');

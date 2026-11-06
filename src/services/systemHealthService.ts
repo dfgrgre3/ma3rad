@@ -5,15 +5,16 @@
 
 import { auditLogger } from './auditLogger';
 import { performanceMonitor } from './performanceMonitor';
+import { securityService } from './SecurityService';
 import { APP_VERSION } from '../config/appVersion';
 
 
 export interface HealthScore {
-  overall: number;
-  security: number;
-  performance: number;
-  dataIntegrity: number;
-  backupHealth: number;
+  overall: number | null;
+  security: number | null;
+  performance: number | null;
+  dataIntegrity: number | null;
+  backupHealth: number | null;
 }
 
 export interface HealthAlert {
@@ -28,18 +29,18 @@ export interface HealthAlert {
 }
 
 export interface HealthMetrics {
-  activeUsers: number;
-  failedLogins: number;
-  encryptionEvents: number;
-  backupEvents: number;
-  auditEvents: number;
-  performanceAlerts: number;
-  securityRanking: 'A' | 'B' | 'C' | 'D';
-  diskSpaceMB: number;
-  memoryUsageMB: number;
-  cpuUsage: number;
-  networkAvailability: boolean;
-  databaseHealth: string;
+  activeUsers: number | null;
+  failedLogins: number | null;
+  encryptionEvents: number | null;
+  backupEvents: number | null;
+  auditEvents: number | null;
+  performanceAlerts: number | null;
+  securityRanking: 'A' | 'B' | 'C' | 'D' | null;
+  diskSpaceMB: number | null;
+  memoryUsageMB: number | null;
+  cpuUsage: number | null;
+  networkAvailability: boolean | null;
+  databaseHealth: 'unknown' | 'responsive' | 'slow';
 }
 
 export interface SystemHealthReport {
@@ -52,7 +53,13 @@ export interface SystemHealthReport {
 
 class SystemHealthService {
   private static instance: SystemHealthService;
-  private lastSafeScore: HealthScore = { overall: 100, security: 100, performance: 100, dataIntegrity: 100, backupHealth: 100 };
+  private lastSafeScore: HealthScore = {
+    overall: null,
+    security: null,
+    performance: null,
+    dataIntegrity: null,
+    backupHealth: null
+  };
   private healthHistory: { score: HealthScore; timestamp: number }[] = [];
   private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -91,38 +98,39 @@ class SystemHealthService {
   public async calculateHealthScore(): Promise<HealthScore> {
     const securityScore = await this.calculateSecurityScore();
     const performanceScore = await this.calculatePerformanceScore();
-    const dataIntegrityScore = await this.calculateDataIntegrityScore();
+    // لا يُستنتج تكامل البيانات من زمن الاستجابة؛ فحوصه في مسار التشخيص المستقل.
+    const dataIntegrityScore: null = null;
     const backupHealthScore = await this.calculateBackupHealthScore();
 
-    const overallScore =
-      (securityScore * 0.3) +
-      (performanceScore * 0.2) +
-      (dataIntegrityScore * 0.25) +
-      (backupHealthScore * 0.25);
+    const components = [
+      { score: securityScore, weight: 0.3 },
+      { score: performanceScore, weight: 0.2 },
+      { score: dataIntegrityScore, weight: 0.25 },
+      { score: backupHealthScore, weight: 0.25 }
+    ].filter((item): item is { score: number; weight: number } => item.score !== null);
+    const totalWeight = components.reduce((total, item) => total + item.weight, 0);
+    const overallScore = totalWeight > 0
+      ? components.reduce((total, item) => total + item.score * item.weight, 0) / totalWeight
+      : null;
 
     return {
-      overall: Math.round(overallScore),
-      security: Math.round(securityScore),
-      performance: Math.round(performanceScore),
-      dataIntegrity: Math.round(dataIntegrityScore),
-      backupHealth: Math.round(backupHealthScore)
+      overall: overallScore === null ? null : Math.round(overallScore),
+      security: securityScore === null ? null : Math.round(securityScore),
+      performance: performanceScore === null ? null : Math.round(performanceScore),
+      dataIntegrity: dataIntegrityScore,
+      backupHealth: backupHealthScore === null ? null : Math.round(backupHealthScore)
     };
   }
 
 
 
   private async calculateSecurityScore(): Promise<number> {
-    let score = 100;
-
-    // التشفير دائمًا مفعل
-    score += 30;
-
-    if (this.lastSafeScore.dataIntegrity < 100) score -= 10;
-
-    return Math.max(0, score);
+    const ranking = securityService.getMetrics().securityRanking;
+    return { A: 100, B: 80, C: 60, D: 40 }[ranking];
   }
 
-  private async calculatePerformanceScore(): Promise<number> {
+  private async calculatePerformanceScore(): Promise<number | null> {
+    if (performanceMonitor.getMetrics().length === 0) return null;
     const alerts = performanceMonitor.getAlerts();
     let score = 100;
 
@@ -131,19 +139,6 @@ class SystemHealthService {
 
     const criticalAlerts = alerts.filter(a => a.severity === 'critical').length;
     if (criticalAlerts > 0) score -= 10 * criticalAlerts;
-
-    return Math.max(0, score);
-  }
-
-  private async calculateDataIntegrityScore(): Promise<number> {
-    // تقييم نقا ء البيانات
-    let score = 100;
-
-    const metrics = performanceMonitor.getMetrics();
-    const dbAccessTime = Math.max(...metrics.map(m => m.dbAccessTime));
-
-    if (dbAccessTime > 500) score -= 20;
-    if (dbAccessTime > 1000) score -= 20;
 
     return Math.max(0, score);
   }
@@ -182,7 +177,7 @@ class SystemHealthService {
   }
 
   private generateQuestions(score: HealthScore): void {
-    if (score.overall < 80) {
+    if (score.overall !== null && score.overall < 80) {
       // إنشاء تنبيه
       const alert: HealthAlert = {
         timestamp: new Date().toISOString(),
@@ -205,8 +200,9 @@ class SystemHealthService {
     if (this.alerts.length > 100) {
       this.alerts = this.alerts.slice(-100);
     }
-    const event = new CustomEvent('system-health-alert', { detail: alert });
-    window.dispatchEvent(event);
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('system-health-alert', { detail: alert }));
+    }
   }
 
   private alerts: HealthAlert[] = [];
@@ -218,16 +214,15 @@ class SystemHealthService {
 
   async generateReport(): Promise<SystemHealthReport> {
     const score = this.lastSafeScore;
-    const securityMetrics = {
-      activeUsers: 1,
-      failedLogins: 0,
-      successfulLogins: 0,
-      encryptionEvents: 0,
-      backupEvents: 0,
-      auditEvents: 0,
-      performanceAlerts: 0,
-      securityRanking: 'A' as const
-    };
+    const securityMetrics = securityService.getMetrics();
+    const runtimeInfo = typeof window !== 'undefined'
+      ? await window.ceramisys?.app?.info?.()
+      : undefined;
+    const latestMetric = performanceMonitor.getMetrics(1)[0];
+    const recentDatabaseAlert = latestMetric && performanceMonitor.getAlerts().some((alert) =>
+      alert.metric === 'dbAccessTime' && alert.timestamp >= latestMetric.timestamp
+    );
+    const disk = runtimeInfo?.system?.disk;
 
     const metrics: HealthMetrics = {
       activeUsers: securityMetrics.activeUsers,
@@ -237,11 +232,11 @@ class SystemHealthService {
       auditEvents: securityMetrics.auditEvents,
       performanceAlerts: securityMetrics.performanceAlerts,
       securityRanking: securityMetrics.securityRanking,
-      diskSpaceMB: 0,
-      memoryUsageMB: 0,
-      cpuUsage: 0,
-      networkAvailability: true,
-      databaseHealth: 'good'
+      diskSpaceMB: disk?.available ? disk.freeBytes / (1024 * 1024) : null,
+      memoryUsageMB: latestMetric?.memoryUsageMB ?? null,
+      cpuUsage: latestMetric?.cpuUsage ?? null,
+      networkAvailability: null,
+      databaseHealth: !latestMetric ? 'unknown' : recentDatabaseAlert ? 'slow' : 'responsive'
     };
 
     const recommendations = this.generateRecommendations(score);
@@ -258,19 +253,22 @@ class SystemHealthService {
   private generateRecommendations(score: HealthScore): string[] {
     const recs: string[] = [];
 
-    if (score.overall < 80) {
+    if (score.overall !== null && score.overall < 80) {
       recs.push('الأداء العام منخفض - يرجى مراجعة الصيانة');
     }
-    if (score.security < 80) {
+    if (score.security !== null && score.security < 80) {
       recs.push('النموذج الأمني يتطلب تحسين التطوير');
     }
-    if (score.performance < 80) {
+    if (score.performance !== null && score.performance < 80) {
       recs.push('تم رصد مشاكل في الأداء - يرجى تنفيذ تحسينات');
     }
-    if (score.dataIntegrity < 80) {
+    if (score.dataIntegrity !== null && score.dataIntegrity < 80) {
       recs.push('تم كشف مشاكل في سلامة البيانات');
     }
-    if (score.backupHealth < 80) {
+    if (score.dataIntegrity === null) {
+      recs.push('لم تُقَس سلامة قاعدة البيانات هنا - شغّل فحوصات التشخيص المخصصة');
+    }
+    if (score.backupHealth !== null && score.backupHealth < 80) {
       recs.push('النسخ الاحتياطي يتطلب تحسينًا');
     }
 
@@ -282,24 +280,37 @@ class SystemHealthService {
     performance: HealthScore['performance'];
     dataIntegrity: HealthScore['dataIntegrity'];
     backupHealth: HealthScore['backupHealth'];
-    uptime: number;
+    uptime: number | null;
     version: string;
-    environment: 'production' | 'development';
-    memoryUsage: { used: number; total: number };
-    diskUsage: { used: number; total: number };
+    environment: 'production' | 'development' | 'unknown';
+    memoryUsage: { used: number | null; total: number | null };
+    diskUsage: { used: number | null; total: number | null };
   }> {
-    performanceMonitor.getMetrics();
+    const runtimeInfo = typeof window !== 'undefined'
+      ? await window.ceramisys?.app?.info?.()
+      : undefined;
+    const system = runtimeInfo?.system;
+    const freeDiskBytes = system?.disk.available ? system.disk.freeBytes : null;
+    const totalDiskBytes = system?.disk.available ? system.disk.totalBytes : null;
 
     return {
       security: this.lastSafeScore.security,
       performance: this.lastSafeScore.performance,
       dataIntegrity: this.lastSafeScore.dataIntegrity,
       backupHealth: this.lastSafeScore.backupHealth,
-      uptime: 0,
+      uptime: system?.processUptimeSeconds ?? null,
       version: APP_VERSION,
-      environment: 'production',
-      memoryUsage: { used: 0, total: 0 },
-      diskUsage: { used: 0, total: 0 }
+      environment: runtimeInfo ? (runtimeInfo.packaged ? 'production' : 'development') : 'unknown',
+      memoryUsage: {
+        used: system ? system.processMemoryBytes / (1024 * 1024) : null,
+        total: system ? system.totalMemoryBytes / (1024 * 1024) : null
+      },
+      diskUsage: {
+        used: freeDiskBytes !== null && totalDiskBytes !== null
+          ? (totalDiskBytes - freeDiskBytes) / (1024 * 1024)
+          : null,
+        total: totalDiskBytes !== null ? totalDiskBytes / (1024 * 1024) : null
+      }
     };
   }
 }

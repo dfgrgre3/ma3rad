@@ -259,14 +259,14 @@ export function printHtml(html: string): void {
  * `printToPDF` and shows a native save dialog; in a browser we fall back to the
  * print dialog where the user can choose "Save as PDF".
  */
-export async function downloadPdf(html: string, fileName: string): Promise<void> {
+export async function downloadPdf(html: string, fileName: string): Promise<boolean> {
   const bridge = window.ceramisys;
   if (bridge?.savePdf) {
     const landscape = /@page[^}]*A4\s+landscape/i.test(html);
-    await bridge.savePdf(html, fileName, landscape);
-    return;
+    return Boolean(await bridge.savePdf(html, fileName, landscape));
   }
   printHtml(html);
+  return true;
 }
 
 export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, permission }: ExportOptions): void {

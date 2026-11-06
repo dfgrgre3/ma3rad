@@ -13,7 +13,7 @@ import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import {
   basePriceFromUnitPrice, convertQuantity, pricePerUnit,
 } from '../../utils/uom';
-import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
+import { openWhatsAppChat } from '../../utils/externalLinks';
 import { PAGE_SIZE, emptyForm, fmt, FormState, Line } from './orders/types';
 import { buildOrderExportRows } from './orders/helpers';
 import { OrdersHeader } from './orders/OrdersHeader';
@@ -274,14 +274,12 @@ export const OrdersPage: React.FC = () => {
   };
 
   const shareOnWhatsApp = (order: Order) => {
-    const phone = (order.customerPhone || '').replace(/[^0-9]/g, '');
-    const text = encodeURIComponent(
+    const text =
       `مرحباً ${order.customerName || ''}\nطلبكم رقم ${order.orderNumber} بتاريخ ${order.date}\n` +
       `الإجمالي: ${fmt(order.totalAmount)}\n` +
       (order.expectedDeliveryDate ? `موعد التسليم المتوقع: ${order.expectedDeliveryDate}\n` : '') +
-      `شكراً لتعاملكم معنا.`
-    );
-    openExternalShare(buildWhatsAppUrl(phone, text), decodeURIComponent(text));
+      `شكراً لتعاملكم معنا.`;
+    openWhatsAppChat(order.customerPhone || '', text);
   };
 
   const openConvert = (order: Order) => {

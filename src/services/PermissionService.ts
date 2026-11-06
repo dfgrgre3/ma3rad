@@ -110,6 +110,13 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'suppliers.payment', name: 'سداد لمورد', module: 'SUPPLIERS' },
   { code: 'suppliers.export', name: 'تصدير الموردين', module: 'SUPPLIERS' },
 
+  // Business partners
+  { code: 'partners.view', name: 'عرض الشركاء وكشوف حساباتهم', module: 'PARTNERS' },
+  { code: 'partners.manage', name: 'إضافة وتعديل بيانات الشركاء ونسب الملكية', module: 'PARTNERS' },
+  { code: 'partners.transactions', name: 'تسجيل مساهمات ومسحوبات ومصروفات الشركاء', module: 'PARTNERS' },
+  { code: 'partners.profits.distribute', name: 'توزيع أرباح الشركاء', module: 'PARTNERS' },
+  { code: 'partners.print', name: 'طباعة كشوف حساب الشركاء', module: 'PARTNERS' },
+
   // Cashier / treasury
   { code: 'cashier.view', name: 'عرض الخزينة', module: 'CASHIER' },
   { code: 'cashier.expense', name: 'إثبات مصروف', module: 'CASHIER' },
@@ -581,6 +588,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'purchases.view', 'purchases.approve', 'purchases.reject', 'purchases.cancel_request', 'purchases.export',
     'customers.view', 'customers.payment', 'customers.export',
     'suppliers.view', 'suppliers.payment', 'suppliers.export',
+    'partners.view', 'partners.manage', 'partners.transactions', 'partners.profits.distribute', 'partners.print',
     'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
     'finance.view', 'finance.approve', 'finance.close', 'finance.debts.view', 'finance.export',
     'finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export',
@@ -665,6 +673,11 @@ const RECEIVABLE_PERMISSION_BACKFILL: Record<string, string[]> = {
 };
 
 const PERMISSION_BACKFILL_SOURCES: Record<string, string[]> = {
+  'partners.view': ['finance.view'],
+  'partners.manage': ['finance.approve'],
+  'partners.transactions': ['finance.approve'],
+  'partners.profits.distribute': ['finance.approve'],
+  'partners.print': ['finance.view'],
   'quotations.create': ['sales.create'],
   'quotations.update': ['sales.create'],
   'quotations.delete': ['sales.create'],
@@ -969,6 +982,7 @@ export class PermissionService {
         `INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, '1')`,
         [markerKey]
       );
+      PermissionService.backfillPartnerPermissions(db, roleCode);
     }
   }
 
@@ -984,6 +998,34 @@ export class PermissionService {
     PermissionService.backfillExportPermissions(db, roleCode);
     PermissionService.backfillReceivablesPermissions(db, roleCode);
     PermissionService.backfillPermissionMappings(db, roleCode);
+    PermissionService.backfillPartnerPermissions(db, roleCode);
+  }
+
+  private static backfillPartnerPermissions(db: DatabaseManager, roleCode: string): void {
+    const markerKey = `rbac.partnerPermissions.v1.${roleCode}`;
+    if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
+    const sources: Record<string, string[]> = {
+      'partners.view': ['finance.view'],
+      'partners.manage': ['finance.approve'],
+      'partners.transactions': ['finance.approve'],
+      'partners.profits.distribute': ['finance.approve'],
+      'partners.print': ['finance.view'],
+    };
+    for (const [permission, required] of Object.entries(sources)) {
+      const granted = roleCode === 'ADMIN' || required.some((source) =>
+        db.query(
+          'SELECT 1 FROM role_permissions WHERE role_code = ? AND permission_code = ?',
+          [roleCode, source]
+        ).length > 0
+      );
+      if (granted) {
+        db.run(
+          'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+          [roleCode, permission]
+        );
+      }
+    }
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
   }
 
   private static backfillReceivablesPermissions(db: DatabaseManager, roleCode: string): void {

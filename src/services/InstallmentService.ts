@@ -117,7 +117,7 @@ export class InstallmentService {
     });
   }
 
-  payInstallment(installmentId: string) {
+  payInstallment(installmentId: string, requestedAmount?: number, paymentDate?: string, notes = '') {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'finance.installments.manage');
     const installment = this.db.query<{ branchId: string }>(
@@ -132,23 +132,36 @@ export class InstallmentService {
       const inst = db.query<any>(`SELECT i.*,p.plan_number,p.installments_count,p.customer_id,p.invoice_id FROM installments i JOIN installment_plans p ON p.id=i.plan_id WHERE i.id=?`, [installmentId])[0];
       if (!inst) throw new Error('Installment not found.');
       if (inst.status === 'PAID' || inst.status === 'WAIVED') throw new Error('Installment is already paid or waived.');
-      const amount = Number(inst.remainingAmount);
-      if (!(amount > 0)) throw new Error('No amount is due for this installment.');
+      const dueAmount = Number(inst.remainingAmount);
+      if (!(dueAmount > 0)) throw new Error('No amount is due for this installment.');
+      const amount = requestedAmount === undefined ? dueAmount : Math.round((requestedAmount + Number.EPSILON) * 100) / 100;
+      if (!Number.isFinite(amount) || amount <= 0 || amount > dueAmount) throw new Error('The payment amount must be positive and cannot exceed the remaining installment balance.');
       const customer = db.query<any>('SELECT name FROM customers WHERE id=?', [inst.customerId])[0];
       const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0];
       if (!register) throw new Error('The main cash register is unavailable.');
       const shift = db.query<any>(`SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND branch_id=? AND status='OPEN' ORDER BY opened_at DESC LIMIT 1`, [actor.id, register.id, installment.branchId])[0];
       const paymentId = uuidv4();
       const receiptNumber = db.nextNumber('RCP-INST');
-      const today = localDateString();
+      const today = paymentDate || localDateString();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(Date.parse(`${today}T00:00:00Z`)) ||
+          new Date(`${today}T00:00:00Z`).toISOString().slice(0, 10) !== today) {
+        throw new Error('تاريخ التحصيل غير صحيح.');
+      }
+      const remainingAmount = Math.round((dueAmount - amount + Number.EPSILON) * 100) / 100;
+      const fullyPaid = remainingAmount <= 0.009;
+      const paymentNotes = [
+        `Installment payment ${inst.sequenceNumber}/${inst.installmentsCount} for plan ${inst.planNumber}`,
+        notes.trim(),
+      ].filter(Boolean).join(' · ');
       db.run(`INSERT INTO customer_payments (id,receipt_number,customer_id,invoice_id,amount,payment_type,date,notes,performed_by,register_id,shift_id,branch_id) VALUES (?,?,?,?,?,'CASH',?,?,?,?,?,?)`,
-        [paymentId, receiptNumber, inst.customerId, inst.invoiceId || null, amount, today, `Installment payment ${inst.sequenceNumber}/${inst.installmentsCount} for plan ${inst.planNumber}`, actor.id, register.id, shift?.id || null, installment.branchId]);
+        [paymentId, receiptNumber, inst.customerId, inst.invoiceId || null, amount, today, paymentNotes, actor.id, register.id, shift?.id || null, installment.branchId]);
       if (inst.invoiceId) db.run(`INSERT INTO customer_payment_allocations (id,payment_id,sales_invoice_id,amount) VALUES (?,?,?,?)`,
         [`cpa_${uuidv4().substring(0, 8)}`, paymentId, inst.invoiceId, amount]);
       if (inst.invoiceId) {
         db.run(`UPDATE sales_invoices SET paid_amount=paid_amount+?,remaining_amount=MAX(0,remaining_amount-?),payment_status=CASE WHEN remaining_amount-?<=0 THEN 'PAID' ELSE 'PARTIAL' END,updated_at=CURRENT_TIMESTAMP WHERE id=?`, [amount, amount, amount, inst.invoiceId]);
       }
-      db.run(`UPDATE installments SET status='PAID',paid_amount=paid_amount+?,remaining_amount=0,paid_at=?,payment_id=? WHERE id=?`, [amount, `${today}T${new Date().toTimeString().slice(0, 8)}`, paymentId, installmentId]);
+      db.run(`UPDATE installments SET status=?,paid_amount=paid_amount+?,remaining_amount=?,paid_at=?,payment_id=? WHERE id=?`,
+        [fullyPaid ? 'PAID' : 'PARTIAL', amount, fullyPaid ? 0 : remainingAmount, fullyPaid ? `${today}T${new Date().toTimeString().slice(0, 8)}` : null, paymentId, installmentId]);
       db.run('UPDATE customers SET current_balance=current_balance-?,updated_at=CURRENT_TIMESTAMP WHERE id=?', [amount, inst.customerId]);
       db.run(`UPDATE installment_plans SET paid_amount=paid_amount+?,remaining_amount=MAX(0,remaining_amount-?),status=CASE WHEN remaining_amount-?<=0 THEN 'COMPLETED' ELSE status END WHERE id=?`, [amount, amount, amount, inst.planId]);
       db.run('UPDATE cash_registers SET current_balance=current_balance+? WHERE id=?', [amount, register.id]);

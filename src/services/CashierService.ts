@@ -220,7 +220,9 @@ export class CashierService {
       shift.totalCustomerPayments -
       shift.totalSupplierPayments -
       shift.totalExpenses -
-      shift.totalRefunds
+      shift.totalRefunds +
+      Number(shift.totalPartnerInflows || 0) -
+      Number(shift.totalPartnerOutflows || 0)
     ).toFixed(2));
   }
 

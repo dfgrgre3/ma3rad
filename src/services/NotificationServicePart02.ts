@@ -1,8 +1,8 @@
-import { DatabaseManager } from '../database/db';
-import { v4 as uuidv4 } from 'uuid';
 import { addLocalDays, localDateString } from '../utils/date';
-import type { Notification, NotificationType } from './notificationTypes';
 import { NotificationServicePart01 } from './NotificationServicePart01';
+import { AuthService } from './AuthService';
+import { PermissionService } from './PermissionService';
+import { BranchAccessService } from './BranchAccessService';
 
 export abstract class NotificationServicePart02 extends NotificationServicePart01 {
 public runScheduledChecks(): { created: number } {
@@ -53,6 +53,53 @@ public runScheduledChecks(): { created: number } {
         );
       }
 
+      const currentActor = AuthService.getCurrentUser();
+      const canViewFinance = PermissionService.hasRoleGrant(currentActor, 'finance.view');
+      const currentBranchId = currentActor && canViewFinance
+        ? new BranchAccessService().getCurrentBranchId(currentActor)
+        : '';
+      const financialEvents = currentBranchId ? this.db.query<any>(`
+        SELECT id, branch_id AS branchId, title, due_date AS dueDate, amount, paid_amount AS paidAmount,
+          currency, reminder_days AS reminderDays, reminder_at AS reminderAt
+        FROM financial_calendar_events
+        WHERE branch_id = ? AND status NOT IN ('PAID', 'COLLECTED', 'CANCELLED')
+          AND amount > paid_amount AND due_date <= ?
+        ORDER BY due_date ASC LIMIT 500
+      `, [currentBranchId, horizon]) : [];
+      const currentDay = new Date(`${today}T00:00:00.000Z`);
+      for (const event of financialEvents) {
+        const dueDay = Math.round(
+          (Date.parse(`${event.dueDate}T00:00:00.000Z`) - currentDay.getTime()) / 86_400_000
+        );
+        let reminderDays: number[] = [];
+        try {
+          const parsed = JSON.parse(event.reminderDays || '[]');
+          if (Array.isArray(parsed)) reminderDays = parsed.filter((day) => [1, 3, 7].includes(Number(day))).map(Number);
+        } catch (error) {
+          console.warn(`Invalid financial calendar reminder configuration for ${event.id}:`, error);
+        }
+        const reminderTimeDue = event.reminderAt && Number.isFinite(Date.parse(event.reminderAt))
+          && Date.parse(event.reminderAt) <= Date.now();
+        if (dueDay < 0) {
+          this.notifyFinancialEventOnce(
+            currentActor?.id || '',
+            event.id,
+            'OVERDUE',
+            'حدث مالي متأخر',
+            `${event.title} — الرصيد المتبقي ${Number(event.amount - event.paidAmount).toFixed(2)} ${event.currency}، وكان الاستحقاق ${event.dueDate}`
+          );
+        } else if (dueDay === 0 || reminderDays.includes(dueDay) || reminderTimeDue) {
+          const key = dueDay === 0 ? 'DUE_TODAY' : `REMINDER_${dueDay}`;
+          this.notifyFinancialEventOnce(
+            currentActor?.id || '',
+            event.id,
+            key,
+            dueDay === 0 ? 'حدث مالي مستحق اليوم' : 'تذكير بموعد مالي قريب',
+            `${event.title} — ${Number(event.amount - event.paidAmount).toFixed(2)} ${event.currency}، تاريخ الاستحقاق ${event.dueDate}`
+          );
+        }
+      }
+
       const pendingApprovals = this.db.query<any>(`
         SELECT id, request_number AS requestNumber, title, requested_value AS requestedValue
         FROM approval_requests WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT 100
@@ -91,6 +138,19 @@ public runScheduledChecks(): { created: number } {
     }
 
     return { created: Math.max(0, this.getUnreadCount() - before) };
+  }
+
+private notifyFinancialEventOnce(userId: string, eventId: string, reminderKey: string, title: string, message: string): void {
+    if (!userId) return;
+    const referenceId = `${eventId}:${reminderKey}`;
+    const exists = this.db.query<{ id: string }>(
+      `SELECT id FROM notifications
+       WHERE user_id = ? AND type = 'PAYMENT_DUE'
+         AND reference_type = 'FINANCIAL_CALENDAR_EVENT' AND reference_id = ?
+       LIMIT 1`,
+      [userId, referenceId]
+    )[0];
+    if (!exists) this.createNotification('PAYMENT_DUE', title, message, userId, 'FINANCIAL_CALENDAR_EVENT', referenceId);
   }
 
 public notifyIncompleteCustomer(customerId: string, customerName: string, missingFields: string[]): void {

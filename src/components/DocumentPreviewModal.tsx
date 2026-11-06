@@ -26,10 +26,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     setSaved(false);
     setSaveError(null);
     try {
-      await downloadPdf(html, fileName);
+      const pdfSaved = await downloadPdf(html, fileName);
+      if (!pdfSaved) {
+        setSaveError('لم يتم حفظ المستند.');
+        return;
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (error) {
+      console.error('Failed to save document PDF:', error);
       setSaveError('تعذر حفظ المستند.');
     } finally {
       setSavingPdf(false);

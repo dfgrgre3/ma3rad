@@ -81,9 +81,23 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   const periods = financeService.getFiscalPeriods(fyId);
   assert.equal(periods.length, 12, 'Must have 12 monthly periods');
 
+  const shiftedYearId = financeService.createFiscalYear({
+    yearCode: 'FY2025JUL',
+    name: 'سنة مالية تبدأ في يوليو',
+    startDate: '2025-07-01',
+    endDate: '2026-06-30',
+  });
+  const shiftedPeriods = financeService.getFiscalPeriods(shiftedYearId);
+  assert.equal(shiftedPeriods.length, 12, 'A non-calendar fiscal year must still have 12 monthly periods');
+  assert.equal(shiftedPeriods[0]?.startDate, '2025-07-01');
+  assert.equal(shiftedPeriods[0]?.endDate, '2025-07-31');
+  assert.equal(shiftedPeriods[11]?.startDate, '2026-06-01');
+  assert.equal(shiftedPeriods[11]?.endDate, '2026-06-30');
+
   // Close January 2025
   const janPeriod = periods.find(p => p.periodNumber === 1);
   assert.ok(janPeriod, 'January period must exist');
+  assert.equal(financeService.getUnpostedJournalEntryCount(janPeriod!.startDate, janPeriod!.endDate), 0);
 
   financeService.closePeriod(janPeriod!.id, 'محضر إقفال شهر يناير 2025');
   const updatedJan = queryOne<{ status: string }>(`SELECT status FROM fiscal_periods WHERE id = ?`, [janPeriod!.id]);
@@ -343,4 +357,322 @@ test('removes only unchanged, unused example records', async () => {
   assert.equal(queryOne(`SELECT id FROM warehouse_locations WHERE id = 'loc_02'`), undefined);
   assert.ok(queryOne(`SELECT id FROM warehouse_locations WHERE id = 'loc_01'`), 'Edited location must be preserved');
   assert.equal(queryOne<{ phone: string }>(`SELECT phone FROM customers WHERE id = 'cust_cash'`)?.phone, '');
+});
+
+test('fixed-asset transfer, depreciation, maintenance, disposal, and physical count are persisted and balanced', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const service = new FinanceExtrasService();
+  const today = new Date().toISOString().slice(0, 10);
+  const branchId = service.getFixedAssetCurrentBranch();
+  const migration = queryOne<{ id: string }>("SELECT id FROM schema_migrations WHERE id = '126_fixed_asset_lifecycle'");
+  assert.ok(migration, 'Append-only lifecycle migration must be applied');
+  assert.ok(queryOne("SELECT id FROM schema_migrations WHERE id = '128_fixed_asset_approval_attachments'"));
+  assert.ok(queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='fixed_asset_disposals'"));
+  const adminUser = queryOne<any>(
+    'SELECT id, username, full_name AS fullName, role, 1 AS isActive, created_at AS createdAt, updated_at AS updatedAt FROM users WHERE username = ?',
+    ['admin']
+  );
+  const reviewerId = 'usr_fixed_asset_reviewer';
+  db.run(
+    `INSERT OR IGNORE INTO users (id, username, password_hash, full_name, role, is_active)
+     VALUES (?, ?, 'test-only', ?, 'ADMIN', 1)`,
+    [reviewerId, 'fixed_asset_reviewer', 'مراجع الأصول']
+  );
+  const reviewer = queryOne<any>(
+    'SELECT id, username, full_name AS fullName, role, 1 AS isActive, created_at AS createdAt, updated_at AS updatedAt FROM users WHERE id = ?',
+    [reviewerId]
+  );
+  assert.ok(adminUser && reviewer);
+
+  service.saveFixedAsset({
+    name: 'سجل إهلاك قديم للاختبار',
+    purchaseDate: today,
+    purchaseCost: 250,
+    paymentType: 'CREDIT',
+  });
+  const legacyAsset = queryOne<{ id: string }>("SELECT id FROM fixed_assets WHERE name = 'سجل إهلاك قديم للاختبار'");
+  assert.ok(legacyAsset);
+  const legacyPeriod = today.slice(0, 7);
+  const legacyEntry = postLedgerEntry(db.getDatabase(), {
+    date: today, description: 'سجل إهلاك سابق قبل ترقية الأصول',
+    referenceType: 'ASSET_DEPRECIATION', referenceId: `${legacyAsset.id}:${legacyPeriod}`,
+    createdBy: 'usr_admin', branchId,
+    lines: [{ accountCode: '5205', debit: 10, credit: 0 }, { accountCode: '1602', debit: 0, credit: 10 }],
+  });
+  db.run('UPDATE fixed_assets SET accumulated_depreciation = 10 WHERE id = ?', [legacyAsset.id]);
+  const lifecycleMigration = MIGRATIONS.find((item) => item.id === '126_fixed_asset_lifecycle');
+  assert.ok(lifecycleMigration, 'Fixed-asset migration must be registered');
+  lifecycleMigration.up(db.getDatabase());
+  assert.equal(queryOne<{ depreciationMethod: string }>(
+    'SELECT depreciation_method AS depreciationMethod FROM fixed_assets WHERE id = ?', [legacyAsset.id]
+  )?.depreciationMethod, 'STRAIGHT_LINE');
+  assert.equal(service.getFixedAssetDepreciationPeriods(legacyAsset.id)[0]?.journalEntryId, legacyEntry);
+  assert.throws(() => service.postDepreciationPeriod(legacyAsset.id, legacyPeriod), /بالفعل/);
+
+  service.saveFixedAsset({
+    name: 'اختبار دورة الأصل الثابت',
+    purchaseDate: today,
+    purchaseCost: 1200,
+    salvageValue: 100,
+    usefulLifeYears: 1,
+    paymentType: 'CREDIT',
+    depreciationMethod: 'STRAIGHT_LINE',
+  });
+  const asset = queryOne<{ id: string; code: string }>("SELECT id, code FROM fixed_assets WHERE name = 'اختبار دورة الأصل الثابت'");
+  assert.ok(asset);
+
+  assert.throws(() => service.transferFixedAsset({
+    assetId: asset.id, transferDate: today, branchId: 'branch-does-not-exist',
+  }), /الفرع الوجهة/);
+  service.transferFixedAsset({
+    assetId: asset.id, transferDate: today, branchId, location: 'مخزن الأصول', notes: 'نقل تجريبي',
+  });
+  assert.throws(() => service.transferFixedAsset({
+    assetId: asset.id, transferDate: today, branchId, location: 'مخزن الأصول', notes: 'نقل تجريبي',
+  }), /مطابقة/);
+  assert.equal(service.getFixedAssetTransfers(asset.id).length, 1);
+  assert.equal(queryOne<{ location: string }>('SELECT location FROM fixed_assets WHERE id = ?', [asset.id])?.location, 'مخزن الأصول');
+
+  const period = today.slice(0, 7);
+  const requestId = service.requestFixedAssetDepreciation(asset.id, period);
+  assert.throws(() => service.requestFixedAssetDepreciation(asset.id, period), /بالفعل/);
+  const pendingRequest = queryOne<{ status: string; journalEntryId: string | null }>(
+    'SELECT status, journal_entry_id AS journalEntryId FROM fixed_asset_depreciation_requests WHERE id = ?',
+    [requestId]
+  );
+  assert.equal(pendingRequest?.status, 'PENDING');
+  assert.equal(pendingRequest?.journalEntryId, null);
+  assert.equal(queryOne<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM fixed_asset_depreciation_periods WHERE asset_id = ? AND period = ?',
+    [asset.id, period]
+  )?.count, 0, 'Pending depreciation must not create a posted period');
+  assert.equal(queryOne<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM journal_entries WHERE reference_type = ? AND reference_id = ?',
+    ['ASSET_DEPRECIATION', `${asset.id}:${period}`]
+  )?.count, 0, 'Pending depreciation must not create a journal entry');
+  assert.throws(() => service.approveFixedAssetDepreciationRequest(requestId), /مستخدمًا مختلفًا/);
+  AuthService.setCurrentUser(reviewer);
+  const approvedPeriod = service.approveFixedAssetDepreciationRequest(requestId);
+  assert.throws(() => service.approveFixedAssetDepreciationRequest(requestId), /بالفعل/);
+  AuthService.setCurrentUser(adminUser);
+  const depreciation = queryOne<{ amount: number; status: string; journalEntryId: string }>(
+    'SELECT amount, status, journal_entry_id AS journalEntryId FROM fixed_asset_depreciation_periods WHERE asset_id = ? AND period = ?',
+    [asset.id, period]
+  );
+  assert.ok(depreciation && depreciation.amount > 0);
+  assert.equal(depreciation?.status, 'POSTED');
+  const depreciationBalance = queryOne<{ debit: number; credit: number }>(
+    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    [depreciation?.journalEntryId]
+  );
+  assert.equal(depreciationBalance?.debit, depreciationBalance?.credit);
+  assert.equal(approvedPeriod.status, 'POSTED');
+  assert.equal(queryOne<{ approvedBy: string }>(
+    'SELECT approved_by AS approvedBy FROM fixed_asset_depreciation_requests WHERE id = ?', [requestId]
+  )?.approvedBy, reviewerId);
+
+  assert.throws(() => service.saveFixedAsset({
+    name: 'إهلاك وحدات بدون توقع',
+    purchaseDate: today,
+    purchaseCost: 1000,
+    depreciationMethod: 'UNITS_OF_PRODUCTION',
+  }), /إجمالي الوحدات المتوقع/);
+  service.saveFixedAsset({
+    name: 'اختبار إهلاك وحدات الإنتاج',
+    purchaseDate: today,
+    purchaseCost: 1000,
+    depreciationMethod: 'UNITS_OF_PRODUCTION',
+    expectedUnits: 100,
+  });
+  const unitsAsset = queryOne<{ id: string }>("SELECT id FROM fixed_assets WHERE name = 'اختبار إهلاك وحدات الإنتاج'");
+  assert.ok(unitsAsset);
+  assert.throws(() => service.requestFixedAssetDepreciation(unitsAsset.id, period), /تتطلب كمية/);
+  assert.throws(() => service.requestFixedAssetDepreciation(unitsAsset.id, period, -1), /تتطلب كمية/);
+  const unitsRequest = service.requestFixedAssetDepreciation(unitsAsset.id, period, 10);
+  AuthService.setCurrentUser(reviewer);
+  service.approveFixedAssetDepreciationRequest(unitsRequest);
+  AuthService.setCurrentUser(adminUser);
+  assert.equal(queryOne<{ accumulatedDepreciation: number }>(
+    'SELECT accumulated_depreciation AS accumulatedDepreciation FROM fixed_assets WHERE id = ?', [unitsAsset.id]
+  )?.accumulatedDepreciation, 100);
+
+  service.recordFixedAssetMaintenance({
+    assetId: asset.id, date: today, type: 'فحص', description: 'فحص دوري', cost: 50, treatment: 'OPERATIONAL',
+  });
+  const operationalMaintenance = queryOne<{ journalEntryId: string }>(
+    "SELECT journal_entry_id AS journalEntryId FROM fixed_asset_maintenance WHERE asset_id = ? AND cost_treatment = 'OPERATIONAL'",
+    [asset.id]
+  );
+  assert.ok(operationalMaintenance?.journalEntryId);
+  const operationalLines = db.query<{ accountCode: string; debit: number; credit: number }>(
+    `SELECT a.code AS accountCode, l.debit, l.credit FROM journal_entry_lines l
+     JOIN chart_of_accounts a ON a.id = l.account_id WHERE l.entry_id = ?`,
+    [operationalMaintenance?.journalEntryId]
+  );
+  assert.ok(operationalLines.some((line) => line.accountCode === '5201' && line.debit === 50));
+  assert.ok(operationalLines.some((line) => line.accountCode === '2201' && line.credit === 50));
+  assert.equal(operationalLines.reduce((sum, line) => sum + line.debit, 0),
+    operationalLines.reduce((sum, line) => sum + line.credit, 0));
+  service.recordFixedAssetMaintenance({
+    assetId: asset.id, date: today, type: 'تحسين', description: 'تحسين رأسمالي', cost: 100, treatment: 'CAPITALIZED', vendor: 'مورد اختبار',
+  });
+  const capitalized = queryOne<{ journalEntryId: string }>(
+    'SELECT journal_entry_id AS journalEntryId FROM fixed_asset_maintenance WHERE asset_id = ? AND cost_treatment = ?',
+    [asset.id, 'CAPITALIZED']
+  );
+  assert.ok(capitalized?.journalEntryId);
+  const capitalizedBalance = queryOne<{ debit: number; credit: number }>(
+    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    [capitalized?.journalEntryId]
+  );
+  assert.equal(capitalizedBalance?.debit, 100);
+  assert.equal(capitalizedBalance?.credit, 100);
+  assert.equal(queryOne<{ purchaseCost: number }>(
+    'SELECT purchase_cost AS purchaseCost FROM fixed_assets WHERE id = ?', [asset.id]
+  )?.purchaseCost, 1300);
+
+  const priorClosedUntil = queryOne<{ value: string }>(
+    "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
+  )?.value;
+  db.run(
+    `INSERT INTO system_settings (key, value) VALUES ('accounting_closed_until_date', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [today]
+  );
+  assert.throws(() => service.recordFixedAssetMaintenance({
+    assetId: asset.id, date: today, type: 'صيانة', description: 'فترة مقفلة', cost: 10, treatment: 'OPERATIONAL',
+  }), /فترة محاسبية مغلقة/);
+  if (priorClosedUntil === undefined) db.run("DELETE FROM system_settings WHERE key = 'accounting_closed_until_date'");
+  else db.run("UPDATE system_settings SET value = ? WHERE key = 'accounting_closed_until_date'", [priorClosedUntil]);
+
+  const attachment = service.addFixedAssetAttachment({
+    assetId: asset.id, documentType: 'INVOICE', fileName: 'invoice.pdf', mimeType: 'application/pdf',
+    fileSize: 1024, checksum: 'a'.repeat(64), storageName: `doc_${'b'.repeat(32)}.pdf`,
+  });
+  assert.equal(service.getFixedAssetAttachments(asset.id)[0]?.id, attachment.id);
+  assert.throws(() => service.addFixedAssetAttachment({
+    assetId: asset.id, documentType: 'INVOICE', fileName: 'invalid.pdf', fileSize: 1024,
+    storageName: '..\\outside.pdf',
+  }), /مرجع التخزين المحلي/);
+
+  const inventoryCountBefore = queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM inventory_transactions')?.count;
+  service.saveFixedAsset({
+    name: 'أصل غير ممسوح في اختبار الجرد',
+    purchaseDate: today,
+    purchaseCost: 200,
+    paymentType: 'CREDIT',
+  });
+  const campaignId = service.createFixedAssetCountCampaign({ branchId, date: today });
+  service.recordFixedAssetCountObservation({ campaignId, code: asset.code, condition: 'جيد', notes: 'تمت المعاينة' });
+  assert.throws(() => service.recordFixedAssetCountObservation({ campaignId, code: asset.code }), /بالفعل/);
+  service.recordFixedAssetCountObservation({ campaignId, code: 'UNREGISTERED-COUNT-001', notes: 'قطعة غير مسجلة' });
+  service.finalizeFixedAssetCountCampaign(campaignId);
+  assert.throws(() => service.finalizeFixedAssetCountCampaign(campaignId), /بالفعل/);
+  const observationStatuses = db.query<{ countStatus: string }>(
+    'SELECT count_status AS countStatus FROM fixed_asset_count_observations WHERE campaign_id = ?',
+    [campaignId]
+  ).map((row) => row.countStatus);
+  assert.ok(observationStatuses.includes('FOUND'));
+  assert.ok(observationStatuses.includes('UNREGISTERED'));
+  assert.ok(observationStatuses.includes('MISSING'), 'Unscanned registered assets are recorded as missing at finalization');
+  assert.equal(queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM inventory_transactions')?.count, inventoryCountBefore);
+
+  const registerId = 'cr_fixed_asset_settlement';
+  db.run(
+    'INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id) VALUES (?, ?, ?, 0, 1, ?)',
+    [registerId, 'خزينة تسوية الأصول', 100, branchId]
+  );
+  const cashBeforeDisposal = queryOne<{ currentBalance: number }>(
+    'SELECT current_balance AS currentBalance FROM cash_registers WHERE id = ?', [registerId]
+  )?.currentBalance || 0;
+  assert.ok(service.getFixedAssetSettlementSources(asset.id).some((source) => source.id === registerId));
+  const disposal = service.disposeFixedAsset({
+    assetId: asset.id, date: today, reason: 'בדיקת מכירה', proceeds: 900, expenses: 25, buyer: 'كجزء اختبار',
+    settlementType: 'CASH_REGISTER', settlementId: registerId,
+  });
+  assert.equal(disposal.bookValue, 1300 - Number(queryOne<{ accumulatedDepreciation: number }>(
+    'SELECT accumulated_depreciation AS accumulatedDepreciation FROM fixed_assets WHERE id = ?', [asset.id]
+  )?.accumulatedDepreciation));
+  assert.equal(disposal.gainLoss, Math.round((900 - disposal.bookValue) * 100) / 100);
+  assert.equal(queryOne<{ currentBalance: number }>(
+    'SELECT current_balance AS currentBalance FROM cash_registers WHERE id = ?', [registerId]
+  )?.currentBalance, cashBeforeDisposal + 875);
+  assert.throws(() => service.disposeFixedAsset({
+    assetId: asset.id, date: today, reason: 'تكرار', proceeds: 1,
+    settlementType: 'CASH_REGISTER', settlementId: registerId,
+  }), /مستبعد بالفعل/);
+  const disposalBalance = queryOne<{ debit: number; credit: number }>(
+    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    [disposal.journalEntryId]
+  );
+  assert.equal(disposalBalance?.debit, disposalBalance?.credit);
+
+  const emptyRegisterId = 'cr_fixed_asset_empty';
+  db.run(
+    'INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id) VALUES (?, ?, 0, 0, 1, ?)',
+    [emptyRegisterId, 'خزينة فارغة للاختبار', branchId]
+  );
+  service.saveFixedAsset({
+    name: 'استبعاد دون رصيد كافٍ',
+    purchaseDate: today,
+    purchaseCost: 10,
+    paymentType: 'CREDIT',
+  });
+  const insufficientAsset = queryOne<{ id: string }>(
+    "SELECT id FROM fixed_assets WHERE name = 'استبعاد دون رصيد كافٍ'"
+  );
+  assert.ok(insufficientAsset);
+  assert.throws(() => service.disposeFixedAsset({
+    assetId: insufficientAsset.id, date: today, reason: 'مصروف بلا رصيد', proceeds: 0, expenses: 1,
+    settlementType: 'CASH_REGISTER', settlementId: emptyRegisterId,
+  }), /غير كافٍ/);
+  assert.equal(service.getFixedAssetDisposal(insufficientAsset.id), null, 'Failed settlement must not dispose the asset');
+
+  const bankGlAccount = queryOne<{ id: string }>("SELECT id FROM chart_of_accounts WHERE code = '1102' AND type = 'ASSET' AND is_active = 1");
+  assert.ok(bankGlAccount, 'A posted bank GL account is required for the existing bank settlement path');
+  const bankId = 'bank_fixed_asset_settlement';
+  db.run(
+    `INSERT INTO bank_accounts (id, account_name, bank_name, account_number, currency, opening_balance,
+       current_balance, gl_account_id, branch_id, is_active)
+     VALUES (?, ?, ?, ?, 'EGP', 50, 50, ?, ?, 1)`,
+    [bankId, 'بنك تسوية الأصول', 'بنك اختبار', 'FA-SETTLEMENT-01', bankGlAccount.id, branchId]
+  );
+  service.saveFixedAsset({
+    name: 'أصل تسوية بنكية', purchaseDate: today, purchaseCost: 75, paymentType: 'CREDIT',
+  });
+  const bankAsset = queryOne<{ id: string }>("SELECT id FROM fixed_assets WHERE name = 'أصل تسوية بنكية'");
+  assert.ok(bankAsset);
+  assert.ok(service.getFixedAssetSettlementSources(bankAsset.id).some((source) => source.id === bankId && source.type === 'BANK_ACCOUNT'));
+  const bankDisposal = service.disposeFixedAsset({
+    assetId: bankAsset.id, date: today, reason: 'بيع عبر البنك', proceeds: 40, expenses: 5,
+    settlementType: 'BANK_ACCOUNT', settlementId: bankId,
+  });
+  assert.equal(queryOne<{ currentBalance: number }>(
+    'SELECT current_balance AS currentBalance FROM bank_accounts WHERE id = ?', [bankId]
+  )?.currentBalance, 85);
+  assert.equal(queryOne<{ debit: number; credit: number }>(
+    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    [bankDisposal.journalEntryId]
+  )?.debit, queryOne<{ debit: number; credit: number }>(
+    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    [bankDisposal.journalEntryId]
+  )?.credit);
+  const timeline = service.getFixedAssetTimeline(asset.id);
+  const timelineTypes = new Set(timeline.map((event) => event.eventType));
+  for (const eventType of ['ACQUISITION', 'TRANSFER', 'MAINTENANCE', 'DEPRECIATION', 'DISPOSAL']) {
+    assert.ok(timelineTypes.has(eventType as (typeof timeline)[number]['eventType']), `Timeline must include ${eventType}`);
+  }
+  assert.ok(timeline.every((event) => /^\d{4}-\d{2}-\d{2}$/.test(event.eventDate) && event.referenceId && event.actorName));
+  assert.equal(timeline.find((event) => event.eventType === 'ACQUISITION')?.amount, 1200);
+  assert.equal(timeline.find((event) => event.eventType === 'DISPOSAL')?.amount, 900);
+  assert.ok(
+    timeline.find((event) => event.eventType === 'DISPOSAL')?.details?.includes('القيمة الدفترية:'),
+    JSON.stringify(timeline)
+  );
+  assert.equal(queryOne<{ status: string }>('SELECT status FROM fixed_assets WHERE id = ?', [asset.id])?.status, 'DISPOSED');
+  assert.throws(() => service.deleteFixedAsset(asset.id), /لا يمكن حذف أصل/);
+  assert.throws(() => db.run('DELETE FROM fixed_asset_disposals WHERE id = ?', [disposal.id]), /immutable/);
 });

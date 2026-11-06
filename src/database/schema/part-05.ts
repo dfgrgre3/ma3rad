@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS branches (
   code TEXT UNIQUE NOT NULL,
   name TEXT UNIQUE NOT NULL,
   phone TEXT,
+  phone2 TEXT,
+  tax_number TEXT,
   address TEXT,
   city TEXT,
   manager_id TEXT,

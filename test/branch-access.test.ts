@@ -14,6 +14,7 @@ import { CashierService } from '../src/services/CashierService.ts';
 import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
 import { OperationsService } from '../src/services/OperationsService.ts';
 import { InventoryService } from '../src/services/InventoryService.ts';
+import { InventoryCostingService } from '../src/services/InventoryCostingService.ts';
 import type { User } from '../src/types/identity.ts';
 
 test('branch access enforces assigned and explicit central scopes in service queries', async () => {
@@ -437,4 +438,150 @@ test('branch onboarding, assignment, editing, and lifecycle stay integrated', as
   )[0].status, 'DISABLED');
   operations.toggleBranch(branch.id, true);
   assert.equal(branchService.getBranchById(branch.id)?.isActive, true);
+});
+
+test('inventory reconciliation and audit logs are limited to the active branch and server-calculated', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  db.run(`
+    INSERT INTO branches (id, code, name, is_main, is_active, company_id)
+    VALUES ('br_recon_scope_a', 'RECON-A', 'Reconciliation A', 0, 1, 'cmp_main'),
+           ('br_recon_scope_b', 'RECON-B', 'Reconciliation B', 0, 1, 'cmp_main')
+  `);
+  db.run(`
+    INSERT INTO warehouses (id, name, code, branch_id, is_active)
+    VALUES ('wh_recon_scope_a', 'Reconciliation Warehouse A', 'RECON-WA', 'br_recon_scope_a', 1),
+           ('wh_recon_scope_b', 'Reconciliation Warehouse B', 'RECON-WB', 'br_recon_scope_b', 1)
+  `);
+  db.run(`
+    INSERT INTO users (id, username, password_hash, full_name, role, is_active, branch_scope)
+    VALUES ('usr_recon_scope', 'recon-scope-user', 'test', 'Reconciliation User', 'SALES', 1, 'ASSIGNED')
+  `);
+  db.run(`INSERT INTO users_branches (user_id, branch_id) VALUES ('usr_recon_scope', 'br_recon_scope_a')`);
+  db.run(`
+    INSERT INTO user_permissions (user_id, permission_code, effect)
+    VALUES ('usr_recon_scope', 'inventory.view', 'GRANT'),
+           ('usr_recon_scope', 'inventory.adjust', 'GRANT')
+  `);
+  const user: User = {
+    id: 'usr_recon_scope',
+    username: 'recon-scope-user',
+    fullName: 'Reconciliation User',
+    role: 'SALES',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  AuthService.setCurrentUser(user);
+
+  db.run(`
+    INSERT INTO products
+      (id, sku, barcode, name, category_id, brand_id, grade, size, base_unit, sell_unit,
+       pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
+       min_selling_price_m2, min_stock_level, is_active)
+    VALUES ('prod_recon_scope', 'RECON-SKU', 'RECON-BAR', 'Reconciliation Scope Product',
+       'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10, 20, 15, 10, 1, 1)
+  `);
+  db.run(`
+    INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+    VALUES ('stk_recon_scope_a', 'wh_recon_scope_a', 'prod_recon_scope', 3, 0),
+           ('stk_recon_scope_b', 'wh_recon_scope_b', 'prod_recon_scope', 500, 0)
+  `);
+  InventoryCostingService.addLayer(db, {
+    productId: 'prod_recon_scope', warehouseId: 'wh_recon_scope_a', sourceType: 'TEST',
+    sourceId: 'recon_scope_a', date: '2026-01-01', quantity: 3, unitCost: 8,
+  });
+  InventoryCostingService.addLayer(db, {
+    productId: 'prod_recon_scope', warehouseId: 'wh_recon_scope_b', sourceType: 'TEST',
+    sourceId: 'recon_scope_b', date: '2026-01-01', quantity: 500, unitCost: 1000,
+  });
+
+  const accountId = db.query<{ id: string }>(
+    `SELECT id FROM chart_of_accounts WHERE code = '1104'`
+  )[0]?.id;
+  assert.ok(accountId, 'inventory GL account is seeded');
+  db.run(`
+    INSERT INTO journal_entries
+      (id, entry_number, date, description, reference_type, reference_id,
+       total_debit, total_credit, is_posted, created_by, branch_id, company_id)
+    VALUES ('je_recon_scope_a', 'JE-RECON-SCOPE-A', '2026-01-01', 'Branch A inventory',
+       'TEST', 'recon_scope_a', 80, 80, 1, 'usr_recon_scope', 'br_recon_scope_a', 'cmp_main'),
+           ('je_recon_scope_b', 'JE-RECON-SCOPE-B', '2026-01-01', 'Branch B inventory',
+       'TEST', 'recon_scope_b', 500000, 500000, 1, 'usr_recon_scope', 'br_recon_scope_b', 'cmp_main')
+  `);
+  db.run(`
+    INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit)
+    VALUES ('jel_recon_scope_a', 'je_recon_scope_a', ?, 80, 0),
+           ('jel_recon_scope_b', 'je_recon_scope_b', ?, 500000, 0)
+  `, [accountId, accountId]);
+
+  const inventory = new InventoryService();
+  assert.deepEqual(inventory.getAllWarehouses().map((warehouse) => warehouse.id), ['wh_recon_scope_a']);
+  assert.throws(() => inventory.reconcileInventoryWithGL('wh_recon_scope_b'), /ليس لديك صلاحية الوصول|الفرع النشط/);
+  const result = inventory.reconcileInventoryWithGL();
+  const expectedPhysical = db.query<{ total: number }>(`
+    SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS total
+    FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
+    WHERE ws.warehouse_id = 'wh_recon_scope_a' AND p.is_active = 1
+  `)[0].total;
+  const expectedFifo = db.query<{ total: number }>(`
+    SELECT COALESCE(SUM(quantity_remaining * unit_cost), 0) AS total
+    FROM inventory_cost_layers WHERE warehouse_id = 'wh_recon_scope_a' AND quantity_remaining > 0
+  `)[0].total;
+  const expectedLedger = db.query<{ total: number }>(`
+    SELECT COALESCE(SUM(jel.debit - jel.credit), 0) AS total
+    FROM journal_entry_lines jel
+    JOIN journal_entries je ON je.id = jel.entry_id
+    WHERE je.is_posted = 1 AND je.branch_id = 'br_recon_scope_a' AND jel.account_id = ?
+  `, [accountId])[0].total;
+  assert.equal(result.totalPhysicalCost, Number(expectedPhysical.toFixed(2)));
+  assert.equal(result.totalFifoLayerCost, Number(expectedFifo.toFixed(2)));
+  assert.equal(result.totalGlInventoryCost, Number(expectedLedger.toFixed(2)));
+
+  db.run(`
+    INSERT INTO inventory_reconciliation_logs (
+      id, reconciliation_date, branch_id, warehouse_id, total_physical_cost,
+      total_fifo_layer_cost, total_gl_inventory_cost, variance_physical_vs_fifo,
+      variance_fifo_vs_gl, status, performed_by
+    ) VALUES ('recon_scope_foreign_log', '2026-01-01', 'br_recon_scope_b', 'wh_recon_scope_b',
+      900000, 900000, 900000, 0, 0, 'BALANCED', 'usr_recon_scope')
+  `);
+  const untrustedSnapshot = {
+    warehouseId: 'wh_recon_scope_a',
+    totalPhysicalCost: 999999,
+    totalFifoLayerCost: 999999,
+    totalGlInventoryCost: 999999,
+    variancePhysicalVsFifo: 0,
+    varianceFifoVsGl: 0,
+    status: 'BALANCED',
+  };
+  inventory.saveReconciliationLog(untrustedSnapshot);
+  const logs = inventory.getReconciliationLogs();
+  assert.ok(logs.every((log) => log.branchId === 'br_recon_scope_a'));
+  const savedLog = logs.find((log) => log.warehouseId === 'wh_recon_scope_a');
+  assert.ok(savedLog);
+  const recalculated = inventory.reconcileInventoryWithGL('wh_recon_scope_a');
+  assert.equal(savedLog.totalPhysicalCost, recalculated.totalPhysicalCost);
+  assert.notEqual(savedLog.totalPhysicalCost, untrustedSnapshot.totalPhysicalCost);
+
+  db.run(`
+    INSERT INTO users (id, username, password_hash, full_name, role, is_active, branch_scope)
+    VALUES ('usr_recon_no_view', 'recon-no-view', 'test', 'No View User', 'SALES', 1, 'ASSIGNED')
+  `);
+  db.run(`
+    INSERT INTO user_permissions (user_id, permission_code, effect)
+    VALUES ('usr_recon_no_view', 'inventory.view', 'DENY')
+  `);
+  AuthService.setCurrentUser({
+    id: 'usr_recon_no_view',
+    username: 'recon-no-view',
+    fullName: 'No View User',
+    role: 'SALES',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  });
+  assert.throws(() => inventory.getReconciliationLogs(), /غير مصرح/);
+  AuthService.logout();
 });

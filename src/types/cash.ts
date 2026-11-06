@@ -30,6 +30,8 @@ export interface CashShift {
   totalSupplierPayments: number;
   totalExpenses: number;
   totalRefunds: number;
+  totalPartnerInflows?: number;
+  totalPartnerOutflows?: number;
   
   expectedEndingCash: number;
   actualEndingCash?: number;

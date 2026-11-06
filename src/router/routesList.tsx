@@ -67,6 +67,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'crm/hub', element: <P.CRMHubPage /> },
   { path: 'crm/dashboard', element: <P.CRMHubPage /> },
   { path: 'customers', element: <P.CustomersView /> },
+  { path: 'partners', element: <P.PartnersPage /> },
   { path: 'customers/imported-products', element: <P.CustomerImportedProductsPage /> },
   { path: 'customers/ready-deliveries', element: <P.ReadyDeliveriesPage /> },
   { path: 'customers/:id/imported-products', element: <P.CustomerImportedProductsPage /> },
@@ -92,6 +93,7 @@ export const appRoutes: RouteDef[] = [
   // Finance
   { path: 'cashboxes', element: <P.CashierView /> },
   { path: 'finance', element: <P.FinanceOverviewPage /> },
+  { path: 'finance/calendar', element: <P.FinancialCalendarPage /> },
   { path: 'finance/receivables', element: <P.ReceivablesHubPage /> },
   { path: 'finance/debts', element: <Navigate to="/finance/receivables?tab=debts" replace /> },
   { path: 'finance/other-receivables', element: <P.ReceivablesHubPage initialTab="other" /> },

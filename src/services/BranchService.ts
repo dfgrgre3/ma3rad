@@ -65,9 +65,12 @@ export class BranchService {
         sqliteDb.run('UPDATE branches SET is_main = 0 WHERE is_main = 1');
       }
       sqliteDb.run(`
-        INSERT INTO branches (id, name, code, address, phone, manager_id, is_main, is_active, created_at, company_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-      `, [id, dto.name, dto.code, dto.address || null, dto.phone || null, dto.managerId || null, dto.isDefault ? 1 : 0, now, companyId]);
+        INSERT INTO branches (id, name, code, address, phone, phone2, tax_number, manager_id, is_main, is_active, created_at, company_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `, [
+        id, dto.name, dto.code, dto.address || null, dto.phone || null, dto.phone2 || null,
+        dto.taxNumber || null, dto.managerId || null, dto.isDefault ? 1 : 0, now, companyId,
+      ]);
       sqliteDb.run(`
         INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id)
         VALUES (?, ?, 0, 1, 1, ?)
@@ -150,6 +153,8 @@ export class BranchService {
     if (updates.code !== undefined) { fields.push('code = ?'); params.push(updates.code.trim()); }
     if (updates.address !== undefined) { fields.push('address = ?'); params.push(updates.address); }
     if (updates.phone !== undefined) { fields.push('phone = ?'); params.push(updates.phone); }
+    if (updates.phone2 !== undefined) { fields.push('phone2 = ?'); params.push(updates.phone2 || null); }
+    if (updates.taxNumber !== undefined) { fields.push('tax_number = ?'); params.push(updates.taxNumber || null); }
     if (updates.city !== undefined) { fields.push('city = ?'); params.push(updates.city); }
     if (updates.notes !== undefined) { fields.push('notes = ?'); params.push(updates.notes); }
     if (updates.managerId !== undefined) { fields.push('manager_id = ?'); params.push(updates.managerId); }

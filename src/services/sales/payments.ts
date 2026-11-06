@@ -20,7 +20,8 @@ export function recordInvoicePaymentEntry(
   registerId?: string,
   shiftId?: string,
   notes = '',
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  paymentDate?: string
 ): CustomerPayment {
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'customers.payment');
@@ -33,7 +34,11 @@ export function recordInvoicePaymentEntry(
   const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
   if (value <= 0) throw new Error('يجب أن يكون مبلغ التحصيل أكبر من الصفر.');
 
-  const today = localDateString();
+  const today = paymentDate || localDateString();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(Date.parse(`${today}T00:00:00Z`)) ||
+      new Date(`${today}T00:00:00Z`).toISOString().slice(0, 10) !== today) {
+    throw new Error('تاريخ التحصيل غير صحيح.');
+  }
   const paymentId = `cpay_${uuidv4().substring(0, 8)}`;
   const register = registerId || 'cr_main';
   const branchId = ctx.branchAccess.requireRegisterAccess(register, actor, invoiceBranchId);

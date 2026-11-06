@@ -1,108 +1,156 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Calendar,
-  Lock,
-  Unlock,
-  CheckCircle2,
+  AlertCircle,
   AlertTriangle,
-  FileCheck,
-  ShieldAlert,
-  Loader2,
-  RefreshCw,
+  CalendarDays,
+  CheckCircle2,
+  Circle,
+  FileCheck2,
+  Lock,
   Plus,
-  BookOpen,
+  RefreshCw,
+  ShieldCheck,
+  Unlock,
+  X,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { FinanceEnterpriseService } from '../../services/FinanceEnterpriseService';
-import type { FiscalYear, FiscalPeriod } from '../../types/finance';
-import { useToast } from '../../components/ui/Toast';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { useToast } from '../../components/ui/Toast';
+import type { FiscalPeriod, FiscalYear } from '../../types/finance';
+
+const formatDate = (value: string) => new Intl.DateTimeFormat('ar-EG', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+}).format(new Date(`${value.slice(0, 10)}T00:00:00`));
+
+const formatClosedAt = (value: string) => new Intl.DateTimeFormat('ar-EG', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+}).format(new Date(value));
+
+const checklistItems = [
+  { id: 'documents', label: 'اكتمال تسجيل فواتير المبيعات والمشتريات والمصروفات' },
+  { id: 'cash', label: 'مطابقة أرصدة الصندوق والحسابات البنكية' },
+  { id: 'balances', label: 'مراجعة أرصدة العملاء والموردين والحسابات' },
+  { id: 'adjustments', label: 'مراجعة التسويات والفروقات والمستندات المعلقة' },
+] as const;
+
+type ChecklistId = typeof checklistItems[number]['id'];
+
+const periodStatus = (period: FiscalPeriod) => {
+  if (period.status === 'LOCKED') return { label: 'مؤمّن نهائيًا', className: 'border-rose-200 bg-rose-50 text-rose-800' };
+  if (period.status === 'CLOSED') return { label: 'مقفلة', className: 'border-emerald-200 bg-emerald-50 text-emerald-800' };
+  return { label: 'مفتوحة', className: 'border-sky-200 bg-sky-50 text-sky-800' };
+};
+
+const yearStatus = (year: FiscalYear) => year.status === 'OPEN' ? 'مفتوحة' : 'مقفلة';
 
 export const FiscalClosingPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const toast = useToast();
   const actor = AuthService.getCurrentUser();
+  const canViewFinance = PermissionService.can(actor, 'finance.view');
   const canManage = PermissionService.can(actor, 'finance.approve');
   const canClose = PermissionService.can(actor, 'finance.close');
   const canReopen = PermissionService.can(actor, 'finance.reopen');
 
-  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
-  const [selectedYearId, setSelectedYearId] = useState<string>('');
+  const [years, setYears] = useState<FiscalYear[]>([]);
+  const [selectedYearId, setSelectedYearId] = useState('');
+  const selectedYearIdRef = useRef('');
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Modals
   const [showYearModal, setShowYearModal] = useState(false);
   const [yearForm, setYearForm] = useState({ yearCode: '', name: '', startDate: '', endDate: '' });
-
   const [closePeriodTarget, setClosePeriodTarget] = useState<FiscalPeriod | null>(null);
-  const [closePeriodNotes, setClosePeriodNotes] = useState('');
-
+  const [unpostedCount, setUnpostedCount] = useState(0);
+  const [completedChecklist, setCompletedChecklist] = useState<ChecklistId[]>([]);
+  const [closeNotes, setCloseNotes] = useState('');
   const [reopenPeriodTarget, setReopenPeriodTarget] = useState<FiscalPeriod | null>(null);
   const [reopenReason, setReopenReason] = useState('');
-
   const [closeYearTarget, setCloseYearTarget] = useState<FiscalYear | null>(null);
   const [retainedEarningsAccount, setRetainedEarningsAccount] = useState('3102');
 
-  const [actionBusy, setActionBusy] = useState(false);
-
-  const loadData = () => {
+  const loadData = useCallback((yearId?: string) => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const years = service.getFiscalYears();
-      setFiscalYears(years);
-      const activeYear = selectedYearId || years[0]?.id || '';
-      setSelectedYearId(activeYear);
-      if (activeYear) {
-        setPeriods(service.getFiscalPeriods(activeYear));
-      }
-    } catch (err: any) {
-      toast.error(err?.message || 'تعذر تحميل بيانات الفترات المالية.');
+      const fiscalYears = service.getFiscalYears();
+      const activeYearId = yearId || selectedYearIdRef.current || fiscalYears[0]?.id || '';
+      selectedYearIdRef.current = activeYearId;
+      setYears(fiscalYears);
+      setSelectedYearId(activeYearId);
+      const fiscalPeriods = activeYearId ? service.getFiscalPeriods(activeYearId) : [];
+      setPeriods(fiscalPeriods);
+      setSelectedPeriodId((current) => fiscalPeriods.some((period) => period.id === current)
+        ? current
+        : fiscalPeriods[0]?.id ?? '');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'تعذر تحميل بيانات السنة المالية.';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, toast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  useEffect(() => {
-    if (selectedYearId) {
-      try {
-        setPeriods(service.getFiscalPeriods(selectedYearId));
-      } catch (err: any) {
-        toast.error(err?.message || 'تعذر تحميل فترات السنة المالية.');
-      }
-    }
-  }, [selectedYearId]);
+  const selectedYear = years.find((year) => year.id === selectedYearId);
+  const selectedPeriod = periods.find((period) => period.id === selectedPeriodId);
+  const closedPeriods = periods.filter((period) => period.status !== 'OPEN').length;
+  const openPeriods = periods.length - closedPeriods;
+  const allChecklistComplete = completedChecklist.length === checklistItems.length && unpostedCount === 0;
 
-  const handleCreateYear = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateYear = (event: React.FormEvent) => {
+    event.preventDefault();
     setActionBusy(true);
     try {
-      service.createFiscalYear(yearForm);
+      const yearId = service.createFiscalYear(yearForm);
       toast.success('تم إنشاء السنة المالية وفتراتها الشهرية بنجاح.');
       setShowYearModal(false);
-      loadData();
-    } catch (err: any) {
-      toast.error(err?.message || 'تعذر إنشاء السنة المالية.');
+      loadData(yearId);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إنشاء السنة المالية.');
     } finally {
       setActionBusy(false);
     }
   };
 
-  const handleClosePeriod = () => {
-    if (!closePeriodTarget) return;
-    setActionBusy(true);
+  const openCloseChecklist = (period: FiscalPeriod) => {
     try {
-      service.closePeriod(closePeriodTarget.id, closePeriodNotes);
-      toast.success(`تم إقفال الفترة ${closePeriodTarget.name} بنجاح وقفل تاريخ القيود.`);
+      setUnpostedCount(service.getUnpostedJournalEntryCount(period.startDate, period.endDate));
+      setCompletedChecklist([]);
+      setCloseNotes('');
+      setClosePeriodTarget(period);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر تحميل قائمة مراجعة الإقفال.');
+    }
+  };
+
+  const handleClosePeriod = () => {
+    if (!closePeriodTarget || !allChecklistComplete) return;
+    setActionBusy(true);
+    const confirmations = checklistItems.map((item) => `✓ ${item.label}`).join('\n');
+    const notes = [
+      `قائمة مراجعة إقفال الشهر:\n${confirmations}`,
+      closeNotes.trim() ? `ملاحظات الإقفال:\n${closeNotes.trim()}` : '',
+    ].filter(Boolean).join('\n\n');
+    try {
+      service.closePeriod(closePeriodTarget.id, notes);
+      toast.success(`تم إقفال الفترة ${closePeriodTarget.name} بنجاح.`);
       setClosePeriodTarget(null);
-      setClosePeriodNotes('');
       loadData();
-    } catch (err: any) {
-      toast.error(err?.message || 'تعذر إقفال الفترة.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إقفال الفترة.');
     } finally {
       setActionBusy(false);
     }
@@ -113,12 +161,12 @@ export const FiscalClosingPage: React.FC = () => {
     setActionBusy(true);
     try {
       service.reopenPeriod(reopenPeriodTarget.id, reopenReason);
-      toast.success(`تم إعادة فتح الفترة ${reopenPeriodTarget.name}.`);
+      toast.success(`تمت إعادة فتح الفترة ${reopenPeriodTarget.name}.`);
       setReopenPeriodTarget(null);
       setReopenReason('');
       loadData();
-    } catch (err: any) {
-      toast.error(err?.message || 'تعذر إعادة فتح الفترة.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إعادة فتح الفترة.');
     } finally {
       setActionBusy(false);
     }
@@ -128,407 +176,480 @@ export const FiscalClosingPage: React.FC = () => {
     if (!closeYearTarget) return;
     setActionBusy(true);
     try {
-      const closingEntryId = service.closeFiscalYear(closeYearTarget.id, retainedEarningsAccount);
-      toast.success(`تم الإقفال السنوي وترحيل الأرباح والخسائر بنجاح (رقم القيد: ${closingEntryId || 'مكتمل'}).`);
+      const entryId = service.closeFiscalYear(closeYearTarget.id, retainedEarningsAccount);
+      toast.success(`تم إقفال السنة المالية وترحيل الأرباح والخسائر (رقم القيد: ${entryId || 'مكتمل'}).`);
       setCloseYearTarget(null);
       loadData();
-    } catch (err: any) {
-      toast.error(err?.message || 'تعذر إقفال السنة المالية.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'تعذر إقفال السنة المالية.');
     } finally {
       setActionBusy(false);
     }
   };
 
-  const currentYearObj = fiscalYears.find((y) => y.id === selectedYearId);
+  const toggleChecklistItem = (itemId: ChecklistId) => {
+    setCompletedChecklist((current) => current.includes(itemId)
+      ? current.filter((id) => id !== itemId)
+      : [...current, itemId]);
+  };
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen text-slate-900 space-y-6" dir="rtl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">الإقفال المالي وإدارة الفترات المحاسبية</h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                إدارة الفترات الشهرية، إقفال الدورة المستندية، منع التعديل على الحسابات المقفلة، وقيد الإقفال السنوي
-              </p>
-            </div>
+    <div className="min-h-full space-y-5 bg-slate-50 p-4 text-slate-900 sm:p-6" dir="rtl">
+      <header className="flex flex-col gap-4 border-b border-slate-200 px-1 pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-cyan-700 shadow-sm">
+            <CalendarDays className="h-6 w-6" />
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadData}
-            className="p-2.5 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition"
-            title="تحديث البيانات"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          {canManage && <button
-            onClick={() => {
-              const nextYear = new Date().getFullYear() + 1;
-              setYearForm({
-                yearCode: `FY${nextYear}`,
-                name: `السنة المالية ${nextYear}`,
-                startDate: `${nextYear}-01-01`,
-                endDate: `${nextYear}-12-31`,
-              });
-              setShowYearModal(true);
-            }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>سنة مالية جديدة</span>
-          </button>}
-        </div>
-      </div>
-
-      {/* Year Selector & Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200">
-          <label className="block text-xs font-medium text-slate-500 mb-1.5">اختر السنة المالية</label>
-          <select
-            value={selectedYearId}
-            onChange={(e) => setSelectedYearId(e.target.value)}
-            className="w-full text-sm font-semibold border border-slate-200 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 bg-slate-50"
-          >
-            {fiscalYears.map((fy) => (
-              <option key={fy.id} value={fy.id}>
-                {fy.name} ({fy.yearCode}) - {fy.status === 'OPEN' ? '🟢 مفتوحة' : '🔒 مقفلة'}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between">
           <div>
-            <span className="text-xs text-slate-500 block">حالة السنة المالية</span>
-            <span className={`text-sm font-bold ${currentYearObj?.status === 'OPEN' ? 'text-emerald-600' : 'text-slate-600'}`}>
-              {currentYearObj?.status === 'OPEN' ? 'مفتوحة للعمليات' : 'مقفلة بالكامل'}
-            </span>
+            <p className="text-xs font-bold tracking-wide text-cyan-800">إدارة الفترات المالية</p>
+            <h2 className="mt-0.5 text-xl font-black text-slate-900">السنة المالية والإقفال الشهري</h2>
+            <p className="mt-1 text-sm text-slate-500">راجع حالة الأشهر، وأدر تواريخ الإقفال وقوائم المراجعة.</p>
           </div>
-          {currentYearObj?.status === 'OPEN' ? (
-            canClose ? <button
-              onClick={() => setCloseYearTarget(currentYearObj)}
-              className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-semibold transition"
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {canViewFinance && (
+            <Link
+              to="/finance/calendar"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
             >
-              إقفال السنة السنوي
-            </button> : <span className="text-xs text-slate-400">الإقفال يتطلب صلاحية مستقلة</span>
-          ) : (
-            <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-medium">
-              قيد الإقفال مُرحّل
-            </span>
+              <CalendarDays className="h-4 w-4" />
+              التقويم المالي
+            </Link>
+          )}
+          <select
+            aria-label="السنة المالية"
+            value={selectedYearId}
+            onChange={(event) => loadData(event.target.value)}
+            disabled={loading || years.length === 0}
+            className="min-w-52 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-cyan-500"
+          >
+            {years.length === 0 && <option value="">لا توجد سنوات مالية</option>}
+            {years.map((year) => <option key={year.id} value={year.id}>{year.name} · {yearStatus(year)}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() => loadData()}
+            disabled={loading}
+            aria-label="تحديث بيانات السنة المالية"
+            className="rounded-xl border border-slate-300 bg-white p-2.5 text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
+                const nextYear = new Date().getFullYear() + 1;
+                setYearForm({
+                  yearCode: `FY${nextYear}`,
+                  name: `السنة المالية ${nextYear}`,
+                  startDate: `${nextYear}-01-01`,
+                  endDate: `${nextYear}-12-31`,
+                });
+                setShowYearModal(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-3.5 py-2.5 text-sm font-bold text-white transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2"
+            >
+              <Plus className="h-4 w-4" />
+              سنة مالية جديدة
+            </button>
           )}
         </div>
+      </header>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-slate-500 block">الفترات المقفلة</span>
-            <span className="text-lg font-bold text-slate-800">
-              {periods.filter((p) => p.status === 'CLOSED' || p.status === 'LOCKED').length} / {periods.length}
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold">
-            <Lock className="w-5 h-5" />
-          </div>
+      {loadError && (
+        <div role="alert" className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          تعذر تحميل بيانات السنة المالية: {loadError}
         </div>
+      )}
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between">
-          <div>
-            <span className="text-xs text-slate-500 block">الفترات النشطة</span>
-            <span className="text-lg font-bold text-emerald-600">
-              {periods.filter((p) => p.status === 'OPEN').length} فترة
-            </span>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold">
-            <Unlock className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
+      {!loading && years.length === 0 && !loadError && (
+        <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <CalendarDays className="mx-auto h-10 w-10 text-slate-300" />
+          <h2 className="mt-4 font-bold text-slate-800">لا توجد سنوات مالية مسجلة</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {canManage ? 'أنشئ سنة مالية لتظهر الأشهر ومواعيد إقفالها هنا.' : 'لا توجد سنوات مالية لعرضها.'}
+          </p>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => {
+                const nextYear = new Date().getFullYear() + 1;
+                setYearForm({ yearCode: `FY${nextYear}`, name: `السنة المالية ${nextYear}`, startDate: `${nextYear}-01-01`, endDate: `${nextYear}-12-31` });
+                setShowYearModal(true);
+              }}
+              className="mt-4 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-800"
+            >
+              إنشاء سنة مالية
+            </button>
+          )}
+        </section>
+      )}
 
-      {/* Periods Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-800">الفترات المحاسبية الشهرية للسنة المالية المحددة</h2>
-          <span className="text-xs text-slate-400">أي فترة مقفلة تمنع تلقائياً أي ترحيل محاسبي بأثر رجعي</span>
-        </div>
+      {selectedYear && (
+        <>
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">السنة المالية</p>
+              <p className="mt-1 text-lg font-black text-slate-800">{selectedYear.name}</p>
+              <p className="mt-1 text-xs text-slate-500">{formatDate(selectedYear.startDate)} — {formatDate(selectedYear.endDate)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">حالة السنة</p>
+              <p className={`mt-1 text-lg font-black ${selectedYear.status === 'OPEN' ? 'text-emerald-700' : 'text-slate-700'}`}>
+                {selectedYear.status === 'OPEN' ? 'مفتوحة' : 'مقفلة'}
+              </p>
+              {selectedYear.closedAt && <p className="mt-1 text-xs text-slate-500">تاريخ الإقفال: {formatClosedAt(selectedYear.closedAt)}</p>}
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">الأشهر المقفلة</p>
+              <p className="mt-1 text-2xl font-black text-emerald-700">{closedPeriods} <span className="text-sm font-semibold text-slate-400">/ {periods.length}</span></p>
+              <p className="mt-1 text-xs text-slate-500">فترة مقفلة أو مؤمنة نهائيًا</p>
+            </div>
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div>
+                <p className="text-xs font-medium text-slate-500">الأشهر المفتوحة</p>
+                <p className="mt-1 text-2xl font-black text-sky-700">{openPeriods}</p>
+                {selectedYear.status === 'OPEN' && canClose && (
+                  <button
+                    type="button"
+                    onClick={() => setCloseYearTarget(selectedYear)}
+                    disabled={openPeriods > 0}
+                    className="mt-1 text-xs font-bold text-rose-700 hover:text-rose-900 disabled:cursor-not-allowed disabled:text-slate-400"
+                    title={openPeriods > 0 ? 'يجب إقفال جميع الأشهر قبل إقفال السنة' : 'إقفال السنة المالية'}
+                  >
+                    إقفال السنة المالية
+                  </button>
+                )}
+              </div>
+              <Unlock className="h-6 w-6 text-sky-600" />
+            </div>
+          </section>
 
-        {loading ? (
-          <div className="p-12 flex justify-center items-center text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin text-emerald-500 ml-2" />
-            <span>جاري تحميل بيانات الفترات...</span>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="p-3.5 font-semibold">رقم الفترة</th>
-                  <th className="p-3.5 font-semibold">اسم الفترة</th>
-                  <th className="p-3.5 font-semibold">تاريخ البداية</th>
-                  <th className="p-3.5 font-semibold">تاريخ النهاية</th>
-                  <th className="p-3.5 font-semibold">الحالة</th>
-                  <th className="p-3.5 font-semibold">ملاحظات الإقفال</th>
-                  <th className="p-3.5 font-semibold text-center">الإجراءات والضوابط</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {periods.map((p) => {
-                  const isClosed = p.status === 'CLOSED' || p.status === 'LOCKED';
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50/70 transition">
-                      <td className="p-3.5 font-bold text-slate-700">#{p.periodNumber}</td>
-                      <td className="p-3.5 font-semibold text-slate-800">{p.name}</td>
-                      <td className="p-3.5 text-slate-600 font-mono">{p.startDate}</td>
-                      <td className="p-3.5 text-slate-600 font-mono">{p.endDate}</td>
-                      <td className="p-3.5">
-                        {isClosed ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md font-semibold text-[11px]">
-                            <Lock className="w-3 h-3 text-slate-500" />
-                            مقفلة (محظور الترحيل)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md font-semibold text-[11px]">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                            مفتوحة للعمليات
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5 text-slate-500 max-w-xs truncate">{p.closingNotes || '-'}</td>
-                      <td className="p-3.5 text-center">
-                        {isClosed ? (
-                          canReopen ? (
-                          <button
-                            onClick={() => setReopenPeriodTarget(p)}
-                            className="px-3 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-xs font-semibold transition"
-                          >
-                            إعادة فتح لضرورة
-                          </button>
-                          ) : <span className="text-slate-400">إعادة الفتح غير مصرح</span>
-                        ) : (
-                          canClose ? <button
-                            onClick={() => setClosePeriodTarget(p)}
-                            className="px-3 py-1 bg-slate-800 text-white hover:bg-slate-900 rounded-lg text-xs font-semibold transition"
-                          >
-                            إقفال الفترة
-                          </button> : <span className="text-slate-400">الإقفال غير مصرح</span>
-                        )}
-                      </td>
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div>
+                <h2 className="font-bold text-slate-800">حالة الأشهر والإقفالات</h2>
+                <p className="mt-1 text-xs text-slate-500">حدد الشهر لمراجعة تفاصيله أو بدء قائمة إقفال الشهر.</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 font-semibold text-sky-800">مفتوحة</span>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-800">مقفلة</span>
+                <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-800">مؤمنة نهائيًا</span>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-12 text-center text-sm text-slate-500">جاري تحميل الفترات المالية...</div>
+            ) : periods.length === 0 ? (
+              <div className="p-10 text-center text-sm text-slate-500">لا توجد فترات مسجلة لهذه السنة المالية.</div>
+            ) : (
+              <>
+                <div className="space-y-2 p-3 xl:hidden">
+                  {periods.map((period) => {
+                    const status = periodStatus(period);
+                    const isSelected = selectedPeriodId === period.id;
+                    return (
+                      <article
+                        key={period.id}
+                        className={`rounded-xl border p-3 transition ${isSelected ? 'border-cyan-300 bg-cyan-50/60' : 'border-slate-200 bg-white'}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-bold text-slate-800">
+                              <button type="button" aria-pressed={isSelected} onClick={() => setSelectedPeriodId(period.id)} className="text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600">
+                                {period.name}<span className="mr-2 text-xs font-medium text-slate-400">#{period.periodNumber}</span>
+                              </button>
+                            </h3>
+                            <span className={`mt-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>
+                              {period.status === 'OPEN' ? <Circle className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                              {status.label}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-500">{period.closedAt ? formatClosedAt(period.closedAt) : 'لم تُقفل بعد'}</span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-white/80 p-2.5 text-xs">
+                          <div><p className="text-slate-500">بداية الفترة</p><p className="mt-1 font-semibold text-slate-800">{formatDate(period.startDate)}</p></div>
+                          <div><p className="text-slate-500">نهاية الفترة</p><p className="mt-1 font-semibold text-slate-800">{formatDate(period.endDate)}</p></div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          {period.status === 'OPEN' ? (
+                            canClose ? (
+                              <button
+                                type="button"
+                                onClick={() => openCloseChecklist(period)}
+                                className="min-h-10 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600"
+                              >
+                                مراجعة وإقفال
+                              </button>
+                            ) : <span className="py-2 text-xs text-slate-400">غير مصرح بالإقفال</span>
+                          ) : period.status === 'CLOSED' && canReopen ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReopenReason('');
+                                setReopenPeriodTarget(period);
+                              }}
+                              className="min-h-10 rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
+                            >
+                              إعادة فتح
+                            </button>
+                          ) : <span className="py-2 text-xs text-slate-400">—</span>}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="hidden overflow-x-auto xl:block">
+                <table className="w-full text-right text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">الشهر / الفترة</th>
+                      <th className="px-4 py-3 font-semibold">بداية الفترة</th>
+                      <th className="px-4 py-3 font-semibold">نهاية الفترة</th>
+                      <th className="px-4 py-3 font-semibold">الحالة</th>
+                      <th className="px-4 py-3 font-semibold">تاريخ ووقت الإقفال</th>
+                      <th className="px-4 py-3 font-semibold">الإجراء</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {periods.map((period) => {
+                      const status = periodStatus(period);
+                      const isSelected = selectedPeriodId === period.id;
+                      return (
+                        <tr
+                          key={period.id}
+                          onClick={() => setSelectedPeriodId(period.id)}
+                          className={`cursor-pointer transition ${isSelected ? 'bg-cyan-50/70' : 'hover:bg-slate-50'}`}
+                        >
+                          <td className="px-4 py-3 font-bold text-slate-800">
+                            {period.name}
+                            <span className="mr-2 text-xs font-medium text-slate-400">#{period.periodNumber}</span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{formatDate(period.startDate)}</td>
+                          <td className="px-4 py-3 text-slate-600">{formatDate(period.endDate)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>
+                              {period.status === 'OPEN' ? <Circle className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                              {status.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-600">
+                            {period.closedAt ? formatClosedAt(period.closedAt) : <span className="text-slate-400">لم تُقفل بعد</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            {period.status === 'OPEN' ? (
+                              canClose ? (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openCloseChecklist(period);
+                                  }}
+                                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-700"
+                                >
+                                  مراجعة وإقفال
+                                </button>
+                              ) : <span className="text-xs text-slate-400">غير مصرح بالإقفال</span>
+                            ) : period.status === 'CLOSED' && canReopen ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setReopenReason('');
+                                  setReopenPeriodTarget(period);
+                                }}
+                                className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                              >
+                                إعادة فتح
+                              </button>
+                            ) : <span className="text-xs text-slate-400">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                </div>
+              </>
+            )}
+          </section>
 
-      {/* Modal: New Fiscal Year */}
+          {selectedPeriod && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-bold text-slate-800">{selectedPeriod.name}</h2>
+                    <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${periodStatus(selectedPeriod).className}`}>
+                      {periodStatus(selectedPeriod).label}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    من {formatDate(selectedPeriod.startDate)} إلى {formatDate(selectedPeriod.endDate)}
+                  </p>
+                </div>
+                {selectedPeriod.closedAt && (
+                  <p className="text-sm text-slate-600">
+                    <span className="font-semibold">أُقفلت في:</span> {formatClosedAt(selectedPeriod.closedAt)}
+                  </p>
+                )}
+              </div>
+              {selectedPeriod.closingNotes && (
+                <div className="mt-4 whitespace-pre-wrap rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+                  {selectedPeriod.closingNotes}
+                </div>
+              )}
+            </section>
+          )}
+        </>
+      )}
+
       {showYearModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
-            <h3 className="text-base font-bold text-slate-800 mb-4">إنشاء سنة مالية جديدة</h3>
-            <form onSubmit={handleCreateYear} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-600 mb-1 font-medium">كود السنة المالية (مثال: FY2026)</label>
-                <input
-                  type="text"
-                  required
-                  value={yearForm.yearCode}
-                  onChange={(e) => setYearForm({ ...yearForm, yearCode: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-2.5"
-                />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="create-year-title" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 id="create-year-title" className="font-black text-slate-800">إنشاء سنة مالية</h2>
+              <button type="button" onClick={() => setShowYearModal(false)} aria-label="إغلاق" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
+            </div>
+            <form onSubmit={handleCreateYear} className="space-y-4">
+              <label className="block text-sm font-semibold text-slate-700">
+                رمز السنة
+                <input required value={yearForm.yearCode} onChange={(event) => setYearForm({ ...yearForm, yearCode: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                اسم السنة
+                <input required value={yearForm.name} onChange={(event) => setYearForm({ ...yearForm, name: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  تاريخ البداية
+                  <input type="date" required value={yearForm.startDate} onChange={(event) => setYearForm({ ...yearForm, startDate: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+                </label>
+                <label className="block text-sm font-semibold text-slate-700">
+                  تاريخ النهاية
+                  <input type="date" required min={yearForm.startDate} value={yearForm.endDate} onChange={(event) => setYearForm({ ...yearForm, endDate: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+                </label>
               </div>
-              <div>
-                <label className="block text-slate-600 mb-1 font-medium">اسم السنة المالية</label>
-                <input
-                  type="text"
-                  required
-                  value={yearForm.name}
-                  onChange={(e) => setYearForm({ ...yearForm, name: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl p-2.5"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-600 mb-1 font-medium">تاريخ البداية</label>
-                  <input
-                    type="date"
-                    required
-                    value={yearForm.startDate}
-                    onChange={(e) => setYearForm({ ...yearForm, startDate: e.target.value })}
-                    className="w-full border border-slate-200 rounded-xl p-2.5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-600 mb-1 font-medium">تاريخ النهاية</label>
-                  <input
-                    type="date"
-                    required
-                    value={yearForm.endDate}
-                    onChange={(e) => setYearForm({ ...yearForm, endDate: e.target.value })}
-                    className="w-full border border-slate-200 rounded-xl p-2.5"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowYearModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionBusy}
-                  className="px-5 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {actionBusy ? 'جاري الإنشاء...' : 'تأكيد وحفظ'}
-                </button>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowYearModal(false)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">إلغاء</button>
+                <button type="submit" disabled={actionBusy} className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-cyan-800 disabled:opacity-50">{actionBusy ? 'جارٍ الحفظ...' : 'إنشاء السنة والفترات'}</button>
               </div>
             </form>
-          </div>
+          </section>
         </div>
       )}
 
-      {/* Modal: Close Period */}
       {closePeriodTarget && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
-            <div className="flex items-center gap-2.5 text-slate-800 font-bold mb-3">
-              <Lock className="w-5 h-5 text-slate-700" />
-              <span>إقفال الفترة المحاسبية ({closePeriodTarget.name})</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="close-period-title" className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-cyan-50 p-2.5 text-cyan-700"><FileCheck2 className="h-5 w-5" /></div>
+                <div>
+                  <h2 id="close-period-title" className="font-black text-slate-800">قائمة مراجعة إقفال الشهر</h2>
+                  <p className="mt-1 text-sm text-slate-500">{closePeriodTarget.name} · {formatDate(closePeriodTarget.startDate)} إلى {formatDate(closePeriodTarget.endDate)}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setClosePeriodTarget(null)} aria-label="إغلاق" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
             </div>
-            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-              عند الإقفال، سيتم حظر تسجيل أي قيود يومية أو فواتير أو سندات قبض وسداد تقع ضمن تواريخ هذه الفترة
-              ({closePeriodTarget.startDate} إلى {closePeriodTarget.endDate}).
-            </p>
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-700 mb-1">ملاحظات الإقفال أو رقم محضر المطابقة</label>
-              <textarea
-                value={closePeriodNotes}
-                onChange={(e) => setClosePeriodNotes(e.target.value)}
-                placeholder="تمت مطابقة الصندوق والبنوك والعملاء..."
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-xs h-20"
-              />
+
+            <div className={`mt-5 rounded-xl border p-3 text-sm ${unpostedCount === 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+              <div className="flex items-center gap-2 font-bold">
+                {unpostedCount === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                {unpostedCount === 0 ? 'لا توجد قيود غير مرحلة' : `يوجد ${unpostedCount} قيد غير مرحل`}
+              </div>
+              {unpostedCount > 0 && (
+                <p className="mt-1">
+                  لا يمكن إقفال الفترة قبل ترحيل القيود أو حذفها.
+                  {' '}<Link to="/finance/journal" onClick={() => setClosePeriodTarget(null)} className="font-bold underline">فتح القيود اليومية</Link>
+                </p>
+              )}
             </div>
-            <div className="flex justify-end gap-2">
+
+            <div className="mt-4 space-y-2">
+              {checklistItems.map((item) => {
+                const checked = completedChecklist.includes(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => toggleChecklistItem(item.id)}
+                    aria-pressed={checked}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-3 text-right text-sm transition ${
+                      checked ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {checked ? <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" /> : <Circle className="h-5 w-5 shrink-0 text-slate-300" />}
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <label className="mt-4 block text-sm font-semibold text-slate-700">
+              ملاحظات الإقفال أو رقم محضر المطابقة
+              <textarea value={closeNotes} onChange={(event) => setCloseNotes(event.target.value)} placeholder="أضف ملاحظات أو مرجع محضر الإقفال..." className="mt-1.5 min-h-20 w-full rounded-xl border border-slate-300 p-3 text-sm font-normal" />
+            </label>
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => setClosePeriodTarget(null)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">إلغاء</button>
               <button
                 type="button"
-                onClick={() => setClosePeriodTarget(null)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium text-xs"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                disabled={actionBusy}
                 onClick={handleClosePeriod}
-                className="px-5 py-2 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 disabled:opacity-50 text-xs"
+                disabled={actionBusy || !allChecklistComplete}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {actionBusy ? 'جاري الإقفال...' : 'تأكيد الإقفال'}
+                <ShieldCheck className="h-4 w-4" />
+                {actionBusy ? 'جارٍ الإقفال...' : 'تأكيد إقفال الشهر'}
               </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
 
-      {/* Modal: Reopen Period */}
       {reopenPeriodTarget && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
-            <div className="flex items-center gap-2.5 text-amber-800 font-bold mb-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600" />
-              <span>إعادة فتح الفترة ({reopenPeriodTarget.name})</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="reopen-period-title" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <h2 id="reopen-period-title" className="font-black text-slate-800">إعادة فتح {reopenPeriodTarget.name}</h2>
             </div>
-            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-              إعادة فتح فترة مقفلة هو إجراء رقابي دقيق. يجب كتابة سبب الإجراء لتوثيقه في سجل التدقيق والمحاضر الرقابية.
-            </p>
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-700 mb-1">سبب إعادة الفتح (إلزامي)</label>
-              <textarea
-                required
-                value={reopenReason}
-                onChange={(e) => setReopenReason(e.target.value)}
-                placeholder="إضافة قيد تسوية ضريبي بناء على توجيه الإدارة..."
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-xs h-20"
-              />
+            <p className="mt-2 text-sm text-slate-500">يجب تسجيل سبب إعادة الفتح لأغراض المراجعة والتدقيق.</p>
+            <label className="mt-4 block text-sm font-semibold text-slate-700">
+              سبب إعادة الفتح
+              <textarea required value={reopenReason} onChange={(event) => setReopenReason(event.target.value)} className="mt-1.5 min-h-24 w-full rounded-xl border border-slate-300 p-3 text-sm font-normal" />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setReopenPeriodTarget(null)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">إلغاء</button>
+              <button type="button" onClick={handleReopenPeriod} disabled={actionBusy || !reopenReason.trim()} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50">{actionBusy ? 'جارٍ التنفيذ...' : 'تأكيد إعادة الفتح'}</button>
             </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setReopenPeriodTarget(null)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium text-xs"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                disabled={actionBusy || !reopenReason.trim()}
-                onClick={handleReopenPeriod}
-                className="px-5 py-2 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 disabled:opacity-50 text-xs"
-              >
-                {actionBusy ? 'جاري الفتح...' : 'تأكيد إعادة الفتح'}
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
       )}
 
-      {/* Modal: Close Fiscal Year Wizard */}
       {closeYearTarget && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl border border-slate-200">
-            <div className="flex items-center gap-2.5 text-rose-800 font-bold mb-3">
-              <ShieldAlert className="w-5 h-5 text-rose-600" />
-              <span>الإقفال السنوي وترحيل الأرباح ({closeYearTarget.name})</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="close-year-title" className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6">
+            <div className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-rose-700" />
+              <h2 id="close-year-title" className="font-black text-slate-800">إقفال {closeYearTarget.name}</h2>
             </div>
-            <div className="text-xs text-slate-600 space-y-2 mb-4 leading-relaxed bg-rose-50/50 p-3.5 rounded-xl border border-rose-100">
-              <p className="font-semibold text-rose-900">سيقوم النظام آلياً بالآتي:</p>
-              <ul className="list-disc list-inside space-y-1 text-slate-700">
-                <li>إقفال كافة الفترات الشهرية الـ 12 المتبقية.</li>
-                <li>تصفير كافة حسابات الإيرادات والمصروفات للسنة المالية.</li>
-                <li>توليد قيد يومية آلي متوازن ينقل صافي الربح أو الخسارة إلى حساب الأرباح المرحلة.</li>
-                <li>تأمين السنة المالية نهائياً.</li>
-              </ul>
+            <p className="mt-2 text-sm text-slate-500">سيتم ترحيل أرصدة الإيرادات والمصروفات إلى الأرباح المحتجزة. لا يمكن التراجع عن هذا الإجراء من هذه الصفحة.</p>
+            <label className="mt-4 block text-sm font-semibold text-slate-700">
+              رمز حساب الأرباح المحتجزة
+              <input required value={retainedEarningsAccount} onChange={(event) => setRetainedEarningsAccount(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5" />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setCloseYearTarget(null)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">إلغاء</button>
+              <button type="button" onClick={handleCloseYear} disabled={actionBusy || !retainedEarningsAccount.trim()} className="rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-rose-800 disabled:opacity-50">{actionBusy ? 'جارٍ الإقفال...' : 'تأكيد الإقفال السنوي'}</button>
             </div>
-
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-700 mb-1">كود حساب الأرباح والخسائر المرحلة (المدورة)</label>
-              <input
-                type="text"
-                value={retainedEarningsAccount}
-                onChange={(e) => setRetainedEarningsAccount(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl p-2.5 text-xs font-mono font-semibold"
-              />
-              <span className="text-[11px] text-slate-400 mt-1 block">الحساب الافتراضي: 3102 - أرباح وخسائر مرحلة</span>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCloseYearTarget(null)}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium text-xs"
-              >
-                تراجع
-              </button>
-              <button
-                type="button"
-                disabled={actionBusy}
-                onClick={handleCloseYear}
-                className="px-5 py-2 bg-rose-700 text-white rounded-xl font-semibold hover:bg-rose-800 disabled:opacity-50 text-xs shadow-md"
-              >
-                {actionBusy ? 'جاري الإقفال والترحيل...' : 'تأكيد الإقفال السنوي النهائي'}
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
       )}
     </div>
   );
 };
+
+export default FiscalClosingPage;

@@ -259,7 +259,7 @@ export const TodayPurchasesPage: React.FC = () => {
       />
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-screen-2xl space-y-4 p-4 sm:space-y-5 sm:p-6">
+        <div className="mx-auto w-full space-y-4 p-4 sm:space-y-5 sm:p-6">
           {error && <PurchasesErrorAlert message={error} onRetry={load} />}
 
           {loading && !data ? (

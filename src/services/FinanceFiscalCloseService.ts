@@ -10,7 +10,7 @@ import type { FiscalYear, FiscalPeriod } from '../types/finance';
 export abstract class FinanceFiscalCloseService extends FinanceEnterpriseContract01 {
   protected requireView() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'finance.view');
+    PermissionService.requireAny(actor, ['finance.view', 'finance.close']);
     return actor;
   }
 
@@ -77,8 +77,31 @@ export abstract class FinanceFiscalCloseService extends FinanceEnterpriseContrac
     }));
   }
 
+  public getUnpostedJournalEntryCount(startDate: string, endDate: string): number {
+    this.requireView();
+    return Number(this.db.query<{ count: number }>(`
+      SELECT COUNT(*) as count FROM journal_entries
+      WHERE date >= ? AND date <= ? AND is_posted = 0
+    `, [startDate, endDate])[0]?.count ?? 0);
+  }
+
   public createFiscalYear(input: { yearCode: string; name: string; startDate: string; endDate: string }): string {
     const actor = this.requireManage();
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    const startDate = new Date(`${input.startDate}T00:00:00.000Z`);
+    const endDate = new Date(`${input.endDate}T00:00:00.000Z`);
+    if (
+      !datePattern.test(input.startDate)
+      || !datePattern.test(input.endDate)
+      || Number.isNaN(startDate.getTime())
+      || Number.isNaN(endDate.getTime())
+      || startDate.toISOString().slice(0, 10) !== input.startDate
+      || endDate.toISOString().slice(0, 10) !== input.endDate
+      || startDate > endDate
+    ) {
+      throw new Error('يجب إدخال تاريخي بداية ونهاية صحيحين، وأن تكون البداية قبل النهاية.');
+    }
+
     const id = `fy_${input.yearCode}`;
     this.db.executeTransaction((tx) => {
       tx.run(`
@@ -86,20 +109,26 @@ export abstract class FinanceFiscalCloseService extends FinanceEnterpriseContrac
         VALUES (?, ?, ?, ?, ?, 'OPEN')
       `, [id, input.yearCode.trim(), input.name.trim(), input.startDate, input.endDate]);
 
-      const [startYear] = input.startDate.split('-').map(Number);
-      for (let m = 1; m <= 12; m++) {
-        const mStr = String(m).padStart(2, '0');
-        const lastDay = new Date(startYear, m, 0).getDate();
+      const startYear = startDate.getUTCFullYear();
+      const startMonth = startDate.getUTCMonth();
+      let periodNumber = 1;
+      for (let monthOffset = 0; ; monthOffset++, periodNumber++) {
+        const monthStart = new Date(Date.UTC(startYear, startMonth + monthOffset, 1));
+        if (monthStart > endDate) break;
+        const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0));
+        const periodStart = monthStart < startDate ? startDate : monthStart;
+        const periodEnd = monthEnd > endDate ? endDate : monthEnd;
+        const periodCode = String(periodNumber).padStart(2, '0');
         tx.run(`
           INSERT INTO fiscal_periods (id, fiscal_year_id, period_number, name, start_date, end_date, status)
           VALUES (?, ?, ?, ?, ?, ?, 'OPEN')
         `, [
-          `fp_${input.yearCode}_${mStr}`,
+          `fp_${input.yearCode}_${periodCode}`,
           id,
-          m,
-          `فترة ${mStr} / ${input.yearCode}`,
-          `${startYear}-${mStr}-01`,
-          `${startYear}-${mStr}-${String(lastDay).padStart(2, '0')}`,
+          periodNumber,
+          `فترة ${periodCode} / ${input.yearCode}`,
+          periodStart.toISOString().slice(0, 10),
+          periodEnd.toISOString().slice(0, 10),
         ]);
       }
 

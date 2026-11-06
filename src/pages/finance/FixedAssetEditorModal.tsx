@@ -1,10 +1,11 @@
 import React from 'react';
 import { Loader2, X } from 'lucide-react';
-import { CATEGORY_LABELS, fmt } from './fixedAssetsHelpers';
+import { CATEGORY_LABELS } from './fixedAssetsHelpers';
 
 export interface FixedAssetForm {
   name: string; category: string; purchaseDate: string; purchaseCost: string; paymentType: string;
   salvageValue: string; usefulLifeYears: string; location: string; notes: string;
+  depreciationMethod: string; decliningRate: string; expectedUnits: string;
 }
 interface FixedAssetEditorModalProps {
   form: FixedAssetForm; setForm: React.Dispatch<React.SetStateAction<FixedAssetForm>>;
@@ -35,8 +36,25 @@ export const FixedAssetEditorModal: React.FC<FixedAssetEditorModalProps> = ({ fo
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">العمر الإنتاجي (سنوات) *</label><input required type="number" min={0.5} step="0.5" value={form.usefulLifeYears} onChange={(e) => setForm({ ...form, usefulLifeYears: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" /></div>
-                <div><label className="font-bold text-slate-700 block mb-1">الموقع</label><input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+                <div><label className="font-bold text-slate-700 block mb-1">{editing ? 'الموقع الحالي — التعديل عبر سجل النقل' : 'الموقع'}</label><input value={form.location} disabled={Boolean(editing)} onChange={(e) => setForm({ ...form, location: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 disabled:cursor-not-allowed disabled:opacity-70" /></div>
               </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">طريقة الإهلاك</label>
+                <select value={form.depreciationMethod} onChange={(e) => setForm({ ...form, depreciationMethod: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                  <option value="STRAIGHT_LINE">القسط الثابت</option>
+                  <option value="DECLINING_BALANCE">الرصيد المتناقص</option>
+                  <option value="UNITS_OF_PRODUCTION">وحدات الإنتاج</option>
+                  <option value="NON_DEPRECIABLE">غير قابل للإهلاك</option>
+                </select>
+              </div>
+              {form.depreciationMethod === 'DECLINING_BALANCE' && <div>
+                <label className="font-bold text-slate-700 block mb-1">معدل الإهلاك السنوي (0–1) *</label>
+                <input required type="number" min="0.0001" max="1" step="0.01" value={form.decliningRate} onChange={(e) => setForm({ ...form, decliningRate: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+              </div>}
+              {form.depreciationMethod === 'UNITS_OF_PRODUCTION' && <div>
+                <label className="font-bold text-slate-700 block mb-1">إجمالي الوحدات المتوقع *</label>
+                <input required type="number" min="0.01" step="0.01" value={form.expectedUnits} onChange={(e) => setForm({ ...form, expectedUnits: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
+              </div>}
               <div><label className="font-bold text-slate-700 block mb-1">ملاحظات</label><textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => onClose()} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>

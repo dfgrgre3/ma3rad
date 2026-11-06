@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate release workflow YAML
+        run: node -e "require('js-yaml').load(require('node:fs').readFileSync('.github/workflows/release-windows.yml', 'utf8'))"
+
       - name: Run checks and production build
         run: npm run check
 

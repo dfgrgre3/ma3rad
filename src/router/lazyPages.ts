@@ -74,6 +74,7 @@ export const HrDashboardPage = lazy(() => import('../pages/hr/HrDashboardPage').
 export const CustomersView = lazy(() => import('../components/CustomersView').then(m => ({ default: m.CustomersView })));
 export const CRMHubPage = lazy(() => import('../pages/crm/CRMHubPage').then(m => ({ default: m.CRMHubPage })));
 export const CustomerDetailPage = lazy(() => import('../pages/customers/CustomerDetailPage').then(m => ({ default: m.CustomerDetailPage })));
+export const PartnersPage = lazy(() => import('../pages/customers/PartnersPage').then(m => ({ default: m.PartnersPage })));
 export const CustomerImportedProductsPage = lazy(() => import('../pages/customers/CustomerImportedProductsPage').then(m => ({ default: m.CustomerImportedProductsPage })));
 export const ReadyDeliveriesPage = lazy(() => import('../pages/customers/ReadyDeliveriesPage').then(m => ({ default: m.ReadyDeliveriesPage })));
 export const CrmDashboardPage = lazy(() => import('../pages/crm/CrmDashboardPage').then(m => ({ default: m.CrmDashboardPage })));
@@ -98,6 +99,7 @@ export const SupplierStatementPage = lazy(() => import('../pages/purchasing/Supp
 // Finance
 export const CashierView = lazy(() => import('../components/CashierView').then(m => ({ default: m.CashierView })));
 export const FinanceOverviewPage = lazy(() => import('../pages/finance/FinanceOverviewPage').then(m => ({ default: m.FinanceOverviewPage })));
+export const FinancialCalendarPage = lazy(() => import('../pages/finance/FinancialCalendarPage').then(m => ({ default: m.FinancialCalendarPage })));
 export const ReceivablesHubPage = lazy(() => import('../pages/finance/ReceivablesHubPage').then(m => ({ default: m.ReceivablesHubPage })));
 export const OtherReceivablesPage = lazy(() => import('../pages/finance/OtherReceivablesPage').then(m => ({ default: m.OtherReceivablesPage })));
 export const DebtsDashboardPage = lazy(() => import('../pages/finance/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
