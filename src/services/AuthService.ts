@@ -252,6 +252,89 @@ export class AuthService {
     return `تم إيقاف المحاولات مؤقتاً بسبب كثرة الأخطاء. حاول مجدداً بعد ${minutes} دقيقة.`;
   }
 
+  private static getLoginRecord(username: string): any {
+    const db = DatabaseManager.getInstance();
+    const rows = db.query<any>(`SELECT * FROM users WHERE username = ? AND is_active = 1`, [username]);
+    if (rows.length === 0) {
+      AuthService.recordLogin(null, username, false, 'USER_NOT_FOUND');
+      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+    }
+
+    const userRecord = rows[0];
+    const guard = AuthService.getLoginGuardStatus(username);
+    if (guard.isLocked) {
+      AuthService.recordLogin(userRecord.id, username, false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(guard.lockedUntil));
+    }
+    return userRecord;
+  }
+
+  private static rejectInvalidPassword(userRecord: any, username: string): never {
+    AuthService.recordLogin(userRecord.id, username, false, 'WRONG_PASSWORD');
+    const updated = AuthService.getLoginGuardStatus(username);
+    if (updated.isLocked) {
+      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+    }
+    if (updated.remainingAttempts != null) {
+      throw new Error(
+        `اسم المستخدم أو كلمة المرور غير صحيحة. المحاولات المتبقية قبل الإيقاف المؤقت: ${updated.remainingAttempts}.`
+      );
+    }
+    throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+  }
+
+  private static finishLogin(
+    userRecord: any,
+    username: string,
+    isDefaultAdmin: boolean,
+    twoFactorCode?: string
+  ): User {
+    // Second factor is checked only after the password succeeds, so a missing or
+    // wrong code never reveals whether a username exists.
+    if (twoFactorAuth.isEnabled(userRecord.id)) {
+      const code = String(twoFactorCode ?? '').trim();
+      if (!code) {
+        throw new TwoFactorRequiredError(username);
+      }
+      const normalizedCode = code.replace(/\s+/g, '');
+      if (!twoFactorAuth.verifyLoginCodeSync(userRecord.id, normalizedCode)) {
+        AuthService.recordLogin(userRecord.id, username, false, 'TWO_FACTOR_FAILED');
+        const updated = AuthService.getLoginGuardStatus(username);
+        if (updated.isLocked) {
+          throw new Error('رمز التحقق الثنائي غير صحيح. تم إيقاف المحاولات مؤقتًا.');
+        }
+        if (updated.remainingAttempts != null) {
+          throw new Error(
+            `رمز التحقق الثنائي غير صحيح. المحاولات المتبقية قبل الإيقاف المؤقت: ${updated.remainingAttempts}.`
+          );
+        }
+        throw new Error('رمز التحقق الثنائي غير صحيح.');
+      }
+    }
+
+    const user: User = {
+      id: userRecord.id,
+      username: userRecord.username,
+      fullName: userRecord.fullName,
+      role: userRecord.role,
+      phone: userRecord.phone,
+      isActive: Boolean(userRecord.isActive),
+      mustChangePassword: isDefaultAdmin,
+      createdAt: userRecord.createdAt,
+      updatedAt: userRecord.updatedAt
+    };
+
+    AuthService.setCurrentUser(user);
+    AuthService.recordLogin(user.id, username, true);
+    AuthService.startSession(user.id);
+    try {
+      localStorage.setItem(SESSION_KEY, user.id);
+    } catch {
+      // ignore
+    }
+    return user;
+  }
+
   public static validatePasswordPolicy(password: string, username?: string): void {
     const policy = getConfiguredPasswordPolicy();
     if (!password || password.length < policy.minLength) {
@@ -391,83 +474,22 @@ export class AuthService {
   }
 
   public static login(username: string, passwordAttempt: string, twoFactorCode?: string): User {
-    const db = DatabaseManager.getInstance();
-    const rows = db.query<any>(`SELECT * FROM users WHERE username = ? AND is_active = 1`, [username]);
-    if (rows.length === 0) {
-      AuthService.recordLogin(null, username, false, 'USER_NOT_FOUND');
-      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
-    }
-
-    const userRecord = rows[0];
-    const guard = AuthService.getLoginGuardStatus(username);
-    if (guard.isLocked) {
-      AuthService.recordLogin(userRecord.id, username, false, 'LOCKED_OUT');
-      throw new Error(AuthService.lockoutMessage(guard.lockedUntil));
-    }
-
+    const userRecord = AuthService.getLoginRecord(username);
     const isValid = bcrypt.compareSync(passwordAttempt, userRecord.passwordHash);
-    if (!isValid) {
-      AuthService.recordLogin(userRecord.id, username, false, 'WRONG_PASSWORD');
-      const updated = AuthService.getLoginGuardStatus(username);
-      if (updated.isLocked) {
-        // The triggering attempt is still reported as a wrong password; the next
-        // attempt is refused by the lockout check above.
-        throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
-      }
-      if (updated.remainingAttempts != null) {
-        throw new Error(
-          `اسم المستخدم أو كلمة المرور غير صحيحة. المحاولات المتبقية قبل الإيقاف المؤقت: ${updated.remainingAttempts}.`
-        );
-      }
-      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
-    }
+    if (!isValid) AuthService.rejectInvalidPassword(userRecord, username);
 
     const isDefaultAdmin = userRecord.username === 'admin' && bcrypt.compareSync('admin123', userRecord.passwordHash);
+    return AuthService.finishLogin(userRecord, username, isDefaultAdmin, twoFactorCode);
+  }
 
-    // Second factor is checked only after the password succeeds, so a missing or
-    // wrong code never reveals whether a username exists.
-    if (twoFactorAuth.isEnabled(userRecord.id)) {
-      const code = String(twoFactorCode ?? '').trim();
-      if (!code) {
-        throw new TwoFactorRequiredError(username);
-      }
-      const normalizedCode = code.replace(/\s+/g, '');
-      if (!twoFactorAuth.verifyLoginCodeSync(userRecord.id, normalizedCode)) {
-        AuthService.recordLogin(userRecord.id, username, false, 'TWO_FACTOR_FAILED');
-        const updated = AuthService.getLoginGuardStatus(username);
-        if (updated.isLocked) {
-          throw new Error('رمز التحقق الثنائي غير صحيح. تم إيقاف المحاولات مؤقتًا.');
-        }
-        if (updated.remainingAttempts != null) {
-          throw new Error(
-            `رمز التحقق الثنائي غير صحيح. المحاولات المتبقية قبل الإيقاف المؤقت: ${updated.remainingAttempts}.`
-          );
-        }
-        throw new Error('رمز التحقق الثنائي غير صحيح.');
-      }
-    }
+  public static async loginAsync(username: string, passwordAttempt: string, twoFactorCode?: string): Promise<User> {
+    const userRecord = AuthService.getLoginRecord(username);
+    const isValid = await bcrypt.compare(passwordAttempt, userRecord.passwordHash);
+    if (!isValid) AuthService.rejectInvalidPassword(userRecord, username);
 
-    const user: User = {
-      id: userRecord.id,
-      username: userRecord.username,
-      fullName: userRecord.fullName,
-      role: userRecord.role,
-      phone: userRecord.phone,
-      isActive: Boolean(userRecord.isActive),
-      mustChangePassword: isDefaultAdmin,
-      createdAt: userRecord.createdAt,
-      updatedAt: userRecord.updatedAt
-    };
-
-    AuthService.setCurrentUser(user);
-    AuthService.recordLogin(user.id, username, true);
-    AuthService.startSession(user.id);
-    try {
-      localStorage.setItem(SESSION_KEY, user.id);
-    } catch {
-      // ignore
-    }
-    return user;
+    const isDefaultAdmin = userRecord.username === 'admin'
+      && await bcrypt.compare('admin123', userRecord.passwordHash);
+    return AuthService.finishLogin(userRecord, username, isDefaultAdmin, twoFactorCode);
   }
 
   public getAllUsers(): User[] {

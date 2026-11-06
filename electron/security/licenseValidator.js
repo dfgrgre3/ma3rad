@@ -7,6 +7,21 @@ const { getHardwareId } = require('../hardwareId');
 // Embedded trusted root public key for CeramiSys / Edarty licensing server.
 // Base64-encoded SPKI DER for Ed25519.
 const DEFAULT_PINNED_PUBLIC_KEY = 'MCowBQYDK2VwAyEAWXcJFVqxr6oFDfuFHNoM0eMd35pWtXlBafhw/LIBucQ=';
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
+
+function parseIsoDate(value) {
+  if (typeof value !== 'string' || !ISO_DATE_PATTERN.test(value)) return NaN;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return NaN;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    calendarDate.getUTCFullYear() !== year ||
+    calendarDate.getUTCMonth() !== month - 1 ||
+    calendarDate.getUTCDate() !== day
+  ) return NaN;
+  return parsed;
+}
 
 class LicenseValidator {
   constructor(options = {}) {
@@ -67,6 +82,32 @@ class LicenseValidator {
       };
     }
 
+    if (!['monthly', 'annual', 'perpetual'].includes(payload.licenseType)) {
+      return { valid: false, reason: 'invalid_license_type', message: 'نوع الترخيص غير صالح.' };
+    }
+
+    for (const field of ['startsAt', 'validUntil', 'offlineLeaseExpiresAt']) {
+      if (payload[field] !== undefined && (
+        !Number.isFinite(parseIsoDate(payload[field]))
+      )) {
+        return { valid: false, reason: 'invalid_license_date', message: 'تاريخ في شهادة الترخيص غير صالح.' };
+      }
+    }
+    if (payload.licenseType !== 'perpetual' && payload.validUntil === undefined) {
+      return { valid: false, reason: 'missing_expiry_date', message: 'تاريخ انتهاء الترخيص مطلوب.' };
+    }
+
+    const hasHardwareId = Object.hasOwn(payload, 'hardwareId');
+    if (hasHardwareId && (typeof payload.hardwareId !== 'string' || !payload.hardwareId.trim())) {
+      return { valid: false, reason: 'invalid_hardware_binding', message: 'بصمة العتاد في شهادة الترخيص غير صالحة.' };
+    }
+    if (options.bindingMode === 'account' && hasHardwareId) {
+      return { valid: false, reason: 'account_license_hardware_bound', message: 'شهادة وضع الحساب يجب ألا تكون مرتبطة ببصمة جهاز.' };
+    }
+    if (options.bindingMode === 'hardwa' && !hasHardwareId) {
+      return { valid: false, reason: 'missing_hardware_binding', message: 'شهادة وضع الجهاز يجب أن تتضمن بصمة العتاد.' };
+    }
+
     // 2. Machine Binding Verification (Hardware ID)
     if (payload.hardwareId && currentHwid) {
       if (String(payload.hardwareId).trim() !== String(currentHwid).trim()) {
@@ -89,24 +130,24 @@ class LicenseValidator {
 
     // 4. StartsAt check
     if (payload.startsAt) {
-      const startsAtMs = new Date(payload.startsAt).getTime();
-      if (!isNaN(startsAtMs) && now < startsAtMs - (5 * 60 * 1000)) { // 5 min clock skew tolerance
+      const startsAtMs = parseIsoDate(payload.startsAt);
+      if (now < startsAtMs - (5 * 60 * 1000)) { // 5 min clock skew tolerance
         return { valid: false, reason: 'not_yet_valid', message: 'صلاحية الترخيص لم تبدأ بعد.' };
       }
     }
 
     // 5. Expiry Check (for non-perpetual licenses)
     if (payload.validUntil && payload.licenseType !== 'perpetual') {
-      const expiresAtMs = new Date(payload.validUntil).getTime();
-      if (!isNaN(expiresAtMs) && now > expiresAtMs) {
+      const expiresAtMs = parseIsoDate(payload.validUntil);
+      if (now > expiresAtMs) {
         return { valid: false, reason: 'license_expired', message: 'انتهت فترة صلاحية الترخيص.' };
       }
     }
 
     // 6. Offline Lease Check (if offline lease timestamp is specified)
     if (payload.offlineLeaseExpiresAt) {
-      const leaseExpiresAtMs = new Date(payload.offlineLeaseExpiresAt).getTime();
-      if (!isNaN(leaseExpiresAtMs) && now > leaseExpiresAtMs) {
+      const leaseExpiresAtMs = parseIsoDate(payload.offlineLeaseExpiresAt);
+      if (now > leaseExpiresAtMs) {
         return {
           valid: false,
           reason: 'offline_lease_expired',
@@ -125,17 +166,17 @@ class LicenseValidator {
   /**
    * Generates an offline activation request payload containing the machine's HWID.
    */
-  generateOfflineActivationRequest(customerInfo = {}) {
-    const hwid = getHardwareId();
-    return {
+  generateOfflineActivationRequest(customerInfo = {}, licenseMode = 'hardwa') {
+    const request = {
       type: 'CERAMISYS_OFFLINE_ACTIVATION_REQUEST',
       version: 1,
-      hardwareId: hwid,
       customerName: customerInfo.customerName || '',
       account: customerInfo.account || '',
       phone: customerInfo.phone || '',
       requestedAt: new Date().toISOString(),
     };
+    if (licenseMode !== 'account') request.hardwareId = getHardwareId();
+    return request;
   }
 }
 

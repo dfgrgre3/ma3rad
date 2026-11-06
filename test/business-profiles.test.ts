@@ -36,6 +36,7 @@ import { TerminologyService } from '../src/services/TerminologyService.ts';
 import { validateModuleSelection } from '../src/config/moduleRegistry.ts';
 import {
   shouldShowFirstRunSetup,
+  BYPASS_FIRST_RUN_ACTIVATION,
   BYPASS_FIRST_RUN_SETUP,
   OPEN_ALL_PAGES,
 } from '../src/config/setupLifecycle.ts';
@@ -67,7 +68,8 @@ test('first-run setup is limited to genuinely unconfigured databases', () => {
   }), false);
 });
 
-test('production mode keeps first-run setup and page guards enabled', () => {
+test('activation screen is bypassed while first-run setup and page guards remain enabled', () => {
+  assert.equal(BYPASS_FIRST_RUN_ACTIVATION, true);
   assert.equal(BYPASS_FIRST_RUN_SETUP, false);
   assert.equal(OPEN_ALL_PAGES, false);
 });

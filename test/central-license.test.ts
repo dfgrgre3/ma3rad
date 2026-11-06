@@ -4,12 +4,19 @@ import assert from 'node:assert/strict';
 import { CentralLicenseService } from '../src/services/CentralLicenseService.ts';
 
 const root = globalThis as any;
-const previousCentralRequest = root.window?.ceramisys?.central?.request;
+root.window.ceramisys = root.window.ceramisys || {};
+const centralApi = root.window.ceramisys.central || {};
+const previousCentralRequest = centralApi.request;
+let activated = false;
+let configured = true;
 
 function resetLicense(storage: Storage = globalThis.localStorage): void {
   storage.removeItem('central_device_credential');
+  storage.removeItem('central_server_url');
   storage.removeItem('central_last_validated_at');
   storage.removeItem('central_first_run_activated');
+  activated = false;
+  configured = true;
 }
 
 function fakeCentralRequest(handler: () => Promise<any> | any): void {
@@ -22,28 +29,33 @@ function fakeCentralRequest(handler: () => Promise<any> | any): void {
 }
 
 function restoreCentralRequest(): void {
-  if (previousCentralRequest) root.window.ceramisys.central.request = previousCentralRequest;
-  else delete root.window.ceramisys?.central?.request;
+  root.window.ceramisys.central.request = previousCentralRequest;
 }
 
-test('activation gate requires the device credential, not a leftover UI flag', () => {
+root.window.ceramisys.central = {
+  ...centralApi,
+  getServerUrl: async () => configured ? 'https://license.example.com' : '',
+  getStatus: async () => ({ configured, activated }),
+  clearCredential: async () => { activated = false; return { ok: true }; },
+};
+
+test('activation gate requires the main-process credential, not a leftover UI flag', async () => {
   resetLicense();
   globalThis.localStorage.setItem('central_first_run_activated', '1');
-  assert.equal(CentralLicenseService.hasCompletedFirstRunActivation(), false);
+  assert.equal(await CentralLicenseService.hasCompletedFirstRunActivation(), false);
 
-  CentralLicenseService.setCredential('cred-123');
-  assert.equal(CentralLicenseService.hasCompletedFirstRunActivation(), true);
+  activated = true;
+  assert.equal(await CentralLicenseService.hasCompletedFirstRunActivation(), true);
 
-  CentralLicenseService.clearActivation();
-  assert.equal(CentralLicenseService.hasCompletedFirstRunActivation(), false);
+  await CentralLicenseService.clearActivation();
+  assert.equal(await CentralLicenseService.hasCompletedFirstRunActivation(), false);
 });
 
 test('license validation fails closed without a credential or after a definitive rejection', async () => {
   resetLicense();
   assert.equal(await CentralLicenseService.validate(), false);
 
-  CentralLicenseService.setServerUrl('https://license.example.com');
-  CentralLicenseService.setCredential('cred-123');
+  activated = true;
   fakeCentralRequest(() => ({ ok: false, status: 401, json: async () => ({}) }));
   try {
     assert.equal(await CentralLicenseService.validate(), false);
@@ -54,8 +66,7 @@ test('license validation fails closed without a credential or after a definitive
 
 test('license validation succeeds and tolerates a temporary outage only within the grace window', async () => {
   resetLicense();
-  CentralLicenseService.setServerUrl('https://license.example.com');
-  CentralLicenseService.setCredential('cred-123');
+  activated = true;
 
   fakeCentralRequest(() => ({ ok: true, status: 200, json: async () => ({}) }));
   assert.equal(await CentralLicenseService.validate(), true);
@@ -71,8 +82,7 @@ test('license validation succeeds and tolerates a temporary outage only within t
 
 test('license validation fails closed once the offline grace window expires', async () => {
   resetLicense();
-  CentralLicenseService.setServerUrl('https://license.example.com');
-  CentralLicenseService.setCredential('cred-123');
+  activated = true;
   globalThis.localStorage.setItem('central_last_validated_at', String(Date.now() - 15 * 24 * 60 * 60 * 1000));
 
   fakeCentralRequest(() => { throw new Error('offline'); });
@@ -97,7 +107,8 @@ test('signed configuration cannot be accepted when its signature is unverifiable
 
 test('fetchConfig does not cache configuration whose signature cannot be verified', async () => {
   resetLicense();
-  CentralLicenseService.setServerUrl('https://license.example.com');
+  configured = true;
+  activated = true;
   globalThis.localStorage.removeItem('central_cached_config');
   const paths: string[] = [];
   root.window.ceramisys.central.request = async (request: { path: string }) => {

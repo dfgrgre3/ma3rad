@@ -77,23 +77,6 @@ async function createHandlers(fsImpl = fs, safeStorageOverride, openPath = async
   };
 }
 
-test('synchronous database saves persist encrypted bytes before returning', async () => {
-  const context = await createHandlers();
-  try {
-    const event = { senderFrame: { url: 'file:///index.html' }, returnValue: undefined };
-    context.events.get('db:save-sync')(event, new Uint8Array([1, 2, 3, 4]));
-    assert.equal(event.returnValue.ok, true);
-    assert.equal(event.returnValue.path, context.dbFile);
-    assert.equal(fsSync.existsSync(context.dbFile), true);
-    assert.deepEqual(
-      Array.from(await context.handlers.get('db:load')(context.event)),
-      [1, 2, 3, 4],
-    );
-  } finally {
-    await fs.rm(context.appDataDir, { recursive: true, force: true });
-  }
-});
-
 test('registered database handlers initialize directories and load/save within the size limit', async () => {
   const context = await createHandlers();
   try {

@@ -110,12 +110,9 @@ function calculateAdjustmentValues(
   const fifoPlan = fifoEnabled && input.type !== 'ADD'
     ? InventoryCostingService.planFifo(txDb, input.productId, input.warehouseId, input.quantity)
     : null;
-  const unitCost = fifoPlan?.unitCost ?? (input.product.costPrice || 0);
+  const rawUnitCost = Number(fifoPlan?.unitCost ?? input.product.costPrice ?? 0);
+  const unitCost = Number.isFinite(rawUnitCost) ? rawUnitCost : 0;
   const totalValue = input.quantity * unitCost;
-
-  if (!(totalValue > 0)) {
-    throw new Error('Set a positive product cost before posting an inventory adjustment.');
-  }
 
   const boxesCount = input.product.productType === 'GENERAL'
     ? input.product.baseUnit === 'BOX' ? input.quantity : 0

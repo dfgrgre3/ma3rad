@@ -192,11 +192,16 @@ export class DatabaseManager {
     this.selectStorageBackend(fileApi);
     await this.backupBeforeGrossProfitMigration(savedBytes, loadedFromFile, isFreshDatabase, fileApi);
 
-    this.ensureLegacySalesInvoiceStatusColumns();
+    const schemaBeforeMigrations = this.getSchemaSignature();
+    const legacyDataChanged = this.ensureLegacySalesInvoiceStatusColumns();
     const report = runMigrations(this.getDatabase());
     await this.handleMigrationFailures(report, isFreshDatabase, fileApi);
 
-    await this.persistInitializedDatabase(isFreshDatabase);
+    const databaseChanged = isFreshDatabase
+      || legacyDataChanged
+      || report.applied.length > 0
+      || schemaBeforeMigrations !== this.getSchemaSignature();
+    await this.persistInitializedDatabase(isFreshDatabase, databaseChanged);
     this.forceFreshAfterRecovery = false;
     this.initializedSuccessfully = true;
     return this.getDatabase();
@@ -411,13 +416,14 @@ export class DatabaseManager {
     }
   }
 
-  private async persistInitializedDatabase(isFreshDatabase: boolean): Promise<void> {
+  private async persistInitializedDatabase(isFreshDatabase: boolean, databaseChanged: boolean): Promise<void> {
     // Seed reference data only for a genuinely new database — migrations already
     // hold everything an existing database needs.
     if (isFreshDatabase) {
       this.seedInitialData();
     }
 
+    if (!databaseChanged) return;
     this.saveToStorage();
     await this.flush();
     if (this.lastPersistError) {
@@ -462,24 +468,46 @@ export class DatabaseManager {
     )[0]?.values.length);
   }
 
-  private ensureLegacySalesInvoiceStatusColumns(): void {
-    if (!this.db) return;
+  private ensureLegacySalesInvoiceStatusColumns(): boolean {
+    if (!this.db) return false;
     const salesInvoices = this.db.exec('SELECT name FROM sqlite_master WHERE type = "table" AND name = "sales_invoices"');
-    if ((salesInvoices[0]?.values?.length ?? 0) === 0) return;
+    if ((salesInvoices[0]?.values?.length ?? 0) === 0) return false;
 
-    const columns = new Set(
-      (this.db.exec('PRAGMA table_info(sales_invoices)')[0]?.values ?? []).map((row) => String(row[1]))
+    const columnInfo = new Map(
+      (this.db.exec('PRAGMA table_info(sales_invoices)')[0]?.values ?? [])
+        .map((row) => [String(row[1]), { notNull: Number(row[3]) === 1 }])
     );
+    let changed = false;
 
-    if (!columns.has('payment_status')) {
+    if (!columnInfo.has('payment_status')) {
       this.db.run("ALTER TABLE sales_invoices ADD COLUMN payment_status TEXT NOT NULL DEFAULT 'PAID'");
+      columnInfo.set('payment_status', { notNull: true });
+      changed = true;
     }
-    if (!columns.has('invoice_status')) {
+    if (!columnInfo.has('invoice_status')) {
       this.db.run("ALTER TABLE sales_invoices ADD COLUMN invoice_status TEXT NOT NULL DEFAULT 'COMPLETED'");
+      columnInfo.set('invoice_status', { notNull: true });
+      changed = true;
     }
 
-    this.db.run(`UPDATE sales_invoices SET payment_status = 'PAID' WHERE payment_status IS NULL`);
-    this.db.run(`UPDATE sales_invoices SET invoice_status = 'COMPLETED' WHERE invoice_status IS NULL`);
+    if (!columnInfo.get('payment_status')?.notNull) {
+      this.db.run(`UPDATE sales_invoices SET payment_status = 'PAID' WHERE payment_status IS NULL`);
+      changed = changed || this.db.getRowsModified() > 0;
+    }
+    if (!columnInfo.get('invoice_status')?.notNull) {
+      this.db.run(`UPDATE sales_invoices SET invoice_status = 'COMPLETED' WHERE invoice_status IS NULL`);
+      changed = changed || this.db.getRowsModified() > 0;
+    }
+    return changed;
+  }
+
+  private getSchemaSignature(): string {
+    if (!this.db) return '';
+    return JSON.stringify(this.db.exec(
+      `SELECT type, name, tbl_name, sql FROM sqlite_master
+       WHERE name NOT LIKE 'sqlite_%'
+       ORDER BY type, name`
+    )[0]?.values ?? []);
   }
 
   public async createFreshAfterRecovery(): Promise<void> {
@@ -606,34 +634,7 @@ export class DatabaseManager {
       console.error('Failed to export SQLite database snapshot', e);
       return;
     }
-    if (this.persistSnapshotSynchronously(snapshot)) return;
     this.persist(snapshot);
-  }
-
-  private persistSnapshotSynchronously(snapshot: Uint8Array): boolean {
-    const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
-    if (!fileApi?.saveSync) return false;
-
-    try {
-      const result = fileApi.saveSync(snapshot);
-      if (!result?.ok) {
-        throw new AppError(result?.error || 'تعذر حفظ قاعدة البيانات على القرص.',
-          result?.code || 'DATABASE_SAVE_FAILED', result?.retryable !== false);
-      }
-      this.storageBackend = 'file';
-      this.lastPersistError = null;
-      this.lastPersistErrorCode = null;
-      if (this.migratedLegacyStorage && typeof localStorage !== 'undefined') {
-        try { localStorage.removeItem(DB_STORAGE_KEY); } catch { /* keep the migrated copy if cleanup is blocked */ }
-        this.migratedLegacyStorage = false;
-      }
-    } catch (error) {
-      const failure = toAppError(error, 'DATABASE_PERSIST_FAILED', 'تعذر حفظ قاعدة البيانات.');
-      this.lastPersistError = persistenceErrorMessage(error, failure.code);
-      this.lastPersistErrorCode = failure.code;
-      console.error('Failed to synchronously persist SQLite database', error);
-    }
-    return true;
   }
 
   /**
@@ -816,11 +817,7 @@ export class DatabaseManager {
         db.exec('COMMIT;');
         committed = true;
         this.clearQueryCache();
-        this.saveToStorage();
-        if (this.lastPersistError) {
-          throw new AppError(`تعذر تثبيت المعاملة على القرص: ${this.lastPersistError}`,
-            'DATABASE_PERSIST_FAILED', true);
-        }
+        this.scheduleDebouncedSave();
       } else {
         db.exec(`RELEASE SAVEPOINT ${savepoint};`);
       }

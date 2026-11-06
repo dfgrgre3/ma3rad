@@ -5,7 +5,6 @@ contextBridge.exposeInMainWorld('ceramisys', {
   db: {
     load: () => ipcRenderer.invoke('db:load'),
     save: (bytes) => ipcRenderer.invoke('db:save', bytes),
-    saveSync: (bytes) => ipcRenderer.sendSync('db:save-sync', bytes),
     decryptLocalBackup: (bytes) => ipcRenderer.invoke('db:decrypt-local-backup', bytes),
     exportRecoveryKey: (password) => ipcRenderer.invoke('db:export-recovery-key', password),
     decryptBackupWithRecoveryKey: (backupBytes, recoveryFileBytes, password) =>
@@ -26,6 +25,10 @@ contextBridge.exposeInMainWorld('ceramisys', {
     clear: () => ipcRenderer.invoke('credentials:clear'),
   },
   central: {
+    getServerUrl: () => ipcRenderer.invoke('central:get-server-url'),
+    getStatus: () => ipcRenderer.invoke('central:get-status'),
+    migrateCredential: (credential) => ipcRenderer.invoke('central:migrate-credential', credential),
+    clearCredential: () => ipcRenderer.invoke('central:clear-credential'),
     request: (request) => ipcRenderer.invoke('central:request', request),
   },
   sync: {
@@ -86,6 +89,8 @@ contextBridge.exposeInMainWorld('ceramisys', {
   },
   license: {
     getHwid: () => ipcRenderer.invoke('license:get-hwid'),
+    getMode: () => ipcRenderer.invoke('license-mode:get'),
+    setMode: (request) => ipcRenderer.invoke('license-mode:set', request),
     load: () => ipcRenderer.invoke('license:load'),
     save: (payload) => ipcRenderer.invoke('license:save', payload),
     applyOfflineLicense: (certificate) => ipcRenderer.invoke('license:apply-offline', certificate),

@@ -63,16 +63,16 @@ export function fetchReturnStats(ctx: SalesContext): ReturnStats {
   const scope = ctx.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
   const row = ctx.db.query<any>(
     `SELECT COUNT(*) AS count,
-            COALESCE(SUM(total_amount), 0) AS totalAmount,
-            COALESCE(SUM(return_tax_amount), 0) AS taxAmount,
-            COALESCE(SUM(total_amount + COALESCE(return_tax_amount, 0)), 0) AS grossAmount,
-            COALESCE(SUM(CASE WHEN return_tax_amount IS NULL THEN 1 ELSE 0 END), 0) AS returnsWithoutRecordedTax,
-            COALESCE(SUM(refunded_amount), 0) AS cashRefunded,
-            COALESCE(SUM(remaining_to_balance), 0) AS creditedToBalance,
-            COALESCE(SUM(CASE WHEN date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
-            COALESCE(SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END), 0) AS todayAmount,
-            COALESCE(SUM(CASE WHEN date = ? THEN COALESCE(return_tax_amount, 0) ELSE 0 END), 0) AS todayTaxAmount,
-            COALESCE(SUM(CASE WHEN date = ? THEN total_amount + COALESCE(return_tax_amount, 0) ELSE 0 END), 0) AS todayGrossAmount
+            COALESCE(SUM(sr.total_amount), 0) AS totalAmount,
+            COALESCE(SUM(sr.return_tax_amount), 0) AS taxAmount,
+            COALESCE(SUM(sr.total_amount + COALESCE(sr.return_tax_amount, 0)), 0) AS grossAmount,
+            COALESCE(SUM(CASE WHEN sr.return_tax_amount IS NULL THEN 1 ELSE 0 END), 0) AS returnsWithoutRecordedTax,
+            COALESCE(SUM(sr.refunded_amount), 0) AS cashRefunded,
+            COALESCE(SUM(sr.remaining_to_balance), 0) AS creditedToBalance,
+            COALESCE(SUM(CASE WHEN sr.date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
+            COALESCE(SUM(CASE WHEN sr.date = ? THEN sr.total_amount ELSE 0 END), 0) AS todayAmount,
+            COALESCE(SUM(CASE WHEN sr.date = ? THEN COALESCE(sr.return_tax_amount, 0) ELSE 0 END), 0) AS todayTaxAmount,
+            COALESCE(SUM(CASE WHEN sr.date = ? THEN sr.total_amount + COALESCE(sr.return_tax_amount, 0) ELSE 0 END), 0) AS todayGrossAmount
      FROM sales_returns sr
      JOIN sales_invoices si ON si.id = sr.original_invoice_id
      JOIN warehouses w ON w.id = si.warehouse_id

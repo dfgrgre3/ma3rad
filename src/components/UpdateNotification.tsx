@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 interface UpdateStatus {
-  status: 'idle' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  status: 'idle' | 'unsupported' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
   currentVersion: string;
   version?: string;
   releaseName?: string;
@@ -37,7 +37,7 @@ export function UpdateNotification() {
     };
   }, []);
 
-  if (!update || ['idle', 'checking', 'not-available'].includes(update.status)) return null;
+  if (!update || ['idle', 'unsupported', 'checking', 'not-available'].includes(update.status)) return null;
   const isError = update.status === 'error';
   const hasRelease = Boolean(update.version || update.releaseName);
   const optional = !update.mandatory;

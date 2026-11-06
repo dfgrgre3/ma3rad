@@ -51,7 +51,7 @@ function createUpdaterContext({ packaged = true, platform = 'win32', appImagePat
   };
 }
 
-test('auto-updates are restricted to packaged apps and supported targets', () => {
+test('auto-updates are restricted to packaged apps and supported targets', async () => {
   assert.equal(isUpdatePlatform('linux', ''), false);
   assert.equal(isUpdatePlatform('linux', '/path/to/appimage'), true);
   assert.equal(isUpdatePlatform('win32', ''), true);
@@ -60,7 +60,33 @@ test('auto-updates are restricted to packaged apps and supported targets', () =>
   const context = createUpdaterContext({ packaged: false });
   try {
     assert.equal(context.updater.autoDownload, undefined);
-    assert.equal(context.controller.getStatus().status, 'idle');
+    assert.equal(context.controller.getStatus().status, 'unsupported');
+    const checkCount = context.getCheckCount();
+    const status = await context.handlers.get('app:update-check')({ trusted: true });
+    assert.equal(status.status, 'unsupported');
+    assert.equal(context.getCheckCount(), checkCount);
+  } finally {
+    context.controller.dispose();
+  }
+});
+
+test('manual update checks report checking and do not start a second concurrent check', async () => {
+  const context = createUpdaterContext();
+  let finishCheck;
+  try {
+    context.updater.emit('update-not-available');
+    context.updater.checkForUpdates = () => new Promise((resolve) => { finishCheck = resolve; });
+    const checking = context.handlers.get('app:update-check')({ trusted: true });
+    assert.equal(context.controller.getStatus().status, 'checking');
+    const count = context.getCheckCount();
+    const overlapping = await context.handlers.get('app:update-check')({ trusted: true });
+    assert.equal(overlapping.status, 'checking');
+    assert.equal(context.getCheckCount(), count);
+
+    context.updater.emit('update-not-available');
+    finishCheck();
+    const result = await checking;
+    assert.equal(result.status, 'not-available');
   } finally {
     context.controller.dispose();
   }
@@ -72,7 +98,7 @@ test('packaged app checks automatically, downloads in the background, and waits 
     const { updater, handlers, sent, controller } = context;
     assert.equal(updater.autoDownload, true);
     assert.equal(updater.autoInstallOnAppQuit, false);
-    assert.equal(updater.allowDowngrade, true);
+    assert.equal(updater.allowDowngrade, false);
 
     updater.emit('update-available', {
       version: '1.1.5',
@@ -111,6 +137,7 @@ test('packaged app checks automatically, downloads in the background, and waits 
 test('failed update checks are surfaced for retry and public release notes are bounded', async () => {
   const context = createUpdaterContext();
   try {
+    context.updater.emit('update-not-available');
     context.updater.checkForUpdates = () => Promise.reject(new Error('offline'));
     const state = await context.handlers.get('app:update-check')({ trusted: true });
     assert.equal(state.status, 'error');

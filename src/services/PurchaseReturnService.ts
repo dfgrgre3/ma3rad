@@ -422,11 +422,11 @@ export class PurchaseReturnService {
     const today = localDateString();
     const row = this.db.query<any>(`
       SELECT COUNT(*) AS count,
-             COALESCE(SUM(total_amount), 0) AS totalAmount,
-             COALESCE(SUM(refunded_amount), 0) AS cashRefunded,
-             COALESCE(SUM(remaining_to_balance), 0) AS creditedToBalance,
-             COALESCE(SUM(CASE WHEN date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
-             COALESCE(SUM(CASE WHEN date = ? THEN total_amount ELSE 0 END), 0) AS todayAmount
+             COALESCE(SUM(pr.total_amount), 0) AS totalAmount,
+             COALESCE(SUM(pr.refunded_amount), 0) AS cashRefunded,
+             COALESCE(SUM(pr.remaining_to_balance), 0) AS creditedToBalance,
+             COALESCE(SUM(CASE WHEN pr.date = ? THEN 1 ELSE 0 END), 0) AS todayCount,
+             COALESCE(SUM(CASE WHEN pr.date = ? THEN pr.total_amount ELSE 0 END), 0) AS todayAmount
       FROM purchase_returns pr
       JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
       JOIN warehouses w ON w.id = pr.warehouse_id

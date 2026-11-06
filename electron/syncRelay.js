@@ -2,11 +2,13 @@ const fs = require('node:fs/promises');
 const http = require('node:http');
 const https = require('node:https');
 const { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } = require('node:crypto');
+const path = require('node:path');
 const { isIP } = require('node:net');
 
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_BATCH_SIZE = 250;
 const MAX_EVENT_BYTES = 1024 * 1024;
+const MAX_JOURNAL_SEGMENT_BYTES = 16 * 1024 * 1024;
 const VALID_OPERATIONS = new Set(['CREATE', 'UPDATE', 'DELETE', 'UPSERT']);
 const POLICY_CONTROLLED_ENTITIES = new Set([
   'category', 'brand', 'product', 'customer', 'supplier', 'sales_invoice', 'sales_return',
@@ -112,53 +114,233 @@ class SyncJournal {
     this.records = [];
     this.byEventId = new Map();
     this.policies = new Map();
+    this.journalByteLength = 0;
+    this.activeJournalPath = filePath;
     this.writeQueue = Promise.resolve();
     this.writeError = null;
   }
 
   async load() {
-    let content;
+    const directory = path.dirname(this.filePath);
+    const baseName = path.basename(this.filePath);
+    let names = [];
     try {
-      content = await fs.readFile(this.filePath, 'utf8');
+      names = await fs.readdir(directory);
     } catch (error) {
-      if (error.code === 'ENOENT') return;
+      if (error.code !== 'ENOENT') throw error;
+    }
+
+    const segmentPrefix = `${baseName}.segment-`;
+    const segments = names
+      .filter((name) => name.startsWith(segmentPrefix) && name.endsWith('.jsonl'))
+      .map((name) => {
+        const sequenceText = name.slice(segmentPrefix.length, -'.jsonl'.length);
+        if (!/^\d{16}$/.test(sequenceText)) {
+          throw new Error(`Sync journal has an invalid segment filename: ${name}`);
+        }
+        const firstSequence = Number(sequenceText);
+        if (!Number.isSafeInteger(firstSequence) || firstSequence < 1) {
+          throw new Error(`Sync journal has an invalid segment sequence: ${name}`);
+        }
+        return { filePath: path.join(directory, name), firstSequence };
+      })
+      .sort((left, right) => left.firstSequence - right.firstSequence);
+    const hasBase = names.includes(baseName);
+    const journalFiles = [
+      ...(hasBase ? [{ filePath: this.filePath, firstSequence: 1, legacy: true }] : []),
+      ...segments,
+    ];
+    if (journalFiles.length === 0) return;
+
+    let expectedSequence = 1;
+    for (let index = 0; index < journalFiles.length; index++) {
+      const journalFile = journalFiles[index];
+      if (!journalFile.legacy && journalFile.firstSequence !== expectedSequence) {
+        throw new Error(`Sync journal segment sequence does not match expected sequence ${expectedSequence}`);
+      }
+      const finalFile = index === journalFiles.length - 1;
+      expectedSequence = await this.loadJournalFile(
+        journalFile.filePath,
+        expectedSequence,
+        finalFile
+      );
+      if (!journalFile.legacy && journalFile.firstSequence === expectedSequence) {
+        if (!finalFile) {
+          throw new Error(`Sync journal contains an empty non-final segment at sequence ${expectedSequence}`);
+        }
+      }
+    }
+
+    const activeFile = journalFiles[journalFiles.length - 1];
+    this.activeJournalPath = activeFile.filePath;
+    this.journalByteLength = (await fs.stat(activeFile.filePath)).size;
+  }
+
+  async loadJournalFile(filePath, expectedSequence, finalFile) {
+    let handle;
+    try {
+      handle = await fs.open(filePath, 'r');
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        if (finalFile) return expectedSequence;
+        throw error;
+      }
       throw error;
     }
-    if (!content) return;
-    if (!content.endsWith('\n')) {
-      throw new Error('Sync journal has an incomplete final record; preserve it and restore from backup before continuing.');
-    }
-    let expectedSequence = 1;
-    for (const line of content.split('\n').slice(0, -1)) {
-      let record;
-      try {
-        const envelope = JSON.parse(line);
-        const iv = Buffer.from(envelope.iv, 'base64');
-        const tag = Buffer.from(envelope.tag, 'base64');
-        const ciphertext = Buffer.from(envelope.data, 'base64');
-        if (envelope.version !== 1 || iv.length !== 12 || tag.length !== 16 || ciphertext.length === 0) {
-          throw new Error('Invalid encrypted journal record');
-        }
-        const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
-        decipher.setAuthTag(tag);
-        record = JSON.parse(Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8'));
-      } catch {
-        throw new Error(`Sync journal record failed integrity verification at sequence ${expectedSequence}`);
-      }
-      if (
-        !record || record.sequence !== expectedSequence ||
-        typeof record.tenantId !== 'string' ||
-        !record.event || typeof record.event.eventId !== 'string'
-      ) {
-        throw new Error(`Sync journal is invalid at sequence ${expectedSequence}`);
-      }
-      const key = `${record.tenantId}\0${record.event.eventId}`;
-      if (this.byEventId.has(key)) throw new Error(`Sync journal contains a duplicate event at sequence ${expectedSequence}`);
-      this.records.push(record);
-      this.byEventId.set(key, record);
-      this.applyPolicyRecord(record);
+
+    let pending = Buffer.alloc(0);
+    let validPrefixBytes = 0;
+    const processLine = (line) => {
+      const record = this.parseRecord(line.toString('utf8'), expectedSequence);
+      this.indexRecord(record, expectedSequence, filePath, validPrefixBytes, line.length);
       expectedSequence++;
+    };
+
+    try {
+      const chunk = Buffer.allocUnsafe(64 * 1024);
+      while (true) {
+        const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
+        if (bytesRead === 0) break;
+        const data = chunk.subarray(0, bytesRead);
+        let start = 0;
+        let newline = data.indexOf(0x0a, start);
+        while (newline !== -1) {
+          const part = data.subarray(start, newline);
+          const line = pending.length ? Buffer.concat([pending, part]) : part;
+          processLine(line.toString('utf8'));
+          validPrefixBytes += line.length + 1;
+          pending = Buffer.alloc(0);
+          start = newline + 1;
+          newline = data.indexOf(0x0a, start);
+        }
+        if (start < data.length) {
+          const tail = data.subarray(start);
+          pending = pending.length ? Buffer.concat([pending, tail]) : Buffer.from(tail);
+        }
+      }
+    } finally {
+      await handle.close();
     }
+
+    if (pending.length === 0) return expectedSequence;
+    if (!finalFile) throw new Error('Sync journal has an incomplete record before a later segment');
+
+    let tailRecord;
+    try {
+      tailRecord = this.parseRecord(pending.toString('utf8'), expectedSequence);
+      const key = `${tailRecord.tenantId}\0${tailRecord.event.eventId}`;
+      if (this.byEventId.has(key)) throw new Error('Duplicate event');
+    } catch {
+      const quarantinePath = await this.quarantineTail(filePath, pending, validPrefixBytes);
+      console.warn(`Sync journal recovered an incomplete final record; preserved it at ${quarantinePath}`);
+      return expectedSequence;
+    }
+
+    const appendHandle = await fs.open(filePath, 'a', 0o600);
+    try {
+      await appendHandle.writeFile('\n', 'utf8');
+      await appendHandle.sync();
+    } finally {
+      await appendHandle.close();
+    }
+    this.indexRecord(tailRecord, expectedSequence, filePath, validPrefixBytes, pending.length);
+    console.warn('Sync journal recovered a complete final record missing its newline delimiter');
+    return expectedSequence + 1;
+  }
+
+  parseRecord(line, expectedSequence) {
+    let record;
+    try {
+      const envelope = JSON.parse(line);
+      const iv = Buffer.from(envelope.iv, 'base64');
+      const tag = Buffer.from(envelope.tag, 'base64');
+      const ciphertext = Buffer.from(envelope.data, 'base64');
+      if (envelope.version !== 1 || iv.length !== 12 || tag.length !== 16 || ciphertext.length === 0) {
+        throw new Error('Invalid encrypted journal record');
+      }
+      const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
+      decipher.setAuthTag(tag);
+      record = JSON.parse(Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8'));
+    } catch {
+      throw new Error(`Sync journal record failed integrity verification at sequence ${expectedSequence}`);
+    }
+    if (
+      !record || record.sequence !== expectedSequence ||
+      typeof record.tenantId !== 'string' ||
+      !record.event || typeof record.event.eventId !== 'string'
+    ) {
+      throw new Error(`Sync journal is invalid at sequence ${expectedSequence}`);
+    }
+    return record;
+  }
+
+  indexRecord(record, sequence, filePath, offset, length) {
+    const key = `${record.tenantId}\0${record.event.eventId}`;
+    if (this.byEventId.has(key)) throw new Error(`Sync journal contains a duplicate event at sequence ${sequence}`);
+    const metadata = {
+      sequence: record.sequence,
+      tenantId: record.tenantId,
+      eventId: record.event.eventId,
+      deviceId: record.event.deviceId,
+      branchId: record.event.branchId,
+      dataScope: record.event.dataScope,
+      filePath,
+      offset,
+      length,
+    };
+    this.records.push(metadata);
+    this.byEventId.set(key, metadata);
+    this.applyPolicyRecord(record);
+  }
+
+  async readRecord(metadata, handle) {
+    const ownHandle = !handle;
+    const journalHandle = handle || await fs.open(metadata.filePath, 'r');
+    try {
+      const bytes = Buffer.alloc(metadata.length);
+      let bytesRead = 0;
+      while (bytesRead < bytes.length) {
+        const result = await journalHandle.read(
+          bytes,
+          bytesRead,
+          bytes.length - bytesRead,
+          metadata.offset + bytesRead
+        );
+        if (result.bytesRead === 0) throw new Error(`Sync journal record is truncated at sequence ${metadata.sequence}`);
+        bytesRead += result.bytesRead;
+      }
+      return this.parseRecord(bytes.toString('utf8'), metadata.sequence);
+    } finally {
+      if (ownHandle) await journalHandle.close();
+    }
+  }
+
+  async quarantineTail(filePath, tail, validPrefixBytes) {
+    let quarantinePath;
+    let quarantineHandle;
+    while (!quarantineHandle) {
+      try {
+        quarantinePath = `${filePath}.tail-${Date.now()}-${randomBytes(6).toString('hex')}.quarantine`;
+        quarantineHandle = await fs.open(quarantinePath, 'wx', 0o600);
+      } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+      }
+    }
+    try {
+      await quarantineHandle.writeFile(tail);
+      await quarantineHandle.sync();
+    } finally {
+      await quarantineHandle.close();
+    }
+
+    const journalHandle = await fs.open(filePath, 'r+');
+    try {
+      await journalHandle.truncate(validPrefixBytes);
+      await journalHandle.sync();
+    } finally {
+      await journalHandle.close();
+    }
+    return quarantinePath;
   }
 
   async append(tenantId, event, identity) {
@@ -167,7 +349,8 @@ class SyncJournal {
       if (this.writeError) throw new Error(`Sync journal is unavailable after a write failure: ${this.writeError.message || this.writeError}`);
       const existing = this.byEventId.get(key);
       if (existing) {
-        if (JSON.stringify(existing.event) !== JSON.stringify(event)) {
+        const existingRecord = await this.readRecord(existing);
+        if (JSON.stringify(existingRecord.event) !== JSON.stringify(event)) {
           throw new Error(`Event ID collision: ${event.eventId}`);
         }
         return { duplicate: true, sequence: existing.sequence };
@@ -193,17 +376,25 @@ class SyncJournal {
       const iv = randomBytes(12);
       const cipher = createCipheriv('aes-256-gcm', this.encryptionKey, iv);
       const ciphertext = Buffer.concat([cipher.update(JSON.stringify(record), 'utf8'), cipher.final()]);
-      const serialized = `${JSON.stringify({
+      const serialized = Buffer.from(`${JSON.stringify({
         version: 1,
         iv: iv.toString('base64'),
         tag: cipher.getAuthTag().toString('base64'),
         data: ciphertext.toString('base64'),
-      })}\n`;
-      await fs.mkdir(require('node:path').dirname(this.filePath), { recursive: true });
+      })}\n`, 'utf8');
+      await fs.mkdir(path.dirname(this.filePath), { recursive: true });
+      let destinationPath = this.activeJournalPath;
+      let destinationOffset = this.journalByteLength;
+      let rotate = this.journalByteLength > 0 &&
+        this.journalByteLength + serialized.length > MAX_JOURNAL_SEGMENT_BYTES;
+      if (rotate) {
+        destinationPath = `${this.filePath}.segment-${String(sequence).padStart(16, '0')}.jsonl`;
+        destinationOffset = 0;
+      }
       try {
-        const handle = await fs.open(this.filePath, 'a', 0o600);
+        const handle = await fs.open(destinationPath, rotate ? 'wx' : 'a', 0o600);
         try {
-          await handle.writeFile(serialized, 'utf8');
+          await handle.writeFile(serialized);
           await handle.sync();
         } finally {
           await handle.close();
@@ -212,9 +403,9 @@ class SyncJournal {
         this.writeError = error;
         throw error;
       }
-      this.records.push(record);
-      this.byEventId.set(key, record);
-      this.applyPolicyRecord(record);
+      this.activeJournalPath = destinationPath;
+      this.journalByteLength = destinationOffset + serialized.length;
+      this.indexRecord(record, sequence, destinationPath, destinationOffset, serialized.length - 1);
       return { duplicate: false, sequence };
     });
     this.writeQueue = write.then(() => undefined, () => undefined);
@@ -229,22 +420,42 @@ class SyncJournal {
     this.policies.set(`${record.tenantId}\0${event.entityId}`, policy);
   }
 
-  pull(identity, cursor, limit) {
+  async pull(identity, cursor, limit) {
     const after = cursor === null ? 0 : Number(cursor);
     if (!Number.isSafeInteger(after) || after < 0) throw new Error('Invalid sync cursor');
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_BATCH_SIZE) throw new Error('Invalid sync batch size');
 
-    const scanned = this.records.filter((record) => record.sequence > after).slice(0, limit);
-    const events = scanned
-      .filter((record) => {
-        const event = record.event;
-        if (record.tenantId !== identity.tenantId || event.deviceId === identity.deviceId) return false;
-        if (event.dataScope === 'BRANCH' && event.branchId !== identity.branchId && !identity.canReadAllBranches) {
-          return false;
+    let low = 0;
+    let high = this.records.length;
+    while (low < high) {
+      const middle = low + Math.floor((high - low) / 2);
+      if (this.records[middle].sequence <= after) low = middle + 1;
+      else high = middle;
+    }
+    const scanned = this.records.slice(low, low + limit);
+    const events = [];
+    if (scanned.length > 0) {
+      const handles = new Map();
+      try {
+        for (const metadata of scanned) {
+          if (metadata.tenantId !== identity.tenantId || metadata.deviceId === identity.deviceId) continue;
+          if (
+            metadata.dataScope === 'BRANCH' &&
+            metadata.branchId !== identity.branchId &&
+            !identity.canReadAllBranches
+          ) continue;
+          let handle = handles.get(metadata.filePath);
+          if (!handle) {
+            handle = await fs.open(metadata.filePath, 'r');
+            handles.set(metadata.filePath, handle);
+          }
+          const record = await this.readRecord(metadata, handle);
+          events.push(record.event);
         }
-        return true;
-      })
-      .map((record) => record.event);
+      } finally {
+        await Promise.all([...handles.values()].map((handle) => handle.close()));
+      }
+    }
     const latestSequence = this.records[this.records.length - 1]?.sequence ?? after;
     const next = scanned.length === limit
       ? scanned[scanned.length - 1].sequence
@@ -429,7 +640,7 @@ function createSyncRelay({
       const cursorValue = url.searchParams.get('cursor');
       const limitValue = Number(url.searchParams.get('limit') ?? 100);
       try {
-        const result = journal.pull(identity, cursorValue, limitValue);
+        const result = await journal.pull(identity, cursorValue, limitValue);
         sendJson(response, 200, result);
       } catch (error) {
         sendJson(response, 400, { error: error instanceof Error ? error.message : String(error) });

@@ -30,8 +30,8 @@ test('3.4: enforce default password change, password policy, and session invalid
     'Rejects default password admin123'
   );
   assert.throws(
-    () => AuthService.validatePasswordPolicy('onlyletters', 'admin'),
-    /أحرف وأرقام/,
+    () => AuthService.validatePasswordPolicy('OnlyLetters', 'admin'),
+    /رقم واحد على الأقل/,
     'Requires both letters and numbers'
   );
 

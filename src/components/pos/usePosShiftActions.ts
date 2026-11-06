@@ -97,7 +97,7 @@ export const usePosShiftActions = ({
 
   const printZReport = useCallback(() => {
     if (!activeShift) return;
-    const reportWindow = window.open('', '_blank', 'width=420,height=720');
+    const reportWindow = window.open('about:blank', '_blank', 'width=420,height=720');
     if (!reportWindow) {
       notify('يرجى السماح بالنوافذ المنبثقة', 'error');
       return;

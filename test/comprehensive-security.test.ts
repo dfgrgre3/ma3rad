@@ -196,6 +196,120 @@ test('SECURITY 06: Offline operation allowed within offlineLease, fails when lea
   assert.equal(expiredResult.reason, 'offline_lease_expired');
 });
 
+test('SECURITY 06b: malformed license dates, missing expiry, and unknown license types are rejected', () => {
+  const validator = new LicenseValidator({ publicKey: testPubKeyBase64 });
+  const basePayload = {
+    licenseKey: 'EDAR-DATE-TEST',
+    customerId: 'customer-date-test',
+    hardwareId: 'HWID-DATE-TEST',
+    licenseType: 'annual',
+    validUntil: new Date(Date.now() + 86400000).toISOString(),
+  };
+
+  for (const field of ['startsAt', 'validUntil', 'offlineLeaseExpiresAt']) {
+    for (const invalidDate of ['not-a-date', '2026-02-31']) {
+      const payload = { ...basePayload, [field]: invalidDate };
+      const result = validator.validateCertificate({
+        payload,
+        signature: signEd25519(payload, testPrivKeyBase64),
+      }, 'HWID-DATE-TEST');
+      assert.equal(result.valid, false, `${field} must be a valid ISO date`);
+      assert.equal(result.reason, 'invalid_license_date');
+    }
+  }
+
+  const missingExpiry: Record<string, unknown> = { ...basePayload };
+  delete missingExpiry.validUntil;
+  assert.equal(validator.validateCertificate({
+    payload: missingExpiry,
+    signature: signEd25519(missingExpiry, testPrivKeyBase64),
+  }, 'HWID-DATE-TEST').reason, 'missing_expiry_date');
+
+  const unknownType = { ...basePayload, licenseType: 'trial' };
+  assert.equal(validator.validateCertificate({
+    payload: unknownType,
+    signature: signEd25519(unknownType, testPrivKeyBase64),
+  }, 'HWID-DATE-TEST').reason, 'invalid_license_type');
+});
+
+test('SECURITY 06c: account licenses must be unbound while device licenses retain hardware binding', () => {
+  const validator = new LicenseValidator({ publicKey: testPubKeyBase64 });
+  const accountActivationRequest = validator.generateOfflineActivationRequest({}, 'account');
+  assert.equal(Object.hasOwn(accountActivationRequest, 'hardwareId'), false);
+
+  const accountPayload = {
+    licenseKey: 'EDAR-ACCOUNT-TEST',
+    customerId: 'customer-account-test',
+    licenseType: 'annual',
+    validUntil: new Date(Date.now() + 86400000).toISOString(),
+  };
+  const accountCertificate = {
+    payload: accountPayload,
+    signature: signEd25519(accountPayload, testPrivKeyBase64),
+  };
+  assert.equal(
+    validator.validateCertificate(accountCertificate, null, { bindingMode: 'account' }).valid,
+    true,
+  );
+  assert.equal(
+    validator.validateCertificate(accountCertificate, 'HWID-SECOND-DEVICE', { bindingMode: 'account' }).valid,
+    true,
+  );
+
+  const devicePayload = { ...accountPayload, hardwareId: 'HWID-FIRST-DEVICE' };
+  const deviceCertificate = {
+    payload: devicePayload,
+    signature: signEd25519(devicePayload, testPrivKeyBase64),
+  };
+  assert.equal(
+    validator.validateCertificate(deviceCertificate, null, { bindingMode: 'account' }).reason,
+    'account_license_hardware_bound',
+  );
+});
+
+test('SECURITY 06d: unsigned mode settings cannot overwrite the saved license certificate', async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'license-save-guard-'));
+  const licenseFile = path.join(tempDir, 'license.dat');
+  const previousLicense = Buffer.from('previous signed license');
+  fs.writeFileSync(licenseFile, previousLicense);
+  try {
+    const guard = new LicenseGuard(tempDir, { licenseMode: 'hardwa' });
+    const result = await guard.saveLicense({ mode: 'account', licenseMode: 'account' });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'missing_signature');
+    assert.deepEqual(fs.readFileSync(licenseFile), previousLicense);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('SECURITY 06e: offline activation reports secure-storage save failures', async () => {
+  const guard = new LicenseGuard(os.tmpdir(), { licenseMode: 'hardwa' });
+  const payload = { licenseKey: 'EDAR-OFFLINE-SAVE-TEST' };
+  guard.validator = {
+    validateCertificate: () => ({ valid: true, payload }),
+  };
+  guard.saveLicense = async () => ({ ok: false, error: 'secure_storage_unavailable' });
+
+  const result = await guard.applyOfflineLicense({ payload, signature: 'valid-test-signature' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'secure_storage_unavailable');
+});
+
+test('SECURITY 06f: offline activation rejects a license that fails its post-save reload check', async () => {
+  const guard = new LicenseGuard(os.tmpdir(), { licenseMode: 'hardwa' });
+  const payload = { licenseKey: 'EDAR-OFFLINE-RELOAD-TEST' };
+  guard.validator = {
+    validateCertificate: () => ({ valid: true, payload }),
+  };
+  guard.saveLicense = async () => ({ ok: true });
+  guard.loadLicense = async () => ({ active: false, reason: 'corrupted_or_invalid' });
+
+  const result = await guard.applyOfflineLicense({ payload, signature: 'valid-test-signature' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'corrupted_or_invalid');
+});
+
 // 7. اختبار التلاعب بملفات البرنامج (App File Integrity Tampering Test)
 test('SECURITY 07: File integrity checker detects modified or missing files', () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'integrity_test_'));
@@ -224,14 +338,20 @@ test('SECURITY 07: File integrity checker detects modified or missing files', ()
   }
 });
 
-test('SECURITY 07b: packaged preload integrity uses a pinned expected hash', () => {
+test('SECURITY 07b: critical Electron bootstrap files use pinned startup hashes', () => {
   const sourceRoot = path.resolve('.');
   const mainSource = fs.readFileSync(path.join(sourceRoot, 'electron', 'main.js'), 'utf8');
   const expectedHash = mainSource.match(/PRELOAD_INTEGRITY_SHA256 = '([a-f0-9]{64})'/)?.[1];
   assert.ok(expectedHash, 'main process contains a fixed preload hash');
 
   const checker = new FileIntegrityChecker(sourceRoot);
-  assert.equal(checker.verifyManifest({ 'electron/preload.js': expectedHash }).valid, true);
+  const manifest: Record<string, string> = { 'electron/preload.js': expectedHash };
+  for (const file of ['electron/entry.js', 'electron/security.js']) {
+    const hash = mainSource.match(new RegExp(`'${file}': '([a-f0-9]{64})'`))?.[1];
+    assert.ok(hash, `main process contains a fixed hash for ${file}`);
+    manifest[file] = hash;
+  }
+  assert.equal(checker.verifyManifest(manifest).valid, true);
 
   const tamperedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'preload_integrity_test_'));
   try {

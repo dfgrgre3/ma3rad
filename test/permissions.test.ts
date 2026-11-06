@@ -10,6 +10,9 @@ import { CustomerService } from '../src/services/CustomerService.ts';
 import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
 import { EmployeeService } from '../src/services/EmployeeService.ts';
 import { PermissionService, ROLE_DEFAULTS } from '../src/services/PermissionService.ts';
+import { ROUTE_PERMISSIONS } from '../src/config/routePermissions.ts';
+import { NAV_GROUPS_02 } from '../src/config/navigationGroups02.ts';
+import { NavigationService } from '../src/services/NavigationService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
 import { SystemDiagnosticsService } from '../src/services/SystemDiagnosticsService.ts';
@@ -184,20 +187,45 @@ test('permissions: reverse, expense mutation, and shift closing require their de
   }
 });
 
-test('permissions: system diagnostics require independent maintenance access', async () => {
+test('permissions: system health view works alone and maintenance actions require health management', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   PermissionService.seed();
   const admin = AuthService.login('admin', 'admin123');
   const role = PermissionService.createRole({ code: 'test_system_health_guard', name: 'System health guard test' }, admin);
-  PermissionService.setRolePermissions(role.code, ['settings.view'], admin);
+  PermissionService.setRolePermissions(role.code, ['settings.health.view'], admin);
   const limited = makeUser(db, 'usr_system_health_guard_test', role.code);
   db.run('UPDATE users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync('test-password', 4), limited.id]);
+  const routeRule = ROUTE_PERMISSIONS.find(({ path }) => path === '/system-health');
+  const routePermissions = NavigationService.getRequiredPermissionGroups('/system-health');
+  const healthNavigationItem = NAV_GROUPS_02.flatMap(({ items }) => items)
+    .find(({ to }) => to === '/system-health');
 
   try {
+    assert.ok(routeRule);
+    assert.deepEqual(routeRule.all, ['settings.health.view']);
+    assert.deepEqual(routeRule.any, undefined);
+    assert.deepEqual(routePermissions, { all: ['settings.health.view'], any: [] });
+    assert.equal(healthNavigationItem?.perm, 'settings.health.view');
+    assert.equal(PermissionService.getCatalog().some(({ code }) => code === 'settings.health.view'), true);
+
     AuthService.logout();
     AuthService.login(limited.username, 'test-password');
-    assert.throws(() => new SystemDiagnosticsService().runDiagnostics(), /settings\.maintenance/);
+    assert.equal(PermissionService.can(limited, routePermissions!.all[0]), true);
+    assert.equal(PermissionService.can(limited, 'settings.maintenance'), false);
+    assert.ok(new SystemDiagnosticsService().runDiagnostics().checks.length > 0);
+    await new SystemDiagnosticsService().getRuntimeDiagnostics();
+    assert.throws(() => new SystemDiagnosticsService().vacuum(), /settings\.health\.manage/);
+    assert.throws(() => new SystemDiagnosticsService().reindex(), /settings\.health\.manage/);
+
+    AuthService.logout();
+    AuthService.login('admin', 'admin123');
+    PermissionService.setRolePermissions(role.code, ['settings.health.manage'], admin);
+    AuthService.logout();
+    AuthService.login(limited.username, 'test-password');
+    assert.equal(PermissionService.can(limited, 'settings.health.manage'), true);
+    new SystemDiagnosticsService().vacuum();
+    new SystemDiagnosticsService().reindex();
   } finally {
     AuthService.logout();
     AuthService.login('admin', 'admin123');

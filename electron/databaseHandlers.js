@@ -180,50 +180,6 @@ async function atomicWrite(fs, filePath, bytes) {
   }
 }
 
-function atomicWriteSync(fsSync, filePath, bytes) {
-  const temporaryPath = `${filePath}.${randomBytes(8).toString('hex')}.tmp`;
-  let descriptor;
-  try {
-    descriptor = fsSync.openSync(temporaryPath, 'wx', 0o600);
-    fsSync.writeFileSync(descriptor, bytes);
-    fsSync.fsyncSync(descriptor);
-    fsSync.closeSync(descriptor);
-    descriptor = undefined;
-    fsSync.renameSync(temporaryPath, filePath);
-    if (process.platform !== 'win32') {
-      const directoryDescriptor = fsSync.openSync(path.dirname(filePath), 'r');
-      try { fsSync.fsyncSync(directoryDescriptor); } finally { fsSync.closeSync(directoryDescriptor); }
-    }
-  } catch (error) {
-    if (descriptor !== undefined) {
-      try { fsSync.closeSync(descriptor); } catch { /* preserve the write failure */ }
-    }
-    try { fsSync.unlinkSync(temporaryPath); } catch { /* preserve the write failure */ }
-    throw error;
-  }
-}
-
-function readOrCreateDatabaseKeySync({ appDataDir, fsSync, safeStorage, path }) {
-  if (typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()
-    || typeof safeStorage.encryptString !== 'function' || typeof safeStorage.decryptString !== 'function') {
-    throw new Error('Synchronous OS secure storage is unavailable; the transaction was not persisted.');
-  }
-
-  const keyPath = path.join(appDataDir, DB_KEY_FILE);
-  try {
-    const key = Buffer.from(safeStorage.decryptString(fsSync.readFileSync(keyPath)), 'base64');
-    if (key.length !== 32) throw new Error('Invalid database encryption key.');
-    return key;
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw new Error(`تعذر فتح مفتاح تشفير قاعدة البيانات: ${error.message || error}`);
-  }
-
-  const key = randomBytes(32);
-  const encryptedKey = safeStorage.encryptString(key.toString('base64'));
-  atomicWriteSync(fsSync, keyPath, encryptedKey);
-  return key;
-}
-
 async function atomicCreate(fs, filePath, bytes) {
   const temporaryPath = `${filePath}.${randomBytes(8).toString('hex')}.tmp`;
   try {
@@ -416,33 +372,6 @@ function registerDatabaseHandlers({
         retryable: true,
         error: message,
       };
-    }
-  });
-
-  if (typeof ipcMain.on === 'function') ipcMain.on('db:save-sync', (event, bytes) => {
-    try {
-      validateIpcSender(event);
-      ensureDirs();
-      if (!(bytes instanceof Uint8Array) && !Array.isArray(bytes)) {
-        const error = new TypeError('Database save payload must be a byte array.');
-        error.code = 'DATABASE_INVALID_PAYLOAD';
-        throw error;
-      }
-      const data = Buffer.from(bytes);
-      if (data.length > MAX_DB_SIZE) throw new Error('Database data exceeds maximum allowed size');
-      const key = readOrCreateDatabaseKeySync({
-        appDataDir: APP_DATA_DIR, fsSync, safeStorage, path,
-      });
-      const encrypted = encryptDatabaseBytes(data, key);
-      atomicWriteSync(fsSync, DB_FILE, encrypted);
-      event.returnValue = { ok: true, path: DB_FILE, bytes: encrypted.length };
-    } catch (error) {
-      const message = describeError(error);
-      const code = error && typeof error === 'object' && typeof error.code === 'string'
-        ? error.code
-        : 'DATABASE_SAVE_FAILED';
-      console.error('Failed to synchronously save encrypted database file:', error);
-      event.returnValue = { ok: false, code, retryable: true, error: message };
     }
   });
 
@@ -691,5 +620,6 @@ module.exports = {
   decryptRecoveryKey,
   encryptRecoveryKey,
   hasDatabaseMagic,
+  readOrCreateDatabaseKey,
   verifySQLiteDatabaseBytes,
 };

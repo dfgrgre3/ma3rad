@@ -70,7 +70,8 @@ function configureAutoUpdater({
   checkIntervalMs = 6 * 60 * 60 * 1000,
 }) {
   const currentVersion = app.getVersion();
-  let state = { status: 'idle', currentVersion };
+  const updatesSupported = app.isPackaged && isUpdatePlatform(platform, appImagePath);
+  let state = { status: updatesSupported ? 'idle' : 'unsupported', currentVersion };
   let client = updater;
   let checkTimer;
 
@@ -91,7 +92,8 @@ function configureAutoUpdater({
     });
     ipcMain.handle('app:update-check', async (event) => {
       validateIpcSender(event);
-      if (!client || state.status === 'downloading' || state.status === 'downloaded') return state;
+      if (!client || ['unsupported', 'checking', 'downloading', 'downloaded'].includes(state.status)) return state;
+      publish({ status: 'checking', error: undefined });
       try {
         await client.checkForUpdates();
         return state;
@@ -114,7 +116,7 @@ function configureAutoUpdater({
   };
 
   registerHandlers();
-  if (!app.isPackaged || !isUpdatePlatform(platform, appImagePath)) {
+  if (!updatesSupported) {
     return {
       getStatus: () => state,
       installNow: () => false,
@@ -125,7 +127,7 @@ function configureAutoUpdater({
   client = client || require('electron-updater').autoUpdater;
   client.autoDownload = true;
   client.autoInstallOnAppQuit = false;
-  client.allowDowngrade = true;
+  client.allowDowngrade = false;
   client.fullChangelog = true;
   client.on('checking-for-update', () => publish({ status: 'checking', error: undefined }));
   client.on('update-available', (info) => publish({
@@ -164,7 +166,8 @@ function configureAutoUpdater({
   });
 
   const checkForUpdates = () => {
-    if (state.status === 'downloading' || state.status === 'downloaded') return;
+    if (['checking', 'downloading', 'downloaded'].includes(state.status)) return;
+    publish({ status: 'checking', error: undefined });
     void client.checkForUpdates().catch((error) => {
       console.error('[updater] Could not check for updates:', error);
       publish({

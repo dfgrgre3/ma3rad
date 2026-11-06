@@ -1312,7 +1312,7 @@ export class PrintService {
     size?: InvoiceSizeId,
     template?: InvoiceTemplateId,
   ): void {
-    const printWindow = window.open('', '_blank', 'width=850,height=900');
+    const printWindow = window.open('about:blank', '_blank', 'width=850,height=900');
     if (!printWindow) {
       alert('يرجى السماح بالنوافذ المنبثقة لطباعة الفاتورة');
       return;
@@ -1346,7 +1346,7 @@ export class PrintService {
 
     if (await this.printThermalReceiptDirect(invoice, settings)) return;
 
-    const printWindow = window.open('', '_blank', 'width=380,height=640');
+    const printWindow = window.open('about:blank', '_blank', 'width=380,height=640');
     if (!printWindow) {
       alert('يرجى السماح بالنوافذ المنبثقة لطباعة الإيصال');
       return;
@@ -1452,7 +1452,7 @@ export class PrintService {
   }
 
   private openDocument(title: string, body: string): void {
-    const win = window.open('', '_blank', 'width=900,height=900');
+    const win = window.open('about:blank', '_blank', 'width=900,height=900');
     if (!win) {
       alert('يرجى السماح بالنوافذ المنبثقة للطباعة');
       return;

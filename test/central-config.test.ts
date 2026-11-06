@@ -26,26 +26,22 @@ function clearCentralConfig(): void {
   globalThis.localStorage.removeItem(CONFIG_KEY);
 }
 
-test('central server URL must be HTTPS unless it is localhost', () => {
-  CentralLicenseService.setServerUrl('https://central.example.com/');
-  assert.equal(CentralLicenseService.getServerUrl(), 'https://central.example.com');
-  assert.equal(CentralLicenseService.getSecureServerUrl(), 'https://central.example.com');
+test('central server URL is read from the trusted Electron main process', async () => {
+  const root = globalThis as any;
+  root.window.ceramisys = root.window.ceramisys || {};
+  root.window.ceramisys.central = root.window.ceramisys.central || {};
+  const central = root.window.ceramisys.central;
+  const previous = central.getServerUrl;
+  central.getServerUrl = async () => 'https://central.example.com';
+  try {
+    assert.equal(await CentralLicenseService.getServerUrl(), 'https://central.example.com');
+    assert.equal(await CentralLicenseService.getSecureServerUrl(), 'https://central.example.com');
 
-  // Plain HTTP to a remote host would leak the device credential.
-  assert.throws(() => CentralLicenseService.setServerUrl('http://central.example.com'), /https/i);
-  assert.equal(CentralLicenseService.getServerUrl(), 'https://central.example.com', 'rejected URL is not stored');
-
-  assert.throws(() => CentralLicenseService.setServerUrl('central.example.com'), /https/i);
-  assert.equal(CentralLicenseService.getServerUrl(), 'https://central.example.com');
-
-  // Local development over HTTP stays allowed.
-  CentralLicenseService.setServerUrl('http://localhost:4000');
-  assert.equal(CentralLicenseService.getSecureServerUrl(), 'http://localhost:4000');
-
-  CentralLicenseService.setServerUrl('http://127.0.0.1:4000');
-  assert.equal(CentralLicenseService.getSecureServerUrl(), 'http://127.0.0.1:4000');
-
-  CentralLicenseService.setServerUrl('https://central.example.com');
+    central.getServerUrl = async () => 'http://localhost:4000';
+    assert.equal(await CentralLicenseService.getSecureServerUrl(), 'http://localhost:4000');
+  } finally {
+    central.getServerUrl = previous;
+  }
 });
 
 test('central page visibility merges hidden menus and per-feature permissions', () => {

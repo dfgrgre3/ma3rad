@@ -63,3 +63,24 @@ test('auth guard: disabled lockout returns a neutral state', async () => {
     db.run(`UPDATE system_settings SET value = '5' WHERE key = 'maxFailedLoginAttempts'`);
   }
 });
+
+test('auth guard: asynchronous login preserves password checks and records successful sessions', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  db.run(`UPDATE system_settings SET value = '5' WHERE key = 'maxFailedLoginAttempts'`);
+  db.run(`DELETE FROM login_history WHERE username_attempted = 'admin'`);
+
+  try {
+    await assert.rejects(
+      AuthService.loginAsync('admin', 'wrong-pass'),
+      /المحاولات المتبقية قبل الإيقاف المؤقت: 4/
+    );
+    const user = await AuthService.loginAsync('admin', 'admin123');
+    assert.equal(user.username, 'admin');
+    assert.equal(AuthService.getLoginGuardStatus('admin').failedAttempts, 0);
+    AuthService.logout();
+  } finally {
+    db.run(`DELETE FROM login_history WHERE username_attempted = 'admin'`);
+    db.run(`UPDATE system_settings SET value = '5' WHERE key = 'maxFailedLoginAttempts'`);
+  }
+});

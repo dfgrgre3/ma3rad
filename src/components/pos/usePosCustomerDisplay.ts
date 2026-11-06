@@ -68,7 +68,7 @@ export const usePosCustomerDisplay = ({
       customerDisplayRef.current.focus();
       return;
     }
-    const display = window.open('', 'pos-customer-display', 'width=420,height=720');
+    const display = window.open('about:blank', 'pos-customer-display', 'width=420,height=720');
     if (!display) {
       notify('يرجى السماح بالنوافذ المنبثقة', 'error');
       return;

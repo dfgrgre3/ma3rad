@@ -161,32 +161,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     const normalizedUsername = username.trim();
 
     try {
-      const user = AuthService.login(
+      const user = await AuthService.loginAsync(
         normalizedUsername,
         password,
         twoFactorRequired ? twoFactorCode : undefined
       );
-      const credentialStore = window.ceramisys?.credentials;
-
-      if (rememberOnDevice && credentialStore?.set) {
-        try {
-          await credentialStore.set(normalizedUsername, password);
-        } catch (saveError) {
-          console.error('Could not save remembered login credentials:', saveError);
-          window.alert('تم تسجيل الدخول، لكن تعذر حفظ بيانات الدخول على هذا الجهاز.');
-        }
-      } else if (!rememberOnDevice && credentialStore?.clear) {
-        try {
-          await credentialStore.clear();
-        } catch (clearError) {
-          console.error('Could not clear remembered login credentials:', clearError);
-          window.alert('تم تسجيل الدخول، لكن تعذر حذف بيانات الدخول المحفوظة سابقًا.');
-        }
-      }
-
       setTwoFactorRequired(false);
       setTwoFactorCode('');
       onSuccess(user);
+
+      const credentialStore = window.ceramisys?.credentials;
+
+      if (rememberOnDevice && credentialStore?.set) {
+        void credentialStore.set(normalizedUsername, password).catch((saveError) => {
+          console.error('Could not save remembered login credentials:', saveError);
+          window.alert('تم تسجيل الدخول، لكن تعذر حفظ بيانات الدخول على هذا الجهاز.');
+        });
+      } else if (!rememberOnDevice && credentialStore?.clear) {
+        void credentialStore.clear().catch((clearError) => {
+          console.error('Could not clear remembered login credentials:', clearError);
+          window.alert('تم تسجيل الدخول، لكن تعذر حذف بيانات الدخول المحفوظة سابقًا.');
+        });
+      }
     } catch (err: any) {
       if (err instanceof TwoFactorRequiredError || err?.code === 'TWO_FACTOR_REQUIRED') {
         // Password accepted; ask for the one-time code without reporting an error.

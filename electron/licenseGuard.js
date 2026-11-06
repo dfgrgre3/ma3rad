@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
+const { randomBytes } = require('node:crypto');
 const { safeStorage } = require('electron');
 const { getHardwareId } = require('./hardwareId');
 const { LicenseValidator } = require('./security/licenseValidator');
@@ -10,6 +11,7 @@ class LicenseGuard {
   constructor(appDataDir, options = {}) {
     this.appDataDir = appDataDir;
     this.licenseFile = path.join(appDataDir, 'license.dat');
+    this.licenseModeFile = path.join(appDataDir, 'license-mode.enc');
     this.timeCheckFile = path.join(appDataDir, '.sys_timestamp');
     this.validator = new LicenseValidator(options);
     // License mode is resolved by electron/main.js and passed in here so the
@@ -17,6 +19,50 @@ class LicenseGuard {
     // licensed account+credential, "hardwa"=existing per-device binding.
     this.licenseMode = String(options.licenseMode || 'hardwa').trim().toLowerCase();
     this.licenseMode = this.licenseMode === 'account' ? 'account' : 'hardwa';
+  }
+
+  async loadStoredLicenseMode() {
+    let encrypted;
+    try {
+      encrypted = await fs.readFile(this.licenseModeFile);
+    } catch (error) {
+      if (error.code === 'ENOENT') return this.licenseMode;
+      throw error;
+    }
+    if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+      throw new Error('OS secure storage is unavailable for the license mode.');
+    }
+    const storedMode = (await safeStorageCompat.decryptString(safeStorage, encrypted)).trim().toLowerCase();
+    if (storedMode !== 'account' && storedMode !== 'hardwa') {
+      throw new Error('The saved license mode is invalid.');
+    }
+    this.licenseMode = storedMode;
+    return this.licenseMode;
+  }
+
+  async setLicenseMode(mode) {
+    if (mode !== 'account' && mode !== 'hardwa') {
+      throw new Error('Invalid license mode.');
+    }
+    if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+      throw new Error('OS secure storage is unavailable; the license mode was not changed.');
+    }
+    const encrypted = await safeStorageCompat.encryptString(safeStorage, mode);
+    await fs.mkdir(this.appDataDir, { recursive: true });
+    const temporaryPath = `${this.licenseModeFile}.${randomBytes(8).toString('hex')}.tmp`;
+    try {
+      await fs.writeFile(temporaryPath, encrypted, { mode: 0o600, flag: 'wx' });
+      await fs.rename(temporaryPath, this.licenseModeFile);
+    } catch (error) {
+      try { await fs.unlink(temporaryPath); } catch (cleanupError) {
+        if (cleanupError.code !== 'ENOENT') {
+          throw new Error(`Could not clean up the temporary license mode: ${cleanupError.message || cleanupError}`);
+        }
+      }
+      throw error;
+    }
+    this.licenseMode = mode;
+    return mode;
   }
 
   get licenseMode() {
@@ -67,23 +113,23 @@ class LicenseGuard {
    */
   async saveLicense(licensePayload) {
     const hwid = getHardwareId();
-    // إذا كان الترخيص يحتوي على شهادة موقعة رقمياً، يتم التحقق منها أولاً
-    if (licensePayload && licensePayload.certificate) {
-      const verification = this.validator.validateCertificate(licensePayload.certificate, hwid);
-      if (!verification.valid) {
-        return { ok: false, error: verification.reason, message: verification.message };
-      }
-    } else if (licensePayload && licensePayload.payload && licensePayload.signature) {
-      // الترخيص نفسه عبارة عن شهادة موقعة
-      const verification = this.validator.validateCertificate(licensePayload, hwid);
-      if (!verification.valid) {
-        return { ok: false, error: verification.reason, message: verification.message };
-      }
+    const certificate = licensePayload?.certificate ||
+      (licensePayload?.payload && licensePayload?.signature ? licensePayload : null);
+    if (!certificate) {
+      return { ok: false, error: 'missing_signature', message: 'لا يمكن حفظ بيانات ترخيص غير موقعة.' };
+    }
+    const verification = this.validator.validateCertificate(
+      certificate,
+      this.licenseMode === 'account' ? null : hwid,
+      { bindingMode: this.licenseMode },
+    );
+    if (!verification.valid) {
+      return { ok: false, error: verification.reason, message: verification.message };
     }
 
     const boundData = {
       ...licensePayload,
-      hwid,
+      hwid: this.licenseMode === 'account' ? null : hwid,
       savedAt: Date.now(),
     };
 
@@ -92,8 +138,18 @@ class LicenseGuard {
       return { ok: false, error: 'secure_storage_unavailable', message: 'لا يمكن حفظ الترخيص لأن التخزين الآمن للنظام غير متاح.' };
     }
     const encrypted = await safeStorageCompat.encryptString(safeStorage, json);
-
-    await fs.writeFile(this.licenseFile, encrypted);
+    const temporaryPath = `${this.licenseFile}.${randomBytes(8).toString('hex')}.tmp`;
+    try {
+      await fs.writeFile(temporaryPath, encrypted, { mode: 0o600, flag: 'wx' });
+      await fs.rename(temporaryPath, this.licenseFile);
+    } catch (error) {
+      try { await fs.unlink(temporaryPath); } catch (cleanupError) {
+        if (cleanupError.code !== 'ENOENT') {
+          throw new Error(`Could not clean up the temporary license: ${cleanupError.message || cleanupError}`);
+        }
+      }
+      throw error;
+    }
     return { ok: true, hwid };
   }
 
@@ -121,7 +177,9 @@ class LicenseGuard {
       jsonStr = await safeStorageCompat.decryptString(safeStorage, encrypted);
 
       const license = JSON.parse(jsonStr);
-      const currentHwid = options.currentHwid === undefined ? getHardwareId() : options.currentHwid;
+      const currentHwid = this.licenseMode === 'account'
+        ? null
+        : (options.currentHwid === undefined ? getHardwareId() : options.currentHwid);
 
       // فحص بصمة العتاد (Hardware ID check) لمنع الاستنساخ
       // - في وضع hardwa: صرامة كاملة، يجب أن تطابق بصمة العتاد الحالية.
@@ -138,7 +196,7 @@ class LicenseGuard {
       }
 
       const cert = license.certificate || (license.payload && license.signature ? license : null);
-      const certCheck = cert ? this.validator.validateCertificate(cert, currentHwid) : { valid: false, reason: 'no_signature', message: 'الترخيص غير موقع رقمياً.' };
+      const certCheck = cert ? this.validator.validateCertificate(cert, currentHwid, { bindingMode: this.licenseMode }) : { valid: false, reason: 'no_signature', message: 'الترخيص غير موقع رقمياً.' };
       if (certCheck.valid) {
         return {
           active: true,
@@ -192,13 +250,13 @@ class LicenseGuard {
       }
     }
 
-    const hwid = getHardwareId();
-    const verification = this.validator.validateCertificate(parsedCert, hwid);
+    const hwid = this.licenseMode === 'account' ? null : getHardwareId();
+    const verification = this.validator.validateCertificate(parsedCert, hwid, { bindingMode: this.licenseMode });
     if (!verification.valid) {
       return { ok: false, error: verification.reason, message: verification.message };
     }
 
-    await this.saveLicense({
+    const saved = await this.saveLicense({
       certificate: parsedCert,
       licenseKey: verification.payload.licenseKey,
       tenantId: verification.payload.customerId,
@@ -208,6 +266,16 @@ class LicenseGuard {
       activatedAt: Date.now(),
       mode: 'offline',
     });
+    if (!saved.ok) return saved;
+
+    const reloaded = await this.loadLicense();
+    if (!reloaded.active) {
+      return {
+        ok: false,
+        error: reloaded.reason || 'license_reload_failed',
+        message: reloaded.message || 'تعذر التحقق من الترخيص بعد حفظه.',
+      };
+    }
 
     return {
       ok: true,
@@ -220,7 +288,7 @@ class LicenseGuard {
    * إنشاء طلب تفعيل أوفلاين للجهاز الحالي
    */
   exportOfflineRequest(customerInfo = {}) {
-    return this.validator.generateOfflineActivationRequest(customerInfo);
+    return this.validator.generateOfflineActivationRequest(customerInfo, this.licenseMode);
   }
 
   /**
@@ -238,12 +306,32 @@ class LicenseGuard {
   }
 }
 
-function registerLicenseHandlers({ ipcMain, validateIpcSender, appDataDir, licenseMode }) {
+function registerLicenseHandlers({
+  ipcMain,
+  validateIpcSender,
+  appDataDir,
+  licenseMode,
+  authorizeLicenseModeChange = async () => false,
+}) {
   const guard = new LicenseGuard(appDataDir, { licenseMode });
 
   ipcMain.handle('license:get-hwid', async (event) => {
     validateIpcSender(event);
     return getHardwareId();
+  });
+
+  ipcMain.handle('license-mode:get', (event) => {
+    validateIpcSender(event);
+    return guard.licenseMode;
+  });
+
+  ipcMain.handle('license-mode:set', async (event, request) => {
+    validateIpcSender(event);
+    if (!request || typeof request !== 'object' ||
+        !(await authorizeLicenseModeChange(request.username, request.password))) {
+      throw new Error('You are not authorized to change the license mode.');
+    }
+    return { ok: true, mode: await guard.setLicenseMode(request.mode) };
   });
 
   ipcMain.handle('license:load', async (event) => {
@@ -270,6 +358,8 @@ function registerLicenseHandlers({ ipcMain, validateIpcSender, appDataDir, licen
     validateIpcSender(event);
     return guard.clearLicense();
   });
+
+  return guard;
 }
 
 module.exports = {

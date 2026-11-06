@@ -85,9 +85,15 @@ function overallStatus(checks: DiagnosticCheck[]): DiagnosticStatus {
 export class SystemDiagnosticsService {
   private db = DatabaseManager.getInstance();
 
-  private requireMaintenance() {
+  private requireHealthView() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'settings.maintenance', '/system-health');
+    PermissionService.require(actor, 'settings.health.view', '/system-health');
+    return actor;
+  }
+
+  private requireHealthManagement() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'settings.health.manage', '/system-health');
     return actor;
   }
 
@@ -117,7 +123,7 @@ export class SystemDiagnosticsService {
   }
 
   public runDiagnostics(): SystemDiagnosticsReport {
-    this.requireMaintenance();
+    this.requireHealthView();
     const database = this.db.getDb();
     const timestamp = new Date().toISOString();
     if (!database) throw new Error('قاعدة البيانات غير جاهزة للتشخيص.');
@@ -269,7 +275,7 @@ export class SystemDiagnosticsService {
   }
 
   public async getRuntimeDiagnostics(timestamp = new Date().toISOString()): Promise<SystemRuntimeDiagnostics> {
-    this.requireMaintenance();
+    this.requireHealthView();
     const ceramisys = typeof window !== 'undefined' ? window.ceramisys : undefined;
     const appInfoApi = ceramisys?.app?.info;
     const dbInfoApi = ceramisys?.db?.info;
@@ -391,7 +397,7 @@ export class SystemDiagnosticsService {
   }
 
   public vacuum(): void {
-    this.requireMaintenance();
+    this.requireHealthManagement();
     const database = this.db.getDb();
     if (!database) throw new Error('قاعدة البيانات غير جاهزة للصيانة.');
     database.run('VACUUM');
@@ -399,7 +405,7 @@ export class SystemDiagnosticsService {
   }
 
   public reindex(): void {
-    this.requireMaintenance();
+    this.requireHealthManagement();
     const database = this.db.getDb();
     if (!database) throw new Error('قاعدة البيانات غير جاهزة للصيانة.');
     database.run('REINDEX');

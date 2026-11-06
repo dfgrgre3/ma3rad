@@ -155,6 +155,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/notifications', all: ['notifications.view'] },
   { path: '/audit', all: ['audit.view'] },
   { path: '/security', any: ['security.view', 'sessions.view'] },
+  { path: '/central-activation', all: ['admin.license.manage'] },
   { path: '/admin', any: ['admin.view', 'users.view', 'roles.view', 'roles.manage', 'admin.navigation', 'admin.data', 'audit.view', 'settings.view'] },
   { path: '/admin/sync-conflicts', all: ['admin.view'] },
   { path: '/admin/data-deletion', all: ['admin.data.delete'] },
@@ -167,5 +168,5 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/settings/configuration-studio', any: ['settings.config_studio.view', 'settings.view'] },
   { path: '/users', all: ['users.view'] },
   { path: '/backup', all: ['settings.backup'] },
-  { path: '/system-health', any: ['settings.health.view', 'settings.maintenance'] },
+  { path: '/system-health', all: ['settings.health.view'] },
 ];

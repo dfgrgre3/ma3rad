@@ -27,7 +27,12 @@ function runBuilder(args, env = process.env) {
   return true;
 }
 
-function buildWithTemporaryOutput(args) {
+function buildWithTemporaryOutput(args, {
+  runBuilder: runBuilderProcess = runBuilder,
+  restoreSource: restoreSourceFiles = () => require('./restore-source.cjs').restoreSource(),
+  createTemporaryOutput = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-electron-builder-')),
+  outputDirectory = path.resolve(projectRoot, packageJson.build.directories.output || 'release'),
+} = {}) {
   const legacyWin7 = args.includes('--legacy-win7');
   const unsignedBuild = args.includes('--unsigned');
   args = args.filter((arg) => arg !== '--legacy-win7' && arg !== '--unsigned');
@@ -54,7 +59,7 @@ function buildWithTemporaryOutput(args) {
     builderEnvironment.CSC_IDENTITY_AUTO_DISCOVERY = 'false';
   }
 
-  const temporaryOutput = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-electron-builder-'));
+  const temporaryOutput = createTemporaryOutput();
   const temporaryConfig = `${temporaryOutput}.json`;
   let succeeded = false;
 
@@ -84,14 +89,11 @@ function buildWithTemporaryOutput(args) {
     };
     fs.writeFileSync(temporaryConfig, JSON.stringify(buildConfig, null, 2));
 
-    if (!runBuilder(['--config', temporaryConfig, ...args], builderEnvironment)) {
+    if (!runBuilderProcess(['--config', temporaryConfig, ...args], builderEnvironment)) {
+      process.exitCode = process.exitCode || 1;
       return;
     }
 
-    const outputDirectory = path.resolve(
-      projectRoot,
-      packageJson.build.directories.output || 'release',
-    );
     fs.mkdirSync(outputDirectory, { recursive: true });
     fs.cpSync(temporaryOutput, outputDirectory, { recursive: true, force: true });
     succeeded = true;
@@ -105,13 +107,17 @@ function buildWithTemporaryOutput(args) {
       console.error(`electron-builder temporary output retained at: ${temporaryOutput}`);
     }
 
-    require('./restore-source.cjs');
+    restoreSourceFiles();
   }
 }
 
-try {
-  buildWithTemporaryOutput(process.argv.slice(2));
-} catch (error) {
-  console.error('electron-builder failed:', error);
-  process.exitCode = 1;
+if (require.main === module) {
+  try {
+    buildWithTemporaryOutput(process.argv.slice(2));
+  } catch (error) {
+    console.error('electron-builder failed:', error);
+    process.exitCode = 1;
+  }
 }
+
+module.exports = { buildWithTemporaryOutput };

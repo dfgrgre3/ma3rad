@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { BYPASS_FIRST_RUN_ACTIVATION } from '../../src/config/setupLifecycle';
 
 /**
  * Shared fixture for Electron end-to-end tests.
@@ -136,7 +137,9 @@ export async function launchApp(dataDir: string): Promise<{
     // from Playwright's default 30-second assertion timeout.
     const page = await app.firstWindow({ timeout: 90_000 });
     await page.waitForLoadState('domcontentloaded');
-    await setLicenseServer(page, mockServer.origin);
+    if (!BYPASS_FIRST_RUN_ACTIVATION) {
+      await setLicenseServer(page, mockServer.origin);
+    }
     return { app, page, closeMockServer: mockServer.close };
   } catch (error) {
     await app.close();
@@ -158,17 +161,10 @@ export async function launchSeededApp(): Promise<{
 }
 
 export async function activate(page: Page): Promise<void> {
-  // Wait for the (possibly async) first render to settle before deciding which
-  // screen we landed on.
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (await page.locator('#username').isVisible().catch(() => false)) return;
-    if (await page.getByLabel('اسم الحساب').isVisible().catch(() => false)) break;
-    await page.waitForTimeout(250);
-  }
+  const loginOrActivationAccount = page.locator('#username').or(page.getByLabel('اسم الحساب'));
+  await expect(loginOrActivationAccount).toBeVisible({ timeout: 90_000 });
   if (await page.locator('#username').isVisible().catch(() => false)) return;
 
-  await expect(page.getByLabel('اسم الحساب')).toBeVisible();
   await page.getByLabel('اسم الحساب').fill('admin');
   await page.getByLabel('كلمة المرور').fill('admin123');
   await page.getByLabel('رقم الهاتف').fill('01000000000');
@@ -181,13 +177,32 @@ export async function login(page: Page): Promise<void> {
   await expect(page.locator('#username')).toBeVisible();
   await page.locator('#username').fill('admin');
   await page.locator('#password').fill('admin123');
-  await page.locator('form button[type="submit"]').click();
+  await page.locator('#password').press('Enter');
+  await expect(page.locator('#username')).toBeHidden({ timeout: 30_000 });
 }
 
-/** Seed + activate + login; lands on the dashboard of a returning installation. */
-export async function launchAuthenticatedApp(): Promise<{ app: ElectronApplication; page: Page; dataDir: string }> {
+/** Seed and restore a valid local admin session for authenticated UI journeys. */
+export async function launchAuthenticatedApp(): Promise<{
+  app: ElectronApplication;
+  page: Page;
+  dataDir: string;
+  closeMockServer: () => Promise<void>;
+}> {
   const seeded = await launchSeededApp();
-  await activate(seeded.page);
-  await login(seeded.page);
+  await expect(seeded.page.locator('#username').or(seeded.page.getByLabel('اسم الحساب')))
+    .toBeVisible({ timeout: 90_000 });
+  await seeded.page.addInitScript(() => {
+    sessionStorage.setItem('ceramisys_runtime_initialized', '1');
+    localStorage.setItem('ceramisys_session_user_id', 'usr_admin');
+  });
+  await seeded.page.reload();
+  await expect(seeded.page.locator('#sec-pulse')).toBeVisible({ timeout: 90_000 });
+  const passwordDialog = seeded.page.getByRole('dialog', { name: 'تغيير كلمة المرور الافتراضية' });
+  await expect(passwordDialog).toBeVisible();
+  await passwordDialog.locator('#current-password').fill('admin123');
+  await passwordDialog.locator('#new-password').fill('E2eTest2026!');
+  await passwordDialog.locator('#confirm-password').fill('E2eTest2026!');
+  await passwordDialog.getByRole('button', { name: 'حفظ كلمة المرور وتأمين النظام' }).click();
+  await expect(passwordDialog).toHaveCount(0);
   return seeded;
 }

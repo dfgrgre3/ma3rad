@@ -82,7 +82,7 @@ export const ProductDetailPage: React.FC = () => {
           `SELECT pi.date AS date, COALESCE(s.name, '—') AS supplier,
                   pii.quantity_m2 AS qty, pii.total_cost AS cost
            FROM purchase_invoice_items pii
-           JOIN purchase_invoices pi ON pi.id = pii.invoice_id
+           JOIN purchase_invoices pi ON pi.id = pii.purchase_id
            LEFT JOIN suppliers s ON s.id = pi.supplier_id
            WHERE pii.product_id = ? AND ${purchaseScope.clause}
            ORDER BY pi.date DESC, pi.created_at DESC LIMIT 15`, [id, ...purchaseScope.params]

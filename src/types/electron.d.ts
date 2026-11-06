@@ -1,13 +1,23 @@
 export {};
 
 declare global {
+  type AppUpdateStatus = {
+    status: 'idle' | 'unsupported' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+    currentVersion: string;
+    version?: string;
+    releaseName?: string;
+    releaseNotes?: string;
+    mandatory?: boolean;
+    progress?: number;
+    error?: string;
+  };
+
   interface Window {
     ceramisys?: {
       savePdf?: (html: string, fileName: string, landscape?: boolean) => Promise<string | null>;
       db?: {
         load?: () => Promise<Uint8Array | null>;
         save?: (bytes: Uint8Array) => Promise<{ ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string }>;
-        saveSync?: (bytes: Uint8Array) => { ok: boolean; code?: string; retryable?: boolean; path?: string; bytes?: number; error?: string };
         decryptLocalBackup?: (bytes: Uint8Array) => Promise<Uint8Array>;
         exportRecoveryKey?: (password: string) => Promise<Uint8Array>;
         decryptBackupWithRecoveryKey?: (
@@ -53,8 +63,11 @@ declare global {
         clear?: () => Promise<{ ok: boolean }>;
       };
       central?: {
+        getServerUrl?: () => Promise<string>;
+        getStatus?: () => Promise<{ configured: boolean; activated: boolean }>;
+        migrateCredential?: (credential: string) => Promise<{ ok: boolean; alreadyStored: boolean }>;
+        clearCredential?: () => Promise<{ ok: boolean }>;
         request?: (request: {
-          serverUrl: string;
           path: string;
           method?: 'GET' | 'POST';
           headers?: Record<string, string>;
@@ -167,37 +180,10 @@ declare global {
         reportError?: (report: { kind: string; message: string; stack?: string }) => Promise<{ ok: boolean }>;
       };
       updater?: {
-        getStatus?: () => Promise<{
-          status: 'idle' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
-          currentVersion: string;
-          version?: string;
-          releaseName?: string;
-          releaseNotes?: string;
-          mandatory?: boolean;
-          progress?: number;
-          error?: string;
-        }>;
-        check?: () => Promise<{
-          status: 'idle' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
-          currentVersion: string;
-          version?: string;
-          releaseName?: string;
-          releaseNotes?: string;
-          mandatory?: boolean;
-          progress?: number;
-          error?: string;
-        }>;
+        getStatus?: () => Promise<AppUpdateStatus>;
+        check?: () => Promise<AppUpdateStatus>;
         install?: () => Promise<{ ok: boolean }>;
-        onStatus?: (callback: (status: {
-          status: 'idle' | 'checking' | 'not-available' | 'downloading' | 'downloaded' | 'error';
-          currentVersion: string;
-          version?: string;
-          releaseName?: string;
-          releaseNotes?: string;
-          mandatory?: boolean;
-          progress?: number;
-          error?: string;
-        }) => void) => () => void;
+        onStatus?: (callback: (status: AppUpdateStatus) => void) => () => void;
       };
       printing?: {
         listPrinters?: () => Promise<{ ok: boolean; printers: string[]; error?: string }>;
@@ -210,6 +196,12 @@ declare global {
       };
       license?: {
         getHwid?: () => Promise<string>;
+        getMode?: () => Promise<'account' | 'hardwa'>;
+        setMode?: (request: {
+          mode: 'account' | 'hardwa';
+          username: string;
+          password: string;
+        }) => Promise<{ ok: boolean; mode: 'account' | 'hardwa' }>;
         load?: () => Promise<{ active: boolean; reason?: string; license?: any; hwid: string; currentHwid?: string; boundHwid?: string }>;
         save?: (payload: any) => Promise<{ ok: boolean; hwid?: string; error?: string; message?: string }>;
         clear?: () => Promise<{ ok: boolean }>;

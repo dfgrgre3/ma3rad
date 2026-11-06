@@ -10,7 +10,11 @@ const { createFileLogger, registerProcessErrorHandlers } = require('./diagnostic
 try { app.commandLine.appendSwitch('enable-logging'); } catch { /* app may be unavailable */ }
 const safeStorageCompat = require('./safeStorageCompat');
 const { registerPrintingHandlers } = require('./printing');
-const { registerDatabaseHandlers } = require('./databaseHandlers');
+const {
+  registerDatabaseHandlers,
+  decryptDatabaseBytes,
+  readOrCreateDatabaseKey,
+} = require('./databaseHandlers');
 const { registerAppHandlers } = require('./appHandlers');
 const { registerDocumentHandlers } = require('./documentHandlers');
 const { isAllowedAppUrl, isAllowedIpcSender, openExternalUrl } = require('./security');
@@ -26,7 +30,7 @@ const { registerLicenseHandlers } = require('./licenseGuard');
 const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
 
 // ───────────────────────────── Environment ────────────────────────────────────
-//   LICENSE_MODE=account|hardwa   (default: hardwa)
+//   LICENSE_MODE=account|hardwa   (default: hardwa; overridden by the protected saved mode)
 //     "account"  -> slots are bound to the licensed account + credential only.
 //                  A fresh machine activates with EDAR code + account and runs
 //                  on any hardware that has the credential.
@@ -347,21 +351,107 @@ registerDocumentHandlers({
   ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, appDataDir: APP_DATA_DIR,
 });
 registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR, MAX_PRINT_DATA });
-registerLicenseHandlers({
+async function authorizeLicenseModeChange(username, password) {
+  if (typeof username !== 'string' || username.trim().length === 0 || username.length > 128 ||
+      typeof password !== 'string' || password.length === 0 || password.length > 1024) {
+    return false;
+  }
+  const encryptedDatabase = await fs.readFile(DB_FILE);
+  const key = await readOrCreateDatabaseKey({
+    appDataDir: APP_DATA_DIR,
+    fs,
+    fsSync,
+    safeStorage,
+    path,
+    createIfMissing: false,
+  });
+  const databaseBytes = decryptDatabaseBytes(encryptedDatabase, key);
+  const loadedSql = require('sql.js');
+  const initializeSql = loadedSql && loadedSql.default ? loadedSql.default : loadedSql;
+  const SQL = await initializeSql({
+    locateFile: (fileName) => path.join(path.dirname(require.resolve('sql.js')), fileName),
+  });
+  const database = new SQL.Database(databaseBytes);
+  try {
+    const userQuery = database.prepare(
+      'SELECT id, password_hash, role FROM users WHERE lower(username) = lower(?) AND is_active = 1 LIMIT 1',
+    );
+    let user;
+    try {
+      userQuery.bind([username.trim()]);
+      if (!userQuery.step()) return false;
+      user = userQuery.getAsObject();
+    } finally {
+      userQuery.free();
+    }
+
+    let passwordMatches = false;
+    try {
+      passwordMatches = require('bcryptjs').compareSync(password, user.password_hash);
+    } catch { /* malformed stored hashes are treated as an authorization failure */ }
+    if (!passwordMatches) return false;
+    if (user.role === 'ADMIN') return true;
+
+    const roleGrants = new Set();
+    const roleQuery = database.prepare('SELECT permission_code FROM role_permissions WHERE role_code = ?');
+    try {
+      roleQuery.bind([user.role]);
+      while (roleQuery.step()) roleGrants.add(String(roleQuery.getAsObject().permission_code));
+    } finally {
+      roleQuery.free();
+    }
+
+    const userGrants = new Set();
+    const userDenials = new Set();
+    const userPermissionsQuery = database.prepare(
+      "SELECT permission_code, COALESCE(effect, 'GRANT') AS effect FROM user_permissions WHERE user_id = ?",
+    );
+    try {
+      userPermissionsQuery.bind([user.id]);
+      while (userPermissionsQuery.step()) {
+        const row = userPermissionsQuery.getAsObject();
+        (String(row.effect).toUpperCase() === 'DENY' ? userDenials : userGrants)
+          .add(String(row.permission_code));
+      }
+    } finally {
+      userPermissionsQuery.free();
+    }
+
+    const requiredPermissions = ['admin.license.manage', 'settings.license_mode.manage'];
+    const matchesGrant = (grants, code) => {
+      const [module] = code.split('.');
+      return grants.has(code) || grants.has(`${module}.*`) || grants.has('*');
+    };
+    if (requiredPermissions.some((code) =>
+      userDenials.has(code) || userDenials.has(`${code.split('.')[0]}.*`) || userDenials.has('*')
+    )) return false;
+    return requiredPermissions.some((code) =>
+      matchesGrant(roleGrants, code) || matchesGrant(userGrants, code)
+    );
+  } finally {
+    database.close();
+  }
+}
+
+const licenseGuard = registerLicenseHandlers({
   ipcMain,
   validateIpcSender,
   appDataDir: APP_DATA_DIR,
   licenseMode: LICENSE_MODE,
+  authorizeLicenseModeChange,
 });
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = '68e8af6cb8a356cae306ec46521b93e161229ca8623af7d173d7863ea29d5860';
+const PRELOAD_INTEGRITY_SHA256 = 'b154c9dd1668e960bcc434ac15db48f64772ce8b1290e31108300d7f6fd9dfbe';
+const CRITICAL_FILE_INTEGRITY = Object.freeze({
+  'electron/entry.js': 'da72fd8b8ae551e00860b84e551fced03d43a66c6d4e3a7a87fc0329056f0631',
+  'electron/preload.js': PRELOAD_INTEGRITY_SHA256,
+  'electron/security.js': 'c88cf3df3608468259747b3078e8fc58fc51bd882114680b82fcfd6b9bf47cfd',
+});
 ipcMain.handle('security:check-integrity', async (event) => {
   validateIpcSender(event);
-  return integrityChecker.verifyManifest({
-    'electron/preload.js': PRELOAD_INTEGRITY_SHA256,
-  });
+  return integrityChecker.verifyManifest(CRITICAL_FILE_INTEGRITY);
 });
 registerSyncClientConfigHandlers({
   ipcMain,
@@ -546,6 +636,70 @@ const CENTRAL_API_URL = (() => {
   } catch { return null; }
 })();
 
+const CENTRAL_CREDENTIAL_FILE = path.join(APP_DATA_DIR, 'central-device-credential.enc');
+
+async function loadCentralCredential() {
+  try {
+    if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+      throw new Error('OS secure storage is unavailable for the central device credential.');
+    }
+    return (await safeStorageCompat.decryptString(safeStorage, await fs.readFile(CENTRAL_CREDENTIAL_FILE))) || null;
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+async function saveCentralCredential(credential) {
+  if (typeof credential !== 'string' || !credential.trim() || credential.length > 4096) {
+    throw new Error('Central API returned an invalid device credential.');
+  }
+  if (!(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+    throw new Error('OS secure storage is unavailable; the device credential was not saved.');
+  }
+  await fs.mkdir(APP_DATA_DIR, { recursive: true });
+  const temporaryPath = `${CENTRAL_CREDENTIAL_FILE}.${randomBytes(8).toString('hex')}.tmp`;
+  try {
+    const encrypted = await safeStorageCompat.encryptString(safeStorage, credential);
+    await fs.writeFile(temporaryPath, encrypted, { mode: 0o600, flag: 'wx' });
+    await fs.rename(temporaryPath, CENTRAL_CREDENTIAL_FILE);
+  } catch (error) {
+    try { await fs.unlink(temporaryPath); } catch (cleanupError) {
+      if (cleanupError.code !== 'ENOENT') {
+        throw new Error(`Could not clean up the temporary central credential: ${cleanupError.message || cleanupError}`);
+      }
+    }
+    throw error;
+  }
+}
+
+ipcMain.handle('central:get-server-url', (event) => {
+  validateIpcSender(event);
+  return CENTRAL_API_URL?.origin || '';
+});
+
+ipcMain.handle('central:get-status', async (event) => {
+  validateIpcSender(event);
+  return { configured: Boolean(CENTRAL_API_URL), activated: Boolean(await loadCentralCredential()) };
+});
+
+ipcMain.handle('central:migrate-credential', async (event, credential) => {
+  validateIpcSender(event);
+  if (await loadCentralCredential()) return { ok: true, alreadyStored: true };
+  await saveCentralCredential(credential);
+  return { ok: true, alreadyStored: false };
+});
+
+ipcMain.handle('central:clear-credential', async (event) => {
+  validateIpcSender(event);
+  try {
+    await fs.unlink(CENTRAL_CREDENTIAL_FILE);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  return { ok: true };
+});
+
 ipcMain.handle('central:request', async (event, request) => {
   validateIpcSender(event);
   if (!CENTRAL_API_URL) throw new Error('Central API is not configured for this application build.');
@@ -556,13 +710,39 @@ ipcMain.handle('central:request', async (event, request) => {
   if (request.body !== undefined && (typeof request.body !== 'string' || Buffer.byteLength(request.body, 'utf8') > 256 * 1024)) {
     throw new Error('Central API request body is invalid or too large.');
   }
+  const requiresCredential = new Set([
+    '/api/v1/licensing/validate',
+    '/api/v1/licensing/heartbeat',
+    '/api/v1/configuration/establishment',
+    '/api/v1/configuration/current',
+    '/api/v1/telemetry/errors',
+  ]).has(request.path);
+  const usesCredential = requiresCredential || request.path === '/api/v1/releases';
+  const credential = usesCredential ? await loadCentralCredential() : null;
+  if (requiresCredential && !credential) throw new Error('This device is not activated with the central platform.');
+  let requestBody = request.body;
+  if (method === 'POST' && requestBody !== undefined) {
+    let parsed;
+    try { parsed = JSON.parse(requestBody); }
+    catch { throw new Error('Central API request body must be valid JSON.'); }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || Object.hasOwn(parsed, 'deviceCredential')) {
+      throw new Error('Central API request body contains unsupported credential data.');
+    }
+    if (credential && ['/api/v1/licensing/validate', '/api/v1/licensing/heartbeat', '/api/v1/telemetry/errors'].includes(request.path)) {
+      parsed.deviceCredential = credential;
+      requestBody = JSON.stringify(parsed);
+    }
+  }
+  if (credential && ['/api/v1/configuration/establishment', '/api/v1/configuration/current', '/api/v1/releases'].includes(request.path)) {
+    headers['X-Device-Credential'] = credential;
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const response = await fetch(target, {
       method,
       headers,
-      ...(request.body === undefined ? {} : { body: request.body }),
+      ...(requestBody === undefined ? {} : { body: requestBody }),
       signal: controller.signal,
       redirect: 'error',
     });
@@ -572,6 +752,15 @@ ipcMain.handle('central:request', async (event, request) => {
     if (text) {
       try { body = JSON.parse(text); }
       catch { throw new Error('Central API returned a malformed JSON response.'); }
+    }
+    if (request.path === '/api/v1/licensing/activate' && response.ok) {
+      if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.deviceCredential !== 'string') {
+        throw new Error('Central API activation response did not contain a device credential.');
+      }
+      await saveCentralCredential(body.deviceCredential);
+      const publicBody = { ...body };
+      delete publicBody.deviceCredential;
+      body = { ...publicBody, credentialStored: true };
     }
     return { ok: response.ok, status: response.status, body };
   } finally {
@@ -602,11 +791,39 @@ app.whenReady().then(async () => {
   // Security: Deny all permission requests (camera, mic, etc.)
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => callback(false));
 
-  if (!CENTRAL_API_URL) {
-    console.warn('CENTRAL_API_URL is unset or invalid; central API network requests are disabled. Set an HTTPS origin without a path, query, or credentials.');
+  const startupIntegrity = integrityChecker.verifyManifest(CRITICAL_FILE_INTEGRITY);
+  if (!startupIntegrity.valid) {
+    console.error('Critical Electron file integrity check failed; the application will not start:', startupIntegrity.results);
+    app.quit();
+    return;
   }
+
+  try {
+    await licenseGuard.loadStoredLicenseMode();
+  } catch (error) {
+    console.error('Could not load the protected license mode; the application will not start:', error);
+    app.quit();
+    return;
+  }
+
   ensureDirs();
   installOfflineNetworkGuard(session.defaultSession);
+  if (CENTRAL_API_URL) {
+    console.info(`[central] Configured API origin: ${CENTRAL_API_URL.origin}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
+    void fetch(new URL('/api/v1/configuration/public-key', CENTRAL_API_URL), {
+      signal: controller.signal,
+      redirect: 'error',
+    }).then((response) => {
+      console.info(`[central] Startup connectivity: HTTP ${response.status}`);
+      return response.body?.cancel();
+    }).catch((error) => {
+      console.warn('[central] Startup connectivity check failed:', error.message || error);
+    }).finally(() => clearTimeout(timeout));
+  } else {
+    console.warn('[central] CENTRAL_API_URL is unset or invalid; central API requests are disabled.');
+  }
   try {
     await initializeSync();
     if (syncRelay) {

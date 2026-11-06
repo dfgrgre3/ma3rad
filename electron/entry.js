@@ -4,12 +4,25 @@ const { app } = require('electron');
 
 const jscPath = path.join(__dirname, 'main.jsc');
 
-if (app.isPackaged) {
-  if (!fs.existsSync(jscPath)) {
-    throw new Error('Packaged Electron main-process bytecode is missing.');
+function loadMainEntry() {
+  if (!app.isPackaged) {
+    require('./main.js');
+    return;
   }
-  require('bytenode');
-  require(jscPath);
-} else {
-  require('./main.js');
+
+  if (!fs.existsSync(jscPath)) {
+    console.warn('[electron-entry] packaged bytecode is missing; falling back to source main.js');
+    require('./main.js');
+    return;
+  }
+
+  try {
+    require('bytenode');
+    require(jscPath);
+  } catch (error) {
+    console.warn('[electron-entry] main bytecode failed to load; falling back to source main.js', error);
+    require('./main.js');
+  }
 }
+
+loadMainEntry();

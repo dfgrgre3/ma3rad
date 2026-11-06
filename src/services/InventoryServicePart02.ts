@@ -77,9 +77,6 @@ public adjustStock(
     context: StockAdjustmentContext
   ): void {
     const cost = this.calculateAdjustmentCost(sqliteDb, context);
-    if (cost.totalCost <= 0) {
-      throw new Error('Set a positive product cost before posting an inventory adjustment.');
-    }
 
     this.updateAdjustmentStock(sqliteDb, context);
     const { transactionId, transactionNumber } = this.recordAdjustmentTransaction(sqliteDb, context, cost);
@@ -101,12 +98,13 @@ public adjustStock(
     const costPlan = fifoEnabled && diffM2 < 0
       ? InventoryCostingService.planFifo(sqliteDb, productId, warehouseId, Math.abs(diffM2))
       : null;
-    const unitCost = costPlan ? costPlan.unitCost : (product ? product.costPrice : 0);
+    const unitCost = costPlan ? Number(costPlan.unitCost) : (product ? Number(product.costPrice) || 0 : 0);
+    const safeUnitCost = Number.isFinite(unitCost) ? unitCost : 0;
     const metersPerBox = product ? product.metersPerBox : 1.44;
     const transactionBoxes = product?.productType === 'GENERAL'
       ? product.baseUnit === 'BOX' ? diffM2 : 0
       : Number((diffM2 / metersPerBox).toFixed(2));
-    const totalCost = Math.round(Math.abs(diffM2 * Number(unitCost || 0)) * 100) / 100;
+    const totalCost = Math.round(Math.abs(diffM2 * safeUnitCost) * 100) / 100;
 
     return { fifoEnabled, costPlan, unitCost, transactionBoxes, totalCost };
   }

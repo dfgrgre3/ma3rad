@@ -168,6 +168,115 @@ test('sync relay applies tenant, branch, and device visibility while advancing c
   }
 });
 
+test('sync relay looks up high cursors without filtering the full journal', async () => {
+  const context = await setup();
+  try {
+    const batch = Array.from({ length: 250 }, (_, index) => event(`scalable-${index}`));
+    assert.equal((await context.a.pushEvents(batch)).acknowledged.length, batch.length);
+
+    const originalFilter = Array.prototype.filter;
+    let filteredJournal = false;
+    Array.prototype.filter = function (...args) {
+      if (this.length > 1 && this[0] && Number.isSafeInteger(this[0].sequence) && this[0].event) filteredJournal = true;
+      return originalFilter.apply(this, args);
+    };
+    let result;
+    try {
+      result = await context.b.pullEvents('tenant-1', '254', 1);
+    } finally {
+      Array.prototype.filter = originalFilter;
+    }
+
+    assert.equal(filteredJournal, false, 'cursor lookup should not filter the journal from its beginning');
+    assert.deepEqual(result.events.map((item) => item.eventId), ['scalable-249']);
+    assert.equal(result.nextCursor, '255');
+  } finally {
+    await context.relay.close();
+    await fs.rm(context.directory, { recursive: true, force: true });
+  }
+});
+
+test('sync relay rotates future writes and preserves legacy cursors across restart', async () => {
+  const context = await setup();
+  try {
+    const journalPath = path.join(context.directory, 'sync', 'events.jsonl');
+    const largeEvents = Array.from({ length: 20 }, (_, index) =>
+      event(`segmented-${index}`, { payload: { value: 'x'.repeat(900_000) } })
+    );
+    for (const largeEvent of largeEvents) {
+      assert.deepEqual(await context.a.pushEvents([largeEvent]), {
+        acknowledged: [largeEvent.eventId],
+        failed: [],
+      });
+    }
+
+    const names = await fs.readdir(path.dirname(journalPath));
+    const segmentNames = names
+      .filter((name) => name.startsWith('events.jsonl.segment-') && name.endsWith('.jsonl'))
+      .sort();
+    assert.ok(segmentNames.length >= 1, 'future writes should rotate to append-only segments');
+    assert.ok(names.includes('events.jsonl'), 'the compatible legacy journal remains present');
+
+    await context.relay.close();
+    const restarted = createSyncRelay({
+      journalPath,
+      encryptionKey: context.encryptionKey,
+      host: '127.0.0.1',
+      port: 0,
+      clients: [
+        { token: TOKEN_A, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a1' },
+        { token: TOKEN_B, tenantId: 'tenant-1', branchId: 'branch-b', deviceId: 'device-b1' },
+      ],
+    });
+    const address = await restarted.start();
+    try {
+      assert.equal(restarted.status().journalEvents, 25);
+      const branchB = createHttpSyncClient({
+        url: `http://127.0.0.1:${address.port}/`,
+        token: TOKEN_B,
+        tenantId: 'tenant-1',
+        branchId: 'branch-b',
+        deviceId: 'device-b1',
+      });
+      const branchA = createHttpSyncClient({
+        url: `http://127.0.0.1:${address.port}/`,
+        token: TOKEN_A,
+        tenantId: 'tenant-1',
+        branchId: 'branch-a',
+        deviceId: 'device-a1',
+      });
+      const legacyPull = await branchB.pullEvents('tenant-1', '4', 1);
+      assert.deepEqual(legacyPull.events.map((item) => item.eventId), ['initial-policy-supplier']);
+      assert.equal(legacyPull.nextCursor, '5');
+
+      const segmentPull = await branchB.pullEvents('tenant-1', '23', 5);
+      assert.deepEqual(segmentPull.events.map((item) => item.eventId), ['segmented-18', 'segmented-19']);
+      assert.equal(segmentPull.nextCursor, '25');
+      assert.deepEqual(await branchA.pushEvents([largeEvents[0]]), {
+        acknowledged: ['segmented-0'],
+        failed: [],
+      });
+      const collision = await branchA.pushEvents([
+        event('segmented-0', { payload: { value: 'changed' } }),
+      ]);
+      assert.equal(collision.acknowledged.length, 0);
+      assert.match(collision.failed[0].error, /collision/i);
+
+      const afterRestart = await branchA.pushEvents([event('policy-replayed-after-segmentation')]);
+      assert.deepEqual(afterRestart, {
+        acknowledged: ['policy-replayed-after-segmentation'],
+        failed: [],
+      });
+      assert.equal(restarted.status().journalEvents, 26);
+    } finally {
+      await restarted.close();
+    }
+  } finally {
+    await context.relay.close();
+    await fs.rm(context.directory, { recursive: true, force: true });
+  }
+});
+
 test('sync relay rejects secret-bearing events and requires TLS on non-loopback hosts', async () => {
   assert.throws(() => createHttpSyncClient({
     url: 'http://192.168.1.10:47821/',
@@ -282,7 +391,7 @@ test('only the authorized head-office device can publish organization sync polic
   }
 });
 
-test('sync relay reloads its durable journal and rejects corrupt or incomplete records', async () => {
+test('sync relay reloads its durable journal and safely recovers an incomplete final record', async () => {
   const context = await setup();
   try {
     const persistedEvent = event('survives-restart');
@@ -295,7 +404,10 @@ test('sync relay reloads its durable journal and rejects corrupt or incomplete r
       encryptionKey: context.encryptionKey,
       host: '127.0.0.1',
       port: 0,
-      clients: [{ token: TOKEN_A, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a1' }],
+      clients: [
+        { token: TOKEN_A, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a1' },
+        { token: TOKEN_B, tenantId: 'tenant-1', branchId: 'branch-b', deviceId: 'device-b1' },
+      ],
     });
     const address = await restarted.start();
     try {
@@ -311,19 +423,106 @@ test('sync relay reloads its durable journal and rejects corrupt or incomplete r
         acknowledged: ['survives-restart'],
         failed: [],
       });
+      const restartedBranchB = createHttpSyncClient({
+        url: `http://127.0.0.1:${address.port}/`,
+        token: TOKEN_B,
+        tenantId: 'tenant-1',
+        branchId: 'branch-b',
+        deviceId: 'device-b1',
+      });
+      const restartedPull = await restartedBranchB.pullEvents('tenant-1', null, 100);
+      assert.ok(restartedPull.events.some((item) => item.eventId === 'survives-restart'));
+      assert.equal(restartedPull.nextCursor, '6');
     } finally {
       await restarted.close();
     }
 
-    await fs.appendFile(path.join(context.directory, 'sync', 'events.jsonl'), '{"incomplete":');
-    const corrupted = createSyncRelay({
-      journalPath: path.join(context.directory, 'sync', 'events.jsonl'),
+    const journalPath = path.join(context.directory, 'sync', 'events.jsonl');
+    const validJournal = await fs.readFile(journalPath);
+    const incompleteTail = Buffer.from('{"incomplete":');
+    await fs.appendFile(journalPath, incompleteTail);
+    const recovered = createSyncRelay({
+      journalPath,
       encryptionKey: context.encryptionKey,
       host: '127.0.0.1',
       port: 0,
       clients: [{ token: TOKEN_A, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a1' }],
     });
-    await assert.rejects(() => corrupted.start(), /incomplete final record/);
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (message) => warnings.push(String(message));
+    let recoveredAddress;
+    try {
+      recoveredAddress = await recovered.start();
+    } finally {
+      console.warn = originalWarn;
+    }
+    try {
+      assert.equal(recovered.status().journalEvents, 6);
+      assert.equal((await fs.readFile(journalPath)).compare(validJournal), 0);
+      const quarantined = (await fs.readdir(path.dirname(journalPath)))
+        .filter((name) => name.endsWith('.quarantine'));
+      assert.equal(quarantined.length, 1);
+      assert.deepEqual(
+        await fs.readFile(path.join(path.dirname(journalPath), quarantined[0])),
+        incompleteTail
+      );
+      assert.ok(warnings.some((warning) => warning.includes(quarantined[0])));
+
+      const recoveredClient = createHttpSyncClient({
+        url: `http://127.0.0.1:${recoveredAddress.port}/`,
+        token: TOKEN_A,
+        tenantId: 'tenant-1',
+        branchId: 'branch-a',
+        deviceId: 'device-a1',
+      });
+      const recoveredEvent = event('appends-after-recovery');
+      assert.deepEqual(await recoveredClient.pushEvents([recoveredEvent]), {
+        acknowledged: ['appends-after-recovery'],
+        failed: [],
+      });
+      assert.equal(recovered.status().journalEvents, 7);
+      await recovered.close();
+
+      const completeTail = await fs.readFile(journalPath);
+      assert.equal(completeTail[completeTail.length - 1], 0x0a);
+      await fs.writeFile(journalPath, completeTail.subarray(0, -1));
+      const completedTailRecovery = createSyncRelay({
+        journalPath,
+        encryptionKey: context.encryptionKey,
+        host: '127.0.0.1',
+        port: 0,
+        clients: [{ token: TOKEN_A, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a1' }],
+      });
+      const completedTailWarnings = [];
+      console.warn = (message) => completedTailWarnings.push(String(message));
+      let completedTailAddress;
+      try {
+        completedTailAddress = await completedTailRecovery.start();
+      } finally {
+        console.warn = originalWarn;
+      }
+      try {
+        assert.equal(completedTailRecovery.status().journalEvents, 7);
+        assert.ok(completedTailWarnings.some((warning) => warning.includes('missing its newline delimiter')));
+        const duplicateClient = createHttpSyncClient({
+          url: `http://127.0.0.1:${completedTailAddress.port}/`,
+          token: TOKEN_A,
+          tenantId: 'tenant-1',
+          branchId: 'branch-a',
+          deviceId: 'device-a1',
+        });
+        assert.deepEqual(await duplicateClient.pushEvents([recoveredEvent]), {
+          acknowledged: ['appends-after-recovery'],
+          failed: [],
+        });
+        assert.equal(completedTailRecovery.status().journalEvents, 7);
+      } finally {
+        await completedTailRecovery.close();
+      }
+    } finally {
+      await recovered.close();
+    }
   } finally {
     await context.relay.close();
     await fs.rm(context.directory, { recursive: true, force: true });

@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Shield, Globe, Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
+import { AuthService } from '../../services/AuthService';
 
 export const LicenseModeSettingsPage: React.FC = () => {
   const can = usePermission();
@@ -9,6 +10,19 @@ export const LicenseModeSettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [pendingMode, setPendingMode] = useState<'account' | 'hardwa' | null>(null);
+  const [adminUsername, setAdminUsername] = useState(() => AuthService.getCurrentUser()?.username || '');
+  const [adminPassword, setAdminPassword] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    void window.ceramisys?.license?.getMode?.().then((storedMode) => {
+      if (active) setMode(storedMode);
+    }).catch((loadError: unknown) => {
+      if (active) setError(loadError instanceof Error ? loadError.message : 'تعذر قراءة وضع الترخيص.');
+    });
+    return () => { active = false; };
+  }, []);
 
   const handleChange = useCallback(async (nextMode: 'account' | 'hardwa') => {
     if (!canManage) return;
@@ -17,21 +31,24 @@ export const LicenseModeSettingsPage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const res = await window.ceramisys?.license?.save?.({
+      const res = await window.ceramisys?.license?.setMode?.({
         mode: nextMode,
-        licenseMode: nextMode,
+        username: adminUsername,
+        password: adminPassword,
       });
       if (!res?.ok) {
-        throw new Error((res as any)?.error || 'تعذر حفظ وضع الترخيص.');
+        throw new Error('تعذر حفظ وضع الترخيص.');
       }
       setMode(nextMode);
-      setSuccess('تم حفظ إعدادات وضع الترخيص بنجاح.');
+      setPendingMode(null);
+      setAdminPassword('');
+      setSuccess('تم حفظ وضع الترخيص وتطبيقه.');
     } catch (err: any) {
       setError(err?.message || 'حدث خطأ أثناء حفظ الإعدادات.');
     } finally {
       setLoading(false);
     }
-  }, [loading, canManage]);
+  }, [loading, canManage, adminUsername, adminPassword]);
 
   if (!canManage) {
     return (
@@ -90,7 +107,7 @@ export const LicenseModeSettingsPage: React.FC = () => {
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => handleChange('account')}
+                onClick={() => setPendingMode('account')}
                 className={`px-4 py-2 text-sm font-medium rounded-lg shrink-0 transition-colors ${
                   mode === 'account'
                     ? 'bg-sky-600 text-white shadow-sm'
@@ -122,7 +139,7 @@ export const LicenseModeSettingsPage: React.FC = () => {
               <button
                 type="button"
                 disabled={loading}
-                onClick={() => handleChange('hardwa')}
+                onClick={() => setPendingMode('hardwa')}
                 className={`px-4 py-2 text-sm font-medium rounded-lg shrink-0 transition-colors ${
                   mode === 'hardwa'
                     ? 'bg-sky-600 text-white shadow-sm'
@@ -149,6 +166,69 @@ export const LicenseModeSettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+      {pendingMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="presentation">
+          <form
+            dir="rtl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="license-mode-auth-title"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleChange(pendingMode);
+            }}
+            className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900"
+          >
+            <h2 id="license-mode-auth-title" className="text-lg font-black text-slate-900 dark:text-slate-100">
+              تأكيد صلاحية المسؤول
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              أدخل بيانات مسؤول مخوّل لتغيير وضع الترخيص. تُستخدم كلمة المرور للتحقق فقط ولا تُحفظ.
+            </p>
+            <label className="block space-y-1 text-sm font-bold">
+              <span>اسم المستخدم</span>
+              <input
+                autoComplete="username"
+                value={adminUsername}
+                onChange={(event) => setAdminUsername(event.target.value)}
+                required
+                disabled={loading}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-left font-normal dark:border-slate-700 dark:bg-slate-800"
+              />
+            </label>
+            <label className="block space-y-1 text-sm font-bold">
+              <span>كلمة المرور</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={adminPassword}
+                onChange={(event) => setAdminPassword(event.target.value)}
+                required
+                disabled={loading}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-left font-normal dark:border-slate-700 dark:bg-slate-800"
+              />
+            </label>
+            {error && <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => { setPendingMode(null); setAdminPassword(''); setError(null); }}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold dark:border-slate-700"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="rounded-lg bg-sky-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {loading ? 'جارٍ التحقق...' : 'تأكيد'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

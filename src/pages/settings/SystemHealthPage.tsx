@@ -109,7 +109,7 @@ function MetricCard({
 
 export const SystemHealthPage: React.FC = () => {
   const currentUser = AuthService.getCurrentUser();
-  const canMaintain = PermissionService.can(currentUser, 'settings.maintenance', '/system-health');
+  const canMaintain = PermissionService.can(currentUser, 'settings.health.manage', '/system-health');
   const canBackup = PermissionService.can(currentUser, 'settings.backup', '/system-health');
   const [stats, setStats] = useState<SystemDiagnosticsReport | null>(null);
   const [runtime, setRuntime] = useState<SystemRuntimeDiagnostics | null>(null);
