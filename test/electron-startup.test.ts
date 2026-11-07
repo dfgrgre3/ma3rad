@@ -31,10 +31,10 @@ test('recovery key is portable and restore validation checks SQLite integrity an
   });
   const database = new SQL.Database();
   database.exec(`
-    CREATE TABLE customers (id TEXT PRIMARY KEY);
+    CREATE TABLE users (id TEXT PRIMARY KEY);
+    CREATE TABLE products (id TEXT PRIMARY KEY);
+    CREATE TABLE system_settings (key TEXT PRIMARY KEY);
     CREATE TABLE sales_invoices (id TEXT PRIMARY KEY);
-    CREATE TABLE sales_returns (id TEXT PRIMARY KEY);
-    CREATE TABLE journal_entries (id TEXT PRIMARY KEY);
   `);
   const plaintext = Buffer.from(database.export());
   database.close();
@@ -46,12 +46,12 @@ test('recovery key is portable and restore validation checks SQLite integrity an
   const corrupt = new SQL.Database();
   corrupt.exec(`
     PRAGMA foreign_keys = OFF;
-    CREATE TABLE customers (id TEXT PRIMARY KEY);
+    CREATE TABLE users (id TEXT PRIMARY KEY);
+    CREATE TABLE products (id TEXT PRIMARY KEY);
+    CREATE TABLE system_settings (key TEXT PRIMARY KEY);
     CREATE TABLE sales_invoices (id TEXT PRIMARY KEY);
-    CREATE TABLE sales_returns (id TEXT PRIMARY KEY);
-    CREATE TABLE journal_entries (id TEXT PRIMARY KEY);
-    CREATE TABLE dependent (customer_id TEXT REFERENCES customers(id));
-    INSERT INTO dependent VALUES ('missing-customer');
+    CREATE TABLE dependent (user_id TEXT REFERENCES users(id));
+    INSERT INTO dependent VALUES ('missing-user');
   `);
   const corruptBytes = Buffer.from(corrupt.export());
   corrupt.close();

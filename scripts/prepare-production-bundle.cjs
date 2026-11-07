@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { createProtectedLoaderSource } = require('./electron-security-integrity.cjs');
 
 const defaultElectronDir = path.join(__dirname, '../electron');
 
@@ -40,8 +41,7 @@ function prepareProductionBundle(electronDir = defaultElectronDir) {
       if (source.includes('// Protected binary code')) continue;
 
       if (!fs.existsSync(backupPath)) fs.copyFileSync(sourcePath, backupPath);
-      const loaderPath = `./${path.basename(name)}.jsc`;
-      fs.writeFileSync(sourcePath, `// Protected binary code\nmodule.exports = require('${loaderPath}');\n`);
+      fs.writeFileSync(sourcePath, createProtectedLoaderSource(path.basename(name)));
       console.log(`  ✓ Protected: ${name}.js replaced with binary bytecode loader`);
     }
   }

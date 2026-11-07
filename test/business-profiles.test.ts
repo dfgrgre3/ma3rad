@@ -68,8 +68,8 @@ test('first-run setup is limited to genuinely unconfigured databases', () => {
   }), false);
 });
 
-test('activation screen is bypassed while first-run setup and page guards remain enabled', () => {
-  assert.equal(BYPASS_FIRST_RUN_ACTIVATION, true);
+test('activation bypass is disabled unless a local build flavor is injected', () => {
+  assert.equal(BYPASS_FIRST_RUN_ACTIVATION, false);
   assert.equal(BYPASS_FIRST_RUN_SETUP, false);
   assert.equal(OPEN_ALL_PAGES, false);
 });

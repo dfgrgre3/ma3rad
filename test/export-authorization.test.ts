@@ -5,7 +5,7 @@ import { DatabaseManager } from '../src/database/db.ts';
 import { AuthService } from '../src/services/AuthService.ts';
 import { PermissionService } from '../src/services/PermissionService.ts';
 import { ExportService } from '../src/services/ExportService.ts';
-import { buildExportHtml, exportToPdf } from '../src/utils/export.ts';
+import { buildExportHtml, exportToExcel, exportToPdf } from '../src/utils/export.ts';
 import type { User } from '../src/types/identity.ts';
 
 const doc = {
@@ -51,6 +51,7 @@ test('exports that declare a permission are refused without it', async () => {
   assert.equal(PermissionService.can(limited, 'reports.export'), false);
   assert.equal(ExportService.canExport('reports.export', limited), false);
   assert.throws(() => ExportService.assertAllowed('reports.export', limited), /صلاحية/);
+  assert.throws(() => exportToExcel(doc), /صلاحية/);
   assert.throws(() => buildExportHtml(doc), /صلاحية/);
   assert.throws(() => exportToPdf(doc), /صلاحية/);
 });
@@ -59,7 +60,7 @@ test('legacy documents without a declared export permission keep building', asyn
   await boot();
   AuthService.setCurrentUser(limited);
   PermissionService.invalidate(limited);
-  const { permission, ...legacy } = doc;
+  const legacy = { ...doc, permission: undefined };
   assert.match(buildExportHtml(legacy), /<table>/);
 });
 

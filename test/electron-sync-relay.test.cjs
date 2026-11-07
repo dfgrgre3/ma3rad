@@ -12,7 +12,7 @@ const TOKEN_B = 'branch-b-token-000000000000000000000000000000';
 const TOKEN_HQ = 'head-office-token-000000000000000000000000000000';
 const TOKEN_OTHER_TENANT = 'other-tenant-token-0000000000000000000000000000';
 
-async function setup() {
+async function setup(maxJournalBytes, journalLimits = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-sync-relay-'));
   const encryptionKey = randomBytes(32);
   const relay = createSyncRelay({
@@ -20,6 +20,8 @@ async function setup() {
     encryptionKey,
     host: '127.0.0.1',
     port: 0,
+    ...(maxJournalBytes ? { maxJournalBytes } : {}),
+    ...journalLimits,
     clients: [
       { token: TOKEN_A, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a1' },
       { token: TOKEN_A_DEVICE_2, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a2' },
@@ -277,14 +279,121 @@ test('sync relay rotates future writes and preserves legacy cursors across resta
   }
 });
 
-test('sync relay rejects secret-bearing events and requires TLS on non-loopback hosts', async () => {
-  assert.throws(() => createHttpSyncClient({
-    url: 'http://192.168.1.10:47821/',
+test('sync relay rejects writes at its total storage limit and refuses oversized journals on restart', async () => {
+  const maxJournalBytes = 1_500_000;
+  const context = await setup(maxJournalBytes);
+  const journalPath = path.join(context.directory, 'sync', 'events.jsonl');
+  try {
+    const oversizedEvent = event('bounded-journal-1', { payload: { value: 'x'.repeat(900_000) } });
+    assert.deepEqual(await context.a.pushEvents([oversizedEvent]), {
+      acknowledged: [oversizedEvent.eventId],
+      failed: [],
+    });
+
+    const rejected = await context.a.pushEvents([
+      event('bounded-journal-2', { payload: { value: 'x'.repeat(900_000) } }),
+    ]);
+    assert.equal(rejected.acknowledged.length, 0);
+    assert.match(rejected.failed[0].error, /journal is full/i);
+    assert.ok(context.relay.status().journalBytes <= maxJournalBytes);
+    assert.equal(context.relay.status().journalEvents, 6);
+
+    const oversizedRestart = createSyncRelay({
+      journalPath,
+      encryptionKey: context.encryptionKey,
+      host: '127.0.0.1',
+      port: 0,
+      maxJournalBytes: context.relay.status().journalBytes - 1,
+      clients: [{ token: TOKEN_A, tenantId: 'tenant-1', branchId: 'branch-a', deviceId: 'device-a1' }],
+    });
+    await assert.rejects(() => oversizedRestart.start(), /exceeds its .* storage limit/);
+  } finally {
+    await context.relay.close();
+    await fs.rm(context.directory, { recursive: true, force: true });
+  }
+});
+
+test('sync relay enforces tenant and branch storage quotas', async () => {
+  const tenantContext = await setup(undefined, {
+    maxTenantJournalBytes: 20_000,
+    maxBranchJournalBytes: 18_000,
+  });
+  try {
+    const first = event('tenant-quota-1', { payload: { value: 'x'.repeat(7_000) } });
+    assert.deepEqual(await tenantContext.a.pushEvents([first]), {
+      acknowledged: [first.eventId],
+      failed: [],
+    });
+
+    const second = event('tenant-quota-2', {
+      branchId: 'branch-b',
+      deviceId: 'device-b1',
+      payload: { value: 'x'.repeat(7_000) },
+    });
+    const tenantRejected = await tenantContext.b.pushEvents([second]);
+    assert.equal(tenantRejected.acknowledged.length, 0);
+    assert.match(tenantRejected.failed[0].error, /tenant quota/i);
+  } finally {
+    await tenantContext.relay.close();
+    await fs.rm(tenantContext.directory, { recursive: true, force: true });
+  }
+
+  const branchContext = await setup(undefined, {
+    maxTenantJournalBytes: 30_000,
+    maxBranchJournalBytes: 15_000,
+  });
+  try {
+    const first = event('branch-quota-1', { payload: { value: 'x'.repeat(7_000) } });
+    assert.deepEqual(await branchContext.a.pushEvents([first]), {
+      acknowledged: [first.eventId],
+      failed: [],
+    });
+
+    const second = event('branch-quota-2', {
+      deviceId: 'device-a2',
+      payload: { value: 'x'.repeat(7_000) },
+    });
+    const branchRejected = await branchContext.a2.pushEvents([second]);
+    assert.equal(branchRejected.acknowledged.length, 0);
+    assert.match(branchRejected.failed[0].error, /branch quota/i);
+  } finally {
+    await branchContext.relay.close();
+    await fs.rm(branchContext.directory, { recursive: true, force: true });
+  }
+});
+
+test('sync relay rejects HTTP except for loopback and requires TLS on non-loopback hosts', async () => {
+  for (const host of [
+    '192.168.1.10',
+    '100.63.255.255',
+    '100.64.0.1',
+    '100.127.255.254',
+    '100.128.0.0',
+    '[::ffff:100.64.0.1]',
+    'branch.example',
+  ]) {
+    assert.throws(() => createHttpSyncClient({
+      url: `http://${host}:47821/`,
+      token: TOKEN_A,
+      tenantId: 'tenant-1',
+      branchId: 'branch-a',
+      deviceId: 'device-a1',
+    }), /HTTPS/);
+  }
+  assert.doesNotThrow(() => createHttpSyncClient({
+    url: 'http://127.0.0.1:47821/',
     token: TOKEN_A,
     tenantId: 'tenant-1',
     branchId: 'branch-a',
     deviceId: 'device-a1',
-  }), /HTTPS/);
+  }));
+  assert.doesNotThrow(() => createHttpSyncClient({
+    url: 'https://branch.example:47821/',
+    token: TOKEN_A,
+    tenantId: 'tenant-1',
+    branchId: 'branch-a',
+    deviceId: 'device-a1',
+  }));
   assert.throws(() => createSyncRelay({
     journalPath: 'sync-events.jsonl',
     encryptionKey: randomBytes(32),

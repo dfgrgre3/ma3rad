@@ -28,6 +28,7 @@ const {
 const tailscaleService = require('./tailscaleService');
 const { registerLicenseHandlers } = require('./licenseGuard');
 const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
+const { autoUpdater } = require('electron-updater');
 
 // ───────────────────────────── Environment ────────────────────────────────────
 //   LICENSE_MODE=account|hardwa   (default: hardwa; overridden by the protected saved mode)
@@ -320,12 +321,12 @@ function createWindow() {
 
 // ─── Database persistence (real file on disk instead of localStorage) ────────
 registerDatabaseHandlers({
-  ipcMain, validateIpcSender, app, path, fs, fsSync, safeStorage,
-  APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
+  ipcMain, validateIpcSender, path, fs, fsSync, safeStorage,
+  APP_DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
 });
 registerAppHandlers({
-  ipcMain, validateIpcSender, app, path, fs, shell, dialog, BrowserWindow,
+  ipcMain, validateIpcSender, app, fs, shell, dialog, BrowserWindow,
   appDataDir: APP_DATA_DIR, DATA_DIR, BACKUP_DIR, ensureDirs,
   requestGracefulRestart: () => {
     const [win] = BrowserWindow.getAllWindows();
@@ -348,7 +349,7 @@ registerAppHandlers({
   },
 });
 registerDocumentHandlers({
-  ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, appDataDir: APP_DATA_DIR,
+  ipcMain, validateIpcSender, path, fs, fsSync, shell, dialog, app, safeStorage, appDataDir: APP_DATA_DIR,
 });
 registerPrintingHandlers({ ipcMain, validateIpcSender, appDataDir: APP_DATA_DIR, MAX_PRINT_DATA });
 async function authorizeLicenseModeChange(username, password) {
@@ -360,7 +361,6 @@ async function authorizeLicenseModeChange(username, password) {
   const key = await readOrCreateDatabaseKey({
     appDataDir: APP_DATA_DIR,
     fs,
-    fsSync,
     safeStorage,
     path,
     createIfMissing: false,
@@ -387,7 +387,7 @@ async function authorizeLicenseModeChange(username, password) {
 
     let passwordMatches = false;
     try {
-      passwordMatches = require('bcryptjs').compareSync(password, user.password_hash);
+      passwordMatches = require('bcryptjs').compareSync(password, String(user.password_hash ?? ''));
     } catch { /* malformed stored hashes are treated as an authorization failure */ }
     if (!passwordMatches) return false;
     if (user.role === 'ADMIN') return true;
@@ -444,10 +444,15 @@ const licenseGuard = registerLicenseHandlers({
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
 const PRELOAD_INTEGRITY_SHA256 = '9d4ab82a0baf8300bc62221a93db2f394fd196b1caf01b364a626bebc60deb70';
+const ENTRY_SOURCE_INTEGRITY_SHA256 = '61099d4251c2542f918796244fb67228f45bed5d1547bba26d259981132e999e';
 const SECURITY_SOURCE_INTEGRITY_SHA256 = 'c88cf3df3608468259747b3078e8fc58fc51bd882114680b82fcfd6b9bf47cfd';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
+const BYTECODE_INTEGRITY = app.isPackaged
+  ? JSON.parse(fsSync.readFileSync(path.join(__dirname, 'bytecode-integrity.json'), 'utf8'))
+  : {};
 const CRITICAL_FILE_INTEGRITY = Object.freeze({
-  'electron/entry.js': 'da72fd8b8ae551e00860b84e551fced03d43a66c6d4e3a7a87fc0329056f0631',
+  ...BYTECODE_INTEGRITY,
+  ...(!app.isPackaged ? { 'electron/entry.js': ENTRY_SOURCE_INTEGRITY_SHA256 } : {}),
   'electron/preload.js': PRELOAD_INTEGRITY_SHA256,
   'electron/security.js': app.isPackaged
     ? SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256
@@ -709,6 +714,7 @@ ipcMain.handle('central:request', async (event, request) => {
   if (!CENTRAL_API_URL) throw new Error('Central API is not configured for this application build.');
   const target = resolveCentralRequest(CENTRAL_API_URL.origin, request, !app.isPackaged);
   const method = String(request.method || 'GET').toUpperCase();
+  /** @type {Record<string, string>} */
   const headers = sanitizeCentralHeaders(request.headers);
   if (method === 'GET' && request.body !== undefined) throw new Error('GET requests cannot include a body.');
   if (request.body !== undefined && (typeof request.body !== 'string' || Buffer.byteLength(request.body, 'utf8') > 256 * 1024)) {
@@ -841,6 +847,7 @@ app.whenReady().then(async () => {
   createWindow();
   updateController = configureAutoUpdater({
     app,
+    updater: autoUpdater,
     ipcMain,
     validateIpcSender,
     getWindow: () => BrowserWindow.getAllWindows()[0] || null,

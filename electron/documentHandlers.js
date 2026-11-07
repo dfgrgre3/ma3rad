@@ -1,8 +1,10 @@
 const crypto = require('node:crypto');
+const safeStorageCompat = require('./safeStorageCompat');
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const MAX_OCR_IMAGE_BYTES = 12 * 1024 * 1024;
 const STORAGE_NAME_PATTERN = /^doc_[a-f0-9]{32}\.[a-z0-9]{1,10}$/i;
+const ENCRYPTED_DOCUMENT_MAGIC = Buffer.from('CERAMISYS-DOC\0v1\0');
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const MIME_BY_EXTENSION = {
@@ -47,16 +49,131 @@ function registerDocumentHandlers({
   fsSync,
   shell,
   dialog,
+  app,
+  safeStorage,
   appDataDir,
 }) {
   const pathModule = configurePath(path);
   const DOCUMENTS_DIR = pathModule.join(appDataDir, 'documents');
+  const OPEN_DIR = pathModule.join(appDataDir, '.document-open');
   let ocrWorkerPromise = null;
   let ocrQueue = Promise.resolve();
+  let vaultInitialization = null;
 
   const ensureDocumentsDir = () => {
-    fsSync.mkdirSync(DOCUMENTS_DIR, { recursive: true });
+    fsSync.mkdirSync(DOCUMENTS_DIR, { recursive: true, mode: 0o700 });
   };
+
+  const assertEncryptionAvailable = async () => {
+    if (!safeStorage || !(await safeStorageCompat.isEncryptionAvailable(safeStorage))) {
+      throw new Error('تشفير مرفقات المستندات غير متاح في هذا النظام؛ لم يتم حفظ الملف.');
+    }
+  };
+
+  const encryptDocument = async (bytes) => {
+    await assertEncryptionAvailable();
+    const dataKey = crypto.randomBytes(32);
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', dataKey, iv);
+    cipher.setAAD(ENCRYPTED_DOCUMENT_MAGIC);
+    const ciphertext = Buffer.concat([cipher.update(bytes), cipher.final()]);
+    const wrappedKey = Buffer.from(await safeStorageCompat.encryptString(safeStorage, dataKey.toString('base64')));
+    const keyLength = Buffer.alloc(4);
+    keyLength.writeUInt32BE(wrappedKey.length);
+    return Buffer.concat([
+      ENCRYPTED_DOCUMENT_MAGIC,
+      keyLength,
+      wrappedKey,
+      iv,
+      cipher.getAuthTag(),
+      ciphertext,
+    ]);
+  };
+
+  const decryptDocument = async (storedBytes) => {
+    await assertEncryptionAvailable();
+    const headerLength = ENCRYPTED_DOCUMENT_MAGIC.length + 4;
+    if (storedBytes.length < headerLength || !storedBytes.subarray(0, ENCRYPTED_DOCUMENT_MAGIC.length).equals(ENCRYPTED_DOCUMENT_MAGIC)) {
+      throw new Error('صيغة ملف المستند المشفر غير صالحة.');
+    }
+    const keyLength = storedBytes.readUInt32BE(ENCRYPTED_DOCUMENT_MAGIC.length);
+    const keyStart = headerLength;
+    const ivStart = keyStart + keyLength;
+    const tagStart = ivStart + 12;
+    const ciphertextStart = tagStart + 16;
+    if (!keyLength || ciphertextStart > storedBytes.length) {
+      throw new Error('ملف المستند المشفر تالف أو غير مكتمل.');
+    }
+
+    const wrappedKey = storedBytes.subarray(keyStart, ivStart);
+    const keyText = await safeStorageCompat.decryptString(safeStorage, wrappedKey);
+    const dataKey = Buffer.from(keyText, 'base64');
+    if (dataKey.length !== 32) throw new Error('مفتاح تشفير المستند غير صالح.');
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', dataKey, storedBytes.subarray(ivStart, tagStart));
+    decipher.setAAD(ENCRYPTED_DOCUMENT_MAGIC);
+    decipher.setAuthTag(storedBytes.subarray(tagStart, ciphertextStart));
+    return Buffer.concat([
+      decipher.update(storedBytes.subarray(ciphertextStart)),
+      decipher.final(),
+    ]);
+  };
+
+  const writeEncryptedDocument = async (target, bytes) => {
+    const encrypted = await encryptDocument(bytes);
+    const temporaryPath = `${target}.${crypto.randomBytes(8).toString('hex')}.tmp`;
+    try {
+      await fs.writeFile(temporaryPath, encrypted, { flag: 'wx', mode: 0o600 });
+      await fs.rename(temporaryPath, target);
+    } catch (error) {
+      try {
+        await fs.unlink(temporaryPath);
+      } catch (cleanupError) {
+        if (cleanupError.code !== 'ENOENT') {
+          console.error('Could not clean up temporary encrypted document:', cleanupError);
+        }
+      }
+      throw error;
+    }
+  };
+
+  const initializeVault = async () => {
+    ensureDocumentsDir();
+    await assertEncryptionAvailable();
+    if (fsSync.existsSync(OPEN_DIR)) fsSync.rmSync(OPEN_DIR, { recursive: true, force: true });
+
+    for (const entry of await fs.readdir(DOCUMENTS_DIR, { withFileTypes: true })) {
+      if (!entry.isFile() || !STORAGE_NAME_PATTERN.test(entry.name)) continue;
+      const target = pathModule.join(DOCUMENTS_DIR, entry.name);
+      const storedBytes = await fs.readFile(target);
+      if (storedBytes.subarray(0, ENCRYPTED_DOCUMENT_MAGIC.length).equals(ENCRYPTED_DOCUMENT_MAGIC)) continue;
+      const plaintext = Buffer.from(storedBytes);
+      if (plaintext.length > MAX_ATTACHMENT_BYTES) {
+        throw new Error(`تعذر ترحيل المرفق القديم ${entry.name}: حجمه يتجاوز الحد المسموح.`);
+      }
+      await writeEncryptedDocument(target, plaintext);
+    }
+  };
+
+  const ensureVault = () => {
+    if (!vaultInitialization) {
+      vaultInitialization = initializeVault().catch((error) => {
+        vaultInitialization = null;
+        throw error;
+      });
+    }
+    return vaultInitialization;
+  };
+
+  const cleanupOpenFiles = () => {
+    try {
+      fsSync.rmSync(OPEN_DIR, { recursive: true, force: true });
+    } catch (error) {
+      console.error('Could not remove temporary decrypted documents:', error);
+    }
+  };
+
+  if (app && typeof app.on === 'function') app.on('will-quit', cleanupOpenFiles);
 
   const getOcrWorker = () => {
     if (!ocrWorkerPromise) {
@@ -98,7 +215,12 @@ function registerDocumentHandlers({
 
   ipcMain.handle('documents:import', async (event) => {
     validateIpcSender(event);
-    ensureDocumentsDir();
+    try {
+      await ensureVault();
+    } catch (error) {
+      console.error('Document vault initialization failed:', error);
+      return { ok: false, error: String(error?.message || error) };
+    }
 
     const selection = await dialog.showOpenDialog({
       title: 'اختيار ملف المستند',
@@ -128,8 +250,11 @@ function registerDocumentHandlers({
         return { ok: false, error: 'مسار التخزين غير صالح.' };
       }
 
-      await fs.copyFile(sourcePath, destination);
-      const bytes = await fs.readFile(destination);
+      const bytes = await fs.readFile(sourcePath);
+      if (bytes.length > MAX_ATTACHMENT_BYTES) {
+        return { ok: false, error: 'حجم الملف يتجاوز الحد المسموح (25 ميجابايت).' };
+      }
+      await writeEncryptedDocument(destination, bytes);
       const checksum = crypto.createHash('sha256').update(bytes).digest('hex');
 
       return {
@@ -137,7 +262,7 @@ function registerDocumentHandlers({
         storageName,
         fileName: pathModule.basename(sourcePath).slice(0, 255),
         mimeType: MIME_BY_EXTENSION[safeExtension] || 'application/octet-stream',
-        fileSize: stat.size,
+        fileSize: bytes.length,
         checksum,
       };
     } catch (error) {
@@ -151,16 +276,26 @@ function registerDocumentHandlers({
     if (typeof storageName !== 'string' || !STORAGE_NAME_PATTERN.test(storageName)) {
       return { ok: false, error: 'اسم الملف غير صالح.' };
     }
-    ensureDocumentsDir();
     const target = pathModule.resolve(DOCUMENTS_DIR, storageName);
     if (!isInside(DOCUMENTS_DIR, target)) {
       return { ok: false, error: 'مسار الملف غير صالح.' };
     }
     try {
-      const stat = await fs.stat(target);
-      if (!stat.isFile()) return { ok: false, error: 'الملف غير موجود.' };
-      const result = await shell.openPath(target);
-      return result ? { ok: false, error: result } : { ok: true };
+      await ensureVault();
+      const storedBytes = await fs.readFile(target);
+      const plaintext = await decryptDocument(storedBytes);
+      fsSync.mkdirSync(OPEN_DIR, { recursive: true, mode: 0o700 });
+      const temporaryPath = pathModule.join(
+        OPEN_DIR,
+        `${crypto.randomUUID().replace(/-/g, '')}${pathModule.extname(storageName)}`,
+      );
+      await fs.writeFile(temporaryPath, plaintext, { flag: 'wx', mode: 0o600 });
+      const result = await shell.openPath(temporaryPath);
+      if (result) {
+        await fs.unlink(temporaryPath);
+        return { ok: false, error: result };
+      }
+      return { ok: true };
     } catch (error) {
       return { ok: false, error: String(error?.message || error) };
     }
@@ -211,7 +346,7 @@ function registerDocumentHandlers({
 
   ipcMain.handle('documents:info', async (event) => {
     validateIpcSender(event);
-    ensureDocumentsDir();
+    await ensureVault();
     return { ok: true, directory: DOCUMENTS_DIR, maxBytes: MAX_ATTACHMENT_BYTES };
   });
 

@@ -1,5 +1,4 @@
 const { createCipheriv, createDecipheriv, randomBytes, scrypt } = require('node:crypto');
-const { promisify } = require('node:util');
 const path = require('node:path');
 const os = require('node:os');
 const backupStrategyService = require('./backupStrategyService');
@@ -8,10 +7,23 @@ const safeStorageCompat = require('./safeStorageCompat');
 const DB_MAGIC = Buffer.from('CERAMISYS-DB\0v1\0', 'utf8');
 const SQLITE_HEADER = Buffer.from('SQLite format 3\0', 'binary');
 const DB_KEY_FILE = 'database-key.enc';
+const REQUIRED_DATABASE_TABLES = ['users', 'products', 'system_settings', 'sales_invoices'];
 const RECOVERY_FILE_FORMAT = 'CERAMISYS-RECOVERY-KEY';
 const RECOVERY_SCRYPT_OPTIONS = { N: 1 << 15, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
-const deriveRecoveryKey = promisify(scrypt);
+const deriveRecoveryKey = (password, salt, keyLength, options) => new Promise((resolve, reject) => {
+  scrypt(password, salt, keyLength, options, (error, key) => {
+    if (error) reject(error);
+    else resolve(key);
+  });
+});
 let sqliteInitializer;
+
+function createCodedError(message, code, cause) {
+  return Object.assign(new TypeError(message), {
+    code,
+    ...(cause === undefined ? {} : { cause }),
+  });
+}
 
 async function decryptStoredString(safeStorage, encrypted) {
   // shouldReEncrypt is a signal to migrate the ciphertext, not to decrypt the
@@ -96,8 +108,7 @@ async function verifySQLiteDatabaseBytes(bytes) {
     if (database.exec('PRAGMA foreign_key_check').some((result) => result.values.length > 0)) {
       throw new Error('فشل PRAGMA foreign_key_check على قاعدة البيانات المستعادة.');
     }
-    const requiredTables = ['customers', 'sales_invoices', 'sales_returns', 'journal_entries'];
-    for (const tableName of requiredTables) {
+    for (const tableName of REQUIRED_DATABASE_TABLES) {
       const exists = database.exec(
         'SELECT 1 FROM sqlite_master WHERE type = ? AND name = ? LIMIT 1',
         ['table', tableName]
@@ -224,10 +235,10 @@ function describeError(error) {
 
 function registerDatabaseHandlers({
   ipcMain, validateIpcSender, path, fs, fsSync, safeStorage,
-  APP_DATA_DIR, DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
+  APP_DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
 }) {
-  const getKey = () => readOrCreateDatabaseKey({ appDataDir: APP_DATA_DIR, fs, fsSync, safeStorage, path });
+  const getKey = () => readOrCreateDatabaseKey({ appDataDir: APP_DATA_DIR, fs, safeStorage, path });
   const offsiteBackupConfig = path.join(APP_DATA_DIR, 'offsite-backup.json');
 
   const getOffsiteBackupDir = async () => {
@@ -350,12 +361,22 @@ function registerDatabaseHandlers({
       validateIpcSender(event);
       ensureDirs();
       if (!(bytes instanceof Uint8Array) && !Array.isArray(bytes)) {
-        const error = new TypeError('Database save payload must be a byte array.');
-        error.code = 'DATABASE_INVALID_PAYLOAD';
-        throw error;
+        throw createCodedError('Database save payload must be a byte array.', 'DATABASE_INVALID_PAYLOAD');
       }
       const data = Buffer.from(bytes);
       if (data.length > MAX_DB_SIZE) throw new Error('Database data exceeds maximum allowed size');
+      if (!data.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
+        throw createCodedError('Database save payload must contain a valid SQLite database.', 'DATABASE_INVALID_SQLITE');
+      }
+      try {
+        await verifySQLiteDatabaseBytes(data);
+      } catch (cause) {
+        throw createCodedError(
+          'Database save payload is not a valid, complete application SQLite database.',
+          'DATABASE_INVALID_SQLITE',
+          cause,
+        );
+      }
       const key = await getKey();
       const encrypted = encryptDatabaseBytes(data, key);
       await atomicWrite(fs, DB_FILE, encrypted);
@@ -437,8 +458,6 @@ function registerDatabaseHandlers({
       }
       const strategy = await backupStrategyService.apply321Strategy({
         BACKUP_DIR,
-        DATA_DIR,
-        APP_DATA_DIR,
         backupPath: target,
         offsiteBackupDir,
         verifyRestoreImpl: async (offsitePath) => {

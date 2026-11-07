@@ -37,7 +37,8 @@ export const SyncClientSettings: React.FC = () => {
     running: boolean;
     ip: string | null;
     nodeName?: string;
-    peers?: Array<{ name: string; ip: string | null; online: boolean }>;
+    dnsName?: string | null;
+    peers?: Array<{ name: string; ip: string | null; dnsName?: string | null; online: boolean }>;
   } | null>(null);
   const [authKey, setAuthKey] = useState('');
   const [tsBusy, setTsBusy] = useState(false);
@@ -117,8 +118,8 @@ export const SyncClientSettings: React.FC = () => {
   };
 
   const copyServerUrl = () => {
-    if (!tailscale?.ip) return;
-    const fullUrl = `http://${tailscale.ip}:47821`;
+    if (!tailscale?.dnsName) return;
+    const fullUrl = `https://${tailscale.dnsName}:47821`;
     navigator.clipboard.writeText(fullUrl);
     setCopied(true);
     toast.success('تم نسخ رابط خادم المعرض: ' + fullUrl);
@@ -254,25 +255,33 @@ export const SyncClientSettings: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-900">الشبكة المشفرة المباشرة (Tailscale)</h3>
-              <p className="text-[11px] text-slate-500">ربط مباشر بين الأجهزة عبر الإنترنت بدون الحاجة لسيرفر سحابي</p>
+              <p className="text-[11px] text-slate-500">يجب استخدام HTTPS بشهادة موثوقة؛ عنوان Tailscale وحده لا يثبت هوية الخادم.</p>
             </div>
           </div>
 
           {/* عنوان جهاز المعرض مع زر نسخ فوري */}
-          {tailscale?.running && tailscale.ip && (
+          {tailscale?.running && (
             <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-1.5 border border-sky-200 shadow-xs">
-              <span className="text-[11px] font-bold text-slate-500">عنوان خادم هذا الجهاز:</span>
-              <span className="text-xs font-mono font-black text-sky-700 bg-sky-50 px-2 py-0.5 rounded" dir="ltr">
-                http://{tailscale.ip}:47821
-              </span>
-              <button
-                type="button"
-                onClick={copyServerUrl}
-                className="flex items-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 px-2.5 py-1 text-[11px] font-bold text-white transition shadow-xs"
-              >
-                {copied ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
-                <span>{copied ? 'تم النسخ!' : 'نسخ الرابط'}</span>
-              </button>
+              {tailscale.dnsName ? (
+                <>
+                  <span className="text-[11px] font-bold text-slate-500">عنوان HTTPS لهذا الجهاز:</span>
+                  <span className="text-xs font-mono font-black text-sky-700 bg-sky-50 px-2 py-0.5 rounded" dir="ltr">
+                    https://{tailscale.dnsName}:47821
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyServerUrl}
+                    className="flex items-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 px-2.5 py-1 text-[11px] font-bold text-white transition shadow-xs"
+                  >
+                    {copied ? <Check className="h-3.5 w-3.5 text-white" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span>{copied ? 'تم النسخ!' : 'نسخ الرابط'}</span>
+                  </button>
+                </>
+              ) : (
+                <span className="text-[11px] font-bold text-amber-700">
+                  لا يتوفر اسم DNS؛ لا تستخدم عنوان IP مع HTTP لإعداد المزامنة.
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -294,23 +303,24 @@ export const SyncClientSettings: React.FC = () => {
             {/* الأجهزة الأخرى المتصلة على نفس الشبكة */}
             {tailscale?.peers && tailscale.peers.length > 0 && (
               <div className="space-y-1">
-                <span className="text-[11px] font-bold text-slate-600 block">اضغط لاختيار أحد أجهزتك المتصلة كخادم:</span>
+                <span className="text-[11px] font-bold text-slate-600 block">اختر جهازاً له اسم DNS وشهادة HTTPS موثوقة:</span>
                 <div className="flex flex-wrap gap-1.5">
                   {tailscale.peers.map((p, idx) => (
                     <button
                       key={idx}
                       type="button"
+                      disabled={!p.dnsName}
                       onClick={() => {
-                        if (p.ip) {
-                          update('url', `http://${p.ip}:47821`);
+                        if (p.dnsName) {
+                          update('url', `https://${p.dnsName}:47821`);
                           toast.success('تم اختيار الجهاز: ' + p.name);
                         }
                       }}
-                      className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:border-sky-400 hover:bg-sky-50 transition"
+                      className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:border-sky-400 hover:bg-sky-50 transition disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <span className={'h-2 w-2 rounded-full ' + (p.online ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300')} />
                       <span>{p.name}</span>
-                      <span className="font-mono text-slate-400 text-[10px]" dir="ltr">({p.ip})</span>
+                      <span className="font-mono text-slate-400 text-[10px]" dir="ltr">({p.dnsName || p.ip || 'بدون عنوان'})</span>
                     </button>
                   ))}
                 </div>
@@ -356,7 +366,7 @@ export const SyncClientSettings: React.FC = () => {
           <div>
             <h2 className="text-sm font-black text-slate-900">بيانات خادم المزامنة</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              أدخل عنوان خادم المعرض ومعرّفات الربط لتمكين المزامنة الفورية.
+              استخدم HTTPS مع شهادة موثوقة تطابق اسم الخادم. يُسمح بـHTTP على هذا الجهاز المحلي فقط.
             </p>
           </div>
           {restartRequired && (
@@ -372,7 +382,7 @@ export const SyncClientSettings: React.FC = () => {
             <input
               value={form.url}
               onChange={(event) => update('url', event.target.value)}
-              placeholder="http://100.x.x.x:47821"
+              placeholder="https://branch.example:47821"
               className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-xs focus:ring-2 focus:ring-sky-500 focus:outline-none"
               dir="ltr"
             />

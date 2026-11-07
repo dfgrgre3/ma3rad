@@ -311,7 +311,7 @@ function registerLicenseHandlers({
   validateIpcSender,
   appDataDir,
   licenseMode,
-  authorizeLicenseModeChange = async () => false,
+  authorizeLicenseModeChange = /** @type {(username: string, password: string) => Promise<boolean>} */ (async () => false),
 }) {
   const guard = new LicenseGuard(appDataDir, { licenseMode });
 

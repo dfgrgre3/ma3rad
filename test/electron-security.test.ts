@@ -152,6 +152,32 @@ test('Tailscale accepts only bounded auth keys and passes CLI arguments separate
   ]);
 });
 
+test('Tailscale status exposes DNS names for HTTPS sync endpoints', async () => {
+  const service = new TailscaleService();
+  service.runCommand = async () => ({
+    ok: true,
+    stdout: JSON.stringify({
+      Self: {
+        HostName: 'gallery',
+        DNSName: 'gallery.example-tailnet.ts.net.',
+        TailscaleIPs: ['100.64.0.10'],
+      },
+      Peer: {
+        peer1: {
+          HostName: 'branch',
+          DNSName: 'branch.example-tailnet.ts.net.',
+          TailscaleIPs: ['100.64.0.11'],
+          Online: true,
+        },
+      },
+    }),
+  });
+
+  const status = await service.getStatus();
+  assert.equal(status.dnsName, 'gallery.example-tailnet.ts.net');
+  assert.equal(status.peers[0].dnsName, 'branch.example-tailnet.ts.net');
+});
+
 test('route guards use the same permissions as navigation entries', async () => {
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();

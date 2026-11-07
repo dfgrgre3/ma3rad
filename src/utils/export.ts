@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { localDateString } from './date';
 import { ExportService } from '../services/ExportService';
 import { SettingsService } from '../services/SettingsService';
@@ -271,42 +270,92 @@ export async function downloadPdf(html: string, fileName: string): Promise<boole
 
 export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, permission }: ExportOptions): void {
   if (permission) ExportService.assertAllowed(permission);
-  const header = columns.map((c) => c.label);
-  const body = rows.map((row) =>
-    columns.map((c) => {
-      const v = row[c.key];
-      return v === null || v === undefined ? '' : v;
-    })
-  );
-  
+
   let companyName = 'معرض السيراميك والبورسلين';
   try {
     const s = SettingsService.getSettings();
     companyName = s.showroomName || s.brandName || companyName;
   } catch { /* ignore */ }
 
-  const meta: unknown[][] = [
-    [companyName],
-    [title],
-    [subtitle || `تاريخ التصدير: ${stamp()}`],
-    [],
-  ];
-
-  if (kpis && kpis.length > 0) {
-    meta.push(['المؤشرات الإجمالية:']);
-    meta.push(kpis.map((k) => `${k.label}: ${k.value}`));
-    meta.push([]);
+  const exportedAt = stamp();
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL('../workers/excelExport.worker.ts', import.meta.url), { type: 'module' });
+  } catch (error) {
+    console.error('Could not create Excel export worker:', error);
+    window.alert('تعذر بدء تصدير Excel. حاول مرة أخرى.');
+    return;
   }
 
-  const sheet = XLSX.utils.aoa_to_sheet([...meta, header, ...body]);
-  sheet['!cols'] = columns.map((c) => ({ wch: Math.max(16, c.label.length + 5) }));
-  
-  // Set right-to-left flag for excel sheet
-  sheet['!views'] = [{ rightToLeft: true }];
+  const startedAt = performance.now();
+  const timeout = window.setTimeout(() => {
+    worker.terminate();
+    console.error('Excel export failed: background workbook generation timed out.');
+    window.alert('تعذر إنشاء ملف Excel في الوقت المحدد. حاول تصدير نطاق أصغر.');
+  }, 120_000);
+  const finish = () => {
+    window.clearTimeout(timeout);
+    worker.terminate();
+  };
 
-  const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, sheet, 'التقرير');
-  XLSX.writeFile(book, `${safeName(fileName)}-${stamp()}.xlsx`);
+  worker.onmessage = (event: MessageEvent<{ bytes?: ArrayBuffer; error?: string }>) => {
+    finish();
+    if (event.data.error || !event.data.bytes) {
+      console.error('Excel export failed:', event.data.error || 'The background worker returned no workbook.');
+      window.alert('تعذر إنشاء ملف Excel. تحقق من البيانات وحاول مرة أخرى.');
+      return;
+    }
+
+    try {
+      const blob = new Blob([event.data.bytes], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${safeName(fileName)}-${exportedAt}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Could not download the generated Excel workbook:', error);
+      window.alert('تم إنشاء التقرير لكن تعذر تنزيل ملف Excel.');
+      return;
+    }
+
+    if (import.meta.env.DEV) {
+      console.info('[performance] Excel export worker completed', {
+        rowCount: rows.length,
+        durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+      });
+    }
+  };
+  worker.onerror = (event) => {
+    finish();
+    console.error('Excel export worker failed:', event.message);
+    window.alert('تعذر إنشاء ملف Excel في الخلفية. حاول مرة أخرى.');
+  };
+  worker.onmessageerror = () => {
+    finish();
+    console.error('Excel export worker returned an unreadable result.');
+    window.alert('تعذر استلام ملف Excel الناتج. حاول مرة أخرى.');
+  };
+
+  try {
+    worker.postMessage({
+      title,
+      subtitle: subtitle || `تاريخ التصدير: ${exportedAt}`,
+      columns,
+      rows,
+      companyName,
+      kpis,
+    });
+  } catch (error) {
+    finish();
+    console.error('Could not start Excel export worker:', error);
+    window.alert('تعذر بدء تصدير Excel. حاول مرة أخرى.');
+  }
 }
 
 export function exportToPdf(options: ExportOptions): void {

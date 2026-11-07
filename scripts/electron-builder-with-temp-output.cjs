@@ -33,6 +33,16 @@ function copyOutputWithRetry(source, destination, copyOutput, wait = waitBeforeR
   }
 }
 
+function assertCommercialBuild(distDirectory = path.join(projectRoot, 'dist')) {
+  const metadataPath = path.join(distDirectory, 'build-info.json');
+  const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+  if (metadata.flavor !== 'commercial' || metadata.activationBypass !== false) {
+    throw new Error(
+      'Refusing to package a non-commercial frontend build; run the commercial build before creating a release artifact.',
+    );
+  }
+}
+
 function runBuilder(args, env = process.env) {
   const child = spawnSync(process.execPath, [builderCli, ...args], {
     cwd: projectRoot,
@@ -56,6 +66,7 @@ function runBuilder(args, env = process.env) {
 function buildWithTemporaryOutput(args, {
   runBuilder: runBuilderProcess = runBuilder,
   restoreSource: restoreSourceFiles = () => require('./restore-source.cjs').restoreSource(),
+  assertCommercialBuild: assertCommercialFrontend = assertCommercialBuild,
   createTemporaryOutput = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-electron-builder-')),
   outputDirectory = path.resolve(projectRoot, packageJson.build.directories.output || 'release'),
   copyOutput = (source, destination) => fs.cpSync(source, destination, { recursive: true, force: true }),
@@ -68,6 +79,13 @@ function buildWithTemporaryOutput(args, {
   if (args.includes('--version') || args.includes('--help') || args.includes('-h')) {
     runBuilder(args);
     return;
+  }
+
+  try {
+    assertCommercialFrontend();
+  } catch (error) {
+    restoreSourceFiles();
+    throw error;
   }
 
   const windowsBuild = args.includes('--win');
@@ -148,4 +166,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildWithTemporaryOutput };
+module.exports = { assertCommercialBuild, buildWithTemporaryOutput };

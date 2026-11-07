@@ -9,6 +9,11 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const MAX_BATCH_SIZE = 250;
 const MAX_EVENT_BYTES = 1024 * 1024;
 const MAX_JOURNAL_SEGMENT_BYTES = 16 * 1024 * 1024;
+const MAX_JOURNAL_BYTES = 256 * 1024 * 1024;
+const MAX_JOURNAL_TENANT_BYTES = 128 * 1024 * 1024;
+const MAX_JOURNAL_BRANCH_BYTES = 32 * 1024 * 1024;
+const MAX_JOURNAL_RECORDS = 100_000;
+const MAX_JOURNAL_SEGMENTS = 64;
 const VALID_OPERATIONS = new Set(['CREATE', 'UPDATE', 'DELETE', 'UPSERT']);
 const POLICY_CONTROLLED_ENTITIES = new Set([
   'category', 'brand', 'product', 'customer', 'supplier', 'sales_invoice', 'sales_return',
@@ -19,19 +24,6 @@ function isLoopbackHost(host) {
   const normalized = String(host).toLowerCase().replace(/^\[|\]$/g, '');
   return normalized === 'localhost' || normalized === '::1' ||
     (isIP(normalized) === 4 && normalized.startsWith('127.'));
-}
-
-/**
- * Returns true for Tailscale CGNAT addresses (100.64.0.0/10).
- * Traffic on this range is end-to-end encrypted by the Tailscale WireGuard
- * tunnel, so plain HTTP is safe and acceptable here.
- */
-function isTailscaleHost(host) {
-  const normalized = String(host).toLowerCase().replace(/^\[|\]$/g, '');
-  if (isIP(normalized) !== 4) return false;
-  const parts = normalized.split('.').map(Number);
-  // Tailscale uses 100.64.0.0/10 -> first octet 100, second octet 64-127
-  return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
 }
 
 function constantTimeEqual(left, right) {
@@ -108,13 +100,26 @@ function validateEvent(input, identity) {
 }
 
 class SyncJournal {
-  constructor(filePath, encryptionKey) {
+  constructor(
+    filePath,
+    encryptionKey,
+    maxJournalBytes = MAX_JOURNAL_BYTES,
+    maxTenantJournalBytes = Math.min(MAX_JOURNAL_TENANT_BYTES, maxJournalBytes),
+    maxBranchJournalBytes = Math.min(MAX_JOURNAL_BRANCH_BYTES, maxTenantJournalBytes)
+  ) {
     this.filePath = filePath;
     this.encryptionKey = encryptionKey;
+    this.maxJournalBytes = maxJournalBytes;
+    this.maxTenantJournalBytes = maxTenantJournalBytes;
+    this.maxBranchJournalBytes = maxBranchJournalBytes;
     this.records = [];
     this.byEventId = new Map();
     this.policies = new Map();
+    this.tenantJournalBytes = new Map();
+    this.branchJournalBytes = new Map();
     this.journalByteLength = 0;
+    this.totalJournalBytes = 0;
+    this.segmentCount = 0;
     this.activeJournalPath = filePath;
     this.writeQueue = Promise.resolve();
     this.writeError = null;
@@ -145,12 +150,24 @@ class SyncJournal {
         return { filePath: path.join(directory, name), firstSequence };
       })
       .sort((left, right) => left.firstSequence - right.firstSequence);
+    if (segments.length > MAX_JOURNAL_SEGMENTS) {
+      throw new Error(`Sync journal exceeds the maximum of ${MAX_JOURNAL_SEGMENTS} segments`);
+    }
     const hasBase = names.includes(baseName);
+    /** @type {Array<{ filePath: string; firstSequence: number; legacy?: boolean }>} */
     const journalFiles = [
       ...(hasBase ? [{ filePath: this.filePath, firstSequence: 1, legacy: true }] : []),
       ...segments,
     ];
     if (journalFiles.length === 0) return;
+
+    let totalBytes = 0;
+    for (const journalFile of journalFiles) {
+      totalBytes += (await fs.stat(journalFile.filePath)).size;
+      if (totalBytes > this.maxJournalBytes) {
+        throw new Error(`Sync journal exceeds its ${this.maxJournalBytes}-byte storage limit`);
+      }
+    }
 
     let expectedSequence = 1;
     for (let index = 0; index < journalFiles.length; index++) {
@@ -174,6 +191,11 @@ class SyncJournal {
     const activeFile = journalFiles[journalFiles.length - 1];
     this.activeJournalPath = activeFile.filePath;
     this.journalByteLength = (await fs.stat(activeFile.filePath)).size;
+    this.totalJournalBytes = 0;
+    for (const journalFile of journalFiles) {
+      this.totalJournalBytes += (await fs.stat(journalFile.filePath)).size;
+    }
+    this.segmentCount = segments.length;
   }
 
   async loadJournalFile(filePath, expectedSequence, finalFile) {
@@ -275,8 +297,21 @@ class SyncJournal {
   }
 
   indexRecord(record, sequence, filePath, offset, length) {
+    if (this.records.length >= MAX_JOURNAL_RECORDS) {
+      throw new Error(`Sync journal exceeds the maximum of ${MAX_JOURNAL_RECORDS} records`);
+    }
     const key = `${record.tenantId}\0${record.event.eventId}`;
     if (this.byEventId.has(key)) throw new Error(`Sync journal contains a duplicate event at sequence ${sequence}`);
+    const recordBytes = length + 1;
+    const branchKey = `${record.tenantId}\0${record.event.branchId}`;
+    const tenantBytes = this.tenantJournalBytes.get(record.tenantId) || 0;
+    const branchBytes = this.branchJournalBytes.get(branchKey) || 0;
+    if (tenantBytes + recordBytes > this.maxTenantJournalBytes) {
+      throw new Error(`Sync journal exceeds its ${this.maxTenantJournalBytes}-byte tenant storage limit`);
+    }
+    if (branchBytes + recordBytes > this.maxBranchJournalBytes) {
+      throw new Error(`Sync journal exceeds its ${this.maxBranchJournalBytes}-byte branch storage limit`);
+    }
     const metadata = {
       sequence: record.sequence,
       tenantId: record.tenantId,
@@ -290,6 +325,8 @@ class SyncJournal {
     };
     this.records.push(metadata);
     this.byEventId.set(key, metadata);
+    this.tenantJournalBytes.set(record.tenantId, tenantBytes + recordBytes);
+    this.branchJournalBytes.set(branchKey, branchBytes + recordBytes);
     this.applyPolicyRecord(record);
   }
 
@@ -382,12 +419,30 @@ class SyncJournal {
         tag: cipher.getAuthTag().toString('base64'),
         data: ciphertext.toString('base64'),
       })}\n`, 'utf8');
+      if (this.totalJournalBytes + serialized.length > this.maxJournalBytes) {
+        throw new Error(`Sync journal is full (${this.maxJournalBytes} bytes); new events are not accepted`);
+      }
+      if (this.records.length >= MAX_JOURNAL_RECORDS) {
+        throw new Error(`Sync journal reached the maximum of ${MAX_JOURNAL_RECORDS} records`);
+      }
+      const tenantBytes = this.tenantJournalBytes.get(tenantId) || 0;
+      if (tenantBytes + serialized.length > this.maxTenantJournalBytes) {
+        throw new Error(`Sync journal tenant quota reached (${this.maxTenantJournalBytes} bytes)`);
+      }
+      const branchKey = `${tenantId}\0${event.branchId}`;
+      const branchBytes = this.branchJournalBytes.get(branchKey) || 0;
+      if (branchBytes + serialized.length > this.maxBranchJournalBytes) {
+        throw new Error(`Sync journal branch quota reached (${this.maxBranchJournalBytes} bytes)`);
+      }
       await fs.mkdir(path.dirname(this.filePath), { recursive: true });
       let destinationPath = this.activeJournalPath;
       let destinationOffset = this.journalByteLength;
       let rotate = this.journalByteLength > 0 &&
         this.journalByteLength + serialized.length > MAX_JOURNAL_SEGMENT_BYTES;
       if (rotate) {
+        if (this.segmentCount >= MAX_JOURNAL_SEGMENTS) {
+          throw new Error(`Sync journal reached the maximum of ${MAX_JOURNAL_SEGMENTS} segments`);
+        }
         destinationPath = `${this.filePath}.segment-${String(sequence).padStart(16, '0')}.jsonl`;
         destinationOffset = 0;
       }
@@ -405,6 +460,8 @@ class SyncJournal {
       }
       this.activeJournalPath = destinationPath;
       this.journalByteLength = destinationOffset + serialized.length;
+      this.totalJournalBytes += serialized.length;
+      if (rotate) this.segmentCount++;
       this.indexRecord(record, sequence, destinationPath, destinationOffset, serialized.length - 1);
       return { duplicate: false, sequence };
     });
@@ -534,6 +591,9 @@ function createSyncRelay({
   host = '127.0.0.1',
   port = 47821,
   clients = [],
+  maxJournalBytes = MAX_JOURNAL_BYTES,
+  maxTenantJournalBytes = Math.min(MAX_JOURNAL_TENANT_BYTES, maxJournalBytes),
+  maxBranchJournalBytes = Math.min(MAX_JOURNAL_BRANCH_BYTES, maxTenantJournalBytes),
   tlsCertPath,
   tlsKeyPath,
 }) {
@@ -542,6 +602,17 @@ function createSyncRelay({
     throw new TypeError('A 256-bit sync journal encryption key is required');
   }
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new RangeError('Sync server port must be between 0 and 65535');
+  if (!Number.isSafeInteger(maxJournalBytes) || maxJournalBytes < 1 || maxJournalBytes > MAX_JOURNAL_BYTES) {
+    throw new RangeError(`Sync journal storage limit must be between 1 and ${MAX_JOURNAL_BYTES} bytes`);
+  }
+  if (!Number.isSafeInteger(maxTenantJournalBytes) || maxTenantJournalBytes < 1 ||
+      maxTenantJournalBytes > maxJournalBytes) {
+    throw new RangeError(`Sync journal tenant limit must be between 1 and ${maxJournalBytes} bytes`);
+  }
+  if (!Number.isSafeInteger(maxBranchJournalBytes) || maxBranchJournalBytes < 1 ||
+      maxBranchJournalBytes > maxTenantJournalBytes) {
+    throw new RangeError(`Sync journal branch limit must be between 1 and ${maxTenantJournalBytes} bytes`);
+  }
   if (Boolean(tlsCertPath) !== Boolean(tlsKeyPath)) {
     throw new Error('Both HTTPS certificate and key paths must be configured together');
   }
@@ -549,7 +620,13 @@ function createSyncRelay({
     throw new Error('HTTPS certificate and key are required when the sync server binds outside loopback');
   }
   const identities = normalizeClients(clients);
-  const journal = new SyncJournal(journalPath, encryptionKey);
+  const journal = new SyncJournal(
+    journalPath,
+    encryptionKey,
+    maxJournalBytes,
+    maxTenantJournalBytes,
+    maxBranchJournalBytes
+  );
   let server = null;
   const failedAuth = new Map();
 
@@ -709,6 +786,8 @@ function createSyncRelay({
         host: address?.address ?? null,
         port: address?.port ?? null,
         journalEvents: journal.records.length,
+        journalBytes: journal.totalJournalBytes,
+        journalSegments: journal.segmentCount,
       };
     },
   };
@@ -726,10 +805,10 @@ function createHttpSyncClient({ url, token, tenantId, branchId, deviceId, timeou
   }
   const isTrustedPlainHttp =
     (endpoint.protocol === 'http:') &&
-    (isLoopbackHost(endpoint.hostname) || isTailscaleHost(endpoint.hostname));
+    isLoopbackHost(endpoint.hostname);
   if (endpoint.protocol !== 'https:' && !isTrustedPlainHttp) {
     throw new Error(
-      'Sync connections require HTTPS, or HTTP on localhost / Tailscale (100.64-127.x.x.x).'
+      'Sync connections require HTTPS, or HTTP on localhost.'
     );
   }
   if (typeof token !== 'string' || Buffer.byteLength(token) < 32) throw new TypeError('A 32-byte sync bearer token is required');
@@ -752,9 +831,10 @@ function createHttpSyncClient({ url, token, tenantId, branchId, deviceId, timeou
     });
     const body = await response.json().catch(() => null);
     if (!response.ok) {
-      const error = new Error(body?.error || `Sync service returned HTTP ${response.status}`);
-      error.status = response.status;
-      throw error;
+      throw Object.assign(
+        new Error(body?.error || `Sync service returned HTTP ${response.status}`),
+        { status: response.status },
+      );
     }
     return body;
   }

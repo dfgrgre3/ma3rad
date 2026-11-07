@@ -108,10 +108,20 @@ function acquireBuildLock({
   }
 }
 
-function runNodeScript(scriptPath, args = [], nodeOptions = []) {
+function resolveBuildFlavor(args) {
+  if (args.some((arg) => arg !== '--local')) {
+    throw new Error(`Unsupported frontend build argument: ${args.find((arg) => arg !== '--local')}`);
+  }
+  if (args.filter((arg) => arg === '--local').length > 1) {
+    throw new Error('The --local frontend build argument may only be specified once.');
+  }
+  return args.includes('--local') ? 'local' : 'commercial';
+}
+
+function runNodeScript(scriptPath, args = [], nodeOptions = [], env = process.env) {
   const child = spawnSync(process.execPath, [...nodeOptions, scriptPath, ...args], {
     cwd: projectRoot,
-    env: process.env,
+    env,
     stdio: 'inherit',
   });
 
@@ -122,21 +132,29 @@ function runNodeScript(scriptPath, args = [], nodeOptions = []) {
   }
 }
 
-let releaseBuildLock;
-try {
-  releaseBuildLock = acquireBuildLock();
-  const viteCliPath = path.resolve(path.dirname(require.resolve('vite')), '..', '..', 'bin', 'vite.js');
-  runNodeScript(viteCliPath, ['build']);
-  runNodeScript(
-    path.join(__dirname, 'obfuscate-frontend.cjs'),
-    [],
-    ['--max-old-space-size=8192'],
-  );
-} catch (error) {
-  console.error('Frontend build failed:', error);
-  process.exitCode = 1;
-} finally {
-  releaseBuildLock?.();
+function buildFrontend(args = process.argv.slice(2)) {
+  let releaseBuildLock;
+  try {
+    const buildFlavor = resolveBuildFlavor(args);
+    releaseBuildLock = acquireBuildLock();
+    const viteCliPath = path.resolve(path.dirname(require.resolve('vite')), '..', '..', 'bin', 'vite.js');
+    runNodeScript(viteCliPath, ['build'], [], {
+      ...process.env,
+      CERAMISYS_BUILD_FLAVOR: buildFlavor,
+    });
+    runNodeScript(
+      path.join(__dirname, 'obfuscate-frontend.cjs'),
+      [],
+      ['--max-old-space-size=8192'],
+    );
+  } catch (error) {
+    console.error('Frontend build failed:', error);
+    process.exitCode = 1;
+  } finally {
+    releaseBuildLock?.();
+  }
 }
 
-module.exports = { acquireBuildLock };
+if (require.main === module) buildFrontend();
+
+module.exports = { acquireBuildLock, buildFrontend, resolveBuildFlavor };

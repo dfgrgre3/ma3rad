@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.electron.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "strict": false
+  },
+  "include": ["electron/**/*.js"]
+}

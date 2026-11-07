@@ -10,7 +10,9 @@ export function shouldShowFirstRunSetup(evidence: FirstRunSetupEvidence): boolea
     && !evidence.hasLegacyConfiguration;
 }
 
-export const BYPASS_FIRST_RUN_ACTIVATION = true;
+export const BYPASS_FIRST_RUN_ACTIVATION =
+  typeof __BYPASS_FIRST_RUN_ACTIVATION__ !== 'undefined'
+  && __BYPASS_FIRST_RUN_ACTIVATION__;
 
 /**
  * وضع التشغيل المحلي الشامل، عند الحاجة:

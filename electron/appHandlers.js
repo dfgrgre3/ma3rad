@@ -61,6 +61,7 @@ function registerAppHandlers({
   ipcMain.handle('app:info', async (event) => {
     validateIpcSender(event);
     const memory = process.memoryUsage();
+    /** @type {{ available: true; freeBytes: number; totalBytes: number } | { available: false; error: string }} */
     let disk = { available: false, error: 'قياس مساحة القرص غير مدعوم على هذا النظام.' };
     if (typeof fs.statfs === 'function') {
       try {

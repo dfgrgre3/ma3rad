@@ -1,0 +1,22 @@
+{
+  "electron/appHandlers.jsc": "b0cbfe202a6e027b94e0d0e8b4dbca3c9a1d23e41779fb922b560ef8104f7997",
+  "electron/autoUpdater.jsc": "51573328b5e8985c348a65945b647523b3382e7df697ac160febc04f664f0142",
+  "electron/centralApi.jsc": "57e0feb6148840956ca942e6592f2afae1add4c39e8c99acd6c35b04076ff190",
+  "electron/databaseHandlers.jsc": "00d3741e1ea24817a52ed621fcc97bf1a8ac6dfec7df5adef7fe9d7f40b34d6a",
+  "electron/documentHandlers.jsc": "b7deea51b75bb72fcac549f6b0e8c09bdbec50e1ff7abaf5d0f800258bb54fa4",
+  "electron/gracefulShutdown.jsc": "93b8e69e9e5f371b9849b65b80a6274de42300f77331d05fed368423fd64671c",
+  "electron/hardwareId.jsc": "893d4e4f6ec6cec2250c3930c06d8fe7bd9f7f761772338c7233168bccd33adc",
+  "electron/licenseGuard.jsc": "7562ec47e06ba506e83f62b1317967d1684b823074f7317e68fdf9dd9dcebbe8",
+  "electron/main.jsc": "c74e015de5c282d146962b920f8ef977cc48c801094e22766171d48b3f1ae6fe",
+  "electron/printing.jsc": "2b11998f180ebf9b724a6bd6e05e0289d3c76a9578a567399696f7b945c8bab7",
+  "electron/safeStorageCompat.jsc": "7a7014c36847db1fe89e6c874e4b7bfffc5eaadc7f2b6732af7404403e4c9a52",
+  "electron/security.jsc": "cac9b7499c21f84b80ef34eb00717449556af9f26fc35b4d46a96974d9b73991",
+  "electron/syncClientConfig.jsc": "7273b95c2e990aff156dbd4ca5900ff1f7ff3342adf68feed960865f79f7d834",
+  "electron/syncRelay.jsc": "538bec19d1433565bee94ca4296db238283196a438e8fda4e7494f925464eab9",
+  "electron/security/auditLogger.jsc": "ee7568488a948ec00d67b903f9fe4fb0240da02fd65de68f742e32f17b30142d",
+  "electron/security/crypto.jsc": "d2fa88bab1bbd2098724578997ce4821378bfce7631f15fd9d610cf30ca97cc5",
+  "electron/security/fileIntegrity.jsc": "0861c31f465e560640fb0529d7e292a0594d985465dab6aeff704b2a1699d4aa",
+  "electron/security/index.jsc": "85d367181a715c17f1a2eabf36d5b6f2d60706921e1d97677b9913fd316a218a",
+  "electron/security/ipcGuard.jsc": "92321705807634c71dc3ba05bff52e37e096a8902f86034f251efab54f2cc9c9",
+  "electron/security/licenseValidator.jsc": "2920a5cc5b64fe9bdba00cf5dd2fb11107c47322e641fd7c54564b3b1ec262ec"
+}

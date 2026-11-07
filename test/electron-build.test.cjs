@@ -6,8 +6,15 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const bytenode = require('bytenode');
+const { createHash } = require('node:crypto');
 const packageConfig = require('../package.json');
-const { acquireBuildLock } = require('../scripts/build-frontend.cjs');
+const { acquireBuildLock, resolveBuildFlavor } = require('../scripts/build-frontend.cjs');
+const {
+  filesToCompile,
+  pinBytecodeIntegrityManifest,
+  verifyBytecodeReproducibility,
+  writeBytecodeIntegrityManifest,
+} = require('../scripts/compile-bytenode.cjs');
 const { prepareProductionBundle } = require('../scripts/prepare-production-bundle.cjs');
 const { restoreSource } = require('../scripts/restore-source.cjs');
 
@@ -54,74 +61,200 @@ test('frontend build lock waiting stops after the configured timeout', (t) => {
   }), /Timed out waiting for frontend build lock held by PID 123/);
 });
 
-test('development loads main.js while packaged Electron requires main.jsc', () => {
-  const entryPath = path.join(projectRoot, 'electron', 'entry.js');
-  const source = fs.readFileSync(entryPath, 'utf8');
-
-  const loadEntry = (isPackaged) => {
-    const calls = [];
-    const fakeRequire = (id) => {
-      if (id === 'electron') return { app: { isPackaged } };
-      if (id === 'path') return path;
-      if (id === 'fs') return fs;
-      if (id === 'bytenode') {
-        calls.push(id);
-        return {};
-      }
-      calls.push(id);
-      return {};
-    };
-    vm.runInNewContext(source, {
-      __dirname: path.dirname(entryPath),
-      require: fakeRequire,
-    }, { filename: entryPath });
-    return calls;
-  };
-
-  assert.deepEqual(loadEntry(false), ['./main.js']);
-  assert.deepEqual(loadEntry(true), ['bytenode', path.join(projectRoot, 'electron', 'main.jsc')]);
+test('frontend build flavor is commercial by default and local only by explicit opt-in', () => {
+  assert.equal(resolveBuildFlavor([]), 'commercial');
+  assert.equal(resolveBuildFlavor(['--local']), 'local');
+  assert.throws(() => resolveBuildFlavor(['--local', '--commercial']), /Unsupported frontend build argument/);
+  assert.throws(() => resolveBuildFlavor(['--local', '--local']), /only be specified once/);
 });
 
-test('packaged entry falls back to source main.js when bytecode is missing or invalid', () => {
+test('release packaging rejects local or bypass-enabled frontend artifacts', (t) => {
+  const distDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-build-info-'));
+  t.after(() => fs.rmSync(distDirectory, { recursive: true, force: true }));
+  const { assertCommercialBuild } = require('../scripts/electron-builder-with-temp-output.cjs');
+  const metadataPath = path.join(distDirectory, 'build-info.json');
+
+  fs.writeFileSync(metadataPath, JSON.stringify({ flavor: 'local', activationBypass: true }));
+  assert.throws(() => assertCommercialBuild(distDirectory), /Refusing to package a non-commercial/);
+  fs.writeFileSync(metadataPath, JSON.stringify({ flavor: 'commercial', activationBypass: true }));
+  assert.throws(() => assertCommercialBuild(distDirectory), /Refusing to package a non-commercial/);
+  fs.writeFileSync(metadataPath, JSON.stringify({ flavor: 'commercial', activationBypass: false }));
+  assert.doesNotThrow(() => assertCommercialBuild(distDirectory));
+});
+
+test('release packaging restores Electron sources when the frontend flavor check fails', () => {
+  const { buildWithTemporaryOutput } = require('../scripts/electron-builder-with-temp-output.cjs');
+  let restored = false;
+  assert.throws(() => buildWithTemporaryOutput(['--linux'], {
+    assertCommercialBuild: () => { throw new Error('local frontend build'); },
+    restoreSource: () => { restored = true; },
+  }), /local frontend build/);
+  assert.equal(restored, true);
+});
+
+test('development loads source directly and packaged Electron verifies bytecode before requiring main.jsc', () => {
   const entryPath = path.join(projectRoot, 'electron', 'entry.js');
   const source = fs.readFileSync(entryPath, 'utf8');
-  const jscPath = path.join(projectRoot, 'electron', 'main.jsc');
+  const electronDir = path.dirname(entryPath);
+  const manifestPath = path.join(electronDir, 'bytecode-integrity.json');
+  const jscPath = path.join(electronDir, 'main.jsc');
+  const mockManifestContents = JSON.stringify({ 'electron/main.jsc': 'a'.repeat(64) });
+  const pinnedManifestHash = source.match(/BYTECODE_INTEGRITY_MANIFEST_SHA256 = '([a-f0-9]{64})'/)?.[1];
 
-  const loadEntry = ({ isPackaged, hasJsc = true, jscFails = false }) => {
+  const loadEntry = ({ isPackaged, actualHash = 'a'.repeat(64), jscFails = false } = {}) => {
     const calls = [];
     const fakeRequire = (id) => {
-      if (id === 'electron') return { app: { isPackaged } };
+      if (id === 'electron') return { app: { isPackaged, quit: () => calls.push('quit') } };
       if (id === 'path') return path;
       if (id === 'fs') return {
-        existsSync: (target) => {
-          if (target === jscPath) return hasJsc;
-          return false;
+        readdirSync: () => [{
+          name: 'main.jsc',
+          isDirectory: () => false,
+          isFile: () => true,
+        }],
+        readFileSync: (target) => {
+          if (target === manifestPath) return mockManifestContents;
+          if (target === jscPath) return Buffer.from('bytecode');
+          throw new Error(`Unexpected file read: ${target}`);
+        },
+      };
+      if (id === 'node:crypto') return {
+        createHash: () => {
+          let input;
+          return {
+            update(value) {
+              input = value.toString();
+              return this;
+            },
+            digest: () => {
+              if (!input.startsWith('{')) return actualHash;
+              return input === mockManifestContents ? pinnedManifestHash : '0'.repeat(64);
+            },
+          };
         },
       };
       if (id === 'bytenode') {
         calls.push(id);
         return {};
       }
-      if (id === jscPath) {
+      if (id === jscPath && jscFails) {
         calls.push(id);
-        if (jscFails) throw new Error('bytecode load failed');
-        return {};
+        throw new Error('bytecode load failed');
       }
       calls.push(id);
       return {};
     };
-
     vm.runInNewContext(source, {
       __dirname: path.dirname(entryPath),
       require: fakeRequire,
-      console: { warn: () => {} },
+      console: { error: () => {} },
     }, { filename: entryPath });
     return calls;
   };
 
   assert.deepEqual(loadEntry({ isPackaged: false }), ['./main.js']);
-  assert.deepEqual(loadEntry({ isPackaged: true, hasJsc: false }), ['./main.js']);
-  assert.deepEqual(loadEntry({ isPackaged: true, jscFails: true }), ['bytenode', jscPath, './main.js']);
+  assert.deepEqual(loadEntry({ isPackaged: true }), ['bytenode', jscPath]);
+  assert.deepEqual(loadEntry({ isPackaged: true, actualHash: 'b'.repeat(64) }), ['quit']);
+  assert.deepEqual(loadEntry({ isPackaged: true, jscFails: true }), ['bytenode', jscPath, 'quit']);
+});
+
+test('packaged Electron rejects tampering with every bytecode module before loading main.jsc', () => {
+  const entryPath = path.join(projectRoot, 'electron', 'entry.js');
+  const source = fs.readFileSync(entryPath, 'utf8');
+  const electronDir = path.dirname(entryPath);
+  const appRoot = path.dirname(electronDir);
+  const manifestPath = path.join(electronDir, 'bytecode-integrity.json');
+  const jscPath = path.join(electronDir, 'main.jsc');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const bytecodePaths = Object.keys(manifest).map((file) => path.resolve(appRoot, file));
+
+  for (const tamperedPath of [manifestPath, ...bytecodePaths]) {
+    const calls = [];
+    const fakeRequire = (id) => {
+      if (id === 'electron') return { app: { isPackaged: true, quit: () => calls.push('quit') } };
+      if (id === 'path') return path;
+      if (id === 'fs') return {
+        readdirSync: fs.readdirSync.bind(fs),
+        readFileSync: (target, ...args) => {
+          const contents = fs.readFileSync(target, ...args);
+          if (path.resolve(target) !== tamperedPath) return contents;
+          return Buffer.concat([contents, Buffer.from('tampered')]);
+        },
+      };
+      if (id === 'node:crypto') return { createHash };
+      if (id === 'bytenode') {
+        calls.push(id);
+        return {};
+      }
+      if (id === jscPath) calls.push(id);
+      return {};
+    };
+
+    vm.runInNewContext(source, {
+      __dirname: electronDir,
+      require: fakeRequire,
+      console: { error: () => {} },
+    }, { filename: entryPath });
+
+    assert.deepEqual(calls, ['quit'], `${path.relative(appRoot, tamperedPath)} must be rejected before loading bytecode`);
+  }
+});
+
+test('bytecode integrity manifest is pinned and covers every compiled Electron module', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-bytecode-manifest-'));
+  const electronDir = path.join(tempRoot, 'electron');
+  t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
+
+  for (const file of filesToCompile) {
+    const bytecodePath = path.join(electronDir, file.replace(/\.js$/, '.jsc'));
+    fs.mkdirSync(path.dirname(bytecodePath), { recursive: true });
+    fs.writeFileSync(bytecodePath, `compiled:${file}`);
+  }
+  fs.mkdirSync(electronDir, { recursive: true });
+  const entryPath = path.join(electronDir, 'entry.js');
+  const originalEntry = `const BYTECODE_INTEGRITY_MANIFEST_SHA256 = '${'0'.repeat(64)}';\n`;
+  fs.writeFileSync(entryPath, originalEntry);
+  writeBytecodeIntegrityManifest(electronDir);
+  pinBytecodeIntegrityManifest(electronDir);
+
+  const manifest = JSON.parse(fs.readFileSync(path.join(electronDir, 'bytecode-integrity.json'), 'utf8'));
+  const entrySource = fs.readFileSync(entryPath, 'utf8');
+  const manifestHash = createHash('sha256')
+    .update(fs.readFileSync(path.join(electronDir, 'bytecode-integrity.json')))
+    .digest('hex');
+  assert.ok(entrySource.includes(manifestHash));
+  assert.equal(fs.existsSync(`${entryPath}.bak`), true);
+  assert.deepEqual(Object.keys(manifest).sort(), filesToCompile
+    .map((file) => `electron/${file.replace(/\.js$/, '.jsc')}`)
+    .sort());
+  for (const [file, hash] of Object.entries(manifest)) {
+    assert.equal(
+      hash,
+      createHash('sha256').update(fs.readFileSync(path.join(tempRoot, file))).digest('hex'),
+    );
+  }
+
+  const checkedInManifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'electron', 'bytecode-integrity.json'), 'utf8'));
+  assert.deepEqual(Object.keys(checkedInManifest).sort(), Object.keys(manifest).sort());
+  for (const [file, hash] of Object.entries(checkedInManifest)) {
+    assert.equal(
+      hash,
+      createHash('sha256').update(fs.readFileSync(path.join(projectRoot, file))).digest('hex'),
+      `${file} must match its checked-in integrity hash`,
+    );
+  }
+  restoreSource(electronDir);
+  assert.equal(fs.readFileSync(entryPath, 'utf8'), originalEntry);
+});
+
+test('development runtime pins the current Electron entry source hash', () => {
+  const entryHash = createHash('sha256')
+    .update(fs.readFileSync(path.join(projectRoot, 'electron', 'entry.js')))
+    .digest('hex');
+  const mainSource = fs.readFileSync(path.join(projectRoot, 'electron', 'main.js'), 'utf8');
+
+  assert.ok(mainSource.includes(`ENTRY_SOURCE_INTEGRITY_SHA256 = '${entryHash}'`));
+  assert.match(mainSource, /!\s*app\.isPackaged\s*\?\s*\{\s*'electron\/entry\.js': ENTRY_SOURCE_INTEGRITY_SHA256\s*\}/);
 });
 
 test('distribution and publish commands compile Electron bytecode before packaging', () => {
@@ -212,6 +345,7 @@ test('electron-builder restores sources after the process exits on success and f
     buildWithTemporaryOutput(['--win', '--unsigned'], {
       createTemporaryOutput: () => temporaryOutput,
       outputDirectory,
+      assertCommercialBuild: () => {},
       restoreSource: () => restoreSource(path.join(fixtureRoot, 'electron')),
       runBuilder: (args) => {
         if (mode === 'failure') return false;
@@ -327,4 +461,25 @@ test('bytenode output executes the exact source passed to the compiler', async (
 
   await bytenode.compileFile({ filename: sourcePath, output: outputPath });
   assert.equal(require(outputPath)(), 'from-current-source');
+});
+
+test('release bytecode can be reproduced exactly from its Electron source', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-bytecode-repro-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const sourcePath = path.join(directory, 'main.js');
+  const artifactPath = path.join(directory, 'main.jsc');
+  fs.writeFileSync(sourcePath, "module.exports = () => 'reproducible';\n");
+  await bytenode.compileFile({
+    filename: sourcePath,
+    output: artifactPath,
+    electronMain: true,
+  });
+
+  await verifyBytecodeReproducibility({ directory, files: ['main.js'] });
+
+  fs.writeFileSync(sourcePath, "module.exports = () => 'changed';\n");
+  await assert.rejects(
+    verifyBytecodeReproducibility({ directory, files: ['main.js'] }),
+    /does not reproducibly match its source/,
+  );
 });

@@ -53,6 +53,13 @@ test('document vault imports into its own directory, hashes the file and rejects
 
   const handlers = new Map();
   const ipcMain = { handle: (name, handler) => handlers.set(name, handler) };
+  const appListeners = new Map();
+  const app = { on: (name, listener) => appListeners.set(name, listener) };
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString(),
+  };
   let senderChecks = 0;
   const opened = [];
   const validateIpcSender = () => { senderChecks++; return true; };
@@ -66,6 +73,8 @@ test('document vault imports into its own directory, hashes the file and rejects
     fsSync,
     shell: { openPath: async (target) => { opened.push(target); return ''; } },
     dialog: { showOpenDialog: async () => dialogResponse },
+    app,
+    safeStorage,
     appDataDir,
   });
 
@@ -81,12 +90,23 @@ test('document vault imports into its own directory, hashes the file and rejects
 
     const storedPath = path.join(appDataDir, 'documents', imported.storageName);
     assert.equal(fsSync.existsSync(storedPath), true);
-    assert.deepEqual(await fs.readFile(storedPath), bytes);
+    const storedBytes = await fs.readFile(storedPath);
+    assert.notDeepEqual(storedBytes, bytes);
+    assert.equal(storedBytes.subarray(0, 17).toString(), 'CERAMISYS-DOC\0v1\0');
 
     const openedResult = await handlers.get('documents:open')(event, imported.storageName);
     assert.equal(openedResult.ok, true);
     assert.equal(opened.length, 1);
-    assert.equal(path.dirname(opened[0]), path.join(appDataDir, 'documents'));
+    assert.equal(path.dirname(opened[0]), path.join(appDataDir, '.document-open'));
+    assert.deepEqual(await fs.readFile(opened[0]), bytes);
+    appListeners.get('will-quit')();
+    assert.equal(fsSync.existsSync(opened[0]), false);
+
+    const tamperedBytes = Buffer.from(storedBytes);
+    tamperedBytes[tamperedBytes.length - 1] ^= 0x01;
+    await fs.writeFile(storedPath, tamperedBytes);
+    const tamperedOpen = await handlers.get('documents:open')(event, imported.storageName);
+    assert.equal(tamperedOpen.ok, false);
 
     const traversal = await handlers.get('documents:open')(event, '../outside.pdf');
     assert.equal(traversal.ok, false);
@@ -110,5 +130,66 @@ test('document vault imports into its own directory, hashes the file and rejects
   } finally {
     await fs.rm(appDataDir, { recursive: true, force: true });
     await fs.rm(sourceDir, { recursive: true, force: true });
+  }
+});
+
+test('document vault migrates existing plaintext attachments and refuses writes without safeStorage', async () => {
+  const appDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-docs-migrate-'));
+  const sourceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-src-'));
+  const legacyBytes = Buffer.from('legacy contract contents');
+  const legacyName = `doc_${'a'.repeat(32)}.pdf`;
+  const legacyPath = path.join(appDataDir, 'documents', legacyName);
+  await fs.mkdir(path.dirname(legacyPath), { recursive: true });
+  await fs.writeFile(legacyPath, legacyBytes);
+
+  const handlers = new Map();
+  const ipcMain = { handle: (name, handler) => handlers.set(name, handler) };
+  const unavailableAppDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-docs-unavailable-'));
+  const sourceFile = path.join(sourceDir, 'new.pdf');
+  await fs.writeFile(sourceFile, 'new contract');
+  const register = (safeStorage) => registerDocumentHandlers({
+    ipcMain,
+    validateIpcSender: () => true,
+    path,
+    fs,
+    fsSync,
+    shell: { openPath: async () => '' },
+    dialog: { showOpenDialog: async () => ({ canceled: false, filePaths: [sourceFile] }) },
+    safeStorage,
+    appDataDir,
+  });
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString(),
+  };
+  const event = { senderFrame: { url: 'file:///index.html' } };
+  try {
+    register(safeStorage);
+    const info = await handlers.get('documents:info')(event);
+    assert.equal(info.ok, true);
+    const migratedBytes = await fs.readFile(legacyPath);
+    assert.notDeepEqual(migratedBytes, legacyBytes);
+    assert.equal(migratedBytes.subarray(0, 17).toString(), 'CERAMISYS-DOC\0v1\0');
+
+    const unavailableHandlers = new Map();
+    registerDocumentHandlers({
+      ipcMain: { handle: (name, handler) => unavailableHandlers.set(name, handler) },
+      validateIpcSender: () => true,
+      path,
+      fs,
+      fsSync,
+      shell: { openPath: async () => '' },
+      dialog: { showOpenDialog: async () => ({ canceled: false, filePaths: [sourceFile] }) },
+      safeStorage: { isEncryptionAvailable: () => false },
+      appDataDir: unavailableAppDataDir,
+    });
+    const unavailable = await unavailableHandlers.get('documents:import')(event);
+    assert.equal(unavailable.ok, false);
+    assert.match(unavailable.error, /تشفير مرفقات المستندات غير متاح/);
+  } finally {
+    await fs.rm(appDataDir, { recursive: true, force: true });
+    await fs.rm(sourceDir, { recursive: true, force: true });
+    await fs.rm(unavailableAppDataDir, { recursive: true, force: true });
   }
 });

@@ -37,53 +37,80 @@ function appCspPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => ({
-  plugins: [react(), appCspPlugin()],
-  define: {
-    __APP_VERSION__: JSON.stringify(packageJson.version),
-  },
-  clearScreen: false,
-  logLevel: 'info',
-  // Electron loads the packaged renderer from file://, so root-absolute URLs
-  // like /assets/... resolve outside the app bundle and leave a blank window.
-  // Relative URLs also work when Vite serves the app from the LAN host root.
-  base: './',
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      crypto: path.resolve(__dirname, './src/shims/crypto.ts'),
+export default defineConfig(({ command }) => {
+  const buildFlavor = process.env.CERAMISYS_BUILD_FLAVOR
+    ?? (command === 'serve' ? 'local' : 'commercial');
+  if (buildFlavor !== 'local' && buildFlavor !== 'commercial') {
+    throw new Error(`Invalid CERAMISYS_BUILD_FLAVOR: ${buildFlavor}`);
+  }
+  const activationBypass = buildFlavor === 'local';
+  const plugins: Plugin[] = [react(), appCspPlugin()];
+
+  if (command === 'build') {
+    plugins.push({
+      name: 'ceramisys-build-flavor',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'build-info.json',
+          source: JSON.stringify({
+            flavor: buildFlavor,
+            activationBypass,
+          }),
+        });
+      },
+    });
+  }
+
+  return {
+    plugins,
+    define: {
+      __APP_VERSION__: JSON.stringify(packageJson.version),
+      __BYPASS_FIRST_RUN_ACTIVATION__: JSON.stringify(activationBypass),
     },
-  },
-  server: {
-    port: 5173,
-    strictPort: true,
-    watch: {
-      ignored: [
-        '**/.electron-data/**',
-        '**/release/**',
-        'release/**',
-      ],
+    clearScreen: false,
+    logLevel: 'info',
+    // Electron loads the packaged renderer from file://, so root-absolute URLs
+    // like /assets/... resolve outside the app bundle and leave a blank window.
+    // Relative URLs also work when Vite serves the app from the LAN host root.
+    base: './',
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        crypto: path.resolve(__dirname, './src/shims/crypto.ts'),
+      },
     },
-  },
-  build: {
-    outDir: 'dist',
-    emptyOutDir: true,
-    sourcemap: false,
-    target: process.env.CERAMISYS_LEGACY_BUILD === '1' ? 'chrome108' : 'modules',
-    chunkSizeWarningLimit: 2000,
-    // Keep stable third-party code cacheable and out of the application entry chunk.
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined;
-          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
-          if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
-          if (id.includes('xlsx')) return 'vendor-xlsx';
-          if (id.includes('jspdf')) return 'vendor-pdf';
-          if (id.includes('sql.js')) return 'vendor-sqlite';
-          return undefined;
+    server: {
+      port: 5173,
+      strictPort: true,
+      watch: {
+        ignored: [
+          '**/.electron-data/**',
+          '**/release/**',
+          'release/**',
+        ],
+      },
+    },
+    build: {
+      outDir: 'dist',
+      emptyOutDir: true,
+      sourcemap: false,
+      target: process.env.CERAMISYS_LEGACY_BUILD === '1' ? 'chrome108' : 'modules',
+      chunkSizeWarningLimit: 2000,
+      // Keep stable third-party code cacheable and out of the application entry chunk.
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
+            if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
+            if (id.includes('xlsx')) return 'vendor-xlsx';
+            if (id.includes('jspdf')) return 'vendor-pdf';
+            if (id.includes('sql.js')) return 'vendor-sqlite';
+            return undefined;
+          },
         },
       },
     },
-  }
-}));
+  };
+});

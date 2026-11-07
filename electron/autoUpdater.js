@@ -104,7 +104,7 @@ function configureAutoUpdater({
   app,
   updater,
   ipcMain,
-  validateIpcSender = () => {},
+  validateIpcSender = /** @type {(event: unknown) => void} */ (() => {}),
   getWindow = () => null,
   onInstallRequested = () => {},
   platform = process.platform,

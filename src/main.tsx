@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { Profiler } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { reportSlowReactRender, startRendererPerformanceMonitoring } from './services/rendererPerformanceMonitor';
+
+startRendererPerformanceMonitoring();
 
 function reportRendererError(kind: string, value: unknown): void {
   const error = value instanceof Error ? value : new Error(String(value));
@@ -23,8 +26,14 @@ window.addEventListener('unhandledrejection', (event) => {
   reportRendererError('unhandled-rejection', event.reason);
 });
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+const app = (
   <React.StrictMode>
     <App />
-  </React.StrictMode>,
+  </React.StrictMode>
+);
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  import.meta.env.DEV
+    ? <Profiler id="CeramiSys" onRender={reportSlowReactRender}>{app}</Profiler>
+    : app,
 );

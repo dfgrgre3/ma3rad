@@ -73,7 +73,7 @@ function validateByteArray(bytes, { maxBytes = 50 * 1024 * 1024, field = 'Byte p
   if (!(bytes instanceof Uint8Array) && !Array.isArray(bytes)) {
     throw new TypeError(`${field} must be a byte array or Buffer.`);
   }
-  const length = bytes.length ?? bytes.byteLength ?? 0;
+  const length = bytes instanceof Uint8Array ? bytes.byteLength : bytes.length;
   if (length > maxBytes) {
     throw new RangeError(`${field} exceeds maximum allowed size of ${maxBytes} bytes.`);
   }

@@ -71,6 +71,9 @@ class TailscaleService {
       const self = data.Self || {};
       const ips = self.TailscaleIPs || [];
       const ipv4 = ips.find((ip) => ip.includes('.')) || null;
+      const dnsName = typeof self.DNSName === 'string'
+        ? self.DNSName.replace(/\.$/, '')
+        : null;
 
       const peers = [];
       if (data.Peer) {
@@ -80,6 +83,7 @@ class TailscaleService {
           peers.push({
             name: p.HostName || p.DNSName,
             ip: peerIps.find((ip) => ip.includes('.')) || null,
+            dnsName: typeof p.DNSName === 'string' ? p.DNSName.replace(/\.$/, '') : null,
             online: Boolean(p.Online),
             os: p.OS
           });
@@ -91,6 +95,7 @@ class TailscaleService {
         running: self.Online !== false,
         ip: ipv4,
         nodeName: self.HostName,
+        dnsName,
         peers,
         backendState: data.BackendState
       };

@@ -11,7 +11,13 @@ const {
 const { registerAppHandlers } = require('../electron/appHandlers');
 const { registerPrintingHandlers } = require('../electron/printing');
 
-async function createHandlers(fsImpl = fs, safeStorageOverride, openPath = async () => '') {
+async function createHandlers(
+  fsImpl = fs,
+  safeStorageOverride,
+  openPath = async () => '',
+  maxDbSize = 4 * 1024 * 1024,
+  validateIpcSenderImpl = () => true,
+) {
   const appDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-electron-'));
   const dataDir = path.join(appDataDir, 'data');
   const backupDir = path.join(appDataDir, 'backups');
@@ -22,7 +28,7 @@ async function createHandlers(fsImpl = fs, safeStorageOverride, openPath = async
     handle: (name, handler) => handlers.set(name, handler),
     on: (name, handler) => events.set(name, handler),
   };
-  const validateIpcSender = () => true;
+  const validateIpcSender = validateIpcSenderImpl;
   let restartRequested = 0;
   let shutdownRequested = 0;
   const ensureDirs = () => {
@@ -52,7 +58,7 @@ async function createHandlers(fsImpl = fs, safeStorageOverride, openPath = async
     ipcMain, validateIpcSender, app, path, fs: fsImpl, fsSync, safeStorage,
     APP_DATA_DIR: appDataDir, DATA_DIR: dataDir, BACKUP_DIR: backupDir,
     DB_FILE: dbFile, REMEMBERED_CREDENTIALS_FILE: path.join(appDataDir, 'credentials.enc'),
-    ensureDirs, databaseFileExists, MAX_DB_SIZE: 4,
+    ensureDirs, databaseFileExists, MAX_DB_SIZE: maxDbSize,
   });
   registerAppHandlers({
     ipcMain, validateIpcSender, app, path, fs,
@@ -77,42 +83,126 @@ async function createHandlers(fsImpl = fs, safeStorageOverride, openPath = async
   };
 }
 
+async function createValidDatabaseBytes() {
+  return createDatabaseBytes(['users', 'products', 'system_settings', 'sales_invoices']);
+}
+
+async function createDatabaseBytes(tableNames) {
+  const sqlJsModule = require('sql.js');
+  const initializeSqlJs = sqlJsModule.default || sqlJsModule;
+  const SQL = await initializeSqlJs({
+    locateFile: (fileName) => path.join(path.dirname(require.resolve('sql.js')), fileName),
+  });
+  const database = new SQL.Database();
+  for (const table of tableNames) {
+    database.run(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY)`);
+  }
+  const bytes = Buffer.from(database.export());
+  database.close();
+  return bytes;
+}
+
 test('registered database handlers initialize directories and load/save within the size limit', async () => {
-  const context = await createHandlers();
+  const databaseBytes = await createValidDatabaseBytes();
+  const context = await createHandlers(fs, undefined, undefined, databaseBytes.length);
   try {
     const { handlers, event, dbFile, dataDir, backupDir } = context;
     assert.equal(await handlers.get('db:load')(event), null);
     assert.ok(fsSync.existsSync(dataDir));
     assert.ok(fsSync.existsSync(backupDir));
 
-    const saved = await handlers.get('db:save')(event, new Uint8Array([1, 2, 3, 4]));
+    const saved = await handlers.get('db:save')(event, databaseBytes);
     assert.equal(saved.ok, true);
     assert.equal(saved.path, dbFile);
-    assert.ok(saved.bytes > 4);
+    assert.ok(saved.bytes > databaseBytes.length);
     const encryptedOnDisk = await fs.readFile(dbFile);
     assert.equal(encryptedOnDisk.subarray(0, 16).toString(), 'CERAMISYS-DB\0v1\0');
     assert.deepEqual(
       Array.from(await handlers.get('db:load')(event)),
-      [1, 2, 3, 4],
+      Array.from(databaseBytes),
     );
     assert.deepEqual(
       Array.from(await handlers.get('db:decrypt-local-backup')(event, encryptedOnDisk)),
-      [1, 2, 3, 4],
+      Array.from(databaseBytes),
     );
+
+    const originalDatabaseFile = await fs.readFile(dbFile);
     const originalConsoleError = console.error;
     let saveError;
-    let oversizedSave;
+    const invalidSaves = [];
     console.error = (...args) => { saveError = args; };
     try {
-      oversizedSave = await handlers.get('db:save')(event, new Uint8Array([1, 2, 3, 4, 5]));
+      for (const invalidBytes of [
+        new Uint8Array(0),
+        Buffer.from('not a SQLite database'),
+        Buffer.concat([Buffer.from('SQLite format 3\0'), Buffer.from([1, 2, 3])]),
+        await createDatabaseBytes(['customers', 'sales_invoices', 'sales_returns', 'journal_entries']),
+      ]) {
+        invalidSaves.push(await handlers.get('db:save')(event, invalidBytes));
+      }
     } finally {
       console.error = originalConsoleError;
     }
-    assert.match(oversizedSave.error, /maximum allowed size/i);
-    assert.match(String(saveError && saveError[1]), /Database data exceeds maximum allowed size/);
+    for (const invalidSave of invalidSaves) {
+      assert.equal(invalidSave.ok, false);
+      assert.equal(invalidSave.code, 'DATABASE_INVALID_SQLITE');
+      assert.match(invalidSave.error, /valid.*SQLite database/i);
+    }
+    assert.match(String(saveError && saveError[1]), /valid.*SQLite database/i);
+    assert.deepEqual(await fs.readFile(dbFile), originalDatabaseFile);
 
-    await fs.writeFile(dbFile, Buffer.from([1, 2, 3, 4, 5]));
+    const originalConsoleErrorForOversizedSave = console.error;
+    let oversizedSave;
+    console.error = () => {};
+    try {
+      oversizedSave = await handlers.get('db:save')(event, Buffer.concat([databaseBytes, Buffer.from([0])]));
+    } finally {
+      console.error = originalConsoleErrorForOversizedSave;
+    }
+    assert.match(oversizedSave.error, /maximum allowed size/i);
+
+    await fs.writeFile(dbFile, Buffer.alloc(databaseBytes.length + 1));
     await assert.rejects(handlers.get('db:load')(event), /maximum allowed size/i);
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
+test('database IPC validates the sender before accessing backup or database files', async () => {
+  let validationCalls = 0;
+  const validationError = new Error('Rejected IPC sender');
+  const context = await createHandlers(
+    fs,
+    undefined,
+    undefined,
+    undefined,
+    () => {
+      validationCalls++;
+      throw validationError;
+    },
+  );
+  try {
+    await assert.rejects(
+      context.handlers.get('db:backup')(context.event, 'manual'),
+      (error) => error === validationError,
+    );
+    assert.equal(validationCalls, 1);
+    assert.equal(fsSync.existsSync(context.dataDir), false);
+    assert.equal(fsSync.existsSync(context.backupDir), false);
+
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    let saveResult;
+    try {
+      saveResult = await context.handlers.get('db:save')(context.event, new Uint8Array([1]));
+    } finally {
+      console.error = originalConsoleError;
+    }
+    assert.equal(saveResult.ok, false);
+    assert.equal(saveResult.error, validationError.message);
+    assert.equal(validationCalls, 2);
+    assert.equal(fsSync.existsSync(context.dataDir), false);
+    assert.equal(fsSync.existsSync(context.backupDir), false);
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }
@@ -165,9 +255,10 @@ test('database handlers persist on Electron versions with synchronous safeStorag
   const context = await createHandlers(fs, safeStorage);
   try {
     const { handlers, event } = context;
-    const saved = await handlers.get('db:save')(event, new Uint8Array([7, 8, 9]));
+    const databaseBytes = await createValidDatabaseBytes();
+    const saved = await handlers.get('db:save')(event, databaseBytes);
     assert.equal(saved.ok, true, saved.error);
-    assert.deepEqual(Array.from(await handlers.get('db:load')(event)), [7, 8, 9]);
+    assert.deepEqual(Array.from(await handlers.get('db:load')(event)), Array.from(databaseBytes));
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }
@@ -193,7 +284,9 @@ test('a failed database write does not replace the last complete database file',
   const context = await createHandlers(interruptedFs);
   try {
     const { handlers, event, dbFile } = context;
-    const original = await handlers.get('db:save')(event, new Uint8Array([1, 2, 3]));
+    const databaseBytes = await createValidDatabaseBytes();
+    const replacementBytes = await createValidDatabaseBytes();
+    const original = await handlers.get('db:save')(event, databaseBytes);
     assert.equal(original.ok, true);
     const originalBytes = await fs.readFile(dbFile);
 
@@ -203,7 +296,7 @@ test('a failed database write does not replace the last complete database file',
     let failed;
     console.error = (...args) => { loggedError = args; };
     try {
-      failed = await handlers.get('db:save')(event, new Uint8Array([4, 5, 6]));
+      failed = await handlers.get('db:save')(event, replacementBytes);
     } finally {
       console.error = originalConsoleError;
     }
@@ -212,7 +305,7 @@ test('a failed database write does not replace the last complete database file',
     assert.deepEqual(await fs.readFile(dbFile), originalBytes);
     assert.deepEqual(
       Array.from(await handlers.get('db:load')(event)),
-      [1, 2, 3],
+      Array.from(databaseBytes),
       'the last successfully committed database remains readable',
     );
     assert.equal(fsSync.existsSync(`${dbFile}.tmp`), false, 'the incomplete temporary file is removed');
@@ -225,7 +318,7 @@ test('automatic database backups complete when applying the backup strategy', as
   const context = await createHandlers();
   try {
     const { handlers, event, backupDir } = context;
-    const saved = await handlers.get('db:save')(event, new Uint8Array([1, 2, 3]));
+    const saved = await handlers.get('db:save')(event, await createValidDatabaseBytes());
     assert.equal(saved.ok, true);
     await fs.writeFile(path.join(backupDir, 'ceramisys_corrupt_test.sqlite.enc'), 'recovery');
 
@@ -261,7 +354,7 @@ test('network backup destination is persisted, isolated from app data, and resto
       locateFile: (fileName) => path.join(path.dirname(require.resolve('sql.js')), fileName),
     });
     const database = new SQL.Database();
-    for (const table of ['customers', 'sales_invoices', 'sales_returns', 'journal_entries']) {
+    for (const table of ['users', 'products', 'system_settings', 'sales_invoices']) {
       database.run(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY)`);
     }
     await fs.writeFile(dbFile, Buffer.from(database.export()));

@@ -134,8 +134,9 @@ declare global {
           running: boolean;
           ip: string | null;
           nodeName?: string;
+          dnsName?: string | null;
           error?: string;
-          peers?: Array<{ name: string; ip: string | null; online: boolean; os?: string }>;
+          peers?: Array<{ name: string; ip: string | null; dnsName?: string | null; online: boolean; os?: string }>;
         }>;
         connect?: (authKey?: string) => Promise<{ ok: boolean; stdout?: string; error?: string }>;
         disconnect?: () => Promise<{ ok: boolean; stdout?: string; error?: string }>;
@@ -146,8 +147,9 @@ declare global {
           running: boolean;
           ip: string | null;
           nodeName?: string;
+          dnsName?: string | null;
           error?: string;
-          peers?: Array<{ name: string; ip: string | null; online: boolean; os?: string }>;
+          peers?: Array<{ name: string; ip: string | null; dnsName?: string | null; online: boolean; os?: string }>;
         }>;
         connect?: (authKey?: string) => Promise<{ ok: boolean; stdout?: string; error?: string }>;
         disconnect?: () => Promise<{ ok: boolean; stdout?: string; error?: string }>;

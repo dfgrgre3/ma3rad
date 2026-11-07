@@ -35,9 +35,11 @@ function resolveCentralRequest(configuredUrl, request, allowLocalHttp = false) {
   return new URL(path, trustedOrigin);
 }
 
+/** @returns {Record<string, string>} */
 function sanitizeCentralHeaders(headers = {}) {
   if (!headers || typeof headers !== 'object' || Array.isArray(headers)) throw new Error('Invalid central API headers.');
   const allowed = new Set(['content-type', 'x-device-id']);
+  /** @type {Record<string, string>} */
   const safe = {};
   for (const [key, value] of Object.entries(headers)) {
     const normalized = key.toLowerCase();

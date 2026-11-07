@@ -6,6 +6,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 
 // Security modules
 import {
@@ -30,6 +31,8 @@ import { isAllowedAppUrl, isAllowedIpcSender } from '../electron/security.js';
 import { LicenseGuard } from '../electron/licenseGuard.js';
 import { DatabaseManager } from '../src/database/db.ts';
 import { encryptExternalBackup, decryptExternalBackup } from '../src/services/backupEncryption.ts';
+
+const require = createRequire(import.meta.url);
 
 // Generate dynamic keypair for testing
 const { publicKey: testPub, privateKey: testPriv } = crypto.generateKeyPairSync('ed25519');
@@ -354,11 +357,9 @@ test('SECURITY 07b: critical Electron bootstrap files use pinned startup hashes'
 
   const checker = new FileIntegrityChecker(sourceRoot);
   const manifest: Record<string, string> = { 'electron/preload.js': expectedHash };
-  for (const file of ['electron/entry.js']) {
-    const hash = mainSource.match(new RegExp(`'${file}': '([a-f0-9]{64})'`))?.[1];
-    assert.ok(hash, `main process contains a fixed hash for ${file}`);
-    manifest[file] = hash;
-  }
+  const entryHash = mainSource.match(/ENTRY_SOURCE_INTEGRITY_SHA256 = '([a-f0-9]{64})'/)?.[1];
+  assert.ok(entryHash, 'main process contains a fixed development entry hash');
+  manifest['electron/entry.js'] = entryHash;
   manifest['electron/security.js'] = sourceSecurityHash;
   assert.equal(checker.verifyManifest(manifest).valid, true);
   assert.equal(
@@ -377,6 +378,50 @@ test('SECURITY 07b: critical Electron bootstrap files use pinned startup hashes'
     );
   } finally {
     fs.rmSync(tamperedRoot, { recursive: true, force: true });
+  }
+});
+
+test('SECURITY 07c: generated source and packaged-loader hashes detect tampering', () => {
+  const { updateSecurityIntegrityHashes } = require('../scripts/electron-security-integrity.cjs');
+  const { prepareProductionBundle } = require('../scripts/prepare-production-bundle.cjs');
+  const sourceRoot = path.resolve('.');
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'electron_security_integrity_'));
+  const tempElectronDir = path.join(tempRoot, 'electron');
+  fs.mkdirSync(tempElectronDir, { recursive: true });
+
+  try {
+    const tempMainPath = path.join(tempElectronDir, 'main.js');
+    const tempEntryPath = path.join(tempElectronDir, 'entry.js');
+    const tempSecurityPath = path.join(tempElectronDir, 'security.js');
+    fs.copyFileSync(path.join(sourceRoot, 'electron', 'main.js'), tempMainPath);
+    fs.copyFileSync(path.join(sourceRoot, 'electron', 'entry.js'), tempEntryPath);
+    fs.appendFileSync(tempEntryPath, '\n// fixture\n', 'utf8');
+    fs.copyFileSync(path.join(sourceRoot, 'electron', 'security.js'), tempSecurityPath);
+    const { entrySourceHash, securitySourceHash, packagedLoaderHash } = updateSecurityIntegrityHashes({
+      mainPath: tempMainPath,
+      entryPath: tempEntryPath,
+      securityPath: tempSecurityPath,
+    });
+    const generatedMain = fs.readFileSync(tempMainPath, 'utf8');
+    assert.match(generatedMain, new RegExp(`ENTRY_SOURCE_INTEGRITY_SHA256 = '${entrySourceHash}'`));
+    assert.match(generatedMain, new RegExp(`SECURITY_SOURCE_INTEGRITY_SHA256 = '${securitySourceHash}'`));
+    assert.match(generatedMain, new RegExp(`SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = '${packagedLoaderHash}'`));
+
+    const checker = new FileIntegrityChecker(tempRoot);
+    const sourceManifest = { 'electron/security.js': securitySourceHash };
+    assert.equal(checker.verifyManifest(sourceManifest).valid, true, 'development source matches the generated manifest');
+    fs.appendFileSync(tempSecurityPath, ' ', 'utf8');
+    assert.equal(checker.verifyManifest(sourceManifest).valid, false, 'a one-byte source change is rejected');
+
+    fs.copyFileSync(path.join(sourceRoot, 'electron', 'security.js'), tempSecurityPath);
+    fs.writeFileSync(path.join(tempElectronDir, 'security.jsc'), 'compiled security fixture');
+    prepareProductionBundle(tempElectronDir);
+    const loaderManifest = { 'electron/security.js': packagedLoaderHash };
+    assert.equal(checker.verifyManifest(loaderManifest).valid, true, 'the generated packaged loader matches its manifest');
+    fs.appendFileSync(tempSecurityPath, ' ', 'utf8');
+    assert.equal(checker.verifyManifest(loaderManifest).valid, false, 'a one-byte loader change is rejected');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 });
 

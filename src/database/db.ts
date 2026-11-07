@@ -8,6 +8,13 @@ const DB_IDB_NAME = 'ceramisys_database';
 const DB_IDB_STORE = 'snapshots';
 const DB_IDB_KEY = 'main';
 type DatabaseFileApi = NonNullable<NonNullable<Window['ceramisys']>['db']>;
+type IdleCallbackHost = typeof globalThis & {
+  requestIdleCallback?: (
+    callback: (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void,
+    options?: { timeout: number },
+  ) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 type DatabaseManagerState = {
   instance: DatabaseManager | null;
   numberFormatter: ((prefix: string, seq: number, date: Date) => string) | null;
@@ -157,6 +164,7 @@ export class DatabaseManager {
   private migratedLegacyStorage = false;
   private forceFreshAfterRecovery = false;
   private debounceSaveTimer: any = null;
+  private idleSaveHandle: number | null = null;
 
   private constructor() {}
 
@@ -626,12 +634,21 @@ export class DatabaseManager {
     }
   }
 
-  public scheduleDebouncedSave(delayMs = 150): void {
+  public scheduleDebouncedSave(delayMs = 750): void {
     if (this.transactionDepth > 0) return;
     if (this.debounceSaveTimer) clearTimeout(this.debounceSaveTimer);
+    this.cancelIdleSave();
     this.debounceSaveTimer = setTimeout(() => {
       this.debounceSaveTimer = null;
-      this.saveToStorage();
+      const idleHost = globalThis as IdleCallbackHost;
+      if (typeof idleHost.requestIdleCallback === 'function') {
+        this.idleSaveHandle = idleHost.requestIdleCallback(() => {
+          this.idleSaveHandle = null;
+          this.saveToStorage();
+        }, { timeout: 2000 });
+      } else {
+        this.saveToStorage();
+      }
     }, delayMs);
   }
 
@@ -641,6 +658,7 @@ export class DatabaseManager {
       clearTimeout(this.debounceSaveTimer);
       this.debounceSaveTimer = null;
     }
+    this.cancelIdleSave();
     let snapshot: Uint8Array;
     try {
       snapshot = this.exportSnapshot();
@@ -699,6 +717,13 @@ export class DatabaseManager {
     }
   }
 
+  private cancelIdleSave(): void {
+    if (this.idleSaveHandle === null) return;
+    const idleHost = globalThis as IdleCallbackHost;
+    idleHost.cancelIdleCallback?.(this.idleSaveHandle);
+    this.idleSaveHandle = null;
+  }
+
   private async persistToFile(snapshot: Uint8Array): Promise<boolean> {
     const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
     if (!fileApi?.save) return false;
@@ -720,7 +745,7 @@ export class DatabaseManager {
 
   /** Wait for all pending disk writes (used before shutdown/backup/restore). */
   public async flush(): Promise<void> {
-    if (this.debounceSaveTimer) {
+    if (this.debounceSaveTimer || this.idleSaveHandle !== null) {
       clearTimeout(this.debounceSaveTimer);
       this.debounceSaveTimer = null;
       this.saveToStorage();
@@ -747,7 +772,9 @@ export class DatabaseManager {
   public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable'; error?: string; code?: string } {
     if (this.lastPersistError) return { status: 'error', error: this.lastPersistError, code: this.lastPersistErrorCode || 'DATABASE_PERSIST_FAILED' };
     if (this.storageBackend === 'none') return { status: 'unavailable' };
-    if (this.debounceSaveTimer || this.isPersisting || this.pendingSnapshot) return { status: 'saving' };
+    if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.isPersisting || this.pendingSnapshot) {
+      return { status: 'saving' };
+    }
     if (this.storageBackend === 'localStorage') return { status: 'unencrypted' };
     return { status: 'saved' };
   }
