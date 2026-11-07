@@ -16,6 +16,11 @@ import { useToast } from '../../components/ui/Toast';
 import { exportToExcel, buildExportHtml } from '../../utils/export';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 const PAGE_SIZE = 15;
 
@@ -49,8 +54,9 @@ export const PurchaseReturnsPage: React.FC = () => {
   const service = useMemo(() => new PurchaseReturnService(), []);
   const purchaseService = useMemo(() => new PurchaseService(), []);
   const printService = useMemo(() => new PrintService(), []);
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
   const toast = useToast();
-  const canReturn = PermissionService.can(AuthService.getCurrentUser(), 'purchases.return');
+  const canReturn = PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.returns.return');
 
   const [rows, setRows] = useState<PurchaseReturnRow[]>([]);
   const [stats, setStats] = useState<PurchaseReturnStats | null>(null);
@@ -71,6 +77,10 @@ export const PurchaseReturnsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const [detail, setDetail] = useState<ReturnDetail | null>(null);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [valuesByReturn, setValuesByReturn] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
   const [docPreview, setDocPreview] = useState<{
     title: string; subtitle?: string; fileName: string; html: string; excel?: () => void;
   } | null>(null);
@@ -78,7 +88,11 @@ export const PurchaseReturnsPage: React.FC = () => {
   const load = () => {
     setLoading(true);
     try {
-      setRows(service.getAllReturns(search, dateFrom || undefined, dateTo || undefined));
+      const currentRows = service.getAllReturns(search, dateFrom || undefined, dateTo || undefined);
+      setOperationalFields(fieldService.getDefinitions('purchase_returns'));
+      const fieldValues = fieldService.getRecordValuesForRecords('purchase_returns', currentRows.map((row) => row.id));
+      setValuesByReturn(fieldValues);
+      setRows(currentRows.filter((row) => matchesOperationalFieldFilters(row.id, fieldValues, fieldFilters)));
       setStats(service.getStats());
       setTopReasons(service.getTopReturnReasons(4));
       setError(null);
@@ -89,7 +103,7 @@ export const PurchaseReturnsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load();   }, [search, dateFrom, dateTo]);
+  useEffect(() => { load();   }, [search, dateFrom, dateTo, fieldFilters]);
   useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -102,6 +116,7 @@ export const PurchaseReturnsPage: React.FC = () => {
       setLines([]);
       setReason('');
       setRefundMethod('BALANCE');
+      setOperationalFieldValues({});
       setModalOpen(true);
     } catch (e: any) { toast.error(e?.message || 'تعذر تحميل فواتير الشراء.'); }
   };
@@ -136,16 +151,19 @@ export const PurchaseReturnsPage: React.FC = () => {
     if (!reason.trim()) return toast.error('سبب المرتجع مطلوب.');
     setSaving(true);
     try {
-      service.createReturn({
+      fieldService.validateRecordValues('purchase_returns', operationalFieldValues, 'create');
+      const created = service.createReturn({
         purchaseId,
         reason,
         refundMethod,
         items: selected.map((l) => ({ productId: l.productId, quantityM2: l.quantityM2 })),
         idempotencyKey: returnIdempotency.getKey(),
       });
+      fieldService.setRecordValues('purchase_returns', created.id, operationalFieldValues, 'create');
       returnIdempotency.resetKey();
       toast.success('تم تسجيل مرتجع الشراء وتحديث المخزون وحساب المورد.');
       setModalOpen(false);
+      setOperationalFieldValues({});
       load();
     } catch (err: any) {
       toast.error(err?.message || 'تعذر تسجيل المرتجع.');
@@ -168,6 +186,7 @@ export const PurchaseReturnsPage: React.FC = () => {
         { key: 'refundedAmount', label: 'نقدي' },
         { key: 'remainingToBalance', label: 'على حساب المورد' },
         { key: 'refundMethod', label: 'طريقة التسوية' },
+        ...operationalFields.map((field) => ({ key: field.name, label: field.name })),
       ],
       rows: rows.map((r) => ({
         returnNumber: r.returnNumber,
@@ -179,6 +198,7 @@ export const PurchaseReturnsPage: React.FC = () => {
         refundedAmount: r.refundedAmount,
         remainingToBalance: r.remainingToBalance,
         refundMethod: REFUND_LABEL[r.refundMethod] || r.refundMethod,
+        ...(fieldService.getRecordValuesForExport('purchase_returns', [r.id])[r.id] || {}),
       })),
       fileName: 'purchase-returns',
       permission: 'purchases.export',
@@ -243,6 +263,7 @@ export const PurchaseReturnsPage: React.FC = () => {
             <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم المرتجع أو الفاتورة أو المورد أو السبب..." className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-rose-400" />
           </div>
+          <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -275,6 +296,7 @@ export const PurchaseReturnsPage: React.FC = () => {
                     <th className="px-4 py-3">الأصناف</th>
                     <th className="px-4 py-3">القيمة</th>
                     <th className="px-4 py-3">نقدي / حساب المورد</th>
+                    {operationalFields.map((field) => <th key={field.id} className="px-4 py-3">{field.name}</th>)}
                     <th className="px-4 py-3 text-left">إجراءات</th>
                   </tr>
                 </thead>
@@ -295,6 +317,7 @@ export const PurchaseReturnsPage: React.FC = () => {
                         </div>
                         <div className="mt-0.5">نقدي: {fmt(row.refundedAmount)} • حساب: {fmt(row.remainingToBalance)}</div>
                       </td>
+                      {operationalFields.map((field) => <td key={field.id} className="px-4 py-3 text-slate-600">{valuesByReturn[row.id]?.[field.name] || '—'}</td>)}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
                           <Btn onClick={() => setDetail(service.getReturnById(row.id) as ReturnDetail)} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
@@ -304,7 +327,7 @@ export const PurchaseReturnsPage: React.FC = () => {
                     </tr>
                   ))}
                   {rows.length === 0 && (
-                    <tr><td colSpan={9} className="py-16 text-center text-slate-400">
+                    <tr><td colSpan={9 + operationalFields.length} className="py-16 text-center text-slate-400">
                       <PackageX className="w-8 h-8 mx-auto mb-2 text-slate-300" /> لا توجد مرتجعات شراء مسجلة
                     </td></tr>
                   )}
@@ -400,6 +423,7 @@ export const PurchaseReturnsPage: React.FC = () => {
                 {RETURN_REASONS.map((r) => <option key={r} value={r} />)}
               </datalist>
             </div>
+            <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={setOperationalFieldValues} title="بيانات إضافية للمرتجع" />
 
             <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
               <span className="text-xs font-bold text-rose-700 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> إجمالي قيمة المرتجع</span>
@@ -437,6 +461,11 @@ export const PurchaseReturnsPage: React.FC = () => {
             <Info label="بواسطة" value={detail.createdByName || '—'} />
           </div>
           {detail.reason && <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-[11px] text-rose-800 mb-4"><b>سبب الإرجاع:</b> {detail.reason}</div>}
+          <OperationalFieldsSummary fields={operationalFields} values={fieldService.getRecordValues('purchase_returns', detail.id)} />
+          <OperationalFieldsRecordEditor recordLabel={detail.returnNumber} fields={operationalFields} initialValues={fieldService.getRecordValues('purchase_returns', detail.id)} canEdit={canReturn} onSave={(values) => {
+            fieldService.setRecordValues('purchase_returns', detail.id, values);
+            load();
+          }} />
           <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
             <table className="w-full text-right text-[11px] min-w-[560px]">
               <thead className="bg-slate-50 text-slate-500 font-bold"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الفرز</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">سعر التكلفة</th><th className="px-3 py-2">قيمة الارتجاع</th></tr></thead>

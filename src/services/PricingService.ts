@@ -84,7 +84,7 @@ export class PricingService {
     isDefault?: boolean; notes?: string;
   }): PriceList {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'ui.pricing.pricing.update');
     if (!input.name.trim()) throw new Error('اسم قائمة الأسعار مطلوب.');
 
     const id = `pl_${uuidv4().substring(0, 8)}`;
@@ -105,7 +105,7 @@ export class PricingService {
 
   public updatePriceList(id: string, patch: Partial<PriceList>): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'ui.pricing.pricing.update');
     if (patch.isDefault) this.db.run(`UPDATE price_lists SET is_default = 0`);
     this.db.run(
       `UPDATE price_lists SET
@@ -138,7 +138,7 @@ export class PricingService {
 
   public addPriceListItem(input: { priceListId: string; productId: string; priceM2: number; priceBox?: number; minQuantityM2?: number }): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'ui.pricing.pricing.update');
     if (!(input.priceM2 > 0)) throw new Error('سعر المتر يجب أن يكون أكبر من صفر.');
     const existing = this.db.query(
       `SELECT id FROM price_list_items WHERE price_list_id = ? AND product_id = ? AND min_quantity_m2 = ?`,
@@ -158,12 +158,12 @@ export class PricingService {
 
   public deletePriceListItem(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'ui.pricing.pricing.update');
     this.db.run(`DELETE FROM price_list_items WHERE id = ?`, [id]);
   }
 
   public getPromotions(search = ''): Promotion[] {
-    PermissionService.require(AuthService.requireAuth(), 'promotions.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.promotions.promotions.view');
     return this.queryPromotions(search);
   }
 
@@ -192,7 +192,7 @@ export class PricingService {
     usageLimit?: number; notes?: string; couponCode?: string; targetIds?: string[];
   }): Promotion {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'promotions.manage');
+    PermissionService.require(actor, 'ui.promotions.promotions.manage');
     if (!input.name.trim()) throw new Error('اسم العرض مطلوب.');
     if (!input.startsAt || !input.endsAt) throw new Error('تواريخ بداية ونهاية العرض مطلوبة.');
     if (input.endsAt < input.startsAt) throw new Error('تاريخ النهاية يجب أن يكون بعد البداية.');
@@ -230,18 +230,18 @@ export class PricingService {
 
   public togglePromotion(id: string, active: boolean): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'promotions.manage');
+    PermissionService.require(actor, 'ui.promotions.promotions.manage');
     this.db.run(`UPDATE promotions SET is_active = ? WHERE id = ?`, [active ? 1 : 0, id]);
   }
 
   public deletePromotion(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'promotions.manage');
+    PermissionService.require(actor, 'ui.promotions.promotions.manage');
     this.db.run(`DELETE FROM promotions WHERE id = ?`, [id]);
   }
 
   public getCustomerOverrides(customerId: string): Array<{ id: string; productId: string; productName: string; priceM2: number; validFrom?: string | null; validTo?: string | null }> {
-    PermissionService.require(AuthService.requireAuth(), 'pricing.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.pricing.pricing.view');
     return this.db.query(
       `SELECT o.id, o.product_id AS productId, p.name AS productName, o.price_m2 AS priceM2,
               o.valid_from AS validFrom, o.valid_to AS validTo
@@ -253,7 +253,7 @@ export class PricingService {
 
   public setCustomerOverride(input: { customerId: string; productId: string; priceM2: number; validFrom?: string; validTo?: string; notes?: string }): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'ui.pricing.pricing.update');
     this.db.run(
       `INSERT INTO customer_price_overrides (id, customer_id, product_id, price_m2, valid_from, valid_to, approved_by, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -265,7 +265,7 @@ export class PricingService {
 
   public deleteCustomerOverride(customerId: string, productId: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'pricing.update');
+    PermissionService.require(actor, 'ui.pricing.pricing.update');
     this.db.run(`DELETE FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?`, [customerId, productId]);
   }
 

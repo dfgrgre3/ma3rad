@@ -21,11 +21,12 @@ import {
   type ProjectTimeSummary,
 } from '../services/ProjectService';
 import { useToast } from './ui/Toast';
+import { localDateString } from '../utils/date';
 
 const money = (n: number) =>
   new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 
 const TASK_STATUS_LABELS: Record<ProjectTaskStatus, string> = {
   TODO: 'بالانتظار', IN_PROGRESS: 'جاري', BLOCKED: 'متوقف', DONE: 'مكتمل', CANCELLED: 'ملغي',

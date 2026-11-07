@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck, Plus, Trash2, Pencil, Save, Search, Lock, ListChecks, Eraser } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, Pencil, Save, Search, Lock, ListChecks, Eraser, ChevronDown, ChevronLeft, Layers } from 'lucide-react';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { usePermission } from '../../hooks/usePermission';
@@ -27,18 +27,12 @@ export const AdminRolesTab: React.FC = () => {
   const catalog = useMemo(() => PermissionService.getCatalog(), []);
   const modules = useMemo(() => PermissionService.getModules(), []);
   const moduleLabels = useMemo(() => PermissionService.getModuleLabels(), []);
-  const catalogByModule = useMemo(() => {
-    const grouped = new Map<string, typeof catalog>();
-    for (const permission of catalog) {
-      const list = grouped.get(permission.module) ?? [];
-      list.push(permission);
-      grouped.set(permission.module, list);
-    }
-    for (const list of grouped.values()) {
-      list.sort((a, b) => a.code.localeCompare(b.code));
-    }
-    return grouped;
-  }, [catalog]);
+  const catalogGroups = useMemo(() => PermissionService.getCatalogGroups(), []);
+  const groupsByModule = useMemo(() => {
+    const map = new Map<string, Array<{ name: string; permissions: typeof catalog }>>();
+    for (const entry of catalogGroups) map.set(entry.module, entry.groups);
+    return map;
+  }, [catalogGroups]);
 
   const load = (keepSelection = true) => {
     try {
@@ -63,15 +57,23 @@ export const AdminRolesTab: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredPerms = (module: string) => {
+  const filteredGroups = (module: string) => {
     const term = search.trim().toLowerCase();
-    const list = catalogByModule.get(module) ?? [];
-    return list.filter(
-      (p) => !term || p.name.toLowerCase().includes(term)
-        || p.code.toLowerCase().includes(term)
-        || moduleLabel(module).toLowerCase().includes(term)
-    );
+    const groups = groupsByModule.get(module) ?? [];
+    return groups
+      .map((group) => ({
+        ...group,
+        permissions: group.permissions.filter(
+          (p) => !term || p.name.toLowerCase().includes(term)
+            || p.code.toLowerCase().includes(term)
+            || group.name.toLowerCase().includes(term)
+            || moduleLabel(module).toLowerCase().includes(term)
+        ),
+      }))
+      .filter((group) => group.permissions.length > 0);
   };
+
+  const filteredPerms = (module: string) => filteredGroups(module).flatMap((group) => group.permissions);
 
   const toggle = (code: string) => {
     if (!canManage || selected?.code === 'ADMIN') return;
@@ -99,11 +101,32 @@ export const AdminRolesTab: React.FC = () => {
     setDirty(true);
   };
 
+  const visibleCodes = () =>
+    search.trim()
+      ? modules.flatMap((module) => filteredPerms(module).map((p) => p.code))
+      : catalog.map((p) => p.code);
+
+  const toggleGroup = (module: string, groupName: string) => {
+    if (!canManage || selected?.code === 'ADMIN') return;
+    const group = filteredGroups(module).find((item) => item.name === groupName);
+    if (!group) return;
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      const allChecked = group.permissions.every((p) => next.has(p.code));
+      for (const p of group.permissions) {
+        if (allChecked) next.delete(p.code);
+        else next.add(p.code);
+      }
+      return next;
+    });
+    setDirty(true);
+  };
+
   const selectAllVisible = () => {
     if (!canManage || selected?.code === 'ADMIN') return;
     setSelectedCodes((prev) => {
       const next = new Set(prev);
-      for (const permission of catalog) next.add(permission.code);
+      for (const code of visibleCodes()) next.add(code);
       return next;
     });
     setDirty(true);
@@ -287,8 +310,9 @@ export const AdminRolesTab: React.FC = () => {
 
         <div className="max-h-[62vh] overflow-y-auto p-4 space-y-2">
           {modules.map((module) => {
-            const perms = filteredPerms(module);
-            if (perms.length === 0) return null;
+            const groups = filteredGroups(module);
+            if (groups.length === 0) return null;
+            const perms = groups.flatMap((group) => group.permissions);
             const checked = perms.filter((p) => selectedCodes.has(p.code) || isAdminRole).length;
             const open = expanded[module] ?? false;
             return (
@@ -297,6 +321,7 @@ export const AdminRolesTab: React.FC = () => {
                   onClick={() => setExpanded((prev) => ({ ...prev, [module]: !open }))}
                   className="flex w-full items-center gap-2 bg-slate-50 dark:bg-slate-800/70 px-4 py-2.5 text-right text-xs font-extrabold text-slate-700 dark:text-slate-200"
                 >
+                  <ChevronLeft className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${open ? '-rotate-90' : ''}`} />
                   <span className="flex-1">
                     {moduleLabel(module)}
                     <span className="mr-1.5 font-mono text-[9px] font-normal text-slate-400">{module}</span>
@@ -317,32 +342,67 @@ export const AdminRolesTab: React.FC = () => {
                   )}
                 </button>
                 {open && (
-                  <div className="grid grid-cols-1 gap-1 p-3 sm:grid-cols-2">
-                    {perms.map((perm) => {
-                      const isChecked = isAdminRole || selectedCodes.has(perm.code);
+                  <div className="space-y-1.5 p-2">
+                    {groups.map((group) => {
+                      const groupKey = `${module}:${group.name}`;
+                      const groupOpen = expanded[groupKey] ?? (groups.length === 1 || Boolean(search.trim()));
+                      const groupChecked = group.permissions.filter((p) => isAdminRole || selectedCodes.has(p.code)).length;
                       return (
-                        <label
-                          key={perm.code}
-                          htmlFor={`permission-${perm.code}`}
-                          className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
-                            isChecked
-                              ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10'
-                              : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
-                          } ${readOnly ? 'cursor-not-allowed opacity-80' : ''}`}
-                        >
-                          <input
-                            id={`permission-${perm.code}`}
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={readOnly}
-                            onChange={() => toggle(perm.code)}
-                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600"
-                          />
-                          <span className="min-w-0">
-                            <span className="block font-bold text-slate-800 dark:text-slate-200">{perm.name}</span>
-                            <span className="block font-mono text-[10px] text-slate-400">{perm.code}</span>
-                          </span>
-                        </label>
+                        <div key={groupKey} className="overflow-hidden rounded-lg border border-slate-200/80 dark:border-slate-700/80">
+                          <button
+                            onClick={() => setExpanded((prev) => ({ ...prev, [groupKey]: !groupOpen }))}
+                            className="flex w-full items-center gap-2 bg-white px-3 py-2 text-right text-[11px] font-bold text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/60"
+                          >
+                            <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${groupOpen ? '' : '-rotate-90'}`} />
+                            <Layers className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+                            <span className="flex-1 truncate">{group.name}</span>
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+                              {groupChecked}/{group.permissions.length}
+                            </span>
+                            {!readOnly && (
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => { e.stopPropagation(); toggleGroup(module, group.name); }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggleGroup(module, group.name); } }}
+                                className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                              >
+                                الكل
+                              </span>
+                            )}
+                          </button>
+                          {groupOpen && (
+                            <div className="grid grid-cols-1 gap-1 border-t border-slate-100 p-2 dark:border-slate-800 sm:grid-cols-2">
+                              {group.permissions.map((perm) => {
+                                const isChecked = isAdminRole || selectedCodes.has(perm.code);
+                                return (
+                                  <label
+                                    key={perm.code}
+                                    htmlFor={`permission-${perm.code}`}
+                                    className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-xs transition ${
+                                      isChecked
+                                        ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+                                        : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+                                    } ${readOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                                  >
+                                    <input
+                                      id={`permission-${perm.code}`}
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={readOnly}
+                                      onChange={() => toggle(perm.code)}
+                                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600"
+                                    />
+                                    <span className="min-w-0">
+                                      <span className="block font-bold text-slate-800 dark:text-slate-200">{perm.name}</span>
+                                      <span className="block font-mono text-[10px] text-slate-400">{perm.code}</span>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>

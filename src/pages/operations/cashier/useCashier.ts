@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { CashierService } from '../../../services/CashierService';
 import { CashRegister, CashShift, Expense, ExpenseCategory, PaymentType } from '../../../types';
 import { CeramicMath } from '../../../utils/ceramicMath';
-import { LayoutContext } from '../../../layouts/MainLayout';
+import { LayoutContext } from '../../../contexts/LayoutContext';
 
 const cashierService = new CashierService();
 

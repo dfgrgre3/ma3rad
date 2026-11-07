@@ -31,6 +31,9 @@ import { ScorecardTab } from './supplier-detail/ScorecardTab';
 import { PriceHistoryTab } from './supplier-detail/PriceHistoryTab';
 import { RecordPaymentModal } from './supplier-detail/RecordPaymentModal';
 import { EditSupplierModal } from './supplier-detail/EditSupplierModal';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { normalizeDynamicAttributeValue } from '../../services/dynamicAttributes';
 
 export const SupplierDetailPage: React.FC = () => {
   const paymentIdempotency = useIdempotencyKey();
@@ -38,6 +41,8 @@ export const SupplierDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('overview');
   const [supplier, setSupplier] = useState<Supplier | null>(null);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   // Associated lists
@@ -74,14 +79,15 @@ export const SupplierDetailPage: React.FC = () => {
   const [paymentError, setPaymentError] = useState('');
 
   const supplierService = new SupplierService();
+  const operationalFieldService = new OperationalFieldService();
   const currentUser = AuthService.getCurrentUser();
-  const canUpdate = PermissionService.can(currentUser, 'suppliers.update');
-  const canPay = PermissionService.can(currentUser, 'suppliers.payment');
-  const canDelete = PermissionService.can(currentUser, 'suppliers.delete');
-  const canViewPurchases = PermissionService.can(currentUser, 'purchases.view');
-  const canViewFinancials = PermissionService.can(currentUser, 'finance.debts.view');
-  const canExportStatement = PermissionService.can(currentUser, 'suppliers.export')
-    && PermissionService.can(currentUser, 'finance.debts.view');
+  const canUpdate = PermissionService.can(currentUser, 'ui.suppliers.supplier_detail.update');
+  const canPay = PermissionService.can(currentUser, 'ui.suppliers.supplier_detail.payment');
+  const canDelete = PermissionService.can(currentUser, 'ui.suppliers.supplier_detail.delete');
+  const canViewPurchases = PermissionService.can(currentUser, 'ui.purchases.invoices.view');
+  const canViewFinancials = PermissionService.can(currentUser, 'ui.finance.receivables.view');
+  const canExportStatement = PermissionService.can(currentUser, 'ui.suppliers.supplier_detail.export')
+    && PermissionService.can(currentUser, 'ui.finance.receivables.view');
 
   useEffect(() => {
     const requiredPermission: Partial<Record<Tab, string>> = {
@@ -115,6 +121,8 @@ export const SupplierDetailPage: React.FC = () => {
       const returnScope = branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
       const sup = supplierService.getSupplierById(id);
       setSupplier(sup);
+      setOperationalFields(operationalFieldService.getDefinitions('suppliers'));
+      setOperationalFieldValues(operationalFieldService.getRecordValues('suppliers', id));
 
       if (sup) {
         setEditFormData({
@@ -248,6 +256,7 @@ export const SupplierDetailPage: React.FC = () => {
     e.preventDefault();
     if (!supplier) return;
     try {
+      operationalFields.forEach((field) => normalizeDynamicAttributeValue(field, operationalFieldValues[field.id]));
       supplierService.updateSupplier(supplier.id, {
         name: editFormData.name,
         companyName: editFormData.companyName || undefined,
@@ -259,6 +268,7 @@ export const SupplierDetailPage: React.FC = () => {
         paymentTermsDays: Number(editFormData.paymentTermsDays),
         notes: editFormData.notes || undefined,
       });
+      operationalFieldService.setRecordValues('suppliers', supplier.id, operationalFieldValues, 'update');
       setIsEditModalOpen(false);
       loadSupplierData();
     } catch (err: any) {
@@ -374,17 +384,29 @@ export const SupplierDetailPage: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* OVERVIEW TAB */}
         {tab === 'overview' && (
-          <OverviewTab
-            supplier={supplier}
-            invoices={invoices}
-            payments={payments}
-            orders={orders}
-            canUpdate={canUpdate}
-            canViewPurchases={canViewPurchases}
-            canViewFinancials={canViewFinancials}
-            onOpenEditModal={() => setIsEditModalOpen(true)}
-            onTabChange={setTab}
-          />
+          <>
+            <OverviewTab
+              supplier={supplier}
+              invoices={invoices}
+              payments={payments}
+              orders={orders}
+              canUpdate={canUpdate}
+              canViewPurchases={canViewPurchases}
+              canViewFinancials={canViewFinancials}
+              onOpenEditModal={() => {
+                setOperationalFieldValues(operationalFieldService.getRecordValues('suppliers', supplier.id));
+                setIsEditModalOpen(true);
+              }}
+              onTabChange={setTab}
+            />
+            <OperationalFieldsForm
+              fields={operationalFields}
+              values={operationalFieldValues}
+              onChange={() => undefined}
+              title="الحقول الإضافية"
+              readOnly
+            />
+          </>
         )}
 
         {/* INVOICES TAB */}
@@ -392,7 +414,7 @@ export const SupplierDetailPage: React.FC = () => {
           <InvoicesTab
             invoices={invoices}
             canViewFinancials={canViewFinancials}
-            canCreatePurchase={PermissionService.can(currentUser, 'purchases.create')}
+            canCreatePurchase={PermissionService.can(currentUser, 'ui.purchases.invoices.create')}
           />
         )}
 
@@ -456,6 +478,9 @@ export const SupplierDetailPage: React.FC = () => {
           onChange={setEditFormData}
           onClose={() => setIsEditModalOpen(false)}
           onSubmit={handleUpdateSupplier}
+          operationalFields={operationalFields}
+          operationalFieldValues={operationalFieldValues}
+          onOperationalFieldValuesChange={setOperationalFieldValues}
         />
       )}
     </div>

@@ -2,6 +2,9 @@ import React from 'react';
 import { AlertCircle, Calendar, DollarSign, Edit3, FileText, Mail, MapPin, Phone, Trash2 } from 'lucide-react';
 import { fmtCurrency } from './helpers';
 import { STATUS_LABELS, type Employee } from './types';
+import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
+import { OperationalFieldsSummary } from '../../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../../components/OperationalFieldsRecordEditor';
 
 interface EmployeeDirectoryTabProps {
   employees: Employee[];
@@ -9,6 +12,9 @@ interface EmployeeDirectoryTabProps {
   onEditEmployee: (emp: Employee) => void;
   onDeleteEmployee: (id: string) => void;
   onOpenHistory: (empId: string) => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalValuesByRecord: Record<string, Record<string, string>>;
+  onSaveOperationalFields: (employeeId: string, values: Record<string, string>) => void;
 }
 
 export const EmployeeDirectoryTab: React.FC<EmployeeDirectoryTabProps> = ({
@@ -17,6 +23,9 @@ export const EmployeeDirectoryTab: React.FC<EmployeeDirectoryTabProps> = ({
   onEditEmployee,
   onDeleteEmployee,
   onOpenHistory,
+  operationalFields,
+  operationalValuesByRecord,
+  onSaveOperationalFields,
 }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -40,6 +49,14 @@ export const EmployeeDirectoryTab: React.FC<EmployeeDirectoryTabProps> = ({
                   {st.label}
                 </span>
               </div>
+              <OperationalFieldsSummary fields={operationalFields} values={operationalValuesByRecord[emp.id] || {}} />
+              <OperationalFieldsRecordEditor
+                recordLabel={emp.name}
+                fields={operationalFields}
+                initialValues={operationalValuesByRecord[emp.id] || {}}
+                canEdit={canManageEmployees}
+                onSave={(values) => onSaveOperationalFields(emp.id, values)}
+              />
 
               <h3 className="font-extrabold text-slate-900 group-hover:text-orange-600 transition mb-1 text-base">{emp.name}</h3>
               <div className="text-xs text-slate-500 font-bold mb-3">{emp.role}</div>

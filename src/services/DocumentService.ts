@@ -230,7 +230,7 @@ export class DocumentService {
   /** Companies the current user may file documents against. Does not require `companies.view`. */
   public getCompanyOptions(): DocumentCompanyOption[] {
     const actor = AuthService.requireAuth();
-    if (!PermissionService.can(actor, 'documents.view') && !PermissionService.can(actor, 'contracts.view')) {
+    if (!PermissionService.can(actor, 'ui.documents.documents.view') && !PermissionService.can(actor, 'ui.contracts.contracts.view')) {
       throw new Error('ليس لديك صلاحية الوصول إلى المستندات أو العقود.');
     }
     const companies = this.access.getAccessibleCompanyIds(actor);
@@ -253,7 +253,7 @@ export class DocumentService {
 
   public getDocuments(filters: DocumentFilters = {}): { documents: EnterpriseDocument[]; total: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'documents.view');
+    PermissionService.require(actor, 'ui.documents.documents.view');
 
     const conditions: string[] = [];
     const params: Array<string | number> = [];
@@ -321,7 +321,7 @@ export class DocumentService {
 
   public getDocument(id: string): EnterpriseDocument {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'documents.view');
+    PermissionService.require(actor, 'ui.documents.documents.view');
     const row = this.db.query<any>(
       `SELECT d.*, c.name AS companyName, b.name AS branchName,
               u.full_name AS ownerName
@@ -350,7 +350,7 @@ export class DocumentService {
 
   public createDocument(dto: CreateDocumentDTO): EnterpriseDocument {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'documents.create');
+    PermissionService.require(actor, 'ui.documents.documents.create');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
 
     if (!dto.companyId) throw new Error('الشركة مطلوبة.');
@@ -413,7 +413,7 @@ export class DocumentService {
 
   public updateDocument(id: string, patch: UpdateDocumentDTO): EnterpriseDocument {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'documents.update');
+    PermissionService.require(actor, 'ui.documents.documents.update');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
 
     const before = this.getDocument(id);
@@ -470,7 +470,7 @@ export class DocumentService {
 
   public addDocumentVersion(id: string, dto: CreateDocumentVersionDTO): EnterpriseDocument {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'documents.update');
+    PermissionService.require(actor, 'ui.documents.documents.update');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
 
     const document = this.getDocument(id);
@@ -520,7 +520,7 @@ export class DocumentService {
     }
 
     const archiving = status === 'ARCHIVED' || before.status === 'ARCHIVED';
-    PermissionService.require(actor, archiving ? 'documents.archive' : 'documents.update');
+    PermissionService.require(actor, archiving ? 'ui.documents.documents.archive' : 'ui.documents.documents.update');
 
     this.db.executeTransaction((tx) => {
       tx.run('UPDATE enterprise_documents SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), id]);
@@ -646,7 +646,7 @@ export class DocumentService {
 
   public getContracts(filters: ContractFilters = {}): { contracts: EnterpriseContract[]; total: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'contracts.view');
+    PermissionService.require(actor, 'ui.contracts.contracts.view');
     const today = localDateString();
 
     const conditions: string[] = [];
@@ -725,7 +725,7 @@ export class DocumentService {
 
   public getContract(id: string): EnterpriseContract {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'contracts.view');
+    PermissionService.require(actor, 'ui.contracts.contracts.view');
     const row = this.db.query<any>(
       `SELECT ct.*, c.name AS companyName, u.full_name AS ownerName, d.title AS documentTitle
        FROM enterprise_contracts ct
@@ -743,7 +743,7 @@ export class DocumentService {
 
   public createContract(dto: CreateContractDTO): EnterpriseContract {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'contracts.create');
+    PermissionService.require(actor, 'ui.contracts.contracts.create');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
 
     if (!dto.companyId) throw new Error('الشركة مطلوبة.');
@@ -826,7 +826,7 @@ export class DocumentService {
 
   public updateContract(id: string, patch: UpdateContractDTO): EnterpriseContract {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'contracts.update');
+    PermissionService.require(actor, 'ui.contracts.contracts.update');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
     const before = this.getContract(id);
     if (before.status === 'TERMINATED') throw new Error('لا يمكن تعديل عقد منتهٍ أو مفسوخ.');
@@ -906,7 +906,7 @@ export class DocumentService {
 
   public activateContract(id: string, effectiveFrom?: string): EnterpriseContract {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'contracts.update');
+    PermissionService.require(actor, 'ui.contracts.contracts.update');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
     const contract = this.getContract(id);
     if (contract.status !== 'DRAFT') throw new Error('يمكن تفعيل العقود المسودة فقط.');
@@ -929,9 +929,9 @@ export class DocumentService {
   public requestActivationApproval(id: string, kind: 'DOCUMENT' | 'CONTRACT'): { approvalId: string; requestNumber: string } {
     const actor = AuthService.requireAuth();
     if (kind === 'DOCUMENT') {
-      PermissionService.require(actor, 'documents.update');
+      PermissionService.require(actor, 'ui.documents.documents.update');
     } else {
-      PermissionService.require(actor, 'contracts.update');
+      PermissionService.require(actor, 'ui.contracts.contracts.update');
     }
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
     ModuleRegistryService.assertModuleEnabled('approvals');
@@ -967,7 +967,7 @@ export class DocumentService {
 
   public terminateContract(id: string, reason: string): EnterpriseContract {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'contracts.terminate');
+    PermissionService.require(actor, 'ui.contracts.contracts.terminate');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
     const contract = this.getContract(id);
     if (contract.status !== 'ACTIVE') throw new Error('يمكن فسخ العقود السارية فقط.');
@@ -991,7 +991,7 @@ export class DocumentService {
   /** Extend a contract. Never rewrites or deletes the previous term; the event keeps it. */
   public renewContract(id: string, newEndDate: string, newValue?: number): EnterpriseContract {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'contracts.update');
+    PermissionService.require(actor, 'ui.contracts.contracts.update');
     ModuleRegistryService.assertModuleEnabled(MODULE_ID);
     const contract = this.getContract(id);
     if (contract.status === 'TERMINATED') throw new Error('لا يمكن تجديد عقد مفسوخ.');
@@ -1088,8 +1088,8 @@ export class DocumentService {
 
   public getSummary(): DocumentModuleSummary {
     const actor = AuthService.requireAuth();
-    const canDocuments = PermissionService.can(actor, 'documents.view');
-    const canContracts = PermissionService.can(actor, 'contracts.view');
+    const canDocuments = PermissionService.can(actor, 'ui.documents.documents.view');
+    const canContracts = PermissionService.can(actor, 'ui.contracts.contracts.view');
     if (!canDocuments && !canContracts) {
       throw new Error('ليس لديك صلاحية الوصول إلى المستندات أو العقود.');
     }
@@ -1153,7 +1153,7 @@ export class DocumentService {
     createdAt: string;
   }> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, entityType === 'DOCUMENT' ? 'documents.view' : 'contracts.view');
+    PermissionService.require(actor, entityType === 'DOCUMENT' ? 'ui.documents.documents.view' : 'ui.contracts.contracts.view');
     if (entityType === 'DOCUMENT') this.getDocument(entityId);
     else this.getContract(entityId);
     return this.db.query<any>(

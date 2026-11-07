@@ -5,6 +5,8 @@ import { formatProductQuantity } from '../../../utils/productUnits';
 import { getSellableUnits, getUomLabel, isWholeUnit } from '../../../utils/uom';
 import { Modal, Field } from './ui';
 import { FormState, Line, fmt } from './types';
+import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../../components/OperationalFieldsForm';
 
 interface OrderFormModalProps {
   editingId: string | null;
@@ -22,11 +24,14 @@ interface OrderFormModalProps {
   lineBaseQuantity: (line: Line) => number;
   stockOf: (productId: string, warehouseId: string) => number;
   total: number;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  onOperationalFieldValuesChange: (values: Record<string, string>) => void;
 }
 
 export const OrderFormModal: React.FC<OrderFormModalProps> = ({
   editingId, form, setForm, customers, products, warehouses, saving,
-  onClose, onSubmit, setLine, pickProduct, changeLineUnit, lineBaseQuantity, stockOf, total,
+  onClose, onSubmit, setLine, pickProduct, changeLineUnit, lineBaseQuantity, stockOf,   total, operationalFields, operationalFieldValues, onOperationalFieldValuesChange,
 }) => (
   <Modal onClose={onClose} wide>
     <div className="flex items-center justify-between mb-4">
@@ -145,6 +150,7 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
         <span className="text-xs font-bold text-violet-700">إجمالي الطلب</span>
         <span className="text-lg font-black text-violet-700">{fmt(total)}</span>
       </div>
+      <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={onOperationalFieldValuesChange} title="بيانات إضافية للطلب" />
 
       <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
         <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>

@@ -21,7 +21,7 @@ export interface StartCountSessionInput {
 export function startCountSession(input: StartCountSessionInput): void {
   const { warehouseId: selectedWarehouseId, countType, selectedProductIds, isBlindCount, notes } = input;
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'inventory.count');
+  PermissionService.require(actor, 'ui.inventory.counts.count');
   branchAccess.requireWarehouseAccess(selectedWarehouseId, actor);
   if (!['FULL', 'PARTIAL', 'SPOT', 'PERIODIC', 'SURPRISE', 'BLIND'].includes(countType)) throw new Error('Invalid count type.');
   if (countType !== 'FULL' && selectedProductIds.length === 0) throw new Error('Select at least one product for a partial count.');
@@ -82,7 +82,7 @@ export function startCountSession(input: StartCountSessionInput): void {
 export function saveCountDraft(activeSession: CountSession, sessionItems: CountItem[]): void {
   const db = DatabaseManager.getInstance();
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'inventory.count');
+  PermissionService.require(actor, 'ui.inventory.counts.count');
   const sessionRow = db.query<{ warehouseId: string }>(
     'SELECT warehouse_id AS warehouseId FROM stock_counts WHERE id = ?',
     [activeSession.id]
@@ -299,7 +299,7 @@ export function submitCountSession(activeSession: CountSession, sessionItems: Co
   saveCountDraft(activeSession, sessionItems);
   const db = DatabaseManager.getInstance();
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'inventory.count');
+  PermissionService.require(actor, 'ui.inventory.counts.count');
   db.executeTransaction(txDb => {
     const current = txDb.query<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [activeSession.id])[0];
     if (!current || current.status !== 'COUNTING') throw new Error('Ø§Ù„Ø¬Ù„Ø³Ø© Ù„ÙŠØ³Øª Ù‚ÙŠØ¯ Ø§Ù„Ø¹Ø¯.');
@@ -312,7 +312,7 @@ export function approveCountSession(activeSession: CountSession): boolean {
   if (activeSession.status === 'POSTED' || activeSession.status === 'CANCELLED') return false;
   const db = DatabaseManager.getInstance();
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'inventory.count.approve');
+  PermissionService.require(actor, 'ui.inventory.counts.approve');
   const sessionRow = db.query<{ warehouseId: string; createdBy: string }>(
     'SELECT warehouse_id AS warehouseId, created_by AS createdBy FROM stock_counts WHERE id = ?',
     [activeSession.id]
@@ -346,7 +346,7 @@ export function approveCountSession(activeSession: CountSession): boolean {
 
 export function rejectCountSession(activeSession: CountSession, reason: string): void {
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'inventory.count.approve');
+  PermissionService.require(actor, 'ui.inventory.counts.approve');
   const db = DatabaseManager.getInstance();
   const session = db.query<{ warehouseId: string; status: string; createdBy: string }>(
     'SELECT warehouse_id AS warehouseId, status, created_by AS createdBy FROM stock_counts WHERE id = ?', [activeSession.id]
@@ -367,7 +367,7 @@ export function rejectCountSession(activeSession: CountSession, reason: string):
 
 export function cancelCountSession(activeSession: CountSession): void {
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'inventory.count');
+  PermissionService.require(actor, 'ui.inventory.counts.count');
   const db = DatabaseManager.getInstance();
   const session = db.query<{ warehouseId: string; status: string }>(
     'SELECT warehouse_id AS warehouseId, status FROM stock_counts WHERE id = ?', [activeSession.id]

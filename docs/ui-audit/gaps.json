@@ -1,0 +1,46 @@
+{
+  "generatedAt": "2026-11-06T23:15:33.845Z",
+  "tool": "scripts/ui-audit/gaps.mjs",
+  "schemaVersion": 1,
+  "totals": {
+    "gaps": 3,
+    "byKind": {
+      "button-without-handler": 3
+    },
+    "files": 3
+  },
+  "topFiles": [
+    {
+      "file": "src/components/auth/PermissionGate.tsx",
+      "count": 1
+    },
+    {
+      "file": "src/components/ui/Can.tsx",
+      "count": 1
+    },
+    {
+      "file": "src/components/ui/CentralLimitGuard.tsx",
+      "count": 1
+    }
+  ],
+  "gaps": [
+    {
+      "kind": "button-without-handler",
+      "file": "src/components/auth/PermissionGate.tsx",
+      "line": 25,
+      "snippet": "<button>"
+    },
+    {
+      "kind": "button-without-handler",
+      "file": "src/components/ui/Can.tsx",
+      "line": 14,
+      "snippet": "<button>"
+    },
+    {
+      "kind": "button-without-handler",
+      "file": "src/components/ui/CentralLimitGuard.tsx",
+      "line": 14,
+      "snippet": "<button>"
+    }
+  ]
+}

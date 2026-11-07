@@ -7,7 +7,8 @@ import { SalesService } from './SalesService';
 import { SupplierService } from './SupplierService';
 import { InstallmentService } from './InstallmentService';
 
-export type FinancialEventSourceType = 'SALES_INVOICE' | 'PURCHASE_INVOICE' | 'INSTALLMENT';
+export type FinancialSourceType = 'SALES_INVOICE' | 'PURCHASE_INVOICE' | 'INSTALLMENT';
+export type FinancialEventOriginType = FinancialSourceType;
 
 export type FinancialEventType =
   | 'INCOME'
@@ -47,7 +48,7 @@ export interface FinancialCalendarEvent extends FinancialCalendarEventInput {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
-  sourceType?: FinancialEventSourceType;
+  sourceType?: FinancialSourceType;
   sourceId?: string;
 }
 
@@ -71,7 +72,7 @@ export class FinancialCalendarEventsService {
 
   private context(manage = false) {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, manage ? 'finance.approve' : 'finance.view');
+    PermissionService.require(actor, manage ? 'ui.finance.receivables.approve' : 'ui.finance.overview.view');
     const branchId = this.branchAccess.getCurrentBranchId(actor);
     const branch = this.db.query<{ companyId: string | null; branchName: string }>(
       `SELECT company_id AS companyId, name AS branchName FROM branches
@@ -391,10 +392,12 @@ export class FinancialCalendarEventsService {
   }
 
   private validateInput(input: FinancialCalendarEventInput): void {
-    if (!input.title.trim()) throw new Error('عنوان الحدث مطلوب.');
+    const allowedEventTypes: FinancialEventType[] = ['INCOME', 'EXPENSE', 'CUSTOMER_INVOICE', 'SUPPLIER_INVOICE', 'PAYROLL', 'INSTALLMENT', 'TAX', 'CHEQUE', 'SUBSCRIPTION'];
+    if (!allowedEventTypes.includes(input.eventType)) throw new Error('نوع الحدث غير صالح.');
+    if (typeof input.title !== 'string' || !input.title.trim()) throw new Error('عنوان الحدث مطلوب.');
     if (!Number.isFinite(input.amount) || round2(input.amount) <= 0) throw new Error('يجب إدخال مبلغ مالي أكبر من صفر.');
     if (!isValidDate(input.dueDate)) throw new Error('تاريخ الاستحقاق غير صحيح.');
-    const currency = input.currency.trim().toUpperCase();
+    const currency = typeof input.currency === 'string' ? input.currency.trim().toUpperCase() : '';
     if (!/^[A-Z]{3}$/.test(currency)) throw new Error('رمز العملة يجب أن يتكون من ثلاثة أحرف.');
     try {
       new Intl.NumberFormat('en', { style: 'currency', currency }).format(0);
@@ -406,7 +409,14 @@ export class FinancialCalendarEventsService {
       SUPPLIER_INVOICE: 'SUPPLIER',
       PAYROLL: 'EMPLOYEE',
     };
-    if (requiredParty[input.eventType] && input.partyType && requiredParty[input.eventType] !== input.partyType) {
+    const partyType = input.partyType as FinancialPartyType | undefined;
+    if (partyType && !['CUSTOMER', 'SUPPLIER', 'EMPLOYEE', 'OTHER'].includes(partyType)) {
+      throw new Error('نوع الطرف المرتبط غير صالح.');
+    }
+    if (requiredParty[input.eventType] && !partyType) {
+      throw new Error('نوع الطرف المرتبط مطلوب لنوع الحدث المحدد.');
+    }
+    if (requiredParty[input.eventType] && requiredParty[input.eventType] !== partyType) {
       throw new Error('نوع الطرف المرتبط لا يتوافق مع نوع الحدث المالي.');
     }
     if (!Array.isArray(input.reminderDays) || input.reminderDays.some((day) => !ALLOWED_REMINDER_DAYS.includes(day))) {
@@ -469,7 +479,7 @@ export class FinancialCalendarEventsService {
     return [...sales, ...purchases, ...installments];
   }
 
-  private mapInvoiceEvent(row: any, sourceType: FinancialEventSourceType): FinancialCalendarEvent {
+  private mapInvoiceEvent(row: any, sourceType: FinancialSourceType): FinancialCalendarEvent {
     return {
       id: `${sourceType.toLowerCase()}:${row.id}`,
       sourceId: row.id,
@@ -505,7 +515,7 @@ export class FinancialCalendarEventsService {
     return {
       id: `installment:${row.id}`,
       sourceId: row.id,
-      sourceType: 'INSTALLMENT' as FinancialEventSourceType,
+      sourceType: 'INSTALLMENT' as FinancialSourceType,
       branchId: row.branchId,
       branchName: row.branchName,
       title: `قسط ${row.reference}`,
@@ -529,16 +539,16 @@ export class FinancialCalendarEventsService {
     };
   }
 
-  private parseSourceId(id: string): { type: FinancialEventSourceType; id: string } | null {
+  private parseSourceId(id: string): { type: FinancialSourceType; id: string } | null {
     const separator = id.indexOf(':');
     if (separator < 0) return null;
     const type = id.slice(0, separator).toUpperCase();
     const sourceId = id.slice(separator + 1);
     if (!sourceId || !['SALES_INVOICE', 'PURCHASE_INVOICE', 'INSTALLMENT'].includes(type)) return null;
-    return { type: type as FinancialEventSourceType, id: sourceId };
+    return { type: type as FinancialSourceType, id: sourceId };
   }
 
-  private getSourceEvent(source: { type: FinancialEventSourceType; id: string }, branchId: string) {
+  private getSourceEvent(source: { type: FinancialSourceType; id: string }, branchId: string) {
     if (source.type === 'INSTALLMENT') {
       const dueDate = this.db.query<{ dueDate: string }>(`
         SELECT i.due_date AS dueDate FROM installments i
@@ -578,7 +588,7 @@ export class FinancialCalendarEventsService {
   }
 
   private recordSourcePayment(
-    source: { type: FinancialEventSourceType; id: string },
+    source: { type: FinancialSourceType; id: string },
     input: { amount: number; paymentDate: string; reference?: string; notes?: string; paymentType?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE'; registerId?: string },
     actorId: string,
     actorName: string
@@ -587,7 +597,7 @@ export class FinancialCalendarEventsService {
     const paymentType = input.paymentType || 'CASH';
     const reference = input.reference?.trim() || `FINCAL-${uuidv4()}`;
     if (source.type === 'INSTALLMENT') {
-      PermissionService.require(AuthService.getCurrentUser(), 'finance.installments.manage');
+      PermissionService.require(AuthService.getCurrentUser(), 'ui.finance.installments.manage');
       const row = this.db.query<{ remainingAmount: number; branchId: string }>(`
         SELECT i.remaining_amount AS remainingAmount, ip.branch_id AS branchId
         FROM installments i JOIN installment_plans ip ON ip.id = i.plan_id
@@ -600,7 +610,7 @@ export class FinancialCalendarEventsService {
       return;
     }
     if (source.type === 'SALES_INVOICE') {
-      PermissionService.require(AuthService.getCurrentUser(), 'customers.payment');
+      PermissionService.require(AuthService.getCurrentUser(), 'ui.customers.detail.payment');
       const invoice = this.db.query<{ remainingAmount: number }>(`
         SELECT si.remaining_amount AS remainingAmount
         FROM sales_invoices si JOIN warehouses w ON w.id = si.warehouse_id
@@ -617,7 +627,7 @@ export class FinancialCalendarEventsService {
       );
       return;
     }
-    PermissionService.require(AuthService.getCurrentUser(), 'suppliers.payment');
+    PermissionService.require(AuthService.getCurrentUser(), 'ui.suppliers.suppliers.payment');
     const invoice = this.db.query<any>(`
       SELECT pi.id, pi.supplier_id AS supplierId, pi.remaining_amount AS remainingAmount
       FROM purchase_invoices pi JOIN warehouses w ON w.id = pi.warehouse_id

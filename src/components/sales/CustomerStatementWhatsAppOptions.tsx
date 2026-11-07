@@ -7,6 +7,7 @@ import type { SalesInvoice, SalesInvoiceItem } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
 import { formatProductQuantity } from '../../utils/productUnits';
 import { openWhatsAppChat } from '../../utils/externalLinks';
+import { localDateString } from '../../utils/date';
 import { shareCustomerStatementOnWhatsApp } from '../../utils/customerStatementSharing';
 
 type CustomerStatement = ReturnType<CustomerService['getCustomerStatement']>;
@@ -100,7 +101,7 @@ export const CustomerStatementWhatsAppOptions: React.FC<CustomerStatementWhatsAp
 
     const errors: string[] = [];
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDateString();
       const invoices = salesService.getInvoicesFiltered({ customerId: statement.customer.id }, false);
       const detailed = invoices
         .map((invoice) => salesService.getInvoiceById(invoice.id))

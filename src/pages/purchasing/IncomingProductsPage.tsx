@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronDown, Clock3, PackageCheck, Search, Truck, Warehouse } from 'lucide-react';
 import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderItem } from '../../services/PurchaseOrderService';
 import { useToast } from '../../components/ui/Toast';
@@ -7,6 +7,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { exportToExcel, exportToPdf } from '../../utils/export';
 import { localDateString } from '../../utils/date';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
 
 type IncomingOrder = PurchaseOrderRow & { items: PurchaseOrderItem[] };
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
@@ -14,8 +15,11 @@ const left = (item: PurchaseOrderItem) => Math.max(0, item.quantityM2 - item.rec
 
 export const IncomingProductsPage: React.FC = () => {
   const service = useMemo(() => new PurchaseOrderService(), []);
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
   const toast = useToast();
   const [orders, setOrders] = useState<IncomingOrder[]>([]);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [valuesByOrder, setValuesByOrder] = useState<Record<string, Record<string, string>>>({});
   const [search, setSearch] = useState('');
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [supplierFilter, setSupplierFilter] = useState('');
@@ -28,17 +32,55 @@ export const IncomingProductsPage: React.FC = () => {
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [receiptNotes, setReceiptNotes] = useState('');
 
-  const load = () => {
+  const load = useCallback(() => {
     const rows = service.getAllOrders('', 'ALL').filter((row) => ['SENT', 'CONFIRMED', 'PARTIAL'].includes(row.status));
-    setOrders(rows.map((row) => service.getOrderById(row.id)).filter((row): row is IncomingOrder => Boolean(row)));
-  };
-  useEffect(() => { load(); }, [service]);
+    const ordersWithItems = rows.map((row) => service.getOrderById(row.id)).filter((row): row is IncomingOrder => Boolean(row));
+    setOrders(ordersWithItems);
+    setOperationalFields(fieldService.getDefinitions('purchase_orders'));
+    setValuesByOrder(fieldService.getRecordValuesForExport('purchase_orders', ordersWithItems.map((order) => order.id)));
+  }, [service, fieldService]);
+  useEffect(() => { load(); }, [load]);
   const today = localDateString();
   const filtered = orders.filter((o) => `${o.orderNumber} ${o.supplierName || ''} ${o.warehouseName || ''} ${o.items.map((i) => `${i.productName} ${i.productCode || ''} ${i.barcode || ''}`).join(' ')}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) && (!overdueOnly || Boolean(o.expectedDate && o.expectedDate < today)) && (!supplierFilter || o.supplierId === supplierFilter) && (!warehouseFilter || o.warehouseId === warehouseFilter) && (statusFilter === 'ALL' || o.status === statusFilter) && (!dateFrom || Boolean(o.expectedDate && o.expectedDate >= dateFrom)) && (!dateTo || Boolean(o.expectedDate && o.expectedDate <= dateTo)));
-  const canUpdate = PermissionService.can(AuthService.getCurrentUser(), 'purchases.update');
+  const canUpdate = PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.incoming.update');
   const updateFollowUp = (order: IncomingOrder, date: string, notes: string) => { try { service.updateFollowUp(order.id, date || null, notes); load(); toast.success('تم تحديث متابعة التوريد.'); } catch (e: any) { toast.error(e?.message || 'تعذر تحديث المتابعة.'); } };
-  const exportRows = () => filtered.flatMap(order => order.items.filter(item => left(item)>0).map(item => ({ order:order.orderNumber,supplier:order.supplierName,phone:order.supplierPhone,product:item.productName,code:item.productCode,quantity:item.quantityM2,received:item.receivedM2,remaining:left(item),unit:getProductUnitLabel(item),cost:item.unitCost,remainingValue:left(item)*item.unitCost,warehouse:order.warehouseName,expected:order.expectedDate,status:order.status })));
-  const report = (format:'excel'|'pdf') => { const options={title:'تقرير البضائع المنتظرة',columns:[{key:'order',label:'طلب الشراء'},{key:'supplier',label:'المورد'},{key:'phone',label:'الهاتف'},{key:'product',label:'المنتج'},{key:'code',label:'الكود'},{key:'quantity',label:'المطلوب'},{key:'received',label:'المستلم'},{key:'remaining',label:'المتبقي'},{key:'unit',label:'الوحدة'},{key:'cost',label:'سعر الوحدة'},{key:'remainingValue',label:'قيمة المتبقي'},{key:'warehouse',label:'المخزن'},{key:'expected',label:'الوصول المتوقع'},{key:'status',label:'الحالة'}],rows:exportRows(),fileName:'البضائع-المنتظرة',permission:'purchases.export'};if(format==='excel')exportToExcel(options);else exportToPdf(options);};
+  const exportRows = () => filtered.flatMap(order => order.items.filter(item => left(item)>0).map(item => ({
+    order: order.orderNumber,
+    supplier: order.supplierName,
+    phone: order.supplierPhone,
+    product: item.productName,
+    code: item.productCode,
+    quantity: item.quantityM2,
+    received: item.receivedM2,
+    remaining: left(item),
+    unit: getProductUnitLabel(item),
+    cost: item.unitCost,
+    remainingValue: left(item) * item.unitCost,
+    warehouse: order.warehouseName,
+    expected: order.expectedDate,
+    status: order.status,
+    ...(valuesByOrder[order.id] || {}),
+  })));
+  const report = (format:'excel'|'pdf') => {
+    const options = {
+      title: 'تقرير البضائع المنتظرة',
+      columns: [
+        { key: 'order', label: 'طلب الشراء' }, { key: 'supplier', label: 'المورد' },
+        { key: 'phone', label: 'الهاتف' }, { key: 'product', label: 'المنتج' },
+        { key: 'code', label: 'الكود' }, { key: 'quantity', label: 'المطلوب' },
+        { key: 'received', label: 'المستلم' }, { key: 'remaining', label: 'المتبقي' },
+        { key: 'unit', label: 'الوحدة' }, { key: 'cost', label: 'سعر الوحدة' },
+        { key: 'remainingValue', label: 'قيمة المتبقي' }, { key: 'warehouse', label: 'المخزن' },
+        { key: 'expected', label: 'الوصول المتوقع' }, { key: 'status', label: 'الحالة' },
+        ...operationalFields.map((field) => ({ key: field.name, label: field.name })),
+      ],
+      rows: exportRows(),
+      fileName: 'البضائع-المنتظرة',
+      permission: 'purchases.export',
+    };
+    if (format === 'excel') exportToExcel(options);
+    else exportToPdf(options);
+  };
   const openReceipt = (order: IncomingOrder) => {
     setReceipt(order);
     setQuantities(Object.fromEntries(order.items.map((item) => [item.id, left(item) ? String(left(item)) : '0'])));

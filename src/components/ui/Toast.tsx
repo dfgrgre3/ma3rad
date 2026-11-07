@@ -21,17 +21,17 @@ interface ToastApi {
 const ToastContext = createContext<ToastApi | null>(null);
 
 const STYLES: Record<ToastKind, string> = {
-  success: 'border-[#d9d9d9] border-r-[3px] border-r-[#107c10] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#6cc36c] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
-  error: 'border-[#d9d9d9] border-r-[3px] border-r-[#c42b1c] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#f1707b] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
-  warning: 'border-[#d9d9d9] border-r-[3px] border-r-[#9d5d00] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#e0a54a] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
-  info: 'border-[#d9d9d9] border-r-[3px] border-r-[#0078d4] bg-white text-[#1b1b1b] dark:border-[#3d3d3d] dark:border-r-[#4aa3e0] dark:bg-[#2b2b2b] dark:text-[#f0f0f0]',
+  success: 'border-[var(--cerami-border)] border-r-[3px] border-r-[var(--cerami-success)] bg-[var(--cerami-surface)] text-[var(--cerami-text)]',
+  error: 'border-[var(--cerami-border)] border-r-[3px] border-r-[var(--cerami-danger)] bg-[var(--cerami-surface)] text-[var(--cerami-text)]',
+  warning: 'border-[var(--cerami-border)] border-r-[3px] border-r-[var(--cerami-warning)] bg-[var(--cerami-surface)] text-[var(--cerami-text)]',
+  info: 'border-[var(--cerami-border)] border-r-[3px] border-r-[var(--cerami-primary)] bg-[var(--cerami-surface)] text-[var(--cerami-text)]',
 };
 
 const ICON_TONES: Record<ToastKind, string> = {
-  success: 'text-[#107c10] dark:text-[#6cc36c]',
-  error: 'text-[#c42b1c] dark:text-[#f1707b]',
-  warning: 'text-[#9d5d00] dark:text-[#e0a54a]',
-  info: 'text-[#0078d4] dark:text-[#4aa3e0]',
+  success: 'text-[var(--cerami-success)]',
+  error: 'text-[var(--cerami-danger)]',
+  warning: 'text-[var(--cerami-warning)]',
+  info: 'text-[var(--cerami-primary)]',
 };
 
 const ICONS: Record<ToastKind, React.ElementType> = {
@@ -96,7 +96,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return (
             <div
               key={item.id}
-              className={`flex items-start gap-3 rounded-[2px] border px-3 py-2.5 ${STYLES[item.kind]}`}
+              className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${STYLES[item.kind]}`}
               role="status"
             >
               <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ICON_TONES[item.kind]}`} />

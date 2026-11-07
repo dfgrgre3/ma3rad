@@ -174,6 +174,32 @@ test('module nav state migrates old combined settings and preserves manual hides
   assert.equal(NavigationService.getAccessibleGroups(admin).some(group => group.items.some(item => item.to === '/sales')), false);
 });
 
+test('navigation overrides can move a page between groups without changing its permissions', async () => {
+  await DatabaseManager.getInstance().initialize();
+  const overrides = NavigationService.getOverrides();
+  const path = '/dashboard';
+  const permissionsBeforeMove = NavigationService.getRequiredPermissionGroups(path);
+  const moved = NavigationService.merge({
+    ...overrides,
+    groupAssignments: { ...overrides.groupAssignments, [path]: 'sales' },
+  }, { includeHidden: true });
+
+  assert.equal(moved.find(group => group.id === 'dashboard')?.items.some(item => item.to === path), false);
+  assert.equal(moved.find(group => group.id === 'sales')?.items.some(item => item.to === path), true);
+  assert.deepEqual(
+    NavigationService.getRequiredPermissionGroups(path),
+    permissionsBeforeMove,
+    'menu placement does not change the route permission rules'
+  );
+
+  const hidden = NavigationService.merge({
+    ...overrides,
+    hidden: [...overrides.hidden, path],
+    groupAssignments: { ...overrides.groupAssignments, [path]: 'sales' },
+  }, { includeHidden: true });
+  assert.equal(hidden.find(group => group.id === 'sales')?.items.some(item => item.to === path), true);
+});
+
 test('module settings use registry defaults, validation and permissions', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

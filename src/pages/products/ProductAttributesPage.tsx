@@ -3,6 +3,7 @@ import { Ruler, Plus, Search, Layers, Sparkles, Tag, Shield, Compass, Loader2, X
 import { AttributeService, AttributeCategory } from '../../services/AttributeService';
 import type { DynamicAttributeDataType } from '../../services/dynamicAttributes';
 import { usePermission } from '../../hooks/usePermission';
+import { OperationalFieldsManager } from './OperationalFieldsManager';
 
 const ICONS: Record<string, React.ElementType> = {
   TILE_SIZES: Ruler, TILE_FINISH: Sparkles, TILE_APPLICATION: Compass,
@@ -124,7 +125,13 @@ export const ProductAttributesPage: React.FC = () => {
 
       {error && <div className="mx-4 mt-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
 
-      <div className="flex-1 overflow-hidden p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+        <section className="rounded-2xl border border-teal-200 bg-white p-4 sm:p-5">
+          <div className="mb-4 border-b border-teal-100 pb-3">
+            <h2 className="text-sm font-black text-slate-900">مواصفات المنتج الفنية</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-600">هذه الخصائص الأساسية مثل المقاس والتشطيب والفرز تُستخدم مباشرةً في نماذج المنتجات وبياناتها الحالية.</p>
+          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="space-y-3 overflow-y-auto">
           <span className="text-xs font-bold text-slate-500 block px-1">مجموعات الخصائص</span>
           {loading ? <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-teal-500" /></div> : categories.map((cat) => {
@@ -191,12 +198,33 @@ export const ProductAttributesPage: React.FC = () => {
           ) : <div className="m-auto text-xs text-slate-400">اختر مجموعة خصائص أو أضف واحدة جديدة</div>}
         </div>
       </div>
+        </section>
+
+        <details className="group rounded-2xl border border-slate-200 bg-slate-100/70 p-3 sm:p-4">
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 rounded-xl p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500">
+            <span>
+              <span className="block text-sm font-black text-slate-800">حقول إضافية للسجلات التشغيلية</span>
+              <span className="mt-1 block max-w-3xl text-xs leading-5 text-slate-600">نظام منفصل عن مواصفات المنتج الأساسية: أضف حقولًا مخصصة للمنتجات أو العملاء أو الفواتير وغيرها من السجلات التشغيلية.</span>
+            </span>
+            <span aria-hidden="true" className="shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 group-open:hidden">إظهار الإعدادات</span>
+            <span aria-hidden="true" className="hidden shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 group-open:inline-flex">إخفاء الإعدادات</span>
+          </summary>
+          <div className="mt-3 border-t border-slate-200 pt-3">
+            <OperationalFieldsManager />
+          </div>
+        </details>
+      </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-2 backdrop-blur-sm sm:items-center sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-attribute-title"
+            className="max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:p-6"
+          >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-extrabold text-slate-900">خاصية جديدة</h3>
+              <h3 id="product-attribute-title" className="text-base font-extrabold text-slate-900">خاصية جديدة</h3>
               <button onClick={() => setModalOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
             </div>
             <form onSubmit={handleAddCategory} className="space-y-3 text-xs">

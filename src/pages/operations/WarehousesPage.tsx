@@ -4,10 +4,18 @@ import { OperationsService, WarehouseRow } from '../../services/OperationsServic
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { CentralLimitGuard } from '../../components/ui/CentralLimitGuard';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 export const WarehousesPage: React.FC = () => {
   const service = new OperationsService();
-  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'warehouses.manage');
+  const fieldService = new OperationalFieldService();
+  const currentUser = AuthService.getCurrentUser();
+  const canCreate = PermissionService.can(currentUser, 'ui.warehouses.warehouses.create');
+  const canManage = PermissionService.can(currentUser, 'ui.warehouses.warehouses.manage');
   const [warehouses, setWarehouses] = useState<WarehouseRow[]>([]);
   const [branches, setBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [search, setSearch] = useState('');
@@ -15,12 +23,19 @@ export const WarehousesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fields, setFields] = useState<OperationalFieldDefinition[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [valuesByWarehouse, setValuesByWarehouse] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
   const [form, setForm] = useState({ name: '', location: '', branchId: '' });
 
   const load = () => {
     setLoading(true);
     try {
-      setWarehouses(service.getWarehouses(search));
+      const currentWarehouses = service.getWarehouses(search);
+      setWarehouses(currentWarehouses);
+      setFields(fieldService.getDefinitions('warehouses'));
+      setValuesByWarehouse(fieldService.getRecordValuesForRecords('warehouses', currentWarehouses.map((warehouse) => warehouse.id)));
       setBranches(service.getBranches().map((b) => ({ id: b.id, name: b.name })));
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل المخازن.'); }
@@ -36,7 +51,10 @@ export const WarehousesPage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      service.createWarehouse({ name: form.name, location: form.location || undefined, branchId: form.branchId || undefined });
+      fieldService.validateRecordValues('warehouses', values, 'create');
+      const created = service.createWarehouse({ name: form.name, location: form.location || undefined, branchId: form.branchId || undefined });
+      fieldService.setRecordValues('warehouses', created.id, values, 'create');
+      setValues({});
       setModalOpen(false);
       setForm({ name: '', location: '', branchId: '' });
       load();
@@ -55,7 +73,7 @@ export const WarehousesPage: React.FC = () => {
           </div>
         </div>
         <CentralLimitGuard metric="maxWarehouses">
-          {canManage && (
+          {(canCreate || canManage) && (
             <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
               <Plus className="w-4 h-4" /> إضافة مخزن جديد
             </button>
@@ -68,13 +86,14 @@ export const WarehousesPage: React.FC = () => {
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم المخزن أو العنوان ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-violet-400" />
         </form>
+        <div className="mt-3"><OperationalFieldsFilter fields={fields} values={fieldFilters} onChange={setFieldFilters} /></div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-violet-500" /></div> : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {warehouses.map((w) => (
+            {warehouses.filter((warehouse) => matchesOperationalFieldFilters(warehouse.id, valuesByWarehouse, fieldFilters)).map((w) => (
               <div key={w.id} className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-5 transition flex flex-col justify-between group">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -91,6 +110,17 @@ export const WarehousesPage: React.FC = () => {
                     <span className="text-xs text-slate-500">أصناف ذات رصيد</span>
                     <span className="text-sm font-black text-violet-600">{w.productsCount || 0} صنف</span>
                   </div>
+                  <OperationalFieldsSummary fields={fields} values={valuesByWarehouse[w.id] || {}} />
+                  <OperationalFieldsRecordEditor
+                    recordLabel={w.name}
+                    fields={fields}
+                    initialValues={valuesByWarehouse[w.id] || {}}
+                    canEdit={canManage}
+                    onSave={(next) => {
+                      fieldService.setRecordValues('warehouses', w.id, next, 'update');
+                      setValuesByWarehouse((previous) => ({ ...previous, [w.id]: next }));
+                    }}
+                  />
                 </div>
               </div>
             ))}
@@ -116,6 +146,7 @@ export const WarehousesPage: React.FC = () => {
                   {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
+              <OperationalFieldsForm fields={fields} values={values} onChange={setValues} title="بيانات إضافية للمخزن" />
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl">إلغاء</button>
                 <button type="submit" disabled={saving} className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl flex items-center gap-2">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} إضافة</button>

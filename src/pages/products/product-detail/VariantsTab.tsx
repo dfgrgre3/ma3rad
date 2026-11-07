@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { GitBranch, Plus, Trash2 } from 'lucide-react';
 import { ProductExtraService, ProductVariant } from '../../../services/ProductExtraService';
-import { GRADE_LABELS } from './constants';
+import { OperationalFieldService, type ProductGradeOption } from '../../../services/OperationalFieldService';
+import { gradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import { money } from './format';
 
 interface VariantsTabProps {
@@ -14,10 +15,22 @@ interface VariantsTabProps {
 
 export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, canViewCosts, canViewPricing, canUpdatePricing }) => {
   const service = new ProductExtraService();
+  const fieldService = new OperationalFieldService();
   const [rows, setRows] = useState<ProductVariant[]>([]);
+  const [gradeOptions, setGradeOptions] = useState<ProductGradeOption[]>([]);
   const [form, setForm] = useState({ variantName: '', sku: '', barcode: '', color: '', size: '', grade: 'GRADE_1', costPrice: '', sellingPriceM2: '' });
 
-  const load = () => { try { setRows(service.getVariants(productId)); } catch (e) { console.error(e); } };
+  const load = () => {
+    try {
+      setRows(service.getVariants(productId));
+      const options = fieldService.getProductGradeOptions(true);
+      setGradeOptions(options);
+      setConfiguredGradeLabels(options);
+      setForm((current) => options.some((option) => option.isActive && option.value === current.grade)
+        ? current
+        : { ...current, grade: options.find((option) => option.isActive)?.value || '' });
+    } catch (e) { console.error(e); }
+  };
   useEffect(() => { load(); }, [productId]);
 
   const add = (e: React.FormEvent) => {
@@ -33,7 +46,7 @@ export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, ca
         } : {}),
         isActive: true,
       });
-      setForm({ variantName: '', sku: '', barcode: '', color: '', size: '', grade: 'GRADE_1', costPrice: '', sellingPriceM2: '' });
+      setForm({ variantName: '', sku: '', barcode: '', color: '', size: '', grade: gradeOptions.find((option) => option.isActive)?.value || '', costPrice: '', sellingPriceM2: '' });
       load();
     } catch (err: any) { alert(err?.message || 'تعذر إضافة المتغير'); }
   };
@@ -55,7 +68,7 @@ export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, ca
             <input placeholder="اللون" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
             <input placeholder="المقاس" value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" />
             <select value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
-              {Object.entries(GRADE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              {gradeOptions.filter((option) => option.isActive || option.value === form.grade).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             {canUpdatePricing && <>
               <input type="number" min={0} step="0.01" placeholder="التكلفة" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-mono" />
@@ -77,7 +90,7 @@ export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, ca
                   <td className="px-4 py-3 font-bold text-slate-900">{v.variantName}</td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-600">{v.sku}<div className="text-slate-400">{v.barcode || '—'}</div></td>
                   <td className="px-4 py-3 text-slate-600">{v.size || '—'} / {v.color || '—'}</td>
-                  <td className="px-4 py-3 text-slate-600">{GRADE_LABELS[v.grade || ''] || v.grade || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{v.grade ? gradeLabel(v.grade) : '—'}</td>
                   {canViewCosts && <td className="px-4 py-3 font-mono text-rose-600">{money(v.costPrice)}</td>}
                   {canViewPricing && <td className="px-4 py-3 font-mono text-sky-600 font-bold">{money(v.sellingPriceM2)}</td>}
                   {canEdit && <td className="px-4 py-3"><button onClick={() => remove(v.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></button></td>}

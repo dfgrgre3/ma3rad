@@ -14,6 +14,7 @@ import type { DatabaseManager } from '../../database/db';
 import type { InvoiceWithItems, SalesContext } from './context';
 import type { ReturnRequestItem } from './types';
 import { ModuleRegistryService } from '../ModuleRegistryService';
+import { PartnerService } from '../PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
 import type { Effect } from '../effects/EffectTypes';
 import '../effects/handlers/salesInvoiceHandlers';
@@ -58,8 +59,8 @@ export function createSaleReturn(
   options: ReturnOptions = {}
 ): SalesReturn {
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'returns.create');
-    if (refundCash) PermissionService.require(actor, 'returns.approve');
+  PermissionService.require(actor, 'ui.returns.returns.create');
+    if (refundCash) PermissionService.require(actor, 'ui.returns.returns.approve');
   const inv = ctx.getInvoiceById(invoiceId);
   if (!inv) throw new Error('الفاتورة الأصلية غير موجودة.');
   if (inv.invoiceStatus === 'VOID') throw new Error('لا يمكن مرتجعة فاتورة ملغاة.');
@@ -241,6 +242,29 @@ function createReturnInTransaction(
     },
   ];
   defaultEffectEngine.run({ db: sqliteDb, actorId: actor.id, actorName: actor.fullName }, effects);
+  const returnedTotals = sqliteDb.query<{ revenue: number; cost: number }>(`
+    SELECT COALESCE(SUM(sri.total_refund), 0) AS revenue,
+           COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) AS cost
+    FROM sales_return_items sri
+    JOIN sales_returns sr ON sr.id = sri.return_id
+    WHERE sr.original_invoice_id = ?
+  `, [invoiceId])[0];
+  const returnedProfit = Number(returnedTotals?.revenue || 0)
+    - (params.trackInventory ? Number(returnedTotals?.cost || 0) : 0);
+  const saleBranchId = sqliteDb.query<{ branchId: string }>(
+    'SELECT branch_id AS branchId FROM sales_invoices WHERE id = ?',
+    [invoiceId]
+  )[0]?.branchId;
+  if (!saleBranchId) throw new Error('تعذر تحديد فرع فاتورة البيع لتسوية أرباح الشركاء.');
+  new PartnerService().adjustSaleProfitAllocation(sqliteDb, {
+    invoiceId,
+    invoiceNumber: inv.invoiceNumber,
+    branchId: saleBranchId,
+    transactionDate: today,
+    invoiceProfit: Number(inv.grossProfit || 0),
+    targetProfit: Math.max(0, round2(Number(inv.grossProfit || 0) - returnedProfit)),
+    actorId: actor.id,
+  });
 
   return {
     id: returnId,

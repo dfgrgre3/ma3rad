@@ -14,7 +14,7 @@ export class BrandService {
   private sync = new MasterDataSyncService(this.db);
 
   public getAllBrands(): BrandWithCount[] {
-    PermissionService.require(AuthService.requireAuth(), 'brands.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.brands.brands.view');
     const rows = this.db.query<any>(`
       SELECT 
         b.id, b.name, b.country, b.created_at,
@@ -37,7 +37,7 @@ export class BrandService {
   }
 
   public getBrandById(id: string): Brand | null {
-    PermissionService.require(AuthService.requireAuth(), 'brands.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.brands.brands.view');
     const rows = this.db.query<Brand>(
       'SELECT id, name, country, created_at FROM brands WHERE id = ?',
       [id]
@@ -47,7 +47,7 @@ export class BrandService {
 
   public createBrand(name: string, country?: string): Brand {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'brands.create');
+    PermissionService.require(actor, 'ui.brands.brands.create');
 
     const cleanName = String(name || '').trim();
     if (!cleanName) throw new Error('اسم الماركة مطلوب.');
@@ -77,7 +77,7 @@ export class BrandService {
 
   public updateBrand(id: string, updates: { name?: string; country?: string }): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'brands.update');
+    PermissionService.require(actor, 'ui.brands.brands.update');
 
     const old = this.getBrandById(id);
     if (!old) throw new Error('الماركة غير موجودة.');
@@ -111,7 +111,7 @@ export class BrandService {
 
   public deleteBrand(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'brands.delete');
+    PermissionService.require(actor, 'ui.brands.brands.delete');
 
     const brand = this.getBrandById(id);
     if (!brand) throw new Error('الماركة غير موجودة.');

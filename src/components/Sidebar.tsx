@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, Moon, PanelRightClose, PanelRightOpen, Sun } from 'lucide-react';
 import type { User } from '../types';
 import { NavigationService } from '../services/NavigationService';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/useTheme';
 
 interface SidebarProps {
   currentUser: User | null;

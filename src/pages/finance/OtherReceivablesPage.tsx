@@ -267,19 +267,19 @@ export const OtherReceivablesPage: React.FC = () => {
   );
   const canCreate = PermissionService.can(
     AuthService.getCurrentUser(),
-    "finance.receivables.create",
+    "ui.finance.other_receivables.create",
   );
   const canUpdate = PermissionService.can(
     AuthService.getCurrentUser(),
-    "finance.receivables.update",
+    "ui.finance.other_receivables.update",
   );
   const canCancel = PermissionService.can(
     AuthService.getCurrentUser(),
-    "finance.receivables.delete",
+    "ui.finance.other_receivables.delete",
   );
   const canExport = PermissionService.can(
     AuthService.getCurrentUser(),
-    "finance.receivables.export",
+    "ui.finance.other_receivables.export",
   );
   const exportReport = (format: "excel" | "pdf") => {
     if (!canExport) return;

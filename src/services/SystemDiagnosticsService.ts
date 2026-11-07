@@ -87,13 +87,13 @@ export class SystemDiagnosticsService {
 
   private requireHealthView() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'settings.health.view', '/system-health');
+    PermissionService.require(actor, 'ui.settings.system_health.view', '/system-health');
     return actor;
   }
 
   private requireHealthManagement() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'settings.health.manage', '/system-health');
+    PermissionService.require(actor, 'ui.settings.system_health.manage', '/system-health');
     return actor;
   }
 

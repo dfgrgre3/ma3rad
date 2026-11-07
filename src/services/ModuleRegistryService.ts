@@ -95,7 +95,7 @@ export class ModuleRegistryService {
   }
 
   public static getModuleState(): ModuleState[] {
-    if (!PermissionService.can(AuthService.getCurrentUser(), 'modules.view')) return [];
+    if (!PermissionService.can(AuthService.getCurrentUser(), 'ui.modules.registry.view')) return [];
     const enabled = new Set(ModuleRegistryService.getEnabledModuleIds());
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     return MODULE_REGISTRY.map((definition) => {
@@ -186,7 +186,7 @@ export class ModuleRegistryService {
     options: { trackInventory?: boolean } = {}
   ): ModuleChangeResult {
     const user = actor ?? AuthService.getCurrentUser();
-    PermissionService.require(user, 'modules.manage');
+    PermissionService.require(user, 'ui.modules.registry.manage');
 
     // Explicitly requested modules must carry their dependencies. Auto-adding
     // here would silently undo an administrator's deactivation request.
@@ -331,7 +331,7 @@ export class ModuleRegistryService {
     if (!setting) throw new Error(`إعداد غير معروف للوحدة ${moduleId}: ${key}`);
 
     const user = actor ?? AuthService.getCurrentUser();
-    PermissionService.require(user, 'modules.manage');
+    PermissionService.require(user, 'ui.modules.registry.manage');
 
     let serialized: string;
     if (setting.type === 'boolean') {

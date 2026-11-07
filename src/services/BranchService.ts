@@ -12,7 +12,7 @@ export class BranchService {
 
   public getAllBranches(): Branch[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.view');
+    PermissionService.require(actor, 'ui.branches.branches.view');
     const scope = this.access.sqlScope('b.id', undefined, actor, true);
     return this.db.query<any>(`
       SELECT b.*, b.is_main AS is_default, u.full_name as managerName, c.name as companyName
@@ -26,7 +26,7 @@ export class BranchService {
 
   public getBranchById(id: string): Branch | null {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.view');
+    PermissionService.require(actor, 'ui.branches.branches.view');
     this.access.requireBranchAccess(id, actor);
     const rows = this.db.query<any>(`
       SELECT b.*, b.is_main AS is_default, u.full_name as managerName, c.name as companyName
@@ -40,7 +40,7 @@ export class BranchService {
 
   public getDefaultBranch(): Branch | null {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.view');
+    PermissionService.require(actor, 'ui.branches.branches.view');
     const scope = this.access.sqlScope('b.id', undefined, actor);
     const rows = this.db.query<any>(`
       SELECT b.*, b.is_main AS is_default, u.full_name as managerName
@@ -54,7 +54,7 @@ export class BranchService {
 
   public createBranch(dto: CreateBranchDTO): Branch {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.create');
+    PermissionService.require(actor, 'ui.branches.branches.create');
     CentralUsageLimitService.assertWithin('maxBranches');
     CentralUsageLimitService.assertWithin('maxPos');
     const companyId = this.resolveCompanyForNewBranch(dto.companyId, actor);
@@ -114,7 +114,7 @@ export class BranchService {
 
   public updateBranch(id: string, updates: Partial<CreateBranchDTO>): Branch {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.update');
+    PermissionService.require(actor, 'ui.branches.branches.update');
     const existing = this.getBranchById(id);
     if (!existing) throw new Error('الفرع غير موجود.');
     if (updates.name !== undefined && updates.name.trim().length < 2) {
@@ -197,7 +197,7 @@ export class BranchService {
 
   public setBranchActive(id: string, isActive: boolean): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.update');
+    PermissionService.require(actor, 'ui.branches.branches.update');
     this.access.requireBranchAuthorization(id, actor);
     const branch = this.getBranchRow(id);
     if (!branch) throw new Error('الفرع غير موجود.');
@@ -214,7 +214,7 @@ export class BranchService {
 
   public deleteBranch(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.delete');
+    PermissionService.require(actor, 'ui.branches.branches.delete');
     const existing = this.getBranchById(id);
     if (!existing) throw new Error('الفرع غير موجود.');
     if (existing.isDefault) throw new Error('لا يمكن حذف الفرع الافتراضي.');
@@ -254,7 +254,7 @@ export class BranchService {
     isAssigned: boolean;
   }> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.manage_users');
+    PermissionService.require(actor, 'ui.branches.branches.manage_users');
     this.access.requireBranchAccess(branchId, actor);
     return this.db.query<any>(`
       SELECT u.id, u.username, u.full_name AS fullName, u.role,
@@ -269,7 +269,7 @@ export class BranchService {
 
   public updateBranchUserAssignments(branchId: string, userIds: string[]): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.manage_users');
+    PermissionService.require(actor, 'ui.branches.branches.manage_users');
     this.access.requireBranchAccess(branchId, actor);
     if (!this.getBranchRow(branchId)) throw new Error('الفرع غير موجود.');
 
@@ -312,7 +312,7 @@ export class BranchService {
 
   public assignWarehouseToBranch(branchId: string, warehouseId: string, isPrimary = false): BranchWarehouse {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.update');
+    PermissionService.require(actor, 'ui.branches.branches.update');
     this.access.requireBranchAccess(branchId, actor);
     const branch = this.getBranchRow(branchId);
     const warehouse = this.db.query<{ branchId: string | null }>(
@@ -339,7 +339,7 @@ export class BranchService {
 
   public removeWarehouseFromBranch(branchId: string, warehouseId: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.update');
+    PermissionService.require(actor, 'ui.branches.branches.update');
     this.access.requireBranchAccess(branchId, actor);
     this.db.run('DELETE FROM branch_warehouses WHERE branch_id = ? AND warehouse_id = ?', [branchId, warehouseId]);
   }
@@ -347,11 +347,11 @@ export class BranchService {
   public getUserBranches(userId: string): Branch[] {
     const actor = AuthService.requireAuth();
     if (actor.role !== 'ADMIN' && actor.id !== userId) {
-      PermissionService.require(actor, 'branches.manage_users');
+      PermissionService.require(actor, 'ui.branches.branches.manage_users');
     }
     const targetScope = this.getUserBranchScope(userId);
     if (targetScope === 'ALL') {
-      if (actor.id !== userId) PermissionService.require(actor, 'branches.access_all');
+      if (actor.id !== userId) PermissionService.require(actor, 'ui.branches.branches.access_all');
       return this.getAllBranches();
     }
     const scope = this.access.sqlScope('b.id', undefined, actor);
@@ -368,7 +368,7 @@ export class BranchService {
   public getUserBranchScope(userId: string): 'ASSIGNED' | 'ALL' {
     const actor = AuthService.requireAuth();
     if (actor.role !== 'ADMIN' && actor.id !== userId) {
-      PermissionService.require(actor, 'branches.manage_users');
+      PermissionService.require(actor, 'ui.branches.branches.manage_users');
     }
     const scope = this.db.query<{ branchScope: 'ASSIGNED' | 'ALL' }>(
       'SELECT branch_scope AS branchScope FROM users WHERE id = ?',
@@ -376,7 +376,7 @@ export class BranchService {
     )[0]?.branchScope;
     if (scope !== 'ASSIGNED' && scope !== 'ALL') throw new Error('المستخدم غير موجود أو نطاقه غير صالح.');
     if (scope === 'ALL' && actor.role !== 'ADMIN' && actor.id !== userId) {
-      PermissionService.require(actor, 'branches.access_all');
+      PermissionService.require(actor, 'ui.branches.branches.access_all');
     }
     return scope;
   }
@@ -384,7 +384,7 @@ export class BranchService {
   public getUserAssignedBranchIds(userId: string): string[] {
     const actor = AuthService.requireAuth();
     if (actor.role !== 'ADMIN' && actor.id !== userId) {
-      PermissionService.require(actor, 'branches.manage_users');
+      PermissionService.require(actor, 'ui.branches.branches.manage_users');
     }
     const scope = this.access.sqlScope('ub.branch_id', undefined, actor);
     return this.db.query<{ branchId: string }>(
@@ -396,7 +396,7 @@ export class BranchService {
 
   public assignUserToBranch(userId: string, branchId: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.manage_users');
+    PermissionService.require(actor, 'ui.branches.branches.manage_users');
     this.access.requireBranchAccess(branchId, actor);
     if (!this.getBranchRow(branchId)) throw new Error('الفرع غير موجود.');
     const target = this.db.query<{ id: string; role: string }>(
@@ -415,15 +415,15 @@ export class BranchService {
 
   public removeUserFromBranch(userId: string, branchId: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.manage_users');
+    PermissionService.require(actor, 'ui.branches.branches.manage_users');
     this.access.requireBranchAccess(branchId, actor);
     this.db.run('DELETE FROM users_branches WHERE user_id = ? AND branch_id = ?', [userId, branchId]);
   }
 
   public setUserBranchScope(userId: string, scope: 'ASSIGNED' | 'ALL'): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.manage_users');
-    if (scope === 'ALL') PermissionService.require(actor, 'branches.access_all');
+    PermissionService.require(actor, 'ui.branches.branches.manage_users');
+    if (scope === 'ALL') PermissionService.require(actor, 'ui.branches.branches.access_all');
     const target = this.db.query<{ id: string; role: string }>(
       'SELECT id, role FROM users WHERE id = ? AND is_active = 1',
       [userId]
@@ -446,8 +446,8 @@ export class BranchService {
 
   public updateUserBranchAccess(userId: string, scope: 'ASSIGNED' | 'ALL', branchIds: string[]): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.manage_users');
-    if (scope === 'ALL') PermissionService.require(actor, 'branches.access_all');
+    PermissionService.require(actor, 'ui.branches.branches.manage_users');
+    if (scope === 'ALL') PermissionService.require(actor, 'ui.branches.branches.access_all');
     const target = this.db.query<{ id: string; role: string }>(
       'SELECT id, role FROM users WHERE id = ? AND is_active = 1',
       [userId]
@@ -494,7 +494,7 @@ export class BranchService {
 
   public getBranchStats(): Array<{ branchId: string; branchName: string; totalSales: number; totalOrders: number }> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.view');
+    PermissionService.require(actor, 'ui.branches.branches.view');
     const scope = this.access.sqlScope('b.id', undefined, actor);
     return this.db.query<any>(`
       SELECT b.id as branchId, b.name as branchName,

@@ -48,7 +48,7 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
   }): any {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
     const wh = this.db.query<any>(`SELECT code FROM warehouses WHERE id = ?`, [input.warehouseId])[0];
     if (!wh) throw new Error('المخزن غير موجود.');
@@ -86,7 +86,7 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
   }): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
     const existing = this.db.query<any>(`SELECT * FROM warehouse_locations WHERE id = ?`, [id])[0];
     if (!existing) throw new Error('الموقع غير موجود.');
@@ -121,7 +121,7 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
   public deleteWarehouseLocation(id: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
     const occupied = this.db.query<any>(`SELECT SUM(quantity_m2) as qty FROM product_location_stock WHERE location_id = ?`, [id])[0];
     if (occupied && Number(occupied.qty || 0) > 0) {

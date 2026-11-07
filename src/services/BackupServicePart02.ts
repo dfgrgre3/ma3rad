@@ -26,7 +26,7 @@ export class BackupServicePart02 extends BackupServicePart01 {
 
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-    const cutoffDateStr = cutoffDate.toISOString().slice(0, 10);
+    const cutoffDateStr = localDateString(cutoffDate);
     const backups = this.db.query<{
       id: string;
       fileName: string;

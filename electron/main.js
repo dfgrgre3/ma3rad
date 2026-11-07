@@ -443,11 +443,15 @@ const licenseGuard = registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = 'b154c9dd1668e960bcc434ac15db48f64772ce8b1290e31108300d7f6fd9dfbe';
+const PRELOAD_INTEGRITY_SHA256 = '9d4ab82a0baf8300bc62221a93db2f394fd196b1caf01b364a626bebc60deb70';
+const SECURITY_SOURCE_INTEGRITY_SHA256 = 'c88cf3df3608468259747b3078e8fc58fc51bd882114680b82fcfd6b9bf47cfd';
+const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
 const CRITICAL_FILE_INTEGRITY = Object.freeze({
   'electron/entry.js': 'da72fd8b8ae551e00860b84e551fced03d43a66c6d4e3a7a87fc0329056f0631',
   'electron/preload.js': PRELOAD_INTEGRITY_SHA256,
-  'electron/security.js': 'c88cf3df3608468259747b3078e8fc58fc51bd882114680b82fcfd6b9bf47cfd',
+  'electron/security.js': app.isPackaged
+    ? SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256
+    : SECURITY_SOURCE_INTEGRITY_SHA256,
 });
 ipcMain.handle('security:check-integrity', async (event) => {
   validateIpcSender(event);

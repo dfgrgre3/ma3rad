@@ -91,7 +91,7 @@ export const OverviewSection: React.FC = () => {
 
       {/* ── Today's Purchases Compact Panel ── */}
       <TodayPurchasesPanel
-        canViewPurchases={PermissionService.can(AuthService.getCurrentUser(), 'purchases.view')}
+        canViewPurchases={PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.invoices.view')}
         todayPurchases={todayPurchases}
         purchaseHourly={purchaseHourly}
         purchasePeakHour={purchasePeakHour}

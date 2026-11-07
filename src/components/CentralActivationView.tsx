@@ -12,7 +12,7 @@ export const CentralActivationView: React.FC = () => {
   const [deviceName, setDeviceName] = useState('');
   const [status, setStatus] = useState('');
   const [config, setConfig] = useState<any>(null);
-  const canManageLicense = PermissionService.can(AuthService.getCurrentUser(), 'admin.license.manage', '/central-activation');
+  const canManageLicense = PermissionService.can(AuthService.getCurrentUser(), 'ui.admin.license.manage', '/central-activation');
 
   useEffect(() => {
     if (canManageLicense) setConfig(CentralLicenseService.getCachedConfig());

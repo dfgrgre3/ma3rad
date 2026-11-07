@@ -9,6 +9,7 @@ import { getEffectiveBusinessType } from './BusinessTypeService';
 import { getProfilePrintTemplate } from '../config/businessProfiles';
 import type { InvoiceSectionId, InvoiceTableColumnId } from '../types';
 import { writeAndPrintWindow } from '../utils/printWindow';
+import { addLocalDays, localDateString } from '../utils/date';
 
 export type InvoiceTemplateId = 'table' | 'classic' | 'modern' | 'compact' | 'detailed';
 export type InvoiceSizeId = 'a4' | 'a5' | 'thermal';
@@ -49,8 +50,8 @@ export class PrintService {
     return {
       id: 'sample-inv-preview',
       invoiceNumber: 'INV-2026-0088',
-      date: new Date().toISOString().split('T')[0],
-      dueDate: new Date().toISOString().split('T')[0],
+      date: localDateString(),
+      dueDate: localDateString(),
       customerId: 'cust_sample_01',
       customerName: 'مؤسسة إعمار وبناء الحديثة',
       customerPhone: '0555123456',
@@ -76,7 +77,7 @@ export class PrintService {
       deliveryAddress: 'حي الياسمين - شارع الملك عبدالعزيز - فيلا 42',
       deliveryContactName: 'م. أحمد الشريف',
       deliveryContactPhone: '0555987654',
-      deliveryDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      deliveryDate: localDateString(addLocalDays(new Date(), 1)),
       driverName: 'سعد المنصور (شاحنة نقل رقم 12)',
       deliveryNotes: 'يرجى الاتصال قبل الوصول بنصف ساعة والتنزيل داخل الحوش',
       // تفاصيل العروض والكوبونات التجريبية

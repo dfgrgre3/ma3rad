@@ -1,5 +1,6 @@
-﻿import React from 'react';
-import { CheckCircle2, ChevronRight, FileText, ScanLine } from 'lucide-react';
+import React from 'react';
+import { CheckCircle2, ChevronRight, FileText } from 'lucide-react';
+import { DataTable, type DataTableColumn } from '../../../components/ui/DataTable';
 import { fmtCountCurrency } from './helpers';
 import type { CountSession } from '../../../services/inventory-count/types';
 
@@ -10,82 +11,87 @@ interface CountSessionsTableProps {
 }
 
 export const CountSessionsTable: React.FC<CountSessionsTableProps> = ({ loading, sessions, onOpenSession }) => {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-32">
-        <div className="w-6 h-6 bg-violet-600 rounded-lg animate-bounce" />
-      </div>
-    );
-  }
-
-  if (sessions.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-500">
-        <ScanLine className="w-10 h-10 opacity-30" />
-        <p className="text-sm">لا توجد جلسات جرد سابقة</p>
-      </div>
-    );
-  }
+  const columns: DataTableColumn<CountSession>[] = [
+    {
+      key: 'code',
+      header: 'كود الجلسة',
+      className: 'font-mono font-bold text-sky-600',
+      render: (session) => session.code,
+    },
+    {
+      key: 'warehouse',
+      header: 'المخزن المستهدف',
+      className: 'font-medium',
+      render: (session) => session.warehouse,
+    },
+    { key: 'date', header: 'التاريخ', className: 'text-[var(--cerami-muted)]', render: (session) => session.startDate },
+    { key: 'owner', header: 'المسؤول', render: (session) => session.countedBy },
+    {
+      key: 'items',
+      header: 'الأصناف',
+      className: 'font-bold',
+      render: (session) => `${session.itemsCount} صنف`,
+    },
+    {
+      key: 'variance-count',
+      header: 'الفروقات',
+      render: (session) => session.status === 'POSTED' ? `${session.itemsWithVariance} أصناف` : '—',
+    },
+    {
+      key: 'variance-value',
+      header: 'قيمة الفروقات',
+      className: 'font-mono',
+      render: (session) => session.status !== 'POSTED'
+        ? '—'
+        : session.totalVarianceValue > 0
+          ? <span className="font-bold text-[var(--cerami-danger)]">{fmtCountCurrency(session.totalVarianceValue)}</span>
+          : <span className="text-[var(--cerami-success)]">مطابق</span>,
+    },
+    {
+      key: 'status',
+      header: 'الحالة',
+      render: (session) => session.status === 'POSTED' ? (
+        <span className="inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+          <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> مطابق ومرحل
+        </span>
+      ) : session.status === 'REVIEW' ? (
+        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">بانتظار المراجعة</span>
+      ) : session.status === 'CANCELLED' ? (
+        <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">ملغى</span>
+      ) : (
+        <span className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+          قيد الجرد والتعبئة
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'الخيارات',
+      render: (session) => (
+        <button
+          type="button"
+          onClick={() => onOpenSession(session)}
+          className="inline-flex items-center gap-1 rounded px-1 py-1 text-xs font-bold text-sky-600 transition-colors hover:text-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cerami-primary)]"
+        >
+          <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>{session.status === 'POSTED' ? 'عرض التقرير' : 'إدخال الجرد'}</span>
+          <ChevronRight className="h-3 w-3" aria-hidden="true" />
+        </button>
+      ),
+    },
+  ];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 border-b border-slate-200">
-          <tr>
-            {['كود الجلسة', 'المخزن المستهدف', 'التاريخ', 'المسؤول', 'الأصناف', 'الفروقات', 'قيمة الفروقات', 'الحالة', 'الخيارات'].map(h => (
-              <th key={h} className="px-4 py-3 text-right text-xs font-bold text-slate-500">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200">
-          {sessions.map((session) => (
-            <tr key={session.id} className="hover:bg-slate-100 transition">
-              <td className="px-4 py-3 font-mono text-sky-600 font-bold">{session.code}</td>
-              <td className="px-4 py-3 text-slate-900 font-medium">{session.warehouse}</td>
-              <td className="px-4 py-3 text-slate-500">{session.startDate}</td>
-              <td className="px-4 py-3 text-slate-700">{session.countedBy}</td>
-              <td className="px-4 py-3 text-slate-700 font-bold">{session.itemsCount} صنف</td>
-              <td className="px-4 py-3 text-slate-405">
-                {session.status === 'POSTED' ? `${session.itemsWithVariance} أصناف` : '—'}
-              </td>
-              <td className="px-4 py-3 font-mono">
-                {session.status === 'POSTED' ? (
-                  session.totalVarianceValue > 0 ? (
-                    <span className="text-rose-600 font-bold">{fmtCountCurrency(session.totalVarianceValue)}</span>
-                  ) : (
-                    <span className="text-emerald-600">مطابق</span>
-                  )
-                ) : '—'}
-              </td>
-              <td className="px-4 py-3">
-                {session.status === 'POSTED' ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1 w-fit">
-                    <CheckCircle2 className="w-3 h-3" /> مطابق ومرحل
-                  </span>
-                ) : session.status === 'REVIEW' ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-sky-50 text-sky-700 border border-sky-200">بانتظار المراجعة</span>
-                ) : session.status === 'CANCELLED' ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-500 border border-slate-200">ملغى</span>
-                ) : (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/10 text-amber-600 border border-amber-500/20 flex items-center gap-1 w-fit animate-pulse">
-                    قيد الجرد والتعبئة
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                <button
-                  onClick={() => onOpenSession(session)}
-                  className="flex items-center gap-1 text-xs text-sky-600 hover:text-sky-700 font-bold transition"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>{session.status === 'POSTED' ? 'عرض التقرير' : 'إدخال الجرد'}</span>
-                  <ChevronRight className="w-3 h-3" />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      ariaLabel="جلسات الجرد السابقة"
+      columns={columns}
+      rows={sessions}
+      rowKey={(session) => session.id}
+      loading={loading}
+      emptyTitle="لا توجد جلسات جرد سابقة"
+      tableClassName="text-sm"
+      minWidth={900}
+      rowClassName={() => 'transition-colors hover:bg-[var(--cerami-surface-muted)]'}
+    />
   );
 };

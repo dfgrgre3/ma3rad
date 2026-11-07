@@ -15,7 +15,7 @@ export class CategoryService {
   private sync = new MasterDataSyncService(this.db);
 
   public getAllCategories(): CategoryWithCount[] {
-    PermissionService.require(AuthService.requireAuth(), 'categories.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.categories.categories.view');
     const rows = this.db.query<any>(`
       SELECT 
         c.id, c.name, c.parent_id, c.description, c.created_at,
@@ -47,7 +47,7 @@ export class CategoryService {
   }
 
   public getCategoryById(id: string): Category | null {
-    PermissionService.require(AuthService.requireAuth(), 'categories.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.categories.categories.view');
     const rows = this.db.query<Category>(
       'SELECT id, name, parent_id, description, created_at FROM categories WHERE id = ?',
       [id]
@@ -57,7 +57,7 @@ export class CategoryService {
 
   public createCategory(name: string, parentId?: string, description?: string): Category {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'categories.create');
+    PermissionService.require(actor, 'ui.categories.categories.create');
 
     const cleanName = String(name || '').trim();
     if (!cleanName) throw new Error('اسم التصنيف مطلوب.');
@@ -91,7 +91,7 @@ export class CategoryService {
 
   public updateCategory(id: string, updates: { name?: string; parentId?: string | null; description?: string }): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'categories.update');
+    PermissionService.require(actor, 'ui.categories.categories.update');
 
     const old = this.getCategoryById(id);
     if (!old) throw new Error('التصنيف غير موجود.');
@@ -148,7 +148,7 @@ export class CategoryService {
 
   public moveProducts(fromCategoryId: string, toCategoryId: string): number {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.update');
+    PermissionService.require(actor, 'ui.products.catalog.update');
     const target = this.getCategoryById(toCategoryId);
     if (!target) throw new Error('التصنيف الهدف غير موجود.');
     const count = this.db.query('SELECT COUNT(*) as cnt FROM products WHERE category_id = ?', [fromCategoryId])[0]?.cnt || 0;
@@ -161,7 +161,7 @@ export class CategoryService {
 
   public deleteCategory(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'categories.delete');
+    PermissionService.require(actor, 'ui.categories.categories.delete');
 
     const category = this.getCategoryById(id);
     if (!category) throw new Error('التصنيف غير موجود.');

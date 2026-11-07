@@ -10,7 +10,6 @@ import { TerminologyService } from './TerminologyService';
 import { AppConfigService } from './AppConfigService';
 import { CentralLicenseService } from './CentralLicenseService';
 import { CentralFeaturePermissionService } from './CentralFeaturePermissionService';
-import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 import { ROUTE_PERMISSIONS } from '../config/routePermissions';
 
 export interface NavOverrides {
@@ -18,6 +17,7 @@ export interface NavOverrides {
   labels: Record<string, string>;
   groupsOrder: string[];
   itemsOrder: Record<string, string[]>;
+  groupAssignments: Record<string, string>;
 }
 
 function parseJson<T>(raw: string | undefined, fallback: T): T {
@@ -27,6 +27,20 @@ function parseJson<T>(raw: string | undefined, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function parseGroupAssignments(raw: string | undefined): Record<string, string> {
+  const parsed = parseJson<unknown>(raw, {});
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  const knownGroups = new Set(NAV_GROUPS.map((group) => group.id));
+  const knownPaths = new Set(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.to)));
+
+  return Object.entries(parsed).reduce<Record<string, string>>((assignments, [path, groupId]) => {
+    if (knownPaths.has(path) && typeof groupId === 'string' && knownGroups.has(groupId)) {
+      assignments[path] = groupId;
+    }
+    return assignments;
+  }, {});
 }
 
 export class NavigationService {
@@ -52,8 +66,27 @@ export class NavigationService {
     ...ROUTE_PERMISSIONS,
   ];
 
+  private static readonly permissionRoutes: Array<{ path: string; all?: string[]; any?: string[] }> = [
+    ...NavigationService.routePermissions,
+    ...NAV_GROUPS.flatMap((group) =>
+      group.items.flatMap((item) => {
+        const itemPermissions = [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])];
+        const itemAny = item.anyPerms ?? [];
+        const groupPermissions = [...(group.perms ?? []), ...(group.perm ? [group.perm] : [])];
+        const all = itemPermissions.length || itemAny.length ? itemPermissions : groupPermissions;
+        const any = itemAny.length ? itemAny : group.anyPerms ?? [];
+        return all.length || any.length
+          ? [{ path: item.to, all, any }]
+          : [];
+      })
+    ),
+  ];
+
   public static getRequiredPermission(pathname: string): string | null {
-    return NavigationService.getRequiredPermissions(pathname)?.[0] ?? null;
+    const groups = NavigationService.getRequiredPermissionGroups(pathname);
+    // بعض المسارات تُحمى بأيٍّ من عدة صلاحيات (`any`) بلا صلاحية إلزامية
+    // (`all`)، لذا نُعيد أول بديل متاح بدل إرجاع null يوهم بأن المسار غير محمي.
+    return groups?.all[0] ?? groups?.any[0] ?? null;
   }
 
   public static getRequiredPermissions(pathname: string): string[] | null {
@@ -61,21 +94,19 @@ export class NavigationService {
   }
 
   public static getRequiredPermissionGroups(pathname: string): { all: string[]; any: string[] } | null {
-    const routes = [
-      ...NAV_GROUPS.flatMap((group) =>
-        group.items.flatMap((item) => {
-          const permissions = [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])];
-          return permissions.length || item.anyPerms?.length
-            ? [{ path: item.to, all: permissions, any: item.anyPerms ?? [] }]
-            : [];
-        })
-      ),
-      ...NavigationService.routePermissions,
-    ];
-    const match = routes
-      .filter(({ path }) => pathname === path || pathname.startsWith(`${path}/`))
-      .sort((a, b) => b.path.length - a.path.length)[0];
-    return match ? { all: match.all ?? [], any: match.any ?? [] } : null;
+    let match: (typeof NavigationService.permissionRoutes)[number] | undefined;
+    for (const route of NavigationService.permissionRoutes) {
+      if (
+        (pathname === route.path || pathname.startsWith(`${route.path}/`))
+        && route.path.length > (match?.path.length ?? -1)
+      ) {
+        match = route;
+      }
+    }
+
+    return match
+      ? { all: [...(match.all ?? [])], any: [...(match.any ?? [])] }
+      : null;
   }
 
   public static getOverrides(): NavOverrides {
@@ -93,6 +124,7 @@ export class NavigationService {
       labels: parseJson<Record<string, string>>(SettingsService.getValue(NAV_STORAGE_KEYS.labels), {}),
       groupsOrder: parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.groupsOrder), []),
       itemsOrder: parseJson<Record<string, string[]>>(SettingsService.getValue(NAV_STORAGE_KEYS.itemsOrder), {}),
+      groupAssignments: parseGroupAssignments(SettingsService.getValue(NAV_STORAGE_KEYS.groupAssignments)),
     };
   }
 
@@ -119,34 +151,34 @@ export class NavigationService {
 
 
     return NavigationService.getGroups()
-      .filter((group) => {
-        const required = [...(group.perms ?? []), ...(group.perm ? [group.perm] : [])];
-        return required.every((permission) => PermissionService.can(user, permission))
-          && (!group.anyPerms?.length || group.anyPerms.some((permission) => PermissionService.can(user, permission)));
-      })
       .map((group) => ({
         ...group,
         items: group.items.filter((item) => {
           if (isCentralHidden(item.to)) return false;
           if (!isModuleAllowed(item.to)) return false;
-          const required = [...(item.perms ?? []), ...(item.perm ? [item.perm] : [])];
-          return required.every((permission) => PermissionService.can(user, permission))
-            && (!item.anyPerms?.length || item.anyPerms.some((permission) => PermissionService.can(user, permission)));
+          const required = NavigationService.getRequiredPermissionGroups(item.to);
+          return !required
+            || required.all.every((permission) => PermissionService.can(user, permission))
+              && (!required.any.length || required.any.some((permission) => PermissionService.can(user, permission)));
         }),
       }))
       .filter((group) => group.items.length > 0);
   }
 
   public static getNavigationGroups(user: User | null): NavGroupDef[] {
-    return OPEN_ALL_PAGES ? NAV_GROUPS : NavigationService.getAccessibleGroups(user);
+    return NavigationService.getAccessibleGroups(user);
   }
 
   public static getFirstAccessiblePath(user: User | null): string | null {
     return NavigationService.getAccessibleGroups(user)[0]?.items[0]?.to ?? null;
   }
 
-  public static merge(source: NavOverrides): NavGroupDef[] {
+  public static merge(
+    source: NavOverrides,
+    options: { includeHidden?: boolean } = {}
+  ): NavGroupDef[] {
     const { hidden, labels, groupsOrder, itemsOrder } = source;
+    const groupAssignments = source.groupAssignments ?? {};
     const hiddenSet = new Set(hidden);
     const businessType = ModuleRegistryService.getBusinessType();
     const termOverrides = TerminologyService.getOverrides();
@@ -156,11 +188,21 @@ export class NavigationService {
       overrides: termOverrides,
     });
 
+    const assignedItems = NAV_GROUPS.flatMap((defaultGroup) =>
+      defaultGroup.items.map((item) => ({
+        item,
+        groupId: groupAssignments[item.to] ?? defaultGroup.id,
+      }))
+    );
+
     const merged = NAV_GROUPS.map((group) => {
       const order = itemsOrder[group.id] || [];
       const rank = new Map(order.map((path, index) => [path, index]));
-      const items = group.items
-        .filter((item) => !hiddenSet.has(item.to))
+      const items = assignedItems
+        .filter(({ item, groupId }) =>
+          groupId === group.id && (options.includeHidden || !hiddenSet.has(item.to))
+        )
+        .map(({ item }) => item)
         .map((item) => {
           const page = AppConfigService.getPage(item.to);
           return {
@@ -209,6 +251,7 @@ export class NavigationService {
         [NAV_STORAGE_KEYS.labels]: JSON.stringify(next.labels),
         [NAV_STORAGE_KEYS.groupsOrder]: JSON.stringify(next.groupsOrder),
         [NAV_STORAGE_KEYS.itemsOrder]: JSON.stringify(next.itemsOrder),
+        [NAV_STORAGE_KEYS.groupAssignments]: JSON.stringify(next.groupAssignments),
       },
       actor
     );
@@ -216,7 +259,13 @@ export class NavigationService {
 
   public static reset(): void {
     const actor = AuthService.requireAuth();
-    NavigationService.saveOverrides({ hidden: [], labels: {}, groupsOrder: [], itemsOrder: {} }, actor);
+    NavigationService.saveOverrides({
+      hidden: [],
+      labels: {},
+      groupsOrder: [],
+      itemsOrder: {},
+      groupAssignments: {},
+    }, actor);
   }
 
   public static getFlatItems(): { groupId: string; label: string; to: string; perm?: string; perms?: string[] }[] {

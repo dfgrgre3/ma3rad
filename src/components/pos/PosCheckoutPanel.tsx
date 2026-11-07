@@ -6,6 +6,8 @@ import type { Customer, PaymentType } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
 import type { AppliedPromotion } from '../../services/PricingService';
 import { CentralLimitGuard } from '../ui/CentralLimitGuard';
+import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../OperationalFieldsForm';
 
 const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
 
@@ -56,6 +58,9 @@ export interface PosCheckoutPanelProps {
   onClearOrder: () => void;
   onOpenCalculator: () => void;
   onCheckout: () => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  onOperationalFieldValuesChange: (values: Record<string, string>) => void;
 }
 
 export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
@@ -103,6 +108,9 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
   onClearOrder,
   onOpenCalculator,
   onCheckout,
+  operationalFields,
+  operationalFieldValues,
+  onOperationalFieldValuesChange,
 }) => (
   <div className="p-3 border-t border-slate-200 bg-white space-y-3 max-h-[58%] overflow-y-auto shadow-[0_-8px_24px_rgba(15,23,42,0.04)] max-[900px]:max-h-[65%]">
     {/* Order extras */}
@@ -117,6 +125,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
           onChange={(e) => setDiscountAmount(e.target.value === '' ? 0 : Math.max(0, Number.parseFloat(e.target.value) || 0))}
           className={numberInputCls}
         />
+        <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={onOperationalFieldValuesChange} title="بيانات إضافية للفاتورة" />
       </div>
       <div>
         <label htmlFor="pos-tax-percentage" className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Percent className="w-3 h-3" /> ضريبة %</label>

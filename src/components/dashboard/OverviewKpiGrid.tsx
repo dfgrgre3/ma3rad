@@ -46,63 +46,66 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
   const growth = Number.isFinite(rawGrowth) ? rawGrowth : null;
   const rawInvoiceGrowth = monthlyComparison?.invoiceGrowth;
   const invoiceGrowth = Number.isFinite(rawInvoiceGrowth) ? rawInvoiceGrowth : null;
+  const hasSales = metrics.salesCount > 0 || metrics.todaySales > 0 || metrics.monthSales > 0;
+  const formatMoney = (value: number, emptyFallback = '—') => (value > 0 ? CeramicMath.formatCurrency(value) : emptyFallback);
+  const formatCount = (value: number, emptyFallback = '—') => (value > 0 ? String(value) : emptyFallback);
 
   return (
     <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
       <KpiTile
         label="مبيعات اليوم"
         icon={ShoppingCart}
-        value={CeramicMath.formatCurrency(metrics.todaySales)}
-        hint={`${metrics.salesCount} فاتورة مبيعات`}
+        value={formatMoney(metrics.todaySales)}
+        hint={hasSales ? `${metrics.salesCount} فاتورة مبيعات` : 'لا توجد مبيعات مسجلة اليوم'}
       />
 
       <KpiTile
         label="مبيعات الشهر"
         icon={TrendingUp}
-        value={CeramicMath.formatCurrency(metrics.monthSales)}
+        value={formatMoney(metrics.monthSales)}
         hint={growth !== null ? (
           <span className="flex items-center gap-1">
             {growth >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
             {Math.abs(growth).toFixed(1)}% نمو شهري
           </span>
-        ) : 'لا توجد مقارنة بالشهر السابق'}
+        ) : (hasSales ? 'لا توجد مقارنة بالشهر السابق' : 'لا توجد بيانات لهذا الشهر')}
       />
 
       <KpiTile
         label="الأرباح الصافية"
         icon={DollarSign}
         tone={metrics.netProfit < 0 ? 'negative' : 'positive'}
-        value={CeramicMath.formatCurrency(metrics.netProfit)}
-        hint={`هامش الربح ${profitMarginPercent}%`}
+        value={formatMoney(metrics.netProfit)}
+        hint={hasSales ? `هامش الربح ${profitMarginPercent}%` : 'لا توجد أرباح مسجلة بعد الآن'}
       />
 
       <KpiTile
         label="متوسط الفاتورة"
         icon={CreditCard}
-        value={CeramicMath.formatCurrency(averageTicket)}
-        hint="معدل القيمة اليومي"
+        value={averageTicket > 0 ? CeramicMath.formatCurrency(averageTicket) : '—'}
+        hint={hasSales ? 'معدل القيمة اليومي' : 'لا توجد فواتير حتى الآن'}
       />
 
       <KpiTile
         label="ديون العملاء"
         icon={Wallet}
         tone={metrics.totalReceivables > 0 ? 'warning' : 'default'}
-        value={CeramicMath.formatCurrency(metrics.totalReceivables)}
-        hint="مستحقات واجبة التحصيل"
+        value={formatMoney(metrics.totalReceivables)}
+        hint={metrics.totalReceivables > 0 ? 'مستحقات واجبة التحصيل' : 'لا توجد ديون مستحقة'}
       />
 
       <KpiTile
         label="قيمة المخزون (التكلفة)"
         icon={Package}
-        value={CeramicMath.formatCurrency(metrics.inventoryValuationCost)}
-        hint="إجمالي بضاعة المستودعات"
+        value={formatMoney(metrics.inventoryValuationCost)}
+        hint={metrics.inventoryValuationCost > 0 ? 'إجمالي بضاعة المستودعات' : 'المخزون غير مُسجل بعد'}
       />
 
       <KpiTile
         label="نواقص المخزون"
         icon={AlertTriangle}
         tone={metrics.lowStockCount > 0 ? 'negative' : 'positive'}
-        value={`${metrics.lowStockCount} صنف`}
+        value={formatCount(metrics.lowStockCount, '0') + ' صنف'}
         hint={metrics.lowStockCount > 0 ? 'أصناف بلغت حد إعادة الطلب' : 'المخزون بمستوى آمن'}
       />
 
@@ -115,7 +118,7 @@ export const OverviewKpiGrid: React.FC<OverviewKpiGridProps> = ({ metrics, month
             {invoiceGrowth >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
             {Math.abs(invoiceGrowth).toFixed(1)}% مقارنة بالشهر السابق
           </span>
-        ) : 'مقارنة بالشهر السابق'}
+        ) : (hasSales ? 'مقارنة بالشهر السابق' : 'لا توجد فواتير مسجلة')}
       />
     </div>
   );

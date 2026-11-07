@@ -9,6 +9,8 @@ import { withModuleDependencies } from '../config/moduleRegistry';
 import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 import { CentralLicenseService } from '../services/CentralLicenseService';
 import { CentralFeaturePermissionService } from '../services/CentralFeaturePermissionService';
+import { PermissionService } from '../services/PermissionService';
+import type { User } from '../types';
 
 export const PageLoader: React.FC = () => (
   <div className="flex-1 flex items-center justify-center h-full">
@@ -22,10 +24,11 @@ export const PageLoader: React.FC = () => (
 );
 
 interface ModuleGuardProps {
+  currentUser: User;
   children: React.ReactNode;
 }
 
-export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
+export const ModuleGuard: React.FC<ModuleGuardProps> = ({ currentUser, children }) => {
   const { pathname } = useLocation();
   const businessType = getEffectiveBusinessType();
   const modules = withModuleDependencies(parseEnabledModules(SettingsService.getValue('enabledModules'), businessType));
@@ -39,6 +42,14 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
   useEffect(() => {
     CentralFeaturePermissionService.setCurrentPath(pathname);
   }, [pathname]);
+
+  if (!PermissionService.canAccessPage(currentUser, pathname)) {
+    return (
+      <div role="alert" className="flex h-full items-center justify-center p-6 text-sm font-semibold text-slate-600">
+        ليس لديك صلاحية للوصول إلى هذه الصفحة.
+      </div>
+    );
+  }
 
   // وضع التشغيل المحلي: فتح كل الصفحات دون أي بوابة (وحدات/مظهر/قيود مركزية).
   if (OPEN_ALL_PAGES) {
@@ -68,5 +79,3 @@ export const ModuleGuard: React.FC<ModuleGuardProps> = ({ children }) => {
 
 // Shorthand alias for concise route definitions
 export const S = ModuleGuard;
-
-

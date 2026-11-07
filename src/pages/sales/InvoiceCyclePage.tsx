@@ -184,8 +184,8 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
   const service = useMemo(() => new SalesService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const user = AuthService.getCurrentUser();
-  const canCollect = PermissionService.can(user, 'customers.payment');
-  const canVoid = PermissionService.can(user, 'sales.void');
+  const canCollect = PermissionService.can(user, 'ui.customers.detail.payment');
+  const canVoid = PermissionService.can(user, 'ui.sales.invoices.void');
   const [showCollect, setShowCollect] = useState(false);
   const [detail, setDetail] = useState<SalesInvoice | null>(null);
   const [busy, setBusy] = useState(false);
@@ -361,7 +361,7 @@ export const InvoiceCyclePage: React.FC = () => {
   const service = useMemo(() => new SalesService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'sales.view');
+  const canView = PermissionService.can(user, 'ui.sales.cycle.view');
 
   const [invoices, setInvoices] = useState<SalesInvoice[]>([]);
   const [stats, setStats] = useState<any>(null);

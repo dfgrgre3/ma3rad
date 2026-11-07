@@ -20,7 +20,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
   }>): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'ui.inventory.hub.transfer');
     if (!Array.isArray(receipts) || receipts.length === 0) {
       throw new Error('يجب تسجيل استلام بند واحد على الأقل.');
     }

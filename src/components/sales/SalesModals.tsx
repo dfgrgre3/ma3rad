@@ -9,6 +9,9 @@ import { formatProductQuantity, getProductUnitLabel } from '../../utils/productU
 import { DocumentPreviewModal } from '../DocumentPreviewModal';
 import { CustomerStatementWhatsAppOptions } from './CustomerStatementWhatsAppOptions';
 import { Modal, InfoBox, SummaryRow } from './SalesUi';
+import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsSummary } from '../OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../OperationalFieldsRecordEditor';
 
 const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
 
@@ -61,6 +64,10 @@ export interface SalesModalsProps {
   openVoid: (invoice: FullInvoice) => void;
   buildExportHtml: (options: any) => string;
   exportToExcel: (options: any) => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  canUpdateOperationalFields: boolean;
+  onSaveOperationalFields: (values: Record<string, string>) => void;
 }
 
 export const SalesModals: React.FC<SalesModalsProps> = ({
@@ -103,6 +110,10 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
   openVoid,
   buildExportHtml,
   exportToExcel,
+  operationalFields,
+  operationalFieldValues,
+  canUpdateOperationalFields,
+  onSaveOperationalFields,
 }) => (
   <>
       {/* ── Invoice Details ─────────────────────────────────────────────────── */}
@@ -124,6 +135,16 @@ export const SalesModals: React.FC<SalesModalsProps> = ({
             <InfoBox label="العميل" value={selected.customerName || 'عميل نقدي'} sub={selected.customerPhone} />
             <InfoBox label="طريقة الدفع" value={paymentTypeLabel[selected.paymentType] || selected.paymentType} sub={canViewDebts ? paymentStatusLabel[selected.paymentStatus] : undefined} />
             <InfoBox label="حالة الفاتورة" value={selected.invoiceStatus === 'VOID' ? 'ملغاة' : 'مكتملة'} sub={`${selected.items.length} بند`} />
+          </div>
+          <div className="mb-4 space-y-2">
+            <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />
+            <OperationalFieldsRecordEditor
+              recordLabel={selected.invoiceNumber}
+              fields={operationalFields}
+              initialValues={operationalFieldValues}
+              canEdit={canUpdateOperationalFields}
+              onSave={onSaveOperationalFields}
+            />
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">

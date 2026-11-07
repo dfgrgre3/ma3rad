@@ -42,7 +42,7 @@ export const CashierPage: React.FC = () => {
   } = useCashier();
 
   const defaultReg = registers.find((r) => r.isDefault) || registers[0];
-  const canManageShifts = PermissionService.can(currentUser, 'cashier.manage');
+  const canManageShifts = PermissionService.can(currentUser, 'ui.cashier.cashier.manage');
 
   if (isLoading && registers.length === 0) {
     return (

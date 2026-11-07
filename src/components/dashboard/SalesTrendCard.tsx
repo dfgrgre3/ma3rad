@@ -23,20 +23,14 @@ export const SalesTrendCard: React.FC<SalesTrendCardProps> = ({ chartData }) => 
       <div className="h-52 w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="salesGradCompact" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35}/>
-                <stop offset="95%" stopColor="#0284c7" stopOpacity={0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.15} />
-            <XAxis dataKey="date" stroke="#94a3b8" fontSize={10} tickLine={false} />
-            <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--cerami-chart-grid)" />
+            <XAxis dataKey="date" stroke="var(--cerami-muted)" fontSize={10} tickLine={false} />
+            <YAxis stroke="var(--cerami-muted)" fontSize={10} tickLine={false} />
             <Tooltip
-              contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '6px', fontSize: '11px', padding: '4px 8px' }}
+              contentStyle={{ backgroundColor: 'var(--cerami-tooltip-surface)', borderColor: 'var(--cerami-tooltip-border)', color: 'var(--cerami-text)', borderRadius: '6px', fontSize: '11px', padding: '4px 8px' }}
               formatter={(val: any) => [CeramicMath.formatCurrency(Number(val)), 'المبيعات']}
             />
-            <Area isAnimationActive={false} type="monotone" dataKey="sales" stroke="#0284c7" strokeWidth={2} fillOpacity={1} fill="url(#salesGradCompact)" />
+            <Area isAnimationActive={false} type="monotone" dataKey="sales" stroke="var(--win-accent)" strokeWidth={2} fillOpacity={0.12} fill="var(--win-accent)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

@@ -6,7 +6,9 @@ import { useToast } from '../ui/Toast';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import type { PaymentType } from '../../types';
 import { round2 } from '../../services/financials';
-import { fmt, input, label, LoadErrorNotice, ModalShell, useLists } from './DailyModalShared';
+import { LoadErrorNotice, ModalShell } from './DailyModalShared';
+import { useLists } from '../../hooks/daily/useLists';
+import { fmt, input, label } from './DailyModalUtils';
 
 interface SaleLine {
   productId: string;

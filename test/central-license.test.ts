@@ -2,6 +2,7 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CentralLicenseService } from '../src/services/CentralLicenseService.ts';
+import { CentralTelemetryService } from '../src/services/CentralTelemetryService.ts';
 
 const root = globalThis as any;
 root.window.ceramisys = root.window.ceramisys || {};
@@ -126,6 +127,44 @@ test('fetchConfig does not cache configuration whose signature cannot be verifie
     assert.equal(await CentralLicenseService.fetchConfig(), null);
     assert.equal(globalThis.localStorage.getItem('central_cached_config'), null);
     assert.deepEqual(paths, ['/api/v1/configuration/current', '/api/v1/configuration/public-key']);
+  } finally {
+    restoreCentralRequest();
+  }
+});
+
+test('central releases surface only the latest version newer than the installed one', async () => {
+  resetLicense();
+  configured = true;
+  activated = true;
+  globalThis.localStorage.removeItem('central_cached_config');
+
+  fakeCentralRequest(() => ({
+    ok: true,
+    status: 200,
+    json: async () => [
+      {
+        id: 'rel_1', version: '1.1.4', release_notes: 'current build', download_url: '',
+        min_required_version: '0.0.0', is_mandatory: false, created_at: '2026-11-01T00:00:00Z',
+      },
+      {
+        id: 'rel_2', version: '1.1.3', release_notes: 'older build', download_url: '',
+        min_required_version: '0.0.0', is_mandatory: false, created_at: '2026-10-20T00:00:00Z',
+      },
+      {
+        id: 'rel_3', version: '1.2.0', release_notes: '- جديدة ميزة\n- إصلاح', download_url: 'https://github.com/dfgrgre3/ma3rad/releases/download/v1.2.0/CeramiSys-Setup-1.2.0-x64.exe',
+        min_required_version: '1.1.0', is_mandatory: true, created_at: '2026-11-06T00:00:00Z',
+      },
+    ],
+  }));
+
+  try {
+    const update = await CentralTelemetryService.checkForUpdates('1.1.4');
+    assert.equal(update?.version, '1.2.0', 'only strictly newer releases are surfaced');
+    assert.equal(update?.is_mandatory, 1);
+    assert.equal(update?.release_notes, '- جديدة ميزة\n- إصلاح');
+
+    const current = await CentralTelemetryService.checkForUpdates('1.2.0');
+    assert.equal(current, null, 'the installed version never reports itself as an update');
   } finally {
     restoreCentralRequest();
   }

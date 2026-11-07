@@ -10,7 +10,7 @@ export class LoyaltyService {
   private db = DatabaseManager.getInstance();
 
   public getAllLoyaltyTiers(): LoyaltyTier[] {
-    PermissionService.require(AuthService.requireAuth(), 'loyalty.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.loyalty.program.view');
     return this.db.query<LoyaltyTier>('SELECT * FROM loyalty_tiers ORDER BY min_points ASC');
   }
 
@@ -21,7 +21,7 @@ export class LoyaltyService {
 
   public createLoyaltyTier(tier: Omit<LoyaltyTier, 'id' | 'createdAt'>): LoyaltyTier {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'loyalty.manage');
+    PermissionService.require(actor, 'ui.loyalty.program.manage');
     const id = `ltier_${uuidv4().substring(0, 8)}`;
     const now = new Date().toISOString();
     this.db.run(`
@@ -32,7 +32,7 @@ export class LoyaltyService {
   }
 
   public getCustomerLoyalty(customerId: string): CustomerLoyalty | null {
-    PermissionService.require(AuthService.requireAuth(), 'loyalty.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.loyalty.program.view');
     const rows = this.db.query<any>(`
       SELECT cl.*, lt.name as tierName
       FROM customer_loyalty cl
@@ -47,7 +47,7 @@ export class LoyaltyService {
   }
 
   public getRedeemablePointBalance(customerId: string): number {
-    PermissionService.require(AuthService.requireAuth(), 'loyalty.redeem');
+    PermissionService.require(AuthService.requireAuth(), 'ui.loyalty.program.redeem');
     const row = this.db.query<{ currentPoints: number }>(
       'SELECT current_points AS currentPoints FROM customer_loyalty WHERE customer_id = ?',
       [customerId]
@@ -69,7 +69,7 @@ export class LoyaltyService {
 
   public earnPoints(dto: EarnLoyaltyPointsDTO): { loyalty: CustomerLoyalty; transaction: LoyaltyTransaction } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'loyalty.earn');
+    PermissionService.require(actor, 'ui.loyalty.program.earn');
     return this.db.executeTransaction((sqliteDb) => {
       const loyalty = this.initializeCustomerLoyalty(dto.customerId);
       const newPoints = loyalty.currentPoints + dto.points;
@@ -101,7 +101,7 @@ export class LoyaltyService {
 
   public redeemPoints(dto: RedeemLoyaltyPointsDTO): { loyalty: CustomerLoyalty; transaction: LoyaltyTransaction } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'loyalty.redeem');
+    PermissionService.require(actor, 'ui.loyalty.program.redeem');
     const loyalty = this.getCustomerLoyalty(dto.customerId);
     if (!loyalty) throw new Error('لم يتم العثور على سجل ولاء لهذا العميل.');
     if (loyalty.currentPoints < dto.points) throw new Error('رصيد النقاط غير كافٍ.');

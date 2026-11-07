@@ -1,12 +1,17 @@
 import React from 'react';
 import { Pencil } from 'lucide-react';
 import { EditSupplierFormData } from './types';
+import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../../components/OperationalFieldsForm';
 
 export interface EditSupplierModalProps {
   editFormData: EditSupplierFormData;
   onChange: (data: EditSupplierFormData) => void;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  onOperationalFieldValuesChange: (values: Record<string, string>) => void;
 }
 
 export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
@@ -14,6 +19,9 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
   onChange,
   onClose,
   onSubmit,
+  operationalFields,
+  operationalFieldValues,
+  onOperationalFieldValuesChange,
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
@@ -128,6 +136,12 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
               className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
             />
           </div>
+          <OperationalFieldsForm
+            fields={operationalFields}
+            values={operationalFieldValues}
+            onChange={onOperationalFieldValuesChange}
+            title="بيانات إضافية"
+          />
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
             <button

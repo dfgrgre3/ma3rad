@@ -41,7 +41,7 @@ export class BatchService {
   // ─── Permissions ────────────────────────────────────────────────────────────
   private requireWrite(manageCost = false): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
     if (manageCost) PermissionService.require(actor, 'pricing.update');
   }
 

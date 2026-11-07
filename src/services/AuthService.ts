@@ -18,6 +18,7 @@ export class TwoFactorRequiredError extends Error {
     this.name = 'TwoFactorRequiredError';
     this.username = username;
   }
+
 }
 
 // Use sessionStorage instead of localStorage for session data (cleared on tab close)
@@ -111,6 +112,82 @@ export class AuthService {
   /** Returns the logged-in user, or null if not authenticated. Never silently impersonates admin. */
   public static getCurrentUser(): User | null {
     return AuthService.currentUser;
+  }
+
+  public static getLoginPinLength(): number {
+    try {
+      const value = Number(DatabaseManager.getInstance().query<{ value: string }>(
+        `SELECT value FROM system_settings WHERE key = 'loginPinLength'`
+      )[0]?.value ?? 4);
+      return Number.isInteger(value) && value >= 4 && value <= 8 ? value : 4;
+    } catch {
+      return 4;
+    }
+  }
+
+  public static getSwitchableUsers(): User[] {
+    const currentUser = AuthService.requireAuth();
+    const row = DatabaseManager.getInstance().query<{ value: string }>(
+      `SELECT value FROM system_settings WHERE key = 'switchableUserIds'`
+    )[0];
+    let allowedIds: string[] = [];
+    try {
+      const parsed: unknown = JSON.parse(row?.value || '[]');
+      if (Array.isArray(parsed)) {
+        allowedIds = [...new Set(parsed.filter((id): id is string => typeof id === 'string'))];
+      }
+    } catch {
+      throw new Error('إعداد الحسابات المسموح بالتبديل إليها غير صالح.');
+    }
+    if (allowedIds.length === 0) return [];
+    const placeholders = allowedIds.map(() => '?').join(', ');
+    return DatabaseManager.getInstance().query<any>(
+      `SELECT id, username, full_name AS fullName, role, phone, is_active AS isActive,
+              created_at AS createdAt, updated_at AS updatedAt
+       FROM users
+       WHERE is_active = 1 AND id IN (${placeholders}) AND id <> ?
+       ORDER BY full_name COLLATE NOCASE`,
+      [...allowedIds, currentUser.id]
+    ).map((row) => ({
+      ...row,
+      isActive: Boolean(row.isActive),
+    }));
+  }
+
+  public static switchToUser(userId: string): User {
+    const actor = AuthService.requireAuth();
+    const allowed = AuthService.getSwitchableUsers().some((user) => user.id === userId);
+    if (!allowed) throw new Error('هذا الحساب غير مسموح بالتبديل إليه.');
+
+    const row = DatabaseManager.getInstance().query<any>(
+      `SELECT id, username, password_hash AS passwordHash, full_name AS fullName,
+              role, phone, is_active AS isActive, created_at AS createdAt, updated_at AS updatedAt
+       FROM users WHERE id = ? AND is_active = 1`,
+      [userId]
+    )[0];
+    if (!row) throw new Error('الحساب المحدد غير موجود أو غير نشط.');
+    if (twoFactorAuth.isEnabled(row.id)) {
+      throw new Error('لا يمكن التبديل إلى حساب يتطلب التحقق الثنائي. سجّل الدخول ببياناته.');
+    }
+
+    const target: User = {
+      id: row.id,
+      username: row.username,
+      fullName: row.fullName,
+      role: row.role,
+      phone: row.phone,
+      isActive: Boolean(row.isActive),
+      mustChangePassword: row.username === 'admin' && bcrypt.compareSync('admin123', row.passwordHash),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
+    PermissionService.invalidate(actor);
+    AuthService.endSession('LOGOUT');
+    AuthService.setCurrentUser(target);
+    AuthService.startSession(target.id);
+    AuthService.recordLogin(actor.id, `SWITCH_TO:${target.username}`, true, 'ACCOUNT_SWITCH');
+    try { localStorage.setItem(SESSION_KEY, target.id); } catch { /* ignore */ }
+    return target;
   }
 
   /** Throws if no user is authenticated. Use at the top of every service method (brief §108). */
@@ -469,6 +546,119 @@ export class AuthService {
     return user;
   }
 
+  public getOwnLoginPinStatus(): { hasPin: boolean; pending: boolean; requestedAt?: string } {
+    const user = AuthService.requireAuth();
+    const record = this.db.query<{ pinCode: string | null }>(
+      'SELECT pin_code AS pinCode FROM users WHERE id = ? AND is_active = 1',
+      [user.id]
+    )[0];
+    if (!record) throw new Error('حساب المستخدم غير موجود أو غير نشط.');
+    const request = this.db.query<{ requestedAt: string }>(
+      `SELECT requested_at AS requestedAt FROM user_login_pin_change_requests
+       WHERE user_id = ? AND status = 'PENDING'`,
+      [user.id]
+    )[0];
+    return { hasPin: Boolean(record.pinCode), pending: Boolean(request), requestedAt: request?.requestedAt };
+  }
+
+  public async requestOwnLoginPinChange(pin: string): Promise<void> {
+    const user = AuthService.requireAuth();
+    const pinHash = this.hashPin(pin);
+    const pinCiphertext = await this.encryptLoginPin(pin);
+    this.assertUniqueActivePin(pin, user.id);
+    if (this.db.query(
+      `SELECT id FROM user_login_pin_change_requests WHERE user_id = ? AND status = 'PENDING'`,
+      [user.id]
+    ).length > 0) {
+      throw new Error('لديك بالفعل طلب تغيير رمز دخول قيد المراجعة.');
+    }
+
+    this.db.run(
+      `INSERT INTO user_login_pin_change_requests (id, user_id, pin_hash, pin_ciphertext)
+       VALUES (?, ?, ?, ?)`,
+      [`pinreq_${uuidv4().replace(/-/g, '').slice(0, 12)}`, user.id, pinHash, pinCiphertext]
+    );
+    this.audit(user, 'طلب تغيير رمز الدخول', 'USERS', user.id, null, { status: 'PENDING' });
+  }
+
+  public getPendingLoginPinChanges(): Array<{
+    id: string;
+    userId: string;
+    username: string;
+    fullName: string;
+    requestedAt: string;
+  }> {
+    const actor = AuthService.requireAuth();
+    this.requirePinChangeApprover(actor);
+    PermissionService.require(actor, 'ui.users.users.update');
+    return this.db.query(
+      `SELECT request.id, request.user_id AS userId, users.username,
+              users.full_name AS fullName, request.requested_at AS requestedAt
+       FROM user_login_pin_change_requests request
+       JOIN users ON users.id = request.user_id
+       WHERE request.status = 'PENDING' AND users.is_active = 1 AND request.user_id <> ?
+       ORDER BY request.requested_at, users.full_name`,
+      [actor.id]
+    );
+  }
+
+  public approveLoginPinChange(requestId: string): void {
+    const actor = AuthService.requireAuth();
+    this.requirePinChangeApprover(actor);
+    PermissionService.require(actor, 'ui.users.users.update');
+    const request = this.db.query<{ id: string; userId: string; pinHash: string; pinCiphertext: string | null; username: string }>(
+      `SELECT request.id, request.user_id AS userId, request.pin_hash AS pinHash,
+              request.pin_ciphertext AS pinCiphertext,
+              users.username
+       FROM user_login_pin_change_requests request
+       JOIN users ON users.id = request.user_id
+       WHERE request.id = ? AND request.status = 'PENDING' AND users.is_active = 1
+         AND request.user_id <> ?`,
+      [requestId, actor.id]
+    )[0];
+    if (!request) throw new Error('طلب تغيير رمز الدخول غير موجود أو لم يعد معلقًا.');
+    if (!request.pinCiphertext) {
+      throw new Error('هذا الطلب قديم ولا يمكن استعادة رمزه. اطلب من المستخدم إنشاء طلب جديد.');
+    }
+
+    const reviewedAt = new Date().toISOString();
+    this.db.executeTransaction(() => {
+      this.db.run(
+        `UPDATE users SET pin_code = ?, pin_ciphertext = ?, updated_at = ? WHERE id = ? AND is_active = 1`,
+        [request.pinHash, request.pinCiphertext, reviewedAt, request.userId]
+      );
+      this.db.run(
+        `UPDATE user_login_pin_change_requests
+         SET status = 'APPROVED', reviewed_by = ?, reviewed_at = ?
+         WHERE id = ? AND status = 'PENDING'`,
+        [actor.id, reviewedAt, requestId]
+      );
+    });
+    this.audit(actor, 'اعتماد تغيير رمز الدخول', 'USERS', request.userId, null, {
+      username: request.username,
+      status: 'APPROVED',
+    });
+  }
+
+  public rejectLoginPinChange(requestId: string): void {
+    const actor = AuthService.requireAuth();
+    this.requirePinChangeApprover(actor);
+    PermissionService.require(actor, 'ui.users.users.update');
+    const request = this.db.query<{ userId: string }>(
+      `SELECT user_id AS userId FROM user_login_pin_change_requests
+       WHERE id = ? AND status = 'PENDING' AND user_id <> ?`,
+      [requestId, actor.id]
+    )[0];
+    if (!request) throw new Error('طلب تغيير رمز الدخول غير موجود أو لم يعد معلقًا.');
+    this.db.run(
+      `UPDATE user_login_pin_change_requests
+       SET status = 'REJECTED', reviewed_by = ?, reviewed_at = ?
+       WHERE id = ? AND status = 'PENDING'`,
+      [actor.id, new Date().toISOString(), requestId]
+    );
+    this.audit(actor, 'رفض تغيير رمز الدخول', 'USERS', request.userId, null, { status: 'REJECTED' });
+  }
+
   private static pinLoginLabel(username: string): string {
     return `PIN:${username}`;
   }
@@ -493,7 +683,7 @@ export class AuthService {
   }
 
   public getAllUsers(): User[] {
-    PermissionService.require(AuthService.requireAuth(), 'users.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.users.users.view');
     const rows = this.db.query<any>(`SELECT id, username, full_name, role, phone, is_active, created_at, updated_at FROM users ORDER BY full_name ASC`);
     return rows.map(r => ({
       id: r.id,
@@ -507,13 +697,87 @@ export class AuthService {
     }));
   }
 
+  public async getRecoverableLoginPins(): Promise<Record<string, string | null>> {
+    const actor = AuthService.requireAuth();
+    if (actor.role !== 'ADMIN') throw new Error('عرض رموز الدخول متاح لمدير النظام فقط.');
+    PermissionService.require(actor, 'ui.users.users.view');
+    const rows = this.db.query<{ id: string; pinCiphertext: string | null }>(
+      'SELECT id, pin_ciphertext AS pinCiphertext FROM users'
+    );
+    const decrypt = typeof window === 'undefined'
+      ? undefined
+      : window.ceramisys?.security?.decryptDatabaseSecret;
+    if (rows.some((row) => row.pinCiphertext) && !decrypt) {
+      throw new Error('خدمة فك تشفير الرموز غير متاحة. افتح النظام من تطبيق سطح المكتب.');
+    }
+    const entries = await Promise.all(rows.map(async ({ id, pinCiphertext }) => [
+      id,
+      pinCiphertext ? await decrypt!(pinCiphertext) : null,
+    ] as const));
+    return Object.fromEntries(entries);
+  }
+
+  public async regenerateAllLoginPinsForAdmin(): Promise<void> {
+    const actor = AuthService.requireAuth();
+    if (actor.role !== 'ADMIN') throw new Error('إعادة إنشاء رموز الدخول متاحة لمدير النظام فقط.');
+    PermissionService.require(actor, 'ui.users.users.update');
+    const users = this.db.query<{ id: string }>('SELECT id FROM users ORDER BY id');
+    if (users.length === 0) throw new Error('لا توجد حسابات لإعادة إنشاء رموز الدخول.');
+    const encrypt = typeof window === 'undefined'
+      ? undefined
+      : window.ceramisys?.security?.encryptDatabaseSecret;
+    if (!encrypt) throw new Error('خدمة تشفير الرموز غير متاحة. افتح النظام من تطبيق سطح المكتب.');
+
+    const generated = new Set<string>();
+    const updates: Array<{ id: string; pinHash: string; pinCiphertext: string }> = [];
+    for (const user of users) {
+      let pin = '';
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const candidate = this.generateUniqueLoginPin();
+        if (!generated.has(candidate)) {
+          pin = candidate;
+          break;
+        }
+      }
+      if (!pin) throw new Error('تعذر إنشاء رموز دخول فريدة لجميع الحسابات.');
+      generated.add(pin);
+      updates.push({
+        id: user.id,
+        pinHash: this.hashPin(pin),
+        pinCiphertext: await encrypt(pin),
+      });
+    }
+
+    const updatedAt = new Date().toISOString();
+    this.db.executeTransaction(() => {
+      for (const update of updates) {
+        this.db.run(
+          'UPDATE users SET pin_code = ?, pin_ciphertext = ?, updated_at = ? WHERE id = ?',
+          [update.pinHash, update.pinCiphertext, updatedAt, update.id]
+        );
+      }
+      this.db.run(
+        `UPDATE user_login_pin_change_requests
+         SET status = 'REJECTED', reviewed_by = ?, reviewed_at = ?
+         WHERE status = 'PENDING'`,
+        [actor.id, updatedAt]
+      );
+    });
+    this.audit(actor, 'إعادة إنشاء رموز دخول جميع المستخدمين', 'USERS', 'all', null, {
+      usersCount: updates.length,
+    });
+  }
+
   public createUser(
-    user: { username: string; password: string; fullName: string; role: UserRole; phone?: string; pinCode?: string },
+    user: { username: string; password: string; fullName: string; role: UserRole; phone?: string; pinCode?: string; pinCiphertext?: string },
     performedBy = 'usr_admin',
     actor?: User | null
   ): User {
     const subject = this.requireActor(actor);
-    PermissionService.require(subject, 'users.create');
+    PermissionService.require(subject, 'ui.users.users.create');
+    if (user.pinCode && subject.role !== 'ADMIN') {
+      throw new Error('تعيين رمز الدخول متاح لمدير النظام فقط.');
+    }
     AuthService.validatePasswordPolicy(user.password, user.username);
     CentralUsageLimitService.assertWithin('maxUsers');
     const roleExists = this.db.query('SELECT code FROM roles WHERE code = ?', [user.role]);
@@ -534,9 +798,9 @@ export class AuthService {
 
     this.db.executeTransaction((db) => {
       db.run(`
-        INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, is_active, branch_id, branch_scope)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, 'ASSIGNED')
-      `, [id, user.username, hash, user.fullName, user.role, user.phone || null, pinHash, branchId]);
+        INSERT INTO users (id, username, password_hash, full_name, role, phone, pin_code, pin_ciphertext, is_active, branch_id, branch_scope)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 'ASSIGNED')
+      `, [id, user.username, hash, user.fullName, user.role, user.phone || null, pinHash, user.pinCiphertext || null, branchId]);
       db.run(
         'INSERT INTO users_branches (user_id, branch_id) VALUES (?, ?)',
         [id, branchId]
@@ -608,26 +872,33 @@ export class AuthService {
   // ─── Admin user management ──────────────────────────────────────────────────
 
   public getUserById(id: string): User | null {
-    PermissionService.require(AuthService.requireAuth(), 'users.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.users.users.view');
     return this.getUserRecordById(id)?.user ?? null;
   }
 
-  private getUserRecordById(id: string): { user: User; pinHash: string | null } | null {
+  private getUserRecordById(id: string): { user: User; pinHash: string | null; pinCiphertext: string | null } | null {
     const row = this.db.query<any>(
-      `SELECT id, username, full_name, role, phone, pin_code, is_active, created_at, updated_at
+      `SELECT id, username, full_name, role, phone, pin_code, pin_ciphertext, is_active, created_at, updated_at
        FROM users WHERE id = ?`,
       [id]
     )[0];
-    return row ? { user: this.mapUser(row), pinHash: row.pinCode || null } : null;
+    return row ? {
+      user: this.mapUser(row),
+      pinHash: row.pinCode || null,
+      pinCiphertext: row.pinCiphertext || null,
+    } : null;
   }
 
   public updateUser(
     id: string,
-    patch: Partial<Pick<User, 'fullName' | 'role' | 'phone' | 'isActive'>> & { pinCode?: string },
+    patch: Partial<Pick<User, 'fullName' | 'role' | 'phone' | 'isActive'>> & { pinCode?: string; pinCiphertext?: string },
     actor?: User | null
   ): User {
     const subject = this.requireActor(actor);
-    PermissionService.require(subject, 'users.update');
+    PermissionService.require(subject, 'ui.users.users.update');
+    if (patch.pinCode !== undefined && subject.role !== 'ADMIN') {
+      throw new Error('تعديل رمز الدخول متاح لمدير النظام فقط.');
+    }
     const record = this.getUserRecordById(id);
     if (!record) throw new Error('المستخدم غير موجود.');
     const existing = record.user;
@@ -642,18 +913,24 @@ export class AuthService {
       : patch.pinCode === ''
         ? null
         : this.hashPin(patch.pinCode);
+    const pinCiphertext = patch.pinCode === undefined
+      ? record.pinCiphertext
+      : patch.pinCode === ''
+        ? null
+        : patch.pinCiphertext || null;
     if (patch.pinCode && (patch.isActive ?? existing.isActive)) {
       this.assertUniqueActivePin(patch.pinCode, id);
     }
 
     this.db.run(
-      `UPDATE users SET full_name = ?, role = ?, phone = ?, pin_code = ?, is_active = ?, updated_at = ?
+      `UPDATE users SET full_name = ?, role = ?, phone = ?, pin_code = ?, pin_ciphertext = ?, is_active = ?, updated_at = ?
        WHERE id = ?`,
       [
         patch.fullName ?? existing.fullName,
         patch.role ?? existing.role,
         patch.phone ?? existing.phone ?? null,
         pinHash,
+        pinCiphertext,
         (patch.isActive ?? existing.isActive) ? 1 : 0,
         new Date().toISOString(),
         id,
@@ -666,7 +943,7 @@ export class AuthService {
 
   public resetPassword(id: string, newPassword: string, actor?: User | null): void {
     const subject = this.requireActor(actor);
-    PermissionService.require(subject, 'users.reset_password');
+    PermissionService.require(subject, 'ui.users.users.reset_password');
     const existing = this.getUserRecordById(id)?.user;
     if (!existing) throw new Error('المستخدم غير موجود.');
     AuthService.validatePasswordPolicy(newPassword, existing.username);
@@ -786,7 +1063,7 @@ export class AuthService {
 
   public deleteUser(id: string, actor?: User | null): void {
     const subject = this.requireActor(actor);
-    PermissionService.require(subject, 'users.delete');
+    PermissionService.require(subject, 'ui.users.users.delete');
     if (id === subject.id) throw new Error('لا يمكنك حذف حسابك الحالي.');
     const existing = this.getUserRecordById(id)?.user;
     if (!existing) throw new Error('المستخدم غير موجود.');
@@ -802,7 +1079,7 @@ export class AuthService {
   }
 
   public getLoginHistory(userId?: string, limit = 100): any[] {
-    PermissionService.require(AuthService.requireAuth(), 'users.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.users.users.view');
     const params: any[] = [];
     let where = '';
     if (userId) {
@@ -822,11 +1099,37 @@ export class AuthService {
     return AuthService.requireAuth();
   }
 
+  public generateUniqueLoginPin(): string {
+    const length = AuthService.getLoginPinLength();
+    const digits = new Uint32Array(length);
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      globalThis.crypto.getRandomValues(digits);
+      const pin = Array.from(digits, (digit) => String(digit % 10)).join('');
+      try {
+        this.assertUniqueActivePin(pin);
+        return pin;
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('مستخدم نشط آخر')) throw error;
+      }
+    }
+    throw new Error('تعذر إنشاء رمز دخول فريد. حاول مرة أخرى.');
+  }
+
   private hashPin(pin: string): string {
-    if (!/^\d{4,8}$/.test(pin)) {
-      throw new Error('رمز PIN يجب أن يتكون من 4 إلى 8 أرقام.');
+    const length = AuthService.getLoginPinLength();
+    if (!new RegExp(`^\\d{${length}}$`).test(pin)) {
+      throw new Error(`رمز الدخول يجب أن يتكون من ${length} أرقام.`);
     }
     return bcrypt.hashSync(pin, bcrypt.genSaltSync(10));
+  }
+
+  public async encryptLoginPin(pin: string): Promise<string> {
+    this.hashPin(pin);
+    const encrypt = typeof window === 'undefined'
+      ? undefined
+      : window.ceramisys?.security?.encryptDatabaseSecret;
+    if (!encrypt) throw new Error('خدمة تشفير الرموز غير متاحة. افتح النظام من تطبيق سطح المكتب.');
+    return encrypt(pin);
   }
 
   private assertUniqueActivePin(pin: string, excludeUserId?: string): void {
@@ -839,6 +1142,22 @@ export class AuthService {
       try { return bcrypt.compareSync(pin, row.pinCode); } catch { return false; }
     })) {
       throw new Error('لا يمكن استخدام رمز PIN مخصص لمستخدم نشط آخر.');
+    }
+    const pending = this.db.query<{ pinHash: string }>(
+      `SELECT pin_hash AS pinHash FROM user_login_pin_change_requests
+       WHERE status = 'PENDING' AND user_id <> ?`,
+      [excludeUserId || '']
+    );
+    if (pending.some((request) => {
+      try { return bcrypt.compareSync(pin, request.pinHash); } catch { return false; }
+    })) {
+      throw new Error('رمز الدخول مستخدم في طلب آخر قيد المراجعة.');
+    }
+  }
+
+  private requirePinChangeApprover(actor: User): void {
+    if (actor.role !== 'ADMIN' && actor.role !== 'MANAGER') {
+      throw new Error('مراجعة طلبات تغيير رمز الدخول متاحة للمدير فقط.');
     }
   }
 

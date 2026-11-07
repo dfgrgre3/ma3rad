@@ -21,6 +21,7 @@ interface UserForm {
   role: UserRole;
   phone: string;
   pinCode: string;
+  pinMode: 'automatic' | 'custom';
 }
 
 const emptyForm: UserForm = {
@@ -30,6 +31,7 @@ const emptyForm: UserForm = {
   role: 'CASHIER',
   phone: '',
   pinCode: '',
+  pinMode: 'automatic',
 };
 
 export const AdminUsersTab: React.FC = () => {
@@ -38,6 +40,8 @@ export const AdminUsersTab: React.FC = () => {
   const toast = useToast();
   const can = usePermission();
   const [users, setUsers] = useState<User[]>([]);
+  const [loginPins, setLoginPins] = useState<Record<string, string | null> | null>(null);
+  const [pinChangeRequests, setPinChangeRequests] = useState<ReturnType<AuthService['getPendingLoginPinChanges']>>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<'create' | 'edit' | 'password' | 'permissions' | 'branch-scope' | null>(null);
@@ -48,11 +52,27 @@ export const AdminUsersTab: React.FC = () => {
   const [branchScope, setBranchScope] = useState<'ASSIGNED' | 'ALL'>('ASSIGNED');
   const [assignedBranchIds, setAssignedBranchIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const currentUserIsAdmin = AuthService.getCurrentUser()?.role === 'ADMIN';
 
   const load = () => {
     try {
       setUsers(auth.getAllUsers());
       setRoles(PermissionService.getRoles());
+      const currentUser = AuthService.getCurrentUser();
+      if (currentUser?.role === 'ADMIN') {
+        setLoginPins(null);
+        void auth.getRecoverableLoginPins()
+          .then(setLoginPins)
+          .catch((error: unknown) => {
+            setLoginPins({});
+            toast.error('تعذر تحميل رموز الدخول', error instanceof Error ? error.message : String(error));
+          });
+      } else {
+        setLoginPins(null);
+      }
+      const canReviewPinChanges = ['ADMIN', 'MANAGER'].includes(currentUser?.role || '')
+        && can('users.update');
+      setPinChangeRequests(canReviewPinChanges ? auth.getPendingLoginPinChanges() : []);
     } catch (error: any) {
       toast.error('تعذر تحميل المستخدمين', error?.message);
     }
@@ -89,6 +109,7 @@ export const AdminUsersTab: React.FC = () => {
       role: user.role,
       phone: user.phone || '',
       pinCode: '',
+      pinMode: 'custom',
     });
     setModal('edit');
   };
@@ -122,11 +143,14 @@ export const AdminUsersTab: React.FC = () => {
     );
   };
 
-  const run = async (fn: () => unknown | Promise<unknown>, success: string) => {
+  const run = async (
+    fn: () => unknown | Promise<unknown>,
+    success: string | ((result: unknown) => string)
+  ) => {
     setBusy(true);
     try {
-      await fn();
-      toast.success(success);
+      const result = await fn();
+      toast.success(typeof success === 'function' ? success(result) : success);
       load();
       setModal(null);
     } catch (error: any) {
@@ -138,19 +162,29 @@ export const AdminUsersTab: React.FC = () => {
 
   const submitCreate = (event: React.FormEvent) => {
     event.preventDefault();
+    let createdPin = '';
     void run(
       () => {
         AuthService.validatePasswordPolicy(form.password, form.username);
-        auth.createUser({
+        createdPin = currentUserIsAdmin
+          ? form.pinMode === 'automatic' ? auth.generateUniqueLoginPin() : form.pinCode
+          : '';
+        const create = (pinCiphertext?: string) => auth.createUser({
           username: form.username.trim(),
           password: form.password,
           fullName: form.fullName.trim(),
           role: form.role,
           phone: form.phone,
-          pinCode: form.pinCode,
+          pinCode: createdPin || undefined,
+          pinCiphertext,
         });
+        return createdPin ? auth.encryptLoginPin(createdPin).then(create) : create();
       },
-      'تم إنشاء المستخدم بنجاح.'
+      () => {
+        return currentUserIsAdmin
+          ? `تم إنشاء المستخدم بنجاح. رمز الدخول: ${createdPin}`
+          : 'تم إنشاء المستخدم بنجاح. سيحدد المدير رمز الدخول.';
+      }
     );
   };
 
@@ -158,15 +192,27 @@ export const AdminUsersTab: React.FC = () => {
     event.preventDefault();
     if (!active) return;
     void run(
-      () =>
-        auth.updateUser(active.id, {
+      async () => {
+        const pinCiphertext = form.pinCode ? await auth.encryptLoginPin(form.pinCode) : undefined;
+        return auth.updateUser(active.id, {
           fullName: form.fullName.trim(),
           role: form.role,
           phone: form.phone,
           pinCode: form.pinCode || undefined,
+          pinCiphertext,
           isActive: active.isActive,
-        }),
+        });
+      },
       'تم تحديث بيانات المستخدم.'
+    );
+  };
+
+  const reviewPinRequest = (requestId: string, approve: boolean) => {
+    void run(
+      () => approve
+        ? auth.approveLoginPinChange(requestId)
+        : auth.rejectLoginPinChange(requestId),
+      approve ? 'تم اعتماد رمز الدخول الجديد.' : 'تم رفض طلب تغيير رمز الدخول.'
     );
   };
 
@@ -188,6 +234,18 @@ export const AdminUsersTab: React.FC = () => {
     void run(() => auth.deleteUser(user.id), 'تم حذف المستخدم.');
   };
 
+  const regenerateAllPins = () => {
+    if (!window.confirm('سيتم استبدال رموز الدخول لجميع الحسابات، بما فيها الحسابات غير النشطة. أخبر المستخدمين برموزهم الجديدة بعد العملية. هل تريد المتابعة؟')) return;
+    void run(
+      () => auth.regenerateAllLoginPinsForAdmin(),
+      'تم إنشاء رموز جديدة لجميع الحسابات. تظهر الرموز في الجدول للمدير فقط.'
+    );
+  };
+
+  const pinsNeedInitialization = currentUserIsAdmin
+    && loginPins !== null
+    && users.some((user) => !loginPins[user.id]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -201,6 +259,15 @@ export const AdminUsersTab: React.FC = () => {
           />
         </div>
         <div className="flex items-center gap-2">
+          {currentUserIsAdmin && pinsNeedInitialization && (
+            <button
+              onClick={regenerateAllPins}
+              disabled={busy}
+              className="rounded-xl border border-amber-300 px-3 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/30"
+            >
+              إعادة إنشاء رموز الحسابات
+            </button>
+          )}
           <button onClick={load} className="rounded-xl border border-slate-200 dark:border-slate-700 p-2.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="تحديث">
             <RefreshCw className="h-4 w-4" />
           </button>
@@ -215,6 +282,27 @@ export const AdminUsersTab: React.FC = () => {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        {pinChangeRequests.length > 0 && (
+          <section className="border-b border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20" aria-labelledby="pin-change-requests-title">
+            <h3 id="pin-change-requests-title" className="text-xs font-extrabold text-amber-900 dark:text-amber-200">
+              طلبات تغيير رمز الدخول ({pinChangeRequests.length})
+            </h3>
+            <div className="mt-2 space-y-2">
+              {pinChangeRequests.map((request) => (
+                <article key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white px-3 py-2 dark:border-amber-900/50 dark:bg-slate-900">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{request.fullName} · @{request.username}</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">تاريخ الطلب: {request.requestedAt}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => reviewPinRequest(request.id, true)} disabled={busy} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">اعتماد</button>
+                    <button type="button" onClick={() => reviewPinRequest(request.id, false)} disabled={busy} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[10px] font-bold text-slate-600 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300">رفض</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-right text-xs">
             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-700">
@@ -224,6 +312,7 @@ export const AdminUsersTab: React.FC = () => {
                 <th className="p-3.5">الدور</th>
                 <th className="p-3.5">نطاق الفروع</th>
                 <th className="p-3.5">الهاتف</th>
+                {currentUserIsAdmin && <th className="p-3.5">رمز الدخول</th>}
                 <th className="p-3.5">الحالة</th>
                 <th className="p-3.5">إجراءات</th>
               </tr>
@@ -248,6 +337,11 @@ export const AdminUsersTab: React.FC = () => {
                       : '—'}
                   </td>
                   <td className="p-3.5 font-mono text-slate-500 dark:text-slate-400">{user.phone || '-'}</td>
+                  {currentUserIsAdmin && (
+                    <td className="p-3.5 font-mono font-bold tracking-widest text-slate-700 dark:text-slate-200">
+                      {loginPins === null ? 'جارٍ التحميل...' : loginPins[user.id] || 'غير متاح'}
+                    </td>
+                  )}
                   <td className="p-3.5">
                     {user.isActive ? (
                       <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
@@ -292,7 +386,7 @@ export const AdminUsersTab: React.FC = () => {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">لا توجد نتائج مطابقة.</td>
+                  <td colSpan={currentUserIsAdmin ? 8 : 7} className="p-8 text-center text-slate-400">لا توجد نتائج مطابقة.</td>
                 </tr>
               )}
             </tbody>
@@ -320,10 +414,39 @@ export const AdminUsersTab: React.FC = () => {
                   {roles.map((role) => <option key={role.id} value={role.code}>{role.name}</option>)}
                 </select>
               </Field>
-              <Field label="رمز PIN">
-                <input inputMode="numeric" autoComplete="off" maxLength={8} value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value })} className={`${inputCls} font-mono`} />
-              </Field>
             </div>
+            {currentUserIsAdmin ? (
+              <>
+                <Field label="طريقة إنشاء رمز الدخول">
+                  <select value={form.pinMode} onChange={(e) => setForm({ ...form, pinMode: e.target.value as UserForm['pinMode'] })} className={inputCls}>
+                    <option value="automatic">إنشاء رمز تلقائيًا</option>
+                    <option value="custom">تعيين رمز مخصص</option>
+                  </select>
+                </Field>
+                {form.pinMode === 'custom' && (
+                  <Field label={`رمز الدخول (${AuthService.getLoginPinLength()} أرقام)`}>
+                    <input
+                      required
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={AuthService.getLoginPinLength()}
+                      value={form.pinCode}
+                      onChange={(e) => setForm({ ...form, pinCode: e.target.value.replace(/\D/g, '') })}
+                      className={`${inputCls} font-mono`}
+                    />
+                  </Field>
+                )}
+                {form.pinMode === 'automatic' && (
+                  <p className="rounded-xl bg-sky-50 p-3 text-[11px] leading-5 text-sky-800 dark:bg-sky-950/30 dark:text-sky-200">
+                    سيُنشئ البرنامج رمزًا فريدًا من {AuthService.getLoginPinLength()} أرقام، وسيظهر للمدير بعد إنشاء الحساب.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="rounded-xl bg-slate-50 p-3 text-[11px] text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                رمز الدخول يحدده مدير النظام.
+              </p>
+            )}
             <Field label="الهاتف">
               <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`${inputCls} font-mono`} />
             </Field>
@@ -344,9 +467,11 @@ export const AdminUsersTab: React.FC = () => {
                   {roles.map((role) => <option key={role.id} value={role.code}>{role.name}</option>)}
                 </select>
               </Field>
-              <Field label="رمز PIN">
-                <input inputMode="numeric" autoComplete="off" maxLength={8} value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value })} className={`${inputCls} font-mono`} placeholder="اتركه فارغاً للإبقاء على الحالي" />
-              </Field>
+              {currentUserIsAdmin && (
+                <Field label={`رمز الدخول (${AuthService.getLoginPinLength()} أرقام)`}>
+                  <input inputMode="numeric" autoComplete="off" maxLength={AuthService.getLoginPinLength()} value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value.replace(/\D/g, '') })} className={`${inputCls} font-mono`} placeholder="اتركه فارغاً للإبقاء على الحالي" />
+                </Field>
+              )}
             </div>
             <Field label="الهاتف">
               <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`${inputCls} font-mono`} />

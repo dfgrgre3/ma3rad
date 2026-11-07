@@ -92,10 +92,34 @@ export class SettingsService {
       brandName: map.brandName === 'CeramiSys ERP' ? 'سيراميسيس' : map.brandName || 'سيراميسيس',
       brandShortName: map.brandShortName === 'C' ? 'س' : map.brandShortName || 'س',
       brandLogoDataUrl: map.brandLogoDataUrl || '',
-      brandPrimaryColor: map.brandPrimaryColor || '#0284c7',
-      brandAccentColor: map.brandAccentColor || '#4f46e5',
+      brandPrimaryColor: map.brandPrimaryColor && map.brandPrimaryColor.toLowerCase() !== '#0284c7'
+        ? map.brandPrimaryColor
+        : '#34445a',
+      brandAccentColor: map.brandAccentColor && map.brandAccentColor.toLowerCase() !== '#4f46e5'
+        ? map.brandAccentColor
+        : '#64748b',
+      uiCanvasColor: map.uiCanvasColor || '#f5f6f8',
+      uiSurfaceColor: map.uiSurfaceColor || '#ffffff',
+      uiTextColor: map.uiTextColor || '#252b36',
+      uiBorderColor: map.uiBorderColor || '#e1e5ea',
+      uiSuccessColor: map.uiSuccessColor || '#39765b',
+      uiDangerColor: map.uiDangerColor || '#a95050',
+      uiWarningColor: map.uiWarningColor || '#8a6a35',
+      uiButtonStyle: map.uiButtonStyle === 'outline' || map.uiButtonStyle === 'soft'
+        ? map.uiButtonStyle
+        : 'solid',
+      uiCornerRadius: map.uiCornerRadius === 'compact' || map.uiCornerRadius === 'rounded'
+        ? map.uiCornerRadius
+        : 'standard',
+      uiDensity: map.uiDensity === 'compact' ? 'compact' : 'comfortable',
+      uiFontScale: map.uiFontScale === 'small' || map.uiFontScale === 'large'
+        ? map.uiFontScale
+        : 'standard',
+      interfaceDirection: map.interfaceDirection === 'ltr' ? 'ltr' : 'rtl',
       themeMode: map.themeMode === 'dark' ? 'dark' : map.themeMode === 'system' ? 'system' : 'light',
-      fontFamily: map.fontFamily || 'Cairo',
+      fontFamily: ['Cairo', 'Tajawal', 'system-ui', 'Arial', 'Tahoma'].includes(map.fontFamily)
+        ? map.fontFamily as SystemSettings['fontFamily']
+        : 'Cairo',
       showBrandText: bool(map.showBrandText === undefined ? '1' : map.showBrandText),
       sidebarStyle: (map.sidebarStyle as SystemSettings['sidebarStyle']) || 'default',
       navigationLayout: map.navigationLayout === 'header' ? 'header' : 'sidebar',
@@ -108,6 +132,17 @@ export class SettingsService {
       installmentGraceDays: num(map.installmentGraceDays, 3),
       sessionTimeoutMinutes: num(map.sessionTimeoutMinutes, 480),
       maxFailedLoginAttempts: num(map.maxFailedLoginAttempts, 5),
+      loginPinLength: Math.min(8, Math.max(4, num(map.loginPinLength, 4))),
+      switchableUserIds: (() => {
+        try {
+          const parsed = JSON.parse(map.switchableUserIds || '[]');
+          return Array.isArray(parsed)
+            ? [...new Set(parsed.filter((id): id is string => typeof id === 'string'))]
+            : [];
+        } catch {
+          return [];
+        }
+      })(),
       defaultBranchId: map.defaultBranchId || 'br_main',
       sellingPriceTiersCount: num(map.sellingPriceTiersCount, 1),
       sellingPriceTierNames: (() => {
@@ -180,14 +215,36 @@ export class SettingsService {
   /** Read + write without UI concerns. Writes are validated and audited. */
   public static update(patch: SettingsPatch, _actor?: User | null): SystemSettings {
     const user = AuthService.requireAuth();
-    PermissionService.require(user, 'settings.update');
-
+    PermissionService.require(user, 'ui.settings.hub.update');
     const normalized = SettingsService.validate(patch);
+    const managesLoginAccess = ['loginPinLength', 'switchableUserIds']
+      .some((key) => normalized[key] !== undefined && normalized[key] !== SettingsService.getValue(key));
+    if (managesLoginAccess && user.role !== 'ADMIN' && user.role !== 'MANAGER') {
+      throw new Error('إعداد رموز الدخول والتبديل بين الحسابات متاح للمدير فقط.');
+    }
+
+    if (normalized.switchableUserIds !== undefined) {
+      const ids = patch.switchableUserIds;
+      if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) {
+        throw new Error('قائمة الحسابات المسموح بالتبديل إليها غير صالحة.');
+      }
+      const uniqueIds = [...new Set(ids)];
+      const users = SettingsService.db().query<{ id: string; isActive: number }>(
+        `SELECT id, is_active AS isActive FROM users`
+      );
+      const knownIds = new Set(users.map((entry) => entry.id));
+      if (uniqueIds.some((id) => !knownIds.has(id))) {
+        throw new Error('تحتوي قائمة التبديل على حساب غير موجود.');
+      }
+      const activeIds = new Set(users.filter((entry) => Boolean(entry.isActive)).map((entry) => entry.id));
+      patch = { ...patch, switchableUserIds: uniqueIds.filter((id) => activeIds.has(id)) };
+    }
+    const validated = SettingsService.validate(patch);
     const db = SettingsService.db();
 
     const before: Record<string, string> = {};
     const after: Record<string, string> = {};
-    for (const [key, value] of Object.entries(normalized)) {
+    for (const [key, value] of Object.entries(validated)) {
       const row = db.query<{ value: string }>('SELECT value FROM system_settings WHERE key = ?', [key])[0];
       const oldValue = row?.value ?? DEFAULT_SETTINGS[key];
       const newValue = String(value);

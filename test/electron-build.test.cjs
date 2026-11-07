@@ -7,10 +7,52 @@ const { spawnSync } = require('node:child_process');
 const vm = require('node:vm');
 const bytenode = require('bytenode');
 const packageConfig = require('../package.json');
+const { acquireBuildLock } = require('../scripts/build-frontend.cjs');
 const { prepareProductionBundle } = require('../scripts/prepare-production-bundle.cjs');
 const { restoreSource } = require('../scripts/restore-source.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
+
+test('frontend builds wait for an active build lock before acquiring it', (t) => {
+  const lockPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-build-lock-')), 'build.lock');
+  t.after(() => fs.rmSync(path.dirname(lockPath), { recursive: true, force: true }));
+  fs.writeFileSync(lockPath, JSON.stringify({ pid: 123, token: 'active-build' }));
+
+  let checks = 0;
+  let waited = false;
+  const releaseBuildLock = acquireBuildLock({
+    lockPath,
+    pid: 456,
+    processRunning: () => {
+      checks++;
+      return checks === 1;
+    },
+    wait: () => {
+      waited = true;
+      fs.unlinkSync(lockPath);
+    },
+  });
+
+  assert.equal(waited, true);
+  assert.equal(JSON.parse(fs.readFileSync(lockPath, 'utf8')).pid, 456);
+  releaseBuildLock();
+  assert.equal(fs.existsSync(lockPath), false);
+});
+
+test('frontend build lock waiting stops after the configured timeout', (t) => {
+  const lockPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-build-lock-')), 'build.lock');
+  t.after(() => fs.rmSync(path.dirname(lockPath), { recursive: true, force: true }));
+  fs.writeFileSync(lockPath, JSON.stringify({ pid: 123, token: 'active-build' }));
+
+  let time = 0;
+  assert.throws(() => acquireBuildLock({
+    lockPath,
+    processRunning: () => true,
+    wait: (delayMs) => { time += delayMs; },
+    timeoutMs: 500,
+    now: () => time,
+  }), /Timed out waiting for frontend build lock held by PID 123/);
+});
 
 test('development loads main.js while packaged Electron requires main.jsc', () => {
   const entryPath = path.join(projectRoot, 'electron', 'entry.js');
@@ -165,6 +207,7 @@ test('electron-builder restores sources after the process exits on success and f
     const { buildWithTemporaryOutput } = require(path.join(projectRoot, 'scripts/electron-builder-with-temp-output.cjs'));
     const { restoreSource } = require(path.join(projectRoot, 'scripts/restore-source.cjs'));
     const temporaryOutput = path.join(fixtureRoot, 'temporary-output');
+    let copyAttempts = 0;
 
     buildWithTemporaryOutput(['--win', '--unsigned'], {
       createTemporaryOutput: () => temporaryOutput,
@@ -178,10 +221,23 @@ test('electron-builder restores sources after the process exits on success and f
         fs.writeFileSync(path.join(config.directories.output, 'build-success.marker'), 'built');
         return true;
       },
+      copyOutput: (source, destination) => {
+        if (mode === 'copy-retry' || mode === 'copy-failure') {
+          copyAttempts++;
+          fs.writeFileSync(path.join(fixtureRoot, 'copy-attempts'), String(copyAttempts));
+          if (mode === 'copy-failure' || copyAttempts < 3) {
+            const error = new Error('simulated file sharing failure');
+            error.code = 'EPIPE';
+            throw error;
+          }
+        }
+        fs.cpSync(source, destination, { recursive: true, force: true });
+      },
+      waitForCopyRetry: () => {},
     });
   `;
 
-  for (const mode of ['success', 'failure']) {
+  for (const mode of ['success', 'failure', 'copy-retry', 'copy-failure']) {
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), `ceramisys-builder-${mode}-`));
     t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
     const electronDir = path.join(fixtureRoot, 'electron');
@@ -203,7 +259,8 @@ test('electron-builder restores sources after the process exits on success and f
     ], { encoding: 'utf8' });
 
     assert.equal(child.error, undefined, child.error?.message);
-    assert.equal(child.status, mode === 'success' ? 0 : 1, child.stderr);
+    const shouldSucceed = mode === 'success' || mode === 'copy-retry';
+    assert.equal(child.status, shouldSucceed ? 0 : 1, child.stderr);
 
     const sourceFiles = [
       path.join(electronDir, 'main.js'),
@@ -215,10 +272,24 @@ test('electron-builder restores sources after the process exits on success and f
     }
     assert.equal(fs.readFileSync(sourceFiles[0], 'utf8'), 'main source');
     assert.equal(fs.readFileSync(sourceFiles[1], 'utf8'), 'nested source');
+    if (mode === 'copy-retry' || mode === 'copy-failure') {
+      assert.equal(
+        fs.readFileSync(path.join(fixtureRoot, 'copy-attempts'), 'utf8'),
+        mode === 'copy-retry' ? '3' : '6',
+      );
+    }
     assert.equal(
       fs.existsSync(path.join(outputDirectory, 'build-success.marker')),
-      mode === 'success',
+      shouldSucceed,
     );
+    assert.equal(
+      fs.existsSync(path.join(fixtureRoot, 'temporary-output', 'build-success.marker')),
+      mode === 'copy-failure',
+    );
+    if (mode === 'copy-failure') {
+      assert.match(child.stderr, /temporary output retained at:/);
+      assert.match(child.stderr, /simulated file sharing failure/);
+    }
   }
 });
 

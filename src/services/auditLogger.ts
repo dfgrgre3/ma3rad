@@ -68,6 +68,7 @@ class AuditLoggerService {
   private maxLogs: number = 10000;  // الحد الأقصى للسجلات
   private flushInterval: number = 5 * 60 * 1000;  // كل 5 دقائق
   private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private initializationLogged = false;
 
   private constructor() {
     this.loadLogs();
@@ -122,9 +123,11 @@ class AuditLoggerService {
    * تهيئة النظام
    */
   initialize(): void {
-    this.loadLogs();
     this.startScheduledFlush();
-    console.log('AuditLogger initialized');
+    if (!this.initializationLogged) {
+      this.initializationLogged = true;
+      console.log('AuditLogger initialized');
+    }
   }
 
   /**

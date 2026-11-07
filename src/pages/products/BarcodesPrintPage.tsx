@@ -6,6 +6,8 @@ import { ProductService } from '../../services/ProductService';
 import { SettingsService } from '../../services/SettingsService';
 import { usePermission } from '../../hooks/usePermission';
 import { Product } from '../../types';
+import { gradeLabel, setConfiguredGradeLabels } from '../../components/products/productFormModel';
+import { OperationalFieldService } from '../../services/OperationalFieldService';
 
 interface LabelSettings {
   labelSize: '50x30' | '60x40' | '80x50' | 'A4_SHEET';
@@ -38,6 +40,8 @@ export const BarcodesPrintPage: React.FC = () => {
   useEffect(() => {
     try {
       const all = productService.getAllProducts();
+      const grades = new OperationalFieldService().getProductGradeOptions(true);
+      setConfiguredGradeLabels(grades);
       setProducts(all);
       if (all.length > 0) {
         setSelectedProductId(all[0].id);
@@ -259,7 +263,7 @@ export const BarcodesPrintPage: React.FC = () => {
                       </span>
                       {settings.showGrade && (
                         <span className="text-[10px] font-black px-1.5 py-0.2 bg-white text-slate-900 rounded">
-                          {({ GRADE_1: 'فرز أول', GRADE_2: 'فرز ثان', GRADE_3: 'فرز ثالث', COMMERCIAL: 'تجاري' } as Record<string, string>)[selectedProduct.grade] || selectedProduct.grade}
+                          {gradeLabel(selectedProduct.grade)}
                         </span>
                       )}
                     </div>

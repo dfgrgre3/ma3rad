@@ -7,6 +7,32 @@ const projectRoot = path.resolve(__dirname, '..');
 const packageJson = require(path.join(projectRoot, 'package.json'));
 const builderCli = require.resolve('electron-builder/cli.js');
 
+const COPY_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 2000];
+const RETRYABLE_COPY_ERROR_CODES = new Set(['EACCES', 'EBUSY', 'EPIPE', 'EPERM']);
+
+function waitBeforeRetry(delayMs) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+}
+
+function copyOutputWithRetry(source, destination, copyOutput, wait = waitBeforeRetry) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      copyOutput(source, destination);
+      return;
+    } catch (error) {
+      const delayMs = COPY_RETRY_DELAYS_MS[attempt];
+      if (!RETRYABLE_COPY_ERROR_CODES.has(error.code) || delayMs === undefined) {
+        throw error;
+      }
+
+      console.warn(
+        `Temporary output copy failed with ${error.code} (attempt ${attempt + 1}/${COPY_RETRY_DELAYS_MS.length + 1}); retrying in ${delayMs}ms.`,
+      );
+      wait(delayMs);
+    }
+  }
+}
+
 function runBuilder(args, env = process.env) {
   const child = spawnSync(process.execPath, [builderCli, ...args], {
     cwd: projectRoot,
@@ -32,6 +58,8 @@ function buildWithTemporaryOutput(args, {
   restoreSource: restoreSourceFiles = () => require('./restore-source.cjs').restoreSource(),
   createTemporaryOutput = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-electron-builder-')),
   outputDirectory = path.resolve(projectRoot, packageJson.build.directories.output || 'release'),
+  copyOutput = (source, destination) => fs.cpSync(source, destination, { recursive: true, force: true }),
+  waitForCopyRetry = waitBeforeRetry,
 } = {}) {
   const legacyWin7 = args.includes('--legacy-win7');
   const unsignedBuild = args.includes('--unsigned');
@@ -95,7 +123,7 @@ function buildWithTemporaryOutput(args, {
     }
 
     fs.mkdirSync(outputDirectory, { recursive: true });
-    fs.cpSync(temporaryOutput, outputDirectory, { recursive: true, force: true });
+    copyOutputWithRetry(temporaryOutput, outputDirectory, copyOutput, waitForCopyRetry);
     succeeded = true;
   } finally {
     if (fs.existsSync(temporaryConfig)) {

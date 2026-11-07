@@ -11,7 +11,8 @@ import { NotesPanel } from '../components/NotesPanel';
 import { AppConfigRuntime } from '../components/config/AppConfigRuntime';
 import { ConfigSection } from '../components/config/ConfigSection';
 import { ConfigText } from '../components/config/ConfigText';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/useTheme';
+import { LayoutContext } from '../contexts/LayoutContext';
 import {
   getPersistedScrollPosition,
   saveNavigationLocation,
@@ -22,22 +23,20 @@ import { User } from '../types';
 interface MainLayoutProps {
   currentUser?: User | null;
   onLogout?: () => void;
+  onSwitchUser?: (userId: string) => void;
 }
-
-// ─── Context for sharing user across layout ───────────────────────────────────
-export const LayoutContext = React.createContext<{
-  currentUser: User | null;
-}>({ currentUser: null });
 
 // ─── MainLayout ───────────────────────────────────────────────────────────────
 export const MainLayout: React.FC<MainLayoutProps> = ({
   currentUser = null,
   onLogout,
+  onSwitchUser,
 }) => {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
   const { settings } = useTheme();
   const navigationLayout = settings.navigationLayout === 'header' ? 'header' : 'sidebar';
+  const interfaceDirection = settings.interfaceDirection === 'ltr' ? 'ltr' : 'rtl';
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [floatingCalculatorOpen, setFloatingCalculatorOpen] = useState(false);
   const [floatingNotesOpen, setFloatingNotesOpen] = useState(false);
@@ -48,6 +47,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const required = NavigationService.getRequiredPermissionGroups(location.pathname);
   // الصلاحيات تُطبَّق دائماً على مستوى المسار: حتى في وضع «فتح كل الصفحات»
   // (الذي يتجاوز الوحدات/المظهر/قيود المنصة) لا يمكن تجاوز صلاحيات المستخدم.
+  // حارس المسار الأساسي (خريطة ROUTE_PERMISSIONS + صلاحيات عناصر القوائم).
+  // الصلاحيات الدقيقة للصفحة/القسم/الزر متاحة أيضاً عبر canAccessPage
+  // وusePagePermissions وتُطبّق في الواجهات الحساسة.
   const isAllowed = !required
     || required.all.every((permission) => PermissionService.can(currentUser, permission))
       && (!required.any.length || required.any.some((permission) => PermissionService.can(currentUser, permission)));
@@ -117,15 +119,20 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     });
   };
 
+  if (!isAllowed) {
+    return <Navigate to={fallbackPath ?? '/not-found'} replace />;
+  }
+
   return (
     <LayoutContext.Provider value={{ currentUser }}>
       <AppConfigRuntime />
-      <div className="app-shell win-app flex h-screen w-full min-w-0 flex-col overflow-hidden bg-[#f3f3f3] text-[#1b1b1b] dark:bg-[#1f1f1f] dark:text-[#f0f0f0]" dir="rtl">
+      <div className="app-shell win-app flex h-screen w-full min-w-0 flex-col overflow-hidden bg-[#f3f3f3] text-[#1b1b1b] dark:bg-[#1f1f1f] dark:text-[#f0f0f0]" dir={interfaceDirection}>
         {/* ── Top bar ──────────────────────────────────────────────────────────── */}
         <Header
           currentUser={currentUser}
           unreadNotifications={unreadNotifications}
           onLogout={onLogout}
+          onSwitchUser={onSwitchUser}
           onOpenSidebar={() => setMobileSidebarOpen(true)}
           navigationLayout={navigationLayout}
         />
@@ -144,7 +151,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
           {/* ── Page content ────────────────────────────────────────────────────── */}
           <main ref={mainRef} data-app-config-scope className="app-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
-            {isAllowed ? <Outlet /> : <Navigate to={fallbackPath ?? '/not-found'} replace />}
+            <Outlet />
           </main>
         </div>
 
@@ -186,14 +193,17 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           </footer>
         </ConfigSection>
         {mobileSidebarOpen && (
-          <div className="fixed inset-0 z-[95] lg:hidden" dir="rtl">
+          <div className="fixed inset-0 z-[95] lg:hidden">
             <button
               type="button"
               aria-label="إغلاق القائمة الجانبية"
               className="absolute inset-0 h-full w-full bg-black/35"
               onClick={() => setMobileSidebarOpen(false)}
             />
-            <div className="absolute inset-y-0 right-0 flex h-full w-[264px] max-w-[85vw] flex-col border-l border-[#d9d9d9] bg-white dark:border-[#3d3d3d] dark:bg-[#2b2b2b]">
+            <div
+              className="absolute inset-y-0 flex h-full w-[264px] max-w-[85vw] flex-col bg-white dark:bg-[#2b2b2b]"
+              style={{ insetInlineStart: 0, borderInlineEnd: '1px solid var(--win-border)' }}
+            >
               <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#d9d9d9] px-3 dark:border-[#3d3d3d]">
                 <span className="text-[12px] font-semibold">القائمة الرئيسية</span>
                 <button

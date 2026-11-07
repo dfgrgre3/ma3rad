@@ -14,6 +14,38 @@ export interface ReleaseInfo {
   created_at: string;
 }
 
+/**
+ * مقارنة بسيطة بأجزاء رقمية للإصدارات (1.10 > 1.9، 1.1.5 > 1.1.4).
+ * تُرجع true فقط عندما يكون الإصدار المقترح أحدث من الإصدار الحالي.
+ */
+export function isNewerVersion(currentVersion: string, version: string): boolean {
+  const candidate = String(version || '');
+  if (!candidate) return false;
+  const currentParts = String(currentVersion || '')
+    .split(/[.-]/)
+    .map((part) => Number.parseInt(part, 10) || 0);
+  const candidateParts = candidate
+    .split(/[.-]/)
+    .map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(currentParts.length, candidateParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const currentSegment = currentParts[index] || 0;
+    const candidateSegment = candidateParts[index] || 0;
+    if (currentSegment !== candidateSegment) return candidateSegment > currentSegment;
+  }
+  return false;
+}
+
+/** أحدث إصدار أحدث من الإصدار الحالي (آخر نشر). */
+export function getLatestNewerRelease(releases: ReleaseInfo[], currentVersion: string): ReleaseInfo | null {
+  const newer = (releases || [])
+    .map((release) => ({ ...release, version: String(release?.version || '') }))
+    .filter((release) => release.version && isNewerVersion(currentVersion, release.version));
+  if (!newer.length) return null;
+  newer.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+  return newer[0];
+}
+
 export class CentralTelemetryService {
   static async reportError(payload: {
     title?: string;
@@ -40,10 +72,16 @@ export class CentralTelemetryService {
 
   static async checkForUpdates(currentVersion: string): Promise<ReleaseInfo | null> {
     const releases = await this.fetchReleases();
-    if (!releases.length) return null;
-    const newer = releases.filter(r => r.version && r.version !== currentVersion);
-    if (!newer.length) return null;
-    newer.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-    return newer[0];
+    const latest = getLatestNewerRelease(releases as ReleaseInfo[], currentVersion);
+    if (!latest) return null;
+    return {
+      id: String(latest.id ?? ''),
+      version: String(latest.version || ''),
+      release_notes: typeof latest.release_notes === 'string' ? latest.release_notes : '',
+      download_url: String(latest.download_url || ''),
+      min_required_version: String(latest.min_required_version || '0.0.0'),
+      is_mandatory: latest.is_mandatory ? 1 : 0,
+      created_at: String(latest.created_at || ''),
+    };
   }
 }

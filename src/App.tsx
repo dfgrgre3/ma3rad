@@ -12,19 +12,20 @@ import {
   BYPASS_FIRST_RUN_ACTIVATION,
   BYPASS_FIRST_RUN_SETUP,
 } from './config/setupLifecycle';
+import { APP_VERSION } from './config/appVersion';
 import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
 import { AppRouter } from './router';
 import { LoginPage } from './pages/auth/LoginPage';
 import { FirstRunActivationPage } from './pages/auth/FirstRunActivationPage';
 import { SetupWizard } from './components/SetupWizard';
 import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
-import { ThemeProvider } from './contexts/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { UpdateNotification } from './components/UpdateNotification';
 import { useAppStartup } from './hooks/useAppStartup';
 import { useAppSession } from './hooks/useAppSession';
-import { securityService, auditLogger, performanceMonitor, localCache, systemHealth } from './services';
+import { securityService, auditLogger, performanceMonitor, localCache, systemHealth, CentralTelemetryService } from './services';
 
 export const App: React.FC = () => {
   const {
@@ -123,27 +124,68 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [centralActive]);
 
-  // تهيئة الخدمات الأمنية ومؤقتات المراقبة
+  // تحديثات التطبيق المركزية: عندما يصدر منشأة مركزية إصدار أحدث،
+  // يُشغَّل تدفق التحديث الحقيقي (الفحص → التنزيل → التثبيت) عبر واجهة التطبيق.
   useEffect(() => {
-    // تفعيل الخدمات الأمنية
-    void securityService.initialize().catch((error) => {
-      console.error('Security services could not initialize:', error);
-    });
-    auditLogger.initialize();
-    void performanceMonitor.startMonitoring().catch((error) => {
-      console.error('Performance monitoring could not start:', error);
-    });
-    void systemHealth.startHealthCheck().catch((error) => {
-      console.error('System health monitoring could not start:', error);
-    });
-    // نظام الذاكرة السريعة
+    if (!centralActive) return;
+    let active = true;
+    let lastReleaseCheckAt = 0;
+    const MIN_RELEASE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+    const runReleaseCheck = async () => {
+      const now = Date.now();
+      if (now - lastReleaseCheckAt < MIN_RELEASE_CHECK_INTERVAL_MS) return;
+      lastReleaseCheckAt = now;
+      try {
+        const update = await CentralTelemetryService.checkForUpdates(APP_VERSION);
+        if (active && update) {
+          const check = window.ceramisys?.updater?.check;
+          if (typeof check === 'function') {
+            void check().catch((error: unknown) => {
+              console.warn('[updates] Real update check could not be started:', error);
+            });
+          }
+        }
+      } catch {
+        // تحديد إصدار التحديثات مركزيًا لا يُعطل تشغيل التطبيق.
+      }
+    };
+    const onFocusOrVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void runReleaseCheck();
+    };
+    void runReleaseCheck();
+    const releaseTimer = setInterval(() => void runReleaseCheck(), MIN_RELEASE_CHECK_INTERVAL_MS);
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+    return () => {
+      active = false;
+      clearInterval(releaseTimer);
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
+    };
+  }, [centralActive]);
+
+  // Start database-backed monitoring only after migrations and persistence finish.
+  useEffect(() => {
+    if (!dbReady) return;
+    let active = true;
+    const startMonitoring = async () => {
+      try {
+        await securityService.initialize();
+        if (active) await systemHealth.startHealthCheck();
+      } catch (error) {
+        console.error('Application monitoring services could not start:', error);
+      }
+    };
+    void startMonitoring();
     localCache.set('app_initialized', true, 24 * 60 * 60 * 1000);
     return () => {
+      active = false;
       performanceMonitor.stopMonitoring();
       systemHealth.stopHealthCheck();
       auditLogger.stopScheduledFlush();
     };
-  }, []);
+  }, [dbReady]);
 
   useAppSession(dbReady, currentUser, () => setCurrentUser(null));
 
@@ -337,7 +379,12 @@ export const App: React.FC = () => {
             />
           ) : (
             <HashRouter>
-              <AppRouter key={centralConfigTick} currentUser={currentUser} onLogout={() => { AuthService.logout(); setCurrentUser(null); }} />
+              <AppRouter
+                key={centralConfigTick}
+                currentUser={currentUser}
+                onLogout={() => { AuthService.logout(); setCurrentUser(null); }}
+                onSwitchUser={(userId) => setCurrentUser(AuthService.switchToUser(userId))}
+              />
             </HashRouter>
           )}
           {dbReady && currentUser && <DatabasePersistenceStatus />}

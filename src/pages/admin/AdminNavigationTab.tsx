@@ -12,7 +12,10 @@ export const AdminNavigationTab: React.FC = () => {
   const [overrides, setOverrides] = useState<NavOverrides>(() => NavigationService.getOverrides());
   const [dirty, setDirty] = useState(false);
 
-  const groups = useMemo(() => NavigationService.merge(overrides), [overrides]);
+  const groups = useMemo(
+    () => NavigationService.merge(overrides, { includeHidden: true }),
+    [overrides]
+  );
 
   useEffect(() => {
     setOverrides(NavigationService.getOverrides());
@@ -48,6 +51,26 @@ export const AdminNavigationTab: React.FC = () => {
     update({ itemsOrder: { ...overrides.itemsOrder, [groupId]: paths } });
   };
 
+  const moveItemToGroup = (sourceGroupId: string, path: string, targetGroupId: string) => {
+    if (sourceGroupId === targetGroupId || !groups.some((group) => group.id === targetGroupId)) return;
+
+    const itemsOrder = Object.fromEntries(
+      Object.entries(overrides.itemsOrder).map(([groupId, paths]) => [
+        groupId,
+        paths.filter((itemPath) => itemPath !== path),
+      ])
+    );
+    const targetPaths = groups.find((group) => group.id === targetGroupId)?.items
+      .map((item) => item.to)
+      .filter((itemPath) => itemPath !== path) ?? [];
+    itemsOrder[targetGroupId] = [...targetPaths, path];
+
+    update({
+      groupAssignments: { ...overrides.groupAssignments, [path]: targetGroupId },
+      itemsOrder,
+    });
+  };
+
   const moveGroup = (groupId: string, direction: -1 | 1) => {
     const order = groups.map((g) => g.id);
     const index = order.indexOf(groupId);
@@ -69,8 +92,14 @@ export const AdminNavigationTab: React.FC = () => {
   };
 
   const reset = () => {
-    if (!window.confirm('إرجاع القوائم إلى الترتيب والتسميات الافتراضية؟')) return;
-    setOverrides({ hidden: [], labels: {}, groupsOrder: [], itemsOrder: {} });
+    if (!window.confirm('إرجاع القوائم إلى الوضع الافتراضي، بما يشمل ترتيب الصفحات ونقلها وتسمياتها؟')) return;
+    setOverrides({
+      hidden: [],
+      labels: {},
+      groupsOrder: [],
+      itemsOrder: {},
+      groupAssignments: {},
+    });
     setDirty(true);
   };
 
@@ -80,7 +109,7 @@ export const AdminNavigationTab: React.FC = () => {
         <div>
           <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">محرر قوائم التنقّل</h3>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            إخفاء أو إعادة تسمية أو ترتيب أي عنصر. الإخفاء هنا يخفي العنصر عن كل المستخدمين بغض النظر عن الصلاحية.
+            انقل الصفحات بين القوائم، أو أعد ترتيبها وتسميتها أو إخفاءها. الإخفاء هنا يطبق على كل المستخدمين.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -133,6 +162,18 @@ export const AdminNavigationTab: React.FC = () => {
                       />
                       <div className="px-1 font-mono text-[10px] text-slate-400">{item.to} · {item.perm || 'بدون صلاحية'}</div>
                     </div>
+                    <select
+                      value={group.id}
+                      onChange={(event) => moveItemToGroup(group.id, item.to, event.target.value)}
+                      disabled={readOnly}
+                      aria-label={`نقل ${item.label} إلى قائمة أخرى`}
+                      title="نقل الصفحة إلى قائمة أخرى"
+                      className="max-w-28 rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-[10px] font-bold text-slate-600 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      {groups.map((targetGroup) => (
+                        <option key={targetGroup.id} value={targetGroup.id}>{targetGroup.label}</option>
+                      ))}
+                    </select>
                     <button disabled={readOnly || itemIndex === 0} onClick={() => moveItem(group.id, item.to, -1)} className="rounded p-1 text-slate-400 hover:text-sky-600 disabled:opacity-30">
                       <ArrowUp className="h-3.5 w-3.5" />
                     </button>

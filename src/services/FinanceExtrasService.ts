@@ -165,13 +165,13 @@ export class FinanceExtrasService {
 
   private requireView() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'finance.view');
+    PermissionService.require(actor, 'ui.finance.overview.view');
     return actor;
   }
 
   private requireManage() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'finance.approve');
+    PermissionService.require(actor, 'ui.finance.receivables.approve');
     return actor;
   }
 

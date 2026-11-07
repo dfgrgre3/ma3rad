@@ -12,6 +12,7 @@ import type { DatabaseManager } from '../../database/db';
 import { isServiceProduct } from '../../utils/productUnits';
 import type { InvoiceWithItems, SalesContext } from './context';
 import { ModuleRegistryService } from '../ModuleRegistryService';
+import { PartnerService } from '../PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
 import type { Effect } from '../effects/EffectTypes';
 import '../effects/handlers/salesInvoiceHandlers';
@@ -66,7 +67,7 @@ function restoreInvoiceItem(
 /** Void a completed sales invoice with full reversal (brief §67/§220). */
 export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: string): SalesInvoice {
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'sales.void');
+  PermissionService.require(actor, 'ui.sales.invoices.void');
   const inv = ctx.getInvoiceById(invoiceId);
   if (!inv) throw new Error('الفاتورة غير موجودة.');
   const returnsCount = ctx.db.query<{ count: number }>(
@@ -166,6 +167,15 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
       },
     ];
     defaultEffectEngine.run({ db: sqliteDb, actorId: actor.id, actorName: actor.fullName }, effects);
+    new PartnerService().adjustSaleProfitAllocation(sqliteDb, {
+      invoiceId,
+      invoiceNumber: inv.invoiceNumber,
+      branchId: ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor),
+      transactionDate: localDateString(),
+      invoiceProfit: Number(inv.grossProfit || 0),
+      targetProfit: 0,
+      actorId: actor.id,
+    });
 
     sqliteDb.run(`UPDATE sales_invoices SET invoice_status = 'VOID', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [invoiceId]);
 

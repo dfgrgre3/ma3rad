@@ -14,7 +14,7 @@ export class InventoryServicePart09 extends InventoryServicePart08 {
 public dispatchTransfer(transferId: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'ui.inventory.hub.transfer');
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');

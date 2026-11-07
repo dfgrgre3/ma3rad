@@ -11,6 +11,7 @@ import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../financials';
 import { ModuleRegistryService } from '../ModuleRegistryService';
 import { CentralUsageLimitService } from '../CentralUsageLimitService';
+import { PartnerService } from '../PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
 import type { Effect } from '../effects/EffectTypes';
 import '../effects/handlers/salesInvoiceHandlers';
@@ -79,11 +80,11 @@ function getUnitLabel(product: any): string {
 }
 
 function validateProductPricing(item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number): void {
-  if (round2(baseUnitPrice) !== Number(product.sellingPriceM2) && !PermissionService.can(actor, 'sales.approve')) {
+  if (round2(baseUnitPrice) !== Number(product.sellingPriceM2) && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
     throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${product.name}».`);
   }
   if (round2(baseUnitPrice) < (product.minSellingPriceM2 || 0)) {
-    PermissionService.require(actor, 'sales.approve');
+    PermissionService.require(actor, 'ui.sales.invoices.approve');
   }
 }
 
@@ -264,10 +265,10 @@ function validateDiscountAndCredit(
     throw new Error('إجمالي الخصم يتجاوز صافي قيمة الأصناف في الفاتورة.');
   }
   if (totalLineDiscount + headerDiscount > 0) {
-    PermissionService.require(actor, 'sales.discount');
+    PermissionService.require(actor, 'ui.sales.invoices.discount');
   }
 
-  if (totals.remainingAmount > 0 && !PermissionService.can(actor, 'sales.credit')) {
+  if (totals.remainingAmount > 0 && !PermissionService.can(actor, 'ui.sales.invoices.credit')) {
     throw new Error('لا تملك صلاحية البيع الآجل أو تسجيل مبلغ متبقٍ على العميل.');
   }
 
@@ -280,7 +281,7 @@ function validateDiscountAndCredit(
   if (!customer) throw new Error('العميل المحدد غير موجود.');
   const limit = Number(customer.creditLimit || 0);
   const projected = round2(Number(customer.currentBalance || 0) + totals.remainingAmount);
-  if (limit > 0 && projected > limit && !PermissionService.can(actor, 'sales.approve')) {
+  if (limit > 0 && projected > limit && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
     throw new Error(
       `تجاوز حد الائتمان للعميل "${customer.name}". الرصيد الحالي ${customer.currentBalance} + الآجل ${totals.remainingAmount} يتجاوز الحد ${limit}.`
     );
@@ -460,7 +461,7 @@ function buildLedgerEntries(
 export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): SalesInvoice {
   assertSaleHasItems(dto);
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'sales.create');
+  PermissionService.require(actor, 'ui.sales.invoices.create');
   CentralUsageLimitService.assertWithin('maxInvoices');
   const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor);
   const companyId = ctx.db.query<{ companyId: string | null }>(
@@ -564,6 +565,15 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       },
     ];
     defaultEffectEngine.run({ db: sqliteDb, actorId: actor.id, actorName: actor.fullName }, effects);
+    new PartnerService().allocateSaleProfit(sqliteDb, {
+      invoiceId,
+      invoiceNumber,
+      companyId,
+      branchId,
+      transactionDate: today,
+      profit: financialTotals.grossProfit,
+      actorId: actor.id,
+    });
 
     return ctx.getInvoiceById(invoiceId)!;
   });

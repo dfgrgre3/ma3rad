@@ -43,7 +43,7 @@ export class AttributeService {
   }
 
   public addValue(attributeId: string, label: string): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
     const clean = label.trim();
     if (!clean) throw new Error('القيمة مطلوبة.');
     const dup = this.db.query(
@@ -59,7 +59,7 @@ export class AttributeService {
   }
 
   public removeValue(optionId: string): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
     const option = this.db.query<{ attributeId: string; value: string }>(
       `SELECT attribute_id AS attributeId, value FROM attribute_options WHERE id = ?`, [optionId]
     )[0];
@@ -82,7 +82,7 @@ export class AttributeService {
     appliesToCategoryId?: string | null;
     options?: string[];
   }): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.create');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.create');
     const name = input.name.trim();
     const code = input.code.trim();
     if (!name || !code) throw new Error('اسم ورمز الخاصية مطلوبان.');
@@ -130,7 +130,7 @@ export class AttributeService {
     appliesToCategoryId?: string | null;
     options?: string[];
   }): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
     const existing = this.getCategoryById(id);
     if (!existing) throw new Error('الخاصية غير موجودة.');
 
@@ -169,7 +169,7 @@ export class AttributeService {
   }
 
   public deleteCategory(id: string): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
     const existing = this.getCategoryById(id);
     if (!existing) throw new Error('الخاصية غير موجودة.');
     const used = this.db.query('SELECT COUNT(*) as c FROM product_attribute_values WHERE attribute_id = ?', [id])[0] as any;

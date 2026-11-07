@@ -4,6 +4,7 @@ import { AuthService } from './AuthService';
 import { PermissionService } from './PermissionService';
 import { BranchAccessService } from './BranchAccessService';
 import { ModuleRegistryService } from './ModuleRegistryService';
+import { localDateString } from '../utils/date';
 
 export type ApprovalType =
   | 'DISCOUNT' | 'PRICE_CHANGE' | 'SALES_RETURN' | 'PURCHASE_RETURN'
@@ -80,7 +81,7 @@ export class ApprovalService {
 
   public getRequests(status = 'ALL', search = '', type = 'ALL'): ApprovalRequest[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'approvals.view');
+    PermissionService.require(actor, 'ui.approvals.inbox.view');
     const scope = this.branchAccess.sqlScope('a.branch_id', undefined, actor);
     let sql = `
       SELECT a.*, ru.full_name AS requested_by_name, du.full_name AS decided_by_name
@@ -102,7 +103,7 @@ export class ApprovalService {
 
   public getStats(): { pending: number; approved: number; rejected: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'approvals.view');
+    PermissionService.require(actor, 'ui.approvals.inbox.view');
     const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const rows = this.db.query<{ status: string; count: number }>(
       `SELECT status, COUNT(*) AS count FROM approval_requests
@@ -123,7 +124,7 @@ export class ApprovalService {
     priority?: ApprovalRequest['priority']; referenceType?: string; referenceId?: string; branchId?: string;
   }): ApprovalRequest {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'approvals.create');
+    PermissionService.require(actor, 'ui.approvals.inbox.create');
     ModuleRegistryService.assertModuleEnabled('approvals');
     if (!input.title.trim()) throw new Error('عنوان الطلب مطلوب.');
     const referenceBranchId = this.resolveReferenceBranch(input.referenceType, input.referenceId);
@@ -161,7 +162,7 @@ export class ApprovalService {
 
   public decide(id: string, approved: boolean, notes?: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, approved ? 'approvals.approve' : 'approvals.reject');
+    PermissionService.require(actor, approved ? 'ui.approvals.inbox.approve' : 'ui.approvals.inbox.reject');
     ModuleRegistryService.assertModuleEnabled('approvals');
     const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const row = this.db.query<ApprovalRequest>(
@@ -202,7 +203,7 @@ export class ApprovalService {
         [row.referenceId]
       )[0];
       if (contract && contract.status === 'DRAFT') {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localDateString();
         const startDate = contract.startDate && contract.startDate <= contract.endDate ? contract.startDate : today;
         db.run(
           "UPDATE enterprise_contracts SET status = 'ACTIVE', start_date = ?, updated_at = ? WHERE id = ?",
@@ -256,7 +257,7 @@ export class ApprovalService {
 
   public cancel(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'approvals.cancel');
+    PermissionService.require(actor, 'ui.approvals.inbox.cancel');
     ModuleRegistryService.assertModuleEnabled('approvals');
     const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const row = this.db.query<ApprovalRequest>(

@@ -9,7 +9,7 @@ import { AuthService } from '../../services/AuthService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
 import { BusinessProfileSupportNotice } from '../../components/business/BusinessProfileSupportNotice';
-import type { InvoiceSectionId, InvoiceTableColumnId, SystemSettings } from '../../types';
+import type { InvoiceSectionId, InvoiceTableColumnId, SystemSettings, User } from '../../types';
 import { PrintService, type InvoiceTemplateId, type InvoiceSizeId } from '../../services/PrintService';
 import {
   BUSINESS_MODULES,
@@ -30,6 +30,7 @@ import { BusinessProfileService } from '../../services/BusinessProfileService';
 import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
 import { CompaniesPanel } from '../../components/CompaniesPanel';
 import { BackupPage } from '../settings/BackupPage';
+import { AppearanceCustomizationTab } from '../settings/AppearanceCustomizationTab';
 import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../../config/moduleRegistry';
 import {
   BUSINESS_TERMINOLOGY,
@@ -48,12 +49,13 @@ const inputCls =
   'w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-sky-500/30';
 const labelCls = 'mb-1 block text-xs font-bold text-slate-700 dark:text-slate-300';
 
-type Tab = 'general' | 'business' | 'branding' | 'invoice' | 'inventory' | 'operations' | 'security' | 'backup';
+type Tab = 'general' | 'business' | 'branding' | 'customization' | 'invoice' | 'inventory' | 'operations' | 'security' | 'backup';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'الإعدادات العامة', icon: Store },
   { id: 'business', label: 'إعدادات النشاط', icon: Boxes },
   { id: 'branding', label: 'الهوية والمظهر', icon: Palette },
+  { id: 'customization', label: 'تخصيص الواجهة', icon: SlidersHorizontal },
   { id: 'invoice', label: 'الفواتير والطباعة', icon: ReceiptText },
   { id: 'inventory', label: 'المخزون والتكلفة', icon: Boxes },
   { id: 'operations', label: 'التشغيل والموافقات', icon: Truck },
@@ -101,12 +103,13 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
   const readOnly = !can('settings.update');
   const canViewBackup = can('settings.backup');
   const visibleTabs = TABS.filter((item) => item.id !== 'backup' || canViewBackup);
-  const [tab, setTab] = useState<Tab>(initialTab && ['general','business','branding','invoice','inventory','operations','security','backup'].includes(initialTab) && (initialTab !== 'backup' || canViewBackup) ? initialTab : 'general');
+  const [tab, setTab] = useState<Tab>(initialTab && ['general','business','branding','customization','invoice','inventory','operations','security','backup'].includes(initialTab) && (initialTab !== 'backup' || canViewBackup) ? initialTab : 'general');
   const changeTab = (next: Tab) => {
     setTab(next);
     onTabChange?.(next);
   };
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
+  const [switchableUsers, setSwitchableUsers] = useState<User[]>([]);
   const [businessProfile, setBusinessProfile] = useState(readBusinessProfile);
   const [businessConfig, setBusinessConfig] = useState(readBusinessConfiguration);
   const [terminologyOverrides, setTerminologyOverrides] = useState<BusinessTermOverrides>(
@@ -116,9 +119,20 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
     const [activitySearch, setActivitySearch] = useState('');
   const [activityFamily, setActivityFamily] = useState('all');
   const canViewConfigHistory = can('audit.view');
+  const canManageLoginSettings = can('settings.update')
+    && ['ADMIN', 'MANAGER'].includes(AuthService.getCurrentUser()?.role || '');
   const [configurationVersions, setConfigurationVersions] = useState<ActivityConfigurationVersion[]>([]);
   const [configurationHistoryError, setConfigurationHistoryError] = useState<string | null>(null);
   const [compareVersionIds, setCompareVersionIds] = useState<[string, string]>(['', '']);
+
+  useEffect(() => {
+    if (tab !== 'security' || !can('users.view')) return;
+    try {
+      setSwitchableUsers(new AuthService().getAllUsers().filter((user) => user.isActive));
+    } catch (error) {
+      toast.error('تعذر تحميل حسابات التبديل', error instanceof Error ? error.message : String(error));
+    }
+  }, [tab, can, toast]);
 
   const printService = useMemo(() => new PrintService(), []);
   const [systemPrinters, setSystemPrinters] = useState<string[]>([]);
@@ -445,9 +459,9 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
 
   const previewStyle = useMemo(
     () => ({
-      background: `linear-gradient(to top right, ${settings.brandPrimaryColor || '#0284c7'}, ${settings.brandAccentColor || '#4f46e5'})`,
+      backgroundColor: settings.brandPrimaryColor || '#34445a',
     }),
-    [settings.brandPrimaryColor, settings.brandAccentColor]
+    [settings.brandPrimaryColor]
   );
 
   return (
@@ -866,10 +880,10 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
               <Field label="اسم النظام / العلامة"><input value={settings.brandName || ''} onChange={(e) => set('brandName', e.target.value)} className={inputCls} /></Field>
               <Field label="الحروف المختصرة"><input maxLength={2} value={settings.brandShortName || ''} onChange={(e) => set('brandShortName', e.target.value)} className={`${inputCls} font-mono`} /></Field>
               <Field label="اللون الأساسي">
-                <ColorInput value={settings.brandPrimaryColor || '#0284c7'} onChange={(v) => set('brandPrimaryColor', v)} />
+                <ColorInput value={settings.brandPrimaryColor || '#34445a'} onChange={(v) => set('brandPrimaryColor', v)} />
               </Field>
               <Field label="اللون الثانوي">
-                <ColorInput value={settings.brandAccentColor || '#4f46e5'} onChange={(v) => set('brandAccentColor', v)} />
+                <ColorInput value={settings.brandAccentColor || '#64748b'} onChange={(v) => set('brandAccentColor', v)} />
               </Field>
               <Field label="وضع العرض">
                 <select value={settings.themeMode || 'light'} onChange={(e) => set('themeMode', e.target.value as SystemSettings['themeMode'])} className={inputCls}>
@@ -879,7 +893,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                 </select>
               </Field>
               <Field label="الخط">
-                <select value={settings.fontFamily || 'Cairo'} onChange={(e) => set('fontFamily', e.target.value)} className={inputCls}>
+                <select value={settings.fontFamily || 'Cairo'} onChange={(e) => set('fontFamily', e.target.value as SystemSettings['fontFamily'])} className={inputCls}>
                   <option value="Cairo">القاهرة</option>
                   <option value="Tajawal">تجوال</option>
                   <option value="system-ui">خط واجهة النظام</option>
@@ -958,6 +972,14 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
               </p>
             </div>
           </div>
+        )}
+
+        {tab === 'customization' && (
+          <AppearanceCustomizationTab
+            settings={settings}
+            readOnly={readOnly}
+            onChange={set}
+          />
         )}
 
         {tab === 'invoice' && (
@@ -1259,10 +1281,10 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="اللون الأساسي">
-                      <ColorInput disabled={readOnly} value={settings.brandPrimaryColor || '#0284c7'} onChange={(value) => set('brandPrimaryColor', value)} />
+                      <ColorInput disabled={readOnly} value={settings.brandPrimaryColor || '#34445a'} onChange={(value) => set('brandPrimaryColor', value)} />
                     </Field>
                     <Field label="اللون المساند">
-                      <ColorInput disabled={readOnly} value={settings.brandAccentColor || '#4f46e5'} onChange={(value) => set('brandAccentColor', value)} />
+                      <ColorInput disabled={readOnly} value={settings.brandAccentColor || '#64748b'} onChange={(value) => set('brandAccentColor', value)} />
                     </Field>
                   </div>
                   <Field label="خط الفاتورة">
@@ -2652,9 +2674,55 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
             <Field label="أقصى محاولات دخول فاشلة">
               <input type="number" min={1} value={settings.maxFailedLoginAttempts ?? 5} onChange={(e) => set('maxFailedLoginAttempts', Number(e.target.value))} className={inputCls} />
             </Field>
+            <Field label="طول رمز الدخول (PIN)">
+              <select
+                value={settings.loginPinLength ?? 4}
+                onChange={(event) => set('loginPinLength', Number(event.target.value))}
+                className={inputCls}
+                disabled={!canManageLoginSettings || readOnly}
+              >
+                {[4, 5, 6, 7, 8].map((length) => <option key={length} value={length}>{length} أرقام</option>)}
+              </select>
+              <p className="mt-1 text-[10px] leading-5 text-slate-500 dark:text-slate-400">
+                ينطبق الطول المحدد على الرموز الجديدة وطلبات التغيير، ولا يغيّر الرموز الحالية.
+              </p>
+            </Field>
             <Field label="فاصل النسخ الاحتياطي التلقائي (ساعات)">
               <input type="number" min={1} value={settings.autoBackupIntervalHours} onChange={(e) => set('autoBackupIntervalHours', Number(e.target.value))} className={inputCls} />
             </Field>
+            <section className="md:col-span-2 rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200">الحسابات المسموح بالتبديل إليها</h4>
+              <p className="mt-1 text-[10px] leading-5 text-slate-500 dark:text-slate-400">
+                يحدد المدير الحسابات التي يمكن للمستخدمين الانتقال إليها من قائمة الحساب دون تسجيل الخروج.
+              </p>
+              {canManageLoginSettings ? (
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {switchableUsers.map((user) => (
+                    <label key={user.id} className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-xs dark:border-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={(settings.switchableUserIds || []).includes(user.id)}
+                        onChange={(event) => {
+                          const current = settings.switchableUserIds || [];
+                          set('switchableUserIds', event.target.checked
+                            ? [...new Set([...current, user.id])]
+                            : current.filter((id) => id !== user.id));
+                        }}
+                        disabled={readOnly}
+                        className="accent-sky-600"
+                      />
+                      <span className="min-w-0 flex-1 truncate font-bold text-slate-700 dark:text-slate-300">{user.fullName}</span>
+                      <span className="truncate font-mono text-[10px] text-slate-500">@{user.username}</span>
+                    </label>
+                  ))}
+                  {switchableUsers.length === 0 && (
+                    <p className="text-[11px] text-slate-500">لا توجد حسابات نشطة أخرى.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-2 text-[11px] text-slate-500">إدارة هذه القائمة متاحة للمدير فقط.</p>
+              )}
+            </section>
           </div>
         )}
 

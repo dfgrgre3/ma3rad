@@ -12,6 +12,7 @@ import { PermissionService } from '../../services/PermissionService';
 import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../types';
 import { useToast } from '../../components/ui/Toast';
 import { formatProductQuantity } from '../../utils/productUnits';
+import { WarrantyClaimsPanel } from './after-sales/WarrantyClaimsPanel';
 
 const fmtCurrency = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
 
@@ -223,7 +224,7 @@ export const AfterSalesPage: React.FC = () => {
             )}
           >
             <ShieldCheck className="w-4 h-4" />
-            سجل الفواتير الحديثة ({recentInvoices.length})
+            مطالبات الضمان وخدمة ما بعد البيع
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -337,71 +338,7 @@ export const AfterSalesPage: React.FC = () => {
           </div>
         </div>
       ) : activeTab === 'warranty' ? (
-        /* Invoice age list; warranty claims are not currently managed here. */
-        <div className="space-y-4">
-          <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 p-4 rounded-2xl flex items-start gap-3">
-            <div className="text-xs text-sky-900 dark:text-sky-200 leading-relaxed">
-              <strong className="block text-sm font-bold mb-0.5">سجل الفواتير الحديثة</strong>
-              يعرض هذا الجدول عمر الفاتورة وملاحظاتها فقط. لا يسجل مطالبات ضمان أو يحدد أهلية الضمان.
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-700">
-              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <FileText className="w-4 h-4 text-sky-600" />
-                الفواتير الحديثة وعمرها
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-sm">
-                <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold border-b border-slate-200 dark:border-slate-700">
-                  <tr>
-                    <th className="p-3.5">رقم الفاتورة</th>
-                    <th className="p-3.5">التاريخ</th>
-                    <th className="p-3.5">العميل</th>
-                    <th className="p-3.5">قيمة الفاتورة</th>
-                    <th className="p-3.5">طريقة الدفع</th>
-                    <th className="p-3.5">العمر منذ الإصدار</th>
-                    <th className="p-3.5">ملاحظات الفاتورة</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
-                  {recentInvoices.map((inv) => {
-                    const daysAgo = Math.floor((Date.now() - new Date(inv.date).getTime()) / (1000 * 60 * 60 * 24));
-                    return (
-                      <tr key={inv.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-700/30 transition">
-                        <td className="p-3.5 font-bold font-mono text-slate-900 dark:text-white">
-                          {inv.invoiceNumber}
-                        </td>
-                        <td className="p-3.5 text-xs text-slate-500 font-mono">
-                          {inv.date ? inv.date.substring(0, 10) : '—'}
-                        </td>
-                        <td className="p-3.5 font-semibold text-slate-900 dark:text-white">
-                          {inv.customerName || 'عميل نقدي'}
-                        </td>
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white">
-                          {fmtCurrency(inv.totalAmount)}
-                        </td>
-                        <td className="p-3.5 text-xs text-slate-600 dark:text-slate-300">
-                          {inv.paymentType}
-                        </td>
-                        <td className="p-3.5">
-                          <span className="px-2.5 py-1 text-xs font-bold rounded-lg border bg-slate-100 text-slate-600 border-slate-200">
-                            {`منذ ${daysAgo} يوم`}
-                          </span>
-                        </td>
-                        <td className="p-3.5 text-xs text-slate-500 max-w-xs truncate">
-                          {inv.notes || '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <WarrantyClaimsPanel invoices={recentInvoices} onChanged={loadData} />
       ) : (
         /* Analytics of Return Reasons */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

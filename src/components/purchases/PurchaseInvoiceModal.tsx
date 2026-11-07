@@ -3,6 +3,8 @@ import { Trash2, Scale } from 'lucide-react';
 import { PaymentType, Product, Supplier, Warehouse } from '../../types';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import { PurchaseInvoiceDto } from './types';
+import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../OperationalFieldsForm';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -22,6 +24,9 @@ interface PurchaseInvoiceModalProps {
   canCreate: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  onOperationalFieldValuesChange: (values: Record<string, string>) => void;
 }
 
 export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
@@ -40,6 +45,9 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
   canCreate,
   onClose,
   onSubmit,
+  operationalFields,
+  operationalFieldValues,
+  onOperationalFieldValuesChange,
 }) => {
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -372,6 +380,7 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
               <span>قيمة البضاعة: {fmt(subtotal)} + تكاليف الوصول: {fmt(totalLandedExpenses)}</span>
               <div className="text-orange-950 text-sm font-black mt-0.5">الإجمالي النهائي للفاتورة: {fmt(finalTotal)}</div>
             </div>
+            <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={onOperationalFieldValuesChange} title="بيانات إضافية لفاتورة الشراء" />
             <div className="text-left font-black">
               <span className="text-rose-700">المتبقي كدين على المعرض: {fmt(Math.max(0, finalTotal - dto.paidAmount))}</span>
             </div>

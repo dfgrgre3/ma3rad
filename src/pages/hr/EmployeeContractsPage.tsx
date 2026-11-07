@@ -5,6 +5,7 @@ import { ContractService } from '../../services/ContractService';
 import { EmployeeService } from '../../services/EmployeeService';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
+import { localDateString } from '../../utils/date';
 import type {
   ContractEffectiveStatus,
   ContractStatus,
@@ -40,7 +41,7 @@ const typeLabels: Record<ContractType, string> = {
 const money = (value: number, currency: string) =>
   `${new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(value) || 0)} ${currency || 'EGP'}`;
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateString();
 
 const emptyForm = {
   employeeId: '',

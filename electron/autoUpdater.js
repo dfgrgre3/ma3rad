@@ -32,6 +32,30 @@ async function createRollbackBackup({ fs, path, dbFile, backupDir, version }) {
   }
 }
 
+/**
+ * electron-updater errors can embed the full HTTP response (headers, cookies)
+ * and the feed URL. Never forward that raw text to the renderer: keep only
+ * the status/message, and translate the well-known "private repo / no release
+ * published yet" 404 into an actionable message.
+ */
+function toSafeUpdateError(error) {
+  const raw = error instanceof Error ? error.message : String(error || 'Unknown update error');
+  const firstLine = raw.split('\n')[0].replace(/\s+Headers:.*$/, '').trim();
+  if (/404/.test(firstLine) && /releases\.atom/.test(raw)) {
+    return 'Update feed not found (HTTP 404). Make sure the GitHub repository is public and a Release containing latest.yml has been published.';
+  }
+  if (/404/.test(firstLine)) {
+    return 'Update feed not found (HTTP 404). The published release may be missing or the repository may be private.';
+  }
+  if (/401|403/.test(firstLine)) {
+    return 'Update check was rejected (HTTP 401/403). The update repository may be private.';
+  }
+  if (/ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|network|internet|offline/i.test(firstLine)) {
+    return 'Could not reach the update server (offline). Check the Internet connection and try again.';
+  }
+  return firstLine.slice(0, 300) || 'Unknown update error';
+}
+
 function getReleaseNotes(info) {
   const notes = info?.releaseNotes;
   if (typeof notes === 'string') return notes;
@@ -56,6 +80,24 @@ function toPublicUpdate(info, currentVersion) {
     releaseNotes: releaseNotes.replace(/<!--\s*mandatory\s*-->/gi, '').trim(),
     mandatory,
   };
+}
+
+/**
+ * Numeric segment comparison for dotted versions (1.10 > 1.9, 1.1.5 > 1.1.4).
+ * Returns true only when the candidate release is strictly newer than the installed one.
+ */
+function isNewerRelease(currentVersion, version) {
+  const candidate = String(version || '');
+  if (!candidate) return false;
+  const currentParts = String(currentVersion || '').split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const candidateParts = candidate.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(currentParts.length, candidateParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const currentSegment = currentParts[index] || 0;
+    const candidateSegment = candidateParts[index] || 0;
+    if (currentSegment !== candidateSegment) return candidateSegment > currentSegment;
+  }
+  return false;
 }
 
 function configureAutoUpdater({
@@ -100,7 +142,7 @@ function configureAutoUpdater({
       } catch (error) {
         publish({
           status: 'error',
-          error: error instanceof Error ? error.message : String(error),
+          error: toSafeUpdateError(error),
         });
         return state;
       }
@@ -161,7 +203,7 @@ function configureAutoUpdater({
     console.error('[updater] Update check or download failed:', error);
     publish({
       status: 'error',
-      error: error instanceof Error ? error.message : String(error),
+      error: toSafeUpdateError(error),
     });
   });
 
@@ -172,7 +214,7 @@ function configureAutoUpdater({
       console.error('[updater] Could not check for updates:', error);
       publish({
         status: 'error',
-        error: error instanceof Error ? error.message : String(error),
+        error: toSafeUpdateError(error),
       });
     });
   };
@@ -195,6 +237,8 @@ module.exports = {
   configureAutoUpdater,
   createRollbackBackup,
   getReleaseNotes,
+  toSafeUpdateError,
+  isNewerRelease,
   isUpdatePlatform,
   toPublicUpdate,
 };

@@ -14,7 +14,7 @@ import { DebtService } from '../src/services/DebtService.ts';
 import { InventoryValuationService } from '../src/services/InventoryValuationService.ts';
 import { InstallmentService } from '../src/services/InstallmentService.ts';
 import { loadReport } from '../src/pages/reports/SalesReportsPage.tsx';
-import { loadPurchaseKpi, loadInventoryKpi } from '../src/pages/reports/PurchaseInventoryReportPage.tsx';
+import { loadPurchaseKpi, loadInventoryKpi } from '../src/services/InventoryReportService.ts';
 import { loadBranchAdjustments } from '../src/pages/inventory/InventoryAdjustmentsPage.tsx';
 import { loadBranchCountSessions } from '../src/pages/inventory/InventoryCountPage.tsx';
 import { localDateString } from '../src/utils/date.ts';

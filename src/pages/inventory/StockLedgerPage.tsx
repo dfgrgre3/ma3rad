@@ -5,6 +5,7 @@ import { BranchAccessService } from '../../services/BranchAccessService';
 import { format } from 'date-fns';
 import { formatProductQuantity } from '../../utils/productUnits';
 import { usePermission } from '../../hooks/usePermission';
+import { exportToExcel } from '../../utils/export';
 
 interface LedgerEntry {
   id: string;
@@ -137,6 +138,33 @@ export const StockLedgerPage: React.FC = () => {
   const paginated = entries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalPages = Math.ceil(entries.length / PAGE_SIZE);
 
+  const exportLedger = () => {
+    exportToExcel({
+      title: 'سجل حركة المخزون',
+      subtitle: `${warehouses.find((w) => w.id === warehouseFilter)?.name ?? 'كل المخازن'} · ${entries.length} حركة`,
+      fileName: 'stock-ledger',
+      permission: 'inventory.export',
+      columns: [
+        { key: 'date', label: 'التاريخ' },
+        { key: 'product', label: 'الصنف' },
+        { key: 'warehouse', label: 'المخزن' },
+        { key: 'type', label: 'نوع الحركة' },
+        { key: 'qtyIn', label: 'وارد' },
+        { key: 'qtyOut', label: 'صادر' },
+        { key: 'qtyLoss', label: 'تالف' },
+        { key: 'balance', label: 'الرصيد' },
+        { key: 'ref', label: 'المرجع' },
+        { key: 'user', label: 'المستخدم' },
+        { key: 'notes', label: 'ملاحظات' },
+      ],
+      rows: entries.map((entry) => ({
+        ...entry,
+        type: TYPE_LABELS[entry.type]?.label ?? entry.type,
+        balance: formatProductQuantity(entry.balance, entry as any),
+      })),
+    });
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
       {/* Header */}
@@ -149,7 +177,13 @@ export const StockLedgerPage: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition">
+          <button
+            type="button"
+            onClick={exportLedger}
+            disabled={!entries.length || !can('inventory.export')}
+            title={can('inventory.export') ? 'تصدير سجل الحركة إلى Excel' : 'لا تملك صلاحية تصدير حركة المخزون'}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+          >
             <Download className="w-3.5 h-3.5" />
             تصدير
           </button>

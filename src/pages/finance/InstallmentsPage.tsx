@@ -71,11 +71,11 @@ export const InstallmentsPage: React.FC = () => {
   const customerService = new CustomerService();
   const installmentService = new InstallmentService();
   const actor = AuthService.getCurrentUser();
-  const canManage = PermissionService.can(actor, 'finance.installments.manage');
+  const canManage = PermissionService.can(actor, 'ui.finance.installments.manage');
 
   const loadData = () => {
     const currentActor = AuthService.getCurrentUser();
-    if (!PermissionService.can(currentActor, 'finance.installments.view') && !PermissionService.can(currentActor, 'finance.installments.manage')) {
+    if (!PermissionService.can(currentActor, 'ui.finance.installments.view') && !PermissionService.can(currentActor, 'ui.finance.installments.manage')) {
       setPlans([]);
       setInstallments([]);
       setCustomers([]);

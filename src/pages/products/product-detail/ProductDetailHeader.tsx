@@ -2,7 +2,8 @@ import React from 'react';
 import { Package, Edit, ArrowRight } from 'lucide-react';
 import { Product } from '../../../types';
 import { getProductUnitLabel } from '../../../utils/productUnits';
-import { TABS, GRADE_LABELS, Tab } from './constants';
+import { TABS, Tab } from './constants';
+import { gradeLabel } from '../../../components/products/productFormModel';
 import { fmt } from './format';
 import { StockSummary } from './types';
 import { usePermission } from '../../../hooks/usePermission';
@@ -35,7 +36,7 @@ export const ProductDetailHeader: React.FC<ProductDetailHeaderProps> = ({ produc
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${product.isActive ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>{product.isActive ? 'نشط' : 'غير نشط'}</span>
-              {product.productType !== 'GENERAL' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 font-bold">{GRADE_LABELS[product.grade] || product.grade}</span>}
+              {product.productType !== 'GENERAL' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 font-bold">{gradeLabel(product.grade)}</span>}
             </div>
             <h1 className="text-lg font-black text-slate-900">{product.name}</h1>
             <div className="mt-1 text-[11px] font-bold text-sky-700">{productsLabel} · {businessProfileLabel}</div>

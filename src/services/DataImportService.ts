@@ -12,6 +12,7 @@ import { OperationsService } from './OperationsService';
 import { DatabaseManager } from '../database/db';
 import { NotificationService } from './NotificationService';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from '../config/routePermissions';
+import { OperationalFieldService } from './OperationalFieldService';
 
 export type ImportEntity = 'customers' | 'suppliers' | 'categories' | 'brands' | 'products' | 'employees' | 'warehouses' | 'dynamic';
 type ExistingImportEntity = Exclude<ImportEntity, 'dynamic'>;
@@ -448,13 +449,17 @@ export class DataImportService {
     }
 
     const grade = values.val('grade').toUpperCase();
+    const gradeOptions = new OperationalFieldService().getProductGradeOptions();
+    const configuredGrade = gradeOptions.find((option) =>
+      option.value.toUpperCase() === grade || option.label.trim().toUpperCase() === grade,
+    )?.value;
     context.products.createProduct({
       sku,
       barcode: values.val('barcode') || sku,
       name: values.val('name'),
       categoryId: category.id,
       brandId: brand.id,
-      grade: (['GRADE_1', 'GRADE_2', 'GRADE_3', 'COMMERCIAL'].includes(grade) ? grade : 'GRADE_1') as any,
+      grade: (configuredGrade || gradeOptions[0]?.value || 'GRADE_1') as any,
       size: values.val('size'),
       baseUnit: 'M2',
       sellUnit: 'M2',

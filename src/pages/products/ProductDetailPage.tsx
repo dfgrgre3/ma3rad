@@ -26,6 +26,9 @@ import { DocumentsTab } from './product-detail/DocumentsTab';
 import { ActivityTab } from './product-detail/ActivityTab';
 import { PriceListsForProduct } from './product-detail/PriceListsForProduct';
 import { InventoryHistory } from './product-detail/InventoryHistory';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { setConfiguredGradeLabels } from '../../components/products/productFormModel';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,7 +38,7 @@ export const ProductDetailPage: React.FC = () => {
   const currentUser = AuthService.getCurrentUser();
   const branchAccess = new BranchAccessService();
   const can = usePermission(currentUser);
-  const canEdit = PermissionService.can(currentUser, 'products.update');
+  const canEdit = PermissionService.can(currentUser, 'ui.products.detail.update');
   const canViewCosts = can('finance.view');
   const canViewPricing = can('pricing.view');
   const canUpdatePricing = can('pricing.update');
@@ -50,14 +53,20 @@ export const ProductDetailPage: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProductEditForm | null>(null);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const operationalFieldService = new OperationalFieldService();
 
   const load = () => {
     if (!id) return;
     setLoading(true);
     try {
       const p = productService.getProductById(id);
+      setConfiguredGradeLabels(operationalFieldService.getProductGradeOptions(true));
       setProduct(p);
       if (p) {
+        setOperationalFields(operationalFieldService.getDefinitions('products'));
+        setOperationalFieldValues(operationalFieldService.getRecordValues('products', p.id));
         const actor = AuthService.requireAuth();
         const salesScope = branchAccess.sqlScope('si.branch_id', undefined, actor);
         const purchaseScope = branchAccess.sqlScope('pi.branch_id', undefined, actor);
@@ -170,7 +179,18 @@ export const ProductDetailPage: React.FC = () => {
       />
 
       <div className="flex-1 overflow-y-auto p-6">
-        {tab === 'overview' && <OverviewTab product={product} margin={margin} canViewCosts={canViewCosts} canViewPricing={canViewPricing} />}
+        {tab === 'overview' && <>
+          <OverviewTab product={product} margin={margin} canViewCosts={canViewCosts} canViewPricing={canViewPricing} />
+          <div className="mt-4">
+            <OperationalFieldsForm
+              fields={operationalFields}
+              values={operationalFieldValues}
+              onChange={() => undefined}
+              title="الحقول التشغيلية"
+              readOnly
+            />
+          </div>
+        </>}
 
         {tab === 'inventory' && can('inventory.view') && <InventoryTab product={product} stock={stock} />}
 

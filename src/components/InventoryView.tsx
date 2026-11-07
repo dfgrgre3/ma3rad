@@ -10,6 +10,7 @@ import { PermissionService } from '../services/PermissionService';
 import { WarehouseStock, InventoryTransaction, Warehouse as IWarehouse, Product } from '../types';
 import { CeramicMath } from '../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../utils/productUnits';
+import { gradeLabel } from './products/productFormModel';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 
 export const InventoryView: React.FC = () => {
@@ -49,9 +50,9 @@ export const InventoryView: React.FC = () => {
   const inventoryService = new InventoryService();
   const productService = new ProductService();
   const currentUser = AuthService.getCurrentUser();
-  const canTransfer = PermissionService.can(currentUser, 'inventory.transfer');
-  const canAdjust = PermissionService.can(currentUser, 'inventory.adjust');
-  const canViewFinancials = PermissionService.can(currentUser, 'finance.view');
+  const canTransfer = PermissionService.can(currentUser, 'ui.inventory.hub.transfer');
+  const canAdjust = PermissionService.can(currentUser, 'ui.inventory.hub.adjust');
+  const canViewFinancials = PermissionService.can(currentUser, 'ui.finance.overview.view');
 
   const loadData = () => {
     try {
@@ -231,7 +232,7 @@ export const InventoryView: React.FC = () => {
                           <div className="text-[10px] text-slate-500">كود: {stk.sku} | باركود: {stk.barcode}</div>
                         </td>
                         <td className="p-3.5 font-semibold text-slate-700">
-                          {stk.productType === 'GENERAL' ? getProductUnitLabel(stk) : `${stk.size} (${stk.grade === 'GRADE_1' ? 'فرز أول' : 'فرز تجاري'})`}
+                          {stk.productType === 'GENERAL' ? getProductUnitLabel(stk) : `${stk.size} (${gradeLabel(stk.grade)})`}
                         </td>
                         <td className="p-3.5 font-black text-emerald-600 text-sm">
                           {stk.productType === 'GENERAL' ? formatProductQuantity(stk.quantityM2, stk) : CeramicMath.formatM2(stk.quantityM2)}

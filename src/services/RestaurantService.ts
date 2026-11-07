@@ -147,7 +147,7 @@ export class RestaurantService {
     const actor = this.requirePermission('orders.create');
     PermissionService.require(actor, 'orders.view');
     PermissionService.require(actor, 'products.view');
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'ui.inventory.hub.view');
     const branchId = this.branchAccess.requireWarehouseAccess(warehouseId, actor);
     const company = this.branchAccess.companyScope('p.company_id', actor);
     const product = this.db.query<{ id: string; companyId: string | null }>(
@@ -243,7 +243,7 @@ export class RestaurantService {
     PermissionService.require(actor, 'orders.view');
     PermissionService.require(actor, 'customers.view');
     PermissionService.require(actor, 'products.view');
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'ui.inventory.hub.view');
     if (!['DINE_IN', 'TAKEAWAY', 'DELIVERY'].includes(input.serviceMode)) {
       throw new Error('نوع خدمة المطعم غير صالح.');
     }

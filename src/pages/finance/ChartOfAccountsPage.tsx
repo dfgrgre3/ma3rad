@@ -79,7 +79,7 @@ const buildAccountTree = (accounts: Account[]): AccountTree => {
 
 export const ChartOfAccountsPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
-  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'finance.approve');
+  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.accounts.approve');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | AccountType>('ALL');

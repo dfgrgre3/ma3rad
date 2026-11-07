@@ -10,8 +10,8 @@ import { CrmActivityModal } from './CrmActivityModal';
 export const CrmActivitiesPage: React.FC = () => {
   const service = new CrmService();
   const user = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(user, 'crm.create');
-  const canUpdate = PermissionService.can(user, 'crm.update');
+  const canCreate = PermissionService.can(user, 'ui.crm.activities.create');
+  const canUpdate = PermissionService.can(user, 'ui.crm.activities.update');
 
   const [activities, setActivities] = useState<CrmActivity[]>([]);
   const [leads, setLeads] = useState<Array<{ id: string; name: string; phone: string }>>([]);

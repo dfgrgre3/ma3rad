@@ -39,10 +39,10 @@ export const PurchaseRequestsPage: React.FC = () => {
   const navigate = useNavigate();
 
   const currentUser = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(currentUser, 'purchases.create');
-  const canApprove = PermissionService.can(currentUser, 'purchases.approve');
-  const canReject = PermissionService.can(currentUser, 'purchases.reject');
-  const canCancelRequest = PermissionService.can(currentUser, 'purchases.cancel_request');
+  const canCreate = PermissionService.can(currentUser, 'ui.purchases.requests.create');
+  const canApprove = PermissionService.can(currentUser, 'ui.purchases.requests.approve');
+  const canReject = PermissionService.can(currentUser, 'ui.purchases.requests.reject');
+  const canCancelRequest = PermissionService.can(currentUser, 'ui.purchases.requests.cancel_request');
 
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [products, setProducts] = useState<Product[]>([]);

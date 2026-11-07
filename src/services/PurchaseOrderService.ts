@@ -118,7 +118,7 @@ export class PurchaseOrderService {
 
   public createOrder(dto: CreatePurchaseOrderDTO): PurchaseOrderRow {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.orders.create');
     if (!dto.supplierId) throw new Error('يجب اختيار المورد.');
     if (!dto.warehouseId) throw new Error('يجب اختيار المخزن.');
     const lines = (dto.items || []).filter((i) => i.productId && Number(i.quantityM2) > 0);
@@ -187,7 +187,7 @@ export class PurchaseOrderService {
 
   public updateStatus(id: string, status: PurchaseOrderStatus): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.update');
+    PermissionService.require(actor, 'ui.purchases.orders.update');
     const order = this.db.query<any>(`SELECT status FROM purchase_orders WHERE id = ?`, [id])[0];
     if (!order) throw new Error('أمر الشراء غير موجود.');
     if (order.status === 'RECEIVED') throw new Error('أمر الشراء مستلم بالفعل.');
@@ -212,7 +212,7 @@ export class PurchaseOrderService {
   /** Post only quantities physically received; stock, invoice and receipt history commit atomically. */
   public receiveQuantities(id: string, requested: Record<string, number>, notes = ''): PurchaseInvoice {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.orders.create');
     const order = this.getOrderById(id);
     if (!order) throw new Error('أمر الشراء غير موجود.');
     if (order.status === 'RECEIVED' || order.status === 'CANCELLED') throw new Error('لا يمكن استلام هذا الأمر.');

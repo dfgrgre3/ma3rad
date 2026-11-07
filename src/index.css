@@ -2,6 +2,7 @@
 @import '@fontsource/cairo/600.css';
 @import '@fontsource/cairo/700.css';
 @import '@fontsource/cairo/800.css';
+@import './styles/design-tokens.css';
 
 @tailwind base;
 @tailwind components;
@@ -75,42 +76,46 @@ input[type=number] {
   }
 }
 
-/* Shared CeramiSys design tokens and accessible interaction states */
-:root {
-  --cerami-primary: #0078d4;
-  --cerami-surface: #ffffff;
-  --cerami-surface-muted: #f3f3f3;
-  --cerami-canvas: #f3f3f3;
-  --cerami-border: #d9d9d9;
-  --cerami-text: #1b1b1b;
-  --cerami-muted: #6b6b6b;
-  --cerami-chart-grid: #e3e3e3;
-  --cerami-tooltip-surface: #ffffff;
-  --cerami-tooltip-border: #d9d9d9;
-  --cerami-scrollbar-thumb: rgba(0, 0, 0, 0.26);
-  --cerami-scrollbar-thumb-hover: rgba(0, 0, 0, 0.42);
-}
+/* Shared enterprise interaction states */
 
-:root { color-scheme: light; }
-.dark {
-  --cerami-surface: #2b2b2b;
-  --cerami-surface-muted: #323232;
-  --cerami-canvas: #1f1f1f;
-  --cerami-border: #3d3d3d;
-  --cerami-text: #f0f0f0;
-  --cerami-muted: #b3b3b3;
-  --cerami-chart-grid: #3d3d3d;
-  --cerami-tooltip-surface: #2b2b2b;
-  --cerami-tooltip-border: #4a4a4a;
-  --cerami-scrollbar-thumb: rgba(255, 255, 255, 0.25);
-  --cerami-scrollbar-thumb-hover: rgba(255, 255, 255, 0.42);
+/* Neutral surfaces share the same low-contrast enterprise canvas. */
+.win-app :is(.bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50) {
+  background-color: var(--win-surface-alt) !important;
 }
+.win-app :is(.bg-slate-100, .bg-slate-200, .bg-gray-100, .bg-gray-200, .bg-zinc-100, .bg-zinc-200, .bg-neutral-100, .bg-neutral-200) {
+  background-color: var(--win-surface-sunken) !important;
+}
+.win-app :is(.text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-zinc-900, .text-zinc-800, .text-neutral-900, .text-neutral-800) {
+  color: var(--win-text) !important;
+}
+.win-app :is(.text-slate-700, .text-slate-600, .text-gray-700, .text-gray-600, .text-zinc-700, .text-zinc-600, .text-neutral-700, .text-neutral-600) {
+  color: var(--win-text-secondary) !important;
+}
+.win-app :is(.text-slate-500, .text-slate-400, .text-gray-500, .text-gray-400, .text-zinc-500, .text-zinc-400, .text-neutral-500, .text-neutral-400) {
+  color: var(--win-text-muted) !important;
+}
+.win-app :is(.border-slate-100, .border-slate-200, .border-slate-300, .border-gray-100, .border-gray-200, .border-gray-300, .border-zinc-100, .border-zinc-200, .border-zinc-300, .border-neutral-100, .border-neutral-200, .border-neutral-300),
+.win-app :is(.divide-slate-100, .divide-slate-200, .divide-gray-100, .divide-gray-200, .divide-zinc-100, .divide-zinc-200, .divide-neutral-100, .divide-neutral-200) > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--win-border) !important;
+}
+.win-app :is(.bg-green-50, .bg-green-100, .bg-emerald-50, .bg-emerald-100) { background-color: var(--win-success-soft) !important; }
+.win-app :is(.bg-red-50, .bg-red-100, .bg-rose-50, .bg-rose-100) { background-color: var(--win-danger-soft) !important; }
+.win-app :is(.bg-amber-50, .bg-amber-100, .bg-yellow-50, .bg-yellow-100, .bg-orange-50, .bg-orange-100) { background-color: var(--win-warning-soft) !important; }
+.win-app :is(.text-green-500, .text-green-600, .text-green-700, .text-emerald-500, .text-emerald-600, .text-emerald-700) { color: var(--win-success-text) !important; }
+.win-app :is(.text-red-500, .text-red-600, .text-red-700, .text-rose-500, .text-rose-600, .text-rose-700) { color: var(--win-danger-text) !important; }
+.win-app :is(.text-amber-600, .text-amber-700, .text-yellow-600, .text-yellow-700, .text-orange-600, .text-orange-700) { color: var(--win-warning-text) !important; }
+.win-app :is(.bg-green-500, .bg-green-600, .bg-emerald-500, .bg-emerald-600) { background-color: var(--win-success) !important; color: var(--cerami-success-on-color) !important; }
+.win-app :is(.bg-red-500, .bg-red-600, .bg-rose-500, .bg-rose-600) { background-color: var(--win-danger) !important; color: var(--cerami-danger-on-color) !important; }
+.win-app :is(.bg-amber-500, .bg-amber-600, .bg-yellow-500, .bg-yellow-600, .bg-orange-500, .bg-orange-600) { background-color: var(--win-warning) !important; color: var(--cerami-warning-on-color) !important; }
+.win-app :is(.border-green-200, .border-green-300, .border-emerald-200, .border-emerald-300) { border-color: var(--win-success-border) !important; }
+.win-app :is(.border-red-200, .border-red-300, .border-rose-200, .border-rose-300) { border-color: var(--win-danger-border) !important; }
+.win-app :is(.border-amber-200, .border-amber-300, .border-yellow-200, .border-yellow-300, .border-orange-200, .border-orange-300) { border-color: var(--win-warning-border) !important; }
 
 * { box-sizing: border-box; }
 /* Touch-friendly: no tap flash, no double-tap zoom on controls */
 html { -webkit-tap-highlight-color: transparent; }
 html, body, #root { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
-body { background: var(--cerami-canvas); color: var(--cerami-text); overflow-x: hidden; }
+body { background: var(--cerami-canvas); color: var(--cerami-canvas-text, var(--cerami-text)); overflow-x: hidden; }
 button, a, [role='button'], input, select, textarea, label { touch-action: manipulation; }
 button, a, input, select, textarea { outline: none; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
@@ -119,30 +124,35 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .ui-card {
-  border: none;
-  border-radius: 2px;
-  background: transparent;
+  border: 1px solid var(--cerami-border);
+  border-radius: var(--win-radius, var(--cerami-radius));
+  background: var(--cerami-surface);
+  color: var(--cerami-surface-text, var(--cerami-text));
+  box-shadow: var(--cerami-shadow-card);
 }
 .ui-input {
-  min-height: 2rem;
-  border: 1px solid #a6a6a6;
-  border-radius: 2px;
+  min-height: 2.25rem;
+  border: 1px solid var(--cerami-border-strong);
+  border-radius: var(--win-radius, var(--cerami-radius));
   background: var(--cerami-surface);
-  padding: 0.35rem 0.5rem;
-  font-size: 0.8125rem;
+  color: var(--cerami-text);
+  padding: 0.4rem 0.65rem;
+  font-size: 0.875rem;
+  transition: border-color var(--cerami-motion-fast) ease, box-shadow var(--cerami-motion-fast) ease;
 }
-.ui-input:hover { border-color: #6b6b6b; }
-.ui-input:focus { border-color: var(--cerami-primary); box-shadow: inset 0 0 0 1px var(--cerami-primary); }
+.ui-input:hover { border-color: var(--cerami-muted); }
+.ui-input:focus { border-color: var(--cerami-primary); box-shadow: var(--cerami-focus-ring); }
 .ui-btn-primary {
-  min-height: 2rem;
+  min-height: 2.25rem;
   border: 1px solid var(--cerami-primary);
-  border-radius: 2px;
+  border-radius: var(--win-radius, var(--cerami-radius));
   background: var(--cerami-primary);
-  color: white;
+  color: var(--cerami-primary-text, #ffffff);
   font-weight: 600;
+  transition: background-color var(--cerami-motion-fast) ease, border-color var(--cerami-motion-fast) ease, box-shadow var(--cerami-motion-fast) ease;
 }
-.ui-btn-primary:hover { background: #106ebe; border-color: #106ebe; }
-.ui-btn-primary:active { background: #005a9e; border-color: #005a9e; }
+.ui-btn-primary:hover { background: var(--cerami-primary-hover); border-color: var(--cerami-primary-hover); color: var(--cerami-primary-hover-text, #ffffff); }
+.ui-btn-primary:active { background: var(--cerami-primary-pressed); border-color: var(--cerami-primary-pressed); color: var(--cerami-primary-pressed-text, #ffffff); }
 
 @media (max-width: 900px) {
   .desktop-only { display: none !important; }
@@ -153,6 +163,43 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .dark .ui-input { color: var(--cerami-text); }
 @media print { .ui-card { box-shadow: none; } }
+
+.ui-filter-toolbar {
+  border-color: var(--cerami-border);
+  border-radius: var(--win-radius, var(--cerami-radius));
+  background: var(--cerami-surface);
+  box-shadow: var(--cerami-shadow-card);
+}
+.ui-filter-toolbar :is(input, select, textarea) {
+  border-color: var(--cerami-border-strong);
+  border-radius: var(--win-radius, var(--cerami-radius));
+  background-color: var(--cerami-surface-muted);
+  color: var(--cerami-text);
+}
+.ui-filter-toolbar :is(input, select, textarea):focus-visible {
+  border-color: var(--cerami-primary);
+  box-shadow: var(--cerami-focus-ring);
+}
+.ui-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid var(--cerami-border);
+  border-radius: var(--win-radius, var(--cerami-radius));
+  background: var(--cerami-surface);
+  -webkit-overflow-scrolling: touch;
+}
+.ui-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--cerami-text);
+  text-align: start;
+}
+.ui-data-table th { text-align: start; }
+.ui-data-table tbody tr { transition: background-color var(--cerami-motion-fast) ease; }
+.ui-form-field { min-width: 0; }
+.ui-form-field > label { display: block; margin-bottom: 0.25rem; color: var(--cerami-text-secondary); font-weight: 600; }
+.ui-form-field [aria-invalid='true'] { border-color: var(--cerami-danger); }
 
 /* Keep shared Tailwind neutral surfaces legible when individual pages omit dark variants. */
 .dark .bg-white,
@@ -189,7 +236,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dark .text-zinc-700,
 .dark .text-zinc-600,
 .dark .text-neutral-700,
-.dark .text-neutral-600 { color: #cbd5e1; }
+.dark .text-neutral-600 { color: var(--cerami-text-secondary); }
 .dark .text-slate-500,
 .dark .text-slate-400,
 .dark .text-gray-500,
@@ -216,7 +263,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
 .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--cerami-border); }
 
-.dark ::placeholder { color: #94a3b8; opacity: 1; }
+.dark ::placeholder { color: var(--cerami-muted); opacity: 1; }
 
 /* Print Styles */
 @media print {
@@ -253,19 +300,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   scrollbar-width: none;
 }
 
-/* Dashboard embedded content normalization and animation suppression */
-#dashboard-scroll-root * {
-  animation: none !important;
-  transition: none !important;
-}
-
-.dashboard-embedded-scope .rounded-3xl,
-.dashboard-embedded-scope .rounded-2xl {
-  border-radius: 0.75rem !important;
-}
-
 /* Responsive application frame and shared content safeguards. */
 .app-shell { height: 100vh; height: 100dvh; }
+.win-app.app-shell { background-color: var(--win-canvas); }
+.win-app .dashboard-page { background-color: var(--win-canvas) !important; }
 .app-main, .app-main > * { min-width: 0; }
 img, video, canvas, svg { max-width: 100%; }
 pre, code { overflow-wrap: anywhere; }
@@ -294,131 +332,265 @@ pre, code { overflow-wrap: anywhere; }
 
 .win-app,
 .win-auth {
-  --win-accent: #0078d4;
-  --win-accent-hover: #106ebe;
-  --win-accent-pressed: #005a9e;
-  --win-accent-soft: #e5f1fb;
-  --win-accent-border: #cce4f7;
-  --win-canvas: #f3f3f3;
-  --win-surface: #ffffff;
-  --win-surface-alt: #fafafa;
-  --win-surface-sunken: #f0f0f0;
-  --win-border: #d9d9d9;
-  --win-border-strong: #b3b3b3;
-  --win-text: #1b1b1b;
-  --win-text-secondary: #4d4d4d;
-  --win-text-muted: #767676;
-  --win-success: #107c10;
-  --win-danger: #c42b1c;
-  --win-warning: #9d5d00;
-  --win-radius: 2px;
+  --win-accent: var(--cerami-primary);
+  --win-accent-hover: var(--cerami-primary-hover);
+  --win-accent-pressed: var(--cerami-primary-pressed);
+  --win-accent-text: var(--cerami-primary-text);
+  --win-accent-hover-text: var(--cerami-primary-hover-text);
+  --win-accent-pressed-text: var(--cerami-primary-pressed-text);
+  --win-accent-readable: var(--cerami-primary-readable);
+  --win-accent-soft: var(--cerami-accent-soft);
+  --win-accent-soft-text: var(--cerami-accent-soft-text);
+  --win-accent-border: var(--cerami-accent-border);
+  --win-canvas: var(--cerami-canvas);
+  --win-canvas-text: var(--cerami-canvas-text, var(--cerami-text));
+  --win-surface: var(--cerami-surface);
+  --win-surface-text: var(--cerami-surface-text, var(--cerami-text));
+  --win-surface-alt: var(--cerami-surface-muted);
+  --win-surface-sunken: var(--cerami-surface-sunken);
+  --win-border: var(--cerami-border);
+  --win-border-strong: var(--cerami-border-strong);
+  --win-text: var(--win-canvas-text);
+  --win-text-secondary: var(--win-canvas-text);
+  --win-text-muted: var(--win-canvas-text);
+  --win-success: var(--cerami-success);
+  --win-success-text: var(--cerami-success-text, var(--cerami-success));
+  --win-success-on-color: var(--cerami-success-on-color);
+  --win-success-soft: var(--cerami-success-soft);
+  --win-success-border: var(--cerami-success-border);
+  --win-danger: var(--cerami-danger);
+  --win-danger-text: var(--cerami-danger-text, var(--cerami-danger));
+  --win-danger-on-color: var(--cerami-danger-on-color);
+  --win-danger-soft: var(--cerami-danger-soft);
+  --win-danger-border: var(--cerami-danger-border);
+  --win-warning: var(--cerami-warning);
+  --win-warning-text: var(--cerami-warning-text, var(--cerami-warning));
+  --win-warning-on-color: var(--cerami-warning-on-color);
+  --win-warning-soft: var(--cerami-warning-soft);
+  --win-warning-border: var(--cerami-warning-border);
+  --win-radius: 6px;
 }
 
-.dark .win-app,
-.dark .win-auth {
-  --win-accent-soft: #0f3550;
-  --win-accent-border: #174a6e;
-  --win-canvas: #1f1f1f;
-  --win-surface: #2b2b2b;
-  --win-surface-alt: #323232;
-  --win-surface-sunken: #272727;
-  --win-border: #3d3d3d;
-  --win-border-strong: #565656;
-  --win-text: #f0f0f0;
-  --win-text-secondary: #cfcfcf;
-  --win-text-muted: #a6a6a6;
+.win-app.app-shell { background-color: var(--win-canvas); color: var(--win-canvas-text); }
+.win-auth { background-color: var(--win-canvas) !important; color: var(--win-text) !important; }
+.win-app :is(.win-card, .ui-card) {
+  --win-text: var(--win-surface-text);
+  --win-text-secondary: var(--win-surface-text);
+  --win-text-muted: var(--win-surface-text);
+  color: var(--win-surface-text);
 }
-
-/* ── Flat geometry: small radii, no heavy depth ───────────────────────────── */
-.win-app :is(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl,
-  .rounded-t-sm, .rounded-t, .rounded-t-md, .rounded-t-lg, .rounded-t-xl, .rounded-t-2xl, .rounded-t-3xl,
-  .rounded-b-sm, .rounded-b, .rounded-b-md, .rounded-b-lg, .rounded-b-xl, .rounded-b-2xl, .rounded-b-3xl,
-  .rounded-s-md, .rounded-s-lg, .rounded-s-xl, .rounded-e-md, .rounded-e-lg, .rounded-e-xl),
-.win-auth :is(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) {
-  border-radius: var(--win-radius) !important;
-}
-
-.win-app :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl, .shadow-inner),
-.win-auth :is(.shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl, .shadow-inner) {
-  box-shadow: none !important;
-}
-
-/* Coloured shadow utilities only carry tint, so they are dropped entirely. */
-.win-app [class*="shadow-"][class*="/"] { box-shadow: none !important; }
+.win-app .win-card { box-shadow: var(--cerami-shadow-card); }
 
 /* Dialogs and menus keep a single soft edge for readability. */
 .win-app [role='dialog'],
 .win-app .win-popover {
   border: 1px solid var(--win-border-strong) !important;
   border-radius: var(--win-radius) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16) !important;
+  box-shadow: var(--cerami-shadow-popover) !important;
 }
 
-/* Flatten decorative card-like containers (shadow + padding/overflow) to bare content. */
-.win-app [class*="shadow-sm"][class*="p-3"],
-.win-app [class*="shadow-sm"][class*="p-4"],
-.win-app [class*="shadow-sm"][class*="p-5"],
-.win-app [class*="shadow-sm"][class*="p-6"],
-.win-app [class*="shadow-xs"][class*="p-3"],
-.win-app [class*="shadow-xs"][class*="p-4"],
-.win-app [class*="shadow-xs"][class*="p-5"],
-.win-app [class*="shadow-xs"][class*="p-6"],
-.win-app [class*="shadow-md"][class*="p-3"],
-.win-app [class*="shadow-md"][class*="p-4"],
-.win-app [class*="shadow-md"][class*="p-5"],
-.win-app [class*="shadow-md"][class*="p-6"],
-.win-app [class*="shadow-sm"][class*="overflow-hidden"],
-.win-app [class*="shadow-xs"][class*="overflow-hidden"],
-.win-app [class*="shadow-md"][class*="overflow-hidden"] {
-  background-color: transparent !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
+.appearance-color-item {
+  position: relative;
+  overflow: hidden;
+  border-width: 1px;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.appearance-color-item:hover {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
+}
+.appearance-color-item:focus-visible,
+.appearance-color-modal:focus-visible {
+  outline: 2px solid var(--win-accent);
+  outline-offset: 2px;
+}
+.appearance-color-swatch {
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06), 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+.appearance-color-backdrop {
+  animation: appearanceBackDropFade 0.18s ease-out;
+}
+.appearance-color-modal {
+  background: var(--win-surface);
+  border-color: var(--win-border-strong);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  animation: appearanceModalIn 0.2s ease-out;
+}
+.appearance-color-preview {
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+}
+.appearance-color-presets button {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+}
+.appearance-color-presets button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
 }
 
-/* ── Motion: no decorative movement (all transitions/animations disabled) ─── */
-.win-app *, .win-auth * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
-.win-app :is(.animate-pulse, .animate-bounce, .animate-spin, .animate-ping) { animation: none !important; }
-.win-app [class*="hover:scale"]:hover,
-.win-app [class*="hover:-translate"]:hover,
-.win-app [class*="active:scale"]:active,
-.win-app [class*="group-hover:scale"],
-.win-app :hover,
-.win-app :active,
-.win-app :focus,
-.win-app :focus-visible,
-.win-app [class*="group-hover"] { transform: none !important; }
-.win-app [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+@keyframes appearanceBackDropFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
-/* Decorative gradients are flattened to the accent (dark text stays legible). */
-.win-app [class*="bg-gradient-to"] { background-image: none !important; }
-.win-app [class*="bg-gradient-to"][class*="text-white"] { background-color: var(--win-accent) !important; }
-.win-app [class*="bg-gradient-to"]:not([class*="text-white"]) {
-  background-color: var(--win-surface-alt) !important;
+@keyframes appearanceModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 640px) {
+  .appearance-color-modal {
+    max-width: calc(100vw - 1rem) !important;
+    padding: 1rem !important;
+  }
+  .appearance-color-item {
+    padding: 0.75rem;
+  }
+  .appearance-color-item .appearance-color-swatch {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
 }
 
 /* ── Primary colour mapping ───────────────────────────────────────────────── */
 .win-app :is(.bg-sky-600, .bg-sky-500, .bg-blue-600, .bg-blue-500, .bg-indigo-600, .bg-indigo-500),
-.win-auth :is(.bg-sky-600, .bg-sky-500, .bg-blue-600, .bg-indigo-600) {
+.win-auth :is(.bg-sky-600, .bg-sky-500, .bg-blue-600, .bg-blue-500, .bg-indigo-600, .bg-indigo-500) {
   background-color: var(--win-accent) !important;
+}
+.win-app :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-sky-500"], button[class~="bg-blue-600"], button[class~="bg-blue-500"], button[class~="bg-indigo-600"], button[class~="bg-indigo-500"], button[class~="bg-[#0078d4]"]),
+.win-auth :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-sky-500"], button[class~="bg-blue-600"], button[class~="bg-blue-500"], button[class~="bg-indigo-600"], button[class~="bg-indigo-500"], button[class~="bg-[#0078d4]"]) {
+  color: var(--win-accent-text) !important;
+}
+.win-app :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-sky-500"], button[class~="bg-blue-600"], button[class~="bg-blue-500"], button[class~="bg-indigo-600"], button[class~="bg-indigo-500"], button[class~="bg-[#0078d4]"]):hover,
+.win-auth :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-sky-500"], button[class~="bg-blue-600"], button[class~="bg-blue-500"], button[class~="bg-indigo-600"], button[class~="bg-indigo-500"], button[class~="bg-[#0078d4]"]):hover {
+  color: var(--win-accent-hover-text) !important;
+}
+.win-app :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-sky-500"], button[class~="bg-blue-600"], button[class~="bg-blue-500"], button[class~="bg-indigo-600"], button[class~="bg-indigo-500"], button[class~="bg-[#0078d4]"]):active,
+.win-auth :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-sky-500"], button[class~="bg-blue-600"], button[class~="bg-blue-500"], button[class~="bg-indigo-600"], button[class~="bg-indigo-500"], button[class~="bg-[#0078d4]"]):active {
+  color: var(--win-accent-pressed-text) !important;
+}
+.win-auth :is(.bg-sky-700, .bg-sky-800, .bg-blue-700, .bg-blue-800, .bg-indigo-700, .bg-indigo-800) {
+  background-color: var(--win-accent-pressed) !important;
 }
 .win-app :is(.bg-sky-700, .bg-blue-700, .bg-indigo-700) { background-color: var(--win-accent-pressed) !important; }
 .win-app :is(.hover\:bg-sky-700:hover, .hover\:bg-sky-600:hover, .hover\:bg-sky-500:hover,
   .hover\:bg-blue-700:hover, .hover\:bg-blue-600:hover, .hover\:bg-indigo-700:hover, .hover\:bg-indigo-600:hover),
-.win-auth .hover\:bg-sky-700:hover {
+.win-auth :is(.hover\:bg-sky-700:hover, .hover\:bg-sky-800:hover, .hover\:bg-blue-700:hover, .hover\:bg-blue-800:hover, .hover\:bg-indigo-700:hover, .hover\:bg-indigo-800:hover) {
   background-color: var(--win-accent-hover) !important;
 }
 .win-app :is(.bg-sky-50, .bg-sky-100, .bg-blue-50, .bg-blue-100, .bg-indigo-50, .bg-indigo-100),
 .win-auth :is(.bg-sky-50, .bg-sky-100) {
   background-color: var(--win-accent-soft) !important;
 }
-.win-app :is(.text-sky-600, .text-sky-500, .text-sky-700, .text-blue-600, .text-indigo-600) {
-  color: var(--win-accent) !important;
+.win-auth :is(.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50) {
+  background-color: var(--win-surface) !important;
 }
+.win-auth :is(.text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-zinc-900, .text-zinc-800, .text-neutral-900, .text-neutral-800) {
+  color: var(--win-text) !important;
+}
+.win-auth :is(.text-slate-700, .text-slate-600, .text-gray-700, .text-gray-600, .text-zinc-700, .text-zinc-600, .text-neutral-700, .text-neutral-600) {
+  color: var(--win-text-secondary) !important;
+}
+.win-auth :is(.text-slate-500, .text-slate-400, .text-gray-500, .text-gray-400, .text-zinc-500, .text-zinc-400, .text-neutral-500, .text-neutral-400) {
+  color: var(--win-text-muted) !important;
+}
+.dark .win-auth :is(.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50) {
+  background-color: var(--win-surface) !important;
+}
+.win-app :is(.text-sky-600, .text-sky-500, .text-sky-700, .text-blue-600, .text-indigo-600) {
+  color: var(--win-accent-readable, var(--win-accent)) !important;
+}
+.win-app [class~="text-[#0078d4]"] { color: var(--win-accent) !important; }
+.win-app [class~="bg-[#0078d4]"] { background-color: var(--win-accent) !important; }
+.win-app [class~="border-[#0078d4]"] { border-color: var(--win-accent) !important; }
+.win-app :is([class~="hover:text-[#005a9e]"]:hover, [class~="hover:border-[#0078d4]"]:hover) {
+  color: var(--win-accent-hover) !important;
+  border-color: var(--win-accent-hover) !important;
+}
+.win-app [class~="hover:bg-[#f2f8fd]"]:hover { background-color: var(--win-accent-soft) !important; }
 .win-app :is(.border-sky-300, .border-sky-400, .border-sky-500, .border-sky-600, .border-blue-500, .border-indigo-500) {
   border-color: var(--win-accent) !important;
 }
 .win-auth :is(.border-sky-500, .border-sky-600) { border-color: var(--win-accent) !important; }
 .win-auth .text-sky-600 { color: var(--win-accent) !important; }
+
+.win-auth-brand {
+  isolation: isolate;
+  background-color: var(--win-accent);
+  color: #ffffff;
+}
+.win-auth-mosaic {
+  z-index: -1;
+  background: transparent;
+}
+.win-auth-mosaic::after {
+  content: none;
+}
+.win-auth-feature {
+  border-top: 1px solid rgba(222, 239, 232, 0.24);
+  padding-block: 0.875rem;
+}
+.win-auth.bg-slate-950 { background-color: var(--win-canvas) !important; }
+.win-auth-activation-card {
+  border: 1px solid var(--win-border);
+  background-color: var(--win-surface);
+  box-shadow: 0 2px 8px rgba(37, 44, 43, 0.08);
+}
+.win-auth-activation-head {
+  background-color: var(--win-accent);
+  background-image: none !important;
+}
+.win-auth-activation-card input:not([type='checkbox']) {
+  border-color: var(--win-border-strong);
+  background-color: var(--win-surface-alt);
+  color: var(--cerami-surface-text, var(--win-text));
+}
+.win-auth-activation-card input:not([type='checkbox']):focus {
+  border-color: var(--win-accent);
+  box-shadow: 0 0 0 2px var(--win-accent-border);
+}
+.win-auth-brand-mark {
+  border: 1px solid var(--win-accent-border);
+  background-color: var(--win-accent);
+  color: #ffffff;
+}
+.win-auth-card {
+  overflow: hidden;
+  border: 1px solid var(--win-border);
+  border-radius: var(--win-radius);
+  background: var(--win-surface);
+  box-shadow: 0 2px 8px rgba(37, 44, 43, 0.06);
+}
+.dark .win-auth-card { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
+.win-auth-card-head {
+  border-bottom: 1px solid var(--win-border);
+  padding: 1.25rem 1.5rem;
+  background: var(--win-surface);
+}
+.win-auth-card-foot {
+  border-top: 1px solid var(--win-border);
+  padding: 0.875rem 1.5rem;
+  background: var(--win-surface-alt);
+}
+.win-auth-kbd {
+  border: 1px solid var(--win-border);
+  border-radius: 3px;
+  background: var(--win-surface-alt);
+  padding-inline: 0.25rem;
+  color: var(--win-text-secondary);
+  font: inherit;
+}
+.win-auth :is(button, input, a):focus-visible {
+  outline: 2px solid var(--win-accent);
+  outline-offset: 2px;
+}
+.win-auth :is(.text-\[\#767676\], .text-\[\#999\]) { color: var(--win-text-muted) !important; }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .win-btn {
@@ -428,64 +600,74 @@ pre, code { overflow-wrap: anywhere; }
   gap: 6px;
   min-height: 32px;
   padding: 0 14px;
-  border: 1px solid #adadad;
+  border: 1px solid var(--win-border-strong);
   border-radius: var(--win-radius);
-  background: #e1e1e1;
-  color: var(--win-text);
+  background: var(--win-surface);
+  color: var(--win-surface-text, var(--win-text));
   font-size: 12.5px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
 }
-.win-btn:hover { background: var(--win-accent-soft); border-color: var(--win-accent); }
-.win-btn:active { background: var(--win-accent-border); border-color: var(--win-accent-pressed); }
+.win-btn:hover { background: var(--win-surface-sunken); border-color: var(--win-border-strong); }
+.win-btn:active { background: var(--win-accent-border); border-color: var(--win-accent-pressed); color: var(--cerami-accent-border-text, var(--win-surface-text)); }
 .win-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.win-btn--primary { background: var(--win-accent); border-color: var(--win-accent); color: #ffffff; }
-.win-btn--primary:hover { background: var(--win-accent-hover); border-color: var(--win-accent-hover); }
-.win-btn--primary:active { background: var(--win-accent-pressed); border-color: var(--win-accent-pressed); }
-.win-btn--danger { background: #ffffff; border-color: var(--win-danger); color: var(--win-danger); }
-.win-btn--danger:hover { background: var(--win-danger); border-color: var(--win-danger); color: #ffffff; }
+.win-btn--primary { background: var(--win-accent); border-color: var(--win-accent); color: var(--win-accent-text, #ffffff); }
+.win-btn--primary:hover { background: var(--win-accent-hover); border-color: var(--win-accent-hover); color: var(--win-accent-hover-text, #ffffff); }
+.win-btn--primary:active { background: var(--win-accent-pressed); border-color: var(--win-accent-pressed); color: var(--win-accent-pressed-text, #ffffff); }
+.win-btn--danger { background: var(--win-surface); border-color: var(--win-danger); color: var(--win-danger-text); }
+.win-btn--danger:hover { background: var(--win-danger); border-color: var(--win-danger); color: var(--win-danger-on-color); }
 .win-btn--ghost { background: transparent; border-color: transparent; color: var(--win-text-secondary); }
 .win-btn--ghost:hover { background: var(--win-surface-sunken); border-color: var(--win-border); }
 .win-btn--sm { min-height: 26px; padding: 0 10px; font-size: 11.5px; }
 
-.dark .win-btn { background: #3a3a3a; border-color: #565656; color: #f0f0f0; }
+.dark .win-btn { background: var(--win-surface); border-color: var(--win-border-strong); color: var(--win-surface-text); }
 .dark .win-btn:hover { background: var(--win-accent-soft); border-color: var(--win-accent); }
-.dark .win-btn--primary { background: var(--win-accent); border-color: var(--win-accent); color: #fff; }
-.dark .win-btn--danger { background: transparent; color: #f1707b; border-color: #f1707b; }
+.dark .win-btn--primary { background: var(--win-accent); border-color: var(--win-accent); color: var(--win-accent-text, #fff); }
+.dark .win-btn--primary:hover { background: var(--win-accent-hover); border-color: var(--win-accent-hover); color: var(--win-accent-hover-text, #fff); }
+.dark .win-btn--primary:active { background: var(--win-accent-pressed); border-color: var(--win-accent-pressed); color: var(--win-accent-pressed-text, #fff); }
+.dark .win-btn--danger { background: transparent; color: var(--win-danger-text); border-color: var(--win-danger); }
 
 /* ── Inputs ───────────────────────────────────────────────────────────────── */
 .win-input {
   min-height: 32px;
   width: 100%;
   padding: 0 8px;
-  border: 1px solid #a6a6a6;
+  border: 1px solid var(--win-border-strong);
   border-radius: var(--win-radius);
   background: var(--win-surface);
   color: var(--win-text);
   font-size: 12.5px;
 }
-.win-input:hover { border-color: #767676; }
+.win-input:hover { border-color: var(--win-text-muted); }
 .win-input:focus { border-color: var(--win-accent); box-shadow: inset 0 0 0 1px var(--win-accent); outline: none; }
-.dark .win-input { border-color: #565656; background: #333333; }
-.dark .win-input:hover { border-color: #8a8a8a; }
+.dark .win-input { border-color: var(--win-border-strong); background: var(--win-surface); }
+.dark .win-input:hover { border-color: var(--win-text-muted); }
 
-.win-app :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), select, textarea) {
+.win-app :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']), select, textarea) {
   border-radius: var(--win-radius);
+  border-color: var(--win-border-strong);
+  background-color: var(--win-surface);
+  color: var(--win-text);
 }
 .win-app :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']), select) {
   min-height: 32px;
 }
 .win-app :is(input, textarea)::placeholder { color: var(--win-text-muted); opacity: 1; }
+.win-app :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']), select, textarea):focus {
+  border-color: var(--win-accent);
+  box-shadow: 0 0 0 2px var(--win-accent-soft);
+}
 .win-app input[type='checkbox'],
 .win-app input[type='radio'] { accent-color: var(--win-accent); }
 
 /* ── Cards, tables and page furniture ─────────────────────────────────────── */
 .win-card {
-  background: transparent;
-  border: none;
+  background: var(--win-surface);
+  border: 1px solid var(--win-border);
   border-radius: var(--win-radius);
+  box-shadow: var(--cerami-shadow-card);
 }
 .win-page-head {
   display: flex;
@@ -519,8 +701,8 @@ pre, code { overflow-wrap: anywhere; }
   border-bottom: 1px solid var(--win-border) !important;
   color: var(--win-text);
 }
-.win-app tbody tr:hover { background-color: #f2f8fd !important; }
-.dark .win-app tbody tr:hover { background-color: #333f47 !important; }
+.win-app tbody tr:hover { background-color: var(--win-accent-soft) !important; }
+.dark .win-app tbody tr:hover { background-color: var(--win-surface-sunken) !important; }
 .win-app tbody tr:last-child td { border-bottom-color: transparent !important; }
 .win-app table tfoot td { border-top: 1px solid var(--win-border-strong) !important; }
 
@@ -529,6 +711,21 @@ pre, code { overflow-wrap: anywhere; }
   background: var(--win-surface);
   border-bottom: 1px solid var(--win-border);
 }
+.win-header [class~="bg-[#0078d4]"] { background-color: var(--win-accent) !important; }
+.win-header [class~="text-[#1b1b1b]"] { color: var(--win-text) !important; }
+.win-header [class~="dark:text-[#f0f0f0]"] { color: var(--win-text) !important; }
+.win-header [class~="bg-[#d9d9d9]"] { background-color: var(--win-border) !important; }
+.win-header [class~="dark:bg-[#3d3d3d]"] { background-color: var(--win-border) !important; }
+.win-header button[title^="بحث شامل"] {
+  border-color: var(--win-border-strong);
+  background-color: var(--win-surface);
+  color: var(--win-text-secondary);
+}
+.win-header button[title^="بحث شامل"]:hover {
+  border-color: var(--win-accent);
+  background-color: var(--win-accent-soft);
+}
+.win-header kbd { border-color: var(--win-border); color: var(--win-text-muted); }
 .win-sidebar {
   background: var(--win-surface-alt);
   border-inline-start: 1px solid var(--win-border);
@@ -578,12 +775,12 @@ pre, code { overflow-wrap: anywhere; }
   top: 5px;
   bottom: 5px;
   width: 2px;
-  background: var(--win-accent);
+  background: var(--brand-accent, var(--win-accent));
 }
-.dark .win-nav-item--active { color: #8ec8f5 !important; }
+.dark .win-nav-item--active { color: var(--win-text) !important; }
 .win-nav-icon { width: 15px; height: 15px; flex: 0 0 auto; color: var(--win-text-muted); }
 .win-nav-item--active .win-nav-icon { color: var(--win-accent); }
-.dark .win-nav-item--active .win-nav-icon { color: #8ec8f5; }
+.dark .win-nav-item--active .win-nav-icon { color: var(--win-text); }
 
 /* Horizontal navigation inside the header (navigationLayout = 'header') */
 .win-topnav { scrollbar-width: none; }
@@ -611,9 +808,9 @@ pre, code { overflow-wrap: anywhere; }
   background: var(--win-accent-soft) !important;
   color: var(--win-accent-pressed) !important;
   font-weight: 600;
-  box-shadow: inset 0 -2px 0 var(--win-accent);
+  box-shadow: inset 0 -2px 0 var(--brand-accent, var(--win-accent));
 }
-.dark .win-topnav-item--active { color: #8ec8f5 !important; }
+.dark .win-topnav-item--active { color: var(--win-text) !important; }
 
 .win-nav-panel {
   position: fixed;
@@ -645,6 +842,7 @@ pre, code { overflow-wrap: anywhere; }
   color: var(--win-text-secondary);
   font-size: 11px;
 }
+.win-statusbar [class~="bg-[#107c10]"] { background-color: var(--win-success) !important; }
 .win-pivot {
   display: inline-flex;
   align-items: center;
@@ -664,9 +862,9 @@ pre, code { overflow-wrap: anywhere; }
 
 /* Windows 10 scrollbars */
 .win-app ::-webkit-scrollbar,
-.win-auth ::-webkit-scrollbar { width: 12px; height: 12px; }
+.win-auth ::-webkit-scrollbar { width: 8px; height: 8px; }
 .win-app ::-webkit-scrollbar-thumb,
-.win-auth ::-webkit-scrollbar-thumb { background: var(--cerami-scrollbar-thumb); border-radius: 0; border: 3px solid transparent; background-clip: padding-box; }
+.win-auth ::-webkit-scrollbar-thumb { background: var(--cerami-scrollbar-thumb); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
 .win-app ::-webkit-scrollbar-thumb:hover,
 .win-auth ::-webkit-scrollbar-thumb:hover { background: var(--cerami-scrollbar-thumb-hover); background-clip: padding-box; }
 .win-app ::-webkit-scrollbar-track,
@@ -719,23 +917,22 @@ pre, code { overflow-wrap: anywhere; }
 
 /* Smooth page transitions & prevent layout shift / jitter */
 .app-main {
-  overflow-y: scroll; /* Reserve scrollbar gutter consistently to prevent horizontal jumping */
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 @keyframes pageFadeIn {
   0% {
     opacity: 0;
-    transform: translateY(3px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
 .page-transition-wrapper {
   animation: pageFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -771,4 +968,269 @@ pre, code { overflow-wrap: anywhere; }
 /* Touch-friendly tap targets on coarse pointers. */
 @media (pointer: coarse) {
   .win-btn, .win-nav-item, .win-pivot { min-height: 40px; }
+}
+
+/* Compact vertical rhythm for operational pages; controls and horizontal
+   spacing stay intact, while dialogs, print output, and POS touch mode opt out. */
+@media screen {
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="p-6"], [class~="py-6"], [class~="pt-6"], [class~="pb-6"],
+    [class*=":p-6"], [class*=":py-6"], [class*=":pt-6"], [class*=":pb-6"]
+  ) {
+    padding-block: 1.125rem;
+  }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="p-5"], [class~="py-5"], [class~="pt-5"], [class~="pb-5"],
+    [class*=":p-5"], [class*=":py-5"], [class*=":pt-5"], [class*=":pb-5"]
+  ) {
+    padding-block: 0.875rem;
+  }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="p-4"], [class~="py-4"], [class~="pt-4"], [class~="pb-4"],
+    [class*=":p-4"], [class*=":py-4"], [class*=":pt-4"], [class*=":pb-4"]
+  ) {
+    padding-block: 0.75rem;
+  }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="p-6"], [class*=":p-6"]
+  ) { padding-inline: 1rem; }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="p-5"], [class*=":p-5"]
+  ) { padding-inline: 0.875rem; }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="p-4"], [class*=":p-4"]
+  ) { padding-inline: 0.75rem; }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="gap-8"], [class~="gap-y-8"], [class*=":gap-8"], [class*=":gap-y-8"]
+  ) {
+    row-gap: 1.25rem;
+  }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(div, section, article, form, header):where(
+    [class~="gap-6"], [class~="gap-y-6"], [class*=":gap-6"], [class*=":gap-y-6"]
+  ) {
+    row-gap: 1rem;
+  }
+
+  .win-app .app-main :where(
+    .space-y-8 > :not([hidden]) ~ :not([hidden]),
+    .space-y-6 > :not([hidden]) ~ :not([hidden]),
+    [class*=":space-y-8"] > :not([hidden]) ~ :not([hidden]),
+    [class*=":space-y-6"] > :not([hidden]) ~ :not([hidden])
+  ):not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *) {
+    margin-block-start: 1rem;
+  }
+
+  .win-app .app-main :where(
+    .space-y-4 > :not([hidden]) ~ :not([hidden]),
+    [class*=":space-y-4"] > :not([hidden]) ~ :not([hidden])
+  ):not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *) {
+    margin-block-start: 0.75rem;
+  }
+
+  .win-app .app-main .win-page-head:not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *) {
+    padding-block: 0.625rem !important;
+    gap: 0.625rem;
+  }
+
+  .win-app .app-main :not([role='dialog'], [role='dialog'] *):not([aria-modal='true'], [aria-modal='true'] *):not(.fixed.inset-0, .fixed.inset-0 *):not(.pos-touch-mode, .pos-touch-mode *):is(h1, h2):where(
+    [class~="text-3xl"], [class~="text-2xl"], [class*=":text-3xl"], [class*=":text-2xl"]
+  ) {
+    font-size: 1.25rem;
+    line-height: 1.3;
+  }
+}
+
+/* User-configurable workspace appearance, applied across every route. */
+:root[data-ui-corner-radius='compact'] :is(.win-app, .win-auth) { --win-radius: 4px; }
+:root[data-ui-corner-radius='standard'] :is(.win-app, .win-auth) { --win-radius: 6px; }
+:root[data-ui-corner-radius='rounded'] :is(.win-app, .win-auth) { --win-radius: 10px; }
+
+:root[data-ui-density='compact'] :is(.win-app, .win-auth) :is(.win-btn, .ui-btn-primary) {
+  min-height: 30px;
+}
+:root[data-ui-density='comfortable'] :is(.win-app, .win-auth) :is(.win-btn, .ui-btn-primary) {
+  min-height: 38px;
+}
+:root[data-ui-density='compact'] .win-app .app-main table thead th,
+:root[data-ui-density='compact'] .win-app .app-main table tbody td {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+:root[data-ui-density='comfortable'] .win-app .app-main table thead th,
+:root[data-ui-density='comfortable'] .win-app .app-main table tbody td {
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+:root[data-ui-density='compact'] .win-app .app-main :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']), select, textarea) {
+  min-height: 30px;
+}
+:root[data-ui-density='comfortable'] .win-app .app-main :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']), select) {
+  min-height: 38px;
+}
+:root[data-ui-density='compact'] .win-auth :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  min-height: 34px;
+}
+:root[data-ui-density='comfortable'] .win-auth :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  min-height: 42px;
+}
+
+:root[data-ui-button-style='outline'] :is(.win-app, .win-auth) :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-blue-600"], button[class~="bg-indigo-600"], button[class~="bg-[#0078d4]"]) {
+  border: 1px solid var(--win-accent) !important;
+  background: transparent !important;
+  color: var(--win-accent-readable) !important;
+  box-shadow: none !important;
+}
+:root[data-ui-button-style='outline'] :is(.win-app, .win-auth) :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-blue-600"], button[class~="bg-indigo-600"], button[class~="bg-[#0078d4]"]):hover {
+  background: var(--win-accent-soft) !important;
+  color: var(--win-accent-soft-text) !important;
+}
+:root[data-ui-button-style='outline'] :is(.win-app, .win-auth) :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-blue-600"], button[class~="bg-indigo-600"], button[class~="bg-[#0078d4]"]):active {
+  background: var(--win-accent-border) !important;
+  color: var(--cerami-accent-border-text) !important;
+}
+:root[data-ui-button-style='soft'] :is(.win-app, .win-auth) :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-blue-600"], button[class~="bg-indigo-600"], button[class~="bg-[#0078d4]"]) {
+  border: 1px solid var(--win-accent-border) !important;
+  background: var(--win-accent-soft) !important;
+  color: var(--win-accent-soft-text) !important;
+  box-shadow: none !important;
+}
+:root[data-ui-button-style='soft'] :is(.win-app, .win-auth) :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-blue-600"], button[class~="bg-indigo-600"], button[class~="bg-[#0078d4]"]):hover {
+  border-color: var(--win-accent) !important;
+  background: var(--win-accent-border) !important;
+  color: var(--cerami-accent-border-text) !important;
+}
+:root[data-ui-button-style='soft'] :is(.win-app, .win-auth) :is(.win-btn--primary, .ui-btn-primary, button[class~="bg-sky-600"], button[class~="bg-blue-600"], button[class~="bg-indigo-600"], button[class~="bg-[#0078d4]"]):active {
+  border-color: var(--win-accent-pressed) !important;
+  background: var(--win-accent-pressed) !important;
+  color: var(--win-accent-pressed-text) !important;
+}
+
+.customization-preview[data-button-style='outline'] .win-btn--primary {
+  border: 1px solid var(--cerami-primary) !important;
+  background: transparent !important;
+  color: var(--cerami-primary-readable) !important;
+  box-shadow: none !important;
+}
+.customization-preview[data-button-style='outline'] .win-btn--primary:hover {
+  background: var(--cerami-accent-soft) !important;
+  color: var(--cerami-accent-soft-text) !important;
+}
+.customization-preview[data-button-style='outline'] .win-btn--primary:active {
+  background: var(--cerami-accent-border) !important;
+  color: var(--cerami-accent-border-text) !important;
+}
+.customization-preview[data-button-style='soft'] .win-btn--primary {
+  border: 1px solid var(--cerami-accent-border) !important;
+  background: var(--cerami-accent-soft) !important;
+  color: var(--cerami-accent-soft-text) !important;
+  box-shadow: none !important;
+}
+.customization-preview[data-button-style='soft'] .win-btn--primary:hover {
+  background: var(--cerami-accent-border) !important;
+  color: var(--cerami-accent-border-text) !important;
+}
+.customization-preview[data-button-style='soft'] .win-btn--primary:active {
+  background: var(--cerami-primary-pressed) !important;
+  color: var(--cerami-primary-pressed-text) !important;
+}
+
+:root[data-ui-font-scale='small'] { font-size: 90%; }
+:root[data-ui-font-scale='standard'] { font-size: 100%; }
+:root[data-ui-font-scale='large'] { font-size: 110%; }
+
+.win-app .customization-preview[data-corner-radius='compact'],
+.win-app .customization-preview[data-corner-radius='standard'],
+.win-app .customization-preview[data-corner-radius='rounded'] {
+  border-radius: var(--preview-radius) !important;
+}
+.win-app .customization-preview :is(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-radius: var(--preview-radius) !important;
+}
+.win-app .customization-preview .preview-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+.win-app .customization-preview[data-navigation-layout='sidebar'] .preview-shell {
+  grid-template-columns: minmax(110px, 0.22fr) minmax(0, 1fr);
+}
+.win-app .customization-preview .preview-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+  border: 1px solid var(--cerami-border);
+  border-radius: var(--preview-radius);
+  background: var(--cerami-surface);
+  color: var(--cerami-text);
+  padding: 0.375rem;
+}
+.win-app .customization-preview[data-navigation-layout='sidebar'] .preview-navigation {
+  flex-direction: column;
+  align-items: stretch;
+}
+.win-app .customization-preview .preview-navigation__item {
+  display: block;
+  border-radius: var(--preview-radius);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: start;
+  white-space: nowrap;
+}
+.win-app .customization-preview .preview-navigation__item--active {
+  background: var(--cerami-accent-soft);
+  color: var(--cerami-primary);
+  font-weight: 700;
+}
+.win-app .customization-preview[data-density='compact'] .preview-navigation__item {
+  padding-block: 0.25rem;
+}
+.win-app .customization-preview[data-density='compact'] .win-btn {
+  min-height: 30px;
+}
+.win-app .customization-preview[data-density='comfortable'] .win-btn {
+  min-height: 38px;
+}
+:root[data-ui-density='comfortable'] .win-app .app-main .customization-preview[data-density='compact'] .preview-table :is(th, td) {
+  padding-block: 5px !important;
+}
+:root[data-ui-density='compact'] .win-app .app-main .customization-preview[data-density='comfortable'] .preview-table :is(th, td) {
+  padding-block: 10px !important;
+}
+.win-app .customization-preview[data-font-scale='small'] .text-sm { font-size: 0.7875rem; }
+.win-app .customization-preview[data-font-scale='standard'] .text-sm { font-size: 0.875rem; }
+.win-app .customization-preview[data-font-scale='large'] .text-sm { font-size: 0.9625rem; }
+.win-app .customization-preview[data-font-scale='small'] .text-xs { font-size: 0.675rem; }
+.win-app .customization-preview[data-font-scale='standard'] .text-xs { font-size: 0.75rem; }
+.win-app .customization-preview[data-font-scale='large'] .text-xs { font-size: 0.825rem; }
+.win-app .customization-preview[data-button-style='outline'] .win-btn--primary {
+  border: 1px solid var(--cerami-primary) !important;
+  background: transparent !important;
+  color: var(--cerami-primary) !important;
+}
+.win-app .customization-preview[data-button-style='soft'] .win-btn--primary {
+  border: 1px solid var(--cerami-accent-border) !important;
+  background: var(--cerami-accent-soft) !important;
+  color: var(--cerami-primary) !important;
+}
+
+@media (max-width: 640px) {
+  .win-app .customization-preview[data-navigation-layout='sidebar'] .preview-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .win-app .customization-preview[data-navigation-layout='sidebar'] .preview-navigation {
+    flex-direction: row;
+  }
+}
+
+:root[data-interface-direction='ltr'] :is(.win-app, .win-auth) [dir='rtl']:not(.customization-preview) {
+  direction: ltr;
 }

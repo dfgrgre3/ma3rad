@@ -16,3 +16,4 @@ export type { HealthScore, HealthAlert, HealthMetrics, SystemHealthReport } from
 export { CentralLicenseService } from './CentralLicenseService';
 export { CentralTelemetryService } from './CentralTelemetryService';
 export type { ReleaseInfo } from './CentralTelemetryService';
+export { getLatestNewerRelease, isNewerVersion } from './CentralTelemetryService';

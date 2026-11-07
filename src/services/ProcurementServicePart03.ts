@@ -56,7 +56,7 @@ type GoodsReceiptProduct = {
 export abstract class ProcurementServicePart03 extends ProcurementServicePart02 {
   public createGoodsReceipt(dto: GoodsReceiptInput): { grn: GoodsReceiptRow; hasDiscrepancy: boolean; damagedTotal: number; shortageTotal: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.invoices.create');
     if (!dto.items || dto.items.length === 0) throw new Error('أدخل صنفاً واحداً على الأقل للاستلام.');
 
     const grnId = `grn_${uuidv4().substring(0, 8)}`;

@@ -57,4 +57,54 @@ test('startup skips unchanged database writes and transaction save failures stay
   manager.saveToStorage();
   await manager.flush();
   assert.notEqual(persistedSnapshot, existingSnapshot, 'a later successful save persists the committed data');
+
+  const sql = await (globalThis as any).initSqlJs();
+  const restoredDatabase = new sql.Database(persistedSnapshot);
+  try {
+    const restoredValue = restoredDatabase.exec(
+      `SELECT value FROM system_settings WHERE key='durability_failure_sentinel'`,
+    )[0]?.values[0]?.[0];
+    assert.equal(
+      restoredValue,
+      'committed',
+      'the successful snapshot can be reopened and contains the committed write',
+    );
+  } finally {
+    restoredDatabase.close();
+  }
+});
+
+test('database manager state survives module re-evaluation during HMR', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  DatabaseManager.setNumberFormatter(() => 'HMR-PERSISTED');
+  manager.run(
+    `INSERT OR REPLACE INTO system_settings (key, value) VALUES ('database_hmr_sentinel', 'preserved')`,
+  );
+
+  try {
+    const reloadedDatabaseModule = await import('../src/database/db.ts?hmr=database-manager-state');
+    const reloadedManager = reloadedDatabaseModule.DatabaseManager.getInstance();
+
+    assert.equal(reloadedManager, manager, 'module re-evaluation must reuse the live database manager');
+    assert.equal(
+      reloadedManager.query<{ ready: number }>('SELECT 1 AS ready')[0]?.ready,
+      1,
+      'database access remains available after module re-evaluation',
+    );
+    assert.equal(
+      reloadedManager.query<{ value: string }>(
+        `SELECT value FROM system_settings WHERE key='database_hmr_sentinel'`,
+      )[0]?.value,
+      'preserved',
+      'database rows remain readable after module re-evaluation',
+    );
+    assert.equal(
+      reloadedManager.executeTransaction((transaction) => transaction.nextNumber('HMR')),
+      'HMR-PERSISTED',
+      'static manager configuration also survives module re-evaluation',
+    );
+  } finally {
+    DatabaseManager.setNumberFormatter(null);
+  }
 });

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { User } from '../types';
 import { NavigationService } from '../services/NavigationService';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/useTheme';
 
 interface HeaderNavProps {
   currentUser: User | null;
+  onOpenQuickCommand: () => void;
 }
 
 interface PanelAnchor {
@@ -20,7 +22,7 @@ interface PanelAnchor {
  * Groups open as compact drop-down panels; permissions and ordering come from
  * the same NavigationService used by the side navigation.
  */
-export const HeaderNav: React.FC<HeaderNavProps> = ({ currentUser }) => {
+export const HeaderNav: React.FC<HeaderNavProps> = ({ currentUser, onOpenQuickCommand }) => {
   const location = useLocation();
   const { settings } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -56,17 +58,20 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ currentUser }) => {
       if (event.key === 'Escape') setOpenId(null);
     };
     const close = () => setOpenId(null);
+    const closeOnScroll = (event: Event) => {
+      if (!panelRef.current?.contains(event.target as Node)) close();
+    };
 
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
     window.addEventListener('resize', close);
-    nav?.addEventListener('scroll', close, { passive: true });
+    window.addEventListener('scroll', closeOnScroll, { capture: true, passive: true });
 
     return () => {
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('resize', close);
-      nav?.removeEventListener('scroll', close);
+      window.removeEventListener('scroll', closeOnScroll, true);
     };
   }, [openId]);
 
@@ -126,41 +131,59 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ currentUser }) => {
         );
       })}
 
+      <button
+        type="button"
+        onClick={onOpenQuickCommand}
+        className="win-topnav-item shrink-0"
+        title="الأوامر السريعة (Ctrl+K)"
+        aria-label="فتح الأوامر السريعة"
+        aria-haspopup="dialog"
+        aria-keyshortcuts="Control+K Meta+K"
+      >
+        <span className="truncate">الأوامر</span>
+        <kbd aria-hidden="true" className="mr-1 rounded-[2px] border border-[#d9d9d9] px-1 text-[10px] text-[#767676] dark:border-[#565656] dark:text-[#a6a6a6]">
+          Ctrl K
+        </kbd>
+      </button>
+
       {openGroup && anchor && (
-        <div
-          ref={panelRef}
-          id={`win-topnav-panel-${openGroup.id}`}
-          role="menu"
-          aria-label={openGroup.label}
-          dir="rtl"
-          className="win-nav-panel"
-          style={{ top: anchor.top, right: anchor.right, width: anchor.width, maxHeight: anchor.maxHeight }}
-        >
-          <div className="win-nav-panel-head">
-            <span className="truncate">{openGroup.label}</span>
-          </div>
-          <div className="win-nav-panel-list">
-            {openGroup.items.map((item) => {
-              return (
-                <NavLink
-                  key={item.to + item.label}
-                  to={item.to}
-                  role="menuitem"
-                  title={item.label}
-                  onClick={() => setOpenId(null)}
-                  className={({ isActive }) => `win-nav-item ${isActive ? 'win-nav-item--active' : ''}`}
-                >
-                  <span className="truncate">{item.label}</span>
-                  {item.badge && item.badge > 0 && (
-                    <span className="mr-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
-                      {item.badge > 99 ? '99+' : item.badge}
-                    </span>
-                  )}
-                </NavLink>
-              );
-            })}
-          </div>
-        </div>
+        createPortal(
+          <div
+            ref={panelRef}
+            id={`win-topnav-panel-${openGroup.id}`}
+            role="menu"
+            aria-label={openGroup.label}
+            dir="rtl"
+            className="win-nav-panel"
+            style={{ top: anchor.top, right: anchor.right, width: anchor.width, maxHeight: anchor.maxHeight }}
+          >
+            <div className="win-nav-panel-head">
+              <span className="truncate">{openGroup.label}</span>
+            </div>
+            <div className="win-nav-panel-list">
+              {openGroup.items.map((item) => {
+                return (
+                  <NavLink
+                    key={item.to + item.label}
+                    to={item.to}
+                    role="menuitem"
+                    title={item.label}
+                    onClick={() => setOpenId(null)}
+                    className={({ isActive }) => `win-nav-item ${isActive ? 'win-nav-item--active' : ''}`}
+                  >
+                    <span className="truncate">{item.label}</span>
+                    {item.badge && item.badge > 0 && (
+                      <span className="mr-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )
       )}
     </nav>
   );

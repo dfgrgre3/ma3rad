@@ -10,7 +10,7 @@ export class ElectronicInvoiceService {
   private db = DatabaseManager.getInstance();
 
   public getAllElectronicInvoices(status?: ElectronicInvoiceStatus): ElectronicInvoice[] {
-    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.e_invoicing.invoices.view');
     let sql = `
       SELECT ei.*, c.name as customerName, u.full_name as createdByName
       FROM electronic_invoices ei
@@ -27,7 +27,7 @@ export class ElectronicInvoiceService {
   }
 
   public getElectronicInvoiceById(id: string): ElectronicInvoice | null {
-    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.e_invoicing.invoices.view');
     return this.queryElectronicInvoiceById(id);
   }
 
@@ -43,7 +43,7 @@ export class ElectronicInvoiceService {
   }
 
   public getElectronicInvoiceBySalesInvoice(salesInvoiceId: string): ElectronicInvoice | null {
-    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.e_invoicing.invoices.view');
     return this.queryElectronicInvoiceBySalesInvoice(salesInvoiceId);
   }
 
@@ -56,7 +56,7 @@ export class ElectronicInvoiceService {
 
   public createElectronicInvoice(dto: CreateElectronicInvoiceDTO): ElectronicInvoice {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'electronic_invoices.create');
+    PermissionService.require(actor, 'ui.e_invoicing.invoices.create');
 
     const salesInvoice = this.db.query<any>(
       'SELECT * FROM sales_invoices WHERE id = ?',
@@ -89,19 +89,19 @@ export class ElectronicInvoiceService {
 
   public submitElectronicInvoice(id: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'electronic_invoices.submit');
+    PermissionService.require(actor, 'ui.e_invoicing.invoices.submit');
     throw new Error('لم يتم إعداد موفر فوترة إلكترونية معتمد؛ لا يمكن تسجيل الفاتورة كمرسلة ضريبيًا.');
   }
 
   public acceptElectronicInvoice(id: string, taxAuthorityReference: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'electronic_invoices.accept');
+    PermissionService.require(actor, 'ui.e_invoicing.invoices.accept');
     throw new Error('لا يمكن تسجيل قبول ضريبي دون رد موثق من موفر التكامل المعتمد.');
   }
 
   public rejectElectronicInvoice(id: string, reason: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'electronic_invoices.reject');
+    PermissionService.require(actor, 'ui.e_invoicing.invoices.reject');
 
     const invoice = this.queryElectronicInvoiceById(id);
     if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة.');
@@ -118,7 +118,7 @@ export class ElectronicInvoiceService {
 
   public cancelElectronicInvoice(id: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'electronic_invoices.cancel');
+    PermissionService.require(actor, 'ui.e_invoicing.invoices.cancel');
 
     const invoice = this.queryElectronicInvoiceById(id);
     if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة.');
@@ -141,7 +141,7 @@ export class ElectronicInvoiceService {
     rejected: number;
     cancelled: number;
   } {
-    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.e_invoicing.invoices.view');
     const rows = this.db.query<any>(`
       SELECT status, COUNT(*) as cnt FROM electronic_invoices GROUP BY status
     `);

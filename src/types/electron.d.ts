@@ -179,6 +179,10 @@ declare global {
       diagnostics?: {
         reportError?: (report: { kind: string; message: string; stack?: string }) => Promise<{ ok: boolean }>;
       };
+      security?: {
+        encryptDatabaseSecret?: (secret: string) => Promise<string>;
+        decryptDatabaseSecret?: (payload: string) => Promise<string>;
+      };
       updater?: {
         getStatus?: () => Promise<AppUpdateStatus>;
         check?: () => Promise<AppUpdateStatus>;

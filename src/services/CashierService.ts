@@ -96,7 +96,7 @@ export class CashierService {
 
   public saveShiftAutoCloseSchedule(enabled: boolean, closeTime: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'cashier.manage');
+    PermissionService.require(actor, 'ui.cashier.cashier.manage');
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(closeTime)) {
       throw new Error('أدخل وقت إغلاق صحيحًا بصيغة الساعة والدقيقة.');
     }
@@ -149,10 +149,10 @@ export class CashierService {
 
   public openShift(registerId: string, userId: string, openingBalance: number): CashShift {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'cashier.shift.open');
+    PermissionService.require(actor, 'ui.cashier.cashier.open_shift');
     const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
     if (actor.id !== userId && actor.role !== 'ADMIN') {
-      PermissionService.require(actor, 'cashier.manage');
+      PermissionService.require(actor, 'ui.cashier.cashier.manage');
     }
     const target = this.db.query<{ branchScope: string }>(
       'SELECT branch_scope AS branchScope FROM users WHERE id = ? AND is_active = 1',
@@ -197,7 +197,7 @@ export class CashierService {
 
   public closeShift(shiftId: string, actualEndingCash: number, closingNotes = '', performedBy = 'usr_admin'): CashShift {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'cashier.shift.close');
+    PermissionService.require(actor, 'ui.cashier.cashier.close_shift');
     if (!Number.isFinite(actualEndingCash) || actualEndingCash < 0) {
       throw new Error('المبلغ الفعلي يجب أن يكون رقمًا صحيحًا غير سالب.');
     }
@@ -208,7 +208,7 @@ export class CashierService {
     if (!shift) throw new Error('الوردية غير موجودة أو مغلقة مسبقاً.');
     this.branchAccess.requireShiftAccess(shiftId, actor, shift.registerId);
     if (actor.id !== shift.userId && actor.role !== 'ADMIN') {
-      PermissionService.require(actor, 'cashier.manage');
+      PermissionService.require(actor, 'ui.cashier.cashier.manage');
     }
     return this.closeShiftInternal(shiftId, actualEndingCash, closingNotes, actor.id, false);
   }
@@ -317,7 +317,7 @@ export class CashierService {
     performedBy = 'usr_admin'
   ): Expense {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'cashier.expense');
+    PermissionService.require(actor, 'ui.cashier.expenses.expense');
     if (amount <= 0) throw new Error('مبلغ المصروف يجب أن يكون أكبر من الصفر.');
     const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
     if (shiftId) {

@@ -8,7 +8,9 @@ import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import { formatProductQuantity } from '../../utils/productUnits';
 import type { PaymentType } from '../../types';
-import { fmt, input, label, LoadErrorNotice, ModalShell, useRegisters } from './DailyModalShared';
+import { LoadErrorNotice, ModalShell } from './DailyModalShared';
+import { useRegisters } from '../../hooks/daily/useRegisters';
+import { fmt, input, label } from './DailyModalUtils';
 import { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
 
 export type PaymentTarget =

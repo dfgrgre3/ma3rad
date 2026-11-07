@@ -18,9 +18,9 @@ const fmt = (value: number) => new Intl.NumberFormat('ar-EG', {
 export function SalesFinancialReconciliation({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
   const service = useMemo(() => new SalesFinancialReconciliationService(), []);
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'finance.view');
+  const canView = PermissionService.can(user, 'ui.finance.overview.view');
   const [centralClosureAccess, setCentralClosureAccess] = useState(false);
-  const canClose = PermissionService.can(user, 'finance.close') && centralClosureAccess;
+  const canClose = PermissionService.can(user, 'ui.finance.bank_reconciliation.close') && centralClosureAccess;
   const [checks, setChecks] = useState<SalesFinancialCheck[]>([]);
   const [closure, setClosure] = useState<SalesFinancialClosure | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});

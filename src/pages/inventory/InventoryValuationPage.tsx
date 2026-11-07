@@ -28,7 +28,7 @@ export const InventoryValuationPage: React.FC = () => {
   const totalCost = data.reduce((s, w) => s + w.costValue, 0);
   const totalRetail = data.reduce((s, w) => s + w.retailValue, 0);
   const potentialProfit = totalRetail - totalCost;
-  const canExport = PermissionService.can(AuthService.getCurrentUser(), 'inventory.export');
+  const canExport = PermissionService.can(AuthService.getCurrentUser(), 'ui.inventory.valuation.export');
   const exportReport = () => exportToExcel({
     title: 'Inventory valuation by warehouse',
     columns: [

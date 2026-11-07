@@ -52,10 +52,10 @@ export const FiscalClosingPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);
   const toast = useToast();
   const actor = AuthService.getCurrentUser();
-  const canViewFinance = PermissionService.can(actor, 'finance.view');
-  const canManage = PermissionService.can(actor, 'finance.approve');
-  const canClose = PermissionService.can(actor, 'finance.close');
-  const canReopen = PermissionService.can(actor, 'finance.reopen');
+  const canViewFinance = PermissionService.can(actor, 'ui.finance.fiscal_closing.view');
+  const canManage = PermissionService.can(actor, 'ui.finance.fiscal_closing.approve');
+  const canClose = PermissionService.can(actor, 'ui.finance.fiscal_closing.close');
+  const canReopen = PermissionService.can(actor, 'ui.finance.fiscal_closing.reopen');
 
   const [years, setYears] = useState<FiscalYear[]>([]);
   const [selectedYearId, setSelectedYearId] = useState('');

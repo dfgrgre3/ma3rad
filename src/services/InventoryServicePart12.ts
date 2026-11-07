@@ -117,7 +117,7 @@ public updateProductPlanningParameters(productId: string, input: {
   }): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
     this.db.run(`
       UPDATE products

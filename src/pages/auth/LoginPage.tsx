@@ -17,7 +17,7 @@ interface LoginPageProps {
   onSuccess: (user: User) => void;
 }
 
-type FieldErrors = { username?: string; password?: string };
+type FieldErrors = { username?: string; password?: string; pinCode?: string };
 
 const EMPTY_GUARD: LoginGuardStatus = {
   maxAttempts: 0,
@@ -38,10 +38,13 @@ function formatCountdown(ms: number): string {
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const pinRef = useRef<HTMLInputElement>(null);
   const twoFactorRef = useRef<HTMLInputElement>(null);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [pinCode, setPinCode] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'pin'>('password');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [rememberOnDevice, setRememberOnDevice] = useState(false);
@@ -98,10 +101,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   useEffect(() => {
     if (guard.isLocked && lockedRemainingMs === 0) {
       // The window elapsed — re-read the guard so the form unlocks.
-      setGuard(AuthService.getLoginGuardStatus(username.trim()));
+      setGuard(AuthService.getLoginGuardStatus(loginMethod === 'pin' ? '__PIN_LOGIN__' : username.trim()));
       setError(null);
     }
-  }, [guard.isLocked, lockedRemainingMs, username]);
+  }, [guard.isLocked, lockedRemainingMs, username, loginMethod]);
 
   // Changing the credentials invalidates any pending second-factor challenge.
   useEffect(() => {
@@ -120,10 +123,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
   const validate = useCallback((): boolean => {
     const next: FieldErrors = {};
-    if (!username.trim()) next.username = 'أدخل اسم المستخدم.';
-    if (!password) next.password = 'أدخل كلمة المرور.';
+    if (loginMethod === 'pin') {
+      if (!pinCode.trim()) next.pinCode = 'أدخل رمز الدخول.';
+    } else {
+      if (!username.trim()) next.username = 'أدخل اسم المستخدم.';
+      if (!password) next.password = 'أدخل كلمة المرور.';
+    }
     setFieldErrors(next);
 
+    if (next.pinCode) {
+      pinRef.current?.focus();
+      return false;
+    }
     if (next.username) {
       usernameRef.current?.focus();
       return false;
@@ -133,7 +144,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       return false;
     }
     return true;
-  }, [username, password]);
+  }, [loginMethod, username, password, pinCode]);
 
   const updateCapsLock = (event: React.KeyboardEvent<HTMLInputElement>) => {
     try {
@@ -161,23 +172,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     const normalizedUsername = username.trim();
 
     try {
-      const user = await AuthService.loginAsync(
-        normalizedUsername,
-        password,
-        twoFactorRequired ? twoFactorCode : undefined
-      );
+      const user = loginMethod === 'pin'
+        ? AuthService.loginByPin(pinCode.trim())
+        : await AuthService.loginAsync(
+          normalizedUsername,
+          password,
+          twoFactorRequired ? twoFactorCode : undefined
+        );
       setTwoFactorRequired(false);
       setTwoFactorCode('');
       onSuccess(user);
 
       const credentialStore = window.ceramisys?.credentials;
 
-      if (rememberOnDevice && credentialStore?.set) {
+      if (loginMethod === 'password' && rememberOnDevice && credentialStore?.set) {
         void credentialStore.set(normalizedUsername, password).catch((saveError) => {
           console.error('Could not save remembered login credentials:', saveError);
           window.alert('تم تسجيل الدخول، لكن تعذر حفظ بيانات الدخول على هذا الجهاز.');
         });
-      } else if (!rememberOnDevice && credentialStore?.clear) {
+      } else if (loginMethod === 'password' && !rememberOnDevice && credentialStore?.clear) {
         void credentialStore.clear().catch((clearError) => {
           console.error('Could not clear remembered login credentials:', clearError);
           window.alert('تم تسجيل الدخول، لكن تعذر حذف بيانات الدخول المحفوظة سابقًا.');
@@ -196,13 +209,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       setError(message);
 
       // Refresh the lockout state so the UI can show remaining attempts or a countdown.
-      const nextGuard = AuthService.getLoginGuardStatus(normalizedUsername);
+      const nextGuard = AuthService.getLoginGuardStatus(loginMethod === 'pin' ? '__PIN_LOGIN__' : normalizedUsername);
       setGuard(nextGuard);
       setNow(Date.now());
-      if (nextGuard.isLocked) setPassword('');
+      if (nextGuard.isLocked) {
+        setPassword('');
+        setPinCode('');
+      }
 
-      passwordRef.current?.focus();
-      passwordRef.current?.select();
+      if (loginMethod === 'pin') {
+        pinRef.current?.focus();
+        pinRef.current?.select();
+      } else {
+        passwordRef.current?.focus();
+        passwordRef.current?.select();
+      }
     } finally {
       setLoading(false);
     }
@@ -224,7 +245,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
   return (
     <div
-      className="win-auth flex min-h-screen w-screen bg-[#f3f3f3] text-[#1b1b1b] dark:bg-[#1f1f1f] dark:text-[#f0f0f0]"
+      className="win-auth flex min-h-screen w-screen"
       dir="rtl"
     >
       <LoginBrandPanel />
@@ -233,27 +254,57 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-[380px]">
           <div className="mb-6 flex flex-col items-center lg:hidden">
-            <div className="mb-2 flex h-12 w-12 items-center justify-center border border-[#005a9e] bg-[#0078d4] text-xl font-bold text-white">
+            <div className="win-auth-brand-mark mb-2 flex h-12 w-12 items-center justify-center text-xl font-bold text-white">
               س
             </div>
             <h1 className="text-[15px] font-semibold">سيراميسيس</h1>
-            <p className="text-[11px] text-[#767676] dark:text-[#a6a6a6]">نظام إدارة معارض السيراميك</p>
+            <p className="mt-0.5 text-xs text-[var(--win-text-muted)]">نظام إدارة معارض السيراميك</p>
           </div>
 
-          <div className="border border-[#d9d9d9] bg-white dark:border-[#3d3d3d] dark:bg-[#2b2b2b]">
-            <div className="border-b border-[#e5e5e5] px-6 py-5 dark:border-[#3d3d3d]">
-              <h2 className="text-[18px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">تسجيل الدخول</h2>
-              <p className="mt-1 text-[11.5px] text-[#767676] dark:text-[#a6a6a6]">
-                أدخل بيانات حسابك للوصول إلى النظام
+          <div className="win-auth-card">
+            <div className="win-auth-card-head">
+              <h2 className="text-[18px] font-semibold text-[var(--win-text)]">تسجيل الدخول</h2>
+              <p className="mt-1 text-xs text-[var(--win-text-muted)]">
+                أدخل بيانات حسابك أو رمز الدخول للوصول إلى النظام
               </p>
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4 px-6 py-5" aria-busy={loading}>
+              {!twoFactorRequired && (
+                <div className="grid grid-cols-2 gap-1 rounded-[2px] border border-[#d9d9d9] bg-[#f5f5f5] p-1 dark:border-[#4a4a4a] dark:bg-[#252525]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginMethod('password');
+                      setGuard(AuthService.getLoginGuardStatus(username.trim()));
+                      setError(null);
+                      setFieldErrors({});
+                    }}
+                    aria-pressed={loginMethod === 'password'}
+                    className={`rounded-[2px] px-2 py-1.5 text-xs font-semibold ${loginMethod === 'password' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                  >
+                    اسم المستخدم وكلمة المرور
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginMethod('pin');
+                      setGuard(AuthService.getLoginGuardStatus('__PIN_LOGIN__'));
+                      setError(null);
+                      setFieldErrors({});
+                    }}
+                    aria-pressed={loginMethod === 'pin'}
+                    className={`rounded-[2px] px-2 py-1.5 text-xs font-semibold ${loginMethod === 'pin' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                  >
+                    رمز الدخول
+                  </button>
+                </div>
+              )}
               {error && (
                 <div
                   role="alert"
                   aria-live="assertive"
-                  className="flex items-start gap-2 border border-[#e5b8b3] border-r-[3px] border-r-[#c42b1c] bg-[#fdf3f2] px-3 py-2 text-[11.5px] font-semibold text-[#a4262c] dark:border-[#5a2a2a] dark:bg-[#3a2626] dark:text-[#f1707b]"
+                  className="flex items-start gap-2 border border-[#e4c6c2] border-r-[3px] border-r-[#a8413e] bg-[#f6e9e7] px-3 py-2 text-xs font-semibold text-[#8f3937] dark:border-[#65413e] dark:bg-[#412c2a] dark:text-[#e3a09b]"
                 >
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>{error}</span>
@@ -264,7 +315,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 <div
                   role="status"
                   aria-live="polite"
-                  className="flex items-start gap-2 border border-[#f0d58c] border-r-[3px] border-r-[#9d5d00] bg-[#fff8e6] px-3 py-2 text-[11.5px] text-[#7a4a00] dark:border-[#5c4620] dark:bg-[#3a3221] dark:text-[#f0c674]"
+                  className="flex items-start gap-2 border border-[var(--win-warning-border)] border-r-[3px] border-r-[var(--win-warning)] bg-[var(--win-warning-soft)] px-3 py-2 text-xs text-[var(--win-warning-text)] dark:text-[#ddc184]"
                 >
                   <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>
@@ -278,59 +329,98 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               )}
 
               {showAttemptsHint && (
-                <p className="text-[11px] text-[#9d5d00] dark:text-[#f0c674]">
+                <p className="text-xs text-[#855e27] dark:text-[#ddc184]">
                   المحاولات المتبقية قبل الإيقاف المؤقت: <strong>{guard.remainingAttempts}</strong>
                 </p>
               )}
 
-              <div>
-                <label
-                  htmlFor="username"
-                  className="mb-1 block text-[11.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]"
-                >
-                  اسم المستخدم
-                </label>
-                <div className="relative">
-                  <UserIcon
-                    className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#767676]"
-                    aria-hidden="true"
-                  />
+              {loginMethod === 'password' && (
+                <div>
+                  <label
+                    htmlFor="username"
+                    className="mb-1 block text-[11.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]"
+                  >
+                    اسم المستخدم
+                  </label>
+                  <div className="relative">
+                    <UserIcon
+                      className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--win-text-muted)]"
+                      aria-hidden="true"
+                    />
+                    <input
+                      ref={usernameRef}
+                      id="username"
+                      type="text"
+                      dir="ltr"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      disabled={loading || twoFactorRequired}
+                      value={username}
+                      onChange={(e) => {
+                        setUsername(e.target.value);
+                        clearFieldError('username');
+                      }}
+                      placeholder="admin"
+                      aria-invalid={Boolean(fieldErrors.username)}
+                      aria-describedby={fieldErrors.username ? 'username-error' : undefined}
+                      className={`win-input w-full pl-2 pr-8 text-[12.5px] text-left disabled:opacity-60 ${
+                        fieldErrors.username ? 'border-[#a8413e] dark:border-[#e3a09b]' : ''
+                      }`}
+                    />
+                  </div>
+                  {fieldErrors.username && (
+                    <p id="username-error" role="alert" className="mt-1 text-xs text-[#a8413e] dark:text-[#e3a09b]">
+                      {fieldErrors.username}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {loginMethod === 'pin' && !twoFactorRequired && (
+                <div>
+                  <label htmlFor="login-pin" className="mb-1 block text-[11.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">
+                    رمز الدخول الشخصي
+                  </label>
                   <input
-                    ref={usernameRef}
-                    id="username"
-                    type="text"
+                    ref={pinRef}
+                    id="login-pin"
+                    type="password"
                     dir="ltr"
-                    autoComplete="username"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    disabled={loading || twoFactorRequired}
-                    value={username}
-                    onChange={(e) => {
-                      setUsername(e.target.value);
-                      clearFieldError('username');
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={8}
+                    disabled={loading}
+                    value={pinCode}
+                    onChange={(event) => {
+                      setPinCode(event.target.value.replace(/\D/g, ''));
+                      clearFieldError('pinCode');
                     }}
-                    placeholder="admin"
-                    aria-invalid={Boolean(fieldErrors.username)}
-                    aria-describedby={fieldErrors.username ? 'username-error' : undefined}
-                    className={`win-input w-full pl-2 pr-8 text-[12.5px] text-left disabled:opacity-60 ${
-                      fieldErrors.username ? 'border-[#c42b1c] dark:border-[#f1707b]' : ''
+                    placeholder={`${'•'.repeat(AuthService.getLoginPinLength())}`}
+                    aria-invalid={Boolean(fieldErrors.pinCode)}
+                    aria-describedby={fieldErrors.pinCode ? 'login-pin-error' : undefined}
+                    className={`win-input w-full text-center font-mono text-[16px] tracking-[0.3em] disabled:opacity-60 ${
+                      fieldErrors.pinCode ? 'border-[#a8413e] dark:border-[#e3a09b]' : ''
                     }`}
                   />
-                </div>
-                {fieldErrors.username && (
-                  <p id="username-error" role="alert" className="mt-1 text-[11px] text-[#c42b1c] dark:text-[#f1707b]">
-                    {fieldErrors.username}
+                  {fieldErrors.pinCode && (
+                    <p id="login-pin-error" role="alert" className="mt-1 text-xs text-[#a8413e] dark:text-[#e3a09b]">
+                      {fieldErrors.pinCode}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[10px] text-[var(--win-text-muted)]">
+                    أدخل رمز الدخول الذي عيّنه المدير أو وافق عليه.
                   </p>
-                )}
-              </div>
+                </div>
+              )}
 
               {twoFactorRequired && (
                 <div>
                   <div
                     role="status"
                     aria-live="polite"
-                    className="mb-3 flex items-start gap-2 border border-[#b6d7f0] border-r-[3px] border-r-[#0078d4] bg-[#eff6fc] px-3 py-2 text-[11.5px] text-[#005a9e] dark:border-[#2a4a63] dark:bg-[#22313d] dark:text-[#9fc9ea]"
+                    className="mb-3 flex items-start gap-2 border border-[var(--win-accent-border)] border-r-[3px] border-r-[var(--win-accent)] bg-[var(--win-accent-soft)] px-3 py-2 text-xs text-[var(--win-accent-pressed)] dark:border-[#285552] dark:text-[#88c9bd]"
                   >
                     <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>أدخل رمز التحقق المكوّن من 6 أرقام من تطبيق المصادقة، أو رمز استرداد.</span>
@@ -367,14 +457,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                       passwordRef.current?.focus();
                     }}
                     disabled={loading}
-                    className="mt-2 text-[11px] font-semibold text-[#005a9e] underline-offset-2 hover:underline disabled:opacity-50 dark:text-[#6cb8e8]"
+                    className="mt-2 text-xs font-semibold text-[var(--win-accent)] underline-offset-2 hover:underline disabled:opacity-50"
                   >
                     العودة إلى بيانات الدخول
                   </button>
                 </div>
               )}
 
-              {!twoFactorRequired && (
+              {!twoFactorRequired && loginMethod === 'password' && (
               <div>
                 <label
                   htmlFor="password"
@@ -384,7 +474,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 </label>
                 <div className="relative">
                   <Lock
-                    className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#767676]"
+                    className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--win-text-muted)]"
                     aria-hidden="true"
                   />
                   <input
@@ -405,15 +495,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                     placeholder="••••••••"
                     aria-invalid={Boolean(fieldErrors.password)}
                     aria-describedby={fieldErrors.password ? 'password-error' : undefined}
-                    className={`win-input w-full pl-8 pr-8 text-[12.5px] text-left disabled:opacity-60 ${
-                      fieldErrors.password ? 'border-[#c42b1c] dark:border-[#f1707b]' : ''
+                    className={`win-input w-full pl-10 pr-8 text-[12.5px] text-left disabled:opacity-60 ${
+                      fieldErrors.password ? 'border-[#a8413e] dark:border-[#e3a09b]' : ''
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     disabled={loading}
-                    className="absolute left-1.5 top-1/2 -translate-y-1/2 rounded-[2px] p-1 text-[#767676] hover:bg-[#f0f0f0] hover:text-[#1b1b1b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0078d4] disabled:opacity-50 dark:hover:bg-[#3a3a3a] dark:hover:text-[#f0f0f0]"
+                    className="absolute left-1.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[2px] bg-transparent p-1 text-[var(--win-text-muted)] transition-colors hover:bg-[var(--win-surface-sunken)] hover:text-[var(--win-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--win-accent)] disabled:opacity-50"
                     aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                     aria-pressed={showPassword}
                   >
@@ -421,12 +511,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   </button>
                 </div>
                 {fieldErrors.password && (
-                  <p id="password-error" role="alert" className="mt-1 text-[11px] text-[#c42b1c] dark:text-[#f1707b]">
+                  <p id="password-error" role="alert" className="mt-1 text-xs text-[#a8413e] dark:text-[#e3a09b]">
                     {fieldErrors.password}
                   </p>
                 )}
                 {capsLockOn && !fieldErrors.password && (
-                  <p role="status" className="mt-1 flex items-center gap-1 text-[11px] text-[#9d5d00] dark:text-[#f0c674]">
+                  <p role="status" className="mt-1 flex items-center gap-1 text-xs text-[#855e27] dark:text-[#ddc184]">
                     <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
                     مفتاح Caps Lock مُفعّل
                   </p>
@@ -434,18 +524,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               </div>
               )}
 
-              {!twoFactorRequired && (
-              <label className="flex items-start gap-2 text-[11.5px] font-medium text-[#4d4d4d] dark:text-[#c8c8c8]">
+              {!twoFactorRequired && loginMethod === 'password' && (
+              <label className="flex items-start gap-2 text-xs font-medium text-[var(--win-text-secondary)]">
                 <input
                   type="checkbox"
                   checked={rememberOnDevice}
                   disabled={loading}
                   onChange={(event) => handleRememberChange(event.target.checked)}
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#0078d4]"
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[var(--win-accent)]"
                 />
                 <span>
                   تذكرني على هذا الجهاز
-                  <span className="mt-0.5 block text-[10.5px] font-normal text-[#767676] dark:text-[#a6a6a6]">
+                  <span className="mt-1 block text-xs font-normal text-[var(--win-text-muted)]">
                     تُحفظ بيانات الدخول مشفّرة على هذا الجهاز فقط.
                   </span>
                 </span>
@@ -462,19 +552,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                 {loading ? 'جارٍ تسجيل الدخول...' : twoFactorRequired ? 'تحقق ودخول' : 'دخول النظام'}
               </button>
 
-              <p className="text-center text-[10px] text-[#767676] dark:text-[#a6a6a6]">
-                اضغط <kbd className="border border-[#d9d9d9] bg-[#fafafa] px-1 font-mono text-[10px] dark:border-[#565656] dark:bg-[#323232]">إدخال</kbd> للدخول
+              <p className="text-center text-xs text-[var(--win-text-muted)]">
+                اضغط <kbd className="win-auth-kbd">إدخال</kbd> للدخول
               </p>
             </form>
 
-            <div className="border-t border-[#e5e5e5] bg-[#fafafa] px-6 py-3 dark:border-[#3d3d3d] dark:bg-[#272727]">
-              <p className="text-[10.5px] leading-relaxed text-[#767676] dark:text-[#a6a6a6]">
+            <div className="win-auth-card-foot">
+              <p className="text-xs leading-relaxed text-[var(--win-text-secondary)]">
                 لأول مرة: استخدم حساب المدير الذي أنشأه مسؤول النظام، ثم غيّر كلمة المرور فورًا من صفحة المستخدمين.
               </p>
             </div>
           </div>
 
-          <p className="mt-4 text-center text-[10px] text-[#999] dark:text-[#8a8a8a]">
+          <p className="mt-4 text-center text-xs text-[var(--win-text-muted)]">
             لن تُعرض بيانات الدخول على الشاشة حفاظًا على أمان النظام.
           </p>
         </div>

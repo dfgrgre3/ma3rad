@@ -375,6 +375,32 @@ function registerDatabaseHandlers({
     }
   });
 
+  ipcMain.handle('security:encrypt-db-secret', async (event, secret) => {
+    validateIpcSender(event);
+    if (typeof secret !== 'string' || secret.length < 1 || secret.length > 256) {
+      throw new TypeError('Database secret must be a string between 1 and 256 characters.');
+    }
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', await getKey(), iv);
+    const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
+    return `v1:${iv.toString('hex')}:${cipher.getAuthTag().toString('hex')}:${ciphertext.toString('hex')}`;
+  });
+
+  ipcMain.handle('security:decrypt-db-secret', async (event, payload) => {
+    validateIpcSender(event);
+    if (typeof payload !== 'string' || payload.length > 1024) {
+      throw new TypeError('Encrypted database secret is invalid.');
+    }
+    const match = /^v1:([a-f0-9]{24}):([a-f0-9]{32}):([a-f0-9]{2,512})$/i.exec(payload);
+    if (!match) throw new Error('Encrypted database secret is invalid.');
+    const decipher = createDecipheriv('aes-256-gcm', await getKey(), Buffer.from(match[1], 'hex'));
+    decipher.setAuthTag(Buffer.from(match[2], 'hex'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(match[3], 'hex')),
+      decipher.final(),
+    ]).toString('utf8');
+  });
+
   ipcMain.handle('db:decrypt-local-backup', async (event, bytes) => {
     validateIpcSender(event);
     const encrypted = Buffer.from(bytes || []);

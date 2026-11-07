@@ -34,7 +34,7 @@ private claimJoins(): string {
 
 public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaimRow[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.view');
+    PermissionService.require(actor, 'ui.purchases.invoices.view');
     const scope = this.claimScope(actor);
     let sql = `
       SELECT c.*, s.name AS supplierName, u.full_name AS createdByName,
@@ -65,7 +65,7 @@ public getAllClaims(search = '', status = 'ALL', supplierId = ''): SupplierClaim
 
 public getClaimById(id: string): (SupplierClaimRow & { items: SupplierClaimItem[] }) | null {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.view');
+    PermissionService.require(actor, 'ui.purchases.invoices.view');
     const claim = this.readClaimById(id, actor);
     if (!claim) return null;
     const { branchId: _branchId, ...result } = claim;
@@ -103,7 +103,7 @@ public settleClaim(
     notes?: string
   ): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.approve');
+    PermissionService.require(actor, 'ui.purchases.invoices.approve');
     const claim = this.readClaimById(claimId, actor);
     if (!claim) throw new Error('المطالبة غير موجودة.');
     if (claim.status === 'SETTLED') throw new Error('تمت تسوية هذه المطالبة مسبقاً.');

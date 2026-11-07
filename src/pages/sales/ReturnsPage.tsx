@@ -20,6 +20,11 @@ import {
 } from '../../utils/uom';
 import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../../services/financials';
 import { HistoricalReturnReconciliationPanel } from './HistoricalReturnReconciliationPanel';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 const PAGE_SIZE = 15;
 
@@ -60,8 +65,9 @@ export const ReturnsPage: React.FC = () => {
   const service = useMemo(() => new SalesService(), []);
   const productService = useMemo(() => new ProductService(), []);
   const printService = useMemo(() => new PrintService(), []);
-  const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'returns.create');
-  const canApproveReturn = PermissionService.can(AuthService.getCurrentUser(), 'returns.approve');
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
+  const canRefund = PermissionService.can(AuthService.getCurrentUser(), 'ui.returns.returns.create');
+  const canApproveReturn = PermissionService.can(AuthService.getCurrentUser(), 'ui.returns.returns.approve');
   const [showHistoricalReconciliation, setShowHistoricalReconciliation] = useState(false);
 
   const [docPreview, setDocPreview] = useState<{
@@ -99,6 +105,10 @@ export const ReturnsPage: React.FC = () => {
   const [selectedNewProduct, setSelectedNewProduct] = useState<Product | null>(null);
 
   const [detail, setDetail] = useState<ReturnDetail | null>(null);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [valuesByReturn, setValuesByReturn] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   useEffect(() => {
     if (!exchangeMode || !newSearch.trim()) { setNewResults([]); return; }
@@ -109,7 +119,11 @@ export const ReturnsPage: React.FC = () => {
   const load = useCallback(() => {
     setLoading(true);
     try {
-      setReturns(service.getReturns(search, dateFrom || undefined, dateTo || undefined));
+      const currentReturns = service.getReturns(search, dateFrom || undefined, dateTo || undefined);
+      setOperationalFields(fieldService.getDefinitions('sales_returns'));
+      const fieldValues = fieldService.getRecordValuesForRecords('sales_returns', currentReturns.map((item) => item.id));
+      setValuesByReturn(fieldValues);
+      setReturns(currentReturns.filter((item) => matchesOperationalFieldFilters(item.id, fieldValues, fieldFilters)));
       setStats(service.getReturnsStats());
       setTopReasons(service.getTopReturnReasons(4));
       setError(null);
@@ -118,7 +132,7 @@ export const ReturnsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, search, service]);
+  }, [dateFrom, dateTo, search, service, fieldService, fieldFilters]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
@@ -150,6 +164,7 @@ export const ReturnsPage: React.FC = () => {
       setInvoiceId('');
       setInvoiceInfo(null);
       setLines([]);
+      setOperationalFieldValues({});
       setModalOpen(true);
       if (presetInvoiceId) {
         const exists = list.some((i) => i.id === presetInvoiceId);
@@ -232,8 +247,9 @@ export const ReturnsPage: React.FC = () => {
     if (exchangeMode && newItems.length === 0) return alert('في وضع الاستبدال، أضف صنفاً بديلاً واحداً على الأقل.');
     setSaving(true);
     try {
+      fieldService.validateRecordValues('sales_returns', operationalFieldValues, 'create');
       if (exchangeMode) {
-        service.exchangeSale(
+        const exchanged = service.exchangeSale(
           invoiceId,
           selected.map((l) => ({
             productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
@@ -246,8 +262,9 @@ export const ReturnsPage: React.FC = () => {
           AuthService.getCurrentUser()?.id || 'usr_admin',
           { warehouseId: invoiceInfo?.warehouseId }
         );
+        fieldService.setRecordValues('sales_returns', exchanged.return.id, operationalFieldValues, 'create');
       } else {
-        service.returnSale(
+        const returned = service.returnSale(
           invoiceId,
           selected.map((l) => ({
             productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
@@ -257,9 +274,11 @@ export const ReturnsPage: React.FC = () => {
           AuthService.getCurrentUser()?.id || 'usr_admin',
           { refundMethod, idempotencyKey: returnIdempotency.getKey() }
         );
+        fieldService.setRecordValues('sales_returns', returned.id, operationalFieldValues, 'create');
         returnIdempotency.resetKey();
       }
       setModalOpen(false);
+      setOperationalFieldValues({});
       setExchangeMode(false);
       setNewItems([]);
       load();
@@ -283,6 +302,7 @@ export const ReturnsPage: React.FC = () => {
         { key: 'refundedAmount', label: 'نقدي (شامل الضريبة)' },
         { key: 'remainingToBalance', label: 'على الرصيد (شامل الضريبة)' },
         { key: 'refundMethod', label: 'طريقة التعويض' },
+        ...operationalFields.map((field) => ({ key: field.name, label: field.name })),
       ],
       rows: returns.map((r) => ({
         returnNumber: r.returnNumber, invoiceNumber: r.invoiceNumber || r.originalInvoiceNumber,
@@ -291,6 +311,7 @@ export const ReturnsPage: React.FC = () => {
         grossAmount: r.returnTaxAmount == null ? null : Number(r.totalAmount) + Number(r.returnTaxAmount),
         refundedAmount: r.refundedAmount, remainingToBalance: r.remainingToBalance,
         refundMethod: REFUND_LABEL[r.refundMethod || 'CASH'] || 'نقدي',
+        ...(fieldService.getRecordValuesForExport('sales_returns', [r.id])[r.id] || {}),
       })),
       fileName: 'sales-returns',
       permission: 'returns.export',
@@ -363,6 +384,7 @@ export const ReturnsPage: React.FC = () => {
             <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم المرتجع أو العميل أو الفاتورة..." className="w-full pl-4 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-400" />
           </div>
+          <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -393,6 +415,7 @@ export const ReturnsPage: React.FC = () => {
                     <th className="px-4 py-3">الضريبة</th>
                     <th className="px-4 py-3">الإجمالي شامل الضريبة</th>
                     <th className="px-4 py-3">نقدي / رصيد</th>
+                    {operationalFields.map((field) => <th key={field.id} className="px-4 py-3">{field.name}</th>)}
                     <th className="px-4 py-3 text-left">إجراءات</th>
                   </tr>
                 </thead>
@@ -412,6 +435,10 @@ export const ReturnsPage: React.FC = () => {
                         <div>على الرصيد: {fmt(r.remainingToBalance)}</div>
                         <div className="text-[9px] font-bold text-sky-600 mt-0.5">{REFUND_LABEL[r.refundMethod || 'CASH'] || r.refundMethod || 'نقدي'}</div>
                       </td>
+                      {operationalFields.map((field) => {
+                        const raw = valuesByReturn[r.id]?.[field.id] || '';
+                        return <td key={field.id} className="px-4 py-3 text-slate-600">{field.values.find((option) => option.value === raw)?.label || raw || '—'}</td>;
+                      })}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
                           <Btn onClick={() => setDetail(service.getReturnById(r.id))} tone="slate"><Eye className="w-3.5 h-3.5" /> تفاصيل</Btn>
@@ -420,7 +447,7 @@ export const ReturnsPage: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-                  {returns.length === 0 && <tr><td colSpan={10} className="py-16 text-center text-slate-400">لا توجد مرتجعات مسجلة</td></tr>}
+                  {returns.length === 0 && <tr><td colSpan={10 + operationalFields.length} className="py-16 text-center text-slate-400">لا توجد مرتجعات مسجلة</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -453,6 +480,7 @@ export const ReturnsPage: React.FC = () => {
                 {invoices.map((i) => <option key={i.id} value={i.id}>{i.invoiceNumber} — {i.customerName} — {fmt(i.totalAmount)}</option>)}
               </select>
             </div>
+            <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={setOperationalFieldValues} title="بيانات إضافية للمرتجع" />
 
             {invoiceInfo && lines.length === 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 flex items-center gap-2"><PackageX className="w-4 h-4" /> لا توجد كميات متاحة للإرجاع من هذه الفاتورة (تم إرجاع كل الكميات سابقاً).</div>
@@ -618,6 +646,13 @@ export const ReturnsPage: React.FC = () => {
             <Info label="طريقة التعويض" value={REFUND_LABEL[detail.refundMethod || 'CASH'] || 'نقدي'} />
           </div>
           {detail.reason && <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-[11px] text-rose-800 mb-4"><b>سبب الإرجاع:</b> {detail.reason}</div>}
+          <div className="mb-4 space-y-2">
+            <OperationalFieldsSummary fields={operationalFields} values={fieldService.getRecordValues('sales_returns', detail.id)} />
+            <OperationalFieldsRecordEditor recordLabel={detail.returnNumber} fields={operationalFields} initialValues={fieldService.getRecordValues('sales_returns', detail.id)} canEdit={canRefund} onSave={(values) => {
+              fieldService.setRecordValues('sales_returns', detail.id, values, 'update');
+              setValuesByReturn((previous) => ({ ...previous, [detail.id]: values }));
+            }} />
+          </div>
           <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
             <table className="w-full text-right text-[11px] min-w-[520px]">
               <thead className="bg-slate-50 text-slate-500 font-bold"><tr><th className="px-3 py-2">الصنف</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الكراتين</th><th className="px-3 py-2">السعر</th><th className="px-3 py-2">الإجمالي</th></tr></thead>

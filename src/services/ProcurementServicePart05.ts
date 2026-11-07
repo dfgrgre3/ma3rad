@@ -111,7 +111,7 @@ public createClaim(dto: {
     items?: { productId: string; defectType?: string; quantityM2: number; unitCost: number; notes?: string }[];
   }): SupplierClaimRow {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.invoices.create');
     if (Number(dto.claimedAmount) <= 0) throw new Error('يجب تحديد مبلغ المطالبة بقيمة موجبة.');
     const branchId = this.branchAccess.getCurrentBranchId(actor);
     const sourceReferences: Array<{ kind: string; id: string | undefined; query: string }> = [

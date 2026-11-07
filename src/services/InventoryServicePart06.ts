@@ -21,7 +21,7 @@ public recordSpecialStock(input: {
   }): any {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
     if (input.quantityM2 <= 0) throw new Error('الكمية يجب أن تكون أكبر من صفر.');
 
@@ -94,7 +94,7 @@ public recordSpecialStock(input: {
 public inspectSpecialStock(id: string, notes: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
     this.db.run(`
       UPDATE inventory_special_stocks

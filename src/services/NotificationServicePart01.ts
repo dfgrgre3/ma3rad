@@ -96,13 +96,13 @@ public createNotification(
 
 public deleteNotification(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'notifications.manage');
+    PermissionService.require(actor, 'ui.notifications.list.manage');
     this.db.run('DELETE FROM notifications WHERE id = ?', [id]);
   }
 
 public deleteAllNotifications(userId?: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'notifications.manage');
+    PermissionService.require(actor, 'ui.notifications.list.manage');
     if (userId) {
       this.db.run('DELETE FROM notifications WHERE user_id = ?', [userId]);
     } else {

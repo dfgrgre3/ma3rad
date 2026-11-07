@@ -3,10 +3,11 @@ import { AlertCircle, Minus, Plus, Trash2, Tag, ChevronDown } from 'lucide-react
 import type { Product } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
-import { getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit } from '../../utils/uom';
+import { getSellableUnits, getUomLabel, pricePerUnit } from '../../utils/uom';
 import { round2, type CartItem, type PosUnit } from './types';
 import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
 import { getPricingTierFactor } from '../../config/businessProfiles';
+import { getCartPriceUnitLabel, getCartQuantityStep } from './cartUtils';
 
 export interface CartLineProps {
   item: CartItem;
@@ -22,11 +23,6 @@ export interface CartLineProps {
   sellingPriceTiersCount?: number;
   sellingPriceTierNames?: string[];
 }
-
-export const getCartQuantityStep = (item: CartItem) =>
-  isWholeUnit(item.soldBy, item.product) ? 1 : 0.01;
-
-export const getCartPriceUnitLabel = (item: CartItem) => getUomLabel(item.soldBy, item.product);
 
 export const CartLine: React.FC<CartLineProps> = ({
   item,

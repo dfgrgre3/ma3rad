@@ -423,7 +423,7 @@ export class AppConfigService {
     const normalizedScopeId = String(scopeId || '').trim();
     if (!normalizedScopeId) throw new Error('معرّف النطاق مطلوب.');
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'settings.update');
+    PermissionService.require(user, 'ui.settings.hub.update');
     const entry = validateAppConfigEntry(input);
     const decision = canOverrideAtScope(scopeType, entry.domain, entry.key);
     if (!decision.allowed) throw new Error(decision.reason);
@@ -522,7 +522,7 @@ export class AppConfigService {
     actor?: User | null,
   ): void {
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'settings.update');
+    PermissionService.require(user, 'ui.settings.hub.update');
     const normalizedScopeId = String(scopeId || '').trim();
     if (!normalizedScopeId) throw new Error('معرّف النطاق مطلوب.');
 
@@ -543,7 +543,7 @@ export class AppConfigService {
     actor?: User | null,
   ): AppConfigScopeVersion[] {
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'audit.view');
+    PermissionService.require(user, 'ui.audit.log.view');
     const normalizedScopeId = String(scopeId || '').trim();
     const bounded = Math.min(Math.max(Math.trunc(limit) || 50, 1), 100);
     const rows = AppConfigService.database().query<ScopeVersionRow>(
@@ -569,7 +569,7 @@ export class AppConfigService {
 
   public static restoreScopeVersion(versionId: string, actor?: User | null): void {
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'settings.update');
+    PermissionService.require(user, 'ui.settings.hub.update');
     const row = AppConfigService.database().query<ScopeVersionRow>(
       `SELECT id, scope_type AS scopeType, scope_id AS scopeId, version, snapshot_json AS snapshotJson,
               created_by AS createdBy, created_by_name AS createdByName, reason, created_at AS createdAt
@@ -749,7 +749,7 @@ export class AppConfigService {
     actor?: User | null,
   ): AppConfigSnapshot {
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'settings.update');
+    PermissionService.require(user, 'ui.settings.hub.update');
 
     const snapshot = validateAppConfigSnapshot({
       schemaVersion: APP_CONFIG_SCHEMA_VERSION,
@@ -896,7 +896,7 @@ export class AppConfigService {
 
   public static exportJson(actor?: User | null): string {
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'settings.view');
+    PermissionService.require(user, 'ui.settings.hub.view');
     const state = AppConfigService.getState();
     return JSON.stringify({
       schemaVersion: APP_CONFIG_SCHEMA_VERSION,
@@ -917,7 +917,7 @@ export class AppConfigService {
 
   public static getVersions(limit = 50, actor?: User | null): AppConfigVersion[] {
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'audit.view');
+    PermissionService.require(user, 'ui.audit.log.view');
     const bounded = Math.min(Math.max(Math.trunc(limit) || 50, 1), 100);
     const rows = AppConfigService.database().query<VersionRow>(
       `SELECT id, version, snapshot_json AS snapshotJson, created_by AS createdBy,
@@ -938,7 +938,7 @@ export class AppConfigService {
 
   public static restoreVersion(versionId: string, actor?: User | null): AppConfigSnapshot {
     const user = actor ?? AuthService.requireAuth();
-    PermissionService.require(user, 'settings.update');
+    PermissionService.require(user, 'ui.settings.hub.update');
     const row = AppConfigService.database().query<VersionRow>(
       `SELECT id, version, snapshot_json AS snapshotJson, created_by AS createdBy,
               created_by_name AS createdByName, reason, created_at AS createdAt

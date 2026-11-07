@@ -129,7 +129,7 @@ export class CentralLicenseService {
   }
 
   static async activate(credentials: CentralActivationCredentials, deviceName?: string): Promise<CentralActivationResult> {
-    PermissionService.require(AuthService.requireAuth(), 'admin.license.manage', '/central-activation');
+    PermissionService.require(AuthService.requireAuth(), 'ui.admin.license.manage', '/central-activation');
     return this.performActivation(credentials, deviceName);
   }
 

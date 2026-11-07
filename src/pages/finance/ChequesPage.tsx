@@ -45,7 +45,7 @@ const today = () => localDateString();
 export const ChequesPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
   const enterpriseService = useMemo(() => new FinanceEnterpriseService(), []);
-  const canManageCheques = PermissionService.can(AuthService.getCurrentUser(), 'finance.approve');
+  const canManageCheques = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.cheques.approve');
 
   const [rows, setRows] = useState<Cheque[]>([]);
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);

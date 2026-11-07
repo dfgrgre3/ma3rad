@@ -118,6 +118,21 @@ test('registered database handlers initialize directories and load/save within t
   }
 });
 
+test('database secret handlers round-trip authenticated ciphertext and reject tampering', async () => {
+  const context = await createHandlers();
+  try {
+    const encrypt = context.handlers.get('security:encrypt-db-secret');
+    const decrypt = context.handlers.get('security:decrypt-db-secret');
+    const encrypted = await encrypt(context.event, '7319');
+    assert.match(encrypted, /^v1:[a-f0-9]{24}:[a-f0-9]{32}:[a-f0-9]+$/i);
+    assert.equal(await decrypt(context.event, encrypted), '7319');
+    await assert.rejects(decrypt(context.event, `${encrypted.slice(0, -2)}00`));
+    await assert.rejects(encrypt(context.event, ''));
+  } finally {
+    await fs.rm(context.appDataDir, { recursive: true, force: true });
+  }
+});
+
 test('database info reports actual on-disk database and encrypted backup statistics', async () => {
   const context = await createHandlers();
   try {

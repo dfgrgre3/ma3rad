@@ -11,8 +11,10 @@ import type { BrandWithCount } from '../../services/BrandService';
 import type { BusinessConfiguration } from '../../config/businessProfiles';
 import { CeramicMath } from '../../utils/ceramicMath';
 import { Field } from './ProductUi';
+import { OperationalFieldsForm } from '../OperationalFieldsForm';
+import type { OperationalFieldDefinition, ProductGradeOption } from '../../services/OperationalFieldService';
 import {
-  GRADES, SURFACES, round,
+  SURFACES, round,
   type ProductEntryFormState, type OpeningStockRow, type TabId, type VariantDraft,
 } from './productFormModel';
 
@@ -84,6 +86,10 @@ export interface ProductFormModalProps {
   attributes: AttributeCategory[];
   attributeValues: Record<string, string>;
   setAttributeValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  setOperationalFieldValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  gradeOptions: ProductGradeOption[];
   isSaving: boolean;
 }
 
@@ -155,6 +161,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   attributes,
   attributeValues,
   setAttributeValues,
+  operationalFields,
+  operationalFieldValues,
+  setOperationalFieldValues,
+  gradeOptions,
   isSaving,
 }) => {
   const [newTone, setNewTone] = React.useState('');
@@ -238,7 +248,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         {formData.productType === 'CERAMIC' && <Field label="الفرز والدرجة">
                           <select required value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value as CeramicGrade | '' })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">
                             <option value="">— اختر الدرجة —</option>
-                            {GRADES.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                            {gradeOptions.filter((option) => option.isActive || option.value === formData.grade).map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
                           </select>
                         </Field>}
                         <Field label="نوع المنتج (التصنيف)" required>
@@ -552,7 +562,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         <Field label="الفرز">
                           <select value={v.grade} onChange={(e) => onUpdateVariantDraft(index, { grade: e.target.value })} className="w-full px-2.5 py-2 rounded-lg border border-indigo-200 font-bold">
                             <option value="">— اختر الفرز —</option>
-                            {GRADES.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                            {gradeOptions.filter((option) => option.isActive || option.value === v.grade).map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
                           </select>
                         </Field>
                         <div className="flex items-end gap-1">
@@ -646,6 +656,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       </div>
                     )}
                   </section>
+                  <OperationalFieldsForm
+                    fields={operationalFields}
+                    values={operationalFieldValues}
+                    onChange={setOperationalFieldValues}
+                  />
                 </div>
               )}
 

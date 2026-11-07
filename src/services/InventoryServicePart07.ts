@@ -13,7 +13,7 @@ export class InventoryServicePart07 extends InventoryServicePart06 {
 public resolveSpecialStock(id: string, action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 'RESTORE_TO_STOCK', notes: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
     const item = this.db.query<any>(`SELECT * FROM inventory_special_stocks WHERE id = ?`, [id])[0];
     if (!item) throw new Error('السجل غير موجود.');

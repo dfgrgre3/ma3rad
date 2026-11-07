@@ -350,7 +350,7 @@ function DailyChart({ rows }: { rows: DailyRow[] }) {
 export const SalesReportsPage: React.FC = () => {
   const toast = useToast();
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'reports.view');
+  const canView = PermissionService.can(user, 'ui.reports.hub.view');
 
   const [reportType, setReportType] = useState<ReportType>('by_category');
   const [activeSection, setActiveSection] = useState<'reports' | 'reconciliation'>('reports');

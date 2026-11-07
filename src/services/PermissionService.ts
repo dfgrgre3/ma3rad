@@ -3,11 +3,29 @@ import { AuditService } from './AuditService';
 import { CentralFeaturePermissionService } from './CentralFeaturePermissionService';
 import type { Role, User } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  GRANULAR_LEGACY_ALIASES,
+  GRANULAR_LEGACY_MAP,
+  GRANULAR_PERMISSIONS,
+  PAGE_VIEW_PERMISSIONS,
+} from '../config/permissionMatrix';
 
 export interface PermissionDef {
   code: string;
   name: string;
   module: string;
+  /** مجموعة/صفحة الصلاحية داخل الوحدة (للصلاحيات الدقيقة). */
+  group?: string;
+  /** نوع الصلاحية: صفحة، إجراء، قسم، حقل. */
+  kind?: 'page' | 'action' | 'section' | 'field';
+  /** الكود القديم المكافئ — يُستخدم في الترقية. */
+  legacy?: string;
+  /** مسار الصفحة المرتبطة. */
+  route?: string;
+  /** صلاحية حساسة/تدميرية. */
+  destructive?: boolean;
+  /** صلاحية دقيقة مولّدة من مصفوفة الصفحات. */
+  granular?: boolean;
 }
 
 export type PermissionEffect = 'GRANT' | 'DENY';
@@ -18,7 +36,7 @@ const compareAlphabetically = (a: string, b: string) => a.localeCompare(b, 'ar')
 // ─── Permission catalog ───────────────────────────────────────────────────────
 // Every actionable capability in the app lives here. UI guards, route guards
 // and service-layer enforcement all resolve against these codes.
-export const PERMISSIONS: PermissionDef[] = [
+const BASE_PERMISSIONS: PermissionDef[] = [
   // Dashboard
   { code: 'dashboard.view', name: 'عرض لوحة المعلومات', module: 'DASHBOARD' },
 
@@ -115,6 +133,9 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'partners.manage', name: 'إضافة وتعديل بيانات الشركاء ونسب الملكية', module: 'PARTNERS' },
   { code: 'partners.transactions', name: 'تسجيل مساهمات ومسحوبات ومصروفات الشركاء', module: 'PARTNERS' },
   { code: 'partners.profits.distribute', name: 'توزيع أرباح الشركاء', module: 'PARTNERS' },
+  { code: 'partners.adjust', name: 'تسوية أرصدة الشركاء يدويًا', module: 'PARTNERS' },
+  { code: 'partners.reverse', name: 'عكس حركات حسابات الشركاء', module: 'PARTNERS' },
+  { code: 'partners.export', name: 'تصدير تقارير وأرصدة الشركاء', module: 'PARTNERS' },
   { code: 'partners.print', name: 'طباعة كشوف حساب الشركاء', module: 'PARTNERS' },
 
   // Cashier / treasury
@@ -543,6 +564,15 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'electronic_invoices.export', name: 'تصدير الفواتير الإلكترونية', module: 'E_INVOICING' },
 ];
 
+/**
+ * الكتالوج الكامل = الصلاحيات الأساسية + آلاف الصلاحيات الدقيقة المولّدة من
+ * مصفوفة الصفحات والأقسام والأزرار (permissionMatrix).
+ */
+export const PERMISSIONS: PermissionDef[] = [
+  ...BASE_PERMISSIONS,
+  ...GRANULAR_PERMISSIONS.map((permission) => ({ ...permission })),
+];
+
 // Default permissions per built-in role. These are only used to seed a role
 // the first time it appears; after that the database (role_permissions) is the
 // single source of truth and the admin can change anything from the UI.
@@ -579,7 +609,9 @@ const MANAGER_RESTRICTED = new Set([
 
 export const ROLE_DEFAULTS: Record<string, string[]> = {
   ADMIN: [...ALL],
-  MANAGER: [...new Set([...ALL.filter((code) => !MANAGER_RESTRICTED.has(code)), 'admin.data', 'admin.data.export'])],
+  // المدير يحصل افتراضياً على الصلاحيات الأساسية فقط، ثم تُشتق له الصلاحيات
+  // الدقيقة من الصلاحيات الأساسية عبر backfillGranularPermissions.
+  MANAGER: [...new Set([...BASE_PERMISSIONS.map((p) => p.code).filter((code) => !MANAGER_RESTRICTED.has(code)), 'admin.data', 'admin.data.export'])],
   ACCOUNTANT: [
     'dashboard.view', 'dashboard.export',
     'products.view', 'categories.view', 'brands.view',
@@ -588,7 +620,8 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'purchases.view', 'purchases.approve', 'purchases.reject', 'purchases.cancel_request', 'purchases.export',
     'customers.view', 'customers.payment', 'customers.export',
     'suppliers.view', 'suppliers.payment', 'suppliers.export',
-    'partners.view', 'partners.manage', 'partners.transactions', 'partners.profits.distribute', 'partners.print',
+    'partners.view', 'partners.manage', 'partners.transactions', 'partners.profits.distribute',
+    'partners.adjust', 'partners.reverse', 'partners.export', 'partners.print',
     'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
     'finance.view', 'finance.approve', 'finance.close', 'finance.debts.view', 'finance.export',
     'finance.receivables.view', 'finance.receivables.create', 'finance.receivables.update', 'finance.receivables.export',
@@ -677,6 +710,9 @@ const PERMISSION_BACKFILL_SOURCES: Record<string, string[]> = {
   'partners.manage': ['finance.approve'],
   'partners.transactions': ['finance.approve'],
   'partners.profits.distribute': ['finance.approve'],
+  'partners.adjust': ['finance.approve'],
+  'partners.reverse': ['finance.approve'],
+  'partners.export': ['finance.view'],
   'partners.print': ['finance.view'],
   'quotations.create': ['sales.create'],
   'quotations.update': ['sales.create'],
@@ -936,6 +972,8 @@ export class PermissionService {
     PermissionService.seedPermissionCatalog(db);
     PermissionService.seedBuiltInRoles(db);
     PermissionService.seedRoleDefaults(db);
+    // الأدوار المخصصة التي أُنشئت قبل الترقية تحتاج أيضاً إلى الصلاحيات الدقيقة.
+    PermissionService.backfillAllRolesGranular(db);
     PermissionService.cache = null;
   }
 
@@ -999,16 +1037,70 @@ export class PermissionService {
     PermissionService.backfillReceivablesPermissions(db, roleCode);
     PermissionService.backfillPermissionMappings(db, roleCode);
     PermissionService.backfillPartnerPermissions(db, roleCode);
+    PermissionService.backfillGranularPermissions(db, roleCode);
+  }
+
+  /**
+   * ترقية غير هدّامة: كل دور يملك صلاحية أساسية قديمة يحصل تلقائياً على
+   * الصلاحيات الدقيقة المشتقة منها (عرض صفحة/قسم/زر). الصلاحيات التدميرية
+   * لا تُمنح تلقائياً أبداً خارج ADMIN، وتبقى قراراً صريحاً من المدير.
+   */
+  private static backfillGranularPermissions(db: DatabaseManager, roleCode: string): void {
+    const markerKey = `rbac.granular.v1.${roleCode}`;
+    if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
+
+    if (roleCode === 'ADMIN') {
+      for (const permission of GRANULAR_PERMISSIONS) {
+        db.run(
+          'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+          [roleCode, permission.code]
+        );
+      }
+      db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
+      return;
+    }
+
+    const current = new Set(
+      db.query<{ permissionCode: string }>(
+        'SELECT permission_code AS permissionCode FROM role_permissions WHERE role_code = ?',
+        [roleCode]
+      ).map((row) => row.permissionCode)
+    );
+
+    for (const permission of GRANULAR_PERMISSIONS) {
+      if (permission.destructive) continue;
+      const matched = (permission.legacy && current.has(permission.legacy))
+        || (permission.legacyAliases ?? []).some((alias) => current.has(alias));
+      if (matched) {
+        db.run(
+          'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+          [roleCode, permission.code]
+        );
+      }
+    }
+
+    db.run('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)', [markerKey, '1']);
+  }
+
+  /** يطبّق ترقية الصلاحيات الدقيقة على كل الأدوار الموجودة (بما فيها المخصصة). */
+  private static backfillAllRolesGranular(db: DatabaseManager): void {
+    const roles = db.query<{ code: string }>('SELECT code FROM roles');
+    for (const role of roles) {
+      PermissionService.backfillGranularPermissions(db, role.code);
+    }
   }
 
   private static backfillPartnerPermissions(db: DatabaseManager, roleCode: string): void {
-    const markerKey = `rbac.partnerPermissions.v1.${roleCode}`;
+    const markerKey = `rbac.partnerPermissions.v2.${roleCode}`;
     if (db.query('SELECT 1 FROM system_settings WHERE key = ?', [markerKey]).length) return;
     const sources: Record<string, string[]> = {
       'partners.view': ['finance.view'],
       'partners.manage': ['finance.approve'],
       'partners.transactions': ['finance.approve'],
       'partners.profits.distribute': ['finance.approve'],
+      'partners.adjust': ['finance.approve'],
+      'partners.reverse': ['finance.approve'],
+      'partners.export': ['finance.view'],
       'partners.print': ['finance.view'],
     };
     for (const [permission, required] of Object.entries(sources)) {
@@ -1145,6 +1237,9 @@ export class PermissionService {
     db.executeTransaction(() => {
       if (retainsOriginalFullGrant) {
         db.run('DELETE FROM role_permissions WHERE role_code = ?', [roleCode]);
+        // أعد اشتقاق الصلاحيات الدقيقة بعد إعادة الضبط حتى يبقى المدير على
+        // الصلاحيات الأساسية + ما يُشتق منها فقط.
+        db.run('DELETE FROM system_settings WHERE key = ?', [`rbac.granular.v1.${roleCode}`]);
         for (const permission of defaults) {
           db.run(
             'INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
@@ -1168,6 +1263,44 @@ export class PermissionService {
 
   public static getModules(): string[] {
     return Array.from(new Set(PERMISSIONS.map((p) => p.module)));
+  }
+
+  /** تجميع الكتالوج حسب الوحدة ثم الصفحة — يخدم مصفوفة الأدوار الضخمة. */
+  public static getCatalogGroups(): Array<{
+    module: string;
+    groups: Array<{ name: string; permissions: PermissionDef[] }>;
+  }> {
+    const modules = new Map<string, Map<string, PermissionDef[]>>();
+    for (const permission of PERMISSIONS) {
+      const groupName = permission.group || permission.module;
+      const groups = modules.get(permission.module) ?? new Map<string, PermissionDef[]>();
+      const list = groups.get(groupName) ?? [];
+      list.push(permission);
+      groups.set(groupName, list);
+      modules.set(permission.module, groups);
+    }
+    return Array.from(modules.entries()).map(([module, groups]) => ({
+      module,
+      groups: Array.from(groups.entries())
+        .map(([name, permissions]) => ({
+          name,
+          permissions: [...permissions].sort((a, b) => a.code.localeCompare(b.code)),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'ar')),
+    }));
+  }
+
+  public static getPermission(code: string): PermissionDef | undefined {
+    return PERMISSIONS.find((permission) => permission.code === code);
+  }
+
+  public static isKnownPermission(code: string): boolean {
+    return PermissionService.getPermission(code) !== undefined;
+  }
+
+  /** عدد الصلاحيات الكلي في الكتالوج (أساسية + دقيقة). */
+  public static getCatalogSize(): number {
+    return PERMISSIONS.length;
   }
 
   /** أسماء عربية مقروءة لوحدات الصلاحيات، تُستخدم في مصفوفة الأدوار. */
@@ -1425,14 +1558,68 @@ export class PermissionService {
     const [mod] = required.split('.');
     // A user-level DENY always wins — including over role wildcards
     // ('sales.*' or '*'), which are the broadest grants a role can carry.
-    if (denies.has(required) || denies.has(`${mod}.*`) || denies.has('*')) return false;
+    const legacyDenyCodes = [
+      ...(GRANULAR_LEGACY_MAP[required] ? [GRANULAR_LEGACY_MAP[required]] : []),
+      ...(GRANULAR_LEGACY_ALIASES[required] ?? []),
+    ];
+    if (
+      denies.has(required)
+      || denies.has(`${mod}.*`)
+      || denies.has('*')
+      || legacyDenyCodes.some((legacy) => denies.has(legacy) || denies.has(`${legacy.split('.')[0]}.*`))
+    ) return false;
     if (grants.has(required)) return true;
+    // توافق خلفي: الصلاحية الدقيقة الجديدة تُمنح إذا كان الدور يملك الكود
+    // الأساسي المكافئ (قبل الترقية). DENY الصريح على الصلاحية الدقيقة يبقى
+    // له الأولوية لأنه فُحص أعلاه.
+    const legacyCodes = [
+      ...(GRANULAR_LEGACY_MAP[required] ? [GRANULAR_LEGACY_MAP[required]] : []),
+      ...(GRANULAR_LEGACY_ALIASES[required] ?? []),
+    ];
+    for (const legacy of legacyCodes) {
+      if (grants.has(legacy)) return true;
+      const legacyModule = legacy.split('.')[0];
+      if (grants.has(`${legacyModule}.*`)) return true;
+    }
     // wildcard support: 'sales.*' grants all sales.* permissions
     return grants.has(`${mod}.*`) || grants.has('*');
   }
 
   public static canAny(user: User | null, required: string[], scope?: string): boolean {
     return required.some((code) => PermissionService.can(user, code, scope));
+  }
+
+  /**
+   * صلاحية «عرض الصفحة» الدقيقة المقابلة لمسار ما (إن وُجدت).
+   * تدعم المسارات الديناميكية مثل /products/:id عبر مطابقة النمط.
+   */
+  public static getPagePermission(pathname: string): string | null {
+    if (!pathname) return null;
+    let best: { path: string; permission: string } | null = null;
+    for (const [route, permission] of Object.entries(PAGE_VIEW_PERMISSIONS)) {
+      let matched = route === pathname;
+      if (!matched && route.includes(':')) {
+        // مطابقة الأنماط الديناميكية: /products/:id أو /customers/:id/imported-products
+        matched = new RegExp(`^${route.replace(/:[^/]+/g, '[^/]+')}$`).test(pathname);
+      } else if (!matched) {
+        matched = pathname.startsWith(`${route}/`);
+      }
+      if (!matched) continue;
+      // نختار دائماً أدق مسار (الأطول) حتى يفوز /products/:id على /products.
+      if (!best || route.length > best.path.length) best = { path: route, permission };
+    }
+    return best?.permission ?? null;
+  }
+
+  public static canAccessPage(user: User | null, pathname: string, scope?: string): boolean {
+    const permission = PermissionService.getPagePermission(pathname);
+    if (!permission) return true;
+    return PermissionService.can(user, permission, scope ?? pathname);
+  }
+
+  public static requirePage(user: User | null, pathname: string): void {
+    const permission = PermissionService.getPagePermission(pathname);
+    if (permission) PermissionService.require(user, permission, pathname);
   }
 
   /** Server-side (service-layer) enforcement — never trust the UI. */

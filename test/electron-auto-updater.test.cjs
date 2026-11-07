@@ -7,8 +7,10 @@ const path = require('node:path');
 const {
   configureAutoUpdater,
   createRollbackBackup,
+  isNewerRelease,
   isUpdatePlatform,
   toPublicUpdate,
+  toSafeUpdateError,
 } = require('../electron/autoUpdater');
 const packageConfig = require('../package.json');
 
@@ -156,6 +158,27 @@ test('failed update checks are surfaced for retry and public release notes are b
   assert.equal(info.mandatory, true);
   assert.equal(info.releaseName, 'Critical fix');
   assert.equal(info.releaseNotes.length, 20_000);
+});
+
+test('raw updater errors are sanitized before reaching the UI', () => {
+  const reported = '404 "method: GET url: https://github.com/dfgrgre3/ma3rad/releases.atom\\n\\nPlease double check that your authentication token is correct." Headers: { "set-cookie": ["_gh_sess=secret; path=/"], "x-github-request-id": "ABC" }';
+  const safe = toSafeUpdateError(new Error(reported));
+  assert.match(safe, /404/);
+  assert.match(safe, /public/);
+  assert.doesNotMatch(safe, /set-cookie|_gh_sess|Headers:/);
+  assert.doesNotMatch(safe, /releases\.atom/);
+  assert.match(toSafeUpdateError(new Error('net::ERR_INTERNET_DISCONNECTED')), /Internet/);
+  assert.equal(toSafeUpdateError(undefined), 'Unknown update error');
+});
+
+test('released versions are compared with numeric segments and only newer releases qualify', () => {
+  assert.equal(isNewerRelease('1.1.4', '1.1.5'), true, 'a higher patch version is newer');
+  assert.equal(isNewerRelease('1.1.5', '1.1.4'), false, 'a lower patch version is not newer');
+  assert.equal(isNewerRelease('1.1.9', '1.1.10'), true, 'numeric segments compare numerically');
+  assert.equal(isNewerRelease('1.1.10', '1.1.9'), false, 'numeric segments do not compare lexically');
+  assert.equal(isNewerRelease('1.1.4', '1.1.4'), false, 'the current version is never newer');
+  assert.equal(isNewerRelease('2.0.0', '2.0.0'), false);
+  assert.equal(isNewerRelease('1.1.4', ''), false, 'empty releases are ignored');
 });
 
 test('desktop release builds require signing and target configured update channels', () => {

@@ -19,6 +19,11 @@ import { formatProductQuantity } from '../utils/productUnits';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 import { PurchaseInvoiceModal } from './purchases/PurchaseInvoiceModal';
 import { PurchaseInvoiceDto } from './purchases/types';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../services/OperationalFieldService';
+import { OperationalFieldsForm } from './OperationalFieldsForm';
+import { OperationalFieldsSummary } from './OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from './OperationalFieldsRecordEditor';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from './OperationalFieldsFilter';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -36,8 +41,10 @@ export const PurchasesView: React.FC = () => {
   const inventoryService = useMemo(() => new InventoryService(), []);
   const procurementService = useMemo(() => new ProcurementService(), []);
   const poService = useMemo(() => new PurchaseOrderService(), []);
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
   const currentUser = AuthService.getCurrentUser();
-  const canCreatePurchase = PermissionService.can(currentUser, 'purchases.create');
+  const canCreatePurchase = PermissionService.can(currentUser, 'ui.purchases.invoices.create');
+  const canUpdatePurchase = PermissionService.can(currentUser, 'ui.purchases.invoices.update');
 
   const [purchases, setPurchases] = useState<PurchaseInvoice[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -48,6 +55,10 @@ export const PurchasesView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedDetails, setExpandedDetails] = useState<any | null>(null);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [valuesByPurchase, setValuesByPurchase] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,17 +79,19 @@ export const PurchasesView: React.FC = () => {
     paymentType: 'CREDIT',
     notes: '',
   });
-
   const loadData = () => {
     try {
       const purs = purchaseService.getAllPurchases(search);
+      setOperationalFields(fieldService.getDefinitions('purchase_invoices'));
+      const fieldValues = fieldService.getRecordValuesForRecords('purchase_invoices', purs.map((purchase) => purchase.id));
+      setValuesByPurchase(fieldValues);
       const sups = supplierService.getAllSuppliers();
       const prods = productService.getAllProducts();
       const whs = inventoryService.getAllWarehouses();
       const grnList = procurementService.getAllGoodsReceipts('', 'ALL');
       const poList = poService.getAllOrders('', 'ALL').filter(p => ['SENT', 'CONFIRMED', 'PARTIAL', 'RECEIVED'].includes(p.status));
 
-      setPurchases(purs);
+      setPurchases(purs.filter((purchase) => matchesOperationalFieldFilters(purchase.id, fieldValues, fieldFilters)));
       setSuppliers(sups);
       setProducts(prods);
       setWarehouses(whs);
@@ -159,7 +172,8 @@ export const PurchasesView: React.FC = () => {
     }
 
     try {
-      purchaseService.createPurchase({
+      fieldService.validateRecordValues('purchase_invoices', operationalFieldValues, 'create');
+      const created = purchaseService.createPurchase({
         supplierId: dto.supplierId,
         supplierInvoiceNumber: dto.supplierInvoiceNumber,
         warehouseId: dto.warehouseId,
@@ -181,7 +195,9 @@ export const PurchasesView: React.FC = () => {
         isNoNumberSupplier: dto.isNoNumberSupplier,
       });
 
+      fieldService.setRecordValues('purchase_invoices', created.id, operationalFieldValues, 'create');
       setIsModalOpen(false);
+      setOperationalFieldValues({});
       loadData();
       alert('تم تسجيل فاتورة الشراء وتوزيع تكاليف الوصول وتحديث متوسطات التكلفة بنجاح.');
     } catch (err: any) {
@@ -197,6 +213,7 @@ export const PurchasesView: React.FC = () => {
           <div className="w-11 h-11 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center">
             <Truck className="w-6 h-6 text-orange-600" />
           </div>
+          <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
           <div>
             <h2 className="text-lg font-black text-slate-900">
               فواتير {purchasingLabel} وتكاليف الوصول (Landed Cost)
@@ -207,7 +224,7 @@ export const PurchasesView: React.FC = () => {
         </div>
 
         {canCreatePurchase && <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { setOperationalFieldValues({}); setIsModalOpen(true); }}
           className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl flex items-center gap-2 shadow-md shadow-orange-600/20 transition text-sm shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -331,6 +348,11 @@ export const PurchasesView: React.FC = () => {
                             {expandedDetails.notes && (
                               <div className="text-[11px] text-slate-500"><strong>ملاحظات:</strong> {expandedDetails.notes}</div>
                             )}
+                            <OperationalFieldsSummary fields={operationalFields} values={valuesByPurchase[inv.id] || {}} />
+                            <OperationalFieldsRecordEditor recordLabel={inv.invoiceNumber} fields={operationalFields} initialValues={valuesByPurchase[inv.id] || {}} canEdit={canUpdatePurchase} onSave={(next) => {
+                              fieldService.setRecordValues('purchase_invoices', inv.id, next, 'update');
+                              setValuesByPurchase((previous) => ({ ...previous, [inv.id]: next }));
+                            }} />
                           </div>
                         </td>
                       </tr>
@@ -366,6 +388,9 @@ export const PurchasesView: React.FC = () => {
           canCreate={canCreatePurchase}
           onClose={() => setIsModalOpen(false)}
           onSubmit={handleCreatePurchase}
+          operationalFields={operationalFields}
+          operationalFieldValues={operationalFieldValues}
+          onOperationalFieldValuesChange={setOperationalFieldValues}
         />
       )}
     </div>

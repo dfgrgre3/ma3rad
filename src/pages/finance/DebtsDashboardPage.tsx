@@ -135,7 +135,7 @@ export const DebtsDashboardPage: React.FC = () => {
   );
   const canManagePromises = PermissionService.can(
     AuthService.getCurrentUser(),
-    "customers.update",
+    "ui.customers.list.update",
   );
 
   const toggleCustomer = (id: string) => {

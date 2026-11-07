@@ -46,10 +46,10 @@ const ExpensesManagement: React.FC<{ dateMode: 'today' | 'range' }> = ({ dateMod
     return !query || `${expense.category} ${expense.description} ${expense.recipient || ''}`.toLowerCase().includes(query);
   });
   const total = filtered.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
-  const canAdd = PermissionService.can(user, 'cashier.expense');
+  const canAdd = PermissionService.can(user, 'ui.cashier.expenses.expense');
   const canEdit = PermissionService.can(user, 'cashier.expense.update');
   const canDelete = PermissionService.can(user, 'cashier.expense.delete');
-  const canExport = PermissionService.can(user, 'finance.export');
+  const canExport = PermissionService.can(user, 'ui.cashier.expenses.export');
 
   const exportExpenses = () => exportToExcel({
     title: dateMode === 'today' ? 'مصروفات اليوم' : 'تقرير المصروفات',

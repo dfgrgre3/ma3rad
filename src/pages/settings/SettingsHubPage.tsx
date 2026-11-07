@@ -5,7 +5,7 @@ import { AdminSettingsTab } from '../admin/AdminSettingsTab';
 import { AppConfigurationPage } from './AppConfigurationPage';
 import { ConfigurationStudioPage } from './ConfigurationStudioPage';
 
-const ADMIN_TABS = ['general', 'business', 'branding', 'invoice', 'inventory', 'operations', 'security', 'backup'];
+const ADMIN_TABS = ['general', 'business', 'branding', 'customization', 'invoice', 'inventory', 'operations', 'security', 'backup'];
 
 const EMPTY_UPDATE_STATUS: AppUpdateStatus = { status: 'unsupported', currentVersion: '' };
 
@@ -183,7 +183,7 @@ export const SettingsHubPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-xl font-black text-slate-900 dark:text-slate-100">مركز إعدادات النظام</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">الإعدادات العامة، النشاط، الهوية، الفواتير، المخزون، التشغيل، الأمان، والنسخ والاستعادة</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">الإعدادات العامة، النشاط، الهوية وتخصيص الواجهة، الفواتير، المخزون، التشغيل، الأمان، والنسخ والاستعادة</p>
           </div>
         </div>
 

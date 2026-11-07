@@ -13,6 +13,11 @@ import { BranchAccessService } from '../../services/BranchAccessService';
 import { useToast } from '../../components/ui/Toast';
 import { CentralLimitGuard } from '../../components/ui/CentralLimitGuard';
 import type { Company, User } from '../../types';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 type BranchStatusFilter = 'ALL' | 'ACTIVE' | 'INACTIVE';
 type ManagementTab = 'overview' | 'warehouses' | 'users';
@@ -53,16 +58,17 @@ const inputClass =
 export const BranchesPage: React.FC = () => {
   const operations = useMemo(() => new OperationsService(), []);
   const branchService = useMemo(() => new BranchService(), []);
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
   const branchAccess = useMemo(() => new BranchAccessService(), []);
   const toast = useToast();
   const currentUser = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(currentUser, 'branches.create')
-    && PermissionService.can(currentUser, 'branches.manage')
-    && PermissionService.can(currentUser, 'branches.access_all');
-  const canUpdate = PermissionService.can(currentUser, 'branches.update');
-  const canManageUsers = PermissionService.can(currentUser, 'branches.manage_users');
-  const canViewWarehouses = PermissionService.can(currentUser, 'warehouses.view');
-  const canViewCompanies = PermissionService.can(currentUser, 'companies.view');
+  const canCreate = PermissionService.can(currentUser, 'ui.branches.branches.create')
+    && PermissionService.can(currentUser, 'ui.branches.branches.manage')
+    && PermissionService.can(currentUser, 'ui.branches.branches.access_all');
+  const canUpdate = PermissionService.can(currentUser, 'ui.branches.branches.update');
+  const canManageUsers = PermissionService.can(currentUser, 'ui.branches.branches.manage_users');
+  const canViewWarehouses = PermissionService.can(currentUser, 'ui.warehouses.warehouses.view');
+  const canViewCompanies = PermissionService.can(currentUser, 'ui.companies.list.view');
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [activeBranchId, setActiveBranchId] = useState('');
@@ -96,17 +102,24 @@ export const BranchesPage: React.FC = () => {
   const [primaryWarehouse, setPrimaryWarehouse] = useState(false);
   const [branchUsers, setBranchUsers] = useState<ReturnType<BranchService['getBranchUserAssignments']>>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [valuesByBranch, setValuesByBranch] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   const load = () => {
     setLoading(true);
     try {
       const nextBranches = operations.getBranches('', true);
       setBranches(nextBranches);
+      setOperationalFields(fieldService.getDefinitions('branches'));
+      const fieldValues = fieldService.getRecordValuesForRecords('branches', nextBranches.map((branch) => branch.id));
+      setValuesByBranch(fieldValues);
       setActiveBranchId(branchAccess.getCurrentBranchId());
       setBranchStats(branchService.getBranchStats());
       if (canViewWarehouses) setWarehouses(operations.getWarehouses());
       if (canViewCompanies) setCompanies(new CompanyService().getAllCompanies(false));
-      if (PermissionService.can(currentUser, 'users.view')) {
+      if (PermissionService.can(currentUser, 'ui.users.users.view')) {
         setManagers(new AuthService().getAllUsers().filter((user) => user.role !== 'ADMIN'));
       }
       setError(null);
@@ -133,7 +146,7 @@ export const BranchesPage: React.FC = () => {
     ].some((value) => value.toLocaleLowerCase().includes(searchTerm));
     const matchesStatus = statusFilter === 'ALL'
       || (statusFilter === 'ACTIVE' ? branch.isActive : !branch.isActive);
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesOperationalFieldFilters(branch.id, valuesByBranch, fieldFilters);
   });
   const activeCount = branches.filter((branch) => branch.isActive).length;
   const totalOrders = branchStats.reduce((sum, item) => sum + Number(item.totalOrders || 0), 0);
@@ -143,11 +156,13 @@ export const BranchesPage: React.FC = () => {
   const openCreate = () => {
     setEditing(null);
     setForm({ ...emptyForm, companyId: companies[0]?.id || '' });
+    setOperationalFieldValues({});
     setFormOpen(true);
   };
 
   const openEdit = (branch: Branch) => {
     setEditing(branch);
+    setOperationalFieldValues(fieldService.getRecordValues('branches', branch.id));
     setForm({
       name: branch.name,
       code: branch.code,
@@ -169,6 +184,9 @@ export const BranchesPage: React.FC = () => {
     event.preventDefault();
     setSaving(true);
     try {
+      fieldService.validateRecordValues(
+        'branches', operationalFieldValues, editing ? 'update' : 'create', editing?.id,
+      );
       if (editing) {
         branchService.updateBranch(editing.id, {
           name: form.name,
@@ -181,6 +199,7 @@ export const BranchesPage: React.FC = () => {
           managerId: form.managerId || null,
           isDefault: form.isDefault,
         });
+        fieldService.setRecordValues('branches', editing.id, operationalFieldValues, 'update');
         toast.success('تم تحديث بيانات الفرع.');
       } else {
         const created = operations.createBranch({
@@ -196,6 +215,7 @@ export const BranchesPage: React.FC = () => {
           deviceName: form.deviceName,
           isDefault: form.isDefault,
         });
+        fieldService.setRecordValues('branches', created.id, operationalFieldValues, 'create');
         setCreatedActivation({
           branchName: created.name,
           activationCode: created.activationCode || '—',
@@ -206,6 +226,7 @@ export const BranchesPage: React.FC = () => {
       setFormOpen(false);
       setEditing(null);
       setForm(emptyForm);
+      setOperationalFieldValues({});
       load();
     } catch (saveError: unknown) {
       toast.error('لم يتم حفظ الفرع', saveError instanceof Error ? saveError.message : String(saveError));
@@ -380,6 +401,7 @@ export const BranchesPage: React.FC = () => {
             <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </label>
         </section>
+        <div className="mb-4"><OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} /></div>
 
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="h-7 w-7 animate-spin text-sky-500" /></div>
@@ -411,6 +433,17 @@ export const BranchesPage: React.FC = () => {
                     <InfoRow icon={<Warehouse />} value={`${branch.warehousesCount || 0} مخزن نشط`} />
                     {branch.deviceType && <InfoRow icon={<Smartphone />} value={`جهاز المزامنة: ${branch.deviceType}`} />}
                   </div>
+                  <OperationalFieldsSummary fields={operationalFields} values={valuesByBranch[branch.id] || {}} />
+                  <OperationalFieldsRecordEditor
+                    recordLabel={branch.name}
+                    fields={operationalFields}
+                    initialValues={valuesByBranch[branch.id] || {}}
+                    canEdit={canUpdate}
+                    onSave={(values) => {
+                      fieldService.setRecordValues('branches', branch.id, values, 'update');
+                      setValuesByBranch((previous) => ({ ...previous, [branch.id]: values }));
+                    }}
+                  />
 
                   {isSelectedBranch ? (
                     <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-xl bg-slate-50 p-3">
@@ -504,6 +537,7 @@ export const BranchesPage: React.FC = () => {
                 </>
               )}
             </div>
+            <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={setOperationalFieldValues} title="بيانات إضافية للفرع" />
             <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <input type="checkbox" checked={form.isDefault} onChange={(event) => setForm({ ...form, isDefault: event.target.checked })} className="h-4 w-4 accent-sky-600" />
               <span><span className="block text-xs font-bold">تعيين كفرع افتراضي</span><span className="mt-0.5 block text-[10px] text-slate-500">سيحل هذا الفرع محل الفرع الافتراضي الحالي.</span></span>

@@ -7,6 +7,7 @@ import { PermissionService } from './PermissionService';
 import { InventoryCostingService } from './InventoryCostingService';
 import { ModuleRegistryService } from './ModuleRegistryService';
 import { SettingsService } from './SettingsService';
+import { localDateString } from '../utils/date';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
 import { MasterDataSyncService } from '../sync/MasterDataSyncService';
 import { CentralUsageLimitService } from './CentralUsageLimitService';
@@ -18,6 +19,7 @@ export interface ProductQueryOptions {
   sortBy?: 'name' | 'newest' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc';
   includeInactive?: boolean;
   status?: 'all' | 'active' | 'inactive';
+  customFieldFilters?: Record<string, string>;
 }
 
 export interface ProductStats {
@@ -37,7 +39,7 @@ export class ProductService {
   private sync = new MasterDataSyncService(this.db);
 
   private productColumns(alias = 'p'): string {
-    const canViewCosts = PermissionService.can(AuthService.getCurrentUser(), 'finance.view');
+    const canViewCosts = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.overview.view');
     return [
       `${alias}.id`, `${alias}.product_type`, `${alias}.custom_unit`, `${alias}.sku`, `${alias}.barcode`,
       `${alias}.name`, `${alias}.category_id`, `${alias}.brand_id`, `${alias}.grade`, `${alias}.size`,
@@ -64,7 +66,7 @@ export class ProductService {
   }
 
   public getAllProducts(search?: string, categoryId?: string, brandId?: string): Product[] {
-    PermissionService.require(AuthService.requireAuth(), 'products.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
     const scope = this.branchAccess.companyScope('p.company_id');
     let sql = `
       SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
@@ -103,7 +105,7 @@ export class ProductService {
     pageSize = 25,
     options: ProductQueryOptions = {},
   ) {
-    PermissionService.require(AuthService.requireAuth(), 'products.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
     const stock = this.stockSubquery();
     const scope = this.branchAccess.companyScope('p.company_id');
     const filters: string[] = [scope.clause];
@@ -119,6 +121,15 @@ export class ProductService {
     if (categoryId) { filters.push('p.category_id = ?'); params.push(categoryId); }
     if (brandId || options.brandId) { filters.push('p.brand_id = ?'); params.push(brandId || options.brandId); }
     if (options.grade) { filters.push('p.grade = ?'); params.push(options.grade); }
+    for (const [fieldId, value] of Object.entries(options.customFieldFilters || {})) {
+      if (!fieldId || !value) continue;
+      filters.push(`EXISTS (
+        SELECT 1 FROM operational_field_values opfv
+        WHERE opfv.entity_type = 'products' AND opfv.record_id = p.id
+          AND opfv.field_id = ? AND opfv.value = ?
+      )`);
+      params.push(fieldId, value);
+    }
     if (options.stockStatus === 'out') filters.push(`COALESCE(st.qty, 0) <= 0`);
     else if (options.stockStatus === 'low') filters.push(`COALESCE(st.qty, 0) > 0 AND COALESCE(st.qty, 0) <= p.min_stock_level`);
     else if (options.stockStatus === 'in') filters.push(`COALESCE(st.qty, 0) > p.min_stock_level`);
@@ -153,8 +164,8 @@ export class ProductService {
 
   public getProductStats(): ProductStats {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.view');
-    const canViewCosts = PermissionService.can(actor, 'finance.view');
+    PermissionService.require(actor, 'ui.products.catalog.view');
+    const canViewCosts = PermissionService.can(actor, 'ui.finance.overview.view');
     const stock = this.stockSubquery();
     const companyScope = this.branchAccess.companyScope('p.company_id', actor);
     const rows = this.db.query<any>(`
@@ -185,7 +196,7 @@ export class ProductService {
   }
 
   public getProductById(id: string): Product | null {
-    PermissionService.require(AuthService.requireAuth(), 'products.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
     const scope = this.branchAccess.companyScope('p.company_id');
     const rows = this.db.query<Product>(`
       SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
@@ -198,7 +209,7 @@ export class ProductService {
   }
 
   public getProductByBarcode(barcode: string): Product | null {
-    PermissionService.require(AuthService.requireAuth(), 'products.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.view');
     const scope = this.branchAccess.companyScope('p.company_id');
     const rows = this.db.query<Product>(`
       SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName
@@ -211,7 +222,7 @@ export class ProductService {
   }
 
   public generateNextBarcode(currentValue = ''): string {
-    PermissionService.require(AuthService.requireAuth(), 'products.create');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.create');
     const rows = this.db.query<{ barcode: string; sku: string }>(
       'SELECT barcode, sku FROM products',
     );
@@ -223,7 +234,7 @@ export class ProductService {
   }
 
   public generateNextSku(currentValue = ''): string {
-    PermissionService.require(AuthService.requireAuth(), 'products.create');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.create');
     const rows = this.db.query<{ barcode: string; sku: string }>(
       'SELECT barcode, sku FROM products',
     );
@@ -237,7 +248,7 @@ export class ProductService {
   }
 
   public createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, initialStock?: { warehouseId: string; quantityM2: number; unitCost: number }, performedBy = 'usr_admin'): Product {
-    PermissionService.require(AuthService.requireAuth(), 'products.create');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.create');
     CentralUsageLimitService.assertWithin('maxProducts');
     if (initialStock && initialStock.quantityM2 > 0 && !ModuleRegistryService.isInventoryTracked()) {
       throw new Error('هذا النشاط لا يتبّع المخزون، لذلك لا يمكن تسجيل رصيد افتتاحي. اضبط كميات المخزون من إعدادات النشاط أولًا.');
@@ -315,7 +326,7 @@ export class ProductService {
         ]);
         InventoryCostingService.addLayer(sqliteDb, {
           productId: id, warehouseId: initialStock.warehouseId, sourceTransactionId: txId,
-          sourceType: 'OPENING_BALANCE', sourceId: txId, date: new Date().toISOString().slice(0, 10),
+          sourceType: 'OPENING_BALANCE', sourceId: txId, date: localDateString(),
           quantity: initialStock.quantityM2, unitCost: initialStock.unitCost || product.costPrice,
         });
       }
@@ -331,7 +342,7 @@ export class ProductService {
   }
 
   public updateProduct(id: string, updates: Partial<Product>, performedBy = 'usr_admin'): Product {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
     const existing = this.getProductById(id);
     if (!existing) throw new Error('المنتج غير موجود.');
 
@@ -408,7 +419,7 @@ export class ProductService {
   }
 
   public deleteProduct(id: string, performedBy = 'usr_admin'): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.delete');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.delete');
     this.db.executeTransaction((sqliteDb) => {
       const hasSales = sqliteDb.query(`SELECT id FROM sales_invoice_items WHERE product_id = ? LIMIT 1`, [id]);
       if (hasSales.length > 0) {
@@ -427,7 +438,7 @@ export class ProductService {
   }
 
   public setProductActive(id: string, active: boolean, performedBy = 'usr_admin'): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
     this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(`UPDATE products SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [active ? 1 : 0, id]);
       this.sync.capture(sqliteDb, 'product', id, 'UPDATE');
@@ -439,7 +450,7 @@ export class ProductService {
   }
 
   public duplicateProduct(id: string, performedBy = 'usr_admin'): Product {
-    PermissionService.require(AuthService.requireAuth(), 'products.create');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.create');
     const source = this.getProductById(id);
     if (!source) throw new Error('الصنف غير موجود.');
 
@@ -487,7 +498,7 @@ export class ProductService {
 
   public getProductStockSummary(productId: string): { totalM2: number; totalBoxes: number; totalPieces: number; byWarehouse: WarehouseStock[] } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'products.view');
+    PermissionService.require(actor, 'ui.products.catalog.view');
     const scope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
     const rows = this.db.query<WarehouseStock>(`
       SELECT ws.*, w.name as warehouseName,

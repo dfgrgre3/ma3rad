@@ -22,6 +22,8 @@ import { StatCard, IconButton, Modal, InfoBox, SummaryRow } from './sales/SalesU
 import { localDateString } from '../utils/date';
 import { openWhatsAppChat } from '../utils/externalLinks';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../services/OperationalFieldService';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from './OperationalFieldsFilter';
 
 type InvoiceRow = SalesInvoice & { itemsCount?: number; returnedAmount?: number };
 
@@ -51,16 +53,18 @@ export const SalesView: React.FC = () => {
   const customerService = useMemo(() => new CustomerService(), []);
   const inventoryService = useMemo(() => new InventoryService(), []);
   const printService = useMemo(() => new PrintService(), []);
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
   const user = AuthService.getCurrentUser();
-  const canVoid = PermissionService.can(user, 'sales.void');
-  const canCollect = PermissionService.can(user, 'customers.payment');
-  const canViewDebts = PermissionService.can(user, 'finance.debts.view');
-  const canViewCustomerStatement = PermissionService.can(user, 'customers.view') && canViewDebts;
-  const canViewReturns = PermissionService.can(user, 'returns.view');
-  const canRefund = PermissionService.can(user, 'sales.refund');
-  const canExport = PermissionService.can(user, 'sales.export');
-  const canCreate = PermissionService.can(user, 'sales.create');
-  const canExportCustomers = PermissionService.can(user, 'customers.export');
+  const canVoid = PermissionService.can(user, 'ui.sales.invoices.void');
+  const canCollect = PermissionService.can(user, 'ui.customers.detail.payment');
+  const canViewDebts = PermissionService.can(user, 'ui.finance.receivables.view');
+  const canViewCustomerStatement = PermissionService.can(user, 'ui.customers.list.view') && canViewDebts;
+  const canViewReturns = PermissionService.can(user, 'ui.returns.returns.view');
+  const canRefund = PermissionService.can(user, 'ui.sales.invoices.refund');
+  const canExport = PermissionService.can(user, 'ui.sales.invoices.export');
+  const canCreate = PermissionService.can(user, 'ui.sales.invoices.create');
+  const canUpdateInvoice = PermissionService.can(user, 'ui.sales.invoices.update');
+  const canExportCustomers = PermissionService.can(user, 'ui.customers.list.export');
 
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [stats, setStats] = useState<InvoiceStats | null>(null);
@@ -95,6 +99,9 @@ export const SalesView: React.FC = () => {
   const [payType, setPayType] = useState<PaymentType>('CASH');
   const [payNotes, setPayNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldFilters, setOperationalFieldFilters] = useState<OperationalFieldFilters>({});
+  const [operationalValuesByInvoice, setOperationalValuesByInvoice] = useState<Record<string, Record<string, string>>>({});
 
   const [statement, setStatement] = useState<ReturnType<CustomerService['getCustomerStatement']> | null>(null);
 
@@ -170,7 +177,11 @@ export const SalesView: React.FC = () => {
   const load = () => {
     setLoading(true);
     try {
-      setInvoices(salesService.getInvoicesFiltered(filters) as InvoiceRow[]);
+      const currentInvoices = salesService.getInvoicesFiltered(filters) as InvoiceRow[];
+      setOperationalFields(operationalFieldService.getDefinitions('sales_invoices'));
+      const valueMap = operationalFieldService.getRecordValuesForRecords('sales_invoices', currentInvoices.map((invoice) => invoice.id));
+      setOperationalValuesByInvoice(valueMap);
+      setInvoices(currentInvoices.filter((invoice) => matchesOperationalFieldFilters(invoice.id, valueMap, operationalFieldFilters)));
       setStats(salesService.getStats(filters));
       setError(null);
     } catch (e: any) {
@@ -181,7 +192,7 @@ export const SalesView: React.FC = () => {
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [filters]);
+  useEffect(() => { load();   }, [filters, operationalFieldFilters]);
 
   useEffect(() => { setPage(1); }, [filters]);
 
@@ -265,6 +276,7 @@ export const SalesView: React.FC = () => {
     ...(canViewReturns ? { returned: inv.returnedAmount || 0 } : {}),
     profit: inv.grossProfit,
     invoiceStatus: inv.invoiceStatus === 'VOID' ? 'ملغاة' : 'مكتملة',
+    ...(operationalFieldService.getRecordValuesForExport('sales_invoices', [inv.id])[inv.id] || {}),
   }));
 
   const exportColumns = [
@@ -282,6 +294,7 @@ export const SalesView: React.FC = () => {
     ...(canViewReturns ? [{ key: 'returned', label: 'المرتجع' }] : []),
     { key: 'profit', label: 'الربح' },
     { key: 'invoiceStatus', label: 'حالة الفاتورة' },
+    ...operationalFields.map((field) => ({ key: field.name, label: field.name })),
   ];
 
   const doExport = (_kind: 'excel' | 'pdf') => {
@@ -463,6 +476,7 @@ export const SalesView: React.FC = () => {
             </button>
           )}
         </div>
+        <div className="mt-3"><OperationalFieldsFilter fields={operationalFields} values={operationalFieldFilters} onChange={setOperationalFieldFilters} /></div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -484,6 +498,7 @@ export const SalesView: React.FC = () => {
                     {canViewDebts && <th className="px-4 py-3">المدفوع</th>}
                     {canViewDebts && <th className="px-4 py-3">المتبقي</th>}
                     <th className="px-4 py-3">حالة الفاتورة</th>
+                    {operationalFields.map((field) => <th key={field.id} className="px-4 py-3">{field.name}</th>)}
                     <th className="px-4 py-3 text-center">الإجراءات</th>
                   </tr>
                 </thead>
@@ -521,6 +536,10 @@ export const SalesView: React.FC = () => {
                           )}
                         </div>
                       </td>
+                      {operationalFields.map((field) => {
+                        const raw = operationalValuesByInvoice[inv.id]?.[field.id] || '';
+                        return <td key={field.id} className="px-4 py-3 text-slate-600">{field.values.find((option) => option.value === raw)?.label || raw || '—'}</td>;
+                      })}
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <IconButton title="معاينة الفاتورة" onClick={() => openInvoicePreview(inv)}><Eye className="w-4 h-4" /></IconButton>
@@ -609,6 +628,14 @@ export const SalesView: React.FC = () => {
         openVoid={openVoid}
         buildExportHtml={buildExportHtml}
         exportToExcel={exportToExcel}
+        operationalFields={operationalFields}
+        operationalFieldValues={selected ? operationalFieldService.getRecordValues('sales_invoices', selected.id) : {}}
+        canUpdateOperationalFields={canUpdateInvoice}
+        onSaveOperationalFields={(values) => {
+          if (!selected) return;
+          operationalFieldService.setRecordValues('sales_invoices', selected.id, values, 'update');
+          setOperationalValuesByInvoice((previous) => ({ ...previous, [selected.id]: values }));
+        }}
       />
     </div>
   );

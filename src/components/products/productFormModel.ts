@@ -28,10 +28,15 @@ export const GRADES: { value: CeramicGrade; label: string }[] = [
   { value: 'GRADE_3', label: 'فرز ثالث' },
   { value: 'COMMERCIAL', label: 'تجاري' },
 ];
+let configuredGradeLabels = new Map<string, string>();
+export const setConfiguredGradeLabels = (grades: Array<{ value: string; label: string }>) => {
+  configuredGradeLabels = new Map(grades.map((grade) => [grade.value, grade.label]));
+};
 
 export const round = (value: number, digits = 2) => Number(((Number.isFinite(value) ? value : 0)).toFixed(digits));
 
-export const gradeLabel = (grade: CeramicGrade) => GRADES.find((g) => g.value === grade)?.label || grade;
+export const gradeLabel = (grade: CeramicGrade) =>
+  configuredGradeLabels.get(grade) || GRADES.find((g) => g.value === grade)?.label || grade;
 
 export const calcMetersFromSize = (size: string, pieces: number): number | null => {
   const normalized = (size || '').replace(/[×*]/g, 'x');
@@ -186,10 +191,17 @@ export const pickCell = (row: Record<string, any>, keys: string[]): string => {
   return '';
 };
 
-export const parseGrade = (value: string): CeramicGrade => {
+export const parseGrade = (
+  value: string,
+  configuredGrades: Array<{ value: string; label: string; isActive?: boolean }> = [],
+): CeramicGrade => {
   const v = value.trim();
+  const match = configuredGrades.find((grade) =>
+    grade.value.toUpperCase() === v.toUpperCase() || grade.label.trim().toLocaleLowerCase() === v.toLocaleLowerCase(),
+  );
+  if (match) return match.value as CeramicGrade;
   if (v.includes('ثاني') || v.toUpperCase() === 'GRADE_2') return 'GRADE_2';
   if (v.includes('ثالث') || v.toUpperCase() === 'GRADE_3') return 'GRADE_3';
   if (v.includes('تجاري') || v.toUpperCase() === 'COMMERCIAL') return 'COMMERCIAL';
-  return 'GRADE_1';
+  return (configuredGrades.find((grade) => grade.isActive)?.value || 'GRADE_1') as CeramicGrade;
 };

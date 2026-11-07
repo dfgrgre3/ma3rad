@@ -64,7 +64,7 @@ export class PurchaseService {
 
   private requirePurchasesView(): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.view');
+    PermissionService.require(actor, 'ui.purchases.invoices.view');
   }
 
   private fetchPurchases(search?: string): PurchaseInvoice[] {
@@ -301,7 +301,7 @@ export class PurchaseService {
       throw new Error('لا يمكن إنشاء فاتورة توريد بدون أصناف.');
     }
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.invoices.create');
     ModuleRegistryService.assertModuleEnabled('purchasing');
     const branchId = this.branchAccess.requireWarehouseAccess(dto.warehouseId, actor);
     const warehouseCompany = this.db.query<{ companyId: string | null }>(
@@ -492,7 +492,7 @@ export class PurchaseService {
     idempotencyKey?: string
   ): { id: string; receiptNumber: string; amount: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'suppliers.payment');
+    PermissionService.require(actor, 'ui.suppliers.supplier_detail.payment');
     ModuleRegistryService.assertModuleEnabled('purchasing');
     const invoice = this.readPurchaseById(purchaseId);
     if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');
@@ -572,7 +572,7 @@ export class PurchaseService {
 
   public deletePurchase(purchaseId: string, reason: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.delete');
+    PermissionService.require(actor, 'ui.purchases.invoices.delete');
     ModuleRegistryService.assertModuleEnabled('purchasing');
     const invoice = this.readPurchaseById(purchaseId);
     if (!invoice) throw new Error('فاتورة الشراء غير موجودة.');

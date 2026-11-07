@@ -30,7 +30,7 @@ export const CategoryDistributionCard: React.FC<CategoryDistributionCardProps> =
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '6px', fontSize: '11px', padding: '4px 8px' }}
+              contentStyle={{ backgroundColor: 'var(--cerami-tooltip-surface)', borderColor: 'var(--cerami-tooltip-border)', color: 'var(--cerami-text)', borderRadius: '6px', fontSize: '11px', padding: '4px 8px' }}
               formatter={(val: any) => [CeramicMath.formatCurrency(Number(val)), 'المبيعات']}
             />
           </PieChartRecharts>

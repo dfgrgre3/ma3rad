@@ -56,8 +56,8 @@ const depreciationProgressOf = (asset: FixedAsset) => {
 export const FixedAssetsPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
   const user = AuthService.getCurrentUser();
-  const canManage = PermissionService.can(user, 'finance.approve');
-  const canExport = PermissionService.can(user, 'finance.export');
+  const canManage = PermissionService.can(user, 'ui.finance.assets.approve');
+  const canExport = PermissionService.can(user, 'ui.finance.assets.export');
   const [rows, setRows] = useState<FixedAsset[]>([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');

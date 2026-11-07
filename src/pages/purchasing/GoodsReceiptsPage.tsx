@@ -32,7 +32,7 @@ export const GoodsReceiptsPage: React.FC = () => {
   const poService = useMemo(() => new PurchaseOrderService(), []);
   const toast = useToast();
   const navigate = useNavigate();
-  const canCreate = PermissionService.can(AuthService.getCurrentUser(), 'purchases.create');
+  const canCreate = PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.receipts.create');
   const formatReceiptTotals = (receipt: GoodsReceiptRow, key: 'totalReceived' | 'totalAccepted' | 'totalDamaged' | 'totalShortage') =>
     (receipt.quantityBreakdown || []).map((unit) => `${fmt(unit[key])} ${unit.unitLabel}`).join('، ') || fmt(0);
   const unitForProduct = (productId: string) => {

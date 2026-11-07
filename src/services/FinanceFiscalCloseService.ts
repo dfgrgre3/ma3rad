@@ -10,19 +10,19 @@ import type { FiscalYear, FiscalPeriod } from '../types/finance';
 export abstract class FinanceFiscalCloseService extends FinanceEnterpriseContract01 {
   protected requireView() {
     const actor = AuthService.requireAuth();
-    PermissionService.requireAny(actor, ['finance.view', 'finance.close']);
+    PermissionService.requireAny(actor, ['ui.finance.overview.view', 'ui.finance.fiscal_closing.close']);
     return actor;
   }
 
   protected requireManage() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'finance.approve');
+    PermissionService.require(actor, 'ui.finance.receivables.approve');
     return actor;
   }
 
   protected requireClose() {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'finance.close');
+    PermissionService.require(actor, 'ui.finance.fiscal_closing.close');
     return actor;
   }
 

@@ -1,12 +1,16 @@
 import React from 'react';
 import { Barcode, Copy, Edit, Eye, Package, PackagePlus, Power, Trash2 } from 'lucide-react';
 import type { Product } from '../../types';
+import { DataTable, type DataTableColumn } from '../ui/DataTable';
 import { CeramicMath } from '../../utils/ceramicMath';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import { round, gradeLabel } from './productFormModel';
+import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
 
 export interface ProductsTableProps {
   products: Product[];
+  operationalFields?: OperationalFieldDefinition[];
+  operationalFieldValues?: Record<string, Record<string, string>>;
   selectedProductIds: string[];
   hasCeramicRows: boolean;
   canViewCosts: boolean;
@@ -31,6 +35,8 @@ export interface ProductsTableProps {
 
 export const ProductsTable: React.FC<ProductsTableProps> = ({
   products,
+  operationalFields = [],
+  operationalFieldValues = {},
   selectedProductIds,
   hasCeramicRows,
   canViewCosts,
@@ -51,96 +57,197 @@ export const ProductsTable: React.FC<ProductsTableProps> = ({
   onOpenBarcodes,
   onToggleActive,
   onDelete,
-}) => (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-right text-xs">
-              <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
-                <tr>
-                  {(canExportProducts || canDeleteProduct) && <th className="p-3.5 text-center"><input aria-label="تحديد كل أصناف الصفحة" type="checkbox" checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))} onChange={onTogglePageSelection} className="rounded border-slate-300 text-sky-600" /></th>}
-                  <th className="p-3.5">الصنف</th>
-                  <th className="p-3.5">الباركود / الكود</th>
-                  <th className="p-3.5">النوع والماركة</th>
-                  {hasCeramicRows && <th className="p-3.5">المقاس والفرز</th>}
-                  <th className="p-3.5">التحويل</th>
-                  {canViewCosts && <th className="p-3.5">التكلفة</th>}
-                  {canViewPricing && <th className="p-3.5">سعر الوحدة</th>}
-                  {hasCeramicRows && canViewPricing && <th className="p-3.5">سعر الكرتونة</th>}
-                  <th className="p-3.5 text-center">المخزون</th>
-                  <th className="p-3.5 text-center">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {products.map((p) => {
-                  const stock = stockOf(p);
-                  return (
-                    <tr key={p.id} className={`hover:bg-slate-50 transition ${p.isActive ? '' : 'opacity-60'}`}>
-                      {(canExportProducts || canDeleteProduct) && <td className="p-3.5 text-center"><input aria-label={`تحديد ${p.name}`} type="checkbox" checked={selectedProductIds.includes(p.id)} onChange={() => onToggleProductSelection(p.id)} className="rounded border-slate-300 text-sky-600" /></td>}
-                      <td className="p-3.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
-                            {p.imagePath ? <img src={p.imagePath} alt={p.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="w-4 h-4" /></div>}
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-900">{p.name}</div>
-                            <div className="text-[10px] text-slate-500">{p.color || '—'} | {p.finish || '—'} {!p.isActive && <span className="text-rose-500 font-bold">(موقوف)</span>}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3.5 font-mono">
-                        <div className="font-bold text-slate-900">{p.barcode}</div>
-                        <div className="text-[10px] text-slate-500">{p.sku}</div>
-                      </td>
-                      <td className="p-3.5">
-                        <div className="font-bold text-slate-700">{p.categoryName || '—'}</div>
-                        <div className="text-[10px] text-slate-500">{p.brandName || '—'}</div>
-                      </td>
-                      {hasCeramicRows && (
-                      <td className="p-3.5">
-                        <span className="font-bold text-slate-700">{p.productType === 'GENERAL' ? '—' : p.size}</span>
-                        {p.productType !== 'GENERAL' && (
-                        <div className="text-[10px]">
-                          <span className={`font-extrabold ${p.grade === 'GRADE_1' ? 'text-sky-600' : 'text-amber-600'}`}>{gradeLabel(p.grade)}</span>
-                        </div>
-                        )}
-                      </td>
-                      )}
-                      <td className="p-3.5 font-semibold text-slate-700">
-                        {p.productType === 'GENERAL' ? <div>وحدة المخزون: {getProductUnitLabel(p)}</div> : <>
-                          <div>{p.metersPerBox} {p.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
-                          <div className="text-[10px] text-slate-500">{p.piecesPerBox} قطعة / كرتونة</div>
-                        </>}
-                      </td>
-                      {canViewCosts && <td className="p-3.5 font-mono text-slate-600">{CeramicMath.formatCurrency(p.costPrice)}</td>}
-                      {canViewPricing && <td className="p-3.5 font-black text-sky-600">{CeramicMath.formatCurrency(p.sellingPriceM2)}</td>}
-                      {hasCeramicRows && canViewPricing && (
-                        <td className="p-3.5 font-bold text-slate-900">{p.productType === 'GENERAL' ? '—' : CeramicMath.formatCurrency(p.sellingPriceBox || (p.sellingPriceM2 * p.metersPerBox))}</td>
-                      )}
-                      <td className="p-3.5 text-center">
-                        <span className={`inline-block px-2 py-1 rounded-lg font-black text-[11px] ${stockTone(p)}`}>
-                          {p.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(p)}` : <>
-                            {CeramicMath.formatM2(stock.m2)}
-                            <span className="mx-1 text-slate-400">|</span>
-                            {round(stock.boxes)} كرتونة
-                            <span className="mx-1 text-slate-400">|</span>
-                            {Math.round(stock.pieces)} قطعة
-                          </>}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => onOpenDetails(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-sky-50 hover:text-sky-600 transition" title="عرض التفاصيل"><Eye className="w-4 h-4" /></button>
-                          {canAdjustInventory && <button onClick={() => onOpenStock(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 transition" title="إضافة كمية للمخزون"><PackagePlus className="w-4 h-4" /></button>}
-                          {canUpdateProduct && <button onClick={() => onOpenEdit(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition" title="تعديل"><Edit className="w-4 h-4" /></button>}
-                          {canCreateProduct && <button onClick={() => onDuplicate(p)} className="p-1.5 rounded-lg text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition" title="نسخ الصنف"><Copy className="w-4 h-4" /></button>}
-                          {canExportProducts && <button onClick={() => onOpenBarcodes()} className="p-1.5 rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-600 transition" title="طباعة باركود"><Barcode className="w-4 h-4" /></button>}
-                          {canDeleteProduct && <button onClick={() => onToggleActive(p)} className={`p-1.5 rounded-lg transition ${p.isActive ? 'text-slate-500 hover:bg-amber-50 hover:text-amber-600' : 'text-emerald-600 hover:bg-emerald-50'}`} title={p.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'}><Power className="w-4 h-4" /></button>}
-                          {canDeleteProduct && <button onClick={() => onDelete(p.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="حذف"><Trash2 className="w-4 h-4" /></button>}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+}) => {
+  const columns: DataTableColumn<Product>[] = [];
+
+  if (canExportProducts || canDeleteProduct) {
+    columns.push({
+      key: 'select',
+      header: (
+        <input
+          aria-label="تحديد كل أصناف الصفحة"
+          type="checkbox"
+          checked={products.length > 0 && products.every((product) => selectedProductIds.includes(product.id))}
+          onChange={onTogglePageSelection}
+          className="rounded border-slate-300 text-sky-600"
+        />
+      ),
+      headerClassName: 'text-center',
+      className: 'text-center',
+      render: (product) => (
+        <input
+          aria-label={`تحديد ${product.name}`}
+          type="checkbox"
+          checked={selectedProductIds.includes(product.id)}
+          onChange={() => onToggleProductSelection(product.id)}
+          className="rounded border-slate-300 text-sky-600"
+        />
+      ),
+    });
+  }
+
+  columns.push(
+    {
+      key: 'product',
+      header: 'الصنف',
+      render: (product) => (
+        <div className="flex items-center gap-2">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+            {product.imagePath
+              ? <img src={product.imagePath} alt={product.name} className="h-full w-full object-cover" />
+              : <div className="flex h-full w-full items-center justify-center text-slate-300"><Package className="h-4 w-4" /></div>}
           </div>
-);
+          <div>
+            <div className="font-bold text-slate-900">{product.name}</div>
+            <div className="text-[10px] text-slate-500">
+              {product.color || '—'} | {product.finish || '—'} {!product.isActive && <span className="font-bold text-rose-500">(موقوف)</span>}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'code',
+      header: 'الباركود / الكود',
+      className: 'font-mono',
+      render: (product) => (
+        <>
+          <div className="font-bold text-slate-900">{product.barcode}</div>
+          <div className="text-[10px] text-slate-500">{product.sku}</div>
+        </>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'النوع والماركة',
+      render: (product) => (
+        <>
+          <div className="font-bold text-slate-700">{product.categoryName || '—'}</div>
+          <div className="text-[10px] text-slate-500">{product.brandName || '—'}</div>
+        </>
+      ),
+    },
+  );
+
+  if (hasCeramicRows) {
+    columns.push({
+      key: 'size',
+      header: 'المقاس والفرز',
+      render: (product) => (
+        <>
+          <span className="font-bold text-slate-700">{product.productType === 'GENERAL' ? '—' : product.size}</span>
+          {product.productType !== 'GENERAL' && (
+            <div className="text-[10px]">
+              <span className={`font-extrabold ${product.grade === 'GRADE_1' ? 'text-sky-600' : 'text-amber-600'}`}>
+                {gradeLabel(product.grade)}
+              </span>
+            </div>
+          )}
+        </>
+      ),
+    });
+  }
+
+  operationalFields.forEach((field) => {
+    columns.push({
+      key: `operational-${field.id}`,
+      header: field.name,
+      render: (product) => operationalFieldValues[product.id]?.[field.name] || '—',
+    });
+  });
+
+  columns.push({
+    key: 'unit',
+    header: 'التحويل',
+    className: 'font-semibold text-slate-700',
+    render: (product) => product.productType === 'GENERAL' ? (
+      <div>وحدة المخزون: {getProductUnitLabel(product)}</div>
+    ) : (
+      <>
+        <div>{product.metersPerBox} {product.baseUnit === 'LINEAR_METER' ? 'م' : 'م²'} / كرتونة</div>
+        <div className="text-[10px] text-slate-500">{product.piecesPerBox} قطعة / كرتونة</div>
+      </>
+    ),
+  });
+
+  if (canViewCosts) {
+    columns.push({
+      key: 'cost',
+      header: 'التكلفة',
+      className: 'font-mono text-slate-600',
+      render: (product) => CeramicMath.formatCurrency(product.costPrice),
+    });
+  }
+  if (canViewPricing) {
+    columns.push({
+      key: 'price',
+      header: 'سعر الوحدة',
+      className: 'font-black text-sky-600',
+      render: (product) => CeramicMath.formatCurrency(product.sellingPriceM2),
+    });
+  }
+  if (hasCeramicRows && canViewPricing) {
+    columns.push({
+      key: 'box-price',
+      header: 'سعر الكرتونة',
+      className: 'font-bold text-slate-900',
+      render: (product) => product.productType === 'GENERAL'
+        ? '—'
+        : CeramicMath.formatCurrency(product.sellingPriceBox || (product.sellingPriceM2 * product.metersPerBox)),
+    });
+  }
+
+  columns.push(
+    {
+      key: 'stock',
+      header: 'المخزون',
+      headerClassName: 'text-center',
+      className: 'text-center',
+      render: (product) => {
+        const stock = stockOf(product);
+        return (
+          <span className={`inline-block rounded-lg px-2 py-1 text-[11px] font-black ${stockTone(product)}`}>
+            {product.productType === 'GENERAL' ? `${round(stock.m2, 3)} ${getProductUnitLabel(product)}` : (
+              <>
+                {CeramicMath.formatM2(stock.m2)}
+                <span className="mx-1 text-slate-400">|</span>
+                {round(stock.boxes)} كرتونة
+                <span className="mx-1 text-slate-400">|</span>
+                {Math.round(stock.pieces)} قطعة
+              </>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: 'الإجراءات',
+      headerClassName: 'text-center',
+      className: 'text-center',
+      render: (product) => (
+        <div className="flex items-center justify-center gap-1">
+          <button type="button" onClick={() => onOpenDetails(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-sky-50 hover:text-sky-600" title="عرض التفاصيل" aria-label={`عرض تفاصيل ${product.name}`}><Eye className="h-4 w-4" /></button>
+          {canAdjustInventory && <button type="button" onClick={() => onOpenStock(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-600" title="إضافة كمية للمخزون" aria-label={`إضافة كمية للمخزون: ${product.name}`}><PackagePlus className="h-4 w-4" /></button>}
+          {canUpdateProduct && <button type="button" onClick={() => onOpenEdit(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100" title="تعديل" aria-label={`تعديل ${product.name}`}><Edit className="h-4 w-4" /></button>}
+          {canCreateProduct && <button type="button" onClick={() => onDuplicate(product)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600" title="نسخ الصنف" aria-label={`نسخ ${product.name}`}><Copy className="h-4 w-4" /></button>}
+          {canExportProducts && <button type="button" onClick={onOpenBarcodes} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-violet-50 hover:text-violet-600" title="طباعة باركود" aria-label={`طباعة باركود ${product.name}`}><Barcode className="h-4 w-4" /></button>}
+          {canDeleteProduct && <button type="button" onClick={() => onToggleActive(product)} className={`rounded-lg p-1.5 transition ${product.isActive ? 'text-slate-500 hover:bg-amber-50 hover:text-amber-600' : 'text-emerald-600 hover:bg-emerald-50'}`} title={product.isActive ? 'إيقاف الصنف' : 'تفعيل الصنف'} aria-label={`${product.isActive ? 'إيقاف' : 'تفعيل'} ${product.name}`}><Power className="h-4 w-4" /></button>}
+          {canDeleteProduct && <button type="button" onClick={() => onDelete(product.id)} className="rounded-lg p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600" title="حذف" aria-label={`حذف ${product.name}`}><Trash2 className="h-4 w-4" /></button>}
+        </div>
+      ),
+    },
+  );
+
+  return (
+    <DataTable
+      ariaLabel="قائمة الأصناف"
+      columns={columns}
+      rows={products}
+      rowKey={(product) => product.id}
+      tableClassName="text-right text-xs"
+      minWidth={1200}
+      rowClassName={(product) => `${product.isActive ? '' : 'opacity-60'} transition-colors hover:bg-slate-50`}
+    />
+  );
+};

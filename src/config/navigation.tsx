@@ -10,4 +10,5 @@ export const NAV_STORAGE_KEYS = {
   labels: 'nav.labels',
   groupsOrder: 'nav.groupsOrder',
   itemsOrder: 'nav.itemsOrder',
+  groupAssignments: 'nav.groupAssignments',
 } as const;

@@ -103,10 +103,11 @@ const ApprovalRequestCard: React.FC<ApprovalRequestCardProps> = ({
 export const ApprovalsPage: React.FC = () => {
   const service = useMemo(() => new ApprovalService(), []);
   const user = AuthService.getCurrentUser();
-  const canApprove = PermissionService.can(user, 'approvals.approve');
-  const canReject = PermissionService.can(user, 'approvals.reject');
-  const canCancel = PermissionService.can(user, 'approvals.cancel');
-  const canCreate = PermissionService.can(user, 'approvals.create');
+  // صلاحيات دقيقة لكل زر مع توافق خلفي مع أكواد approvals.* القديمة.
+  const canApprove = PermissionService.can(user, 'ui.approvals.inbox.approve');
+  const canReject = PermissionService.can(user, 'ui.approvals.inbox.reject');
+  const canCancel = PermissionService.can(user, 'ui.approvals.inbox.cancel');
+  const canCreate = PermissionService.can(user, 'ui.approvals.inbox.create');
 
   const [requests, setRequests] = useState<ApprovalRequest[]>([]);
   const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });

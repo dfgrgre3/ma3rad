@@ -926,7 +926,7 @@ export class ManufacturingService {
       if (!['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(input.status)) throw new Error('حالة الصيانة غير صالحة.');
       updates.push('status = ?'); params.push(input.status);
       if (input.status === 'COMPLETED' && !input.completedDate) {
-        updates.push('completed_date = ?'); params.push(new Date().toISOString().slice(0, 10));
+        updates.push('completed_date = ?'); params.push(localDateString());
       }
     }
     if (input.completedDate !== undefined) {

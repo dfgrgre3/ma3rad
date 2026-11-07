@@ -11,6 +11,9 @@ import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import type { Product } from '../../types';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/useBusinessTerm';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
 
 const STATUS: Record<ProjectStatus, { label: string; color: string }> = {
   PLANNED: { label: 'قيد التخطيط', color: 'text-amber-700 bg-amber-50 border-amber-200' },
@@ -32,9 +35,10 @@ export const ProjectDetailPage: React.FC = () => {
   const projectsLabel = useBusinessTerm('entities.projects.plural');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const service = new ProjectService();
+  const fieldService = new OperationalFieldService();
   const user = AuthService.getCurrentUser();
-  const canUpdate = PermissionService.can(user, 'projects.update');
-  const canApprove = PermissionService.can(user, 'projects.approve');
+  const canUpdate = PermissionService.can(user, 'ui.projects.detail.update');
+  const canApprove = PermissionService.can(user, 'ui.projects.detail.approve');
 
   const [project, setProject] = useState<Project | null>(null);
   const [units, setUnits] = useState<ProjectUnit[]>([]);
@@ -47,6 +51,8 @@ export const ProjectDetailPage: React.FC = () => {
   const [unitForm, setUnitForm] = useState({ name: '', unitType: 'APARTMENT', areaM2: '', parentId: '' });
   const [productForm, setProductForm] = useState({ productId: '', unitId: '', plannedQuantityM2: '', agreedPriceM2: '' });
   const [saving, setSaving] = useState(false);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
 
   const load = () => {
     setLoading(true);
@@ -54,6 +60,8 @@ export const ProjectDetailPage: React.FC = () => {
       const p = service.getProjectById(id);
       if (!p) { setError('المشروع غير موجود.'); return; }
       setProject(p);
+      setOperationalFields(fieldService.getDefinitions('projects'));
+      setOperationalFieldValues(fieldService.getRecordValues('projects', id));
       setUnits(service.getUnits(id));
       setProducts(service.getProjectProducts(id));
       setCatalog(new ProductService().getAllProducts());
@@ -409,6 +417,7 @@ export const ProjectDetailPage: React.FC = () => {
         )}
 
         {tab === 'info' && (
+          <div className="space-y-4">
           <div className="bg-white rounded-xl border border-slate-200 p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
             {[
               { label: 'كود المشروع', value: project.code, icon: Boxes },
@@ -437,6 +446,18 @@ export const ProjectDetailPage: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+          <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />
+          <OperationalFieldsRecordEditor
+            recordLabel={project.name}
+            fields={operationalFields}
+            initialValues={operationalFieldValues}
+            canEdit={canUpdate}
+            onSave={(values) => {
+              fieldService.setRecordValues('projects', id, values, 'update');
+              setOperationalFieldValues(values);
+            }}
+          />
           </div>
         )}
       </div>

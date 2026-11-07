@@ -8,6 +8,21 @@ const DB_IDB_NAME = 'ceramisys_database';
 const DB_IDB_STORE = 'snapshots';
 const DB_IDB_KEY = 'main';
 type DatabaseFileApi = NonNullable<NonNullable<Window['ceramisys']>['db']>;
+type DatabaseManagerState = {
+  instance: DatabaseManager | null;
+  numberFormatter: ((prefix: string, seq: number, date: Date) => string) | null;
+};
+const DATABASE_MANAGER_STATE_KEY = '__ceramisysDatabaseManagerState__';
+
+function getDatabaseManagerState(): DatabaseManagerState {
+  const runtime = globalThis as typeof globalThis & {
+    __ceramisysDatabaseManagerState__?: DatabaseManagerState;
+  };
+  if (!runtime[DATABASE_MANAGER_STATE_KEY]) {
+    runtime[DATABASE_MANAGER_STATE_KEY] = { instance: null, numberFormatter: null };
+  }
+  return runtime[DATABASE_MANAGER_STATE_KEY]!;
+}
 
 function openDatabaseStorage(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -116,8 +131,6 @@ function snakeToCamelKeys<T extends Record<string, unknown>>(row: T): T {
 }
 
 export class DatabaseManager {
-  private static instance: DatabaseManager;
-  private static numberFormatter: ((prefix: string, seq: number, date: Date) => string) | null = null;
   private db: Database | null = null;
   private databaseFacade: Database | null = null;
   private databaseFacadeTarget: Database | null = null;
@@ -148,10 +161,11 @@ export class DatabaseManager {
   private constructor() {}
 
   public static getInstance(): DatabaseManager {
-    if (!DatabaseManager.instance) {
-      DatabaseManager.instance = new DatabaseManager();
+    const state = getDatabaseManagerState();
+    if (!state.instance) {
+      state.instance = new DatabaseManager();
     }
-    return DatabaseManager.instance;
+    return state.instance;
   }
 
   /**
@@ -162,7 +176,7 @@ export class DatabaseManager {
   public static setNumberFormatter(
     formatter: ((prefix: string, seq: number, date: Date) => string) | null,
   ): void {
-    DatabaseManager.numberFormatter = formatter;
+    getDatabaseManagerState().numberFormatter = formatter;
   }
 
   public initialize(): Promise<Database> {
@@ -186,10 +200,11 @@ export class DatabaseManager {
       this.db = null;
     }
 
-    await this.initializeSqlEngine();
-
     const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
-    const { savedBytes, loadedFromFile } = await this.loadSavedBytes(fileApi);
+    const [, { savedBytes, loadedFromFile }] = await Promise.all([
+      this.initializeSqlEngine(),
+      this.loadSavedBytes(fileApi),
+    ]);
     const isFreshDatabase = await this.openDatabase(savedBytes);
     this.selectStorageBackend(fileApi);
     await this.backupBeforeGrossProfitMigration(savedBytes, loadedFromFile, isFreshDatabase, fileApi);
@@ -219,14 +234,14 @@ export class DatabaseManager {
       );
     }
 
-    console.log('🔄 Loading SQL.js engine. WASM URL:', wasmUrl);
+    console.log('[database] Loading SQL.js engine. WASM URL:', wasmUrl);
     try {
       this.SQL = await initSqlJsFn({
         locateFile: (_file: string) => wasmUrl,
       });
-      console.log('✅ SQL.js engine ready.');
+      console.log('[database] SQL.js engine ready.');
     } catch (err) {
-      console.error('❌ SQL.js failed to load:', err);
+      console.error('[database] SQL.js failed to load:', err);
       throw err;
     }
   }
@@ -330,7 +345,7 @@ export class DatabaseManager {
         try {
           savedBytes = base64ToBytes(legacy);
           this.migratedLegacyStorage = true;
-          console.log('✅ Found legacy database snapshot; migrating it to a file.');
+          console.log('[database] Found legacy database snapshot; migrating it to a file.');
         } catch (e) {
           console.error('Failed to decode legacy database snapshot', e);
         }
@@ -350,7 +365,7 @@ export class DatabaseManager {
         // Verify file is a valid readable SQLite database immediately
         loadedDb.exec("SELECT 1 FROM sqlite_master LIMIT 1");
         this.db = loadedDb;
-        console.log(`✅ Loaded existing SQLite database (${this.storageBackend === 'file' ? 'file' : 'legacy storage'}).`);
+        console.log(`[database] Loaded existing SQLite database (${this.storageBackend === 'file' ? 'file' : 'legacy storage'}).`);
       } catch (e) {
         throw await this.databaseRecoveryError(e);
       }
@@ -402,7 +417,7 @@ export class DatabaseManager {
     fileApi: DatabaseFileApi | undefined
   ): Promise<void> {
     if (report.failed.length > 0) {
-      console.error('⚠️ Some migrations did not apply; they will be retried on next launch.', report.failed);
+      console.error('[database] Some migrations did not apply; they will be retried on next launch.', report.failed);
       let backupMessage = '';
       if (!isFreshDatabase && fileApi?.preserveCorrupt) {
         try {
@@ -789,7 +804,7 @@ export class DatabaseManager {
     const next = (row?.value ?? 0) + 1;
     this.run('UPDATE sequence_counters SET value = ? WHERE name = ?', [next, prefix]);
     const year = new Date().getFullYear();
-    const custom = DatabaseManager.numberFormatter?.(prefix, next, new Date());
+    const custom = getDatabaseManagerState().numberFormatter?.(prefix, next, new Date());
     if (custom) return custom;
     return `${prefix}-${year}-${String(next).padStart(6, '0')}`;
   }

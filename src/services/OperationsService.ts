@@ -115,7 +115,7 @@ export class OperationsService {
   // ── Branches ───────────────────────────────────────────────────────────────
   public getBranches(search = '', includeAllAuthorizedBranches = false): Branch[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'branches.view');
+    PermissionService.require(actor, 'ui.branches.branches.view');
     PermissionService.require(actor, 'operations.view');
     const scope = this.branchAccess.sqlScope('b.id', undefined, actor, includeAllAuthorizedBranches);
     let sql = `
@@ -160,9 +160,9 @@ export class OperationsService {
     isDefault?: boolean;
   }): Branch {
     ModuleRegistryService.assertModuleEnabled('operations');
-    this.requireManage('branches.manage');
-    PermissionService.require(AuthService.getCurrentUser(), 'branches.create');
-    PermissionService.require(AuthService.getCurrentUser(), 'branches.access_all');
+    this.requireManage('ui.branches.branches.manage');
+    PermissionService.require(AuthService.getCurrentUser(), 'ui.branches.branches.create');
+    PermissionService.require(AuthService.getCurrentUser(), 'ui.branches.branches.access_all');
     CentralUsageLimitService.assertWithin('maxBranches');
     const trimmedName = input.name?.trim();
     if (!trimmedName) throw new Error('اسم الفرع مطلوب.');
@@ -264,7 +264,7 @@ export class OperationsService {
   // ── Warehouses ─────────────────────────────────────────────────────────────
   public getWarehouses(search = ''): WarehouseRow[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'warehouses.view');
+    PermissionService.require(actor, 'ui.warehouses.warehouses.view');
     PermissionService.require(actor, 'operations.view');
     const scope = this.branchAccess.sqlScope('w.branch_id', undefined, actor);
     let sql = `
@@ -314,7 +314,7 @@ export class OperationsService {
   // ── Drivers ────────────────────────────────────────────────────────────────
   public getDrivers(search = ''): Driver[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'drivers.view');
+    PermissionService.require(actor, 'ui.drivers.drivers.view');
     PermissionService.require(actor, 'operations.view');
     let sql = `
       SELECT d.*, (SELECT COUNT(*) FROM deliveries dl WHERE dl.driver_id = d.id) AS trips_count
@@ -356,7 +356,7 @@ export class OperationsService {
   // ── Vehicles ───────────────────────────────────────────────────────────────
   public getVehicles(search = ''): Vehicle[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'vehicles.view');
+    PermissionService.require(actor, 'ui.vehicles.vehicles.view');
     PermissionService.require(actor, 'operations.view');
     let sql = `
       SELECT v.*, d.full_name AS assigned_driver_name
@@ -417,7 +417,7 @@ export class OperationsService {
   // ── Deliveries ─────────────────────────────────────────────────────────────
   public getDeliveries(search = '', status = 'ALL'): Delivery[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'deliveries.view');
+    PermissionService.require(actor, 'ui.deliveries.deliveries.view');
     PermissionService.require(actor, 'operations.view');
     let sql = `
       SELECT dl.*, c.name AS customer_name, c.phone AS customer_phone,

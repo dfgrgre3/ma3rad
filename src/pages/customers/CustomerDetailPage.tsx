@@ -16,6 +16,8 @@ import { useToast } from '../../components/ui/Toast';
 import { format, isValid } from 'date-fns';
 import { Customer, Product } from '../../types';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/useBusinessTerm';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
 
 type Tab = 'overview' | 'sales' | 'quotations' | 'orders' | 'needs' | 'payments' | 'returns' | 'debts' | 'projects' | 'activities' | 'timeline' | 'prices';
 
@@ -111,6 +113,8 @@ export const CustomerDetailPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [overrideForm, setOverrideForm] = useState({ productId: '', priceM2: '', validFrom: '', validTo: '' });
   const [savingOverride, setSavingOverride] = useState(false);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
   const toast = useToast();
 
   const reloadOverrides = (customerId: string) => {
@@ -186,6 +190,9 @@ export const CustomerDetailPage: React.FC = () => {
       const projectScope = branchAccess.sqlScope('pr.branch_id');
       const projectClause = `(pr.branch_id IS NULL OR ${projectScope.clause})`;
       setCustomer(new CustomerService().getCustomerById(id));
+      const fieldService = new OperationalFieldService();
+      setOperationalFields(fieldService.getDefinitions('customers'));
+      setOperationalFieldValues(fieldService.getRecordValues('customers', id));
       const availableLists: Record<string, CustomerDetailRow[]> = {};
       if (can('sales.view')) {
         try {
@@ -436,6 +443,13 @@ export const CustomerDetailPage: React.FC = () => {
                 هذا سجل عميل وبيانات تعاملات، وليس حساب مستخدم للبرنامج. لا يخزّن النظام اسم دخول أو كلمة مرور مرتبطة بهذا العميل، لذلك لا توجد كلمة مرور لعرضها أو استعادتها.
               </p>
             </div>
+            <OperationalFieldsForm
+              fields={operationalFields}
+              values={operationalFieldValues}
+              onChange={() => undefined}
+              title="الحقول الإضافية"
+              readOnly
+            />
           </div>
         )}
 

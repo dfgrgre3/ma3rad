@@ -26,13 +26,13 @@ export class SupplierService {
 
   private requireSuppliersView(): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'suppliers.view');
+    PermissionService.require(actor, 'ui.suppliers.suppliers.view');
   }
 
   /** Supplier directory is also needed to record purchases, receipts and quotations. */
   private requireSuppliersDirectory(): void {
     const actor = AuthService.requireAuth();
-    PermissionService.requireAny(actor, ['suppliers.view', 'purchases.create', 'purchases.view']);
+    PermissionService.requireAny(actor, ['ui.suppliers.suppliers.view', 'purchases.create', 'purchases.view']);
   }
 
   /** Internal read used by mutations; public reads additionally require `suppliers.view`. */
@@ -64,8 +64,8 @@ export class SupplierService {
 
   public createSupplier(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { initialBalance?: number }): Supplier {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'suppliers.create');
-    if (Number(supplier.initialBalance || 0) !== 0) PermissionService.require(actor, 'finance.approve');
+    PermissionService.require(actor, 'ui.suppliers.suppliers.create');
+    if (Number(supplier.initialBalance || 0) !== 0) PermissionService.require(actor, 'ui.finance.receivables.approve');
     const cleanName = String(supplier.name || '').trim();
     if (!cleanName) throw new Error('اسم المورد مطلوب.');
     if (!String(supplier.phone || '').trim()) throw new Error('رقم هاتف المورد مطلوب.');
@@ -101,8 +101,8 @@ export class SupplierService {
 
   public updateSupplier(id: string, updates: Partial<Supplier>): Supplier {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'suppliers.update');
-    if (updates.isActive !== undefined) PermissionService.require(actor, 'suppliers.delete');
+    PermissionService.require(actor, 'ui.suppliers.suppliers.update');
+    if (updates.isActive !== undefined) PermissionService.require(actor, 'ui.suppliers.suppliers.delete');
     const existing = this.readSupplier(id);
     if (!existing) throw new Error('المورد غير موجود.');
 
@@ -163,7 +163,7 @@ export class SupplierService {
     invoiceId?: string
   ): SupplierPayment {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'suppliers.payment');
+    PermissionService.require(actor, 'ui.suppliers.suppliers.payment');
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('يجب أن يكون مبلغ السداد أكبر من الصفر.');
     const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
 
@@ -284,7 +284,7 @@ export class SupplierService {
 
   public getSupplierStatement(supplierId: string, fromDate?: string, toDate?: string) {
     this.requireSuppliersView();
-    PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.finance.receivables.view');
     const sup = this.readSupplier(supplierId);
     if (!sup) throw new Error('المورد غير موجود.');
 
@@ -408,7 +408,10 @@ export class SupplierService {
       }))
     ];
 
-    allRecords.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    allRecords.sort((a, b) =>
+      String(a.date).localeCompare(String(b.date)) ||
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
 
     const totalDebits = Number(totals?.payments || 0) + Number(totals?.returns || 0) + Number(totals?.claims || 0);
     const historicalOpening = Number(sup.currentBalance || 0) -
@@ -436,7 +439,7 @@ export class SupplierService {
 
   public getInvoicesWithAllocations(supplierId: string) {
     this.requireSuppliersView();
-    PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.finance.receivables.view');
     const invoiceScope = this.branchAccess.sqlScope(
       'pi.branch_id',
       '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)',
@@ -466,7 +469,7 @@ export class SupplierService {
 
   public getPaymentsWithAllocations(supplierId: string) {
     this.requireSuppliersView();
-    PermissionService.require(AuthService.requireAuth(), 'finance.debts.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.finance.receivables.view');
     const paymentScope = this.branchAccess.sqlScope(
       'sp.branch_id',
       '(SELECT cr.branch_id FROM cash_registers cr WHERE cr.id = sp.register_id)',
@@ -480,7 +483,8 @@ export class SupplierService {
 
     return payments.map(pay => {
       const allocations = this.db.query<any>(`
-        SELECT a.id, a.amount, pi.invoice_number AS invoiceNumber, pi.date AS invoiceDate, pi.total_amount AS invoiceTotal
+        SELECT a.id, a.purchase_invoice_id AS purchaseInvoiceId, a.amount,
+          pi.invoice_number AS invoiceNumber, pi.date AS invoiceDate, pi.total_amount AS invoiceTotal
         FROM supplier_payment_allocations a
         JOIN purchase_invoices pi ON pi.id = a.purchase_invoice_id
         WHERE a.payment_id = ?
@@ -497,47 +501,107 @@ export class SupplierService {
 
   public reallocateSupplierPayment(paymentId: string, allocations: { purchaseInvoiceId: string; amount: number }[]) {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'suppliers.payment');
-    PermissionService.require(actor, 'finance.debts.view');
+    PermissionService.require(actor, 'ui.suppliers.suppliers.payment');
+    PermissionService.require(actor, 'ui.finance.receivables.view');
+    if (!Array.isArray(allocations)) throw new Error('قائمة التوزيعات غير صحيحة.');
 
-    const payment = this.db.query<any>(`SELECT * FROM supplier_payments WHERE id = ?`, [paymentId])[0];
-    if (!payment) throw new Error('سند الصرف غير موجود.');
-
-    const totalAlloc = allocations.reduce((s, a) => s + Number(a.amount || 0), 0);
-    if (totalAlloc > Number(payment.amount) + 0.01) {
-      throw new Error(`مجموع التوزيعات (${totalAlloc} ج) يتجاوز قيمة السند (${payment.amount} ج).`);
+    const requested = new Map<string, number>();
+    const seenInvoices = new Set<string>();
+    for (const item of allocations) {
+      const invoiceId = String(item?.purchaseInvoiceId || '').trim();
+      const amount = Number(item?.amount);
+      if (!invoiceId || !Number.isFinite(amount) || amount < 0) {
+        throw new Error('بيانات تخصيص الفاتورة غير صحيحة.');
+      }
+      if (seenInvoices.has(invoiceId)) throw new Error('لا يمكن إضافة الفاتورة نفسها أكثر من مرة في التوزيع.');
+      seenInvoices.add(invoiceId);
+      const cents = Math.round(amount * 100);
+      if (cents > 0) requested.set(invoiceId, cents);
     }
 
     this.db.executeTransaction((db) => {
-      // 1. Remove previous allocations for this payment and revert invoice paid amounts
-      const oldAllocations = db.query<any>(`SELECT purchase_invoice_id, amount FROM supplier_payment_allocations WHERE payment_id = ?`, [paymentId]);
+      const payment = db.query<any>(`
+        SELECT sp.id, sp.supplier_id AS supplierId, sp.amount,
+          COALESCE(sp.branch_id, cr.branch_id) AS effectiveBranchId
+        FROM supplier_payments sp
+        LEFT JOIN cash_registers cr ON cr.id = sp.register_id
+        WHERE sp.id = ?
+      `, [paymentId])[0];
+      if (!payment) throw new Error('سند الصرف غير موجود.');
+      if (!payment.effectiveBranchId) throw new Error('سند الصرف غير مرتبط بفرع.');
+      this.branchAccess.requireBranchAccess(payment.effectiveBranchId, actor);
+
+      const paymentCents = Math.round(Number(payment.amount) * 100);
+      const requestedCents = [...requested.values()].reduce((sum, amount) => sum + amount, 0);
+      if (!Number.isFinite(paymentCents) || paymentCents <= 0 || requestedCents > paymentCents) {
+        throw new Error(`مجموع التوزيعات (${(requestedCents / 100).toFixed(2)} ج) يتجاوز قيمة السند (${payment.amount} ج).`);
+      }
+
+      const oldAllocations = db.query<any>(`
+        SELECT purchase_invoice_id AS purchaseInvoiceId, amount
+        FROM supplier_payment_allocations
+        WHERE payment_id = ?
+      `, [paymentId]);
+      const priorByInvoice = new Map<string, number>();
       for (const old of oldAllocations) {
+        const invoiceId = String(old.purchaseInvoiceId);
+        const amountCents = Math.round(Number(old.amount) * 100);
+        if (!invoiceId || !Number.isFinite(amountCents) || amountCents < 0) {
+          throw new Error('تخصيص سابق غير صالح على سند الصرف.');
+        }
+        priorByInvoice.set(invoiceId, (priorByInvoice.get(invoiceId) || 0) + amountCents);
+      }
+
+      const invoiceStates = new Map<string, { paidCents: number; totalCents: number }>();
+      for (const invoiceId of new Set([...priorByInvoice.keys(), ...requested.keys()])) {
+        const invoice = db.query<any>(`
+          SELECT pi.id, pi.supplier_id AS supplierId, pi.paid_amount AS paidAmount,
+            pi.total_amount AS totalAmount, COALESCE(pi.branch_id, w.branch_id) AS effectiveBranchId
+          FROM purchase_invoices pi
+          LEFT JOIN warehouses w ON w.id = pi.warehouse_id
+          WHERE pi.id = ?
+        `, [invoiceId])[0];
+        if (!invoice || invoice.supplierId !== payment.supplierId ||
+            invoice.effectiveBranchId !== payment.effectiveBranchId) {
+          throw new Error('الفاتورة غير تابعة لهذا المورد أو خارج نطاق فرع السند.');
+        }
+        const paidAmount = Number(invoice.paidAmount || 0);
+        const totalAmount = Number(invoice.totalAmount || 0);
+        if (!Number.isFinite(paidAmount) || !Number.isFinite(totalAmount) || paidAmount < 0 || totalAmount < 0) {
+          throw new Error(`أرصدة الفاتورة ${invoiceId} غير صالحة.`);
+        }
+        const paidCents = Math.round(paidAmount * 100);
+        const totalCents = Math.round(totalAmount * 100);
+        const priorCents = priorByInvoice.get(invoiceId) || 0;
+        const capacityCents = Math.max(0, totalCents - Math.max(0, paidCents - priorCents));
+        const requestedAmountCents = requested.get(invoiceId) || 0;
+        if (requestedAmountCents > capacityCents) {
+          throw new Error(`التوزيع يتجاوز المتبقي المتاح على الفاتورة ${invoiceId}.`);
+        }
+        invoiceStates.set(invoiceId, { paidCents, totalCents });
+      }
+
+      db.run(`DELETE FROM supplier_payment_allocations WHERE payment_id = ?`, [paymentId]);
+      for (const invoiceId of invoiceStates.keys()) {
+        const state = invoiceStates.get(invoiceId)!;
+        const adjustedPaidCents = Math.max(0, state.paidCents - (priorByInvoice.get(invoiceId) || 0))
+          + (requested.get(invoiceId) || 0);
+        const remainingCents = Math.max(0, state.totalCents - adjustedPaidCents);
+        const paidAmount = adjustedPaidCents / 100;
+        const remainingAmount = remainingCents / 100;
         db.run(`
           UPDATE purchase_invoices
-          SET paid_amount = MAX(0, paid_amount - ?),
-              remaining_amount = total_amount - MAX(0, paid_amount - ?),
-              payment_status = CASE WHEN total_amount - MAX(0, paid_amount - ?) <= 0.01 THEN 'PAID' ELSE 'PARTIAL' END
+          SET paid_amount = ?, remaining_amount = ?,
+              payment_status = CASE WHEN ? <= 1 THEN 'PAID' ELSE 'PARTIAL' END
           WHERE id = ?
-        `, [old.amount, old.amount, old.amount, old.purchase_invoice_id]);
+        `, [paidAmount, remainingAmount, remainingCents, invoiceId]);
       }
-      db.run(`DELETE FROM supplier_payment_allocations WHERE payment_id = ?`, [paymentId]);
 
-      // 2. Insert new allocations and update invoices
-      for (const item of allocations) {
-        const val = Math.round(Number(item.amount) * 100) / 100;
-        if (val <= 0) continue;
+      for (const [invoiceId, amountCents] of requested) {
         db.run(`
           INSERT INTO supplier_payment_allocations (id, payment_id, purchase_invoice_id, amount)
           VALUES (?, ?, ?, ?)
-        `, [`spa_${uuidv4().substring(0, 8)}`, paymentId, item.purchaseInvoiceId, val]);
-
-        db.run(`
-          UPDATE purchase_invoices
-          SET paid_amount = paid_amount + ?,
-              remaining_amount = MAX(0, total_amount - (paid_amount + ?)),
-              payment_status = CASE WHEN MAX(0, total_amount - (paid_amount + ?)) <= 0.01 THEN 'PAID' ELSE 'PARTIAL' END
-          WHERE id = ?
-        `, [val, val, val, item.purchaseInvoiceId]);
+        `, [`spa_${uuidv4().substring(0, 8)}`, paymentId, invoiceId, amountCents / 100]);
       }
     });
   }

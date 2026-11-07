@@ -87,8 +87,8 @@ export class EmployeeService {
   private static requireView() {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
-      'employees.view', 'employees.payroll.view', 'employees.financials.view',
-      'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage',
+      'ui.employees.employees.view', 'employees.payroll.view', 'employees.financials.view',
+      'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage',
     ]);
     return actor;
   }
@@ -96,14 +96,14 @@ export class EmployeeService {
   private static requireManage() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.require(actor, 'employees.manage');
+    PermissionService.require(actor, 'ui.employees.employees.manage');
     return actor;
   }
 
   private static requirePayrollView() {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
-      'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage',
+      'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage',
     ]);
     return actor;
   }
@@ -111,7 +111,7 @@ export class EmployeeService {
   private static requireFinancialView() {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
-      'employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage',
+      'employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage',
     ]);
     return actor;
   }
@@ -119,14 +119,14 @@ export class EmployeeService {
   private static requirePayrollManage() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.requireAny(actor, ['employees.payroll.manage', 'employees.manage']);
+    PermissionService.requireAny(actor, ['employees.payroll.manage', 'ui.employees.employees.manage']);
     return actor;
   }
 
   private static requirePayrollApproval() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.requireAny(actor, ['employees.payroll.approve', 'employees.manage']);
+    PermissionService.requireAny(actor, ['employees.payroll.approve', 'ui.employees.employees.manage']);
     return actor;
   }
 
@@ -144,7 +144,7 @@ export class EmployeeService {
 
   static getAll(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Employee[] {
     const actor = this.requireView();
-    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
+    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage']);
     const salaryColumns = canSeeFinancials
       ? 'base_salary AS baseSalary, salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
@@ -182,7 +182,7 @@ export class EmployeeService {
     const actor = this.requireView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
-    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage']);
+    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage']);
     const salaryColumns = canSeeFinancials
       ? 'base_salary AS baseSalary, salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";

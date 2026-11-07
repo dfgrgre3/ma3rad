@@ -13,7 +13,7 @@ import { BusinessRecordSyncService } from '../sync/BusinessRecordSyncService';
 export class InventoryServicePart08 extends InventoryServicePart07 {
 public getTransferItems(transferId: string): any[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'ui.inventory.hub.transfer');
     this.requireTransferWarehouseAuthorization(transferId, actor);
     return this.db.query<any>(`
       SELECT 
@@ -50,7 +50,7 @@ public createTransferRequest(input: {
   }): string {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'ui.inventory.hub.transfer');
 
     if (input.fromWarehouseId === input.toWarehouseId) {
       throw new Error('لا يمكن التحويل لنفس المخزن.');
@@ -143,7 +143,7 @@ public createTransferRequest(input: {
 public approveTransfer(transferId: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'ui.inventory.hub.transfer');
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');
@@ -160,7 +160,7 @@ public approveTransfer(transferId: string): void {
 public prepareTransfer(transferId: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'ui.inventory.hub.transfer');
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');

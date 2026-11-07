@@ -5,6 +5,7 @@ import {
 import type { Warehouse } from '../../types';
 import type { CategoryWithCount } from '../../services/CategoryService';
 import type { SortMode } from './types';
+import type { ProductGradeOption } from '../../services/OperationalFieldService';
 
 export interface PosCatalogFiltersProps {
   barcodeInputRef: React.RefObject<HTMLInputElement>;
@@ -23,6 +24,7 @@ export interface PosCatalogFiltersProps {
   onBrandChange: (brandId: string) => void;
   hasCeramicCatalog: boolean;
   selectedGrade: string;
+  gradeOptions: ProductGradeOption[];
   onGradeChange: (grade: string) => void;
   visibleSizes: string[];
   selectedSize: string;
@@ -59,6 +61,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
   onBrandChange,
   hasCeramicCatalog,
   selectedGrade,
+  gradeOptions,
   onGradeChange,
   visibleSizes,
   selectedSize,
@@ -147,7 +150,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
       {hasCeramicCatalog && (<>
         <label htmlFor="pos-grade-filter" className="sr-only">فلتر الفرز</label>
         <select id="pos-grade-filter" aria-label="فلتر الفرز" value={selectedGrade} onChange={(e) => onGradeChange(e.target.value)} className={selectCls}>
-          <option value="ALL">كل الأنواع والفرز</option><option value="GRADE_1">فرز أول</option><option value="GRADE_2">فرز ثاني</option><option value="GRADE_3">فرز ثالث</option><option value="COMMERCIAL">تجاري</option>
+          <option value="ALL">كل الأنواع والفرز</option>{gradeOptions.map((grade) => <option key={grade.value} value={grade.value}>{grade.label}</option>)}
         </select>
         {visibleSizes.length > 0 && (<>
           <label htmlFor="pos-size-filter" className="sr-only">فلتر المقاس</label>

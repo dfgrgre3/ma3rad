@@ -14,7 +14,7 @@ public createActivity(input: {
     body?: string; scheduledAt?: string; assignedTo?: string;
   }): CrmActivity {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.create');
+    PermissionService.require(actor, 'ui.crm.leads.create');
     if (!input.leadId && !input.customerId) {
       throw new Error('يجب ربط النشاط بعميل محتمل أو عميل مسجل.');
     }
@@ -36,7 +36,7 @@ public createActivity(input: {
 
 public completeActivity(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.update');
+    PermissionService.require(actor, 'ui.crm.leads.update');
     this.db.run(
       `UPDATE crm_activities SET status = 'COMPLETED', completed_at = ? WHERE id = ?`,
       [new Date().toISOString(), id]
@@ -45,13 +45,13 @@ public completeActivity(id: string): void {
 
 public cancelActivity(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.update');
+    PermissionService.require(actor, 'ui.crm.leads.update');
     this.db.run(`UPDATE crm_activities SET status = 'CANCELLED' WHERE id = ?`, [id]);
   }
 
 public deleteActivity(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.update');
+    PermissionService.require(actor, 'ui.crm.leads.update');
     this.db.run(`DELETE FROM crm_activities WHERE id = ?`, [id]);
   }
 

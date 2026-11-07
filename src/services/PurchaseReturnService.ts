@@ -81,7 +81,7 @@ export class PurchaseReturnService {
 
   private requirePurchasesView(): ReturnType<typeof AuthService.requireAuth> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.view');
+    PermissionService.require(actor, 'ui.purchases.returns.view');
     return actor;
   }
 
@@ -251,7 +251,7 @@ export class PurchaseReturnService {
 
   public createReturn(dto: CreatePurchaseReturnDTO): PurchaseReturnRow {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.return');
+    PermissionService.require(actor, 'ui.purchases.returns.return');
     if (!dto.items || dto.items.length === 0) throw new Error('يجب تحديد أصناف للمرتجع.');
     if (!dto.reason.trim()) throw new Error('يجب إدخال سبب المرتجع.');
 

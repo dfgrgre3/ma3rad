@@ -27,7 +27,6 @@ function run(command, args, env = process.env) {
     cwd: projectRoot,
     env,
     stdio: 'inherit',
-    shell: process.platform === 'win32' && command === 'npm',
   });
 
   if (child.error) throw child.error;
@@ -87,6 +86,11 @@ async function build() {
   }
 
   const unsignedBuild = process.argv.includes('--unsigned');
+  const npmCliPath = process.env.npm_execpath;
+  if (!npmCliPath) {
+    throw new Error('npm_execpath is unavailable; run the ia32 build through its npm script.');
+  }
+
   findBytecode(electronDirectory);
   const electronPath = await downloadLegacyElectron();
   const legacyEnvironment = {
@@ -94,7 +98,7 @@ async function build() {
     CERAMISYS_LEGACY_BUILD: '1',
   };
 
-  run('npm', ['run', 'build'], legacyEnvironment);
+  run(process.execPath, [npmCliPath, 'run', 'build'], legacyEnvironment);
 
   const compiledFiles = [
     'main.js',

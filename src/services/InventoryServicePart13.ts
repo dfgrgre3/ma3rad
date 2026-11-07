@@ -83,7 +83,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
 
   public reconcileInventoryWithGL(warehouseId?: string): any {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'ui.inventory.hub.view');
     return this.calculateInventoryReconciliation(warehouseId, actor);
   }
 
@@ -93,7 +93,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
   }): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
     const reconciliation = this.calculateInventoryReconciliation(input.warehouseId, actor);
     const branchId = this.branchAccess.getCurrentBranchId(actor);
 
@@ -113,7 +113,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
 
   public getReconciliationLogs(): any[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'ui.inventory.hub.view');
     const scope = this.branchAccess.sqlScope('irl.branch_id', undefined, actor);
     return this.db.query<any>(`
       SELECT

@@ -90,7 +90,7 @@ export class CustomerSupplyService {
 
   public getOpenRequests(filters: { customerId?: string; warehouseId?: string; search?: string } = {}): CustomerSupplyRequest[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.view');
+    PermissionService.require(actor, 'ui.sales.invoices.view');
     this.ensureTables();
     const companyScope = this.branchAccess.companyScope('w.company_id', actor);
     const params: any[] = [...companyScope.params];
@@ -152,7 +152,7 @@ export class CustomerSupplyService {
     expectedDate?: string | null;
     notes?: string | null;
   }): CustomerSupplyRequestItem {
-    PermissionService.require(AuthService.requireAuth(), 'sales.create');
+    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.create');
     this.ensureTables();
     const quantity = Number(input.quantityRequested || 0);
     if (!(quantity > 0)) throw new Error('يجب إدخال كمية أكبر من صفر للمنتج المطلوب.');
@@ -226,7 +226,7 @@ export class CustomerSupplyService {
   }
 
   public allocateReceivedQuantity(warehouseId: string, productId: string, receivedQuantity: number, db = this.db): number {
-    PermissionService.require(AuthService.requireAuth(), 'purchases.create');
+    PermissionService.require(AuthService.requireAuth(), 'ui.purchases.invoices.create');
     this.ensureTables();
     const qty = Number(receivedQuantity || 0);
     if (!(qty > 0)) return 0;

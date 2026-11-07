@@ -29,7 +29,7 @@ function assertDate(value: string | null | undefined, label: string): void {
 function addDays(date: string, days: number): string {
   const parsed = new Date(`${date}T00:00:00`);
   parsed.setDate(parsed.getDate() + days);
-  return parsed.toISOString().slice(0, 10);
+  return localDateString(parsed);
 }
 
 export class EmployeeDocumentService {
@@ -52,9 +52,8 @@ export class EmployeeDocumentService {
     }
     const today = localDateString();
     if (document.expiresAt < today) return { ...document, effectiveStatus: 'EXPIRED' };
-    const cutoff = new Date(`${today}T00:00:00`);
-    cutoff.setDate(cutoff.getDate() + 30);
-    if (document.expiresAt <= cutoff.toISOString().slice(0, 10)) {
+    const cutoff = addDays(today, 30);
+    if (document.expiresAt <= cutoff) {
       return { ...document, effectiveStatus: 'EXPIRING' };
     }
     return { ...document, effectiveStatus: 'ACTIVE' };

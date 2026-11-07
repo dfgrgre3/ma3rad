@@ -7,7 +7,7 @@ build/*
 !build/installer.nsh
 /release/
 *.tsbuildinfo
-
+/e2e-data
 # Electron runtime data (created via app.setPath('userData', .../.electron-data))
 .electron-data/
 
@@ -86,3 +86,4 @@ Microsoft/
 # UI audit (regenerable artifacts; run `npm run ui-audit:scan` and `npx playwright test e2e/ui-audit.spec.ts`)
 docs/ui-audit/manifest.json
 docs/ui-audit/smoke-report.json
+e2e-data/ceramisys-e2e-d0qghf/DevToolsActivePort

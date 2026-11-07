@@ -163,8 +163,20 @@ export interface SystemSettings {
   brandLogoDataUrl?: string;
   brandPrimaryColor?: string;
   brandAccentColor?: string;
+  uiCanvasColor?: string;
+  uiSurfaceColor?: string;
+  uiTextColor?: string;
+  uiBorderColor?: string;
+  uiSuccessColor?: string;
+  uiDangerColor?: string;
+  uiWarningColor?: string;
+  uiButtonStyle?: 'solid' | 'outline' | 'soft';
+  uiCornerRadius?: 'compact' | 'standard' | 'rounded';
+  uiDensity?: 'comfortable' | 'compact';
+  uiFontScale?: 'small' | 'standard' | 'large';
+  interfaceDirection?: 'rtl' | 'ltr';
   themeMode?: 'light' | 'dark' | 'system';
-  fontFamily?: string;
+  fontFamily?: 'Cairo' | 'Tajawal' | 'system-ui' | 'Arial' | 'Tahoma';
   showBrandText?: boolean;
   sidebarStyle?: 'default' | 'compact' | 'hidden';
   /**
@@ -185,6 +197,8 @@ export interface SystemSettings {
   installmentGraceDays?: number;
   sessionTimeoutMinutes?: number;
   maxFailedLoginAttempts?: number;
+  loginPinLength?: number;
+  switchableUserIds?: string[];
   defaultBranchId?: string;
 
   // POS & Invoicing settings

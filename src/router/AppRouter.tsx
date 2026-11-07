@@ -9,9 +9,10 @@ import { appRoutes } from './routesList';
 export interface AppRouterProps {
   currentUser: User;
   onLogout: () => void;
+  onSwitchUser: (userId: string) => void;
 }
 
-export const AppRouter: React.FC<AppRouterProps> = ({ currentUser, onLogout }) => (
+export const AppRouter: React.FC<AppRouterProps> = ({ currentUser, onLogout, onSwitchUser }) => (
   <Routes>
     <Route
       path="/"
@@ -19,6 +20,7 @@ export const AppRouter: React.FC<AppRouterProps> = ({ currentUser, onLogout }) =
         <MainLayout
           currentUser={currentUser}
           onLogout={onLogout}
+          onSwitchUser={onSwitchUser}
         />
       }
     >
@@ -29,7 +31,7 @@ export const AppRouter: React.FC<AppRouterProps> = ({ currentUser, onLogout }) =
       <Route path="crm" element={<Navigate to="/crm/dashboard" replace />} />
 
       {appRoutes.map((r) => (
-        <Route key={r.path} path={r.path} element={<S>{r.element}</S>} />
+        <Route key={r.path} path={r.path} element={<S currentUser={currentUser}>{r.element}</S>} />
       ))}
     </Route>
   </Routes>

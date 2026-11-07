@@ -311,6 +311,63 @@ test('navigation layout setting accepts only header or sidebar and persists', as
   assert.equal(SettingsService.getSettings().navigationLayout, 'sidebar');
 });
 
+test('appearance settings validate and persist workspace colors and control styles', async () => {
+  await DatabaseManager.getInstance().initialize();
+  AuthService.login('admin', 'admin123');
+  const before = SettingsService.getSettings();
+
+  assert.equal(before.interfaceDirection, 'rtl');
+  assert.equal(before.uiFontScale, 'standard');
+  assert.throws(
+    () => SettingsService.update({ uiButtonStyle: 'gradient' }),
+    /نمط الأزرار غير صالح/
+  );
+  assert.throws(
+    () => SettingsService.update({ uiCanvasColor: 'red' }),
+    /لون بصيغة HEX/
+  );
+  assert.throws(
+    () => SettingsService.update({ uiFontScale: 'huge' }),
+    /حجم الخط غير صالح/
+  );
+  assert.throws(
+    () => SettingsService.update({ interfaceDirection: 'vertical' }),
+    /اتجاه الواجهة غير صالح/
+  );
+  assert.throws(
+    () => SettingsService.update({ fontFamily: 'Comic Sans' }),
+    /الخط المحدد غير صالح/
+  );
+
+  SettingsService.update({
+    uiCanvasColor: '#f1f3f5',
+    uiButtonStyle: 'soft',
+    uiCornerRadius: 'rounded',
+    uiDensity: 'compact',
+    uiFontScale: 'large',
+    interfaceDirection: 'ltr',
+    fontFamily: 'Tajawal',
+  });
+  const updated = SettingsService.getSettings();
+  assert.equal(updated.uiCanvasColor, '#f1f3f5');
+  assert.equal(updated.uiButtonStyle, 'soft');
+  assert.equal(updated.uiCornerRadius, 'rounded');
+  assert.equal(updated.uiDensity, 'compact');
+  assert.equal(updated.uiFontScale, 'large');
+  assert.equal(updated.interfaceDirection, 'ltr');
+  assert.equal(updated.fontFamily, 'Tajawal');
+
+  SettingsService.update({
+    uiCanvasColor: before.uiCanvasColor,
+    uiButtonStyle: before.uiButtonStyle,
+    uiCornerRadius: before.uiCornerRadius,
+    uiDensity: before.uiDensity,
+    uiFontScale: before.uiFontScale,
+    interfaceDirection: before.interfaceDirection,
+    fontFamily: before.fontFamily,
+  });
+});
+
 test('enabling FIFO refuses destructive conversion when cost history exists', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

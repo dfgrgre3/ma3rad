@@ -20,6 +20,12 @@ import { MIGRATION_PART_16 } from './migrations/part16';
 import { MIGRATION_PART_17 } from './migrations/part17';
 import { MIGRATION_PART_18 } from './migrations/part18';
 import { MIGRATION_PART_19 } from './migrations/part19';
+import { MIGRATION_PART_20 } from './migrations/part20';
+import { MIGRATION_PART_21 } from './migrations/part21';
+import { MIGRATION_PART_22 } from './migrations/part22';
+import { MIGRATION_PART_23 } from './migrations/part23';
+import { MIGRATION_PART_24 } from './migrations/part24';
+import { MIGRATION_PART_25 } from './migrations/part25';
 import { MIGRATION_ENTERPRISE } from './migrations/enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './migrationSupport';
 
@@ -2497,6 +2503,12 @@ export const MIGRATIONS: Migration[] = [
   ...MIGRATION_PART_17,
   ...MIGRATION_PART_18,
   ...MIGRATION_PART_19,
+  ...MIGRATION_PART_20,
+  ...MIGRATION_PART_21,
+  ...MIGRATION_PART_22,
+  ...MIGRATION_PART_23,
+  ...MIGRATION_PART_24,
+  ...MIGRATION_PART_25,
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

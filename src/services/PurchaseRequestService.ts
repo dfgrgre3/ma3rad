@@ -44,7 +44,7 @@ export class PurchaseRequestService {
 
   public getRequests(search = '', status = 'ALL'): PurchaseRequest[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.view');
+    PermissionService.require(actor, 'ui.purchases.requests.view');
     const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
     let sql = `
       SELECT pr.*, u.full_name AS requester_name, du.full_name AS decided_by_name,
@@ -71,7 +71,7 @@ export class PurchaseRequestService {
 
   public getItems(requestId: string): any[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.view');
+    PermissionService.require(actor, 'ui.purchases.requests.view');
     const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
     if (!this.db.query(
       `SELECT pr.id FROM purchase_requests pr WHERE pr.id = ? AND ${scope.clause}`,
@@ -95,7 +95,7 @@ export class PurchaseRequestService {
     items: PurchaseRequestItemInput[];
   }): PurchaseRequest {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.requests.create');
     const items = input.items.filter((i) => i.quantityM2 > 0);
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
 
@@ -143,10 +143,10 @@ export class PurchaseRequestService {
   public decide(id: string, status: 'APPROVED' | 'REJECTED' | 'ORDERED' | 'CANCELLED'): void {
     const actor = AuthService.requireAuth();
     const requiredPermission = status === 'APPROVED' || status === 'ORDERED'
-      ? 'purchases.approve'
+      ? 'ui.purchases.requests.approve'
       : status === 'REJECTED'
-        ? 'purchases.reject'
-        : 'purchases.cancel_request';
+        ? 'ui.purchases.requests.reject'
+        : 'ui.purchases.requests.cancel_request';
     PermissionService.require(actor, requiredPermission);
     const scope = this.branchAccess.sqlScope('branch_id', undefined, actor);
     const req = this.db.query<{ status: string }>(

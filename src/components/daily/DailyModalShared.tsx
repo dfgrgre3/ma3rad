@@ -1,16 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { CustomerService } from '../../services/CustomerService';
-import { ProductService } from '../../services/ProductService';
-import { OperationsService } from '../../services/OperationsService';
-import { CashierService } from '../../services/CashierService';
-import { DatabaseManager } from '../../database/db';
-import type { Customer, Product, CashRegister, ExpenseCategory, Supplier } from '../../types';
-import type { WarehouseRow } from '../../services/OperationsService';
-
-export const input = 'w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500';
-export const label = 'block text-[11px] font-semibold text-slate-600 mb-1';
-export const fmt = (value: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(value) || 0);
 
 export const ModalShell: React.FC<{
   title: string;
@@ -95,71 +84,6 @@ export const ModalShell: React.FC<{
       </div>
     </div>
   );
-};
-
-export const useLists = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [warehouses, setWarehouses] = useState<WarehouseRow[]>([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    try {
-      setCustomers(new CustomerService().getAllCustomers());
-      setProducts(new ProductService().getAllProducts());
-      setWarehouses(new OperationsService().getWarehouses());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تحميل بيانات القوائم');
-    }
-  }, []);
-  return { customers, products, warehouses, error };
-};
-
-export const useRegisters = () => {
-  const [registers, setRegisters] = useState<CashRegister[]>([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    try {
-      setRegisters(new CashierService().getAllRegisters());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تحميل الخزائن');
-    }
-  }, []);
-
-  return { registers, error };
-};
-
-export const useExpenseCategories = () => {
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    try {
-      setCategories(new CashierService().getExpenseCategories());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تحميل تصنيفات المصروفات');
-    }
-  }, []);
-
-  return { categories, error };
-};
-
-export const useSuppliers = () => {
-  const [suppliers, setSuppliers] = useState<Pick<Supplier, 'id' | 'name' | 'phone'>[]>([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    try {
-      setSuppliers(DatabaseManager.getInstance().query<Pick<Supplier, 'id' | 'name' | 'phone'>>(
-        'SELECT id, name, phone FROM suppliers WHERE is_active = 1 ORDER BY name'
-      ));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تحميل قائمة الموردين');
-    }
-  }, []);
-
-  return { suppliers, error };
 };
 
 export const LoadErrorNotice: React.FC<{ message: string }> = ({ message }) => (

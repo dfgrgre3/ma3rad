@@ -46,7 +46,7 @@ export class ProductExtraService {
   private db = DatabaseManager.getInstance();
 
   private requireWrite(): void {
-    PermissionService.require(AuthService.requireAuth(), 'products.update');
+    PermissionService.require(AuthService.requireAuth(), 'ui.products.catalog.update');
   }
 
   public getVariantById(id: string): ProductVariant | null {
@@ -67,7 +67,7 @@ export class ProductExtraService {
   }): ProductVariant {
     this.requireWrite();
     if (data.costPrice !== undefined || data.sellingPriceM2 !== undefined) {
-      PermissionService.require(AuthService.requireAuth(), 'pricing.update');
+      PermissionService.require(AuthService.requireAuth(), 'ui.pricing.pricing.update');
     }
     if (!String(data.sku || '').trim()) throw new Error('كود المتغير مطلوب.');
     if (!String(data.variantName || '').trim()) throw new Error('اسم المتغير مطلوب.');
@@ -96,7 +96,7 @@ export class ProductExtraService {
   public updateVariant(id: string, updates: Partial<ProductVariant>): void {
     this.requireWrite();
     if (updates.costPrice !== undefined || updates.sellingPriceM2 !== undefined) {
-      PermissionService.require(AuthService.requireAuth(), 'pricing.update');
+      PermissionService.require(AuthService.requireAuth(), 'ui.pricing.pricing.update');
     }
     const existing = this.getVariantById(id);
     if (!existing) throw new Error('المتغير غير موجود.');

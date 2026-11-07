@@ -15,6 +15,10 @@ import {
   basePriceFromUnitPrice, convertQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
 } from '../../utils/uom';
 import { buildWhatsAppUrl, openExternalShare } from '../../utils/externalLinks';
+import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
 
 export const STATUS_LABELS: Record<QuotationStatus, { label: string; color: string }> = {
   PENDING: { label: 'بانتظار الموافقة', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
@@ -122,6 +126,11 @@ interface QuotationModalsProps {
   reopenQuotation: (quotation: Quotation) => void;
   cancelQuotation: (quotation: Quotation) => void;
   deleteQuotation: (quotation: Quotation) => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  onOperationalFieldValuesChange: (values: Record<string, string>) => void;
+  canUpdateOperationalFields: boolean;
+  onSaveOperationalFields: (quotationId: string, values: Record<string, string>) => void;
 };
 
 export const QuotationModals: React.FC<QuotationModalsProps> = ({
@@ -183,6 +192,11 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
   reopenQuotation,
   cancelQuotation,
   deleteQuotation,
+  operationalFields,
+  operationalFieldValues,
+  onOperationalFieldValuesChange,
+  canUpdateOperationalFields,
+  onSaveOperationalFields,
 }) => (
   <>
 {/* Create / edit modal */}
@@ -193,6 +207,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       <button onClick={() => setFormOpen(false)} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
     </div>
     <form onSubmit={submitForm} className="space-y-3 text-xs">
+      <OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={onOperationalFieldValuesChange} title="بيانات إضافية لعرض السعر" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="font-bold text-slate-700 block mb-1">العميل *</label>
@@ -315,6 +330,16 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       <Info label="العميل" value={detail.customerName || '—'} sub={detail.customerPhone || ''} />
       <Info label="المخزن المرجعي" value={warehouses.find((w) => w.id === detail.warehouseId)?.name || '—'} sub={detail.convertedInvoiceNumber ? `الفاتورة: ${detail.convertedInvoiceNumber}` : 'لم تُفوتر بعد'} />
       <Info label="القيمة" value={fmt(detail.totalAmount)} sub={`${detail.items?.length || 0} بند`} />
+    </div>
+    <div className="mb-4 space-y-2">
+      <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />
+      <OperationalFieldsRecordEditor
+        recordLabel={detail.quotationNumber}
+        fields={operationalFields}
+        initialValues={operationalFieldValues}
+        canEdit={canUpdateOperationalFields}
+        onSave={(values) => onSaveOperationalFields(detail.id, values)}
+      />
     </div>
     <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
       <table className="w-full text-right text-[11px] min-w-[560px]">

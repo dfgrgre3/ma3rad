@@ -14,14 +14,14 @@ export const PaymentMethodsCard: React.FC<PaymentMethodsCardProps> = ({ paymentD
       <div className="h-44 w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={paymentDistribution} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" opacity={0.15} />
-            <XAxis dataKey="method" stroke="#94a3b8" fontSize={9} tickLine={false} />
-            <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--cerami-chart-grid)" />
+            <XAxis dataKey="method" stroke="var(--cerami-muted)" fontSize={9} tickLine={false} />
+            <YAxis stroke="var(--cerami-muted)" fontSize={9} tickLine={false} />
             <Tooltip
-              contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '6px', fontSize: '11px', padding: '4px 8px' }}
+              contentStyle={{ backgroundColor: 'var(--cerami-tooltip-surface)', borderColor: 'var(--cerami-tooltip-border)', color: 'var(--cerami-text)', borderRadius: '6px', fontSize: '11px', padding: '4px 8px' }}
               formatter={(val: any) => [CeramicMath.formatCurrency(Number(val)), 'المبلغ']}
             />
-            <Bar isAnimationActive={false} dataKey="amount" fill="#0284c7" radius={[2, 2, 0, 0]} />
+            <Bar isAnimationActive={false} dataKey="amount" fill="var(--win-accent)" radius={[2, 2, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

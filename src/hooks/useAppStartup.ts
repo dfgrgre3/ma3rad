@@ -4,6 +4,7 @@ import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
 import { CentralLicenseService } from '../services/CentralLicenseService';
 import { scheduleAutomaticBackupChecks } from '../services/BackupScheduler';
+import { NotificationService } from '../services/NotificationService';
 import { toAppError } from '../errors/appError';
 import { ElectronSyncTransport } from '../sync/ElectronSyncTransport';
 import { SyncEngine } from '../sync/SyncEngine';
@@ -48,9 +49,7 @@ export function useAppStartup() {
         setCurrentUser(restoreCurrentRuntimeSession ? AuthService.restoreSession() : null);
         setDbReady(true);
         scheduleAutomaticBackupChecks(backupTimer);
-        void import('../services/NotificationService').then(({ NotificationService }) => {
-          try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
-        });
+        try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
       })
       .catch((err) => {
         const failure = toAppError(err, 'DATABASE_INITIALIZATION_FAILED', 'حدث خطأ أثناء تحميل قاعدة البيانات.');

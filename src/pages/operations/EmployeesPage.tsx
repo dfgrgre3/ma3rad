@@ -17,6 +17,10 @@ import { EmployeeTabs } from './employees/EmployeeTabs';
 import { EmployeeTransactionModal } from './employees/EmployeeTransactionModal';
 import { EmployeesHeader } from './employees/EmployeesHeader';
 import { calculateTotalWagesBill, filterEmployees, getEmployeeFinancials } from './employees/helpers';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
 import {
   type AttendanceRecord,
   type Employee,
@@ -29,14 +33,18 @@ import {
 
 export const EmployeesPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'employees.manage');
-  const canExportEmployees = PermissionService.can(AuthService.getCurrentUser(), 'employees.export');
+  const canManageEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.manage');
+  const canExportEmployees = PermissionService.can(AuthService.getCurrentUser(), 'ui.employees.employees.export');
   // --- Database State ---
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [payrollPayables, setPayrollPayables] = useState<PayrollPayable[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employeeBranches, setEmployeeBranches] = useState<Array<{ id: string; name: string }>>([]);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [valuesByEmployee, setValuesByEmployee] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
 
@@ -50,7 +58,11 @@ export const EmployeesPage: React.FC = () => {
           .filter((branch) => branch.id === currentBranchId)
           .map(({ id, name }) => ({ id, name }))
       );
-      setEmployees(EmployeeService.getAll() as unknown as Employee[]);
+      const currentEmployees = EmployeeService.getAll() as unknown as Employee[];
+      setEmployees(currentEmployees);
+      const fieldService = new OperationalFieldService();
+      setOperationalFields(fieldService.getDefinitions('employees'));
+      setValuesByEmployee(fieldService.getRecordValuesForRecords('employees', currentEmployees.map((employee) => employee.id)));
       setTransactions(canManageEmployees
         ? EmployeeService.getTransactions() as unknown as FinancialTransaction[]
         : []);
@@ -67,6 +79,9 @@ export const EmployeesPage: React.FC = () => {
   useEffect(() => { loadAll(); }, []);
   useEffect(() => { setSearchQuery(searchParams.get('search') || ''); }, [searchParams]);
   const handleExportEmployees = () => {
+    const fieldService = new OperationalFieldService();
+    const valueMap = fieldService.getRecordValuesForExport('employees', employees.map((employee) => employee.id));
+    const fields = fieldService.getDefinitions('employees');
     exportToExcel({
       title: 'الموظفون',
       subtitle: 'قائمة الموظفين',
@@ -77,8 +92,9 @@ export const EmployeesPage: React.FC = () => {
         { key: 'phone', label: 'الهاتف' },
         { key: 'email', label: 'البريد' },
         { key: 'status', label: 'الحالة' },
+        ...fields.map((field) => ({ key: field.name, label: field.name })),
       ],
-      rows: employees.map((e) => ({ name: e.name, role: e.role, location: e.location, phone: e.phone, email: e.email, status: e.status })),
+      rows: employees.map((e) => ({ name: e.name, role: e.role, location: e.location, phone: e.phone, email: e.email, status: e.status, ...(valueMap[e.id] || {}) })),
       fileName: 'employees',
       permission: 'employees.export',
     });
@@ -134,6 +150,7 @@ export const EmployeesPage: React.FC = () => {
   // --- Actions handlers ---
   const handleOpenAddEmployee = () => {
     setEditingEmployee(null);
+    setOperationalFieldValues({});
     setEmployeeFormError(null);
     setEmpForm({
       branchId: employeeBranches[0]?.id || '',
@@ -154,6 +171,7 @@ export const EmployeesPage: React.FC = () => {
 
   const handleOpenEditEmployee = (emp: Employee) => {
     setEditingEmployee(emp);
+    setOperationalFieldValues(new OperationalFieldService().getRecordValues('employees', emp.id));
     setEmployeeFormError(null);
     setEmpForm({
       branchId: emp.branchId || employeeBranches[0]?.id || '',
@@ -186,11 +204,17 @@ export const EmployeesPage: React.FC = () => {
     setEmployeeFormError(null);
     setIsEmployeeSaving(true);
     try {
+      new OperationalFieldService().validateRecordValues(
+        'employees', operationalFieldValues, editingEmployee ? 'update' : 'create', editingEmployee?.id,
+      );
       if (editingEmployee) {
         EmployeeService.update(editingEmployee.id, empForm);
+        new OperationalFieldService().setRecordValues('employees', editingEmployee.id, operationalFieldValues, 'update');
       } else {
-        EmployeeService.create(empForm);
+        const created = EmployeeService.create(empForm);
+        new OperationalFieldService().setRecordValues('employees', created.id, operationalFieldValues, 'create');
       }
+      setOperationalFieldValues({});
       setIsEmployeeModalOpen(false);
       loadAll();
     } catch (err: any) {
@@ -287,7 +311,8 @@ export const EmployeesPage: React.FC = () => {
     setTransactions(prev => prev.filter(item => item.id !== id));
   };
 
-  const filteredEmployees = filterEmployees(employees, searchQuery, selectedLocation);
+  const filteredEmployees = filterEmployees(employees, searchQuery, selectedLocation)
+    .filter((employee) => matchesOperationalFieldFilters(employee.id, valuesByEmployee, fieldFilters));
   const employeeLocations = [...new Set([
     ...employees.map((employee) => employee.location).filter(Boolean),
   ])];
@@ -315,6 +340,7 @@ export const EmployeesPage: React.FC = () => {
         canExport={canExportEmployees}
         onExport={handleExportEmployees}
       />
+      {activeTab === 'directory' && <div className="px-4 pb-2"><OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} /></div>}
 
       {/* Tabs Switcher */}
       <EmployeeTabs
@@ -345,6 +371,12 @@ export const EmployeesPage: React.FC = () => {
             <EmployeeDirectoryTab
               employees={filteredEmployees}
               canManageEmployees={canManageEmployees}
+              operationalFields={operationalFields}
+              operationalValuesByRecord={valuesByEmployee}
+              onSaveOperationalFields={(employeeId, values) => {
+                new OperationalFieldService().setRecordValues('employees', employeeId, values, 'update');
+                setValuesByEmployee((previous) => ({ ...previous, [employeeId]: values }));
+              }}
               onEditEmployee={handleOpenEditEmployee}
               onDeleteEmployee={handleDeleteEmployee}
               onOpenHistory={handleOpenHistory}
@@ -403,6 +435,9 @@ export const EmployeesPage: React.FC = () => {
         onFormChange={setEmpForm}
         onClose={handleCloseEmployeeForm}
         onSubmit={handleSaveEmployee}
+        operationalFields={operationalFields}
+        operationalFieldValues={operationalFieldValues}
+        onOperationalFieldValuesChange={setOperationalFieldValues}
       />
 
       {/* --- MODAL 2: ADD FINANCIAL TRANSACTION (تسجيل حركة مالية) --- */}

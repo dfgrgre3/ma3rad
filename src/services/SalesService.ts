@@ -50,7 +50,7 @@ export class SalesService {
 
   private requireSalesView(): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.view');
+    PermissionService.require(actor, 'ui.sales.invoices.view');
   }
 
   // ─── Invoices ───────────────────────────────────────────────────────────────

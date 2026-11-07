@@ -1,5 +1,8 @@
+// Must run before pdfjs-dist: it reads `Iterator.prototype` at module load
+// and throws "Iterator is not defined" on legacy Chromium (< 117).
+import '../shims/iterator-helpers';
 import { getDocument, GlobalWorkerOptions, type PDFPageProxy } from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import pdfWorkerUrl from '../workers/pdf.worker.ts?worker&url';
 
 export const MAX_PDF_IMPORT_BYTES = 25 * 1024 * 1024;
 const MAX_PDF_IMPORT_PAGES = 100;

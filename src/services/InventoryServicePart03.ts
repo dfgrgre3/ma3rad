@@ -20,7 +20,7 @@ public transferStock(
   ): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.transfer');
+    PermissionService.require(actor, 'ui.inventory.hub.transfer');
     const performedBy2 = actor.id;
     if (fromWarehouseId === toWarehouseId) {
       throw new Error('لا يمكن التحويل لنفس المخزن.');
@@ -114,7 +114,7 @@ public transferStock(
 
 public getTransactions(limit = 100): InventoryTransaction[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.view');
+    PermissionService.require(actor, 'ui.inventory.hub.view');
     const scope = this.branchAccess.sqlScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id AND bw.is_primary = 1)',

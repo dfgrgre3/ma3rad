@@ -13,6 +13,7 @@ import { InventoryService } from '../services/InventoryService';
 import { CategoryService, CategoryWithCount } from '../services/CategoryService';
 import { BrandService, BrandWithCount } from '../services/BrandService';
 import { AttributeService, AttributeCategory } from '../services/AttributeService';
+import { OperationalFieldService, type OperationalFieldDefinition, type ProductGradeOption } from '../services/OperationalFieldService';
 import { ProductExtraService, ProductImage } from '../services/ProductExtraService';
 import { normalizeDynamicAttributeValue } from '../services/dynamicAttributes';
 import { Product, CeramicGrade, UnitType, Warehouse } from '../types';
@@ -27,9 +28,11 @@ import { PermissionService } from '../services/PermissionService';
 import { parseBusinessConfiguration } from '../config/businessProfiles';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 import { CentralLimitGuard } from './ui/CentralLimitGuard';
+import { FilterToolbar } from './ui/FilterToolbar';
+import { FormField } from './ui/FormField';
 import {
   GRADES, SURFACES, UNITS, calcMetersFromSize, emptyProductEntryForm, emptyVariant, gradeLabel,
-  parseGrade, pickCell, round, unitLabelFor,
+  parseGrade, pickCell, round, unitLabelFor, setConfiguredGradeLabels,
   type FormState, type OpeningStockRow, type ProductEntryFormState, type TabId, type VariantDraft,
 } from './products/productFormModel';
 import { Field, ListPagination, StatCard } from './products/ProductUi';
@@ -89,7 +92,7 @@ const applyRememberedFormFields = (
     if (field === 'categoryId' && !categories.some((category) => category.id === value)) continue;
     if (field === 'brandId' && value !== '' && !brands.some((brand) => brand.id === value)) continue;
     if (field === 'productType' && value !== 'CERAMIC' && value !== 'GENERAL') continue;
-    if (field === 'grade' && !GRADES.some((grade) => grade.value === value)) continue;
+    if (field === 'grade' && typeof value !== 'string') continue;
     if (field === 'surfaceLocation' && !SURFACES.some((surface) => surface.value === value)) continue;
     if ((field === 'baseUnit' || field === 'sellUnit')
       && !UNITS.some((unit) => unit.value === value)
@@ -109,12 +112,18 @@ export const ProductsView: React.FC = () => {
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [brands, setBrands] = useState<BrandWithCount[]>([]);
   const [attributes, setAttributes] = useState<AttributeCategory[]>([]);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [gradeOptions, setGradeOptions] = useState<ProductGradeOption[]>([]);
+  const [operationalValuesByProduct, setOperationalValuesByProduct] = useState<Record<string, Record<string, string>>>({});
   const [stats, setStats] = useState<ProductStats | null>(null);
   const [search, setSearch] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedGrade, setSelectedGrade] = useState('');
+  const [selectedCustomField, setSelectedCustomField] = useState('');
+  const [selectedCustomFieldValue, setSelectedCustomFieldValue] = useState('');
   const [stockStatus, setStockStatus] = useState<'all' | 'in' | 'low' | 'out'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'newest' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc'>('name');
   const [productStatus, setProductStatus] = useState<'active' | 'inactive' | 'all'>('active');
@@ -175,17 +184,18 @@ export const ProductsView: React.FC = () => {
 
   const navigate = useNavigate();
   const permissionUser = AuthService.getCurrentUser();
-  const canCreateProduct = PermissionService.can(permissionUser, 'products.create');
-  const canUpdateProduct = PermissionService.can(permissionUser, 'products.update');
-  const canDeleteProduct = PermissionService.can(permissionUser, 'products.delete');
-  const canExportProducts = PermissionService.can(permissionUser, 'products.export');
-  const canImportProducts = PermissionService.can(permissionUser, 'products.import');
-  const canAdjustInventory = PermissionService.can(permissionUser, 'inventory.adjust');
-  const canCreateCategory = PermissionService.can(permissionUser, 'categories.create');
-  const canCreateBrand = PermissionService.can(permissionUser, 'brands.create');
-  const canViewCosts = PermissionService.can(permissionUser, 'finance.view');
-  const canViewPricing = PermissionService.can(permissionUser, 'pricing.view');
-  const canUpdatePricing = PermissionService.can(permissionUser, 'pricing.update');
+  // صلاحيات دقيقة لكل زر، مع توافق خلفي تلقائي مع products.* القديمة.
+  const canCreateProduct = PermissionService.can(permissionUser, 'ui.products.catalog.create');
+  const canUpdateProduct = PermissionService.can(permissionUser, 'ui.products.catalog.update');
+  const canDeleteProduct = PermissionService.can(permissionUser, 'ui.products.catalog.delete');
+  const canExportProducts = PermissionService.can(permissionUser, 'ui.products.catalog.export');
+  const canImportProducts = PermissionService.can(permissionUser, 'ui.products.catalog.import');
+  const canAdjustInventory = PermissionService.can(permissionUser, 'ui.inventory.hub.adjust');
+  const canCreateCategory = PermissionService.can(permissionUser, 'ui.categories.categories.create');
+  const canCreateBrand = PermissionService.can(permissionUser, 'ui.brands.brands.create');
+  const canViewCosts = PermissionService.can(permissionUser, 'ui.finance.overview.view');
+  const canViewPricing = PermissionService.can(permissionUser, 'ui.pricing.pricing.view');
+  const canUpdatePricing = PermissionService.can(permissionUser, 'ui.pricing.pricing.update');
   const canManagePricing = editingProduct ? canUpdatePricing : canCreateProduct;
 
   const productService = new ProductService();
@@ -194,6 +204,7 @@ export const ProductsView: React.FC = () => {
   const categoryService = new CategoryService();
   const brandService = new BrandService();
   const attributeService = new AttributeService();
+  const operationalFieldService = new OperationalFieldService();
   const extraService = new ProductExtraService();
 
   const loadLookups = () => {
@@ -204,10 +215,16 @@ export const ProductsView: React.FC = () => {
       // Older installations saved a profile before attributes were materialized;
       // applying it here is idempotent and additive, and only for users who are
       // allowed to create products.
-      if (PermissionService.can(AuthService.getCurrentUser(), 'products.create')) {
+      if (PermissionService.can(AuthService.getCurrentUser(), 'ui.products.catalog.create')) {
         BusinessProfileService.applyFromSettings();
       }
       setAttributes(attributeService.getCategories());
+      setOperationalFields(operationalFieldService.getDefinitions('products'));
+      const configuredGrades = operationalFieldService.getProductGradeOptions(true);
+      setGradeOptions(configuredGrades.length ? configuredGrades : GRADES.map((item, index) => ({
+        ...item, isActive: true, sortOrder: index,
+      })));
+      setConfiguredGradeLabels(configuredGrades);
     } catch (e) {
       console.error(e);
     }
@@ -233,6 +250,9 @@ export const ProductsView: React.FC = () => {
         pageSize,
         {
           grade: selectedGrade || undefined,
+          customFieldFilters: selectedCustomField && selectedCustomFieldValue
+            ? { [selectedCustomField]: selectedCustomFieldValue }
+            : undefined,
           stockStatus: stockStatus === 'all' ? undefined : stockStatus,
           sortBy,
           includeInactive: productStatus === 'all',
@@ -240,6 +260,9 @@ export const ProductsView: React.FC = () => {
         },
       );
       setProducts(result.items);
+      setOperationalValuesByProduct(operationalFieldService.getRecordValuesForExport(
+        'products', result.items.map((product) => product.id),
+      ));
       setPage(result.page);
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
@@ -258,11 +281,11 @@ export const ProductsView: React.FC = () => {
 
   useEffect(() => {
     loadProducts();
-  }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, productStatus, page, pageSize]);
+  }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, page, pageSize]);
 
-  useEffect(() => { setSelectedProductIds([]); }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, productStatus, page, pageSize]);
+  useEffect(() => { setSelectedProductIds([]); }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, page, pageSize]);
 
-  useEffect(() => { setPage(1); }, [search, selectedCategory, selectedBrand, selectedGrade, stockStatus, sortBy, productStatus]);
+  useEffect(() => { setPage(1); }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus]);
 
   useEffect(() => { localStorage.setItem('products_view_mode', viewMode); }, [viewMode]);
 
@@ -332,6 +355,7 @@ export const ProductsView: React.FC = () => {
     setVariants([]);
     setRemovedVariantIds([]);
     setAttributeValues({});
+    setOperationalFieldValues({});
     setExistingImages([]);
     setPendingImages([]);
     setRemovedImageIds([]);
@@ -340,6 +364,9 @@ export const ProductsView: React.FC = () => {
       ...emptyProductEntryForm(),
       ...generatedCodes,
     }, preferences, categories, brands);
+    if (!initialForm.grade || !gradeOptions.some((option) => option.value === initialForm.grade && option.isActive)) {
+      initialForm.grade = gradeOptions.find((option) => option.isActive)?.value || '';
+    }
     const initialAttributes: Record<string, string> = {};
     Object.entries(preferences).forEach(([key, value]) => {
       if (key.startsWith('attribute:') && typeof value === 'string') {
@@ -403,6 +430,7 @@ export const ProductsView: React.FC = () => {
         sellingPriceM2: v.sellingPriceM2 || 0,
       })));
       setAttributeValues(extraService.getAttributeValues(product.id));
+      setOperationalFieldValues(operationalFieldService.getRecordValues('products', product.id));
       setExistingImages(extraService.getImages(product.id));
       const summary = productService.getProductStockSummary(product.id);
       setEditStock(summary.byWarehouse.map((w) => ({ warehouseName: w.warehouseName || 'مخزن', quantityM2: w.quantityM2 })));
@@ -606,6 +634,9 @@ export const ProductsView: React.FC = () => {
       for (const attribute of applicableAttributes) {
         normalizeDynamicAttributeValue(attribute, attributeValues[attribute.id]);
       }
+      for (const field of operationalFields) {
+        normalizeDynamicAttributeValue(field, operationalFieldValues[field.id]);
+      }
     } catch (error) {
       alert(error instanceof Error ? error.message : 'راجع قيم الخصائص الإضافية.');
       return false;
@@ -790,6 +821,9 @@ export const ProductsView: React.FC = () => {
         extraService.setAttributeValues(productId, Object.fromEntries(
           Object.entries(attributeValues).filter(([attributeId]) => applicableAttributeIds.has(attributeId)),
         ));
+        operationalFieldService.setRecordValues(
+          'products', productId, operationalFieldValues, editingProduct ? 'update' : 'create',
+        );
 
         removedImageIds.forEach((id) => {
           try { extraService.deleteImage(id); } catch (err) { console.error(err); }
@@ -913,11 +947,17 @@ export const ProductsView: React.FC = () => {
         ? selectedProductIds.map((id) => productService.getProductById(id)).filter((p): p is Product => Boolean(p))
         : productService.getProductsPage(search, selectedCategory || undefined, selectedBrand || undefined, 1, 100000, {
             grade: selectedGrade || undefined,
+            customFieldFilters: selectedCustomField && selectedCustomFieldValue
+              ? { [selectedCustomField]: selectedCustomFieldValue }
+              : undefined,
             stockStatus: stockStatus === 'all' ? undefined : stockStatus,
             sortBy,
             status: productStatus,
             includeInactive: productStatus === 'all',
           }).items;
+      const exportedFieldValues = operationalFieldService.getRecordValuesForExport(
+        'products', all.map((product) => product.id),
+      );
       const rows = all.map((p) => {
         const stock = productService.getProductStockSummary(p.id);
         return {
@@ -942,6 +982,7 @@ export const ProductsView: React.FC = () => {
           stockM2: stock.totalM2,
           stockBoxes: stock.totalBoxes,
           stockPieces: stock.totalPieces,
+          ...exportedFieldValues[p.id],
         };
       });
       // Box/piece breakdowns only make sense when the selection contains
@@ -964,6 +1005,7 @@ export const ProductsView: React.FC = () => {
           { key: 'color', label: 'اللون' },
           { key: 'tone', label: 'التون' },
           { key: 'finish', label: 'التشطيب' },
+          ...operationalFields.map((field) => ({ key: field.name, label: field.name })),
           ...(hasBoxUnits ? [
             { key: 'piecesPerBox', label: 'قطع/كرتونة' },
             { key: 'metersPerBox', label: 'م²/كرتونة' },
@@ -1071,7 +1113,9 @@ export const ProductsView: React.FC = () => {
             categoryId,
             brandId,
             productType: ceramicRow ? 'CERAMIC' : 'GENERAL',
-            grade: parseGrade(pickCell(row, ['grade', 'الفرز'])),
+            grade: gradeOptions.find((option) => option.value === pickCell(row, ['grade', 'الفرز'])
+              || option.label === pickCell(row, ['grade', 'الفرز']))?.value
+              || parseGrade(pickCell(row, ['grade', 'الفرز']), gradeOptions.filter((option) => option.isActive)),
             size,
             thickness: Number(pickCell(row, ['thickness', 'السمك'])) || 0,
             color: pickCell(row, ['color', 'اللون']),
@@ -1174,19 +1218,20 @@ export const ProductsView: React.FC = () => {
         <StatCard label="الأنواع / الماركات" value={`${categories.length} / ${brands.length}`} hint={`${attributes.length} خصائص`} icon={<Layers className="w-5 h-5 text-violet-600" />} tone="bg-violet-50" />
       </div>
 
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <FilterToolbar ariaLabel="بحث وتصفية الأصناف" className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex-1 min-w-[240px] relative">
             <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
+              aria-label="بحث الأصناف"
               placeholder="بحث بالاسم، الباركود، الكود، المقاس، النوع، الماركة..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-4 pr-9 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
           </div>
-          <button onClick={() => setShowFilters((v) => !v)} className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${showFilters ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+          <button onClick={() => setShowFilters((v) => !v)} aria-expanded={showFilters} aria-controls="product-advanced-filters" className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${showFilters ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
             <Filter className="w-4 h-4" /> فلاتر متقدمة
           </button>
         <div className="flex items-center overflow-hidden rounded-xl border border-slate-200">
@@ -1197,26 +1242,53 @@ export const ProductsView: React.FC = () => {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
-            <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSearchParams(e.target.value ? { category: e.target.value } : {}, { replace: true }); }} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+          <div id="product-advanced-filters" className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+            <FormField label="نوع المنتج" visuallyHidden>
+            <select value={selectedCategory} onChange={(e) => { setSelectedCategory(e.target.value); setSearchParams(e.target.value ? { category: e.target.value } : {}, { replace: true }); }} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="">جميع الأنواع</option>
               {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
             </select>
-            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            </FormField>
+            <FormField label="الماركة" visuallyHidden>
+            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="">جميع الماركات</option>
               {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
             </select>
-            {businessConfig.businessType === 'ceramics' && (<select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            </FormField>
+            {businessConfig.businessType === 'ceramics' && (<FormField label="الفرز" visuallyHidden><select value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="">جميع الفرزات</option>
-              {GRADES.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </select>)}
-            <select value={stockStatus} onChange={(e) => setStockStatus(e.target.value as any)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+              {gradeOptions.filter((option) => option.isActive).map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+            </select></FormField>)}
+            {operationalFields.filter((field) => field.isFilterable).map((field) => (
+              <FormField key={field.id} label={field.name} visuallyHidden>
+                {['SELECT', 'BOOLEAN'].includes(field.dataType) ? (
+                  <select value={selectedCustomField === field.id ? selectedCustomFieldValue : ''} onChange={(event) => {
+                    setSelectedCustomField(field.id);
+                    setSelectedCustomFieldValue(event.target.value);
+                  }} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700">
+                    <option value="">كل القيم — {field.name}</option>
+                    {field.dataType === 'BOOLEAN'
+                      ? <><option value="true">نعم</option><option value="false">لا</option></>
+                      : field.values.map((option) => <option key={option.id} value={option.value}>{option.label}</option>)}
+                  </select>
+                ) : (
+                  <input value={selectedCustomField === field.id ? selectedCustomFieldValue : ''} onChange={(event) => {
+                    setSelectedCustomField(field.id);
+                    setSelectedCustomFieldValue(event.target.value);
+                  }} placeholder={`تصفية حسب ${field.name}`} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700" />
+                )}
+              </FormField>
+            ))}
+            <FormField label="حالة المخزون" visuallyHidden>
+            <select value={stockStatus} onChange={(e) => setStockStatus(e.target.value as any)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="all">حالة المخزون: الكل</option>
               <option value="in">متوفر</option>
               <option value="low">قارب على النفاذ</option>
               <option value="out">نافد</option>
             </select>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+            </FormField>
+            <FormField label="ترتيب الأصناف" visuallyHidden>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="name">ترتيب: الاسم</option>
               <option value="newest">الأحدث إضافة</option>
               <option value="price_asc">السعر: الأقل</option>
@@ -1224,15 +1296,18 @@ export const ProductsView: React.FC = () => {
               <option value="stock_asc">المخزون: الأقل</option>
               <option value="stock_desc">المخزون: الأكثر</option>
             </select>
+            </FormField>
+            <FormField label="حالة الصنف" visuallyHidden>
             <select aria-label="حالة الصنف" value={productStatus} onChange={(e) => setProductStatus(e.target.value as typeof productStatus)} className="px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
               <option value="active">الأصناف النشطة</option>
               <option value="inactive">الأصناف غير النشطة</option>
               <option value="all">كل الأصناف</option>
             </select>
-            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">مسح عوامل التصفية</button>
+            </FormField>
+            <button onClick={() => { setSearch(''); setSelectedCategory(''); setSearchParams({}, { replace: true }); setSelectedBrand(''); setSelectedGrade(''); setSelectedCustomField(''); setSelectedCustomFieldValue(''); setStockStatus('all'); setSortBy('name'); setProductStatus('active'); }} className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50">مسح عوامل التصفية</button>
           </div>
         )}
-      </div>
+      </FilterToolbar>
 
       {selectedProductIds.length > 0 && (canExportProducts || canDeleteProduct) && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3">
@@ -1256,6 +1331,8 @@ export const ProductsView: React.FC = () => {
         ) : viewMode === 'table' ? (
           <ProductsTable
             products={products}
+            operationalFields={operationalFields}
+            operationalFieldValues={operationalValuesByProduct}
             selectedProductIds={selectedProductIds}
             hasCeramicRows={hasCeramicRows}
             canViewCosts={canViewCosts}
@@ -1280,6 +1357,8 @@ export const ProductsView: React.FC = () => {
         ) : (
           <ProductsCards
             products={products}
+            operationalFields={operationalFields}
+            operationalFieldValues={operationalValuesByProduct}
             selectedProductIds={selectedProductIds}
             canViewCosts={canViewCosts}
             canViewPricing={canViewPricing}
@@ -1377,6 +1456,10 @@ export const ProductsView: React.FC = () => {
         attributes={attributes}
         attributeValues={attributeValues}
         setAttributeValues={setAttributeValues}
+        operationalFields={operationalFields}
+        operationalFieldValues={operationalFieldValues}
+        setOperationalFieldValues={setOperationalFieldValues}
+        gradeOptions={gradeOptions}
         isSaving={isSaving}
       />
 

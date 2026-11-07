@@ -9,6 +9,11 @@ import { PermissionService } from '../../services/PermissionService';
 import type { Product, Supplier } from '../../types';
 import { useToast } from '../../components/ui/Toast';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -25,9 +30,11 @@ type Line = { productId: string; quantityM2: number; unitCost: number; boxesCoun
 
 export const PurchaseOrdersPage: React.FC = () => {
   const service = useMemo(() => new PurchaseOrderService(), []);
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
   const toast = useToast();
-  const canCreate = PermissionService.can(AuthService.getCurrentUser(), 'purchases.create');
-  const canUpdate = PermissionService.can(AuthService.getCurrentUser(), 'purchases.update');
+  const currentUser = AuthService.getCurrentUser();
+  const canCreate = PermissionService.can(currentUser, 'ui.purchases.orders.create');
+  const canUpdate = PermissionService.can(currentUser, 'ui.purchases.orders.update');
 
   const [rows, setRows] = useState<PurchaseOrderRow[]>([]);
   const [search, setSearch] = useState('');
@@ -46,15 +53,25 @@ export const PurchaseOrdersPage: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState<Line[]>([{ productId: '', quantityM2: 0, unitCost: 0, boxesCount: 0 }]);
   const [saving, setSaving] = useState(false);
+  const [fields, setFields] = useState<OperationalFieldDefinition[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [valuesByOrder, setValuesByOrder] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   const load = () => {
     setLoading(true);
-    try { setRows(service.getAllOrders(search, statusFilter)); }
+    try {
+      const currentRows = service.getAllOrders(search, statusFilter);
+      setFields(fieldService.getDefinitions('purchase_orders'));
+      const fieldValues = fieldService.getRecordValuesForRecords('purchase_orders', currentRows.map((row) => row.id));
+      setValuesByOrder(fieldValues);
+      setRows(currentRows.filter((row) => matchesOperationalFieldFilters(row.id, fieldValues, fieldFilters)));
+    }
     catch (e: any) { toast.error(e?.message || 'تعذر تحميل أوامر الشراء.'); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load();   }, [statusFilter]);
+  useEffect(() => { load();   }, [statusFilter, fieldFilters]);
 
   const openDetails = (row: PurchaseOrderRow) => {
     if (expanded === row.id) { setExpanded(null); setDetails(null); return; }
@@ -69,6 +86,7 @@ export const PurchaseOrdersPage: React.FC = () => {
       setProducts(new ProductService().getAllProducts());
       setSupplierId(''); setWarehouseId(''); setExpectedDate(''); setNotes('');
       setLines([{ productId: '', quantityM2: 0, unitCost: 0, boxesCount: 0 }]);
+      setValues({});
       setModalOpen(true);
     } catch (e: any) { toast.error(e?.message); }
   };
@@ -90,7 +108,8 @@ export const PurchaseOrdersPage: React.FC = () => {
     if (items.length === 0) return toast.error('أضف صنفًا واحدًا على الأقل.');
     setSaving(true);
     try {
-      service.createOrder({
+      fieldService.validateRecordValues('purchase_orders', values, 'create');
+      const created = service.createOrder({
         supplierId, warehouseId, expectedDate: expectedDate || undefined, notes: notes || undefined,
         items: items.map((line) => ({
           productId: line.productId,
@@ -99,6 +118,8 @@ export const PurchaseOrdersPage: React.FC = () => {
           unitCost: Number(line.unitCost),
         })),
       });
+      fieldService.setRecordValues('purchase_orders', created.id, values, 'create');
+      setValues({});
       toast.success('تم إنشاء أمر الشراء كمسودة.');
       setModalOpen(false);
       load();
@@ -156,6 +177,7 @@ export const PurchaseOrdersPage: React.FC = () => {
           <option value="ALL">كل الحالات</option>
           {Object.entries(STATUS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
         </select>
+        <OperationalFieldsFilter fields={fields} values={fieldFilters} onChange={setFieldFilters} />
       </div>
 
       <div className="flex-1 overflow-auto p-6">
@@ -208,6 +230,11 @@ export const PurchaseOrdersPage: React.FC = () => {
                             </tbody>
                           </table>
                           {details.notes && <div className="mt-2 text-[11px] text-slate-500">ملاحظات: {details.notes}</div>}
+                          <OperationalFieldsSummary fields={fields} values={valuesByOrder[row.id] || {}} />
+                          <OperationalFieldsRecordEditor recordLabel={row.orderNumber} fields={fields} initialValues={valuesByOrder[row.id] || {}} canEdit={canUpdate} onSave={(next) => {
+                            fieldService.setRecordValues('purchase_orders', row.id, next, 'update');
+                            setValuesByOrder((previous) => ({ ...previous, [row.id]: next }));
+                          }} />
                         </td>
                       </tr>
                     )}
@@ -276,6 +303,7 @@ export const PurchaseOrdersPage: React.FC = () => {
               </div>
 
               <div><label className="font-bold text-slate-700 block mb-1">ملاحظات</label><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
+              <OperationalFieldsForm fields={fields} values={values} onChange={setValues} title="بيانات إضافية لأمر الشراء" />
 
               <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
                 <span className="text-xs font-bold text-orange-700">إجمالي أمر الشراء</span>

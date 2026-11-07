@@ -4,7 +4,10 @@ import { useToast } from '../ui/Toast';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import type { PaymentType } from '../../types';
 import { round2 } from '../../services/financials';
-import { fmt, input, label, LoadErrorNotice, ModalShell, useLists, useSuppliers } from './DailyModalShared';
+import { LoadErrorNotice, ModalShell } from './DailyModalShared';
+import { useLists } from '../../hooks/daily/useLists';
+import { useSuppliers } from '../../hooks/daily/useSuppliers';
+import { fmt, input, label } from './DailyModalUtils';
 import { Plus, Trash2, Loader2, Save } from 'lucide-react';
 
 interface PurchaseLine { productId: string; quantityM2: string; unitCost: string; }

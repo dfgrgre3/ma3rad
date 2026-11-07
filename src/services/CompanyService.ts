@@ -32,7 +32,7 @@ export class CompanyService {
 
   public getAllCompanies(includeInactive = true): Company[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'companies.view');
+    PermissionService.require(actor, 'ui.companies.list.view');
     const scope = this.scopeClause(actor);
     const rows = this.db.query<any>(
       `SELECT c.*,
@@ -47,7 +47,7 @@ export class CompanyService {
 
   public getCompanyById(id: string): Company | null {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'companies.view');
+    PermissionService.require(actor, 'ui.companies.list.view');
     this.access.requireCompanyAccess(id, actor);
     const row = this.db.query<any>(
       `SELECT c.*,
@@ -60,7 +60,7 @@ export class CompanyService {
 
   public createCompany(dto: CreateCompanyDTO): Company {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'companies.create');
+    PermissionService.require(actor, 'ui.companies.list.create');
     CentralUsageLimitService.assertWithin('maxFacilities');
 
     const code = (dto.code || '').trim().toUpperCase();
@@ -121,7 +121,7 @@ export class CompanyService {
 
   public updateCompany(id: string, patch: Partial<Omit<Company, 'id' | 'code' | 'createdAt'>>): Company {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'companies.update');
+    PermissionService.require(actor, 'ui.companies.list.update');
     const before = this.getCompanyById(id);
     if (!before) throw new Error('الشركة غير موجودة أو خارج نطاق صلاحيتك.');
 
@@ -184,7 +184,7 @@ export class CompanyService {
    */
   public deactivateCompany(id: string): Company {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'companies.delete');
+    PermissionService.require(actor, 'ui.companies.list.delete');
     const company = this.getCompanyById(id);
     if (!company) throw new Error('الشركة غير موجودة أو خارج نطاق صلاحيتك.');
     if (!company.isActive) return company;

@@ -3,6 +3,11 @@ import { Truck, Plus, Search, Loader2, X, Calendar, Fuel } from 'lucide-react';
 import { OperationsService, Vehicle, Driver } from '../../services/OperationsService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 const STATUS_LABEL: Record<Vehicle['status'], string> = {
   AVAILABLE: 'متاحة', ON_DELIVERY: 'في رحلة', MAINTENANCE: 'صيانة', OUT_OF_SERVICE: 'خارج الخدمة',
@@ -16,7 +21,11 @@ const STATUS_STYLE: Record<Vehicle['status'], string> = {
 
 export const VehiclesPage: React.FC = () => {
   const service = useMemo(() => new OperationsService(), []);
-  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'vehicles.manage');
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
+  const currentUser = AuthService.getCurrentUser();
+  const canCreate = PermissionService.can(currentUser, 'ui.vehicles.vehicles.create');
+  const canUpdate = PermissionService.can(currentUser, 'ui.vehicles.vehicles.update');
+  const canManage = PermissionService.can(currentUser, 'ui.vehicles.vehicles.manage');
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [search, setSearch] = useState('');
@@ -24,6 +33,10 @@ export const VehiclesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fields, setFields] = useState<OperationalFieldDefinition[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [valuesByVehicle, setValuesByVehicle] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
   const [form, setForm] = useState({
     plateNumber: '', make: '', model: '', year: '', capacityKg: '', assignedDriverId: '',
     licenseExpiresAt: '', insuranceExpiresAt: '',
@@ -32,12 +45,15 @@ export const VehiclesPage: React.FC = () => {
   const load = useCallback((query: string) => {
     setLoading(true);
     try {
-      setVehicles(service.getVehicles(query));
+      const currentVehicles = service.getVehicles(query);
+      setVehicles(currentVehicles);
+      setFields(fieldService.getDefinitions('vehicles'));
+      setValuesByVehicle(fieldService.getRecordValuesForRecords('vehicles', currentVehicles.map((vehicle) => vehicle.id)));
       setDrivers(service.getDrivers());
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل المركبات.'); }
     finally { setLoading(false); }
-  }, [service]);
+  }, [service, fieldService]);
 
   useEffect(() => { load(''); }, [load]);
 
@@ -45,7 +61,8 @@ export const VehiclesPage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      service.createVehicle({
+      fieldService.validateRecordValues('vehicles', values, 'create');
+      const created = service.createVehicle({
         plateNumber: form.plateNumber,
         make: form.make || undefined,
         model: form.model || undefined,
@@ -55,6 +72,8 @@ export const VehiclesPage: React.FC = () => {
         licenseExpiresAt: form.licenseExpiresAt || undefined,
         insuranceExpiresAt: form.insuranceExpiresAt || undefined,
       });
+      fieldService.setRecordValues('vehicles', created.id, values, 'create');
+      setValues({});
       setModalOpen(false);
       setForm({ plateNumber: '', make: '', model: '', year: '', capacityKg: '', assignedDriverId: '', licenseExpiresAt: '', insuranceExpiresAt: '' });
       load(search);
@@ -76,7 +95,7 @@ export const VehiclesPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">أسطول التوصيل وحالات المركبات</p>
           </div>
         </div>
-        {canManage && (
+        {canCreate && (
           <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
             <Plus className="w-4 h-4" /> إضافة مركبة
           </button>
@@ -88,13 +107,14 @@ export const VehiclesPage: React.FC = () => {
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث برقم اللوحة أو الماركة ثم اضغط إدخال..." className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-teal-400" />
         </form>
+        <div className="mt-3"><OperationalFieldsFilter fields={fields} values={fieldFilters} onChange={setFieldFilters} /></div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-teal-500" /></div> : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {vehicles.map((v) => (
+            {vehicles.filter((vehicle) => matchesOperationalFieldFilters(vehicle.id, valuesByVehicle, fieldFilters)).map((v) => (
               <div key={v.id} className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-5 transition">
                 <div className="flex items-start justify-between mb-2">
                   <div>
@@ -107,7 +127,18 @@ export const VehiclesPage: React.FC = () => {
                   <div className="flex items-center gap-1.5"><Fuel className="w-3.5 h-3.5" /><span>السائق: {v.assignedDriverName || 'غير مسند'}</span></div>
                   <div className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /><span>انتهاء الترخيص: {v.licenseExpiresAt ? new Date(v.licenseExpiresAt).toLocaleDateString('ar-EG') : '—'}</span></div>
                 </div>
-                {canManage && (
+                <OperationalFieldsSummary fields={fields} values={valuesByVehicle[v.id] || {}} />
+                <OperationalFieldsRecordEditor
+                  recordLabel={v.plateNumber}
+                  fields={fields}
+                  initialValues={valuesByVehicle[v.id] || {}}
+                  canEdit={canUpdate || canManage}
+                  onSave={(next) => {
+                    fieldService.setRecordValues('vehicles', v.id, next, 'update');
+                    setValuesByVehicle((previous) => ({ ...previous, [v.id]: next }));
+                  }}
+                />
+                {(canUpdate || canManage) && (
                   <div className="mt-4 pt-3 border-t border-slate-100">
                     <select value={v.status} onChange={(e) => changeStatus(v, e.target.value as Vehicle['status'])} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700">
                       {Object.entries(STATUS_LABEL).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
@@ -143,6 +174,7 @@ export const VehiclesPage: React.FC = () => {
                   {drivers.map((d) => <option key={d.id} value={d.id}>{d.fullName}</option>)}
                 </select>
               </div>
+              <OperationalFieldsForm fields={fields} values={values} onChange={setValues} title="بيانات إضافية للمركبة" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div><label className="font-bold text-slate-700 block mb-1">انتهاء الترخيص</label><input type="date" value={form.licenseExpiresAt} onChange={(e) => setForm({ ...form, licenseExpiresAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>
                 <div><label className="font-bold text-slate-700 block mb-1">انتهاء التأمين</label><input type="date" value={form.insuranceExpiresAt} onChange={(e) => setForm({ ...form, insuranceExpiresAt: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200" /></div>

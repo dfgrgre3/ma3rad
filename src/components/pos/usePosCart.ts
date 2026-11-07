@@ -9,7 +9,7 @@ import {
   getSellableUnits,
   toBaseQuantity,
 } from '../../utils/uom';
-import { getCartQuantityStep } from './CartLine';
+import { getCartQuantityStep } from './cartUtils';
 import { round2, type CartItem, type PosUnit, type Toast } from './types';
 import type { PricingService } from '../../services/PricingService';
 

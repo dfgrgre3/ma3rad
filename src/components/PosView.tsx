@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProductService } from '../services/ProductService';
+import { OperationalFieldService, type ProductGradeOption } from '../services/OperationalFieldService';
 import { InventoryService } from '../services/InventoryService';
 import { CustomerService } from '../services/CustomerService';
 import { CategoryService, CategoryWithCount } from '../services/CategoryService';
@@ -16,7 +17,7 @@ import { PermissionService } from '../services/PermissionService';
 import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, SystemSettings, ToneMixingConflict } from '../types';
 import { CeramicCalculatorModal } from './CeramicCalculatorModal';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
-import { LayoutContext } from '../layouts/MainLayout';
+import { LayoutContext } from '../contexts/LayoutContext';
 import {
   type InvoicePreview, type Toast,
 } from './pos/types';
@@ -40,6 +41,8 @@ import { PosCatalogFilters } from './pos/PosCatalogFilters';
 import { PosProductGrid } from './pos/PosProductGrid';
 import { PosCartPanel } from './pos/PosCartPanel';
 import { PosCheckoutPanel } from './pos/PosCheckoutPanel';
+import { gradeLabel as configuredGradeLabel, setConfiguredGradeLabels } from './products/productFormModel';
+import type { OperationalFieldDefinition } from '../services/OperationalFieldService';
 
 export const PosView: React.FC = () => {
   const navigate = useNavigate();
@@ -48,6 +51,9 @@ export const PosView: React.FC = () => {
   const effectiveUser = actingUser || currentUser;
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [gradeOptions, setGradeOptions] = useState<ProductGradeOption[]>([]);
+  const [invoiceOperationalFields, setInvoiceOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [invoiceOperationalValues, setInvoiceOperationalValues] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -107,6 +113,7 @@ export const PosView: React.FC = () => {
   const toastTimer = useRef<number | null>(null);
 
   const productService = useMemo(() => new ProductService(), []);
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
   const inventoryService = useMemo(() => new InventoryService(), []);
   const customerService = useMemo(() => new CustomerService(), []);
   const categoryService = useMemo(() => new CategoryService(), []);
@@ -232,6 +239,10 @@ export const PosView: React.FC = () => {
       const allCats = categoryService.getAllCategories();
       const allRegs = cashierService.getAllRegisters();
       const sysSettings = printService.getSettings();
+      const configuredGrades = operationalFieldService.getProductGradeOptions();
+      setInvoiceOperationalFields(operationalFieldService.getDefinitions('sales_invoices'));
+      setGradeOptions(configuredGrades);
+      setConfiguredGradeLabels(configuredGrades);
       const defaultWarehouse = allWhs[0];
       const shift = cashierService.getActiveShift();
 
@@ -260,7 +271,7 @@ export const PosView: React.FC = () => {
       console.error(e);
       notify('تعذر تحميل بيانات نقطة البيع', 'error');
     }
-  }, [productService, customerService, inventoryService, categoryService, cashierService, printService, loadStock, notify]);
+  }, [productService, operationalFieldService, customerService, inventoryService, categoryService, cashierService, printService, loadStock, notify]);
 
   useEffect(() => {
     loadInitialData();
@@ -375,6 +386,11 @@ export const PosView: React.FC = () => {
     pricingService,
     performedBy: effectiveUser?.id || currentUser?.id || 'usr_admin',
     loadStock,
+    onInvoiceCreated: (invoiceId) => {
+      operationalFieldService.setRecordValues('sales_invoices', invoiceId, invoiceOperationalValues, 'create');
+      setInvoiceOperationalValues({});
+    },
+    validateInvoiceFields: () => operationalFieldService.validateRecordValues('sales_invoices', invoiceOperationalValues, 'create'),
   });
   const { openCustomerDisplay } = usePosCustomerDisplay({
     cart,
@@ -497,7 +513,7 @@ export const PosView: React.FC = () => {
   const handleManagerOverride = useCallback(async (username: string, password: string): Promise<boolean> => {
     try {
       const u = AuthService.login(username, password);
-      if (!PermissionService.can(u, 'sales.void')) {
+      if (!PermissionService.can(u, 'ui.sales.pos.void')) {
         notify('المستخدم المحدد لا يملك صلاحية إلغاء الفاتورة', 'error');
         return false;
       }
@@ -534,8 +550,7 @@ export const PosView: React.FC = () => {
     paidInputRef,
   });
 
-  const gradeLabel = (grade: Product['grade']) =>
-    grade === 'GRADE_1' ? 'فرز أول' : grade === 'GRADE_2' ? 'فرز ثاني' : grade === 'GRADE_3' ? 'فرز ثالث' : 'تجاري';
+  const gradeLabel = (grade: Product['grade']) => configuredGradeLabel(grade);
 
   return (
     <div className={`flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col ${touchMode ? 'pos-touch-mode' : ''}`} dir="rtl">
@@ -587,6 +602,7 @@ export const PosView: React.FC = () => {
           onBrandChange={setSelectedBrand}
           hasCeramicCatalog={hasCeramicCatalog}
           selectedGrade={selectedGrade}
+          gradeOptions={gradeOptions}
           onGradeChange={setSelectedGrade}
           visibleSizes={visibleSizes}
           selectedSize={selectedSize}
@@ -725,6 +741,9 @@ export const PosView: React.FC = () => {
           onClearOrder={clearCart}
           onOpenCalculator={() => setIsCalculatorOpen(true)}
           onCheckout={() => handleCheckout()}
+          operationalFields={invoiceOperationalFields}
+          operationalFieldValues={invoiceOperationalValues}
+          onOperationalFieldValuesChange={setInvoiceOperationalValues}
         />
       </div>
 

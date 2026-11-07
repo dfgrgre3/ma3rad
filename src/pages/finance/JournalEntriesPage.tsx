@@ -11,7 +11,7 @@ const emptyLine = (): DraftLine => ({ accountId: '', debit: '', credit: '', desc
 
 export const JournalEntriesPage: React.FC = () => {
   const service = useMemo(() => new FinanceExtrasService(), []);
-  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'finance.approve');
+  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.journal.approve');
   const [tab, setTab] = useState<'entries' | 'trial'>('entries');
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);

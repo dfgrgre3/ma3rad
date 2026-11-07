@@ -12,6 +12,9 @@ import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTer
 import { useIdempotencyKey } from '../hooks/useIdempotencyKey';
 import { usePermission } from '../hooks/usePermission';
 import { ConfiguredActionButton } from './config/ConfiguredActionButton';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../services/OperationalFieldService';
+import { OperationalFieldsForm } from './OperationalFieldsForm';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from './OperationalFieldsFilter';
 const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (
   <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs border-slate-200">
     <span className="text-slate-500">عرض {Math.min((page - 1) * pageSize + 1, totalItems)}–{Math.min(page * pageSize, totalItems)} من {totalItems}</span>
@@ -32,6 +35,11 @@ export const CustomersView: React.FC = () => {
   const canViewDebts = can('finance.debts.view');
   const canViewStatement = canViewPurchases && canViewDebts;
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [customerFieldValues, setCustomerFieldValues] = useState<Record<string, Record<string, string>>>({});
+  const [customerFieldValuesById, setCustomerFieldValuesById] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [statement, setStatement] = useState<any | null>(null);
@@ -65,11 +73,19 @@ export const CustomersView: React.FC = () => {
   });
 
   const customerService = new CustomerService();
+  const operationalFieldService = new OperationalFieldService();
 
   const loadCustomers = () => {
     try {
-      const result = customerService.getCustomersPage(search, page, pageSize);
+      const result = customerService.getCustomersPage(search, page, pageSize, fieldFilters);
       setCustomers(result.items);
+      setOperationalFields(operationalFieldService.getDefinitions('customers'));
+      setCustomerFieldValues(operationalFieldService.getRecordValuesForExport(
+        'customers', result.items.map((customer) => customer.id),
+      ));
+      setCustomerFieldValuesById(operationalFieldService.getRecordValuesForRecords(
+        'customers', result.items.map((customer) => customer.id),
+      ));
       setPage(result.page);
       setTotalPages(result.totalPages);
       setTotalItems(result.totalItems);
@@ -86,13 +102,14 @@ export const CustomersView: React.FC = () => {
 
   useEffect(() => {
     loadCustomers();
-  }, [search, page, pageSize]);
+  }, [search, page, pageSize, fieldFilters]);
 
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, fieldFilters]);
 
   const handleOpenStatement = (cust: Customer) => {
     if (!canViewStatement) return;
     setSelectedCustomer(cust);
+    setOperationalFieldValues(operationalFieldService.getRecordValues('customers', cust.id));
     const stmt = customerService.getCustomerStatement(cust.id);
     setStatement(stmt);
   };
@@ -100,7 +117,8 @@ export const CustomersView: React.FC = () => {
   const handleSaveCustomer = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      customerService.createCustomer({
+      operationalFieldService.validateRecordValues('customers', operationalFieldValues, 'create');
+      const customer = customerService.createCustomer({
         code: `CUST-${Date.now().toString().slice(-4)}`,
         name: formData.name,
         phone: formData.phone,
@@ -114,7 +132,9 @@ export const CustomersView: React.FC = () => {
         initialBalance: formData.initialBalance,
         notes: formData.notes
       });
+      operationalFieldService.setRecordValues('customers', customer.id, operationalFieldValues, 'create');
       setIsAddModalOpen(false);
+      setOperationalFieldValues({});
       loadCustomers();
     } catch (err: any) {
       alert(`خطأ: ${err.message || err}`);
@@ -182,6 +202,7 @@ export const CustomersView: React.FC = () => {
               initialBalance: 0,
               notes: ''
             });
+            setOperationalFieldValues({});
             setIsAddModalOpen(true);
           }}
         />
@@ -202,6 +223,7 @@ export const CustomersView: React.FC = () => {
           />
         </div>
       </div>
+      <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
 
       {/* Customers List & Statement Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -221,7 +243,7 @@ export const CustomersView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 ">
-                {customers.map((c) => {
+                {customers.filter((customer) => matchesOperationalFieldFilters(customer.id, customerFieldValuesById, fieldFilters)).map((c) => {
                   const hasDebt = canViewDebts && c.currentBalance > 0;
                   const isSelected = selectedCustomer?.id === c.id;
 
@@ -244,6 +266,9 @@ export const CustomersView: React.FC = () => {
                           {c.name}
                         </Link>
                         {c.address && <div className="text-[10px] text-slate-500 font-normal">{c.address}</div>}
+                        {Object.entries(customerFieldValues[c.id] || {}).map(([label, value]) => (
+                          <div key={label} className="text-[10px] font-normal text-teal-700">{label}: {value}</div>
+                        ))}
                       </td>
                       <td className="p-3.5 font-mono text-slate-600 ">{c.phone}</td>
                       <td className="p-3.5">
@@ -314,6 +339,13 @@ export const CustomersView: React.FC = () => {
                     {CeramicMath.formatCurrency(selectedCustomer.currentBalance)}
                   </span>
                 </div>
+                <OperationalFieldsForm
+                  fields={operationalFields}
+                  values={operationalFieldValues}
+                  onChange={() => undefined}
+                  title="الحقول الإضافية"
+                  readOnly
+                />
                 <div className="flex justify-between">
                   <span className="text-slate-500">الحد الائتماني المسموح:</span>
                   <span className="font-bold">{CeramicMath.formatCurrency(selectedCustomer.creditLimit)}</span>
@@ -439,6 +471,12 @@ export const CustomersView: React.FC = () => {
                   className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 "
                 />
               </div>
+              <OperationalFieldsForm
+                fields={operationalFields}
+                values={operationalFieldValues}
+                onChange={setOperationalFieldValues}
+                title="بيانات إضافية"
+              />
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 ">
                 <button

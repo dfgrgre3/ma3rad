@@ -57,7 +57,7 @@ export class CustomerService {
   private sync = new MasterDataSyncService(this.db);
 
   public getAllCustomers(search?: string): Customer[] {
-    PermissionService.require(AuthService.requireAuth(), 'customers.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
     const scope = this.branchAccess.companyScope('company_id');
     let sql = `SELECT * FROM customers WHERE ${scope.clause}`;
     const params: any[] = [...scope.params];
@@ -72,8 +72,8 @@ export class CustomerService {
     return this.db.query<Customer>(sql, params);
   }
 
-  public getCustomersPage(search = '', page = 1, pageSize = 25) {
-    PermissionService.require(AuthService.requireAuth(), 'customers.view');
+  public getCustomersPage(search = '', page = 1, pageSize = 25, fieldFilters: Record<string, string> = {}) {
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
     const scope = this.branchAccess.companyScope('company_id');
     const params: any[] = [...scope.params];
     let where = ` WHERE ${scope.clause}`;
@@ -82,6 +82,15 @@ export class CustomerService {
       const term = `%${search.trim()}%`;
       params.push(term, term, term, term);
     }
+    Object.entries(fieldFilters).forEach(([fieldId, value]) => {
+      if (!value) return;
+      where += ` AND EXISTS (
+        SELECT 1 FROM operational_field_values opfv
+        WHERE opfv.entity_type = 'customers' AND opfv.record_id = customers.id
+          AND opfv.field_id = ? AND opfv.value LIKE ?
+      )`;
+      params.push(fieldId, `%${value}%`);
+    });
     return this.db.queryPage<Customer>(
       `SELECT * FROM customers${where} ORDER BY name ASC`,
       `SELECT COUNT(*) as total_items FROM customers${where}`,
@@ -90,7 +99,7 @@ export class CustomerService {
   }
 
   public getCustomerById(id: string): Customer | null {
-    PermissionService.require(AuthService.requireAuth(), 'customers.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
     return this.findCustomerById(id);
   }
 
@@ -102,7 +111,7 @@ export class CustomerService {
 
   public createCustomer(customer: Omit<Customer, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { code?: string; initialBalance?: number }, performedBy = 'usr_admin'): Customer {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'customers.create');
+    PermissionService.require(actor, 'ui.customers.list.create');
     const cleanName = String(customer.name || '').trim();
     if (!cleanName) throw new Error('اسم العميل مطلوب.');
     customer.name = cleanName;
@@ -137,7 +146,7 @@ export class CustomerService {
 
   public deleteCustomer(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'customers.delete');
+    PermissionService.require(actor, 'ui.customers.list.delete');
     const existing = this.getCustomerById(id);
     if (!existing) throw new Error('العميل غير موجود.');
     const balance = Number(existing.currentBalance || 0);
@@ -156,7 +165,7 @@ export class CustomerService {
 
   public updateCustomer(id: string, updates: Partial<Customer>): Customer {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'customers.update');
+    PermissionService.require(actor, 'ui.customers.list.update');
     const existing = this.findCustomerById(id);
     if (!existing) throw new Error('العميل غير موجود.');
 
@@ -219,7 +228,7 @@ export class CustomerService {
   ): CustomerPayment {
     if (amount <= 0) throw new Error('يجب أن يكون مبلغ السند أكبر من الصفر.');
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'customers.payment');
+    PermissionService.require(actor, 'ui.customers.detail.payment');
 
     const cust = this.findCustomerById(customerId);
     if (!cust) throw new Error('العميل غير موجود.');
@@ -391,8 +400,8 @@ export class CustomerService {
     }[];
   } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'sales.view');
-    PermissionService.require(actor, 'finance.debts.view');
+    PermissionService.require(actor, 'ui.sales.invoices.view');
+    PermissionService.require(actor, 'ui.finance.receivables.view');
 
     const cust = this.getCustomerById(customerId);
     if (!cust) throw new Error('العميل غير موجود.');

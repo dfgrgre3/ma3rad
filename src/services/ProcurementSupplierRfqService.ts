@@ -68,7 +68,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
     items: { productId: string; quantityM2: number; notes?: string }[];
   }): SupplierRfqRow {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.invoices.create');
     if (!dto.items || dto.items.length === 0) throw new Error('يجب اختيار صنف واحد على الأقل.');
 
     const rfqId = `rfq_${uuidv4().substring(0, 8)}`;
@@ -195,7 +195,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
     items: { rfqItemId?: string; productId: string; quantityM2: number; unitCost: number; notes?: string }[];
   }): SupplierQuotationRow {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.create');
+    PermissionService.require(actor, 'ui.purchases.invoices.create');
     const rfq = this.getRfqById(dto.rfqId);
     if (!rfq) throw new Error('طلب عروض الأسعار غير موجود.');
     if (rfq.status === 'AWARDED' || rfq.status === 'CANCELLED') throw new Error('لا يمكن إضافة عروض لهذا الطلب بعد الإغلاق.');
@@ -239,7 +239,7 @@ export abstract class ProcurementSupplierRfqService extends ProcurementServicePa
 
   public awardQuotation(quotationId: string, createPurchaseOrder = true, warehouseId = 'wh_main'): { orderId?: string } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'purchases.approve');
+    PermissionService.require(actor, 'ui.purchases.invoices.approve');
 
     const quote = this.db.query<any>(`
       SELECT q.*, s.name AS supplierName FROM supplier_quotations q JOIN suppliers s ON s.id = q.supplier_id WHERE q.id = ?

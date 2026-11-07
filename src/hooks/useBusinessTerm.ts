@@ -4,7 +4,7 @@ import { getBusinessProfile } from '../config/businessProfiles';
 import { TerminologyService } from '../services/TerminologyService';
 import { SettingsService } from '../services/SettingsService';
 import { getEffectiveBusinessType } from '../services/BusinessTypeService';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/useTheme';
 
 export function useBusinessTerm(
   key: BusinessTermKey,

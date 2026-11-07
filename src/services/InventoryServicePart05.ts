@@ -12,7 +12,7 @@ export class InventoryServicePart05 extends InventoryWarehouseLocationService {
 public assignProductLocation(locationId: string, productId: string, quantityM2: number): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
     if (quantityM2 < 0) throw new Error('الكمية لا يمكن أن تكون سالبة.');
 
     const location = this.db.query<any>(`SELECT * FROM warehouse_locations WHERE id = ?`, [locationId])[0];

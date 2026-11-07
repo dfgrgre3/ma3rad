@@ -11,7 +11,7 @@ protected db = DatabaseManager.getInstance();
 /** كل دوال القراءة في CRM تتطلب صلاحية العرض، كي لا تُعرض البيانات عند دمج
  *  الشاشات داخل لوحة المعلومات دون فحص صلاحية المسار الأب. */
 protected requireView(): void {
-  PermissionService.require(AuthService.requireAuth(), 'crm.view', '/crm/dashboard');
+  PermissionService.require(AuthService.requireAuth(), 'ui.crm.leads.view', '/crm/dashboard');
 }
 
 public getLeads(search = '', stage?: string): Lead[] {
@@ -42,7 +42,7 @@ public createLead(input: {
     probability?: number; assignedTo?: string; nextFollowUp?: string; notes?: string;
   }): Lead {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.create');
+    PermissionService.require(actor, 'ui.crm.leads.create');
     if (!input.name.trim() || !input.phone.trim()) throw new Error('اسم العميل ورقم الهاتف مطلوبان.');
 
     const id = `lead_${uuidv4().substring(0, 8)}`;
@@ -66,7 +66,7 @@ public createLead(input: {
 
 public updateLead(id: string, patch: Partial<Lead>): Lead {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.update');
+    PermissionService.require(actor, 'ui.crm.leads.update');
     const existing = this.getLeadById(id);
     if (!existing) throw new Error('العميل المحتمل غير موجود.');
 
@@ -100,7 +100,7 @@ public updateLead(id: string, patch: Partial<Lead>): Lead {
 
 public deleteLead(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.delete');
+    PermissionService.require(actor, 'ui.crm.leads.delete');
     const existing = this.getLeadById(id);
     if (!existing) throw new Error('العميل المحتمل غير موجود.');
     this.db.executeTransaction((db) => {
@@ -116,7 +116,7 @@ public deleteLead(id: string): void {
 
   public convertLeadToCustomer(id: string): { customerId: string } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'crm.update');
+    PermissionService.require(actor, 'ui.crm.leads.update');
     PermissionService.require(actor, 'customers.create');
     const lead = this.getLeadById(id);
     if (!lead) throw new Error('العميل المحتمل غير موجود.');

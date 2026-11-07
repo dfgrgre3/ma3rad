@@ -57,6 +57,7 @@ export class SecurityService {
   private static instance: SecurityService;
   private config!: SecurityConfig;
   private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
   private constructor() {
     this.loadConfig();
@@ -134,18 +135,37 @@ export class SecurityService {
     localStorage.setItem('security_config', JSON.stringify(this.config));
   }
 
-  async initialize(): Promise<void> {
-    if (this.initialized) return;
+  initialize(): Promise<void> {
+    if (this.initialized) return this.startConfiguredServices();
+    if (this.initializationPromise) {
+      return this.initializationPromise.then(() => this.startConfiguredServices());
+    }
 
+    const initialization = this.initializeServices().then(() => {
+      this.initialized = true;
+    }).finally(() => {
+      if (this.initializationPromise === initialization) {
+        this.initializationPromise = null;
+      }
+    });
+    this.initializationPromise = initialization;
+    return initialization;
+  }
+
+  private async initializeServices(): Promise<void> {
     // التحقق من توفر التشفير الآمن
     if (!window.crypto || !window.crypto.subtle) {
       console.error('crypto API غير متاح');
       throw new Error('لا يمكن تهيئة الأمان - browser لا يدعم Web Crypto API');
     }
 
+    await this.startConfiguredServices();
+  }
+
+  private async startConfiguredServices(): Promise<void> {
     // بدء مراقبة الأداء
     if (this.config.performanceMonitoring) {
-      performanceMonitor.startMonitoring();
+      await performanceMonitor.startMonitoring();
     }
 
     // تفعيل سجلات التدقيق

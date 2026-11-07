@@ -133,9 +133,9 @@ export const FinancialEventsCalendar: React.FC = () => {
   const service = useMemo(() => new FinancialCalendarEventsService(), []);
   const toast = useToast();
   const actor = AuthService.getCurrentUser();
-  const canView = Boolean(actor && PermissionService.can(actor, 'finance.view'));
-  const canManage = Boolean(actor && PermissionService.can(actor, 'finance.approve'));
-  const canExport = Boolean(actor && PermissionService.can(actor, 'finance.export'));
+  const canView = Boolean(actor && PermissionService.can(actor, 'ui.finance.calendar.view'));
+  const canManage = Boolean(actor && PermissionService.can(actor, 'ui.finance.calendar.approve'));
+  const canExport = Boolean(actor && PermissionService.can(actor, 'ui.finance.calendar.export'));
 
   const [mode, setMode] = useState<ViewMode>('month');
   const [anchorDate, setAnchorDate] = useState(() => new Date());

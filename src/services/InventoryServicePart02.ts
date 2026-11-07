@@ -46,7 +46,7 @@ public adjustStock(
   ): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
     const performedBy2 = actor.id;
     const currentStock = this.getProductStock(productId, warehouseId);
     const currentM2 = currentStock ? currentStock.quantityM2 : 0;

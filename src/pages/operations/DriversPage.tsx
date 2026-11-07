@@ -6,7 +6,10 @@ import { PermissionService } from '../../services/PermissionService';
 
 export const DriversPage: React.FC = () => {
   const service = new OperationsService();
-  const canManage = PermissionService.can(AuthService.getCurrentUser(), 'drivers.manage');
+  const currentUser = AuthService.getCurrentUser();
+  const canCreate = PermissionService.can(currentUser, 'ui.drivers.drivers.create');
+  const canUpdate = PermissionService.can(currentUser, 'ui.drivers.drivers.update');
+  const canManage = PermissionService.can(currentUser, 'ui.drivers.drivers.manage');
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -56,7 +59,7 @@ export const DriversPage: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">بيانات السائقين والرخص وعدد الرحلات</p>
           </div>
         </div>
-        {canManage && (
+        {canCreate && (
           <button onClick={() => setModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition shrink-0">
             <Plus className="w-4 h-4" /> إضافة سائق
           </button>
@@ -83,7 +86,7 @@ export const DriversPage: React.FC = () => {
                   <th className="px-4 py-3">انتهاء الرخصة</th>
                   <th className="px-4 py-3">الرحلات</th>
                   <th className="px-4 py-3">الحالة</th>
-                  {canManage && <th className="px-4 py-3"></th>}
+                  {(canUpdate || canManage) && <th className="px-4 py-3"></th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -98,7 +101,7 @@ export const DriversPage: React.FC = () => {
                     <td className="px-4 py-3 text-slate-600">{d.licenseExpiresAt ? new Date(d.licenseExpiresAt).toLocaleDateString('ar-EG') : '—'}</td>
                     <td className="px-4 py-3"><span className="inline-flex items-center gap-1 text-slate-600"><Truck className="w-3 h-3" />{d.tripsCount || 0}</span></td>
                     <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${d.isActive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{d.isActive ? 'نشط' : 'معطل'}</span></td>
-                    {canManage && (
+                    {(canUpdate || canManage) && (
                       <td className="px-4 py-3 text-left">
                         <button onClick={() => toggle(d)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition ${d.isActive ? 'bg-slate-50 text-slate-600 border-slate-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
                           <Power className="w-3 h-3 inline ml-1" />{d.isActive ? 'تعطيل' : 'تفعيل'}

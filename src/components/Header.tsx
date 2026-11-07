@@ -1,88 +1,48 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Building2, Menu, Moon, Search, Sun } from 'lucide-react';
+import { Bell, Menu, Search } from 'lucide-react';
 import type { User } from '../types';
-import { NavigationService } from '../services/NavigationService';
-import { CentralFeaturePermissionService } from '../services/CentralFeaturePermissionService';
 import { BranchAccessService } from '../services/BranchAccessService';
 import { PermissionService } from '../services/PermissionService';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/useTheme';
+import { resolvePageTitle } from '../utils/resolvePageTitle';
 import { ProfileMenu } from './ui/ProfileMenu';
 import { GlobalSearch } from './GlobalSearch';
 import { HeaderNav } from './HeaderNav';
 import { useToast } from './ui/Toast';
-import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
 
 interface HeaderProps {
   currentUser: User | null;
   unreadNotifications?: number;
   onLogout?: () => void;
+  onSwitchUser?: (userId: string) => void;
   onOpenSidebar?: () => void;
   /** `header` moves the main navigation into the top bar on large screens. */
   navigationLayout?: 'sidebar' | 'header';
-}
-
-const EXTRA_TITLES: Record<string, string> = {
-  '/dashboard': 'لوحة المعلومات',
-  '/dashboard/executive': 'الأداء التنفيذي',
-  '/notifications': 'الإشعارات',
-  '/tools': 'الأدوات السريعة',
-  '/audit': 'سجل التدقيق',
-  '/security': 'مركز الأمان',
-  '/admin': 'إدارة النظام',
-  '/admin/data-deletion': 'إدارة وحذف البيانات',
-  '/users': 'المستخدمون',
-  '/settings': 'الإعدادات',
-  '/backup': 'النسخ الاحتياطي',
-  '/system-health': 'صحة النظام',
-  '/data-import': 'استيراد البيانات',
-  '/data-import/types': 'أنواع البيانات الديناميكية',
-};
-
-/** Resolve the current page title from the navigation structure. */
-export function resolvePageTitle(pathname: string): { title: string; group: string } {
-  const isHidden = (path: string) => !OPEN_ALL_PAGES && !CentralFeaturePermissionService.isPageVisible(path);
-
-  let best: { title: string; group: string; length: number } | null = null;
-  for (const group of NavigationService.getNavigationGroups(null)) {
-    for (const item of group.items) {
-      if (isHidden(item.to)) continue;
-      const matches = pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`));
-      if (matches && item.to.length > (best?.length ?? -1)) {
-        best = { title: item.label, group: group.label, length: item.to.length };
-      }
-    }
-  }
-
-  if (best) return { title: best.title, group: best.group };
-
-  let closest: { title: string; length: number } | null = null;
-  for (const [path, title] of Object.entries(EXTRA_TITLES)) {
-    if ((pathname === path || pathname.startsWith(`${path}/`)) && path.length > (closest?.length ?? -1)) {
-      closest = { title, length: path.length };
-    }
-  }
-  return { title: closest?.title ?? 'سيراميسيس', group: 'سيراميسيس' };
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
   unreadNotifications = 0,
   onLogout,
+  onSwitchUser,
   onOpenSidebar,
   navigationLayout = 'sidebar',
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
-  const { settings, resolvedMode, toggleMode } = useTheme();
+  const { settings } = useTheme();
   const toast = useToast();
   const branchAccess = useMemo(() => new BranchAccessService(), []);
   const [branches, setBranches] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [activeBranchId, setActiveBranchId] = useState('');
   const isTopNav = navigationLayout === 'header';
 
-  const page = useMemo(() => resolvePageTitle(location.pathname), [location.pathname]);
+  const page = useMemo(
+    () => resolvePageTitle(location.pathname, currentUser),
+    [currentUser, location.pathname]
+  );
 
   useEffect(() => {
     const handleSearchShortcut = (event: KeyboardEvent) => {
@@ -96,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!currentUser || !PermissionService.can(currentUser, 'branches.view')) {
+    if (!currentUser || !PermissionService.can(currentUser, 'ui.branches.branches.view')) {
       setBranches([]);
       setActiveBranchId('');
       return;
@@ -120,6 +80,10 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const closeSearch = () => {
+    setSearchOpen(false);
+  };
+
   const brandName = settings.brandName || 'سيراميسيس';
   const shortName = settings.brandShortName === 'C' ? 'س' : settings.brandShortName || 'س';
 
@@ -135,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
         <Menu className="h-4 w-4" />
       </button>
 
-      {/* Brand */}
+      {/* Brand identity and header navigation */}
       <NavLink to="/dashboard" className="flex min-w-0 shrink-0 items-center gap-2">
         <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[2px] bg-[#0078d4] text-xs font-bold text-white">
           {settings.brandLogoDataUrl ? (
@@ -157,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {isTopNav ? (
         /* Main navigation moved into the header (large screens only). */
-        <HeaderNav currentUser={currentUser} />
+        <HeaderNav currentUser={currentUser} onOpenQuickCommand={() => setSearchOpen(true)} />
       ) : (
         /* Current page */
         <div className="flex min-w-0 flex-col justify-center leading-tight">
@@ -168,29 +132,12 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Actions */}
       <div className="mr-auto flex shrink-0 flex-wrap items-center gap-1">
-        {branches.length > 1 && (
-          <label className="flex h-7 w-[116px] max-w-[38vw] items-center gap-1 rounded-[2px] border border-[#a6a6a6] bg-white px-1 text-[#4d4d4d] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] sm:h-8 sm:w-auto sm:max-w-60 sm:gap-1.5 sm:px-2">
-            <Building2 className="h-3.5 w-3.5 shrink-0 text-[#0078d4]" />
-            <span className="hidden text-[10px] text-[#767676] lg:inline">الفرع</span>
-            <select
-              value={activeBranchId}
-              onChange={(event) => switchBranch(event.target.value)}
-              className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent py-1 text-[10px] font-semibold text-inherit outline-none sm:text-[11px]"
-              aria-label="الفرع النشط"
-              title="تبديل الفرع النشط"
-            >
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id} className="bg-white text-slate-900">
-                  {branch.name} · {branch.code}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className="flex min-h-8 items-center gap-2 rounded-[2px] border border-[#a6a6a6] bg-white px-2.5 text-[12px] text-[#4d4d4d] hover:border-[#0078d4] hover:bg-[#f2f8fd] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] dark:hover:bg-[#3d3d3d]"
+          className={`flex min-h-8 items-center gap-2 rounded-[2px] border border-[#a6a6a6] bg-white px-2.5 text-[12px] text-[#4d4d4d] hover:border-[#0078d4] hover:bg-[#f2f8fd] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] dark:hover:bg-[#3d3d3d] ${
+            isTopNav ? 'lg:hidden' : ''
+          }`}
           title="بحث شامل (Ctrl+K)"
           aria-label="بحث شامل"
           aria-haspopup="dialog"
@@ -200,16 +147,6 @@ export const Header: React.FC<HeaderProps> = ({
           <kbd className="hidden rounded-[2px] border border-[#d9d9d9] px-1 text-[10px] text-[#767676] dark:border-[#565656] dark:text-[#a6a6a6] xl:inline">
             Ctrl K
           </kbd>
-        </button>
-
-        <button
-          type="button"
-          onClick={toggleMode}
-          className="win-btn win-btn--ghost hidden !min-h-8 !px-2 sm:flex"
-          title={resolvedMode === 'dark' ? 'الوضع الفاتح' : 'الوضع الداكن'}
-          aria-label={resolvedMode === 'dark' ? 'التبديل إلى الوضع الفاتح' : 'التبديل إلى الوضع الداكن'}
-        >
-          {resolvedMode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
         <button
@@ -232,13 +169,17 @@ export const Header: React.FC<HeaderProps> = ({
             currentUser={currentUser}
             unreadNotifications={unreadNotifications}
             onLogout={onLogout}
+            onSwitchUser={onSwitchUser}
+            branches={branches}
+            activeBranchId={activeBranchId}
+            onBranchChange={switchBranch}
           />
         )}
       </div>
 
       <GlobalSearch
         open={searchOpen}
-        onClose={() => setSearchOpen(false)}
+        onClose={closeSearch}
         currentUser={currentUser}
       />
     </header>

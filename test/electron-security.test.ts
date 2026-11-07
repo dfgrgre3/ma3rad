@@ -156,7 +156,9 @@ test('route guards use the same permissions as navigation entries', async () => 
   await DatabaseManager.getInstance().initialize();
   PermissionService.seed();
   const protectedRoutes: Array<[string, string]> = [
-    ['/sales/cycle', 'sales.view'],
+    // The invoice-cycle page owns a granular view permission, with the legacy
+    // `sales.view` kept as an accepted alternative.
+    ['/sales/cycle', 'sales.cycle.view'],
     ['/purchases/returns', 'purchases.return'],
     // Legacy path redirects to the shared receivables hub; the selected tab
     // applies its own finer-grained permission inside that hub.

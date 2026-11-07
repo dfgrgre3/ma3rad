@@ -74,4 +74,74 @@ export const MIGRATION_PART_19: Migration[] = [
       `);
     },
   },
+  {
+    id: '129_customer_warranty_claims',
+    description: 'Track customer warranty, repair, replacement and complaint claims with an audit trail.',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS customer_warranty_claims (
+          id TEXT PRIMARY KEY,
+          claim_number TEXT UNIQUE NOT NULL,
+          invoice_id TEXT NOT NULL,
+          invoice_item_id TEXT,
+          customer_id TEXT NOT NULL,
+          product_id TEXT NOT NULL,
+          branch_id TEXT,
+          warehouse_id TEXT,
+          claim_type TEXT NOT NULL DEFAULT 'WARRANTY'
+            CHECK(claim_type IN ('WARRANTY', 'REPAIR', 'REPLACEMENT', 'COMPLAINT')),
+          status TEXT NOT NULL DEFAULT 'OPEN'
+            CHECK(status IN ('OPEN', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'RESOLVED', 'CANCELLED')),
+          quantity_m2 REAL NOT NULL CHECK(quantity_m2 > 0),
+          warranty_months INTEGER NOT NULL DEFAULT 12 CHECK(warranty_months >= 0),
+          warranty_expires_at TEXT,
+          issue_description TEXT NOT NULL,
+          resolution_type TEXT
+            CHECK(resolution_type IS NULL OR resolution_type IN ('REPAIR', 'REPLACEMENT', 'REFUND', 'REJECTED', 'OTHER')),
+          resolution_notes TEXT,
+          decided_by TEXT,
+          decided_at TEXT,
+          closed_at TEXT,
+          created_by TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (invoice_id) REFERENCES sales_invoices(id) ON DELETE RESTRICT,
+          FOREIGN KEY (invoice_item_id) REFERENCES sales_invoice_items(id) ON DELETE SET NULL,
+          FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
+          FOREIGN KEY (branch_id) REFERENCES branches(id),
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
+          FOREIGN KEY (decided_by) REFERENCES users(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_warranty_claims_status
+          ON customer_warranty_claims(status, created_at);
+        CREATE INDEX IF NOT EXISTS idx_warranty_claims_customer
+          ON customer_warranty_claims(customer_id);
+        CREATE INDEX IF NOT EXISTS idx_warranty_claims_invoice
+          ON customer_warranty_claims(invoice_id);
+        CREATE INDEX IF NOT EXISTS idx_warranty_claims_branch
+          ON customer_warranty_claims(branch_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_warranty_claims_product
+          ON customer_warranty_claims(product_id);
+
+        CREATE TABLE IF NOT EXISTS customer_warranty_claim_events (
+          id TEXT PRIMARY KEY,
+          claim_id TEXT NOT NULL,
+          action TEXT NOT NULL DEFAULT 'CREATE',
+          from_status TEXT,
+          to_status TEXT NOT NULL,
+          notes TEXT,
+          created_by TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (claim_id) REFERENCES customer_warranty_claims(id) ON DELETE CASCADE,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_warranty_claim_events_claim
+          ON customer_warranty_claim_events(claim_id, created_at);
+      `);
+    },
+  },
 ];

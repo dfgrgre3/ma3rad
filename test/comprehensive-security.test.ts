@@ -343,15 +343,28 @@ test('SECURITY 07b: critical Electron bootstrap files use pinned startup hashes'
   const mainSource = fs.readFileSync(path.join(sourceRoot, 'electron', 'main.js'), 'utf8');
   const expectedHash = mainSource.match(/PRELOAD_INTEGRITY_SHA256 = '([a-f0-9]{64})'/)?.[1];
   assert.ok(expectedHash, 'main process contains a fixed preload hash');
+  const sourceSecurityHash = mainSource.match(/SECURITY_SOURCE_INTEGRITY_SHA256 = '([a-f0-9]{64})'/)?.[1];
+  assert.ok(sourceSecurityHash, 'main process contains a fixed development security-module hash');
+  const packagedSecurityHash = mainSource.match(/SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = '([a-f0-9]{64})'/)?.[1];
+  assert.ok(packagedSecurityHash, 'main process contains a fixed packaged security-loader hash');
+  assert.match(
+    mainSource,
+    /'electron\/security\.js': app\.isPackaged\s*\?\s*SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256\s*:\s*SECURITY_SOURCE_INTEGRITY_SHA256/,
+  );
 
   const checker = new FileIntegrityChecker(sourceRoot);
   const manifest: Record<string, string> = { 'electron/preload.js': expectedHash };
-  for (const file of ['electron/entry.js', 'electron/security.js']) {
+  for (const file of ['electron/entry.js']) {
     const hash = mainSource.match(new RegExp(`'${file}': '([a-f0-9]{64})'`))?.[1];
     assert.ok(hash, `main process contains a fixed hash for ${file}`);
     manifest[file] = hash;
   }
+  manifest['electron/security.js'] = sourceSecurityHash;
   assert.equal(checker.verifyManifest(manifest).valid, true);
+  assert.equal(
+    packagedSecurityHash,
+    sha256Hex(Buffer.from("// Protected binary code\nmodule.exports = require('./security.jsc');\n")),
+  );
 
   const tamperedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'preload_integrity_test_'));
   try {

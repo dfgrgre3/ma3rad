@@ -21,7 +21,7 @@ export class ReservationService {
   private branchAccess = new BranchAccessService();
 
   public getReservations(filters: { status?: string; search?: string } = {}): StockReservation[] {
-    PermissionService.require(AuthService.requireAuth(), 'inventory.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.inventory.hub.view');
     let sql = `
       SELECT r.id, r.product_id AS productId, p.name AS productName, p.sku AS productSku,
              p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
@@ -66,7 +66,7 @@ export class ReservationService {
     expiresAt?: string; notes?: string;
   }): StockReservation {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
     this.branchAccess.requireWarehouseAccess(input.warehouseId, actor);
     const quantity = round2(input.quantityM2);
     if (!(quantity > 0)) throw new Error('كمية الحجز يجب أن تكون أكبر من صفر.');
@@ -109,7 +109,7 @@ export class ReservationService {
 
   public releaseReservation(id: string, reason: 'RELEASED' | 'EXPIRED' = 'RELEASED'): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
     const row = this.db.query<any>(
       `SELECT id, product_id AS productId, warehouse_id AS warehouseId, quantity_m2 AS quantity, status
        FROM stock_reservations WHERE id = ?`,
@@ -125,7 +125,7 @@ export class ReservationService {
   /** Converts an active reservation into an actual stock deduction. */
   public consumeReservation(id: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'inventory.adjust');
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
     const row = this.db.query<any>(
       `SELECT id, product_id AS productId, warehouse_id AS warehouseId, quantity_m2 AS quantity,
               reference_type AS referenceType, reference_id AS referenceId, status

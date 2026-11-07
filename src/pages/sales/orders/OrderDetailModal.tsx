@@ -7,6 +7,8 @@ import { formatProductQuantity } from '../../../utils/productUnits';
 import { Modal, Info } from './ui';
 import { STATUS_LABELS, fmt } from './types';
 import { summarizeOrderQuantity } from './helpers';
+import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
+import { OperationalFieldsSummary } from '../../../components/OperationalFieldsSummary';
 
 interface OrderDetailModalProps {
   order: Order;
@@ -20,11 +22,14 @@ interface OrderDetailModalProps {
   onAdvance: (order: Order) => void;
   onOpenConvert: (order: Order) => void;
   onCancel: (order: Order) => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
 }
 
 export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
   order: detail, canUpdate, canApprove, onClose, onPrint, onShareOnWhatsApp,
   onOpenTimeline, onOpenDelivery, onAdvance, onOpenConvert, onCancel,
+  operationalFields, operationalFieldValues,
 }) => (
   <Modal onClose={onClose} wide>
     <div className="flex items-start justify-between mb-4">
@@ -32,6 +37,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
         <h3 className="text-base font-black text-slate-900">طلب {detail.orderNumber}</h3>
         <p className="text-[11px] text-slate-500 mt-1">{detail.date} • {detail.warehouseName} • {STATUS_LABELS[detail.status].label}</p>
       </div>
+      <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />
       <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100"><X className="w-4 h-4" /></button>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">

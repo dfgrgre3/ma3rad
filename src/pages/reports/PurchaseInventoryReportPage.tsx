@@ -1,109 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ShoppingBag, TrendingUp, TrendingDown, Package, Download, CalendarDays,
-  Loader2, AlertCircle, RefreshCw, BarChart3, Handshake, ArrowUpRight,
+  ShoppingBag, TrendingDown, Package, CalendarDays,
+  Loader2, AlertCircle, RefreshCw, BarChart3, Handshake,
   Scale, Star, PackageCheck, DollarSign,
 } from 'lucide-react';
-import { DatabaseManager } from '../../database/db';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
+import { loadInventoryKpi, loadPurchaseKpi, type PurchaseKpi } from '../../services/InventoryReportService';
+import type { InventoryKpi } from '../../services/InventoryValuationService';
 import { localDateString } from '../../utils/date';
-import { exportToExcel } from '../../utils/export';
-import { useToast } from '../../components/ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { getProductUnitLabel } from '../../utils/productUnits';
-import { BranchAccessService } from '../../services/BranchAccessService';
-import { InventoryValuationService } from '../../services/InventoryValuationService';
 
-const db = DatabaseManager.getInstance();
-const branchAccess = new BranchAccessService();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtM = (n: number) => n >= 1_000_000 ? (n / 1_000_000).toFixed(2) + 'م' : n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
 const today = () => localDateString();
 const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
 
 type Tab = 'purchases' | 'suppliers' | 'inventory' | 'returns';
-
-interface PurchaseKpi {
-  totalPurchases: number;
-  totalInvoices: number;
-  totalPaid: number;
-  totalDue: number;
-  topSuppliers: { name: string; total: number; count: number }[];
-  topCategories: { category: string; total: number; qty: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[];
-  returnsTotal: number;
-  returnsCount: number;
-}
-
-interface InventoryKpi {
-  totalValue: number;
-  totalSkus: number;
-  lowStockCount: number;
-  zeroStockCount: number;
-  topValueItems: { name: string; value: number; qty: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: string; customUnit?: string }[];
-  categoryBreakdown: { category: string; items: number; value: number }[];
-}
-
-export function loadPurchaseKpi(from: string, to: string): PurchaseKpi {
-  const purchaseScope = branchAccess.sqlScope(
-    'pi.branch_id',
-    '(SELECT w.branch_id FROM warehouses w WHERE w.id = pi.warehouse_id)'
-  );
-  const returnScope = branchAccess.sqlScope(
-    'pi.branch_id',
-    '(SELECT w.branch_id FROM warehouses w WHERE w.id = pr.warehouse_id)'
-  );
-  const base = `pi.date >= ? AND pi.date <= ? AND ${purchaseScope.clause}`;
-  const params = [from, to, ...purchaseScope.params];
-
-  const summary = db.query<any>(`
-    SELECT 
-      COALESCE(SUM(pi.total_amount), 0) AS total,
-      COUNT(*) AS count,
-      COALESCE(SUM(pi.paid_amount), 0) AS paid
-    FROM purchase_invoices pi WHERE ${base}
-  `, params)[0] || {};
-
-  const topSuppliers = db.query<any>(`
-    SELECT s.name, COALESCE(SUM(pi.total_amount), 0) AS total, COUNT(*) AS count
-    FROM purchase_invoices pi JOIN suppliers s ON s.id = pi.supplier_id
-    WHERE ${base} GROUP BY s.id ORDER BY total DESC LIMIT 8
-  `, params).map(r => ({ name: r.name, total: Number(r.total), count: Number(r.count) }));
-
-  const topCategories = db.query<any>(`
-    SELECT COALESCE(c.name, 'غير مصنف') AS category,
-      COALESCE(SUM(pii.unit_cost * pii.quantity_m2), 0) AS total,
-      COALESCE(SUM(pii.quantity_m2), 0) AS qty,
-      p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
-    FROM purchase_invoices pi
-    JOIN purchase_invoice_items pii ON pii.purchase_id = pi.id
-    JOIN products p ON p.id = pii.product_id
-    LEFT JOIN categories c ON c.id = p.category_id
-    WHERE ${base} GROUP BY c.id, p.product_type, p.base_unit, p.custom_unit ORDER BY total DESC LIMIT 8
-  `, params).map(r => ({ category: r.category, total: Number(r.total), qty: Number(r.qty), productType: r.productType, baseUnit: r.baseUnit, customUnit: r.customUnit }));
-
-  const returnsSummary = db.query<any>(`
-    SELECT COALESCE(SUM(pr.total_amount), 0) AS total, COUNT(*) AS count
-    FROM purchase_returns pr
-    LEFT JOIN purchase_invoices pi ON pi.id = pr.original_purchase_id
-    WHERE pr.created_at >= ? AND pr.created_at <= ? AND ${returnScope.clause}
-  `, [from + 'T00:00:00', to + 'T23:59:59', ...returnScope.params])[0] || {};
-
-  return {
-    totalPurchases: Number(summary.total || 0),
-    totalInvoices: Number(summary.count || 0),
-    totalPaid: Number(summary.paid || 0),
-    totalDue: Number(summary.total || 0) - Number(summary.paid || 0),
-    topSuppliers,
-    topCategories,
-    returnsTotal: Number(returnsSummary.total || 0),
-    returnsCount: Number(returnsSummary.count || 0),
-  };
-}
-
-export function loadInventoryKpi(): InventoryKpi {
-  return new InventoryValuationService().getKpi();
-}
 
 function StatCard({ label, value, sub, icon: Icon, color, bg }: {
   label: string; value: string; sub?: string;
@@ -155,12 +69,19 @@ function HBar({ rows, color }: { rows: { label: string; value: number; sub?: str
 }
 
 export const PurchaseInventoryReportPage: React.FC = () => {
-  const toast = useToast();
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'reports.view');
+  const canView = PermissionService.can(user, 'ui.reports.hub.view');
+  const canViewPurchases = PermissionService.canAny(user, [
+    'ui.reports.purchases.view',
+    'ui.purchases.invoices.view',
+  ]);
+  const canViewInventory = PermissionService.can(user, 'ui.reports.inventory.view')
+    || PermissionService.can(user, 'ui.inventory.valuation.view');
 
-  const [tab, setTab] = useState<Tab>('purchases');
+  const [tab, setTab] = useState<Tab>(
+    canViewPurchases ? 'purchases' : canViewInventory ? 'inventory' : 'purchases'
+  );
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [purchaseKpi, setPurchaseKpi] = useState<PurchaseKpi | null>(null);
@@ -168,7 +89,11 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
+    if (tab === 'inventory' ? !canViewInventory : !canViewPurchases) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       if (tab !== 'inventory') setPurchaseKpi(loadPurchaseKpi(from, to));
@@ -179,15 +104,17 @@ export const PurchaseInventoryReportPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canViewInventory, canViewPurchases, from, tab, to]);
 
-  useEffect(() => { if (canView) load(); }, [tab, from, to]);
+  useEffect(() => {
+    if (canView && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
+  }, [canView, canViewInventory, canViewPurchases, load, tab]);
 
-  const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'purchases', label: 'المشتريات', icon: ShoppingBag },
-    { id: 'suppliers', label: 'الموردون', icon: Handshake },
-    { id: 'inventory', label: 'قيمة المخزون', icon: Package },
-    { id: 'returns', label: 'المرتجعات', icon: TrendingDown },
+  const TABS: { id: Tab; label: string; icon: React.ElementType; visible: boolean }[] = [
+    { id: 'purchases', label: 'المشتريات', icon: ShoppingBag, visible: canViewPurchases },
+    { id: 'suppliers', label: 'الموردون', icon: Handshake, visible: canViewPurchases },
+    { id: 'inventory', label: 'قيمة المخزون', icon: Package, visible: canViewInventory },
+    { id: 'returns', label: 'المرتجعات', icon: TrendingDown, visible: canViewPurchases },
   ];
 
   return (
@@ -240,7 +167,7 @@ export const PurchaseInventoryReportPage: React.FC = () => {
 
       {/* Tabs */}
       <div className="bg-white border-b border-slate-100 px-6 py-2 flex gap-1 flex-shrink-0">
-        {TABS.map(t => {
+        {TABS.filter((item) => item.visible).map(t => {
           const Icon = t.icon;
           const isActive = tab === t.id;
           return (
@@ -259,7 +186,15 @@ export const PurchaseInventoryReportPage: React.FC = () => {
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
+        {!canView ? (
+          <div role="alert" className="py-16 text-center text-sm font-semibold text-slate-600">
+            ليس لديك صلاحية لعرض هذا التقرير.
+          </div>
+        ) : !TABS.some((item) => item.visible) ? (
+          <div role="alert" className="py-16 text-center text-sm font-semibold text-slate-600">
+            لا توجد لديك صلاحية لعرض أقسام هذا التقرير.
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
           </div>

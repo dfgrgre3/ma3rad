@@ -408,10 +408,10 @@ export const CustomerStatementPage: React.FC = () => {
   const customerService = useMemo(() => new CustomerService(), []);
   const salesService = useMemo(() => new SalesService(), []);
   const user = AuthService.getCurrentUser();
-  const canView = PermissionService.can(user, 'customers.view')
-    && PermissionService.can(user, 'sales.view')
-    && PermissionService.can(user, 'finance.debts.view');
-  const canExport = PermissionService.can(user, 'customers.export');
+  const canView = PermissionService.can(user, 'ui.customers.list.view')
+    && PermissionService.can(user, 'ui.sales.invoices.view')
+    && PermissionService.can(user, 'ui.finance.receivables.view');
+  const canExport = PermissionService.can(user, 'ui.customers.list.export');
 
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [loading, setLoading] = useState(true);

@@ -12,6 +12,9 @@ import { AuthService } from '../services/AuthService';
 import { PermissionService } from '../services/PermissionService';
 import { useBusinessProfileMeta, useBusinessTerm } from '../hooks/useBusinessTerm';
 import { Link } from 'react-router-dom';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../services/OperationalFieldService';
+import { OperationalFieldsForm } from './OperationalFieldsForm';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from './OperationalFieldsFilter';
 
 const csvCell = (value: unknown) => {
   const text = String(value ?? '');
@@ -35,6 +38,11 @@ export const SuppliersView: React.FC = () => {
   const supplierSingularLabel = useBusinessTerm('entities.suppliers.singular');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [supplierFieldValues, setSupplierFieldValues] = useState<Record<string, Record<string, string>>>({});
+  const [supplierFieldValuesById, setSupplierFieldValuesById] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -66,21 +74,29 @@ export const SuppliersView: React.FC = () => {
   });
 
   const supplierService = new SupplierService();
+  const operationalFieldService = new OperationalFieldService();
   const currentUser = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(currentUser, 'suppliers.create');
-  const canUpdate = PermissionService.can(currentUser, 'suppliers.update');
-  const canDelete = PermissionService.can(currentUser, 'suppliers.delete');
-  const canPay = PermissionService.can(currentUser, 'suppliers.payment');
-  const canExport = PermissionService.can(currentUser, 'suppliers.export');
-  const canViewPurchases = PermissionService.can(currentUser, 'purchases.view');
-  const canViewFinancials = PermissionService.can(currentUser, 'finance.debts.view');
-  const canApproveFinancials = PermissionService.can(currentUser, 'finance.approve');
-  const canImport = PermissionService.can(currentUser, 'settings.view');
+  const canCreate = PermissionService.can(currentUser, 'ui.suppliers.suppliers.create');
+  const canUpdate = PermissionService.can(currentUser, 'ui.suppliers.suppliers.update');
+  const canDelete = PermissionService.can(currentUser, 'ui.suppliers.suppliers.delete');
+  const canPay = PermissionService.can(currentUser, 'ui.suppliers.suppliers.payment');
+  const canExport = PermissionService.can(currentUser, 'ui.suppliers.suppliers.export');
+  const canViewPurchases = PermissionService.can(currentUser, 'ui.purchases.invoices.view');
+  const canViewFinancials = PermissionService.can(currentUser, 'ui.finance.receivables.view');
+  const canApproveFinancials = PermissionService.can(currentUser, 'ui.finance.receivables.approve');
+  const canImport = PermissionService.can(currentUser, 'ui.settings.hub.view');
 
   const loadSuppliers = () => {
     try {
       const data = supplierService.getAllSuppliers(search, showInactive);
       setSuppliers(data);
+      setOperationalFields(operationalFieldService.getDefinitions('suppliers'));
+      setSupplierFieldValues(operationalFieldService.getRecordValuesForExport(
+        'suppliers', data.map((supplier) => supplier.id),
+      ));
+      setSupplierFieldValuesById(operationalFieldService.getRecordValuesForRecords(
+        'suppliers', data.map((supplier) => supplier.id),
+      ));
     } catch (e) {
       console.error(e);
     }
@@ -104,18 +120,21 @@ export const SuppliersView: React.FC = () => {
 
   const handleOpenStatement = (sup: Supplier) => {
     setSelectedSupplier(sup);
+    setOperationalFieldValues(operationalFieldService.getRecordValues('suppliers', sup.id));
     setStatement(canViewFinancials ? supplierService.getSupplierStatement(sup.id, statementFrom, statementTo) : null);
   };
 
   const handleSaveSupplier = (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      operationalFieldService.validateRecordValues('suppliers', operationalFieldValues, editingSupplier ? 'update' : 'create', editingSupplier?.id);
       if (editingSupplier) {
         const updated = supplierService.updateSupplier(editingSupplier.id, formData);
+        operationalFieldService.setRecordValues('suppliers', updated.id, operationalFieldValues, 'update');
         setSelectedSupplier(updated);
         if (canViewFinancials) setStatement(supplierService.getSupplierStatement(updated.id, statementFrom, statementTo));
       } else {
-        supplierService.createSupplier({
+        const created = supplierService.createSupplier({
           code: `SUP-${Date.now().toString().slice(-4)}`,
           name: formData.name,
           companyName: formData.companyName,
@@ -128,9 +147,11 @@ export const SuppliersView: React.FC = () => {
           paymentTermsDays: formData.paymentTermsDays,
           notes: formData.notes
         });
+        operationalFieldService.setRecordValues('suppliers', created.id, operationalFieldValues, 'create');
       }
       setIsAddModalOpen(false);
       setEditingSupplier(null);
+      setOperationalFieldValues({});
       loadSuppliers();
     } catch (err: any) {
       alert(`خطأ: ${err.message || err}`);
@@ -166,6 +187,7 @@ export const SuppliersView: React.FC = () => {
 
   const openEditSupplier = (supplier: Supplier) => {
     setEditingSupplier(supplier);
+    setOperationalFieldValues(operationalFieldService.getRecordValues('suppliers', supplier.id));
     setFormData({
       name: supplier.name || '',
       companyName: supplier.companyName || '',
@@ -201,9 +223,11 @@ export const SuppliersView: React.FC = () => {
     if (canViewPurchases) headers.push('إجمالي المشتريات');
     if (canViewFinancials) headers.push('الرصيد');
     headers.push('مدة السداد', 'الحالة', 'ملاحظات');
+    headers.push(...operationalFields.map((field) => field.name));
     downloadCsv('suppliers.csv', [
       headers,
       ...suppliers.map((supplier) => {
+        const extraValues = supplierFieldValues[supplier.id] || {};
         const row: unknown[] = [
           supplier.code, supplier.name, supplier.companyName, supplier.phone, supplier.email,
           supplier.taxNumber, supplier.commercialRecord, supplier.address,
@@ -211,8 +235,9 @@ export const SuppliersView: React.FC = () => {
         if (canViewPurchases) row.push(supplier.totalPurchases);
         if (canViewFinancials) row.push(supplier.currentBalance);
         row.push(supplier.paymentTermsDays, supplier.isActive === 0 ? 'غير نشط' : 'نشط', supplier.notes);
+        operationalFields.forEach((field) => row.push(extraValues[field.name] || ''));
         return row;
-      })
+      }),
     ]);
   };
 
@@ -249,6 +274,7 @@ export const SuppliersView: React.FC = () => {
           {canCreate && <button
           onClick={() => {
             setEditingSupplier(null);
+            setOperationalFieldValues({});
             setFormData({
               name: '',
               companyName: '',
@@ -302,6 +328,7 @@ export const SuppliersView: React.FC = () => {
           إظهار الموردين غير النشطين
         </label>
       </div>
+      <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
 
       {/* Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -320,7 +347,7 @@ export const SuppliersView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 ">
-                {suppliers.map((s) => {
+                {suppliers.filter((supplier) => matchesOperationalFieldFilters(supplier.id, supplierFieldValuesById, fieldFilters)).map((s) => {
                   const isSelected = selectedSupplier?.id === s.id;
                   return (
                     <tr
@@ -337,6 +364,9 @@ export const SuppliersView: React.FC = () => {
                           {s.isActive === 0 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] text-slate-500">غير نشط</span>}
                         </div>
                         {s.companyName && <div className="text-[10px] text-slate-500 font-normal">{s.companyName}</div>}
+                        {Object.entries(supplierFieldValues[s.id] || {}).map(([label, value]) => (
+                          <div key={label} className="text-[10px] font-normal text-teal-700">{label}: {value}</div>
+                        ))}
                       </td>
                       <td className="p-3.5 font-mono text-slate-600 ">{s.phone}</td>
                       {canViewPurchases && <td className="p-3.5 font-bold text-slate-700">
@@ -422,6 +452,13 @@ export const SuppliersView: React.FC = () => {
                 </button>}
                 </div>
               </div>
+              <OperationalFieldsForm
+                fields={operationalFields}
+                values={operationalFieldValues}
+                onChange={() => undefined}
+                title="الحقول الإضافية"
+                readOnly
+              />
 
               {/* Statement Summary Card */}
               <div className="bg-slate-50 p-3 rounded-xl space-y-1.5 text-xs">
@@ -578,6 +615,12 @@ export const SuppliersView: React.FC = () => {
                 />
               </div>
               }
+              <OperationalFieldsForm
+                fields={operationalFields}
+                values={operationalFieldValues}
+                onChange={setOperationalFieldValues}
+                title="بيانات إضافية"
+              />
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 ">
                 <button

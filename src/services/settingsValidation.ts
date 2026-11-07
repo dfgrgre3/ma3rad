@@ -4,7 +4,34 @@ function validateStringSetting(key: string, value: string): string {
   switch (key) {
     case 'brandPrimaryColor':
     case 'brandAccentColor':
-      if (!HEX_COLOR.test(value)) throw new Error('لون الهوية يجب أن يكون بصيغة HEX مثل #0284c7.');
+    case 'uiCanvasColor':
+    case 'uiSurfaceColor':
+    case 'uiTextColor':
+    case 'uiBorderColor':
+    case 'uiSuccessColor':
+    case 'uiDangerColor':
+    case 'uiWarningColor':
+      if (!HEX_COLOR.test(value)) throw new Error('يجب إدخال لون بصيغة HEX مثل #34445a.');
+      break;
+    case 'uiButtonStyle':
+      if (!['solid', 'outline', 'soft'].includes(value)) throw new Error('نمط الأزرار غير صالح.');
+      break;
+    case 'uiCornerRadius':
+      if (!['compact', 'standard', 'rounded'].includes(value)) throw new Error('استدارة الزوايا غير صالحة.');
+      break;
+    case 'uiDensity':
+      if (!['comfortable', 'compact'].includes(value)) throw new Error('كثافة الواجهة غير صالحة.');
+      break;
+    case 'uiFontScale':
+      if (!['small', 'standard', 'large'].includes(value)) throw new Error('حجم الخط غير صالح.');
+      break;
+    case 'interfaceDirection':
+      if (!['rtl', 'ltr'].includes(value)) throw new Error('اتجاه الواجهة غير صالح.');
+      break;
+    case 'fontFamily':
+      if (!['Cairo', 'Tajawal', 'system-ui', 'Arial', 'Tahoma'].includes(value)) {
+        throw new Error('الخط المحدد غير صالح.');
+      }
       break;
     case 'themeMode':
       if (!['light', 'dark', 'system'].includes(value)) throw new Error('وضع العرض غير صالح.');
@@ -18,6 +45,13 @@ function validateStringSetting(key: string, value: string): string {
     case 'costingMethod':
       if (!['AVERAGE_COST', 'FIFO'].includes(value)) throw new Error('Invalid inventory costing method.');
       break;
+    case 'loginPinLength': {
+      const length = Number(value);
+      if (!Number.isInteger(length) || length < 4 || length > 8) {
+        throw new Error('طول رمز الدخول يجب أن يكون من 4 إلى 8 أرقام.');
+      }
+      break;
+    }
     case 'showroomName':
       if (value.length < 2) throw new Error('اسم المعرض مطلوب (حرفان على الأقل).');
       break;

@@ -1,4 +1,5 @@
-export type CeramicGrade = 'GRADE_1' | 'GRADE_2' | 'GRADE_3' | 'COMMERCIAL';
+/** Stable values configured by administrators; existing grade keys remain valid. */
+export type CeramicGrade = string;
 export type UnitType =
   | 'M2'
   | 'LINEAR_METER'

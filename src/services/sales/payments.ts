@@ -24,7 +24,7 @@ export function recordInvoicePaymentEntry(
   paymentDate?: string
 ): CustomerPayment {
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'customers.payment');
+  PermissionService.require(actor, 'ui.customers.detail.payment');
   const invoice = ctx.getInvoiceById(invoiceId);
   if (!invoice) throw new Error('الفاتورة غير موجودة.');
   if (invoice.invoiceStatus === 'VOID') throw new Error('لا يمكن التحصيل على فاتورة ملغاة.');
@@ -163,7 +163,7 @@ export function recordCustomerPaymentAllocationsEntry(
   idempotencyKey?: string,
 ): { groupId: string; total: number; receipts: string[] } {
   const actor = AuthService.requireAuth();
-  PermissionService.require(actor, 'customers.payment');
+  PermissionService.require(actor, 'ui.customers.detail.payment');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('تاريخ الدفعة غير صحيح.');
   const entries = allocations.filter((a) => Number(a.amount) > 0);
   if (!entries.length || new Set(entries.map((a) => a.invoiceId)).size !== entries.length) throw new Error('حدد فواتير ومبالغ صحيحة دون تكرار.');

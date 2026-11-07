@@ -17,6 +17,8 @@ import { NavigationService } from '../src/services/NavigationService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
 import { SupplierService } from '../src/services/SupplierService.ts';
 import { SystemDiagnosticsService } from '../src/services/SystemDiagnosticsService.ts';
+import { InventoryValuationService } from '../src/services/InventoryValuationService.ts';
+import { appRoutes } from '../src/router/routesList.tsx';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -52,6 +54,72 @@ test('finance navigation separates calendar viewing from close access', async ()
     assert.equal(accessibleFinanceGroup?.items.some(({ to }) => to === '/finance/calendar'), false);
   } finally {
     db.run('DELETE FROM users WHERE id = ?', [closeOnly.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
+
+test('page-specific permissions expose only the matching page in navigation', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  db.run(
+    'INSERT INTO roles (id, code, name) VALUES (?, ?, ?)',
+    ['role_pos_visibility_test', 'POS_VISIBILITY_TEST', 'اختبار صلاحية نقطة البيع']
+  );
+  db.run(
+    'INSERT INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
+    ['POS_VISIBILITY_TEST', 'sales.pos.view']
+  );
+  const user = {
+    id: 'usr_pos_visibility_test',
+    username: 'pos_visibility_test',
+    fullName: 'اختبار صلاحيات نقطة البيع',
+    role: 'POS_VISIBILITY_TEST',
+    phone: undefined,
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+
+  try {
+    PermissionService.invalidate(user);
+    const paths = NavigationService.getNavigationGroups(user).flatMap(
+      (group) => group.items.map((item) => item.to)
+    );
+    assert.ok(paths.includes('/pos'));
+    assert.equal(paths.includes('/sales'), false);
+    assert.deepEqual(NavigationService.getRequiredPermissionGroups('/pos'), {
+      all: [],
+      any: ['sales.pos.view', 'sales.create'],
+    });
+    assert.equal(PermissionService.canAccessPage(user, '/pos'), true);
+    assert.equal(PermissionService.canAccessPage(user, '/sales'), false);
+    assert.equal(PermissionService.canAccessPage(user, '/inventory'), false);
+    assert.equal(PermissionService.canAccessPage(user, '/inventory/reservations'), false);
+    assert.equal(PermissionService.canAccessPage(user, '/tools'), false);
+    assert.equal(PermissionService.canAccessPage(user, '/crm/hub'), false);
+  } finally {
+    PermissionService.invalidate(user);
+    db.run('DELETE FROM roles WHERE code = ?', ['POS_VISIBILITY_TEST']);
+  }
+});
+
+test('inventory valuation data requires its service-layer permission', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_inventory_valuation_denied', name: 'Inventory valuation denied test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['sales.view'], admin);
+  const limited = makeUser(db, 'usr_inventory_valuation_denied', role.code);
+
+  try {
+    AuthService.setCurrentUser(limited);
+    assert.throws(() => new InventoryValuationService().getKpi(), /غير مصرح/);
+    assert.throws(() => new InventoryValuationService().getByWarehouse(), /غير مصرح/);
+  } finally {
+    AuthService.setCurrentUser(admin);
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
     PermissionService.deleteRole(role.id, admin);
   }
 });
@@ -205,7 +273,7 @@ test('permissions: reverse, expense mutation, and shift closing require their de
       paymentType: 'CASH',
     }), /cashier\.expense\.update/);
     assert.throws(() => new CashierService().deleteExpense('missing'), /cashier\.expense\.delete/);
-    assert.throws(() => new CashierService().closeShift('missing', 0), /cashier\.shift\.close/);
+    assert.throws(() => new CashierService().closeShift('missing', 0), /ui\.cashier\.cashier\.close_shift/);
   } finally {
     AuthService.logout();
     AuthService.login('admin', 'admin123');
@@ -242,8 +310,8 @@ test('permissions: system health view works alone and maintenance actions requir
     assert.equal(PermissionService.can(limited, 'settings.maintenance'), false);
     assert.ok(new SystemDiagnosticsService().runDiagnostics().checks.length > 0);
     await new SystemDiagnosticsService().getRuntimeDiagnostics();
-    assert.throws(() => new SystemDiagnosticsService().vacuum(), /settings\.health\.manage/);
-    assert.throws(() => new SystemDiagnosticsService().reindex(), /settings\.health\.manage/);
+    assert.throws(() => new SystemDiagnosticsService().vacuum(), /ui\.settings\.system_health\.manage/);
+    assert.throws(() => new SystemDiagnosticsService().reindex(), /ui\.settings\.system_health\.manage/);
 
     AuthService.logout();
     AuthService.login('admin', 'admin123');
@@ -300,7 +368,7 @@ test('permissions: audit reads require audit.view inside the service', async () 
   try {
     AuthService.logout();
     AuthService.login(limited.username, 'test-password');
-    assert.throws(() => new AuditService().getAuditLogs({ page: 1, pageSize: 8 }), /audit\.view/);
+    assert.throws(() => new AuditService().getAuditLogs({ page: 1, pageSize: 8 }), /ui\.audit\.log\.view/);
   } finally {
     AuthService.logout();
     AuthService.login('admin', 'admin123');
@@ -322,11 +390,11 @@ test('permissions: customer reads and supply requests require their view grants'
   try {
     AuthService.login(limited.username, 'test-password');
     const customers = new CustomerService();
-    assert.throws(() => customers.getAllCustomers(), /customers\.view/);
-    assert.throws(() => customers.getCustomersPage(), /customers\.view/);
-    assert.throws(() => customers.getCustomerById('missing'), /customers\.view/);
-    assert.throws(() => customers.getCustomerStatement('missing'), /sales\.view/);
-    assert.throws(() => new CustomerSupplyService().getOpenRequests(), /sales\.view/);
+    assert.throws(() => customers.getAllCustomers(), /ui\.customers\.list\.view/);
+    assert.throws(() => customers.getCustomersPage(), /ui\.customers\.list\.view/);
+    assert.throws(() => customers.getCustomerById('missing'), /ui\.customers\.list\.view/);
+    assert.throws(() => customers.getCustomerStatement('missing'), /ui\.sales\.invoices\.view/);
+    assert.throws(() => new CustomerSupplyService().getOpenRequests(), /ui\.sales\.invoices\.view/);
   } finally {
     AuthService.logout();
     AuthService.login('admin', 'admin123');
@@ -457,4 +525,92 @@ test('auth: createUser enforces the same password policy as password changes', a
     db.run(`DELETE FROM users WHERE username = ?`, ['weak_password_user']);
     AuthService.logout();
   }
+});
+
+test('permission matrix: exposes a large, unique fine-grained catalog with a view grant for every page', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+
+  const { GRANULAR_PERMISSIONS, PAGE_VIEW_PERMISSIONS } = await import('../src/config/permissionMatrix.ts');
+  assert.ok(GRANULAR_PERMISSIONS.length > 1000, 'must expose more than 1000 granular permissions');
+  assert.ok(PermissionService.getCatalogSize() > 4000, 'catalog must include base and granular permissions');
+
+  const codes = GRANULAR_PERMISSIONS.map(({ code }) => code);
+  assert.equal(new Set(codes).size, codes.length, 'granular permission codes must be unique');
+  assert.ok(GRANULAR_PERMISSIONS.every(({ code }) => code.startsWith('ui.')), 'granular codes must use the ui. namespace');
+
+  const pagePermissions = GRANULAR_PERMISSIONS.filter(({ kind }) => kind === 'page');
+  assert.ok(pagePermissions.length >= 140, 'every application page must own a page-level permission');
+  assert.ok(pagePermissions.every(({ code }) => code.endsWith('.view')), 'page permissions must end with .view');
+  assert.ok(pagePermissions.every(({ route }) => Boolean(route)), 'page permissions must declare their route');
+
+  for (const [route, permission] of Object.entries(PAGE_VIEW_PERMISSIONS)) {
+    assert.ok(codes.includes(permission), `route ${route} must map to a known granular permission`);
+    assert.equal(PermissionService.isKnownPermission(permission), true, `${permission} must be in the catalog`);
+  }
+  const unguardedRoutes = appRoutes
+    .filter(({ path }) => path !== '*')
+    .map(({ path }) => `/${path.replace(/:[^/]+/g, 'test-route')}`)
+    .filter((path) => !PermissionService.getPagePermission(path));
+  assert.deepEqual(unguardedRoutes, [], 'every application route must resolve a page permission');
+});
+
+test('permission matrix: legacy grants keep working and page access resolves routes', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_granular_compat', name: 'Granular compatibility test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['crm.create', 'inventory.export', 'finance.close', 'deliveries.manage'], admin);
+  const limited = makeUser(db, 'usr_granular_compat_test', role.code);
+
+  try {
+    assert.equal(PermissionService.can(limited, 'ui.crm.leads.create'), true);
+    assert.equal(PermissionService.can(limited, 'ui.crm.activities.create'), true);
+    assert.equal(PermissionService.can(limited, 'ui.inventory.valuation.export'), true);
+    assert.equal(PermissionService.can(limited, 'ui.finance.fiscal_closing.close'), true);
+    assert.equal(PermissionService.can(limited, 'ui.deliveries.deliveries.manage'), true);
+    assert.equal(PermissionService.can(limited, 'ui.sales.invoices.create'), false);
+
+    assert.equal(PermissionService.canAccessPage(limited, '/customers/cus_1'), false);
+    assert.equal(PermissionService.canAccessPage(admin, '/customers/cus_1'), true);
+    assert.equal(PermissionService.canAccessPage(null, '/customers/cus_1'), false);
+    assert.equal(PermissionService.getPagePermission('/products/prd_1'), 'ui.products.detail.view');
+    assert.equal(PermissionService.getPagePermission('/no-such-page'), null);
+
+    PermissionService.setUserOverride(limited.id, 'ui.crm.leads.create', 'DENY', admin);
+    PermissionService.invalidate(limited);
+    assert.equal(PermissionService.can(limited, 'ui.crm.leads.create'), false, 'explicit DENY must beat legacy compatibility');
+    PermissionService.clearUserOverrides(limited.id, admin);
+  } finally {
+    db.run('DELETE FROM users WHERE id = ?', [limited.id]);
+    PermissionService.deleteRole(role.id, admin);
+  }
+});
+
+test('permission matrix: non-admin backfill never grants destructive granular permissions', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const role = PermissionService.createRole({ code: 'test_granular_backfill', name: 'Granular backfill test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['products.view', 'products.delete', 'sales.view', 'sales.create'], admin);
+
+  // force a fresh backfill for this role after the permissions were changed
+  db.run('DELETE FROM system_settings WHERE key = ?', [`rbac.granular.v1.${role.code}`]);
+  PermissionService.seed();
+
+  const grants = new Set(PermissionService.getRolePermissions(role.code));
+  assert.equal(grants.has('ui.products.catalog.view'), true);
+  assert.equal(grants.has('ui.products.catalog.delete'), false);
+  assert.equal(grants.has('ui.sales.invoices.view'), true);
+  assert.equal(grants.has('ui.sales.invoices.create'), true);
+  assert.equal(grants.has('ui.sales.invoices.delete'), false);
+
+  const adminGrants = new Set(PermissionService.getRolePermissions('ADMIN'));
+  assert.equal(adminGrants.has('ui.sales.invoices.delete'), true);
+  assert.equal(adminGrants.has('ui.products.catalog.delete'), true);
+
+  PermissionService.deleteRole(role.id, admin);
 });

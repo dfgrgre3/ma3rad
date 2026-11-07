@@ -294,7 +294,7 @@ export const InventoryCountPage: React.FC = () => {
           onNoteChange={handleItemNoteChange}
           onSaveDraft={handleSaveDraft}
           onPost={handlePostSession}
-          canApprove={PermissionService.can(AuthService.getCurrentUser(), 'inventory.count.approve')}
+          canApprove={PermissionService.can(AuthService.getCurrentUser(), 'ui.inventory.counts.approve')}
           onApprove={handleApproveSession}
           onReject={handleRejectSession}
           onCancelSession={handleCancelSession}

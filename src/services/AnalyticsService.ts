@@ -211,7 +211,7 @@ export class AnalyticsService {
 
   public recordSnapshot(metricName: string, metricValue: number, periodStart: string, periodEnd: string, dimension?: string): void {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'analytics.write');
+    PermissionService.require(actor, 'ui.analytics.overview.write');
 
     const id = `an_${uuidv4().substring(0, 8)}`;
     const now = new Date().toISOString();
@@ -222,7 +222,7 @@ export class AnalyticsService {
   }
 
   public getSnapshots(metricName: string, periodStart: string, periodEnd: string): AnalyticsSnapshot[] {
-    PermissionService.require(AuthService.requireAuth(), 'analytics.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.analytics.overview.view');
     return this.db.query<AnalyticsSnapshot>(`
       SELECT * FROM analytics_snapshots
       WHERE metric_name = ? AND period_start >= ? AND period_end <= ?
@@ -232,7 +232,7 @@ export class AnalyticsService {
 
   public getDashboardMetrics(): Array<{ name: string; value: number; label: string; trend: 'up' | 'down' | 'stable' }> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'analytics.view');
+    PermissionService.require(actor, 'ui.analytics.overview.view');
     const today = localDateString();
     const monthStartStr = `${today.slice(0, 7)}-01`;
     const scope = this.branchAccess.sqlScope(

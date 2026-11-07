@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Employee, EmployeeFormState } from './types';
+import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../../components/OperationalFieldsForm';
 
 interface EmployeeBranchOption {
   id: string;
@@ -16,6 +18,9 @@ interface EmployeeFormModalProps {
   onFormChange: React.Dispatch<React.SetStateAction<EmployeeFormState>>;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  operationalFields: OperationalFieldDefinition[];
+  operationalFieldValues: Record<string, string>;
+  onOperationalFieldValuesChange: (values: Record<string, string>) => void;
 }
 
 const fieldClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:bg-slate-100';
@@ -31,6 +36,9 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   onFormChange,
   onClose,
   onSubmit,
+  operationalFields,
+  operationalFieldValues,
+  onOperationalFieldValuesChange,
 }) => {
   if (!open) return null;
 
@@ -211,6 +219,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               </label>
             </div>
           </section>
+          <div className="mt-4"><OperationalFieldsForm fields={operationalFields} values={operationalFieldValues} onChange={onOperationalFieldValuesChange} title="بيانات إضافية للموظف" /></div>
 
           <label className="mt-4 block">
             <span className={labelClass}>ملاحظات</span>

@@ -30,7 +30,7 @@ function assertDate(value: string | null | undefined, label: string): void {
 function addDays(date: string, days: number): string {
   const parsed = new Date(`${date}T00:00:00`);
   parsed.setDate(parsed.getDate() + days);
-  return parsed.toISOString().slice(0, 10);
+  return localDateString(parsed);
 }
 
 export class ContractService {

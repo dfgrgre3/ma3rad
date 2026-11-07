@@ -5,7 +5,7 @@
  * التصميم:
  * - سر كل مستخدم وإعداداته تُخزَّن في جدول user_2fa (وليس في localStorage).
  * - رموز الاسترداد تُخزَّن كتجزئات bcrypt فقط.
- * - الحساب متزامن (pure JS) كي يعمل داخل مسار تسجيل الدخول المتزامن.
+ * - التحقق متزامن كي يعمل داخل مسار تسجيل الدخول، بينما إنشاء إعداد 2FA لا يحجب الواجهة.
  */
 
 import bcrypt from 'bcryptjs';
@@ -299,7 +299,7 @@ class TwoFactorAuthService {
   async setup2FA(userId: string, algorithm: 'TOTP' | 'HOTP' = 'TOTP'): Promise<TwoFactorSetup> {
     const secret = this.generateSecret();
     const recoveryCodes = await this.generateRecoveryCodes(10);
-    const hashedCodes = recoveryCodes.map((code) => bcrypt.hashSync(code, 10));
+    const hashedCodes = await Promise.all(recoveryCodes.map((code) => bcrypt.hash(code, 10)));
     const period = algorithm === 'TOTP' ? DEFAULT_PERIOD : 0;
     const setupDate = new Date().toISOString();
 

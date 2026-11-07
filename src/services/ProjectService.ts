@@ -238,7 +238,7 @@ export class ProjectService {
     return project;
   }
 
-  private requireWrite(permission: 'projects.create' | 'projects.update' | 'projects.delete'): void {
+  private requireWrite(permission: 'ui.projects.list.create' | 'ui.projects.list.update' | 'ui.projects.list.delete'): void {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('projects');
     PermissionService.require(actor, permission);
@@ -246,7 +246,7 @@ export class ProjectService {
 
   public getProjects(search = '', status?: string): Project[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     const scope = this.branchAccess.sqlScope('p.branch_id', undefined, actor);
     let sql = `
       SELECT p.*, c.name AS customer_name, c.phone AS customer_phone,
@@ -285,7 +285,7 @@ export class ProjectService {
 
   public getProjectById(id: string): Project | null {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     return this.scopedProject(id);
   }
 
@@ -296,7 +296,7 @@ export class ProjectService {
     contractValue?: number; status?: ProjectStatus; notes?: string;
   }): Project {
     const actor = AuthService.requireAuth();
-    this.requireWrite('projects.create');
+    this.requireWrite('ui.projects.list.create');
     if (!input.name.trim()) throw new Error('اسم المشروع مطلوب.');
     if (!input.customerId) throw new Error('يجب اختيار العميل.');
 
@@ -335,7 +335,7 @@ export class ProjectService {
 
   public updateProject(id: string, patch: Partial<Project>): Project {
     const actor = AuthService.requireAuth();
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.requireProject(id);
     if (patch.branchId) this.branchAccess.requireBranchAccess(patch.branchId, actor);
 
@@ -372,7 +372,7 @@ export class ProjectService {
 
   public deleteProject(id: string): void {
     const actor = AuthService.requireAuth();
-    this.requireWrite('projects.delete');
+    this.requireWrite('ui.projects.list.delete');
     this.requireProject(id);
     const linkedInvoices = this.db.query<{ count: number }>(
       `SELECT COUNT(*) AS count FROM sales_invoices WHERE project_id = ? AND invoice_status != 'VOID'`,
@@ -391,7 +391,7 @@ export class ProjectService {
 
   public getUnits(projectId: string): ProjectUnit[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     return this.db.query<ProjectUnit>(
       `SELECT * FROM project_units WHERE project_id = ? ORDER BY sort_order, name`,
@@ -403,7 +403,7 @@ export class ProjectService {
     projectId: string; parentId?: string; unitType: ProjectUnit['unitType'];
     name: string; areaM2?: number; status?: ProjectUnit['status']; notes?: string;
   }): ProjectUnit {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (!input.name.trim()) throw new Error('اسم الوحدة مطلوب.');
     if (input.parentId) {
@@ -428,7 +428,7 @@ export class ProjectService {
   }
 
   public updateUnit(id: string, patch: Partial<ProjectUnit>): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const unit = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_units WHERE id = ?`,
       [id]
@@ -445,7 +445,7 @@ export class ProjectService {
   }
 
   public deleteUnit(id: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const unit = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_units WHERE id = ?`,
       [id]
@@ -457,7 +457,7 @@ export class ProjectService {
 
   public getProjectProducts(projectId: string): ProjectProduct[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     return this.db.query<ProjectProduct>(
       `SELECT pp.*, u.name AS unit_name FROM project_products pp
@@ -471,7 +471,7 @@ export class ProjectService {
     projectId: string; unitId?: string; productId: string; plannedQuantityM2: number;
     agreedPriceM2?: number; notes?: string;
   }): ProjectProduct {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     const product = this.db.query<{ name: string }>(`SELECT name FROM products WHERE id = ?`, [input.productId])[0];
     if (!product) throw new Error('المنتج غير موجود.');
@@ -505,7 +505,7 @@ export class ProjectService {
   }
 
   public updateProjectProduct(id: string, patch: { deliveredQuantityM2?: number; agreedPriceM2?: number; notes?: string }): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0];
     if (!existing) throw new Error('بند المشروع غير موجود.');
     this.requireProject(existing.projectId);
@@ -525,7 +525,7 @@ export class ProjectService {
   }
 
   public deleteProjectProduct(id: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<ProjectProduct>(`SELECT * FROM project_products WHERE id = ?`, [id])[0];
     if (!existing) return;
     this.requireProject(existing.projectId);
@@ -543,7 +543,7 @@ export class ProjectService {
   private requireApprove(): void {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('projects');
-    PermissionService.require(actor, 'projects.approve');
+    PermissionService.require(actor, 'ui.projects.list.approve');
   }
 
   private audit(action: string, recordId: string, values?: unknown): void {
@@ -569,7 +569,7 @@ export class ProjectService {
 
   public getTasks(projectId: string): ProjectTask[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     const tasks = this.db.query<ProjectTask>(
       `SELECT * FROM project_tasks WHERE project_id = ? ORDER BY sort_order, created_at`,
@@ -594,7 +594,7 @@ export class ProjectService {
     priority?: ProjectTaskPriority; assigneeName?: string; startDate?: string; dueDate?: string;
     progress?: number; sortOrder?: number;
   }): ProjectTask {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (!input.title?.trim()) throw new Error('عنوان المهمة مطلوب.');
     const status = input.status || 'TODO';
@@ -634,7 +634,7 @@ export class ProjectService {
     assigneeName?: string; startDate?: string | null; dueDate?: string | null;
     progress?: number; sortOrder?: number;
   }): ProjectTask {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const location = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_tasks WHERE id = ?`,
       [id]
@@ -680,7 +680,7 @@ export class ProjectService {
   }
 
   public deleteTask(id: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const location = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_tasks WHERE id = ?`,
       [id]
@@ -695,7 +695,7 @@ export class ProjectService {
   }
 
   public addTaskDependency(input: { projectId: string; taskId: string; dependsOnTaskId: string }): ProjectTaskDependency {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (input.taskId === input.dependsOnTaskId) throw new Error('لا يمكن أن تعتمد المهمة على نفسها.');
     this.requireTask(input.projectId, input.taskId);
@@ -739,7 +739,7 @@ export class ProjectService {
   }
 
   public removeTaskDependency(projectId: string, dependencyId: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(projectId);
     const dependency = this.db.query<{ id: string }>(
       `SELECT id FROM project_task_dependencies WHERE id = ? AND project_id = ?`,
@@ -751,7 +751,7 @@ export class ProjectService {
   }
 
   public removeTaskDependencyByPair(projectId: string, taskId: string, dependsOnTaskId: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(projectId);
     const dependency = this.db.query<{ id: string }>(
       `SELECT id FROM project_task_dependencies
@@ -764,7 +764,7 @@ export class ProjectService {
 
   public getTimeEntries(projectId: string): ProjectTimeEntry[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     return this.db.query<ProjectTimeEntry>(
       `SELECT t.*, task.title AS task_title
@@ -780,7 +780,7 @@ export class ProjectService {
     projectId: string; taskId?: string; employeeName?: string; entryDate: string;
     hours: number; description?: string; billable?: boolean;
   }): ProjectTimeEntry {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (!input.entryDate) throw new Error('تاريخ تسجيل الوقت مطلوب.');
     assertDate(input.entryDate, 'تاريخ تسجيل الوقت');
@@ -806,7 +806,7 @@ export class ProjectService {
   }
 
   public deleteTimeEntry(id: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const entry = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_time_entries WHERE id = ?`,
       [id]
@@ -846,7 +846,7 @@ export class ProjectService {
 
   public getBudgetLines(projectId: string): ProjectBudgetLine[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     return this.db.query<ProjectBudgetLine>(
       `SELECT * FROM project_budget_lines WHERE project_id = ? ORDER BY category, created_at`,
@@ -858,7 +858,7 @@ export class ProjectService {
     projectId: string; category: string; description?: string;
     plannedAmount: number; actualAmount?: number; notes?: string;
   }): ProjectBudgetLine {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (!input.category?.trim()) throw new Error('بند الميزانية مطلوب.');
     assertAmount(input.plannedAmount, 'المبلغ المخطط');
@@ -882,7 +882,7 @@ export class ProjectService {
   public updateBudgetLine(id: string, patch: {
     category?: string; description?: string; plannedAmount?: number; actualAmount?: number; notes?: string;
   }): ProjectBudgetLine {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<ProjectBudgetLine>(
       `SELECT * FROM project_budget_lines WHERE id = ?`,
       [id]
@@ -910,7 +910,7 @@ export class ProjectService {
   }
 
   public deleteBudgetLine(id: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_budget_lines WHERE id = ?`,
       [id]
@@ -953,7 +953,7 @@ export class ProjectService {
 
   public getRisks(projectId: string): ProjectRisk[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     return this.db.query<ProjectRisk>(
       `SELECT * FROM project_risks WHERE project_id = ? ORDER BY
@@ -968,7 +968,7 @@ export class ProjectService {
     projectId: string; title: string; description?: string; severity?: ProjectRiskSeverity;
     probability?: ProjectRiskProbability; mitigation?: string; ownerName?: string;
   }): ProjectRisk {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (!input.title?.trim()) throw new Error('عنوان الخطر مطلوب.');
     const severity = input.severity || 'MEDIUM';
@@ -999,7 +999,7 @@ export class ProjectService {
     probability?: ProjectRiskProbability; status?: ProjectRiskStatus;
     mitigation?: string; ownerName?: string;
   }): ProjectRisk {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<ProjectRisk>(`SELECT * FROM project_risks WHERE id = ?`, [id])[0];
     if (!existing) throw new Error('الخطر غير موجود.');
     this.requireProject(existing.projectId);
@@ -1027,7 +1027,7 @@ export class ProjectService {
   }
 
   public deleteRisk(id: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_risks WHERE id = ?`,
       [id]
@@ -1040,7 +1040,7 @@ export class ProjectService {
 
   public getChangeRequests(projectId: string): ProjectChangeRequest[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     return this.db.query<ProjectChangeRequest>(
       `SELECT c.*, ru.full_name AS requester_name, du.full_name AS decider_name
@@ -1057,7 +1057,7 @@ export class ProjectService {
     projectId: string; title: string; description?: string;
     costImpact?: number; timeImpactDays?: number;
   }): ProjectChangeRequest {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (!input.title?.trim()) throw new Error('عنوان طلب التغيير مطلوب.');
     const costImpact = input.costImpact ?? 0;
@@ -1105,7 +1105,7 @@ export class ProjectService {
 
   public cancelChangeRequest(id: string, note?: string): ProjectChangeRequest {
     const actor = AuthService.requireAuth();
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<{ projectId: string; status: ProjectChangeStatus; requestedBy: string | null }>(
       `SELECT project_id AS projectId, status, requested_by AS requestedBy
        FROM project_change_requests WHERE id = ?`,
@@ -1114,7 +1114,7 @@ export class ProjectService {
     if (!existing) throw new Error('طلب التغيير غير موجود.');
     this.requireProject(existing.projectId);
     if (existing.status !== 'PENDING') throw new Error('لا يمكن إلغاء طلب تغيير تم البت فيه.');
-    if (existing.requestedBy !== actor.id && !PermissionService.can(actor, 'projects.approve')) {
+    if (existing.requestedBy !== actor.id && !PermissionService.can(actor, 'ui.projects.list.approve')) {
       throw new Error('ليس لديك صلاحية إلغاء طلب التغيير هذا.');
     }
     this.db.run(
@@ -1129,7 +1129,7 @@ export class ProjectService {
 
   public getDeliverables(projectId: string): ProjectDeliverable[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'projects.view');
+    PermissionService.require(actor, 'ui.projects.list.view');
     this.requireProject(projectId);
     return this.db.query<ProjectDeliverable>(
       `SELECT * FROM project_deliverables WHERE project_id = ?
@@ -1142,7 +1142,7 @@ export class ProjectService {
   public createDeliverable(input: {
     projectId: string; title: string; description?: string; dueDate?: string; notes?: string;
   }): ProjectDeliverable {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     this.requireProject(input.projectId);
     if (!input.title?.trim()) throw new Error('عنوان المخرج مطلوب.');
     assertDate(input.dueDate, 'تاريخ استحقاق المخرج');
@@ -1166,7 +1166,7 @@ export class ProjectService {
     title?: string; description?: string; dueDate?: string | null;
     status?: ProjectDeliverableStatus; notes?: string;
   }): ProjectDeliverable {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<ProjectDeliverable>(`SELECT * FROM project_deliverables WHERE id = ?`, [id])[0];
     if (!existing) throw new Error('المخرج غير موجود.');
     this.requireProject(existing.projectId);
@@ -1199,7 +1199,7 @@ export class ProjectService {
   }
 
   public deleteDeliverable(id: string): void {
-    this.requireWrite('projects.update');
+    this.requireWrite('ui.projects.list.update');
     const existing = this.db.query<{ projectId: string }>(
       `SELECT project_id AS projectId FROM project_deliverables WHERE id = ?`,
       [id]

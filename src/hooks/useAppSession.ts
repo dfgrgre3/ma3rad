@@ -3,6 +3,7 @@ import { AuthService } from '../services/AuthService';
 import { SettingsService } from '../services/SettingsService';
 import { getEffectiveBusinessType } from '../services/BusinessTypeService';
 import { AppConfigService } from '../services/AppConfigService';
+import { NotificationService } from '../services/NotificationService';
 
 import type { User } from '../types';
 
@@ -79,9 +80,7 @@ export function useAppSession(
     if (!currentUser) return;
     const heartbeat = window.setInterval(() => AuthService.touchSession(), 5 * 60_000);
     const alerts = window.setInterval(() => {
-      void import('../services/NotificationService').then(({ NotificationService }) => {
-        try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
-      });
+      try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
     }, 30 * 60_000);
     return () => {
       window.clearInterval(heartbeat);

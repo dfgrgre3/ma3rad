@@ -45,7 +45,12 @@ test('2FA secrets live per user and verification rejects wrong, replayed, and re
   const userId = await adminId(db);
 
   try {
+    let setupYieldedToEventLoop = false;
+    setTimeout(() => {
+      setupYieldedToEventLoop = true;
+    }, 0);
     const setup = await twoFactorAuth.setup2FA(userId, 'TOTP');
+    assert.equal(setupYieldedToEventLoop, true, 'setup should not block the event loop while hashing recovery codes');
     assert.equal(setup.secret.length, 32);
     assert.equal(setup.recoveryCodes.length, 10);
     assert.match(setup.qrCodeImage ?? '', /^otpauth:\/\/totp\//);
@@ -144,6 +149,104 @@ test('PIN login never bypasses an enabled second factor', async () => {
   } finally {
     db.run(`DELETE FROM user_2fa WHERE user_id = ?`, [userId]);
     db.run(`UPDATE users SET pin_code = NULL WHERE id = ?`, [userId]);
+  }
+});
+
+test('login PIN changes stay pending until a manager approves them', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const previousFailedAttempts = db.query<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`
+  )[0]?.value || '5';
+  const previousPinLength = db.query<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = 'loginPinLength'`
+  )[0]?.value || '4';
+  db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
+  db.run(`UPDATE system_settings SET value = '4' WHERE key = 'loginPinLength'`);
+  const admin = AuthService.login('admin', 'admin123');
+  const auth = new AuthService();
+  const previousCeramisys = window.ceramisys;
+  window.ceramisys = {
+    ...previousCeramisys,
+    security: {
+      ...previousCeramisys?.security,
+      encryptDatabaseSecret: async (secret) => `encrypted:${secret}`,
+      decryptDatabaseSecret: async (payload) => payload.replace(/^encrypted:/, ''),
+    },
+  };
+  const user = auth.createUser({
+    username: 'pin_change_approval_test',
+    password: 'Test1234!',
+    fullName: 'PIN change approval test',
+    role: 'CASHIER',
+    pinCode: '9876',
+  }, 'usr_admin', admin);
+
+  try {
+    assert.match(auth.generateUniqueLoginPin(), /^\d{4}$/);
+    AuthService.setCurrentUser(user);
+    await auth.requestOwnLoginPinChange('1357');
+    await assert.rejects(auth.getRecoverableLoginPins(), /مدير النظام فقط/);
+    const status = auth.getOwnLoginPinStatus();
+    assert.equal(status.hasPin, true);
+    assert.equal(status.pending, true);
+    assert.equal(typeof status.requestedAt, 'string');
+    assert.throws(() => auth.approveLoginPinChange('not-a-request'), /متاحة للمدير فقط/);
+
+    AuthService.setCurrentUser(admin);
+    const pending = auth.getPendingLoginPinChanges();
+    assert.equal(pending.length, 1);
+    assert.equal(pending[0].userId, user.id);
+    auth.approveLoginPinChange(pending[0].id);
+
+    const storedPin = db.query<{ pinCode: string }>(
+      'SELECT pin_code AS pinCode FROM users WHERE id = ?',
+      [user.id]
+    )[0].pinCode;
+    assert.notEqual(storedPin, '1357');
+    assert.equal(bcrypt.compareSync('1357', storedPin), true);
+    assert.equal((await auth.getRecoverableLoginPins())[user.id], '1357');
+
+    AuthService.logout();
+    assert.equal(AuthService.loginByPin('1357').id, user.id);
+  } finally {
+    AuthService.logout();
+    window.ceramisys = previousCeramisys;
+    db.run('DELETE FROM users WHERE id = ?', [user.id]);
+    db.run(`UPDATE system_settings SET value = ? WHERE key = 'maxFailedLoginAttempts'`, [previousFailedAttempts]);
+    db.run(`UPDATE system_settings SET value = ? WHERE key = 'loginPinLength'`, [previousPinLength]);
+  }
+});
+
+test('account switching is limited to active users selected by a manager', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const previousFailedAttempts = db.query<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`
+  )[0]?.value || '5';
+  db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
+  const admin = AuthService.login('admin', 'admin123');
+  const auth = new AuthService();
+  const user = auth.createUser({
+    username: 'switch_user_test',
+    password: 'Test1234!',
+    fullName: 'Switch user test',
+    role: 'CASHIER',
+  }, 'usr_admin', admin);
+  const previous = db.query<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = 'switchableUserIds'`
+  )[0]?.value || '[]';
+
+  try {
+    db.run(`UPDATE system_settings SET value = ? WHERE key = 'switchableUserIds'`, [JSON.stringify([user.id])]);
+    assert.deepEqual(AuthService.getSwitchableUsers().map((entry) => entry.id), [user.id]);
+    assert.equal(AuthService.switchToUser(user.id).id, user.id);
+    assert.throws(() => AuthService.switchToUser(admin.id), /غير مسموح/);
+  } finally {
+    AuthService.logout();
+    db.run(`UPDATE system_settings SET value = ? WHERE key = 'switchableUserIds'`, [previous]);
+    db.run('DELETE FROM users WHERE id = ?', [user.id]);
+    db.run(`UPDATE system_settings SET value = ? WHERE key = 'maxFailedLoginAttempts'`, [previousFailedAttempts]);
   }
 });
 

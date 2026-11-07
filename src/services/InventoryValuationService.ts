@@ -1,6 +1,7 @@
 import { DatabaseManager } from '../database/db';
 import { AuthService } from './AuthService';
 import { BranchAccessService } from './BranchAccessService';
+import { PermissionService } from './PermissionService';
 import { getProductUnitLabel } from '../utils/productUnits';
 
 export interface WarehouseValuation {
@@ -21,12 +22,16 @@ export interface InventoryKpi {
   categoryBreakdown: { category: string; items: number; value: number }[];
 }
 
+type InventoryKpiPermission = 'ui.inventory.valuation.view' | 'ui.reports.inventory.view';
+
 export class InventoryValuationService {
   private db = DatabaseManager.getInstance();
   private branches = new BranchAccessService();
 
   getByWarehouse(): WarehouseValuation[] {
-    const scope = this.branches.warehouseBranchScope('w', undefined, AuthService.requireAuth());
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.inventory.valuation.view');
+    const scope = this.branches.warehouseBranchScope('w', undefined, actor);
     const warehouses = this.db.query<any>(`
       SELECT w.id, w.name, COUNT(DISTINCT ws.product_id) AS itemsCount,
         COALESCE(SUM(ws.quantity_m2 * p.cost_price),0) AS costValue,
@@ -62,8 +67,10 @@ export class InventoryValuationService {
     }));
   }
 
-  getKpi(): InventoryKpi {
-    const scope = this.branches.warehouseBranchScope('w', undefined, AuthService.requireAuth());
+  getKpi(requiredPermission: InventoryKpiPermission = 'ui.inventory.valuation.view'): InventoryKpi {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, requiredPermission);
+    const scope = this.branches.warehouseBranchScope('w', undefined, actor);
     const summary = this.db.query<any>(`
       SELECT COUNT(DISTINCT ws.product_id) AS skus,
         COALESCE(SUM(ws.quantity_m2 * p.cost_price),0) AS value,

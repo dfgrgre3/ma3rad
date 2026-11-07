@@ -84,3 +84,48 @@ test('supplier payment retry with the same idempotency key posts once and reject
   assert.throws(() => service.recordPayment(supplierId, 30, 'BANK_TRANSFER', 'cr_main', 'retry test', 'supplier-payment-retry-key'), /already used for a different request/);
   assert.equal(Number(service.getSupplierById(supplierId)!.currentBalance), DATA_INTEGRITY_BASELINE.supplierPaymentRetry.expectedBalance, 'conflicting key reuse does not post a second payment');
 });
+
+test('supplier payment reallocation preserves prior paid amounts and enforces invoice and payment caps', async () => {
+  const db = DatabaseManager.getInstance(); await db.initialize(); await PermissionService.seed(); AuthService.login('admin', 'admin123');
+  const supplierId = 'sup_reallocate_caps_test';
+  const branchId = db.query<any>(`SELECT branch_id FROM warehouses WHERE id='wh_main'`)[0].branchId;
+  db.run(`INSERT INTO suppliers (id,code,name,phone,current_balance,total_purchases,company_id)
+    VALUES (?,?,?,?,?,?,?)`, [supplierId,'SUP-REALLOC','مورد إعادة التوزيع','01000000008',1000,200,'cmp_main']);
+  db.run(`INSERT INTO purchase_invoices
+    (id,invoice_number,date,supplier_id,warehouse_id,branch_id,subtotal,total_amount,paid_amount,remaining_amount,payment_status,created_by)
+    VALUES
+    ('pi_realloc_a','REALLOC-A','2026-10-24',?,'wh_main',?,50,50,35,15,'PARTIAL','usr_admin'),
+    ('pi_realloc_b','REALLOC-B','2026-10-24',?,'wh_main',?,100,100,0,100,'UNPAID','usr_admin')`,
+  [supplierId,branchId,supplierId,branchId]);
+
+  const service = new SupplierService();
+  const payment = service.recordPayment(supplierId,40,'BANK_TRANSFER','cr_main','allocation test');
+  assert.equal(Number(db.query<any>(`SELECT paid_amount FROM purchase_invoices WHERE id='pi_realloc_a'`)[0].paidAmount),50);
+
+  assert.throws(
+    () => service.reallocateSupplierPayment(payment.id,[{purchaseInvoiceId:'pi_realloc_a',amount:16}]),
+    /المتبقي المتاح/
+  );
+  assert.throws(
+    () => service.reallocateSupplierPayment(payment.id,[
+      {purchaseInvoiceId:'pi_realloc_a',amount:30},
+      {purchaseInvoiceId:'pi_realloc_b',amount:11}
+    ]),
+    /يتجاوز قيمة السند/
+  );
+  assert.equal(Number(db.query<any>(`SELECT paid_amount FROM purchase_invoices WHERE id='pi_realloc_a'`)[0].paidAmount),50,
+    'failed reallocations do not remove the payment’s existing allocation');
+
+  service.reallocateSupplierPayment(payment.id,[
+    {purchaseInvoiceId:'pi_realloc_a',amount:15},
+    {purchaseInvoiceId:'pi_realloc_b',amount:25}
+  ]);
+  assert.deepEqual(
+    db.query<any>(`SELECT id,paid_amount,remaining_amount FROM purchase_invoices WHERE id IN ('pi_realloc_a','pi_realloc_b') ORDER BY id`),
+    [
+      { id:'pi_realloc_a', paidAmount:50, remainingAmount:0 },
+      { id:'pi_realloc_b', paidAmount:25, remainingAmount:75 }
+    ]
+  );
+  assert.equal(Number(db.query<any>(`SELECT SUM(amount) AS total FROM supplier_payment_allocations WHERE payment_id=?`,[payment.id])[0].total),40);
+});

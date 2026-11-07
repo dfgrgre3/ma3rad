@@ -21,7 +21,7 @@ export const PipelinePage: React.FC = () => {
   const service = new CrmService();
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
-  const canUpdate = PermissionService.can(user, 'crm.update');
+  const canUpdate = PermissionService.can(user, 'ui.crm.pipeline.update');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -6,6 +6,11 @@ import { CustomerService } from '../../services/CustomerService';
 import { AuthService } from '../../services/AuthService';
 import { PermissionService } from '../../services/PermissionService';
 import type { Customer } from '../../types';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
+import { OperationalFieldsSummary } from '../../components/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../components/OperationalFieldsRecordEditor';
 
 const STATUS: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
   PLANNED:   { label: 'قيد التخطيط', color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200' },
@@ -19,9 +24,10 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) 
 
 export const ProjectsPage: React.FC = () => {
   const service = new ProjectService();
+  const fieldService = new OperationalFieldService();
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(user, 'projects.create');
+  const canCreate = PermissionService.can(user, 'ui.projects.list.create');
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -31,6 +37,10 @@ export const ProjectsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fields, setFields] = useState<OperationalFieldDefinition[]>([]);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [valuesByProject, setValuesByProject] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
   const [form, setForm] = useState({
     name: '', customerId: '', projectType: 'BUILDING', contractorName: '',
     engineerName: '', city: '', startDate: '', expectedEndDate: '', contractValue: '', notes: '',
@@ -39,7 +49,11 @@ export const ProjectsPage: React.FC = () => {
   const load = () => {
     setLoading(true);
     try {
-      setProjects(service.getProjects(search));
+      const currentProjects = service.getProjects(search);
+      setProjects(currentProjects);
+      setFields(fieldService.getDefinitions('projects'));
+      const valueMap = fieldService.getRecordValuesForRecords('projects', currentProjects.map((project) => project.id));
+      setValuesByProject(valueMap);
       setCustomers(new CustomerService().getAllCustomers());
       setError(null);
     } catch (e: any) {
@@ -52,7 +66,10 @@ export const ProjectsPage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
-  const filtered = projects.filter((p) => statusFilter === 'ALL' || p.status === statusFilter);
+  const filtered = projects.filter((project) =>
+    (statusFilter === 'ALL' || project.status === statusFilter)
+    && matchesOperationalFieldFilters(project.id, valuesByProject, fieldFilters),
+  );
   const active = projects.filter((p) => p.status === 'ACTIVE').length;
   const totalValue = projects.reduce((s, p) => s + (p.contractValue || 0), 0);
   const totalSold = projects.reduce((s, p) => s + (p.totalSold || 0), 0);
@@ -61,6 +78,7 @@ export const ProjectsPage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
+      fieldService.validateRecordValues('projects', values, 'create');
       const project = service.createProject({
         name: form.name,
         customerId: form.customerId,
@@ -73,6 +91,8 @@ export const ProjectsPage: React.FC = () => {
         contractValue: Number(form.contractValue) || 0,
         notes: form.notes || undefined,
       });
+      fieldService.setRecordValues('projects', project.id, values, 'create');
+      setValues({});
       setModalOpen(false);
       setForm({ name: '', customerId: '', projectType: 'BUILDING', contractorName: '', engineerName: '', city: '', startDate: '', expectedEndDate: '', contractValue: '', notes: '' });
       navigate(`/projects/${project.id}`);
@@ -128,6 +148,9 @@ export const ProjectsPage: React.FC = () => {
           {Object.entries(STATUS).map(([key, st]) => <option key={key} value={key}>{st.label}</option>)}
         </select>
       </div>
+      <div className="px-4 pb-3 bg-white border-b border-slate-200">
+        <OperationalFieldsFilter fields={fields} values={fieldFilters} onChange={setFieldFilters} />
+      </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         {error && <div className="mb-3 px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
@@ -143,6 +166,17 @@ export const ProjectsPage: React.FC = () => {
                     <h3 className="font-bold text-slate-900 text-sm leading-snug group-hover:text-sky-600 transition">{project.name}</h3>
                     <span className={`text-[10px] px-2 py-1 rounded-lg font-bold whitespace-nowrap border ${st.bg} ${st.color}`}>{st.label}</span>
                   </div>
+                  <OperationalFieldsSummary fields={fields} values={valuesByProject[project.id] || {}} />
+                  <OperationalFieldsRecordEditor
+                    recordLabel={project.name}
+                    fields={fields}
+                    initialValues={valuesByProject[project.id] || {}}
+                    canEdit={PermissionService.can(user, 'ui.projects.list.update')}
+                    onSave={(next) => {
+                      fieldService.setRecordValues('projects', project.id, next, 'update');
+                      setValuesByProject((previous) => ({ ...previous, [project.id]: next }));
+                    }}
+                  />
                   <p className="text-[10px] font-mono text-slate-400 mb-3">{project.code}</p>
                   <div className="space-y-2 text-xs text-slate-500">
                     <div className="flex items-center gap-2"><User className="w-3.5 h-3.5" />{project.customerName}</div>
@@ -186,6 +220,7 @@ export const ProjectsPage: React.FC = () => {
                   <label className="font-bold text-slate-700 block mb-1">اسم المشروع *</label>
                   <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-semibold" />
                 </div>
+                <OperationalFieldsForm fields={fields} values={values} onChange={setValues} title="بيانات إضافية للمشروع" />
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">العميل *</label>
                   <select required value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 font-bold">

@@ -25,6 +25,8 @@ import { OrderDetailModal } from './orders/OrderDetailModal';
 import { DeliveryModal } from './orders/DeliveryModal';
 import { TimelineModal } from './orders/TimelineModal';
 import { ConvertInvoiceModal } from './orders/ConvertInvoiceModal';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 export const OrdersPage: React.FC = () => {
   const service = useMemo(() => new OrderService(), []);
@@ -32,11 +34,12 @@ export const OrdersPage: React.FC = () => {
   const productService = useMemo(() => new ProductService(), []);
   const inventoryService = useMemo(() => new InventoryService(), []);
   const printService = useMemo(() => new PrintService(), []);
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
   const user = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(user, 'orders.create');
-  const canUpdate = PermissionService.can(user, 'orders.update');
-  const canApprove = PermissionService.can(user, 'orders.approve');
-  const canDelete = PermissionService.can(user, 'orders.delete');
+  const canCreate = PermissionService.can(user, 'ui.orders.orders.create');
+  const canUpdate = PermissionService.can(user, 'ui.orders.orders.update');
+  const canApprove = PermissionService.can(user, 'ui.orders.orders.approve');
+  const canDelete = PermissionService.can(user, 'ui.orders.orders.delete');
 
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -62,6 +65,9 @@ export const OrdersPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   const [detail, setDetail] = useState<Order | null>(null);
   const [timeline, setTimeline] = useState<{ order: Order; entries: OrderStatusEntry[] } | null>(null);
@@ -76,7 +82,10 @@ export const OrdersPage: React.FC = () => {
   const load = useCallback(() => {
     setLoading(true);
     try {
-      setOrders(service.getOrders(search.trim(), statusFilter, dateFrom || undefined, dateTo || undefined));
+      const allOrders = service.getOrders(search.trim(), statusFilter, dateFrom || undefined, dateTo || undefined);
+      setOperationalFields(operationalFieldService.getDefinitions('orders'));
+      const valueMap = operationalFieldService.getRecordValuesForRecords('orders', allOrders.map((order) => order.id));
+      setOrders(allOrders.filter((order) => matchesOperationalFieldFilters(order.id, valueMap, fieldFilters)));
       setStats(service.getStats());
       setError(null);
     } catch (e: any) {
@@ -84,7 +93,7 @@ export const OrdersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [service, search, statusFilter, dateFrom, dateTo]);
+  }, [service, operationalFieldService, search, statusFilter, dateFrom, dateTo, fieldFilters]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo]);
@@ -105,6 +114,7 @@ export const OrdersPage: React.FC = () => {
       const whs = loadReferences();
       setEditingId(null);
       setForm({ ...emptyForm(), warehouseId: whs.find((w) => w.isDefault)?.id || whs[0]?.id || '' });
+      setOperationalFieldValues({});
       setFormOpen(true);
     } catch (e: any) { alert(e?.message || 'تعذر تحميل بيانات الطلب.'); }
   };
@@ -130,6 +140,7 @@ export const OrdersPage: React.FC = () => {
           discountAmount: i.discountAmount || 0,
         })),
       });
+      setOperationalFieldValues(operationalFieldService.getRecordValues('orders', order.id));
       setFormOpen(true);
     } catch (e: any) { alert(e?.message || 'تعذر تحميل بيانات الطلب.'); }
   };
@@ -185,6 +196,9 @@ export const OrdersPage: React.FC = () => {
     if (items.length === 0) return alert('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
     setSaving(true);
     try {
+      operationalFieldService.validateRecordValues(
+        'orders', operationalFieldValues, editingId ? 'update' : 'create', editingId || undefined,
+      );
       const payload = {
         customerId: form.customerId,
         warehouseId: form.warehouseId,
@@ -202,8 +216,13 @@ export const OrdersPage: React.FC = () => {
           discountAmount: l.discountAmount || 0,
         })),
       };
-      if (editingId) service.updateOrder(editingId, payload);
-      else service.createOrder(payload);
+      if (editingId) {
+        service.updateOrder(editingId, payload);
+        operationalFieldService.setRecordValues('orders', editingId, operationalFieldValues, 'update');
+      } else {
+        const created = service.createOrder(payload);
+        operationalFieldService.setRecordValues('orders', created.id, operationalFieldValues, 'create');
+      }
       setFormOpen(false);
       load();
     } catch (err: any) {
@@ -318,7 +337,10 @@ export const OrdersPage: React.FC = () => {
     if (full) printService.printOrder(full);
   };
 
-  const exportRows = () => buildOrderExportRows(orders);
+  const exportRows = () => buildOrderExportRows(orders).map((row, index) => ({
+    ...row,
+    ...(operationalFieldService.getRecordValuesForExport('orders', [orders[index].id])[orders[index].id] || {}),
+  }));
 
   const doExport = (kind: 'excel' | 'pdf') => {
     const options = {
@@ -335,6 +357,7 @@ export const OrdersPage: React.FC = () => {
         { key: 'total', label: 'الإجمالي' },
         { key: 'status', label: 'الحالة' },
         { key: 'invoice', label: 'الفاتورة' },
+        ...operationalFields.map((field) => ({ key: field.name, label: field.name })),
       ],
       rows: exportRows(),
       fileName: 'sales-orders',
@@ -368,6 +391,7 @@ export const OrdersPage: React.FC = () => {
           onDateToChange={setDateTo}
           onRefresh={load}
         />
+        <OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -415,6 +439,9 @@ export const OrdersPage: React.FC = () => {
           lineBaseQuantity={lineBaseQuantity}
           stockOf={stockOf}
           total={total}
+          operationalFields={operationalFields}
+          operationalFieldValues={operationalFieldValues}
+          onOperationalFieldValuesChange={setOperationalFieldValues}
         />
       )}
 
@@ -432,6 +459,8 @@ export const OrdersPage: React.FC = () => {
           onAdvance={advance}
           onOpenConvert={openConvert}
           onCancel={cancel}
+          operationalFields={operationalFields}
+          operationalFieldValues={operationalFieldService.getRecordValues('orders', detail.id)}
         />
       )}
 

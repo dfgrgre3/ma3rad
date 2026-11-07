@@ -7,7 +7,9 @@ import { BusinessRecordSyncService } from './BusinessRecordSyncService.ts';
 import type { SyncEvent, SyncOperation } from './types.ts';
 import type { EventDispatcher } from './PullChangesService.ts';
 
-type MasterEntityType = 'category' | 'brand' | 'product' | 'customer' | 'supplier';
+type MasterEntityType =
+  | 'category' | 'brand' | 'product' | 'customer' | 'supplier'
+  | 'operational_field' | 'operational_field_option' | 'operational_field_value' | 'product_grade_option';
 type SyncIdentity = { tenantId: string; branchId: string; deviceId: string; canManagePolicies?: boolean };
 type EntitySpec = { table: string; columns: string[] };
 
@@ -84,9 +86,28 @@ const ENTITY_SPECS: Record<MasterEntityType, EntitySpec> = {
       'payment_terms_days', 'notes', 'created_at',
     ],
   },
+  operational_field: {
+    table: 'operational_field_definitions',
+    columns: ['id', 'entity_type', 'code', 'name', 'data_type', 'unit', 'is_required', 'is_filterable', 'sort_order', 'created_at'],
+  },
+  operational_field_option: {
+    table: 'operational_field_options',
+    columns: ['id', 'field_id', 'value', 'label', 'sort_order'],
+  },
+  operational_field_value: {
+    table: 'operational_field_values',
+    columns: ['id', 'entity_type', 'record_id', 'field_id', 'value'],
+  },
+  product_grade_option: {
+    table: 'product_grade_options',
+    columns: ['id', 'value', 'label', 'is_active', 'sort_order', 'updated_at'],
+  },
 };
 
-const BOOTSTRAP_ORDER: MasterEntityType[] = ['category', 'brand', 'customer', 'supplier', 'product'];
+const BOOTSTRAP_ORDER: MasterEntityType[] = [
+  'category', 'brand', 'customer', 'supplier', 'operational_field',
+  'operational_field_option', 'operational_field_value', 'product_grade_option', 'product',
+];
 
 function isMasterEntityType(value: string): value is MasterEntityType {
   return Object.prototype.hasOwnProperty.call(ENTITY_SPECS, value);

@@ -24,6 +24,9 @@ import { openWhatsAppChat } from '../../utils/externalLinks';
 import { QuotationModals } from './QuotationModals';
 import { emptyForm } from './QuotationModals';
 import type { FormState, Line } from './QuotationModals';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from '../../components/OperationalFieldsForm';
+import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../components/OperationalFieldsFilter';
 
 
 const PAGE_SIZE = 12;
@@ -43,11 +46,12 @@ export const QuotationsPage: React.FC = () => {
   const productService = useMemo(() => new ProductService(), []);
   const inventoryService = useMemo(() => new InventoryService(), []);
   const printService = useMemo(() => new PrintService(), []);
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
   const user = AuthService.getCurrentUser();
-  const canCreate = PermissionService.can(user, 'quotations.create');
-  const canUpdate = PermissionService.can(user, 'quotations.update');
-  const canDelete = PermissionService.can(user, 'quotations.delete');
-  const canApprove = PermissionService.can(user, 'quotations.approve');
+  const canCreate = PermissionService.can(user, 'ui.quotations.quotations.create');
+  const canUpdate = PermissionService.can(user, 'ui.quotations.quotations.update');
+  const canDelete = PermissionService.can(user, 'ui.quotations.quotations.delete');
+  const canApprove = PermissionService.can(user, 'ui.quotations.quotations.approve');
 
   const [docPreview, setDocPreview] = useState<{
     title: string;
@@ -73,6 +77,10 @@ export const QuotationsPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
+  const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
+  const [valuesByQuotation, setValuesByQuotation] = useState<Record<string, Record<string, string>>>({});
+  const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   const [detail, setDetail] = useState<Quotation | null>(null);
   const [convertTarget, setConvertTarget] = useState<Quotation | null>(null);
@@ -97,11 +105,15 @@ export const QuotationsPage: React.FC = () => {
       const rows = service.getQuotations({
         search, status: statusFilter, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
       });
+      setOperationalFields(fieldService.getDefinitions('quotations'));
+      const fieldValues = fieldService.getRecordValuesForRecords('quotations', rows.map((row) => row.id));
+      setValuesByQuotation(fieldValues);
       const today = localDateString();
       setQuotations(
         followUpOnly
-          ? rows.filter((q) => q.status === 'PENDING' && q.followUpDate && q.followUpDate <= today)
-          : rows
+          ? rows.filter((q) => q.status === 'PENDING' && q.followUpDate && q.followUpDate <= today
+            && matchesOperationalFieldFilters(q.id, fieldValues, fieldFilters))
+          : rows.filter((q) => matchesOperationalFieldFilters(q.id, fieldValues, fieldFilters))
       );
       setStats(service.getStats());
       setError(null);
@@ -112,7 +124,7 @@ export const QuotationsPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load();   }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
+  useEffect(() => { load();     }, [search, statusFilter, dateFrom, dateTo, followUpOnly, fieldFilters]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
 
   const totalPages = Math.max(1, Math.ceil(quotations.length / PAGE_SIZE));
@@ -131,6 +143,7 @@ export const QuotationsPage: React.FC = () => {
       const whs = loadReferences();
       setEditingId(null);
       setForm({ ...emptyForm(), warehouseId: service.getDefaultWarehouseId() || whs[0]?.id || '' });
+      setOperationalFieldValues({});
       setFormOpen(true);
     } catch (e: any) { alert(e?.message || 'تعذر تحميل البيانات.'); }
   };
@@ -140,6 +153,7 @@ export const QuotationsPage: React.FC = () => {
       loadReferences();
       const full = service.getQuotation(quotation.id) || quotation;
       setEditingId(full.id);
+      setOperationalFieldValues(fieldService.getRecordValues('quotations', full.id));
       const days = Math.max(1, Math.round((new Date(full.validUntil).getTime() - Date.now()) / 86400000)) || 15;
       setForm({
         customerId: full.customerId,
@@ -202,6 +216,9 @@ export const QuotationsPage: React.FC = () => {
     if (items.length === 0) return alert('أضف بنداً واحداً على الأقل بكمية أكبر من صفر.');
     setSaving(true);
     try {
+      fieldService.validateRecordValues(
+        'quotations', operationalFieldValues, editingId ? 'update' : 'create', editingId || undefined,
+      );
       const payload = {
         customerId: form.customerId,
         warehouseId: form.warehouseId || undefined,
@@ -218,8 +235,14 @@ export const QuotationsPage: React.FC = () => {
           discountAmount: l.discountAmount || 0,
         })),
       };
-      if (editingId) service.updateQuotation(editingId, payload);
-      else service.createQuotation(payload);
+      if (editingId) {
+        service.updateQuotation(editingId, payload);
+        fieldService.setRecordValues('quotations', editingId, operationalFieldValues, 'update');
+      } else {
+        const created = service.createQuotation(payload);
+        fieldService.setRecordValues('quotations', created.id, operationalFieldValues, 'create');
+      }
+      setOperationalFieldValues({});
       setFormOpen(false);
       load();
     } catch (err: any) {
@@ -363,6 +386,7 @@ export const QuotationsPage: React.FC = () => {
         { key: 'followUp', label: 'المتابعة القادمة' },
         { key: 'order', label: 'الطلب' },
         { key: 'invoice', label: 'الفاتورة' },
+        ...operationalFields.map((field) => ({ key: field.name, label: field.name })),
       ],
       rows: quotations.map((q) => ({
         quotationNumber: q.quotationNumber, date: q.date, validUntil: q.validUntil,
@@ -372,6 +396,7 @@ export const QuotationsPage: React.FC = () => {
         followUp: q.followUpDate || '',
         order: q.convertedOrderNumber || '',
         invoice: q.convertedInvoiceNumber || '',
+        ...(fieldService.getRecordValuesForExport('quotations', [q.id])[q.id] || {}),
       })),
       fileName: 'quotations',
       permission: 'quotations.export',
@@ -394,6 +419,7 @@ export const QuotationsPage: React.FC = () => {
             <h1 className="text-base font-black text-slate-900">عروض الأسعار والمقايسات</h1>
             <p className="text-xs text-slate-500 font-medium">إنشاء المقايسات، متابعة صلاحيتها، وتحويلها إلى فواتير مبيعات معتمدة</p>
           </div>
+          <div className="mt-3"><OperationalFieldsFilter fields={operationalFields} values={fieldFilters} onChange={setFieldFilters} /></div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={() => doExport('excel')} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold"><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> جدول بيانات</button>
@@ -590,6 +616,14 @@ export const QuotationsPage: React.FC = () => {
         reopenQuotation={reopenQuotation}
         cancelQuotation={cancelQuotation}
         deleteQuotation={deleteQuotation}
+        operationalFields={operationalFields}
+        operationalFieldValues={detail ? fieldService.getRecordValues('quotations', detail.id) : operationalFieldValues}
+        onOperationalFieldValuesChange={setOperationalFieldValues}
+        canUpdateOperationalFields={canUpdate}
+        onSaveOperationalFields={(quotationId, values) => {
+          fieldService.setRecordValues('quotations', quotationId, values, 'update');
+          setValuesByQuotation((previous) => ({ ...previous, [quotationId]: values }));
+        }}
       />
     </div>
   );

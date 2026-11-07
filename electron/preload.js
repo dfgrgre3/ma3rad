@@ -99,5 +99,7 @@ contextBridge.exposeInMainWorld('ceramisys', {
   },
   security: {
     checkIntegrity: () => ipcRenderer.invoke('security:check-integrity'),
+    encryptDatabaseSecret: (secret) => ipcRenderer.invoke('security:encrypt-db-secret', secret),
+    decryptDatabaseSecret: (payload) => ipcRenderer.invoke('security:decrypt-db-secret', payload),
   },
 });

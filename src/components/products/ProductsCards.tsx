@@ -4,9 +4,12 @@ import type { Product } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
 import { getProductUnitLabel } from '../../utils/productUnits';
 import { round, gradeLabel } from './productFormModel';
+import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
 
 export interface ProductsCardsProps {
   products: Product[];
+  operationalFields?: OperationalFieldDefinition[];
+  operationalFieldValues?: Record<string, Record<string, string>>;
   selectedProductIds: string[];
   canViewCosts: boolean;
   canViewPricing: boolean;
@@ -28,6 +31,8 @@ export interface ProductsCardsProps {
 
 export const ProductsCards: React.FC<ProductsCardsProps> = ({
   products,
+  operationalFields = [],
+  operationalFieldValues = {},
   selectedProductIds,
   canViewCosts,
   canViewPricing,
@@ -93,6 +98,12 @@ export const ProductsCards: React.FC<ProductsCardsProps> = ({
                           <span>حد الطلب: {p.minStockLevel} م²</span>
                         </>}
                     </div>
+                    {operationalFields.length > 0 && <div className="space-y-1 border-t border-slate-100 pt-2 text-[10px] text-slate-600">
+                      {operationalFields.map((field) => {
+                        const value = operationalFieldValues[p.id]?.[field.name];
+                        return value ? <div key={field.id} className="flex justify-between gap-2"><span className="font-semibold">{field.name}</span><span className="text-left">{value}</span></div> : null;
+                      })}
+                    </div>}
                   </div>
                   <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-2 py-1.5">
                     <div className="flex items-center gap-0.5">

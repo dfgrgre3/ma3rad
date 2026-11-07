@@ -8,6 +8,7 @@ import { CustomerService } from '../src/services/CustomerService.ts';
 import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
 import { PrintService } from '../src/services/PrintService.ts';
 import { SalesService } from '../src/services/SalesService.ts';
+import { PartnerService } from '../src/services/PartnerService.ts';
 import { runMigrations } from '../src/database/migrations.ts';
 import { SCHEMA_SQL } from '../src/database/schema.ts';
 
@@ -61,6 +62,9 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
     name: 'عميل اختبار المبيعات', phone: '0122222222', customerType: 'RETAIL', creditLimit: 0,
   });
   seedProduct(db, 'prod_sale_1');
+  const partnerService = new PartnerService();
+  const majorityPartner = partnerService.createPartner({ name: 'شريك حصة 60%', ownershipPercent: 60, capitalAmount: 0 });
+  const minorityPartner = partnerService.createPartner({ name: 'شريك حصة 40%', ownershipPercent: 40, capitalAmount: 0 });
 
   // empty cart is rejected
   assert.throws(
@@ -88,6 +92,8 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.equal(invoice.totalAmount, 3000);
   assert.equal(invoice.paidAmount, 2000);
   assert.equal(invoice.remainingAmount, 1000);
+  assert.equal(partnerService.getPartnerStatement(majorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.6);
+  assert.equal(partnerService.getPartnerStatement(minorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.4);
 
   const invoiceHtml = new PrintService().getInvoiceHtml({
     ...invoice,
@@ -135,6 +141,8 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   svc.returnSale(invoice.id, [{
     productId: 'prod_sale_1', quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'اختبار',
   }]);
+  assert.equal(partnerService.getPartnerStatement(majorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.6 * 0.6);
+  assert.equal(partnerService.getPartnerStatement(minorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.4 * 0.6);
   const afterReturn = q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0];
   assert.equal(afterReturn.q, 94);
 
@@ -158,6 +166,8 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.throws(() => svc.voidInvoice(invoice2.id, ''), /سبب إلغاء/);
   svc.voidInvoice(invoice2.id, 'خطأ في الإدخال');
   assert.equal(svc.getInvoiceById(invoice2.id)!.invoiceStatus, 'VOID');
+  assert.equal(partnerService.getPartnerStatement(majorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.6 * 0.6);
+  assert.equal(partnerService.getPartnerStatement(minorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.4 * 0.6);
   assert.throws(() => svc.recordInvoicePayment(invoice2.id, 50), /ملغاة/);
 
   // Voiding after a separate receipt would otherwise leave its cash/register

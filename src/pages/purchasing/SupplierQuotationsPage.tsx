@@ -29,8 +29,8 @@ const STATUS_BADGES: Record<string, { label: string; color: string }> = {
 export const SupplierQuotationsPage: React.FC = () => {
   const service = useMemo(() => new ProcurementService(), []);
   const toast = useToast();
-  const canCreate = PermissionService.can(AuthService.getCurrentUser(), 'purchases.create');
-  const canApprove = PermissionService.can(AuthService.getCurrentUser(), 'purchases.approve');
+  const canCreate = PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.quotations.create');
+  const canApprove = PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.quotations.approve');
 
   const [rfqs, setRfqs] = useState<SupplierRfqRow[]>([]);
   const [search, setSearch] = useState('');

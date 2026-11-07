@@ -236,8 +236,8 @@ function LocationChart({ locations }: { locations: { location: string; count: nu
 export const HrDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
-  const canManage = PermissionService.can(user, 'employees.manage');
-  const canViewRecruitment = PermissionService.can(user, 'hr.recruitment.view');
+  const canManage = PermissionService.can(user, 'ui.employees.employees.manage');
+  const canViewRecruitment = PermissionService.can(user, 'ui.hr.recruitment.view');
   const [stats, setStats] = useState<HrStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

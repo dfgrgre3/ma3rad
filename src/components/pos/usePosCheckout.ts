@@ -63,6 +63,8 @@ interface UsePosCheckoutOptions {
   pricingService: PricingService;
   performedBy: string;
   loadStock: (warehouseId: string) => void;
+  onInvoiceCreated: (invoiceId: string) => void;
+  validateInvoiceFields: () => void;
 }
 
 export const usePosCheckout = ({
@@ -116,6 +118,8 @@ export const usePosCheckout = ({
   pricingService,
   performedBy,
   loadStock,
+  onInvoiceCreated,
+  validateInvoiceFields,
 }: UsePosCheckoutOptions) => {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -305,6 +309,7 @@ export const usePosCheckout = ({
         setIsProcessing(false);
         return;
       }
+      validateInvoiceFields();
       const invoice = salesService.createSale({
         customerId: selectedCustomer.id,
         warehouseId: selectedWarehouseId,
@@ -336,6 +341,7 @@ export const usePosCheckout = ({
         notes,
         performedBy
       });
+      onInvoiceCreated(invoice.id);
 
       setSuccessInvoice(invoice);
       let loyaltyRedemptionError: string | null = null;
@@ -409,7 +415,7 @@ export const usePosCheckout = ({
     setCart, setDiscountAmount, setPromotionDiscount, setLoyaltyDiscount,
     setAppliedPromotion, setCouponCode, setRedeemPoints, setShippingCost,
     setNotes, setPaidAmount, setSuccessInvoice, setProducts, productService,
-    loadStock, setActiveShift, cashierService, notify,
+    loadStock, setActiveShift, cashierService, notify, onInvoiceCreated, validateInvoiceFields,
   ]);
 
   return { isProcessing, setIsProcessing, handleCheckout };
