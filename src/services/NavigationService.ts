@@ -135,6 +135,7 @@ export class NavigationService {
 
   public static getAccessibleGroups(user: User | null): NavGroupDef[] {
     const centralCfg = CentralLicenseService.getCachedConfig();
+    const enabledModules = new Set(ModuleRegistryService.getEnabledModuleIds());
     // Single source of truth for per-page visibility (hidden menus + feature flags).
     const isCentralHidden = (path: string) => !CentralFeaturePermissionService.isPageVisible(path);
     const centralAllowed: string[] | null = Array.isArray(centralCfg?.config?.allowedModules)
@@ -142,7 +143,7 @@ export class NavigationService {
       : null;
     const isModuleAllowed = (path: string) => {
       const localOwner = getModulePathOwner(path);
-      if (localOwner && !ModuleRegistryService.isModuleEnabled(localOwner)) return false;
+      if (localOwner && !enabledModules.has(localOwner)) return false;
       if (!centralAllowed) return true;
       const owner = getModulePathOwner(path);
       if (!owner) return true;

@@ -633,13 +633,13 @@ function createSyncRelay({
   function isRateLimited(request) {
     const now = Date.now();
     const address = request.socket.remoteAddress || 'unknown';
-    const previous = failedAuth.get(address);
-    if (previous && now - previous.startedAt < 60000 && previous.count >= 30) return true;
-    if (failedAuth.size > 5000) {
+    if (failedAuth.size >= 5000) {
       for (const [key, value] of failedAuth) {
         if (now - value.startedAt >= 60000) failedAuth.delete(key);
       }
     }
+    const previous = failedAuth.get(address);
+    if (previous && now - previous.startedAt < 60000 && previous.count >= 30) return true;
     if (!previous && failedAuth.size >= 5000) return true;
     return false;
   }

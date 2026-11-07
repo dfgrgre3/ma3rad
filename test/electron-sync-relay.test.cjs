@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { randomBytes } = require('node:crypto');
@@ -93,6 +94,21 @@ function event(eventId, overrides = {}) {
   };
 }
 
+function requestFromAddress(port, localAddress) {
+  return new Promise((resolve, reject) => {
+    const request = http.get({
+      hostname: '127.0.0.1',
+      port,
+      path: '/sync/pull',
+      localAddress,
+    }, (response) => {
+      response.resume();
+      response.once('end', () => resolve(response.statusCode));
+    });
+    request.once('error', reject);
+  });
+}
+
 test('sync relay authenticates devices and rejects event identity spoofing', async () => {
   const context = await setup();
   try {
@@ -109,6 +125,25 @@ test('sync relay authenticates devices and rejects event identity spoofing', asy
     await assert.rejects(() => context.a.pushEvents([
       event('spoofed-device', { deviceId: 'device-b1' }),
     ]), /another device/);
+  } finally {
+    await context.relay.close();
+    await fs.rm(context.directory, { recursive: true, force: true });
+  }
+});
+
+test('sync relay clears expired failed-auth addresses before enforcing capacity', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 1_800_000_000_000 });
+  const context = await setup();
+  try {
+    const port = context.relay.status().port;
+    for (let index = 0; index < 5000; index++) {
+      const localAddress = `127.0.${Math.floor(index / 254)}.${(index % 254) + 1}`;
+      assert.equal(await requestFromAddress(port, localAddress), 401);
+    }
+
+    assert.equal(await requestFromAddress(port, '127.0.20.1'), 429);
+    t.mock.timers.setTime(Date.now() + 60000);
+    assert.equal(await requestFromAddress(port, '127.0.20.1'), 401);
   } finally {
     await context.relay.close();
     await fs.rm(context.directory, { recursive: true, force: true });
