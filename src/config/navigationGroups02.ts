@@ -1,16 +1,16 @@
 import {
-  Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Building2, CalendarDays, Car, CheckSquare,
-  CreditCard, Cpu, Download, Factory, FileSignature, FileSpreadsheet, FileText, HardHat,
-  RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal, Sparkles, Trash2, Truck, UserPlus, UserRound,
-  Wallet, Warehouse,
+  Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Building2, CalendarDays, Car,
+  CheckSquare, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
+  HardHat, RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal,
+  Sparkles, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
 } from 'lucide-react';
 import type { NavGroupDef } from './navigationTypes';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from './routePermissions';
 
 export const NAV_GROUPS_02: NavGroupDef[] = [
-{
+  {
     id: 'operations',
-    label: 'العمليات',
+    label: 'إدارة المنشأة والموارد البشرية',
     icon: Building2,
     color: 'text-slate-500',
     perm: 'operations.view',
@@ -33,9 +33,9 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'التصنيع', to: '/manufacturing', icon: Factory, perm: 'manufacturing.view' },
     ],
   },
-{
+  {
     id: 'reports',
-    label: 'التقارير',
+    label: 'التقارير والتحليلات',
     icon: BarChart3,
     color: 'text-teal-600',
     perm: 'reports.view',
@@ -50,30 +50,21 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'التوقعات والتحليل', to: '/reports/category/forecast', icon: Sparkles, perm: 'reports.view' },
     ],
   },
-{
-    id: 'approvals',
-    label: 'الموافقات',
-    icon: CheckSquare,
-    color: 'text-yellow-500',
-    perm: 'approvals.view',
-    items: [
-      { label: 'صندوق الموافقات', to: '/approvals', icon: CheckSquare, perm: 'approvals.view' },
-    ],
-  },
-{
+  {
     id: 'documents',
-    label: 'المستندات والعقود',
+    label: 'المستندات والموافقات',
     icon: FileText,
     color: 'text-indigo-600',
-    perm: 'documents.view',
+    anyPerms: ['documents.view', 'contracts.view', 'approvals.view'],
     items: [
+      { label: 'صندوق الموافقات', to: '/approvals', icon: CheckSquare, perm: 'approvals.view' },
       { label: 'مركز المستندات والعقود', to: '/documents', icon: FileText, anyPerms: ['documents.view', 'contracts.view'] },
       { label: 'العقود', to: '/contracts', icon: FileSignature, perm: 'contracts.view' },
     ],
   },
-{
+  {
     id: 'system',
-    label: 'النظام',
+    label: 'إدارة النظام',
     icon: Settings,
     color: 'text-slate-500',
     anyPerms: ['settings.view', ...DATA_IMPORT_ACCESS_PERMISSIONS],
@@ -81,6 +72,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'مركز التحكم', to: '/admin', icon: SlidersHorizontal, highlight: true, anyPerms: ['admin.view', 'users.view'] },
       { label: 'تعارضات مزامنة الفروع', to: '/admin/sync-conflicts', icon: RefreshCw, perm: 'admin.view' },
       { label: 'مركز استيراد البيانات', to: '/data-import', icon: FileSpreadsheet, anyPerms: DATA_IMPORT_ACCESS_PERMISSIONS },
+      { label: 'أنواع البيانات الديناميكية', to: '/data-import/types', icon: FileSpreadsheet, anyPerms: ['settings.dynamic_data.view', 'settings.view'] },
       { label: 'الإشعارات', to: '/notifications', icon: Bell, perm: 'notifications.view' },
       { label: 'سجل التدقيق', to: '/audit', icon: ShieldCheck, perm: 'audit.view' },
       { label: 'مركز الأمان', to: '/security', icon: ShieldCheck, perm: 'sessions.view' },
@@ -92,5 +84,5 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'محرك التكوين الديناميكي', to: '/settings/app-configuration', icon: SlidersHorizontal, perm: 'settings.view' },
       { label: 'استوديو التكوين', to: '/settings/configuration-studio', icon: SlidersHorizontal, perm: 'settings.view' },
     ],
-  }
+  },
 ];

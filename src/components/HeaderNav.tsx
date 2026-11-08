@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import type { User } from '../types';
-import { NavigationService } from '../services/NavigationService';
-import { useTheme } from '../contexts/useTheme';
+import { useNavigationGroups } from '../hooks/useNavigationGroups';
 
 interface HeaderNavProps {
   currentUser: User | null;
@@ -24,19 +23,12 @@ interface PanelAnchor {
  */
 export const HeaderNav: React.FC<HeaderNavProps> = ({ currentUser, onOpenQuickCommand }) => {
   const location = useLocation();
-  const { settings } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<PanelAnchor | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const visibleGroups = useMemo(
-    () => NavigationService.getNavigationGroups(currentUser),
-    // `settings` is part of the dependency list because navigation overrides are
-    // stored in system settings and must refresh when they change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentUser, settings]
-  );
+  const visibleGroups = useNavigationGroups(currentUser);
 
   const openGroup = visibleGroups.find((group) => group.id === openId) ?? null;
 

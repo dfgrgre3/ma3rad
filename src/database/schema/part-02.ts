@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS customers (
   payment_terms_days INTEGER DEFAULT 0,
   current_balance REAL DEFAULT 0,
   total_purchases REAL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
   notes TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP

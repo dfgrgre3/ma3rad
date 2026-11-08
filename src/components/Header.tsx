@@ -1,15 +1,38 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Menu, Search } from 'lucide-react';
+import { Bell, ChevronLeft, Menu, Search } from 'lucide-react';
 import type { User } from '../types';
 import { BranchAccessService } from '../services/BranchAccessService';
 import { PermissionService } from '../services/PermissionService';
 import { useTheme } from '../contexts/useTheme';
 import { resolvePageTitle } from '../utils/resolvePageTitle';
+import type { PageBreadcrumb } from '../utils/resolvePageTitle';
+import { useNavigationGroups } from '../hooks/useNavigationGroups';
 import { ProfileMenu } from './ui/ProfileMenu';
 import { GlobalSearch } from './GlobalSearch';
 import { HeaderNav } from './HeaderNav';
 import { useToast } from './ui/Toast';
+
+const BreadcrumbTrail: React.FC<{ crumbs: PageBreadcrumb[]; className?: string }> = ({ crumbs, className = '' }) => (
+  <nav aria-label="مسار التنقل" className={`min-w-0 overflow-hidden ${className}`}>
+    <ol className="flex min-w-0 items-center gap-1 text-[10px] text-[#767676] dark:text-[#a6a6a6]">
+      {crumbs.map((crumb, index) => (
+        <li key={`${crumb.path ?? crumb.label}-${index}`} className="flex min-w-0 shrink items-center gap-1">
+          {index > 0 && <ChevronLeft aria-hidden="true" className="h-3 w-3 shrink-0 opacity-60" />}
+          {crumb.path && index < crumbs.length - 1 ? (
+            <NavLink to={crumb.path} className="truncate hover:text-[#0078d4] hover:underline">
+              {crumb.label}
+            </NavLink>
+          ) : (
+            <span className="truncate" aria-current={index === crumbs.length - 1 ? 'page' : undefined}>
+              {crumb.label}
+            </span>
+          )}
+        </li>
+      ))}
+    </ol>
+  </nav>
+);
 
 interface HeaderProps {
   currentUser: User | null;
@@ -38,10 +61,11 @@ export const Header: React.FC<HeaderProps> = ({
   const [branches, setBranches] = useState<Array<{ id: string; name: string; code: string }>>([]);
   const [activeBranchId, setActiveBranchId] = useState('');
   const isTopNav = navigationLayout === 'header';
+  const navigationGroups = useNavigationGroups(currentUser);
 
   const page = useMemo(
-    () => resolvePageTitle(location.pathname, currentUser),
-    [currentUser, location.pathname]
+    () => resolvePageTitle(location.pathname, currentUser, navigationGroups),
+    [currentUser, location.pathname, navigationGroups]
   );
 
   useEffect(() => {
@@ -68,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
     } catch (error) {
       toast.error('تعذر تحديد الفرع النشط', error instanceof Error ? error.message : String(error));
     }
-  }, [branchAccess, currentUser?.id, toast]);
+  }, [branchAccess, currentUser, toast]);
 
   const switchBranch = (branchId: string) => {
     if (!branchId || branchId === activeBranchId) return;
@@ -101,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Brand identity and header navigation */}
       <NavLink to="/dashboard" className="flex min-w-0 shrink-0 items-center gap-2">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[2px] bg-[#0078d4] text-xs font-bold text-white">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[var(--win-radius)] bg-[var(--win-accent)] text-xs font-bold text-[var(--win-accent-text)]">
           {settings.brandLogoDataUrl ? (
             <img src={settings.brandLogoDataUrl} alt="الشعار" className="h-full w-full object-cover" />
           ) : (
@@ -109,7 +133,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </span>
         <span
-          className={`truncate text-[13px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0] ${
+          className={`truncate text-[13px] font-semibold text-[var(--win-text)] ${
             isTopNav ? 'hidden xl:block' : 'hidden sm:block'
           }`}
         >
@@ -117,16 +141,17 @@ export const Header: React.FC<HeaderProps> = ({
         </span>
       </NavLink>
 
-      <span aria-hidden="true" className="mx-1 hidden h-4 w-px bg-[#d9d9d9] dark:bg-[#3d3d3d] sm:block" />
-
       {isTopNav ? (
         /* Main navigation moved into the header (large screens only). */
-        <HeaderNav currentUser={currentUser} onOpenQuickCommand={() => setSearchOpen(true)} />
+        <>
+          <HeaderNav currentUser={currentUser} onOpenQuickCommand={() => setSearchOpen(true)} />
+          <BreadcrumbTrail crumbs={page.breadcrumbs} className="hidden max-w-[18vw] shrink-0 xl:block" />
+        </>
       ) : (
         /* Current page */
         <div className="flex min-w-0 flex-col justify-center leading-tight">
-          <h1 className="truncate text-[13px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">{page.title}</h1>
-          <span className="hidden truncate text-[10px] text-[#767676] sm:block">{page.group}</span>
+          <h1 className="truncate text-[13px] font-semibold text-[var(--win-text)]">{page.title}</h1>
+          <BreadcrumbTrail crumbs={page.breadcrumbs} className="hidden sm:block" />
         </div>
       )}
 
@@ -135,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className={`flex min-h-8 items-center gap-2 rounded-[2px] border border-[#a6a6a6] bg-white px-2.5 text-[12px] text-[#4d4d4d] hover:border-[#0078d4] hover:bg-[#f2f8fd] dark:border-[#565656] dark:bg-[#333] dark:text-[#d0d0d0] dark:hover:bg-[#3d3d3d] ${
+          className={`flex min-h-8 items-center gap-2 rounded-[var(--win-radius)] border border-[var(--win-border-strong)] bg-[var(--win-surface)] px-2.5 text-[12px] text-[var(--win-text-secondary)] transition-colors hover:border-[var(--win-accent)] hover:bg-[var(--win-accent-soft)] ${
             isTopNav ? 'lg:hidden' : ''
           }`}
           title="بحث شامل (Ctrl+K)"
@@ -144,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Search className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">بحث</span>
-          <kbd className="hidden rounded-[2px] border border-[#d9d9d9] px-1 text-[10px] text-[#767676] dark:border-[#565656] dark:text-[#a6a6a6] xl:inline">
+          <kbd className="hidden rounded-[var(--ui-radius-sm)] border border-[var(--win-border)] px-1 text-[10px] text-[var(--win-text-muted)] xl:inline">
             Ctrl K
           </kbd>
         </button>

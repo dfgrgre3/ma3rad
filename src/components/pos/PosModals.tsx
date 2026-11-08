@@ -94,7 +94,14 @@ export const HeldOrdersModal: React.FC<{
   onResume: (order: HeldOrder) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
-}> = ({ orders, onResume, onDelete, onClose }) => (
+}> = ({ orders, onResume, onDelete, onClose }) => {
+  const heldTotal = (h: HeldOrder) => {
+    const lines = (h.items || []).reduce((sum, item) => sum + (item.quantityM2 * item.unitPrice - (item.discountAmount || 0)), 0);
+    const base = Math.max(0, lines - (h.discountAmount || 0));
+    const withTax = base + (h.taxPercentage ? base * (h.taxPercentage / 100) : 0);
+    return withTax + (h.shippingCost || 0) + (h.extraFees || 0);
+  };
+  return (
   <Modal title="الطلبات المعلّقة" icon={<History className="w-5 h-5" />} onClose={onClose}>
     {orders.length === 0 ? (
       <div className="text-center text-slate-500 text-xs py-10">لا توجد طلبات معلّقة حالياً</div>
@@ -105,8 +112,9 @@ export const HeldOrdersModal: React.FC<{
             <div className="min-w-0">
               <div className="text-xs font-bold text-slate-900 truncate">{h.customerName}</div>
               <div className="text-[10px] text-slate-500">
-                {h.items.length} صفوف • {new Date(h.createdAt).toLocaleString('ar-EG')}
+                {h.items.length} أصناف • {new Date(h.createdAt).toLocaleString('ar-EG')}
               </div>
+              <div className="text-[11px] font-black text-sky-700 tabular-nums mt-0.5">{CeramicMath.formatCurrency(heldTotal(h))}</div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -124,7 +132,8 @@ export const HeldOrdersModal: React.FC<{
       </div>
     )}
   </Modal>
-);
+  );
+};
 
 export const NewCustomerModal: React.FC<{
   name: string;
@@ -429,12 +438,19 @@ export const ToneWarningModal: React.FC<{
 );
 
 const SHORTCUTS: Array<[string, string]> = [
-  ['F1', 'عرض شاشة الاختصارات'],
-  ['F2', 'التركيز على حقل البحث / الباركود'],
-  ['F4', 'التركيز على المبلغ المدفوع'],
-  ['F8', 'فتح حاسبة السيراميك والمقايسة'],
+  ['F1', 'عرض شاشة الاختصارات والمساعدة'],
+  ['F2', 'البحث السريع عن منتج / تركيز حقل الباركود'],
+  ['F3', 'البحث عن اختيار العميل'],
+  ['F4', 'إدخال المبلغ المدفوع'],
+  ['F5', 'تحديث قائمة المنتجات والأرصدة'],
+  ['F6', 'التنقل بين طرق الدفع'],
+  ['F7', 'الانتقال إلى حقل خصم الفاتورة'],
+  ['F8', 'تعليق الفاتورة الحالية'],
   ['F9', 'اعتماد وحفظ الفاتورة'],
-  ['Esc', 'إغلاق النوافذ المفتوحة'],
+  ['F10', 'فتح / إغلاق الفواتير المعلقة'],
+  ['Delete', 'حذف المنتج المحدد من السلة'],
+  ['+ / -', 'زيادة / تقليل كمية المنتج المحدد'],
+  ['Esc', 'إغلاق النافذة الحالية'],
 ];
 
 export const ShortcutsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (

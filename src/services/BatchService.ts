@@ -306,12 +306,15 @@ export class BatchService {
   /**
    * يستهلك من الدفعات بنظام FIFO عند تأكيد فاتورة البيع.
    * إذا لا توجد دفعات مسجلة للصنف → no-op (التتبع اختياري).
+   * allowShortfall: مع السماح ببيع مخزون غير متوفر (enableNegativeStock)، نشحن ما هو متاح
+   * ولا نرمي خطأ — الجزء غير المغطي يُترك بدون تخصيص دفعات.
    */
   public deductFromBatches(
     productId: string,
     warehouseId: string,
-    quantityM2: number
-  ): { tracked: boolean; deductedM2: number; allocations: Array<{ batchId: string; quantityM2: number }> } {
+    quantityM2: number,
+    options: { allowShortfall?: boolean } = {}
+  ): { tracked: boolean; deductedM2: number; shortfallM2?: number; allocations: Array<{ batchId: string; quantityM2: number }> } {
     const batches = this.db.query<{ id: string; quantityRemainingM2: number }>(
       `SELECT id, quantity_remaining_m2 AS quantityRemainingM2
        FROM product_batches
@@ -336,6 +339,9 @@ export class BatchService {
       );
       allocations.push({ batchId: batch.id, quantityM2: deduct });
       remaining -= deduct;
+    }
+    if (remaining > 0.001 && options.allowShortfall) {
+      return { tracked: true, deductedM2: initialQuantity - remaining, shortfallM2: Math.round(remaining * 100) / 100, allocations };
     }
     if (remaining > 0.001) {
       throw new Error(`Insufficient tracked batch quantity for product ${productId}: short ${remaining.toFixed(3)} m².`);

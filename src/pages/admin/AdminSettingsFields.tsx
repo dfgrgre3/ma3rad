@@ -39,11 +39,14 @@ export const NavigationLayoutPreview: React.FC<{ variant: 'sidebar' | 'header' }
   </div>
 );
 
-export const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string }> = ({ checked, onChange, label }) => (
+export const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string; disabled?: boolean }> = ({ checked, onChange, label, disabled }) => (
   <button
     type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
     onClick={() => onChange(!checked)}
-    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-bold transition ${
+    className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
       checked
         ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
         : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400'

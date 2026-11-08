@@ -155,6 +155,13 @@ export class SettingsService {
         return ['سعر القطاعي (الأساسي)', 'سعر الجملة', 'سعر خاص / موزع', 'سعر مشاريع', 'سعر كبار العملاء'];
       })(),
       posShowCashButton: map.posShowCashButton === undefined ? true : bool(map.posShowCashButton),
+      posShowCardButton: map.posShowCardButton === undefined ? true : bool(map.posShowCardButton),
+      posShowBankTransferButton: map.posShowBankTransferButton === undefined ? true : bool(map.posShowBankTransferButton),
+      posShowChequeButton: map.posShowChequeButton === undefined ? true : bool(map.posShowChequeButton),
+      posShowCreditButton: map.posShowCreditButton === undefined ? true : bool(map.posShowCreditButton),
+      posShowMixedPaymentButton: map.posShowMixedPaymentButton === undefined ? true : bool(map.posShowMixedPaymentButton),
+      posShowCouponCode: map.posShowCouponCode === undefined ? true : bool(map.posShowCouponCode),
+      posShowLoyaltyPoints: map.posShowLoyaltyPoints === undefined ? true : bool(map.posShowLoyaltyPoints),
       posAllowDuplicateItems: bool(map.posAllowDuplicateItems),
       posAutoSaveInvoice: bool(map.posAutoSaveInvoice),
       posMultiSelectSearch: bool(map.posMultiSelectSearch),

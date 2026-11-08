@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Calculator, NotebookPen, X } from 'lucide-react';
 import { Header } from '../components/Header';
@@ -6,6 +6,7 @@ import { Sidebar } from '../components/Sidebar';
 import { NotificationService } from '../services/NotificationService';
 import { PermissionService } from '../services/PermissionService';
 import { NavigationService } from '../services/NavigationService';
+import { useNavigationGroups } from '../hooks/useNavigationGroups';
 import { CalculatorPanel } from '../components/CalculatorPanel';
 import { NotesPanel } from '../components/NotesPanel';
 import { AppConfigRuntime } from '../components/config/AppConfigRuntime';
@@ -18,6 +19,7 @@ import {
   saveNavigationLocation,
   saveNavigationScrollPosition,
 } from '../router/navigationPersistence';
+import { recordRecentNavigation } from '../router/navigationShortcuts';
 import { User } from '../types';
 
 interface MainLayoutProps {
@@ -33,6 +35,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   onSwitchUser,
 }) => {
   const location = useLocation();
+  const accessibleGroups = useNavigationGroups(currentUser);
+  const accessibleNavigationPaths = useMemo(
+    () => accessibleGroups.flatMap((group) => group.items.map((item) => item.to)),
+    [accessibleGroups]
+  );
   const mainRef = useRef<HTMLElement>(null);
   const { settings } = useTheme();
   const navigationLayout = settings.navigationLayout === 'header' ? 'header' : 'sidebar';
@@ -59,10 +66,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   useEffect(() => {
     if (!currentUser?.id || !isAllowed || location.pathname === '/') return;
     saveNavigationLocation(currentUser.id, persistedLocation);
+    recordRecentNavigation(currentUser.id, location.pathname, accessibleNavigationPaths);
     if (mainRef.current) {
       mainRef.current.scrollTop = getPersistedScrollPosition(currentUser.id, persistedLocation);
     }
-  }, [currentUser?.id, isAllowed, location.pathname, persistedLocation]);
+  }, [accessibleNavigationPaths, currentUser?.id, isAllowed, location.pathname, persistedLocation]);
 
   useEffect(() => {
     const userId = currentUser?.id;

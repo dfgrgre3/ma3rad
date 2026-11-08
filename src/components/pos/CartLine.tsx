@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, Minus, Plus, Trash2, Tag, ChevronDown } from 'lucide-react';
+import { AlertCircle, Minus, Plus, Trash2, Tag, ChevronDown, Package } from 'lucide-react';
 import type { Product } from '../../types';
 import { CeramicMath } from '../../utils/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
@@ -22,6 +22,8 @@ export interface CartLineProps {
   onUpdateLineDiscount: (index: number, value: number) => void;
   sellingPriceTiersCount?: number;
   sellingPriceTierNames?: string[];
+  isActive?: boolean;
+  onSelect?: (index: number) => void;
 }
 
 export const CartLine: React.FC<CartLineProps> = ({
@@ -37,6 +39,8 @@ export const CartLine: React.FC<CartLineProps> = ({
   onUpdateLineDiscount,
   sellingPriceTiersCount = 1,
   sellingPriceTierNames = [],
+  isActive = false,
+  onSelect,
 }) => {
   const businessType = getEffectiveBusinessType();
   const [isPriceMenuOpen, setIsPriceMenuOpen] = useState(false);
@@ -78,18 +82,33 @@ export const CartLine: React.FC<CartLineProps> = ({
 
   return (
     <div
-      className={`bg-white dark:bg-slate-900 p-2.5 rounded-xl border text-xs space-y-2 ${overStock ? 'border-rose-500/50' : 'border-slate-200/80 dark:border-slate-800'}`}
+      onClick={() => onSelect?.(index)}
+      aria-current={isActive || undefined}
+      className={`bg-white dark:bg-slate-900 p-2 rounded-xl border text-xs space-y-1.5 cursor-pointer transition ${
+        overStock ? 'border-rose-500/50' : isActive ? 'border-sky-500 ring-2 ring-sky-500/25' : 'border-slate-200/80 dark:border-slate-800'
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{item.product.name}</div>
+        <div className="flex items-start gap-2 min-w-0">
+          {item.product.imagePath ? (
+            <img src={item.product.imagePath} alt={item.product.name} className="w-10 h-10 object-cover rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          ) : (
+            <div aria-hidden="true" className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 flex items-center justify-center shrink-0">
+              <Package className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="font-bold text-slate-900 dark:text-slate-100 line-clamp-1">{item.product.name}</div>
           <div className="text-[10px] text-slate-500 dark:text-slate-400">
             {isGeneral ? `الوحدة الأساسية: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
           </div>
         </div>
+        </div>
         <button
           onClick={() => onRemove(index)}
-          className="text-slate-400 hover:text-rose-600 transition shrink-0"
+          aria-label={`حذف ${item.product.name} من السلة`}
+          title="حذف من السلة (Delete)"
+          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition shrink-0"
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -125,7 +144,8 @@ export const CartLine: React.FC<CartLineProps> = ({
         <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5">
           <button
             onClick={() => onStepQuantity(index, -1)}
-            className="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+            aria-label="إنقاص الكمية"
+            className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
           >
             <Minus className="w-3 h-3" />
           </button>
@@ -139,7 +159,8 @@ export const CartLine: React.FC<CartLineProps> = ({
           />
           <button
             onClick={() => onStepQuantity(index, 1)}
-            className="w-6 h-6 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+            aria-label="زيادة الكمية"
+            className="w-7 h-7 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
           >
             <Plus className="w-3 h-3" />
           </button>

@@ -12,6 +12,7 @@ export interface Customer {
   paymentTermsDays?: number;
   currentBalance: number; // مدين (+) أو دائن (-)
   totalPurchases: number;
+  isActive?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;

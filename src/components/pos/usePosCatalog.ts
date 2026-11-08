@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import type { CategoryWithCount } from '../../services/CategoryService';
 import type { Customer, Product } from '../../types';
 import type { SortMode } from './types';
@@ -20,17 +20,22 @@ export const usePosCatalog = ({ products, categories, customers, stockOf }: UseP
   const [customerSearch, setCustomerSearch] = useState('');
   const [inStockOnly, setInStockOnly] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>('NAME');
+  // المُؤجل (Deferred Value): يمنع تأخر الكتابة عند البحث في كتالوجات آلاف الأصناف —
+  // الإدخال يظهر فوراً والتصفية تُشتق في الخلفية.
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const filteredProducts = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = deferredSearchQuery.trim().toLowerCase();
     let list = products.filter((p) => {
       const matchesSearch = !q ||
         p.name.toLowerCase().includes(q) ||
-        (p.barcode || '').includes(q) ||
+        (p.barcode || '').toLowerCase().includes(q) ||
         (p.sku || '').toLowerCase().includes(q) ||
-        (p.size || '').includes(q) ||
+        (p.id || '').toLowerCase().includes(q) ||
+        (p.size || '').toLowerCase().includes(q) ||
         (p.brandName || '').toLowerCase().includes(q) ||
-        (p.color || '').toLowerCase().includes(q);
+        (p.color || '').toLowerCase().includes(q) ||
+        ((p as any).internalCode || '').toLowerCase().includes(q);
       const matchesCategory = selectedCategory === 'ALL' || p.categoryId === selectedCategory;
       const matchesBrand = selectedBrand === 'ALL' || p.brandId === selectedBrand;
       const matchesGrade = selectedGrade === 'ALL' || p.grade === selectedGrade;
@@ -50,7 +55,7 @@ export const usePosCatalog = ({ products, categories, customers, stockOf }: UseP
       }
     });
     return list;
-  }, [products, searchQuery, selectedCategory, selectedBrand, selectedGrade, selectedSize, selectedColor, inStockOnly, sortMode, stockOf]);
+  }, [products, deferredSearchQuery, selectedCategory, selectedBrand, selectedGrade, selectedSize, selectedColor, inStockOnly, sortMode, stockOf]);
 
   const visibleCategories = useMemo(() => {
     const counts = new Map<string, number>();

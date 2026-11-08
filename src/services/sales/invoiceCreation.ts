@@ -162,7 +162,8 @@ function buildPreparedItem(
   plannedByProduct: Map<string, number>,
   plannedFifoByLayer: Map<string, number>,
   costingMethod: string,
-  trackInventory: boolean
+  trackInventory: boolean,
+  allowNegativeStock: boolean
 ): PreparedSaleItem {
   const product = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
   if (!product) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
@@ -171,20 +172,26 @@ function buildPreparedItem(
   const baseQuantity = units.baseQuantity;
   validateItemQuantity(baseQuantity);
 
-  const isGeneralProduct = product.productType === 'GENERAL';
   const serviceLine = isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
   const tracksStock = trackInventory && !serviceLine;
   const unitLabel = getUnitLabel(product);
   validateProductPricing(item, product, actor, units.baseUnitPrice);
 
+  let stockSufficient = true;
   if (tracksStock) {
     const availableM2 = getAvailableStockM2(sqliteDb, item.productId, dto.warehouseId);
     const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
-    assertAvailableStock(product, unitLabel, availableM2, alreadyPlanned, baseQuantity);
+    if (allowNegativeStock) {
+      // المخزون السالب مسموح في الإعدادات — التحقق يتم في الواجهة فقط،
+      // لكن طبقات FIFO لا يمكن أن تهبط تحت الصفر، لذا FIFO يُطبق فقط على ما يغطيه الرصيد.
+      stockSufficient = availableM2 - alreadyPlanned >= baseQuantity;
+    } else {
+      assertAvailableStock(product, unitLabel, availableM2, alreadyPlanned, baseQuantity);
+    }
     plannedByProduct.set(item.productId, alreadyPlanned + baseQuantity);
   }
 
-  const fifoPlan = tracksStock
+  const fifoPlan = tracksStock && (!allowNegativeStock || stockSufficient)
     ? getFifoPlan(sqliteDb, item, dto, baseQuantity, plannedFifoByLayer, costingMethod)
     : null;
   // Financials are computed in the unit the cashier used, so a price of
@@ -237,7 +244,8 @@ function prepareSaleItems(
   dto: CreateSaleDTO,
   actor: any,
   costingMethod: string,
-  trackInventory: boolean
+  trackInventory: boolean,
+  allowNegativeStock: boolean
 ): { preparedItems: PreparedSaleItem[]; totalLineDiscount: number } {
   let totalLineDiscount = 0;
   const preparedItems: PreparedSaleItem[] = [];
@@ -245,7 +253,7 @@ function prepareSaleItems(
   const plannedFifoByLayer = new Map<string, number>();
 
   for (const item of dto.items) {
-    const preparedItem = buildPreparedItem(sqliteDb, dto, item, actor, plannedByProduct, plannedFifoByLayer, costingMethod, trackInventory);
+    const preparedItem = buildPreparedItem(sqliteDb, dto, item, actor, plannedByProduct, plannedFifoByLayer, costingMethod, trackInventory, allowNegativeStock);
     totalLineDiscount += preparedItem.discountAmount;
     preparedItems.push(preparedItem);
   }
@@ -308,7 +316,8 @@ function insertInvoiceItems(
   invoiceId: string,
   invoiceNumber: string | number,
   actor: any,
-  costingMethod: string
+  costingMethod: string,
+  allowNegativeStock = false
 ): void {
   for (const item of preparedItems) {
     item.invoiceId = invoiceId;
@@ -355,7 +364,7 @@ function insertInvoiceItems(
     if (costingMethod === 'FIFO' && item.fifoPlan) InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan);
 
     if (item.productType !== 'GENERAL') {
-      const batchResult = new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2);
+      const batchResult = new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2, { allowShortfall: allowNegativeStock });
       for (const allocation of batchResult.allocations) {
         sqliteDb.run(`
           INSERT INTO sales_invoice_batch_allocations (id, invoice_item_id, batch_id, quantity_m2)
@@ -368,7 +377,10 @@ function insertInvoiceItems(
 
 function resolvePayments(dto: CreateSaleDTO): { method: PaymentType; amount: number; reference?: string }[] {
   if (dto.payments && dto.payments.length > 0) {
-    return dto.payments.filter((p) => p.amount > 0);
+    // ── CREDIT legs are NOT tender payments: they are the invoice's receivable
+    // (remaining_amount on the invoice + customer balance). Posting them here
+    // would double-count and break the ledger mapping (no CREDIT account exists).
+    return dto.payments.filter((p) => p.amount > 0 && (p.method as PaymentType) !== 'CREDIT');
   }
   if (dto.paidAmount > 0) {
     return [{ method: dto.paymentType, amount: dto.paidAmount }];
@@ -460,6 +472,13 @@ function buildLedgerEntries(
 
 export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): SalesInvoice {
   assertSaleHasItems(dto);
+  // حارس عدم الاتساق: مجموع أطر الدفع بعد الاستبعاد يجب أن يساوي المدفوع المعلن —
+  // يمنع دفتر يومية غير متوازن قبل الدخول في المعاملة برسالة واضحة.
+  const tenderPayments = resolvePayments(dto);
+  const tenderSum = round2(tenderPayments.reduce((sum, payment) => sum + payment.amount, 0));
+  if (Math.abs(tenderSum - round2(dto.paidAmount || 0)) > 0.01) {
+    throw new Error(`المبلغ المدفوع (${round2(dto.paidAmount || 0).toFixed(2)}) لا يساوي مجموع أطر الدفع (${tenderSum.toFixed(2)}).`);
+  }
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.sales.invoices.create');
   CentralUsageLimitService.assertWithin('maxInvoices');
@@ -470,9 +489,11 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   )[0]?.companyId ?? null;
 
   return ctx.db.executeTransaction((sqliteDb) => {
-    const costingMethod = SettingsService.getSettings().costingMethod;
+    const sysSettings = SettingsService.getSettings();
+    const costingMethod = sysSettings.costingMethod;
+    const allowNegativeStock = sysSettings.enableNegativeStock === true;
     const trackInventory = ModuleRegistryService.isInventoryTracked();
-    const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod, trackInventory);
+    const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod, trackInventory, allowNegativeStock);
     const headerDiscount = dto.discountAmount || 0;
     const totals = computeSaleTotals({
       lines: preparedItems.map((p) => ({
@@ -518,7 +539,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       totals.paymentStatus, financialTotals.totalCost, financialTotals.grossProfit, dto.notes || null, actor.id
     ]);
 
-    insertInvoiceItems(sqliteDb, dto, preparedItems, invoiceId, invoiceNumber, actor, costingMethod);
+    insertInvoiceItems(sqliteDb, dto, preparedItems, invoiceId, invoiceNumber, actor, costingMethod, allowNegativeStock);
     updateCustomerAndCash(sqliteDb, dto, totals, cashRegisterId);
 
     // Persist split-payment breakdown (one row per method).
@@ -556,7 +577,24 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
         payload: {
           aggregateType: 'sales_invoice',
           aggregateId: invoiceId,
-          data: { invoiceId, invoiceNumber, totals },
+          data: {
+            action: 'إنشاء فاتورة مبيعات',
+            module: 'SALES',
+            recordId: invoiceId,
+            newValues: {
+              invoiceNumber,
+              customerId: dto.customerId,
+              warehouseId: dto.warehouseId,
+              itemsCount: preparedItems.length,
+              totalAmount: totals.totalAmount,
+              discountAmount: totals.discountAmount,
+              taxAmount: totals.taxAmount,
+              shippingCost: totals.shippingCost,
+              paidAmount: totals.paidAmount,
+              remainingAmount: totals.remainingAmount,
+              paymentType: dto.paymentType,
+            },
+          },
         },
       },
       {

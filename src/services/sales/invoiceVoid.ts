@@ -125,6 +125,15 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
       }
     }
 
+    // عكس قيد البيع: نتبع بالضبط الحسابات التي خُصمت عند الإنشاء (أطر الدفع المسجلة)
+    const splitPaymentsForLedger = sqliteDb.query<{ method: string; amount: number }>(
+      `SELECT method, COALESCE(SUM(amount), 0) AS amount
+       FROM sales_invoice_payments WHERE invoice_id = ? AND method != 'CREDIT' GROUP BY method`,
+      [invoiceId]
+    );
+    const reversedPaymentLines = splitPaymentsForLedger.length > 0
+      ? splitPaymentsForLedger.map((row) => ({ accountCode: paymentAccountCode(row.method), debit: 0, credit: round2(row.amount) }))
+      : (inv.paidAmount > 0 ? [{ accountCode: paymentAccountCode(inv.paymentType), debit: 0, credit: inv.paidAmount }] : []);
     const invoiceCost = trackInventory
       ? round2(inv.items
         .filter((item) => !isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit }))
@@ -146,7 +155,7 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
               { accountCode: '4101', debit: round2(inv.subtotal - inv.discountAmount), credit: 0 },
               ...(inv.shippingCost > 0 ? [{ accountCode: '4102', debit: inv.shippingCost, credit: 0 }] : []),
               ...(inv.taxAmount > 0 ? [{ accountCode: '2102', debit: inv.taxAmount, credit: 0 }] : []),
-              ...(inv.paidAmount > 0 ? [{ accountCode: paymentAccountCode(inv.paymentType), debit: 0, credit: inv.paidAmount }] : []),
+              ...reversedPaymentLines,
               ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),
               ...(invoiceCost > 0 ? [{ accountCode: '1104', debit: invoiceCost, credit: 0 }, { accountCode: '5101', debit: 0, credit: invoiceCost }] : []),
             ],

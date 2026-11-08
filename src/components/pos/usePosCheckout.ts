@@ -1,13 +1,12 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { BatchService } from '../../services/BatchService';
 import { AppConfigService } from '../../services/AppConfigService';
 import { ApprovalService } from '../../services/ApprovalService';
 import type { CashierService } from '../../services/CashierService';
 import type { LoyaltyService } from '../../services/LoyaltyService';
 import type { PricingService, AppliedPromotion } from '../../services/PricingService';
-import type { ProductService } from '../../services/ProductService';
 import type { SalesService } from '../../services/SalesService';
-import type { CashShift, Customer, PaymentType, Product, SystemSettings, ToneMixingConflict } from '../../types';
+import type { CashShift, Customer, PaymentType, SystemSettings, ToneMixingConflict } from '../../types';
 import { formatProductQuantity } from '../../utils/productUnits';
 import { pricePerUnit } from '../../utils/uom';
 import { round2, type CartItem, type Toast } from './types';
@@ -37,6 +36,10 @@ interface UsePosCheckoutOptions {
   taxPercentage: number;
   taxAmount: number;
   shippingCost: number;
+  /** Extra fees (رسوم إضافية). Recorded on the invoice inside shippingCost. */
+  extraFees?: number;
+  /** Invoice-discount percentage (for display/storage on the sale record). */
+  discountPercentage?: number;
   setShippingCost: Dispatch<SetStateAction<number>>;
   paidAmount: number;
   setPaidAmount: Dispatch<SetStateAction<number>>;
@@ -45,18 +48,18 @@ interface UsePosCheckoutOptions {
   splitCard: number;
   splitBank: number;
   splitCheque: number;
+  /** الجزء الآجل من الدفع المختلط — يُسجَّل كرصيد على العميل وليس كدفعة */
+  splitCredit: number;
   notes: string;
   setNotes: Dispatch<SetStateAction<string>>;
   remainingAmount: number;
   lineSubtotal: number;
   lineDiscountTotal: number;
   setSuccessInvoice: Dispatch<SetStateAction<any>>;
-  setProducts: Dispatch<SetStateAction<Product[]>>;
   setActiveShift: Dispatch<SetStateAction<CashShift | null>>;
   setToneConflicts: Dispatch<SetStateAction<ToneMixingConflict[]>>;
   setIsToneWarningOpen: Dispatch<SetStateAction<boolean>>;
   salesService: SalesService;
-  productService: ProductService;
   cashierService: CashierService;
   batchService: BatchService;
   loyaltyService: LoyaltyService;
@@ -92,6 +95,8 @@ export const usePosCheckout = ({
   taxPercentage,
   taxAmount,
   shippingCost,
+  extraFees = 0,
+  discountPercentage = 0,
   setShippingCost,
   paidAmount,
   setPaidAmount,
@@ -100,18 +105,17 @@ export const usePosCheckout = ({
   splitCard,
   splitBank,
   splitCheque,
+  splitCredit,
   notes,
   setNotes,
   remainingAmount,
   lineSubtotal,
   lineDiscountTotal,
   setSuccessInvoice,
-  setProducts,
   setActiveShift,
   setToneConflicts,
   setIsToneWarningOpen,
   salesService,
-  productService,
   cashierService,
   batchService,
   loyaltyService,
@@ -122,13 +126,17 @@ export const usePosCheckout = ({
   validateInvoiceFields,
 }: UsePosCheckoutOptions) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  // قفل متزامن داخل الذاكرة: يمنع فاتورة مكررة عند الضغط المزدوج أو F9 في اللحظة نفسها
+  // (isProcessing وحده لا يكفي لأن تحديث الحالة لا يتم فورياً).
+  const inFlightRef = useRef(false);
 
   const validateCartAndPermissions = useCallback(() => {
     if (!Number.isFinite(discountAmount) || discountAmount < 0
       || !Number.isFinite(shippingCost) || shippingCost < 0
+      || !Number.isFinite(extraFees) || extraFees < 0
       || !Number.isFinite(taxPercentage) || taxPercentage < 0
       || !Number.isFinite(paidAmount) || paidAmount < 0) {
-      notify('تحقق من أن الخصم والضريبة والشحن والمدفوع أرقام صحيحة غير سالبة', 'error');
+      notify('تحقق من أن الخصم والضريبة والشحن والمصاريف الإضافية والمدفوع أرقام صحيحة غير سالبة', 'error');
       return false;
     }
     const invalidItem = cart.find((item) => !Number.isFinite(item.quantityM2) || item.quantityM2 <= 0
@@ -159,8 +167,25 @@ export const usePosCheckout = ({
       notify('لا تملك صلاحية البيع الآجل أو ترك مبلغ متبقٍ', 'error');
       return false;
     }
+    if (paymentType === 'MIXED') {
+      const paidPart = round2(splitCash + splitCard + splitBank + splitCheque);
+      const splitSum = round2(paidPart + splitCredit);
+      const expectedTotal = round2(paidAmount + remainingAmount);
+      if (splitSum <= 0) {
+        notify('أدخل مبالغ الدفع المختلط أولاً', 'error');
+        return false;
+      }
+      if (Math.abs(splitSum - expectedTotal) > 0.01) {
+        notify(`مجموع طرق الدفع المختلط (${splitSum.toFixed(2)}) يجب أن يساوي إجمالي الفاتورة (${expectedTotal.toFixed(2)}) — الفرق ${round2(Math.abs(splitSum - expectedTotal)).toFixed(2)}`, 'error');
+        return false;
+      }
+      if (splitCredit > 0 && !can('sales.credit')) {
+        notify('لا تملك صلاحية البيع الآجل (الجزء الآجل من الدفع المختلط)', 'error');
+        return false;
+      }
+    }
     return true;
-  }, [cart, discountAmount, shippingCost, taxPercentage, paidAmount, selectedCustomer, selectedWarehouseId, can, remainingAmount, notify]);
+  }, [cart, discountAmount, shippingCost, extraFees, taxPercentage, paidAmount, paymentType, splitCash, splitCard, splitBank, splitCheque, splitCredit, selectedCustomer, selectedWarehouseId, can, remainingAmount, notify]);
 
   const validateStockAvailability = useCallback(() => {
     if (settings?.enableNegativeStock ?? false) return true;
@@ -302,7 +327,12 @@ export const usePosCheckout = ({
   }, [cart, selectedWarehouseId, batchService, setToneConflicts, setIsToneWarningOpen]);
 
   const handleCheckout = useCallback((skipToneCheck = false) => {
-    if (isProcessing || !validateCheckoutDetails() || !selectedCustomer) return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    if (isProcessing || !validateCheckoutDetails() || !selectedCustomer) {
+      inFlightRef.current = false;
+      return;
+    }
     try {
       setIsProcessing(true);
       if (!skipToneCheck && showToneMixingWarning()) {
@@ -327,9 +357,10 @@ export const usePosCheckout = ({
           discountAmount: item.discountAmount
         })),
         discountAmount: round2(discountAmount + promotionDiscount + loyaltyDiscount),
+        discountPercentage: round2(discountPercentage),
         taxPercentage,
         taxAmount,
-        shippingCost,
+        shippingCost: round2(shippingCost + (extraFees || 0)),
         paidAmount,
         paymentType,
         payments: paymentType === 'MIXED' ? ([
@@ -391,7 +422,7 @@ export const usePosCheckout = ({
       setShippingCost(0);
       setNotes('');
       setPaidAmount(0);
-      setProducts(productService.getAllProducts());
+      // جدول المنتجات لم يتغير — نُعيد تحميل الأرصدة من المخزن فقط (تحديث البيانات المتأثرة فقط)
       if (selectedWarehouseId) loadStock(selectedWarehouseId);
       setActiveShift(cashierService.getActiveShift());
       notify(
@@ -403,18 +434,19 @@ export const usePosCheckout = ({
     } catch (error: any) {
       notify(error.message || 'خطأ أثناء حفظ الفاتورة', 'error');
     } finally {
+      inFlightRef.current = false;
       setIsProcessing(false);
     }
   }, [
     isProcessing, validateCheckoutDetails, selectedCustomer, showToneMixingWarning,
     salesService, selectedWarehouseId, activeShift, cart, discountAmount,
-    promotionDiscount, loyaltyDiscount, taxPercentage, taxAmount, shippingCost,
+    promotionDiscount, loyaltyDiscount, taxPercentage, taxAmount, shippingCost, extraFees, discountPercentage,
     paidAmount, paymentType, splitCash, splitCard, splitBank, splitCheque, notes,
     redeemPoints,
     performedBy, appliedPromotion, pricingService, couponCode, loyaltyService,
     setCart, setDiscountAmount, setPromotionDiscount, setLoyaltyDiscount,
     setAppliedPromotion, setCouponCode, setRedeemPoints, setShippingCost,
-    setNotes, setPaidAmount, setSuccessInvoice, setProducts, productService,
+    setNotes, setPaidAmount, setSuccessInvoice,
     loadStock, setActiveShift, cashierService, notify, onInvoiceCreated, validateInvoiceFields,
   ]);
 

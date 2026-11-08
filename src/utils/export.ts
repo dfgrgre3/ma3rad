@@ -1,6 +1,7 @@
 import { localDateString } from './date';
 import { ExportService } from '../services/ExportService';
 import { SettingsService } from '../services/SettingsService';
+import { createExcelWorkbook } from './excelExportWorkbook';
 
 export interface ExportColumn {
   key: string;
@@ -278,6 +279,46 @@ export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, 
   } catch { /* ignore */ }
 
   const exportedAt = stamp();
+  const triggerDownload = (bytes: ArrayBuffer | Uint8Array) => {
+    try {
+      // Copy into a fresh ArrayBuffer-backed view: Blob requires ArrayBuffer (not SharedArrayBuffer).
+      const blobBytes = bytes instanceof Uint8Array ? new Uint8Array(bytes).buffer : bytes;
+      const blob = new Blob([blobBytes], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${safeName(fileName)}-${exportedAt}.xlsx`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Could not download the generated Excel workbook:', error);
+      window.alert('تم إنشاء التقرير لكن تعذر تنزيل ملف Excel.');
+      return;
+    }
+  };
+
+  if (typeof Worker === 'undefined') {
+    try {
+      const workbook = createExcelWorkbook({
+        title,
+        subtitle: subtitle || `تاريخ التصدير: ${exportedAt}`,
+        columns,
+        rows,
+        companyName,
+        kpis,
+      });
+      triggerDownload(workbook);
+    } catch (error) {
+      console.error('Could not generate Excel workbook without a web worker:', error);
+      window.alert('تعذر إنشاء ملف Excel. حاول مرة أخرى.');
+    }
+    return;
+  }
+
   let worker: Worker;
   try {
     worker = new Worker(new URL('../workers/excelExport.worker.ts', import.meta.url), { type: 'module' });
@@ -306,23 +347,7 @@ export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, 
       return;
     }
 
-    try {
-      const blob = new Blob([event.data.bytes], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${safeName(fileName)}-${exportedAt}.xlsx`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) {
-      console.error('Could not download the generated Excel workbook:', error);
-      window.alert('تم إنشاء التقرير لكن تعذر تنزيل ملف Excel.');
-      return;
-    }
+    triggerDownload(event.data.bytes);
 
     if (import.meta.env.DEV) {
       console.info('[performance] Excel export worker completed', {

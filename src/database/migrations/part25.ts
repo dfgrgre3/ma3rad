@@ -14,4 +14,17 @@ export const MIGRATION_PART_25: Migration[] = [
       }
     },
   },
+  {
+    id: '136_customer_active_status',
+    description: 'Track active and inactive customers for POS selection and customer management.',
+    up: (db) => {
+      if (!columnExists(db, 'customers', 'is_active')) {
+        db.exec('ALTER TABLE customers ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
+      }
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_customers_status_type_name
+          ON customers(company_id, is_active, customer_type, name)
+      `);
+    },
+  },
 ];

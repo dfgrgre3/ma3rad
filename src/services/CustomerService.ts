@@ -9,6 +9,11 @@ import { localDateString } from '../utils/date';
 import { paymentAccountCode, postLedgerEntry } from '../database/ledger';
 import { MasterDataSyncService } from '../sync/MasterDataSyncService';
 
+export interface CustomerPageFilters {
+  customerType?: Customer['customerType'];
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
 function getExistingCustomerPayment(
   prior: CustomerPayment[],
   customerId: string,
@@ -72,7 +77,13 @@ export class CustomerService {
     return this.db.query<Customer>(sql, params);
   }
 
-  public getCustomersPage(search = '', page = 1, pageSize = 25, fieldFilters: Record<string, string> = {}) {
+  public getCustomersPage(
+    search = '',
+    page = 1,
+    pageSize = 25,
+    fieldFilters: Record<string, string> = {},
+    filters: CustomerPageFilters = {},
+  ) {
     PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
     const scope = this.branchAccess.companyScope('company_id');
     const params: any[] = [...scope.params];
@@ -81,6 +92,14 @@ export class CustomerService {
       where += ' AND (name LIKE ? OR phone LIKE ? OR phone2 LIKE ? OR code LIKE ?)';
       const term = `%${search.trim()}%`;
       params.push(term, term, term, term);
+    }
+    if (filters.customerType) {
+      where += ' AND customer_type = ?';
+      params.push(filters.customerType);
+    }
+    if (filters.status) {
+      where += ' AND is_active = ?';
+      params.push(filters.status === 'ACTIVE' ? 1 : 0);
     }
     Object.entries(fieldFilters).forEach(([fieldId, value]) => {
       if (!value) return;
@@ -101,6 +120,20 @@ export class CustomerService {
   public getCustomerById(id: string): Customer | null {
     PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
     return this.findCustomerById(id);
+  }
+
+  public getCustomerByPhone(phone: string): Customer | null {
+    PermissionService.require(AuthService.requireAuth(), 'ui.customers.list.view');
+    const normalizedPhone = phone.trim().replace(/\s+/g, '');
+    if (!normalizedPhone) return null;
+    const scope = this.branchAccess.companyScope('company_id');
+    return this.db.query<Customer>(
+      `SELECT * FROM customers
+       WHERE ${scope.clause}
+         AND (REPLACE(phone, ' ', '') = ? OR REPLACE(COALESCE(phone2, ''), ' ', '') = ?)
+       LIMIT 1`,
+      [...scope.params, normalizedPhone, normalizedPhone],
+    )[0] ?? null;
   }
 
   private findCustomerById(id: string): Customer | null {
@@ -191,6 +224,7 @@ export class CustomerService {
         address = COALESCE(?, address),
         city = COALESCE(?, city),
         customer_type = COALESCE(?, customer_type),
+        is_active = COALESCE(?, is_active),
         credit_limit = COALESCE(?, credit_limit),
         payment_terms_days = COALESCE(?, payment_terms_days),
         notes = COALESCE(?, notes),
@@ -201,7 +235,8 @@ export class CustomerService {
     return this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(sql, [
         updates.name ?? null, updates.phone ?? null, updates.phone2 ?? null, updates.nationalId ?? null,
-        updates.address ?? null, updates.city ?? null, updates.customerType ?? null, updates.creditLimit ?? null, updates.paymentTermsDays ?? null,
+        updates.address ?? null, updates.city ?? null, updates.customerType ?? null, updates.isActive ?? null,
+        updates.creditLimit ?? null, updates.paymentTermsDays ?? null,
         updates.notes ?? null, id
       ]);
       this.sync.capture(sqliteDb, 'customer', id, 'UPDATE');

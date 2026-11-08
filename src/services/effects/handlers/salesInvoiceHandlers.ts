@@ -21,7 +21,7 @@ defaultEffectRegistry.register('ledger.post', (ctx: EffectContext, effect) => {
 
 defaultEffectRegistry.register('audit.log', (ctx: EffectContext, effect) => {
   const data = effect.payload.data as any;
-  const action = data.action || ' issuance فاتورة مبيعات';
+  const action = data.action || 'إنشاء فاتورة مبيعات';
   const module = data.module || 'SALES';
   const oldValues = data.oldValues != null ? JSON.stringify(data.oldValues) : null;
   const newValues = data.newValues != null ? JSON.stringify(data.newValues) : null;

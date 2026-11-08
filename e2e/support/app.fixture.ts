@@ -173,11 +173,35 @@ export async function activate(page: Page): Promise<void> {
   await expect(page.locator('#username')).toBeVisible();
 }
 
+const DEFAULT_E2E_ADMIN_PASSWORD = 'admin123';
+const STRONG_E2E_ADMIN_PASSWORD = 'E2eTest2026!';
+
+async function completePasswordChangeIfNeeded(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'تغيير كلمة المرور الافتراضية' });
+  let seen = false;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (await dialog.isVisible().catch(() => false)) {
+      seen = true;
+      break;
+    }
+    await page.waitForTimeout(250);
+  }
+  if (!seen) return;
+
+  await dialog.locator('#current-password').fill(DEFAULT_E2E_ADMIN_PASSWORD);
+  await dialog.locator('#new-password').fill(STRONG_E2E_ADMIN_PASSWORD);
+  await dialog.locator('#confirm-password').fill(STRONG_E2E_ADMIN_PASSWORD);
+  await dialog.getByRole('button', { name: 'حفظ كلمة المرور وتأمين النظام' }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 30_000 });
+}
+
 export async function login(page: Page): Promise<void> {
   await expect(page.locator('#username')).toBeVisible();
   await page.locator('#username').fill('admin');
-  await page.locator('#password').fill('admin123');
+  await page.locator('#password').fill(DEFAULT_E2E_ADMIN_PASSWORD);
   await page.locator('#password').press('Enter');
+
+  await completePasswordChangeIfNeeded(page);
   await expect(page.locator('#username')).toBeHidden({ timeout: 30_000 });
 }
 

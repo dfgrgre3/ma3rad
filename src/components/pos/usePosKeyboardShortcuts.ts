@@ -3,7 +3,6 @@ import type { InvoicePreview } from './types';
 
 interface UsePosKeyboardShortcutsOptions {
   handleCheckout: () => void;
-  hasCeramicCatalog: boolean;
   isCalculatorOpen: boolean;
   setIsCalculatorOpen: Dispatch<SetStateAction<boolean>>;
   isCustomerModalOpen: boolean;
@@ -20,6 +19,16 @@ interface UsePosKeyboardShortcutsOptions {
   successInvoice: unknown;
   barcodeInputRef: RefObject<HTMLInputElement>;
   paidInputRef: RefObject<HTMLInputElement>;
+  /** F5 — إعادة تحميل المنتجات والأرصدة دون إعادة تحميل الصفحة */
+  refreshCatalog: () => void;
+  /** F6 — التنقل بين طرق الدفع */
+  cyclePaymentType: () => void;
+  /** F8 — تعليق الفاتورة الحالية */
+  holdCurrentOrder: () => void;
+  /** Delete — حذف المنتج المحدد في السلة */
+  deleteActiveCartLine: () => void;
+  /** + / - — تعديل كمية المنتج المحدد في السلة */
+  stepActiveCartLine: (direction: 1 | -1) => void;
 }
 
 export const usePosKeyboardShortcuts = (options: UsePosKeyboardShortcutsOptions) => {
@@ -27,37 +36,101 @@ export const usePosKeyboardShortcuts = (options: UsePosKeyboardShortcutsOptions)
   latest.current = options;
 
   useEffect(() => {
+    const focusById = (id: string) => {
+      const el = document.getElementById(id) as HTMLElement | null;
+      el?.focus();
+    };
+
     const handler = (event: KeyboardEvent) => {
       const state = latest.current;
       const target = event.target as HTMLElement | null;
       const isTyping = !!target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
-      if (event.key === 'F9' && (
+      const anyModalOpen =
         state.isCalculatorOpen || state.isCustomerModalOpen || state.isHeldModalOpen ||
         state.isShortcutsOpen || state.isShiftModalOpen || state.isCloseShiftModalOpen ||
-        state.isToneWarningOpen || state.invoicePreview || state.successInvoice
-      )) return;
-      if (isTyping && !['F1', 'F8', 'Escape'].includes(event.key)) return;
+        state.isToneWarningOpen || !!state.invoicePreview || !!state.successInvoice;
+
+      // اختصارات تعمل حتى أثناء الكتابة في الحقول (F1–F10)
+      if (event.key === 'F1') {
+        event.preventDefault();
+        state.setIsShortcutsOpen((value) => !value);
+        return;
+      }
       if (event.key === 'F2') {
         event.preventDefault();
         state.barcodeInputRef.current?.focus();
-      } else if (event.key === 'F4') {
+        state.barcodeInputRef.current?.select?.();
+        return;
+      }
+      if (event.key === 'F3') {
+        event.preventDefault();
+        focusById('pos-customer-search');
+        return;
+      }
+      if (event.key === 'F4') {
         event.preventDefault();
         state.paidInputRef.current?.focus();
-      } else if (event.key === 'F8') {
+        state.paidInputRef.current?.select?.();
+        return;
+      }
+      if (event.key === 'F5') {
         event.preventDefault();
-        if (state.hasCeramicCatalog) state.setIsCalculatorOpen((value) => !value);
-      } else if (event.key === 'F9') {
+        state.refreshCatalog();
+        return;
+      }
+      if (event.key === 'F6') {
+        event.preventDefault();
+        state.cyclePaymentType();
+        return;
+      }
+      if (event.key === 'F7') {
+        event.preventDefault();
+        focusById('pos-invoice-discount');
+        return;
+      }
+
+      // F8 / F9 ممنوعان أثناء فتح نافذة أخرى
+      if (event.key === 'F8') {
+        if (anyModalOpen) return;
+        event.preventDefault();
+        state.holdCurrentOrder();
+        return;
+      }
+      if (event.key === 'F9') {
+        if (anyModalOpen) return;
         event.preventDefault();
         state.handleCheckout();
-      } else if (event.key === 'F1') {
+        return;
+      }
+      if (event.key === 'F10') {
         event.preventDefault();
-        state.setIsShortcutsOpen((value) => !value);
-      } else if (event.key === 'Escape') {
+        state.setIsHeldModalOpen((value) => !value);
+        return;
+      }
+      if (event.key === 'Escape') {
         state.setIsCalculatorOpen(false);
         state.setIsCustomerModalOpen(false);
         state.setIsHeldModalOpen(false);
         state.setIsShortcutsOpen(false);
         state.setIsShiftModalOpen(false);
+        return;
+      }
+
+      // Delete و +/- لا يعملان أثناء الكتابة داخل حقل نصي
+      if (isTyping) return;
+      if (event.key === 'Delete') {
+        event.preventDefault();
+        state.deleteActiveCartLine();
+        return;
+      }
+      if (event.key === '+' || event.key === '=' || event.key === 'Add') {
+        event.preventDefault();
+        state.stepActiveCartLine(1);
+        return;
+      }
+      if (event.key === '-' || event.key === 'Subtract') {
+        event.preventDefault();
+        state.stepActiveCartLine(-1);
       }
     };
     window.addEventListener('keydown', handler);

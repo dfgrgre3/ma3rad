@@ -63,6 +63,13 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   sellingPriceTiersCount: '1',
   sellingPriceTierNames: '["سعر القطاعي (الأساسي)", "سعر الجملة", "سعر خاص / موزع", "سعر مشاريع", "سعر كبار العملاء"]',
   posShowCashButton: '1',
+  posShowCardButton: '1',
+  posShowBankTransferButton: '1',
+  posShowChequeButton: '1',
+  posShowCreditButton: '1',
+  posShowMixedPaymentButton: '1',
+  posShowCouponCode: '1',
+  posShowLoyaltyPoints: '1',
   posAllowDuplicateItems: '0',
   posAutoSaveInvoice: '0',
   posMultiSelectSearch: '0',
@@ -105,7 +112,7 @@ export const EXTENDED_SETTINGS_KEYS = [
   'uiSuccessColor', 'uiDangerColor', 'uiWarningColor', 'uiButtonStyle',
   'uiCornerRadius', 'uiDensity', 'uiFontScale', 'interfaceDirection',
   'navigationLayout', 'businessTerminologyOverrides', 'loginPinLength', 'switchableUserIds',
-  'sellingPriceTiersCount', 'sellingPriceTierNames', 'posShowCashButton', 'posAllowDuplicateItems', 'posAutoSaveInvoice', 'posMultiSelectSearch', 'invoiceTableStyle', 'invoiceShowItemCode', 'invoiceShowItemSpecs', 'invoiceShowBoxesCount', 'invoiceShowLineDiscount', 'invoiceShowTableSummary', 'invoiceTableColumns', 'invoiceShowPromotions', 'invoiceShowShipping', 'invoiceShowPaymentSplits', 'invoiceShowNotes', 'invoiceShowBrandLogo', 'invoiceFontFamily', 'invoiceSectionOrder', 'allowOverdraftSale', 'insufficientStockAsReserved', 'lockSaleOnReservedQty', 'preventPermitSaleWithoutStock', 'preventOverdraftDeliveryPermit', 'allowAdminOverdraftSale', 'allowPermissionHoldersOverdraftSale', 'allowLineItemDiscount', 'returnRequiresInvoiceOrCustomer', 'newInvoicesUnderDelivery', 'vatOnDeliveryFee', 'cashierMaxDiscountPercentWithoutApproval', 'requireRemoteManagerApproval', 'posItemRemovalReasons',
+  'sellingPriceTiersCount', 'sellingPriceTierNames', 'posShowCashButton', 'posShowCardButton', 'posShowBankTransferButton', 'posShowChequeButton', 'posShowCreditButton', 'posShowMixedPaymentButton', 'posShowCouponCode', 'posShowLoyaltyPoints', 'posAllowDuplicateItems', 'posAutoSaveInvoice', 'posMultiSelectSearch', 'invoiceTableStyle', 'invoiceShowItemCode', 'invoiceShowItemSpecs', 'invoiceShowBoxesCount', 'invoiceShowLineDiscount', 'invoiceShowTableSummary', 'invoiceTableColumns', 'invoiceShowPromotions', 'invoiceShowShipping', 'invoiceShowPaymentSplits', 'invoiceShowNotes', 'invoiceShowBrandLogo', 'invoiceFontFamily', 'invoiceSectionOrder', 'allowOverdraftSale', 'insufficientStockAsReserved', 'lockSaleOnReservedQty', 'preventPermitSaleWithoutStock', 'preventOverdraftDeliveryPermit', 'allowAdminOverdraftSale', 'allowPermissionHoldersOverdraftSale', 'allowLineItemDiscount', 'returnRequiresInvoiceOrCustomer', 'newInvoicesUnderDelivery', 'vatOnDeliveryFee', 'cashierMaxDiscountPercentWithoutApproval', 'requireRemoteManagerApproval', 'posItemRemovalReasons',
 ];
 
 export const DEFAULT_BRANCH_ID = 'br_main';

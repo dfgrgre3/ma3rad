@@ -1,14 +1,14 @@
 import {
   Banknote, BarChart3, BookmarkPlus, BookOpen, Boxes, Building2, CalendarDays,
-  ClipboardList, CreditCard, FileText, Layers, LayoutDashboard, Lock, MessageCircle,
-  FolderTree, Package, Package2, PackageCheck, Percent, PieChart, Receipt, RotateCcw as RotateCcl, Scale, ShoppingBag,
-  ShoppingCart, ShieldCheck, Star, Tags, Target, TrendingDown, TrendingUp, Users,
-  UserRound, Utensils, Wallet, Workflow,
+  ClipboardList, CreditCard, FileText, FolderTree, Layers, LayoutDashboard, Lock,
+  MessageCircle, Package, Package2, PackageCheck, Percent, PieChart, Receipt,
+  RotateCcw, Scale, ShoppingBag, ShoppingCart, ShieldCheck, Star, Tags, Target,
+  TrendingDown, TrendingUp, Users, UserRound, Utensils, Wallet, Workflow,
 } from 'lucide-react';
 import type { NavGroupDef } from './navigationTypes';
 
 export const NAV_GROUPS_01: NavGroupDef[] = [
-{
+  {
     id: 'dashboard',
     label: 'الرئيسية',
     icon: LayoutDashboard,
@@ -17,9 +17,9 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'لوحة المعلومات والتحليلات الشاملة', to: '/dashboard', icon: LayoutDashboard, perm: 'dashboard.view' },
     ],
   },
-{
+  {
     id: 'daily',
-    label: 'العمليات اليومية',
+    label: 'مركز العمل اليومي',
     icon: CalendarDays,
     color: 'text-blue-600',
     items: [
@@ -29,7 +29,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'ديون اليوم', to: '/daily/debts', icon: Banknote, perm: 'finance.debts.view' },
     ],
   },
-{
+  {
     id: 'sales',
     label: 'المبيعات',
     icon: ShoppingCart,
@@ -39,18 +39,19 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'نقطة البيع (POS)', to: '/pos', icon: ShoppingCart, highlight: true, perm: 'sales.create' },
       { label: 'إدارة المطعم', to: '/restaurant', icon: Utensils, perm: 'orders.view' },
       { label: 'مركز المبيعات', to: '/sales', icon: Receipt, perm: 'sales.view' },
+      { label: 'تحليلات المبيعات', to: '/sales/analytics', icon: BarChart3, anyPerms: ['sales.analytics.view', 'sales.view'] },
       { label: 'دورة الفاتورة الشاملة', to: '/sales/cycle', icon: Workflow, perm: 'sales.view' },
       { label: 'كشف حساب العميل', to: '/sales/statement', icon: UserRound, perms: ['customers.view', 'sales.view', 'finance.debts.view'] },
-      { label: 'الحجوزات والعربونات', to: '/sales/reservations', icon: BookmarkPlus, perm: 'sales.view' },
+      { label: 'الحجوزات والعربونات', to: '/sales/orders-deposits', icon: BookmarkPlus, anyPerms: ['sales.orders_deposits.view', 'sales.reservations.view', 'sales.view'] },
       { label: 'خدمة ما بعد البيع والضمان', to: '/sales/after-sales', icon: ShieldCheck, perm: 'sales.view' },
       { label: 'عروض الأسعار', to: '/quotations', icon: FileText, perm: 'quotations.view' },
       { label: 'الطلبات', to: '/orders', icon: Package2, perm: 'orders.view' },
-      { label: 'المرتجعات', to: '/returns', icon: RotateCcl, perm: 'returns.view' },
+      { label: 'المرتجعات', to: '/returns', icon: RotateCcw, perm: 'returns.view' },
     ],
   },
-{
+  {
     id: 'inventory',
-    label: 'مركز المخزون',
+    label: 'المخزون والمستودعات',
     icon: Layers,
     color: 'text-violet-600',
     perm: 'inventory.view',
@@ -68,15 +69,6 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'مواقع الرفوف', to: '/inventory/locations', icon: Building2, perm: 'inventory.view' },
       { label: 'التالف والحجر', to: '/inventory/damage-quarantine', icon: Lock, perm: 'inventory.adjust' },
       { label: 'مطابقة المخزون', to: '/inventory/reconciliation', icon: ClipboardList, perm: 'inventory.view' },
-    ],
-  },
-{
-    id: 'products',
-    label: 'كتالوج المنتجات',
-    icon: Package,
-    color: 'text-amber-600',
-    perm: 'products.view',
-    items: [
       { label: 'المنتجات', to: '/products', icon: Package, perm: 'products.view' },
       { label: 'التصنيفات', to: '/categories', icon: FolderTree, perm: 'categories.view' },
       { label: 'الماركات', to: '/brands', icon: Tags, perm: 'brands.view' },
@@ -86,27 +78,9 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'العروض والخصومات', to: '/promotions', icon: Star, perm: 'promotions.view' },
     ],
   },
-{
-    id: 'crm',
-    label: 'CRM والعملاء',
-    icon: Users,
-    color: 'text-pink-600',
-    perm: 'customers.view',
-    items: [
-        { label: 'لوحة علاقات العملاء', to: '/crm/dashboard', icon: Target, anyPerms: ['crm.view', 'customers.view'] },
-        { label: 'العملاء', to: '/customers', icon: Users, perm: 'customers.view' },
-        { label: 'إدارة المشاريع', to: '/projects', icon: Boxes, perm: 'projects.view' },
-        { label: 'العملاء المحتملون', to: '/crm/leads', icon: TrendingUp, perm: 'crm.view' },
-        { label: 'خط المبيعات', to: '/crm/pipeline', icon: TrendingUp, perm: 'crm.view' },
-        { label: 'الأنشطة والمتابعات', to: '/crm/activities', icon: MessageCircle, perm: 'crm.view' },
-        { label: 'الحملات التسويقية', to: '/crm/campaigns', icon: Star, perm: 'crm.view' },
-      { label: 'منتجات العملاء الخارجية', to: '/customers/imported-products', icon: MessageCircle, perm: 'sales.view' },
-      { label: 'طلبات جاهزة للتسليم', to: '/customers/ready-deliveries', icon: PackageCheck, perm: 'sales.view' },
-    ],
-  },
-{
+  {
     id: 'purchasing',
-    label: 'المشتريات',
+    label: 'المشتريات والموردون',
     icon: ShoppingBag,
     color: 'text-orange-600',
     perm: 'purchases.view',
@@ -120,22 +94,31 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'فواتير الشراء', to: '/purchases', icon: Receipt, perm: 'purchases.view' },
       { label: 'كشف حساب المورد', to: '/purchases/statement', icon: Wallet, perm: 'finance.debts.view' },
       { label: 'مطالبات الموردين', to: '/purchases/claims', icon: ShieldCheck, perm: 'purchases.view' },
-      { label: 'مرتجعات المشتريات', to: '/purchases/returns', icon: RotateCcl, perm: 'purchases.return' },
+      { label: 'مرتجعات المشتريات', to: '/purchases/returns', icon: RotateCcw, perm: 'purchases.return' },
     ],
   },
-{
-    id: 'partners',
-    label: 'الشركاء',
+  {
+    id: 'crm',
+    label: 'العملاء وإدارة العلاقات CRM',
     icon: Users,
-    color: 'text-indigo-600',
-    perm: 'partners.view',
+    color: 'text-pink-600',
+    perm: 'customers.view',
     items: [
+      { label: 'لوحة علاقات العملاء', to: '/crm/dashboard', icon: Target, anyPerms: ['crm.view', 'customers.view'] },
+      { label: 'العملاء', to: '/customers', icon: Users, perm: 'customers.view' },
+      { label: 'إدارة المشاريع', to: '/projects', icon: Boxes, perm: 'projects.view' },
       { label: 'حسابات الشركاء', to: '/partners', icon: Users, perm: 'partners.view' },
+      { label: 'العملاء المحتملون', to: '/crm/leads', icon: TrendingUp, perm: 'crm.view' },
+      { label: 'خط المبيعات', to: '/crm/pipeline', icon: TrendingUp, perm: 'crm.view' },
+      { label: 'الأنشطة والمتابعات', to: '/crm/activities', icon: MessageCircle, perm: 'crm.view' },
+      { label: 'الحملات التسويقية', to: '/crm/campaigns', icon: Star, perm: 'crm.view' },
+      { label: 'منتجات العملاء الخارجية', to: '/customers/imported-products', icon: MessageCircle, perm: 'sales.view' },
+      { label: 'طلبات جاهزة للتسليم', to: '/customers/ready-deliveries', icon: PackageCheck, perm: 'sales.view' },
     ],
   },
-{
+  {
     id: 'finance',
-    label: 'المالية',
+    label: 'المالية والحسابات',
     icon: Wallet,
     color: 'text-cyan-600',
     anyPerms: ['finance.view', 'finance.close'],
@@ -157,5 +140,5 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'ذمم أخرى', to: '/finance/other-receivables', icon: Wallet, anyPerms: ['finance.view', 'finance.receivables.view'] },
       { label: 'الأقساط', to: '/finance/installments', icon: CreditCard, perm: 'finance.view' },
     ],
-  }
+  },
 ];

@@ -47,6 +47,22 @@ import {
 import { ColorInput, Field, inputCls, labelCls, NavigationLayoutPreview, Toggle } from './AdminSettingsFields';
 
 type Tab = 'general' | 'business' | 'branding' | 'customization' | 'invoice' | 'inventory' | 'operations' | 'security' | 'backup';
+type PosPaymentVisibilitySetting =
+  | 'posShowCashButton'
+  | 'posShowCardButton'
+  | 'posShowBankTransferButton'
+  | 'posShowChequeButton'
+  | 'posShowCreditButton'
+  | 'posShowMixedPaymentButton';
+
+const POS_PAYMENT_VISIBILITY_OPTIONS: { key: PosPaymentVisibilitySetting; label: string }[] = [
+  { key: 'posShowCashButton', label: 'نقدي' },
+  { key: 'posShowCardButton', label: 'بطاقة' },
+  { key: 'posShowBankTransferButton', label: 'تحويل بنكي' },
+  { key: 'posShowChequeButton', label: 'شيك' },
+  { key: 'posShowCreditButton', label: 'آجل' },
+  { key: 'posShowMixedPaymentButton', label: 'دفع مختلط' },
+];
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'الإعدادات العامة', icon: Store },
@@ -106,6 +122,9 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
     onTabChange?.(next);
   };
   const [settings, setSettings] = useState<SystemSettings>(() => SettingsService.getSettings());
+  const visiblePosPaymentMethods = POS_PAYMENT_VISIBILITY_OPTIONS
+    .filter(({ key }) => settings[key] !== false)
+    .length;
   const [switchableUsers, setSwitchableUsers] = useState<User[]>([]);
   const [businessProfile, setBusinessProfile] = useState(readBusinessProfile);
   const [businessConfig, setBusinessConfig] = useState(readBusinessConfiguration);
@@ -2060,29 +2079,43 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
                 )}
               </div>
 
-              {/* إظهار زر «نقدي» في نقطة البيع */}
-              <div className="flex flex-row-reverse items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={settings.posShowCashButton !== false}
-                  onClick={() => set('posShowCashButton', settings.posShowCashButton === false ? true : false)}
-                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    settings.posShowCashButton !== false ? 'bg-[#1e5871]' : 'bg-slate-300 dark:bg-slate-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                      settings.posShowCashButton !== false ? 'translate-x-0' : '-translate-x-5'
-                    }`}
-                  />
-                </button>
+              <div className="space-y-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="text-right">
-                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">
-                    إظهار زر «نقدي» في نقطة البيع
+                  <div className="text-xs font-black text-slate-900 dark:text-slate-100">طرق السداد الظاهرة في نقطة البيع</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">اختر طرق السداد التي تريد إظهارها للكاشير. يجب إبقاء طريقة واحدة ظاهرة على الأقل.</div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {POS_PAYMENT_VISIBILITY_OPTIONS.map(({ key, label }) => {
+                    const checked = settings[key] !== false;
+                    return (
+                      <div key={key} className="space-y-1">
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{label}</div>
+                        <Toggle
+                          checked={checked}
+                          onChange={(value) => set(key, value)}
+                          label={checked ? 'ظاهر' : 'مخفي'}
+                          disabled={checked && visiblePosPaymentMethods <= 1}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300">رمز القسيمة</div>
+                    <Toggle
+                      checked={settings.posShowCouponCode !== false}
+                      onChange={(value) => set('posShowCouponCode', value)}
+                      label={settings.posShowCouponCode !== false ? 'ظاهر' : 'مخفي'}
+                    />
                   </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    عند الإيقاف تكون كل الفواتير آجلة افتراضيًا
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300">عدد نقاط الولاء</div>
+                    <Toggle
+                      checked={settings.posShowLoyaltyPoints !== false}
+                      onChange={(value) => set('posShowLoyaltyPoints', value)}
+                      label={settings.posShowLoyaltyPoints !== false ? 'ظاهر' : 'مخفي'}
+                    />
                   </div>
                 </div>
               </div>

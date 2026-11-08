@@ -10,6 +10,7 @@ interface UsePosTotalsOptions {
   loyaltyDiscount: number;
   taxPercentage: number;
   shippingCost: number;
+  extraFees?: number;
   paidAmount: number;
   activeShift: CashShift | null;
 }
@@ -21,6 +22,7 @@ export const usePosTotals = ({
   loyaltyDiscount,
   taxPercentage,
   shippingCost,
+  extraFees = 0,
   paidAmount,
   activeShift,
 }: UsePosTotalsOptions) => {
@@ -29,7 +31,7 @@ export const usePosTotals = ({
   const subtotal = round2(lineSubtotal - lineDiscountTotal);
   const taxableBase = round2(Math.max(0, subtotal - discountAmount - promotionDiscount - loyaltyDiscount));
   const taxAmount = round2(taxableBase * (taxPercentage || 0) / 100);
-  const totalAmount = round2(Math.max(0, taxableBase + taxAmount + (shippingCost || 0)));
+  const totalAmount = round2(Math.max(0, taxableBase + taxAmount + (shippingCost || 0) + (extraFees || 0)));
   const remainingAmount = round2(Math.max(0, totalAmount - (paidAmount || 0)));
   const changeDue = round2(Math.max(0, (paidAmount || 0) - totalAmount));
   const expectedClosingCash = round2(

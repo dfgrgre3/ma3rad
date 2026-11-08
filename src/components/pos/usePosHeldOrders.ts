@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Customer, PaymentType } from '../../types';
 import { HeldOrderService } from '../../services/HeldOrderService';
+import type { CustomerService } from '../../services/CustomerService';
 import { fromBaseQuantity } from '../../utils/uom';
 import { HELD_STORAGE_KEY, round2, type CartItem, type HeldOrder, type Toast } from './types';
 
@@ -11,7 +12,7 @@ interface UsePosHeldOrdersOptions {
   setCart: Dispatch<SetStateAction<CartItem[]>>;
   selectedCustomer: Customer | null;
   setSelectedCustomer: Dispatch<SetStateAction<Customer | null>>;
-  customers: Customer[];
+  customerService: Pick<CustomerService, 'getCustomerById'>;
   selectedWarehouseId: string;
   setSelectedWarehouseId: Dispatch<SetStateAction<string>>;
   discountAmount: number;
@@ -21,6 +22,18 @@ interface UsePosHeldOrdersOptions {
   defaultTaxPercentage?: number;
   shippingCost: number;
   setShippingCost: Dispatch<SetStateAction<number>>;
+  extraFees?: number;
+  setExtraFees?: Dispatch<SetStateAction<number>>;
+  splitCash?: number;
+  setSplitCash?: Dispatch<SetStateAction<number>>;
+  splitCard?: number;
+  setSplitCard?: Dispatch<SetStateAction<number>>;
+  splitBank?: number;
+  setSplitBank?: Dispatch<SetStateAction<number>>;
+  splitCheque?: number;
+  setSplitCheque?: Dispatch<SetStateAction<number>>;
+  splitCredit?: number;
+  setSplitCredit?: Dispatch<SetStateAction<number>>;
   notes: string;
   setNotes: Dispatch<SetStateAction<string>>;
   paidAmount: number;
@@ -44,7 +57,7 @@ export const usePosHeldOrders = ({
   setCart,
   selectedCustomer,
   setSelectedCustomer,
-  customers,
+  customerService,
   selectedWarehouseId,
   setSelectedWarehouseId,
   discountAmount,
@@ -54,6 +67,18 @@ export const usePosHeldOrders = ({
   defaultTaxPercentage,
   shippingCost,
   setShippingCost,
+  extraFees = 0,
+  setExtraFees,
+  splitCash = 0,
+  setSplitCash,
+  splitCard = 0,
+  setSplitCard,
+  splitBank = 0,
+  setSplitBank,
+  splitCheque = 0,
+  setSplitCheque,
+  splitCredit = 0,
+  setSplitCredit,
   notes,
   setNotes,
   paidAmount,
@@ -127,6 +152,12 @@ export const usePosHeldOrders = ({
       discountAmount,
       taxPercentage,
       shippingCost,
+      extraFees,
+      splitCash,
+      splitCard,
+      splitBank,
+      splitCheque,
+      splitCredit,
       notes,
       paidAmount,
       paymentType,
@@ -139,6 +170,12 @@ export const usePosHeldOrders = ({
     setDiscountAmount(0);
     setTaxPercentage(defaultTaxPercentage || 0);
     setShippingCost(0);
+    setExtraFees?.(0);
+    setSplitCash?.(0);
+    setSplitCard?.(0);
+    setSplitBank?.(0);
+    setSplitCheque?.(0);
+    setSplitCredit?.(0);
     setNotes('');
     setPaidAmount(0);
     setCouponCode('');
@@ -148,7 +185,7 @@ export const usePosHeldOrders = ({
   };
 
   const resumeHeldOrder = (order: HeldOrder) => {
-    const customer = customers.find((item) => item.id === order.customerId) || null;
+    const customer = order.customerId ? customerService.getCustomerById(order.customerId) : null;
     setSelectedCustomer(customer);
     if (order.warehouseId) setSelectedWarehouseId(order.warehouseId);
     setCart((order.items || []).map((item) => ({
@@ -161,6 +198,12 @@ export const usePosHeldOrders = ({
     setDiscountAmount(order.discountAmount || 0);
     setTaxPercentage(order.taxPercentage ?? defaultTaxPercentage ?? 0);
     setShippingCost(order.shippingCost || 0);
+    setExtraFees?.(order.extraFees || 0);
+    setSplitCash?.(order.splitCash || 0);
+    setSplitCard?.(order.splitCard || 0);
+    setSplitBank?.(order.splitBank || 0);
+    setSplitCheque?.(order.splitCheque || 0);
+    setSplitCredit?.(order.splitCredit || 0);
     setNotes(order.notes || '');
     setPaidAmount(order.paidAmount || 0);
     setPaymentType(order.paymentType || 'CASH');

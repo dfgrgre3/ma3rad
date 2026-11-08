@@ -205,6 +205,13 @@ export interface SystemSettings {
   sellingPriceTiersCount?: number;
   sellingPriceTierNames?: string[];
   posShowCashButton?: boolean;
+  posShowCardButton?: boolean;
+  posShowBankTransferButton?: boolean;
+  posShowChequeButton?: boolean;
+  posShowCreditButton?: boolean;
+  posShowMixedPaymentButton?: boolean;
+  posShowCouponCode?: boolean;
+  posShowLoyaltyPoints?: boolean;
   posAllowDuplicateItems?: boolean;
   posAutoSaveInvoice?: boolean;
   posMultiSelectSearch?: boolean;

@@ -42,7 +42,8 @@ test('production CSP supports customer display, A4, thermal, and shift-close pri
 
     const [customerDisplay] = await Promise.all([
       page.waitForEvent('popup'),
-      page.getByRole('button', { name: 'عرض العميل' }).click(),
+      page.getByRole('button', { name: 'المزيد' }).click()
+        .then(() => page.getByRole('menuitem', { name: /شاشة عرض العميل/ }).click()),
     ]);
     await expect(customerDisplay).toHaveTitle('عرض العميل');
     await expect(customerDisplay.locator('#root')).toContainText('المجموع الفرعي');

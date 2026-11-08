@@ -20,6 +20,21 @@ export interface NavOverrides {
   groupAssignments: Record<string, string>;
 }
 
+const LEGACY_GROUP_IDS: Record<string, string> = {
+  products: 'inventory',
+  partners: 'crm',
+  approvals: 'documents',
+};
+
+const LEGACY_PATHS: Record<string, string> = {
+  '/sales/reservations': '/sales/orders-deposits',
+};
+
+const LEGACY_DEFAULT_GROUP_ORDER = [
+  'dashboard', 'daily', 'sales', 'inventory', 'products', 'crm', 'purchasing',
+  'partners', 'finance', 'operations', 'reports', 'approvals', 'documents', 'system',
+];
+
 function parseJson<T>(raw: string | undefined, fallback: T): T {
   if (!raw) return fallback;
   try {
@@ -35,25 +50,49 @@ function parseGroupAssignments(raw: string | undefined): Record<string, string> 
   const knownGroups = new Set(NAV_GROUPS.map((group) => group.id));
   const knownPaths = new Set(NAV_GROUPS.flatMap((group) => group.items.map((item) => item.to)));
 
-  return Object.entries(parsed).reduce<Record<string, string>>((assignments, [path, groupId]) => {
-    if (knownPaths.has(path) && typeof groupId === 'string' && knownGroups.has(groupId)) {
+  return Object.entries(parsed).reduce<Record<string, string>>((assignments, [savedPath, savedGroupId]) => {
+    const path = LEGACY_PATHS[savedPath] ?? savedPath;
+    const groupId = typeof savedGroupId === 'string' ? LEGACY_GROUP_IDS[savedGroupId] ?? savedGroupId : '';
+    if (knownPaths.has(path) && knownGroups.has(groupId)) {
       assignments[path] = groupId;
     }
     return assignments;
   }, {});
 }
 
-export class NavigationService {
-  private static readonly groupTerms: Partial<Record<string, BusinessTermKey>> = {
-    sales: 'modules.sales',
-    inventory: 'modules.inventory',
-    products: 'entities.products.plural',
-    crm: 'entities.customers.plural',
-    purchasing: 'modules.purchasing',
-    operations: 'modules.operations',
-    reports: 'modules.reports',
-  };
+function normalizeGroupsOrder(saved: string[]): string[] {
+  if (
+    saved.length === LEGACY_DEFAULT_GROUP_ORDER.length
+    && saved.every((groupId, index) => groupId === LEGACY_DEFAULT_GROUP_ORDER[index])
+  ) return [];
+  return [...new Set(saved.map((groupId) => LEGACY_GROUP_IDS[groupId] ?? groupId))];
+}
 
+function normalizeItemsOrder(saved: Record<string, string[]>): Record<string, string[]> {
+  return Object.entries(saved).reduce<Record<string, string[]>>((orders, [savedGroupId, paths]) => {
+    const groupId = LEGACY_GROUP_IDS[savedGroupId] ?? savedGroupId;
+    if (!Array.isArray(paths)) return orders;
+    const normalizedPaths = paths.map((path) => LEGACY_PATHS[path] ?? path);
+    orders[groupId] = [...new Set([...(orders[groupId] ?? []), ...normalizedPaths])];
+    return orders;
+  }, {});
+}
+
+function normalizeLabels(saved: Record<string, string>): Record<string, string> {
+  const labels = { ...saved };
+  for (const [legacyGroupId, groupId] of Object.entries(LEGACY_GROUP_IDS)) {
+    const legacyLabel = labels[`group:${legacyGroupId}`];
+    if (legacyLabel !== undefined && labels[`group:${groupId}`] === undefined) {
+      labels[`group:${groupId}`] = legacyLabel;
+    }
+  }
+  for (const [legacyPath, path] of Object.entries(LEGACY_PATHS)) {
+    if (labels[legacyPath] !== undefined && labels[path] === undefined) labels[path] = labels[legacyPath];
+  }
+  return labels;
+}
+
+export class NavigationService {
   private static readonly pathTerms: Partial<Record<string, BusinessTermKey>> = {
     '/customers': 'entities.customers.plural',
     '/products': 'entities.products.plural',
@@ -113,17 +152,21 @@ export class NavigationService {
     const manualHiddenRaw = SettingsService.getValue(NAV_STORAGE_KEYS.hidden);
     const legacyHidden = parseJson<string[]>(SettingsService.getValue('nav.hidden'), []);
     const enabledModules = ModuleRegistryService.getEnabledModuleIds();
-    const hidden = manualHiddenRaw !== undefined
+    const savedHidden = manualHiddenRaw !== undefined
       ? parseJson<string[]>(manualHiddenRaw, [])
       : legacyHidden.filter((path) => {
           const owner = getModulePathOwner(path);
           return !owner || enabledModules.includes(owner);
         });
+    const hidden = [...new Set(savedHidden.map((path) => LEGACY_PATHS[path] ?? path))];
+    const savedLabels = parseJson<Record<string, string>>(SettingsService.getValue(NAV_STORAGE_KEYS.labels), {});
+    const savedGroupsOrder = parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.groupsOrder), []);
+    const savedItemsOrder = parseJson<Record<string, string[]>>(SettingsService.getValue(NAV_STORAGE_KEYS.itemsOrder), {});
     return {
       hidden,
-      labels: parseJson<Record<string, string>>(SettingsService.getValue(NAV_STORAGE_KEYS.labels), {}),
-      groupsOrder: parseJson<string[]>(SettingsService.getValue(NAV_STORAGE_KEYS.groupsOrder), []),
-      itemsOrder: parseJson<Record<string, string[]>>(SettingsService.getValue(NAV_STORAGE_KEYS.itemsOrder), {}),
+      labels: normalizeLabels(savedLabels),
+      groupsOrder: normalizeGroupsOrder(savedGroupsOrder),
+      itemsOrder: normalizeItemsOrder(savedItemsOrder),
       groupAssignments: parseGroupAssignments(SettingsService.getValue(NAV_STORAGE_KEYS.groupAssignments)),
     };
   }
@@ -224,10 +267,7 @@ export class NavigationService {
         .map(({ __enabled, __order, ...item }) => item);
       return {
         ...group,
-        label: labels[`group:${group.id}`]
-          || (NavigationService.groupTerms[group.id]
-            ? term(NavigationService.groupTerms[group.id]!)
-            : group.label),
+        label: labels[`group:${group.id}`] || group.label,
         items,
       };
     });

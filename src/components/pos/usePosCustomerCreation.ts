@@ -7,7 +7,6 @@ interface UsePosCustomerCreationOptions {
   can: (permission: string) => boolean;
   notify: (message: string, type?: Toast['type']) => void;
   customerService: CustomerService;
-  customers: Customer[];
   setCustomers: Dispatch<SetStateAction<Customer[]>>;
   applyCustomerPricing: (customer: Customer | null) => void;
   setSelectedCustomer: Dispatch<SetStateAction<Customer | null>>;
@@ -29,7 +28,6 @@ export const usePosCustomerCreation = ({
   can,
   notify,
   customerService,
-  customers,
   setCustomers,
   applyCustomerPricing,
   setSelectedCustomer,
@@ -56,11 +54,10 @@ export const usePosCustomerCreation = ({
       return;
     }
     try {
-      const normalizedPhone = phone.trim().replace(/\s+/g, '');
-      if (customers.some((customer) => (customer.phone || '').replace(/\s+/g, '') === normalizedPhone)) {
-        setError('رقم الهاتف مرتبط بعميل موجود. ابحث عنه واختره بدلاً من إنشاء سجل مكرر.');
-        return;
-      }
+        if (customerService.getCustomerByPhone(phone)) {
+          setError('رقم الهاتف مرتبط بعميل موجود. ابحث عنه واختره بدلاً من إنشاء سجل مكرر.');
+          return;
+        }
       const created = customerService.createCustomer({
         code: '',
         name: name.trim(),
@@ -70,7 +67,7 @@ export const usePosCustomerCreation = ({
         currentBalance: 0,
         totalPurchases: 0
       } as any);
-      setCustomers(customerService.getAllCustomers());
+      setCustomers([created]);
       setSelectedCustomer(created);
       setRedeemPoints(0);
       setLoyaltyDiscount(0);

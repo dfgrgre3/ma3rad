@@ -26,6 +26,24 @@ manager.run(
    VALUES ('e2e_stock_1', 'wh_main', 'e2e_prod_1', 120, 0)`
 );
 
+const customerTypes = ['RETAIL', 'CONTRACTOR', 'WHOLESALE', 'ENGINEER'];
+for (let index = 1; index <= 30; index += 1) {
+  const suffix = String(index).padStart(3, '0');
+  manager.run(
+    `INSERT OR REPLACE INTO customers (
+       id, code, name, phone, customer_type, current_balance, total_purchases, is_active, company_id
+     ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, 'cmp_main')`,
+    [
+      `e2e_customer_${suffix}`,
+      `E2E-CUST-${suffix}`,
+      `عميل اختبار POS ${suffix}`,
+      `0100000${suffix}`,
+      customerTypes[index % customerTypes.length],
+      index === 30 ? 0 : 1,
+    ],
+  );
+}
+
 const dbDir = path.join(dataDir, 'data');
 fs.mkdirSync(dbDir, { recursive: true });
 const target = path.join(dbDir, 'ceramisys.sqlite');

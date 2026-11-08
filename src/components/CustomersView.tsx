@@ -29,6 +29,7 @@ export const CustomersView: React.FC = () => {
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const can = usePermission();
   const canCreate = can('customers.create');
+  const canUpdate = can('customers.update');
   const canCollect = can('customers.payment');
   const canDelete = can('customers.delete');
   const canViewPurchases = can('sales.view');
@@ -97,6 +98,17 @@ export const CustomersView: React.FC = () => {
     if (!window.confirm(`حذف العميل "${customer.name}"؟`)) return;
     try { customerService.deleteCustomer(customer.id); loadCustomers(); }
     catch (e: any) { alert(e?.message || 'تعذر حذف العميل.'); }
+  };
+  const handleToggleCustomerStatus = (customer: Customer) => {
+    const isActivating = customer.isActive === 0;
+    if (!window.confirm(`${isActivating ? 'تفعيل' : 'إيقاف'} العميل "${customer.name}"؟`)) return;
+    try {
+      const updatedCustomer = customerService.updateCustomer(customer.id, { isActive: isActivating ? 1 : 0 });
+      setSelectedCustomer(updatedCustomer);
+      loadCustomers();
+    } catch (error: any) {
+      alert(error?.message || 'تعذر تحديث حالة العميل.');
+    }
   };
 
 
@@ -237,6 +249,7 @@ export const CustomersView: React.FC = () => {
                   <th className="p-3.5">الاسم والبيانات</th>
                   <th className="p-3.5">الهاتف</th>
                   <th className="p-3.5">النوع</th>
+                  <th className="p-3.5">الحالة</th>
                   {canViewPurchases && <th className="p-3.5">إجمالي المشتريات</th>}
                   {canViewDebts && <th className="p-3.5">الرصيد المستحق</th>}
                   {canViewStatement && <th className="p-3.5 text-center">كشف الحساب</th>}
@@ -274,6 +287,11 @@ export const CustomersView: React.FC = () => {
                       <td className="p-3.5">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
                           {c.customerType === 'CONTRACTOR' ? 'مقاول / مهندس' : 'قطاعي / أفراد'}
+                        </span>
+                      </td>
+                      <td className="p-3.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.isActive === 0 ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-700'}`}>
+                          {c.isActive === 0 ? 'موقوف' : 'نشط'}
                         </span>
                       </td>
                       {canViewPurchases && <td className="p-3.5 font-bold text-slate-700">
@@ -319,6 +337,12 @@ export const CustomersView: React.FC = () => {
                 >
                   <DollarSign className="w-4 h-4" />
                   <span>سند قبض / تحصيل</span>
+                </button>}
+                {canUpdate && selectedCustomer && <button
+                  onClick={() => handleToggleCustomerStatus(selectedCustomer)}
+                  className={`px-3 py-1.5 font-bold rounded-xl text-xs border ${selectedCustomer.isActive === 0 ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'}`}
+                >
+                  {selectedCustomer.isActive === 0 ? 'تفعيل العميل' : 'إيقاف العميل'}
                 </button>}
                 {canDelete && selectedCustomer && (
                   <button

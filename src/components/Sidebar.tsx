@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, Moon, PanelRightClose, PanelRightOpen, Sun } from 'lucide-react';
 import type { User } from '../types';
-import { NavigationService } from '../services/NavigationService';
+import { useNavigationGroups } from '../hooks/useNavigationGroups';
 import { useTheme } from '../contexts/useTheme';
 
 interface SidebarProps {
@@ -23,8 +23,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
 }) => {
   const location = useLocation();
-  const { settings, resolvedMode, toggleMode } = useTheme();
+  const { resolvedMode, toggleMode } = useTheme();
   const isCollapsed = mobile ? false : collapsed;
+  const visibleGroups = useNavigationGroups(currentUser);
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     try {
@@ -34,11 +35,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return { dashboard: true };
     }
   });
-
-  const visibleGroups = useMemo(
-    () => NavigationService.getNavigationGroups(currentUser),
-    [currentUser, settings]
-  );
 
   // Always reveal the group that owns the current route.
   useEffect(() => {
@@ -63,11 +59,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`win-sidebar flex h-full min-h-0 flex-col select-none ${isCollapsed ? 'w-12' : 'w-[228px]'} ${mobile ? 'w-[264px]' : ''}`}
+      className={`win-sidebar flex h-full min-h-0 flex-col select-none ${isCollapsed ? 'w-12' : 'w-[232px]'} ${mobile ? 'w-[280px]' : ''}`}
       dir="rtl"
       aria-label="التنقل الجانبي"
     >
-      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-2">
+      <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-2" aria-label="أقسام النظام">
         {isCollapsed
           ? visibleGroups.flatMap((group) =>
               group.items.map((item) => {
@@ -113,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => toggleGroup(group.id)}
                     className="win-nav-group"
                     aria-expanded={isOpen}
-                    style={hasActiveChild ? { color: 'var(--win-accent)' } : undefined}
+                    style={hasActiveChild ? { color: 'var(--win-accent-readable)' } : undefined}
                   >
                     <GroupIcon className="h-[15px] w-[15px] shrink-0" />
                     <span className="flex-1 truncate">{group.label}</span>
@@ -135,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <ItemIcon className="win-nav-icon" />
                             <span className="truncate">{item.label}</span>
                             {item.badge && item.badge > 0 && (
-                              <span className="mr-auto min-w-[18px] rounded-[2px] bg-[#c42b1c] px-1 text-center text-[10px] font-bold leading-[16px] text-white">
+                              <span className="mr-auto min-w-[18px] rounded-full bg-[var(--win-danger)] px-1 text-center text-[10px] font-bold leading-[16px] text-[var(--win-danger-on-color)]">
                                 {item.badge > 99 ? '99+' : item.badge}
                               </span>
                             )}
@@ -149,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             })}
       </nav>
 
-      <div className="shrink-0 border-t border-[#d9d9d9] px-2 py-1.5 dark:border-[#3d3d3d]">
+      <div className="shrink-0 border-t border-[var(--win-border)] px-2 py-1.5">
         {mobile && (
           <button
             type="button"

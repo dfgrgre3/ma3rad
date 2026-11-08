@@ -18,6 +18,7 @@ export interface CartItem {
   unitPrice: number;
   discountAmount: number;
   availableStockM2: number;
+  notes?: string;
 }
 
 export interface HeldOrder {
@@ -31,6 +32,14 @@ export interface HeldOrder {
   discountAmount: number;
   taxPercentage?: number;
   shippingCost: number;
+  /** مصاريف إضافية — اختيارية للتوافق مع الفواتير المعلقة القديمة */
+  extraFees?: number;
+  /** توزيع الدفع المختلط — اختياري للتوافق مع المعلقات القديمة */
+  splitCash?: number;
+  splitCard?: number;
+  splitBank?: number;
+  splitCheque?: number;
+  splitCredit?: number;
   notes: string;
   paidAmount?: number;
   paymentType?: PaymentType;

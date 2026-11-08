@@ -59,7 +59,8 @@ export const usePosCart = ({
         : CeramicMath.calculatePiecesFromBoxes(boxes, piecesPerBox),
       unitPrice,
       discountAmount: 0,
-      availableStockM2: stockOf(product.id)
+      availableStockM2: stockOf(product.id),
+      notes: '',
     };
   }, [pricingService, selectedCustomer, stockOf]);
 
