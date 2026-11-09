@@ -1,13 +1,13 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { AccountingService } from '../src/services/AccountingService.ts';
-import { BackupService } from '../src/services/BackupService.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
-import { localDateString } from '../src/utils/date.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { AccountingService } from '../src/services/finance/AccountingService.ts';
+import { BackupService } from '../src/services/backup/BackupService.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
+import { localDateString } from '../src/utils/shared/date.ts';
 
 test('3.4: enforce default password change, password policy, and session invalidation', async () => {
   const db = DatabaseManager.getInstance();

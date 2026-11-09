@@ -6,10 +6,10 @@ import {
 import {
   WarrantyClaimService, WarrantyClaim, WarrantyClaimStatus, WarrantyClaimType,
   WarrantyClaimAction, WarrantyClaimsStats, EligibleWarrantyItem, WarrantyResolutionType,
-} from '../../../services/WarrantyClaimService';
+} from '../../../services/sales/WarrantyClaimService';
 import { PermissionGate } from '../../../components/auth/PermissionGate';
 import { useToast } from '../../../components/ui/Toast';
-import { formatProductQuantity } from '../../../utils/productUnits';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
 import type { SalesInvoice } from '../../../types';
 
 const fmtCurrency = (n: number) =>

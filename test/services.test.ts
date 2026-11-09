@@ -1,28 +1,28 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { PricingService } from '../src/services/PricingService.ts';
-import { FinancialStatementsService } from '../src/services/FinancialStatementsService.ts';
-import { CommissionService } from '../src/services/CommissionService.ts';
-import { ReservationService } from '../src/services/ReservationService.ts';
-import { ApprovalService } from '../src/services/ApprovalService.ts';
-import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
-import { AccountingService } from '../src/services/AccountingService.ts';
-import { SupplierService } from '../src/services/SupplierService.ts';
-import { localDateString } from '../src/utils/date.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
-import { EmployeeService } from '../src/services/EmployeeService.ts';
-import { InventoryCostingService } from '../src/services/InventoryCostingService.ts';
-import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
-import { CustomerSupplyService } from '../src/services/CustomerSupplyService.ts';
-import { SettingsService } from '../src/services/SettingsService.ts';
-import { CashierService } from '../src/services/CashierService.ts';
-import { BackupService } from '../src/services/BackupService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { PricingService } from '../src/services/sales/PricingService.ts';
+import { FinancialStatementsService } from '../src/services/reports/FinancialStatementsService.ts';
+import { CommissionService } from '../src/services/hr/CommissionService.ts';
+import { ReservationService } from '../src/services/sales/ReservationService.ts';
+import { ApprovalService } from '../src/services/approvals/ApprovalService.ts';
+import { DailyOperationsService } from '../src/services/operations/DailyOperationsService.ts';
+import { AccountingService } from '../src/services/finance/AccountingService.ts';
+import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
+import { localDateString } from '../src/utils/shared/date.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
+import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
+import { InventoryCostingService } from '../src/services/inventory/InventoryCostingService.ts';
+import { FinanceExtrasService } from '../src/services/finance/FinanceExtrasService.ts';
+import { CustomerSupplyService } from '../src/services/customers/CustomerSupplyService.ts';
+import { SettingsService } from '../src/services/config/SettingsService.ts';
+import { CashierService } from '../src/services/finance/CashierService.ts';
+import { BackupService } from '../src/services/backup/BackupService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -81,6 +81,71 @@ test('dashboard sales and gross profit reconcile invoice returns and same-period
 
   db.run('DELETE FROM sales_returns WHERE id = ?', [`${id}_return`]);
   db.run('DELETE FROM sales_invoices WHERE id IN (?, ?)', [`${id}_current`, `${id}_previous`]);
+});
+
+test('dashboard trend and monthly comparison batch invoice and return totals correctly', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const today = localDateString();
+  const [year, month, day] = today.split('-').map(Number);
+  const previousMonth = new Date(year, month - 2, 1);
+  const previousMonthLastDay = new Date(year, month - 1, 0).getDate();
+  const previousMonthDate = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}-${String(Math.min(day, previousMonthLastDay)).padStart(2, '0')}`;
+  const customerId = q('SELECT id FROM customers LIMIT 1')[0].id;
+  const id = 'dashboard_summary_batch';
+  const accounting = new AccountingService();
+  const trendBefore = accounting.getSalesTrendLast7Days();
+  const monthBefore = accounting.getMonthlyComparison();
+
+  try {
+    db.run(`INSERT INTO products
+      (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,pieces_per_box,meters_per_box,
+       cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,min_stock_level,is_active)
+      VALUES (?, ?, ?, 'Dashboard summary batch test', 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2',
+        4, 1.44, 80, 100, 90, 0, 0, 1)`,
+      [`${id}_product`, `${id}_product`, `${id}_product`]);
+    db.run(`INSERT INTO sales_invoices
+      (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
+       paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
+      VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 200, 0, 0, 200, 0, 200, 'CREDIT', 'UNPAID', 'COMPLETED', 80, 120, 'usr_admin')`,
+      [`${id}_current`, `${id}_current`, today, customerId]);
+    db.run(`INSERT INTO sales_returns
+      (id,return_number,original_invoice_id,original_invoice_number,customer_id,warehouse_id,date,total_amount,
+       refunded_amount,remaining_to_balance,reason,created_by)
+      VALUES (?, ?, ?, ?, ?, 'wh_main', ?, 100, 0, 100, 'test', 'usr_admin')`,
+      [`${id}_return`, `${id}_return`, `${id}_current`, `${id}_current`, customerId, today]);
+    db.run(`INSERT INTO sales_return_items
+      (id,return_id,product_id,product_name,grade,quantity_m2,boxes_count,unit_price,unit_cost,total_refund)
+      VALUES (?, ?, ?, 'test', 'GRADE_1', 1, 1, 100, 80, 100)`,
+      [`${id}_item`, `${id}_return`, `${id}_product`]);
+    db.run(`INSERT INTO sales_invoices
+      (id,invoice_number,date,customer_id,warehouse_id,branch_id,company_id,subtotal,discount_amount,tax_amount,total_amount,
+       paid_amount,remaining_amount,payment_type,payment_status,invoice_status,total_cost,gross_profit,created_by)
+      VALUES (?, ?, ?, ?, 'wh_main', 'br_main', 'cmp_main', 90, 0, 0, 90, 0, 90, 'CREDIT', 'UNPAID', 'COMPLETED', 40, 50, 'usr_admin')`,
+      [`${id}_previous`, `${id}_previous`, previousMonthDate, customerId]);
+
+    const trendAfter = accounting.getSalesTrendLast7Days();
+    const monthAfter = accounting.getMonthlyComparison();
+    const todayBefore = trendBefore.find((row) => row.date === today)!;
+    const todayAfter = trendAfter.find((row) => row.date === today)!;
+
+    assert.equal(todayAfter.sales - todayBefore.sales, 100);
+    assert.equal(todayAfter.profit - todayBefore.profit, 100);
+    assert.equal(monthAfter.currentMonth.sales - monthBefore.currentMonth.sales, 100);
+    assert.equal(monthAfter.currentMonth.profit - monthBefore.currentMonth.profit, 100);
+    assert.equal(monthAfter.currentMonth.invoices - monthBefore.currentMonth.invoices, 1);
+    assert.equal(monthAfter.previousMonth.sales - monthBefore.previousMonth.sales, 90);
+    assert.equal(monthAfter.previousMonth.profit - monthBefore.previousMonth.profit, 50);
+    assert.equal(monthAfter.previousMonth.invoices - monthBefore.previousMonth.invoices, 1);
+  } finally {
+    db.run('DELETE FROM sales_return_items WHERE id = ?', [`${id}_item`]);
+    db.run('DELETE FROM sales_returns WHERE id = ?', [`${id}_return`]);
+    db.run('DELETE FROM sales_invoices WHERE id IN (?, ?)', [`${id}_current`, `${id}_previous`]);
+    db.run('DELETE FROM products WHERE id = ?', [`${id}_product`]);
+  }
 });
 
 test('dashboard FIFO inventory valuation uses remaining layer cost', async () => {

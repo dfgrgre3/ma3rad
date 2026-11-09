@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { sha256Hex } = require('./crypto');
 
+const BYTECODE_MANIFEST_HASH_PATTERN = /(const BYTECODE_INTEGRITY_MANIFEST_SHA256 = ')[a-f0-9]{64}(';)/;
+
 class FileIntegrityChecker {
   constructor(appRoot) {
     this.appRoot = appRoot;
@@ -15,7 +17,14 @@ class FileIntegrityChecker {
   hashFile(relativePath) {
     const fullPath = path.resolve(this.appRoot, relativePath);
     if (!fs.existsSync(fullPath)) return null;
-    const content = fs.readFileSync(fullPath);
+    let content = fs.readFileSync(fullPath);
+    if (path.normalize(relativePath) === path.join('electron', 'entry.js')) {
+      const source = content.toString('utf8');
+      content = Buffer.from(source.replace(
+        BYTECODE_MANIFEST_HASH_PATTERN,
+        (_match, prefix, suffix) => `${prefix}${'0'.repeat(64)}${suffix}`,
+      ));
+    }
     return sha256Hex(content);
   }
 
@@ -64,4 +73,3 @@ class FileIntegrityChecker {
 module.exports = {
   FileIntegrityChecker,
 };
-

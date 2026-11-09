@@ -1,8 +1,8 @@
 import React from 'react';
 import { Package2, Wallet, Clock, Truck, CheckCircle2, Receipt } from 'lucide-react';
-import { OrderStats } from '../../../services/OrderService';
+import { OrderStats } from '../../../services/sales/OrderService';
 import { Stat } from './ui';
-import { fmt } from './types';
+import { fmt } from '../../../types/sales/ordersPage';
 
 interface OrdersStatsProps {
   stats: OrderStats | null;

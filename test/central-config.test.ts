@@ -1,15 +1,15 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { SettingsService } from '../src/services/SettingsService.ts';
-import { CentralLicenseService } from '../src/services/CentralLicenseService.ts';
-import { CentralFeaturePermissionService } from '../src/services/CentralFeaturePermissionService.ts';
-import { CentralUsageLimitService } from '../src/services/CentralUsageLimitService.ts';
-import { CentralConfigApplier } from '../src/services/CentralConfigApplier.ts';
-import { CentralEstablishmentService } from '../src/services/CentralEstablishmentService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { SettingsService } from '../src/services/config/SettingsService.ts';
+import { CentralLicenseService } from '../src/services/licensing/CentralLicenseService.ts';
+import { CentralFeaturePermissionService } from '../src/services/licensing/CentralFeaturePermissionService.ts';
+import { CentralUsageLimitService } from '../src/services/licensing/CentralUsageLimitService.ts';
+import { CentralConfigApplier } from '../src/services/licensing/CentralConfigApplier.ts';
+import { CentralEstablishmentService } from '../src/services/licensing/CentralEstablishmentService.ts';
 
 const CONFIG_KEY = 'central_cached_config';
 

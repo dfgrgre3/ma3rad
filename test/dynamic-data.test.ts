@@ -2,10 +2,10 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from 'xlsx';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { DynamicDataService } from '../src/services/DynamicDataService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { DynamicDataService } from '../src/services/data/DynamicDataService.ts';
 
 test('dynamic data: an unseen type is inferred, reused, searched, edited, exported, and safely rolled back', async () => {
   await DatabaseManager.getInstance().initialize();

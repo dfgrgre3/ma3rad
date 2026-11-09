@@ -4,12 +4,12 @@ import {
   Coins,
 } from 'lucide-react';
 import type { Customer, PaymentType } from '../../types';
-import { CeramicMath } from '../../utils/ceramicMath';
-import type { AppliedPromotion } from '../../services/PricingService';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import type { AppliedPromotion } from '../../services/sales/PricingService';
 import { CentralLimitGuard } from '../ui/CentralLimitGuard';
-import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
-import { OperationalFieldsForm } from '../OperationalFieldsForm';
-import { round2 } from './types';
+import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
+import { round2 } from '../../types/pos';
 
 const paymentLabel = (type: PaymentType) => ({ CASH: 'نقدي', CARD: 'بطاقة', BANK_TRANSFER: 'تحويل بنكي', CHEQUE: 'شيك', CREDIT: 'آجل', MIXED: 'دفع مختلط' }[type]);
 
@@ -139,31 +139,29 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
   operationalFieldValues,
   onOperationalFieldValuesChange,
 }) => (
-  <div className="flex min-h-0 max-h-[58%] flex-col overflow-hidden border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 max-[900px]:max-h-[65%]">
+  <div className="flex min-h-0 flex-[1.25_1_0%] max-h-[58%] flex-col overflow-hidden border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 max-[900px]:max-h-[68%]">
     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
     {/* Order extras */}
-    <section aria-label="تعديلات الفاتورة" className="space-y-1.5">
+    <section aria-label="تعديلات الفاتورة" className="space-y-1.5 [container-type:inline-size]">
     <div className="text-xs font-black text-slate-700 dark:text-slate-200">تعديلات الفاتورة</div>
-    <div className="grid grid-cols-2 gap-1.5 text-xs lg:grid-cols-4">
-      <div>
-        <div className="flex items-center justify-between gap-1 mb-0.5">
-          <label htmlFor="pos-invoice-discount" className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300"><Percent className="w-3 h-3" /> خصم الفاتورة</label>
-          <div role="group" aria-label="نوع الخصم" className="flex items-center overflow-hidden rounded-lg border border-slate-200">
+    <div className="grid grid-cols-2 gap-2 text-xs [@container(min-width:40rem)]:grid-cols-4">
+      <div className="min-w-0">
+        <label htmlFor="pos-invoice-discount" className="flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300"><Percent className="w-3 h-3 shrink-0" /> خصم الفاتورة</label>
+        <div role="group" aria-label="نوع الخصم" className="mt-1 flex w-full items-center overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
             <button
               type="button"
               onClick={() => onDiscountModeChange('percent')}
               aria-pressed={discountMode === 'percent'}
               title="خصم بنسبة مئوية"
-              className={`min-h-8 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${discountMode === 'percent' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300'}`}
+              className={`min-h-8 min-w-0 flex-1 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${discountMode === 'percent' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300'}`}
             >%</button>
             <button
               type="button"
               onClick={() => onDiscountModeChange('amount')}
               aria-pressed={discountMode === 'amount'}
               title="خصم بمبلغ ثابت"
-              className={`min-h-8 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${discountMode === 'amount' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300'}`}
+              className={`min-h-8 min-w-0 flex-1 px-2 py-1 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${discountMode === 'amount' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-300'}`}
             >ج.م</button>
-          </div>
         </div>
         {discountMode === 'percent' ? (
           <div className="relative">
@@ -423,16 +421,16 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
       <button
         onClick={onHoldOrder}
         disabled={cartLength === 0}
-        className="min-h-10 rounded-lg bg-slate-100 px-2 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+        className="flex min-h-8 items-center justify-center gap-1 rounded-lg bg-slate-100 px-1.5 py-1 text-[11px] font-bold text-slate-800 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
       >
-        <PauseCircle className="w-4 h-4" /> تعليق
+        <PauseCircle className="h-3.5 w-3.5" /> تعليق
       </button>
       <button
         onClick={onClearOrder}
         disabled={cartLength === 0}
-        className="min-h-10 rounded-lg bg-slate-100 px-2 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+        className="flex min-h-8 items-center justify-center gap-1 rounded-lg bg-slate-100 px-1.5 py-1 text-[11px] font-bold text-slate-800 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
       >
-        <RefreshCw className="w-4 h-4" /> إفراغ
+        <RefreshCw className="h-3.5 w-3.5" /> إفراغ
       </button>
       {hasCeramicCatalog && (
         <button
@@ -446,7 +444,7 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
 
     </div>
 
-    <div className="z-10 shrink-0 space-y-1 border-t border-slate-200 bg-white px-2 pb-2 pt-1.5 shadow-[0_-8px_18px_rgba(15,23,42,0.10)] dark:border-slate-800 dark:bg-slate-950">
+    <div className="sticky bottom-0 z-10 shrink-0 space-y-1 border-t border-slate-200 bg-white px-2 pb-2 pt-1.5 shadow-[0_-8px_18px_rgba(15,23,42,0.10)] dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-black text-slate-700 dark:text-slate-200">الإجمالي النهائي</span>
         <span className="text-left text-xl font-black tabular-nums text-sky-800 dark:text-sky-300">{CeramicMath.formatCurrency(totalAmount)} <span className="text-xs font-bold">ج.م</span></span>
@@ -464,9 +462,9 @@ export const PosCheckoutPanel: React.FC<PosCheckoutPanelProps> = ({
       <button
         onClick={onCheckout}
         disabled={isProcessing || cartLength === 0}
-        className="min-h-12 w-full rounded-xl bg-emerald-700 px-4 py-3.5 font-black text-white transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+        className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-2.5 py-1.5 text-xs font-black text-white transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
       >
-        <CheckCircle2 className="w-5 h-5" />
+        <CheckCircle2 className="h-4 w-4" />
         <span>{isProcessing ? 'جاري الحفظ والخصم من المخزن...' : 'اعتماد وحفظ الفاتورة (F9)'}</span>
       </button>
       </CentralLimitGuard>

@@ -1,10 +1,10 @@
 ﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup } from '../src/services/backupEncryption.ts';
-import { createXlsxBackupWorkbook, extractDatabaseFromXlsxBackup } from '../src/services/xlsxBackup.ts';
-import { SecurityService } from '../src/services/SecurityService.ts';
-import { DatabaseManager } from '../src/database/db.ts';
-import { MIGRATIONS, validateMigrationCatalog } from '../src/database/migrations.ts';
+import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup } from '../src/services/backup/backupEncryption.ts';
+import { createXlsxBackupWorkbook, extractDatabaseFromXlsxBackup } from '../src/services/backup/xlsxBackup.ts';
+import { SecurityService } from '../src/services/security/SecurityService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { MIGRATIONS, validateMigrationCatalog } from '../src/database/migrations/index.ts';
 
 test('external backup encryption authenticates and round-trips SQLite bytes', async () => {
   const db = DatabaseManager.getInstance();

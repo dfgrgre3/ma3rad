@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart3, HardHat, Landmark, UserCheck } from 'lucide-react';
-import type { EmployeeTab } from './types';
+import type { EmployeeTab } from '../../../types/hr/employeesPage';
 
 interface EmployeeTabsProps {
   activeTab: EmployeeTab;

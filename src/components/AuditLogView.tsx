@@ -1,1 +1,0 @@
-export { AuditLogPage as AuditLogView, default } from '../pages/admin/AuditLogPage';

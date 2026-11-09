@@ -1,7 +1,7 @@
 import React from 'react';
-import { ActionRegistryService } from '../../services/ActionRegistryService';
-import { usePermission } from '../../hooks/usePermission';
-import { useDynamicAction } from '../../hooks/useDace';
+import { ActionRegistryService } from '../../services/config/ActionRegistryService';
+import { usePermission } from '../../hooks/auth/usePermission';
+import { useDynamicAction } from '../../hooks/config/useDace';
 
 interface ConfiguredActionButtonProps {
   actionId: string;

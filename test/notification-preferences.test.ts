@@ -1,10 +1,10 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { NotificationPreferencesService } from '../src/services/NotificationPreferencesService.ts';
-import { NotificationService } from '../src/services/NotificationService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { NotificationPreferencesService } from '../src/services/notifications/NotificationPreferencesService.ts';
+import { NotificationService } from '../src/services/notifications/NotificationService.ts';
 
 test('notification preferences are self-service and filter in-app notifications', async () => {
   const db = DatabaseManager.getInstance();

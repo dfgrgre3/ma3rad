@@ -1,15 +1,15 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { BranchService } from '../src/services/BranchService.ts';
-import { BranchAccessService } from '../src/services/BranchAccessService.ts';
-import { EmployeeService } from '../src/services/EmployeeService.ts';
-import { EmployeeDocumentService } from '../src/services/EmployeeDocumentService.ts';
-import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { BranchService } from '../src/services/organization/BranchService.ts';
+import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
+import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
+import { EmployeeDocumentService } from '../src/services/hr/EmployeeDocumentService.ts';
+import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
   id: 'usr_hrdocs_admin',

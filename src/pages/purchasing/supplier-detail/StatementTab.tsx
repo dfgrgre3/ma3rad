@@ -1,7 +1,7 @@
 import React from 'react';
 import { Download, Printer } from 'lucide-react';
-import { CeramicMath } from '../../../utils/ceramicMath';
-import { SupplierStatement } from './types';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
+import { SupplierStatement } from '../../../types/purchasing/supplierDetailPage';
 
 export interface StatementTabProps {
   supplierName: string;

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { FinancialTransaction, TransactionFormState } from './types';
+import type { FinancialTransaction, TransactionFormState } from '../../../types/hr/employeesPage';
 
 interface EmployeeTransactionModalProps {
   open: boolean;

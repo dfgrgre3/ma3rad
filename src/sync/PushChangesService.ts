@@ -1,7 +1,7 @@
 ﻿import { OutboxRepository } from './OutboxRepository.ts';
 import { RetryScheduler } from './RetryScheduler.ts';
 import { SyncPolicyService } from './SyncPolicyService.ts';
-import type { SyncTransport, SyncPushResult } from './types.ts';
+import type { SyncTransport, SyncPushResult } from '../types/sync/index.ts';
 
 export class PushChangesService {
   private outbox: OutboxRepository;

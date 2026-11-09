@@ -1,15 +1,15 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { MIGRATIONS } from '../src/database/migrations.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { LoyaltyService } from '../src/services/LoyaltyService.ts';
-import { PricingService, type PromotionCartItem } from '../src/services/PricingService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { localDateString } from '../src/utils/date.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { MIGRATIONS } from '../src/database/migrations/index.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { LoyaltyService } from '../src/services/sales/LoyaltyService.ts';
+import { PricingService, type PromotionCartItem } from '../src/services/sales/PricingService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { localDateString } from '../src/utils/shared/date.ts';
 
 test('promotions created in pricing evaluate to the same discounts POS applies', async () => {
   const manager = DatabaseManager.getInstance();
@@ -67,6 +67,49 @@ test('promotions created in pricing evaluate to the same discounts POS applies',
   canonicalize.up(manager.getDatabase());
   assert.equal(pricing.evaluatePromotions(cart)?.promotionId, 'legacy-promo');
   assert.equal(pricing.evaluatePromotions(cart)?.discountAmount, 5);
+});
+
+test('POS customer pages search and filter real customers by type and active status', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const customerService = new CustomerService();
+  const suffix = Date.now().toString();
+  const active = customerService.createCustomer({
+    name: `POS active ${suffix}`,
+    phone: `010${suffix.slice(-8)}`,
+    customerType: 'WHOLESALE',
+    creditLimit: 0,
+  });
+  const inactive = customerService.createCustomer({
+    name: `POS inactive ${suffix}`,
+    phone: `011${suffix.slice(-8)}`,
+    customerType: 'RETAIL',
+    creditLimit: 0,
+  });
+
+  try {
+    customerService.updateCustomer(inactive.id, { isActive: 0 });
+
+    const activePage = customerService.getCustomersPage(active.code, 1, 25, {}, {
+      customerType: 'WHOLESALE',
+      status: 'ACTIVE',
+    });
+    assert.deepEqual(activePage.items.map((customer) => customer.id), [active.id]);
+    assert.equal(activePage.totalItems, 1);
+    assert.deepEqual(
+      customerService.getCustomersPage(inactive.phone, 1, 25, {}, { status: 'INACTIVE' }).items.map((customer) => customer.id),
+      [inactive.id],
+    );
+    assert.ok(!customerService.getAllCustomers().some((customer) => customer.id === 'cust_cash'));
+    assert.ok(!customerService.getCustomersPage('', 1, 25, {}, { status: 'ACTIVE' }).items.some((customer) => customer.id === 'cust_cash'));
+    assert.equal(customerService.getCustomerByPhone(` ${active.phone} `)?.id, active.id);
+  } finally {
+    customerService.deleteCustomer(active.id);
+    customerService.deleteCustomer(inactive.id);
+  }
 });
 
 test('sales reject POS discounts that exceed the net item subtotal', async () => {

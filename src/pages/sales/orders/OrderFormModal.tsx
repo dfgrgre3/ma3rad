@@ -1,12 +1,13 @@
 import React from 'react';
 import { Package2, X, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Customer, Product, Warehouse } from '../../../types';
-import { formatProductQuantity } from '../../../utils/productUnits';
-import { getSellableUnits, getUomLabel, isWholeUnit } from '../../../utils/uom';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
+import { getSellableUnits, getUomLabel, isWholeUnit } from '../../../utils/products/uom';
 import { Modal, Field } from './ui';
-import { FormState, Line, fmt } from './types';
-import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
-import { OperationalFieldsForm } from '../../../components/OperationalFieldsForm';
+import { FormState, Line, fmt } from '../../../types/sales/ordersPage';
+import type { OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
+import { ProductPicker } from '../../../components/products/ProductPicker';
 
 interface OrderFormModalProps {
   editingId: string | null;
@@ -85,10 +86,12 @@ export const OrderFormModal: React.FC<OrderFormModalProps> = ({
               return (
                 <tr key={idx}>
                   <td className="px-3 py-2">
-                    <select value={l.productId} onChange={(e) => pickProduct(idx, e.target.value)} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold">
-                      <option value="">— اختر الصنف —</option>
-                      {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.size} — {p.grade}</option>)}
-                    </select>
+                    <ProductPicker
+                      value={l.productId}
+                      selectedLabel={selectedProduct?.name}
+                      ariaLabel={`استعراض أصناف طلب البيع للسطر ${idx + 1}`}
+                      onChange={(productId) => pickProduct(idx, productId)}
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Download, Package, ReceiptText, Truck, Wallet } from 'lucide-react';
-import type { NumberFormatter, TabKey } from './types';
+import type { NumberFormatter, TabKey } from '../../../types/dashboard/todayPurchases';
 
 export interface PurchasesTabsBarProps {
   tab: TabKey;
@@ -26,19 +26,20 @@ export const PurchasesTabsBar: React.FC<PurchasesTabsBarProps> = ({
         { key: 'payments', label: 'سداد الموردين', icon: Wallet },
       ] as { key: TabKey; label: string; icon: React.ElementType }[]).map((entry) => {
         const TabIcon = entry.icon;
+        const active = tab === entry.key;
         return (
-          <button
-            key={entry.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === entry.key}
-            onClick={() => onTabChange(entry.key)}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${tab === entry.key ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
-          >
-            <TabIcon className="h-3.5 w-3.5" />
-            {entry.label}
-            <span className={`rounded px-1.5 py-0.5 text-[9px] tabular-nums ${tab === entry.key ? 'bg-white/15 dark:bg-slate-900/10' : 'bg-slate-100 dark:bg-slate-800'}`}>{plain(tabCounts[entry.key])}</span>
-          </button>
+          <div key={entry.key} role="tab" aria-selected={active} className="contents">
+            <button
+              type="button"
+              aria-selected={active}
+              onClick={() => onTabChange(entry.key)}
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${active ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}
+            >
+              <TabIcon className="h-3.5 w-3.5" />
+              {entry.label}
+              <span className={`rounded px-1.5 py-0.5 text-[9px] tabular-nums ${active ? 'bg-white/15 dark:bg-slate-900/10' : 'bg-slate-100 dark:bg-slate-800'}`}>{plain(tabCounts[entry.key])}</span>
+            </button>
+          </div>
         );
       })}
     </div>

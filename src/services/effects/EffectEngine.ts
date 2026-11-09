@@ -1,4 +1,4 @@
-import type { Effect, EffectContext } from './EffectTypes';
+import type { Effect, EffectContext } from '../../types/effects';
 import { EffectRegistry, defaultEffectRegistry } from './EffectRegistry';
 
 /**

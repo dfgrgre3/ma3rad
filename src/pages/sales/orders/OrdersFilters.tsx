@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, Calendar, RefreshCw } from 'lucide-react';
-import { OrderStatus } from '../../../services/OrderService';
-import { STATUS_LABELS } from './types';
+import { OrderStatus } from '../../../services/sales/OrderService';
+import { STATUS_LABELS } from '../../../types/sales/ordersPage';
 
 interface OrdersFiltersProps {
   search: string;

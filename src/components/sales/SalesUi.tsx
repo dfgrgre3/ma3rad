@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { CeramicMath } from '../../utils/ceramicMath';
+import { CeramicMath } from '../../utils/products/ceramicMath';
 
 const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
 

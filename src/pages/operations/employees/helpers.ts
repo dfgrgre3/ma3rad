@@ -1,4 +1,4 @@
-import type { AttendanceRecord, Employee, FinancialTransaction } from './types';
+import type { AttendanceRecord, Employee, FinancialTransaction } from '../../../types/hr/employeesPage';
 
 export interface EmployeeFinancials {
   base: number;

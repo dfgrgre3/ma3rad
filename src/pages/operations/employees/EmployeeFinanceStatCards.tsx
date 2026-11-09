@@ -1,7 +1,7 @@
 import React from 'react';
 import { DollarSign, TrendingDown, TrendingUp } from 'lucide-react';
 import { fmtCurrency, sumTransactionsByType } from './helpers';
-import type { FinancialTransaction } from './types';
+import type { FinancialTransaction } from '../../../types/hr/employeesPage';
 
 interface EmployeeFinanceStatCardsProps {
   totalWagesBill: number;

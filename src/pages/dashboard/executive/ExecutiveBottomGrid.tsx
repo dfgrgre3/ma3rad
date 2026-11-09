@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { type DebtCustomer, type RecentInvoice, type TopProduct, formatCurrency, paymentStatusLabel } from './types';
+import { type DebtCustomer, type RecentInvoice, type TopProduct, formatCurrency, paymentStatusLabel } from '../../../types/dashboard/executive';
 
 interface Props {
   topProducts: TopProduct[];

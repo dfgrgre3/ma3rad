@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowUpDown, TrendingDown, TrendingUp } from 'lucide-react';
 import { PAY_LABEL, STATUS_BADGE } from './constants';
 import { sortIndicator } from './helpers';
-import type { SortDir, SortKey } from './types';
+import type { SortDir, SortKey } from '../../../types/dashboard/todayPurchases';
 
 export const Panel: React.FC<{
   title: string;

@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle2, FileText, MapPin } from 'lucide-react';
 import { EmployeeFinanceStatCards } from './EmployeeFinanceStatCards';
 import { fmtCurrency, getEmployeeFinancials } from './helpers';
-import type { Employee, FinancialTransaction, PayrollPayable } from './types';
+import type { Employee, FinancialTransaction, PayrollPayable } from '../../../types/hr/employeesPage';
 
 interface EmployeeFinanceTabProps {
   employees: Employee[];

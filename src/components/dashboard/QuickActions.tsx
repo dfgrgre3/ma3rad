@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Package, ShoppingBag, ShoppingCart, Wallet } from 'lucide-react';
-import type { QuickActionItem } from './types';
+import type { QuickActionItem } from '../../types/dashboard/components';
 
 const QUICK_ACTIONS: QuickActionItem[] = [
   { to: '/pos', label: 'فاتورة بيع جديدة', detail: 'ابدأ عملية بيع', icon: ShoppingCart, tone: '' },

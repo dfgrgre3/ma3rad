@@ -1,18 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Loader2, Save, Percent, Truck, Barcode } from 'lucide-react';
-import { SalesService } from '../../services/SalesService';
-import { InventoryService } from '../../services/InventoryService';
+import { SalesService } from '../../services/sales/SalesService';
+import { InventoryService } from '../../services/inventory/InventoryService';
 import { useToast } from '../ui/Toast';
-import { getProductUnitLabel } from '../../utils/productUnits';
+import { getProductUnitLabel } from '../../utils/products/productUnits';
 import type { PaymentType } from '../../types';
-import { round2 } from '../../services/financials';
+import { round2 } from '../../services/finance/financials';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
 import { useLists } from '../../hooks/daily/useLists';
 import { fmt, input, label } from './DailyModalUtils';
+import { ProductPicker } from '../products/ProductPicker';
 
 interface SaleLine {
   productId: string;
-  productSearch: string;
   quantityM2: string;
   unitPrice: string;
 }
@@ -22,7 +22,7 @@ interface WarehouseProductStock {
   reservedM2: number;
 }
 
-const emptyLine = (): SaleLine => ({ productId: '', productSearch: '', quantityM2: '', unitPrice: '' });
+const emptyLine = (): SaleLine => ({ productId: '', quantityM2: '', unitPrice: '' });
 
 export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void }> = ({ onClose, onSaved }) => {
   const toast = useToast();
@@ -93,7 +93,6 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
     const product = productOf(productId);
     setLine(index, {
       productId,
-      productSearch: '',
       unitPrice: product ? String(product.sellingPriceM2) : '',
     });
   };
@@ -117,7 +116,7 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
       setLine(existingIndex, { quantityM2: String((Number(lines[existingIndex].quantityM2) || 0) + 1) });
     } else {
       setLines((prev) => [...prev.filter((line, index) => index !== 0 || line.productId || line.quantityM2 || line.unitPrice), {
-        productId: product.id, productSearch: '', quantityM2: '1', unitPrice: String(product.sellingPriceM2),
+        productId: product.id, quantityM2: '1', unitPrice: String(product.sellingPriceM2),
       }]);
     }
   };
@@ -273,36 +272,21 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
               const priceId = `sale-price-${index}`;
               return (
               <div key={index} className="p-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
-                <div className="sm:col-span-6">
+                <div className="sm:col-span-4">
                   <label htmlFor={productId} className={label}>الصنف</label>
                   {products.length > 0 ? (
-                    <>
-                      <input
-                        type="search"
-                        placeholder="ابحث بالاسم أو الكود..."
-                        value={line.productSearch}
-                        aria-label={`بحث عن صنف للسطر ${index + 1}`}
-                        onChange={(e) => setLine(index, { productSearch: e.target.value, productId: '', unitPrice: '' })}
-                        className={`${input} mb-1`}
-                        disabled={Boolean(listsError)}
-                      />
-                      <select id={productId} value={line.productId} onChange={(e) => chooseProduct(index, e.target.value)} className={input} disabled={Boolean(listsError)}>
-                        <option value="">اختر الصنف</option>
-                        {products
-                          .filter((p) => {
-                            const search = line.productSearch.trim().toLocaleLowerCase();
-                            return !search || `${p.name} ${p.sku} ${p.barcode}`.toLocaleLowerCase().includes(search);
-                          })
-                          .map((p) => <option key={p.id} value={p.id}>{p.name} — {p.sku}</option>)}
-                      </select>
-                    </>
+                    <ProductPicker
+                      id={productId}
+                      value={line.productId}
+                      selectedLabel={product?.name}
+                      ariaLabel={`استعراض أصناف السطر ${index + 1}`}
+                      onChange={(id) => chooseProduct(index, id)}
+                      disabled={Boolean(listsError)}
+                    />
                   ) : (
                     <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
                       لا توجد أصناف نشطة متاحة. أضف صنفًا أو أعد تفعيله قبل تسجيل البيع.
                     </div>
-                  )}
-                  {line.productSearch && !product && products.length > 0 && !products.some((p) => `${p.name} ${p.sku} ${p.barcode}`.toLocaleLowerCase().includes(line.productSearch.trim().toLocaleLowerCase())) && (
-                    <p className="mt-1 text-[11px] text-slate-500">لا توجد أصناف مطابقة للبحث.</p>
                   )}
                   {product && warehouseId && (
                     <p className="mt-1 text-[11px] text-slate-500" aria-live="polite">
@@ -312,11 +296,11 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
                     </p>
                   )}
                 </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <label htmlFor={quantityId} className={label}>الكمية {unit}</label>
                   <input id={quantityId} type="number" min="0" step="0.01" value={line.quantityM2} onChange={(e) => setLine(index, { quantityM2: e.target.value })} className={input} disabled={products.length === 0 || Boolean(listsError)} />
                 </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <label htmlFor={priceId} className={label}>سعر {unit}</label>
                   <input id={priceId} type="number" min="0" step="0.01" value={line.unitPrice} onChange={(e) => setLine(index, { unitPrice: e.target.value })} className={input} disabled={products.length === 0 || Boolean(listsError)} />
                 </div>

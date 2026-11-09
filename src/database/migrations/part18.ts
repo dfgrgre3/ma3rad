@@ -1,4 +1,4 @@
-import { addColumn, type Migration } from '../migrationSupport';
+import { addColumn, type Migration } from './support';
 
 export const MIGRATION_PART_18: Migration[] = [
   {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeftRight, Landmark, MapPin } from 'lucide-react';
 import { fmtCurrency } from './helpers';
-import { TX_TYPES, type Employee, type FinancialTransaction } from './types';
+import { TX_TYPES, type Employee, type FinancialTransaction } from '../../../types/hr/employeesPage';
 
 interface EmployeeAnalyticsTabProps {
   employees: Employee[];

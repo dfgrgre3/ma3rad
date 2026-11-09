@@ -2,15 +2,15 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from 'xlsx';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { DataAdminService } from '../src/services/DataAdminService.ts';
-import type { DataImportSheet } from '../src/services/dataAdminTypes.ts';
-import { BackupService } from '../src/services/BackupService.ts';
-import { encryptExternalBackup } from '../src/services/backupEncryption.ts';
-import { parseAdminDataWorkbook } from '../src/pages/admin/adminDataUtils.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { DataAdminService } from '../src/services/admin/DataAdminService.ts';
+import type { DataImportSheet } from '../src/types/admin/dataAdmin.ts';
+import { BackupService } from '../src/services/backup/BackupService.ts';
+import { encryptExternalBackup } from '../src/services/backup/backupEncryption.ts';
+import { parseAdminDataWorkbook } from '../src/pages/admin/admin/adminDataUtils.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 test('previews conflicts and merges XLSX and encrypted backup records', async () => {
   const db = DatabaseManager.getInstance();

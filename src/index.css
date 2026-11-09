@@ -351,8 +351,8 @@ pre, code { overflow-wrap: anywhere; }
   --win-border: var(--cerami-border);
   --win-border-strong: var(--cerami-border-strong);
   --win-text: var(--win-canvas-text);
-  --win-text-secondary: var(--win-canvas-text);
-  --win-text-muted: var(--win-canvas-text);
+  --win-text-secondary: var(--cerami-text-secondary);
+  --win-text-muted: var(--cerami-muted);
   --win-success: var(--cerami-success);
   --win-success-text: var(--cerami-success-text, var(--cerami-success));
   --win-success-on-color: var(--cerami-success-on-color);
@@ -375,8 +375,8 @@ pre, code { overflow-wrap: anywhere; }
 .win-auth { background-color: var(--win-canvas) !important; color: var(--win-text) !important; }
 .win-app :is(.win-card, .ui-card) {
   --win-text: var(--win-surface-text);
-  --win-text-secondary: var(--win-surface-text);
-  --win-text-muted: var(--win-surface-text);
+  --win-text-secondary: var(--cerami-text-secondary);
+  --win-text-muted: var(--cerami-muted);
   color: var(--win-surface-text);
 }
 .win-app .win-card { box-shadow: var(--cerami-shadow-card); }
@@ -782,6 +782,62 @@ pre, code { overflow-wrap: anywhere; }
 .win-nav-item--active .win-nav-icon { color: var(--win-accent); }
 .dark .win-nav-item--active .win-nav-icon { color: var(--win-text); }
 
+.floating-panel {
+  position: fixed;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 16px);
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--win-border-strong);
+  border-radius: var(--win-radius);
+  background: var(--win-surface);
+  color: var(--win-surface-text);
+  box-shadow: var(--cerami-shadow-popover);
+}
+.floating-panel__titlebar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--ui-space-sm);
+  min-height: 34px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--win-border);
+  background: var(--win-surface-alt);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+.floating-panel__titlebar:focus-visible { outline: 2px solid var(--win-accent); outline-offset: -2px; }
+.floating-panel__title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--win-text-secondary);
+  font-size: var(--ui-font-xs);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.floating-panel__close {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--win-radius);
+  background: transparent;
+  color: var(--win-text-secondary);
+  cursor: pointer;
+}
+.floating-panel__close:hover { background: var(--win-surface-sunken); color: var(--win-text); }
+.floating-panel__close:focus-visible { outline: 2px solid var(--win-accent); outline-offset: 1px; }
+.floating-panel__close svg { width: 15px; height: 15px; }
+.floating-panel__body { min-height: 0; overflow: auto; }
+
 /* Horizontal navigation inside the header (navigationLayout = 'header') */
 .win-topnav { scrollbar-width: none; }
 .win-topnav::-webkit-scrollbar { display: none; }
@@ -814,14 +870,14 @@ pre, code { overflow-wrap: anywhere; }
 
 .win-nav-panel {
   position: fixed;
-  z-index: 80;
+  z-index: 120;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 4px 0 6px;
-  background: var(--win-surface);
-  border: 1px solid var(--win-border-strong);
-  border-radius: var(--win-radius);
+  padding: 0;
+  background-color: var(--cerami-surface, #ffffff) !important;
+  border: 1px solid var(--cerami-border-strong, #cdd3db);
+  border-radius: var(--cerami-radius, 6px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
 }
 .win-nav-panel-head {
@@ -829,13 +885,28 @@ pre, code { overflow-wrap: anywhere; }
   align-items: center;
   gap: 6px;
   padding: 4px 12px 6px;
-  border-bottom: 1px solid var(--win-border);
-  color: var(--win-text-muted);
+  border-bottom: 1px solid var(--cerami-border, #e1e5ea);
+  color: var(--cerami-muted, #626c78);
   font-size: 11px;
   font-weight: 600;
 }
 .win-nav-panel-list { overflow-y: auto; padding-top: 2px; }
-.win-nav-panel .win-nav-item { margin: 0 4px; }
+.win-nav-panel .win-nav-item {
+  margin: 0 4px;
+  border-radius: var(--cerami-radius, 6px);
+  color: var(--cerami-text-secondary, #4c5664);
+}
+.win-nav-panel .win-nav-item:hover {
+  background-color: var(--cerami-surface-sunken, #eef1f4);
+  color: var(--cerami-text, #252b36);
+}
+.win-nav-panel .win-nav-item--active {
+  background-color: var(--cerami-accent-soft, #e9edf2) !important;
+  color: var(--cerami-primary-pressed, #253345) !important;
+}
+.win-nav-panel .win-nav-item--active::before {
+  background: var(--brand-accent, var(--cerami-primary, #34445a));
+}
 .win-statusbar {
   background: var(--win-surface-sunken);
   border-top: 1px solid var(--win-border);
@@ -847,6 +918,7 @@ pre, code { overflow-wrap: anywhere; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 auto;
   padding: 7px 12px;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -878,7 +950,11 @@ pre, code { overflow-wrap: anywhere; }
 /* Give each route root the full content width without imposing widths on its
    nested controls, dialogs, or other feature-specific content. */
 .app-main { min-width: 0; overflow-x: hidden; }
-.app-main > * { width: 100%; min-width: 0; max-width: none; }
+.app-main > :not(.absolute):not(.fixed):not([role='menu']):not([role='listbox']) {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
 
 /* Keep native table sizing so columns fill the available width and align
    naturally. Only the table's immediate container scrolls when content is wide. */
@@ -947,7 +1023,7 @@ pre, code { overflow-wrap: anywhere; }
    Ensures every direct child of .app-main (page roots) fills the available
    width without any horizontal margin collapsing it. Individual page
    components may still add their own horizontal padding via p-* or px-*. */
-.app-main > * {
+.app-main > :not(.absolute):not(.fixed):not([role='menu']):not([role='listbox']) {
   width: 100%;
   min-width: 0;
 }
@@ -962,7 +1038,9 @@ pre, code { overflow-wrap: anywhere; }
 @media (max-width: 640px) {
   .app-header { height: auto; min-height: 3rem; flex-wrap: wrap; row-gap: 0.25rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
   .win-statusbar { font-size: 10px; }
-  .app-main { padding-left: 0.5rem; padding-right: 0.5rem; }
+  /* Pages own their horizontal padding; the scroll container must not add a
+     second gutter that shrinks the usable width on phones. */
+  .app-main { padding-left: 0; padding-right: 0; }
 }
 
 /* Touch-friendly tap targets on coarse pointers. */
@@ -1233,4 +1311,473 @@ pre, code { overflow-wrap: anywhere; }
 
 :root[data-interface-direction='ltr'] :is(.win-app, .win-auth) [dir='rtl']:not(.customization-preview) {
   direction: ltr;
+}
+
+/* ==========================================================================
+   ERP Compact Design System v2
+   --------------------------------------------------------------------------
+   One visual rhythm for every route. Feature pages keep their markup and
+   behaviour; this layer only normalises spacing, control metrics, card
+   proportions and responsive safeguards through the shared layout.
+   ========================================================================== */
+
+.win-app .app-main {
+  --erp-space-1: var(--ui-space-xs);
+  --erp-space-2: var(--ui-space-sm);
+  --erp-space-3: var(--ui-space-md);
+  --erp-space-4: var(--ui-space-lg);
+  --erp-control-h: var(--ui-control-height);
+  --erp-control-font: var(--ui-font-sm);
+  --erp-radius: var(--win-radius, var(--ui-radius-md));
+  --erp-grid-gap: var(--ui-grid-gap);
+}
+
+/* ── Vertical rhythm ─────────────────────────────────────────────────────── */
+.win-app .app-main .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 14px !important; }
+.win-app .app-main .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 12px !important; }
+.win-app .app-main .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 10px !important; }
+
+.win-app .app-main :is(.gap-6, .gap-5) { gap: 12px !important; }
+.win-app .app-main .gap-4 { gap: 10px !important; }
+.win-app .app-main .gap-3 { gap: 8px !important; }
+.win-app .app-main :is(.gap-x-6, .gap-x-5, .gap-x-4) { column-gap: 12px !important; }
+.win-app .app-main :is(.gap-y-6, .gap-y-5, .gap-y-4) { row-gap: 10px !important; }
+
+/* Box padding: large Tailwind steps become the documented ERP spacing scale:
+   8/12 px inside controls and list rows, 14-16 px inside cards and sections. */
+.win-app .app-main :is(.p-8, .p-7) { padding: 16px !important; }
+.win-app .app-main .p-6 { padding: 14px 16px !important; }
+.win-app .app-main .p-5 { padding: 12px 14px !important; }
+.win-app .app-main .p-4 { padding: 10px 12px !important; }
+.win-app .app-main :is(.p-12, .p-10) { padding: 20px !important; }
+
+.win-app .app-main :is(.px-8, .px-7, .px-6) { padding-inline: 14px !important; }
+.win-app .app-main :is(.py-8, .py-7) { padding-block: 16px !important; }
+.win-app .app-main .py-6 { padding-block: 14px !important; }
+.win-app .app-main .py-5 { padding-block: 12px !important; }
+
+.win-app .app-main :is(.mt-8, .mt-7, .mt-6) { margin-top: 12px !important; }
+.win-app .app-main :is(.mb-8, .mb-7, .mb-6) { margin-bottom: 12px !important; }
+.win-app .app-main .mb-5 { margin-bottom: 10px !important; }
+
+/* ── Typography hierarchy ────────────────────────────────────────────────── */
+.win-app .app-main :is(h1, h2).text-3xl { font-size: 1.375rem !important; line-height: 1.3 !important; }
+.win-app .app-main :is(h1, h2).text-2xl { font-size: 1.25rem !important; line-height: 1.3 !important; }
+.win-app .app-main :is(h1, h2).text-xl { font-size: 1.125rem !important; line-height: 1.35 !important; }
+.win-app .app-main :is(h1, h2, h3).text-lg { font-size: 0.975rem !important; line-height: 1.4 !important; }
+.win-app .app-main :is(h2, h3).text-base { font-size: 0.9rem !important; line-height: 1.4 !important; }
+.win-app .app-main :is(h1, h2, h3) { letter-spacing: -0.005em; }
+.win-app .app-main .win-page-title { font-size: var(--ui-font-xl); line-height: 1.3; }
+.win-app .app-main .win-page-subtitle { font-size: var(--ui-font-xs); margin-top: 2px; }
+.win-app .app-main .win-page-head { padding-block: 10px; gap: 10px; }
+
+/* ── Surfaces, radii and shadows ─────────────────────────────────────────── */
+.win-app .app-main :is([class~="rounded-2xl"], [class~="rounded-3xl"]) { border-radius: var(--erp-radius) !important; }
+.win-app .app-main :is(section, article, div, form):is([class*="shadow-lg"], [class*="shadow-xl"], [class*="shadow-2xl"]) {
+  box-shadow: var(--cerami-shadow-card) !important;
+}
+.win-app .app-main :is(.ui-card, .win-card) { border-radius: var(--erp-radius); }
+
+/* ── Buttons and action bars ─────────────────────────────────────────────── */
+.win-app .app-main :is(.icon-action, .primary-action) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--erp-control-h);
+  padding: 0 11px;
+  border: 1px solid var(--win-border-strong, var(--cerami-border-strong));
+  border-radius: var(--erp-radius);
+  background: var(--win-surface, var(--cerami-surface));
+  color: var(--win-text, var(--cerami-text));
+  font-size: var(--erp-control-font);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--ui-transition), border-color var(--ui-transition), color var(--ui-transition);
+}
+.win-app .app-main .icon-action:hover { background: var(--win-surface-sunken, var(--cerami-surface-sunken)); border-color: var(--win-accent, var(--cerami-primary)); }
+.win-app .app-main .primary-action { background: var(--win-accent, var(--cerami-primary)); border-color: var(--win-accent, var(--cerami-primary)); color: var(--win-accent-text, #fff); }
+.win-app .app-main .primary-action:hover { background: var(--win-accent-hover, var(--cerami-primary-hover)); border-color: var(--win-accent-hover, var(--cerami-primary-hover)); }
+.win-app .app-main :is(.icon-action, .primary-action):disabled { opacity: 0.5; cursor: not-allowed; }
+.win-app .app-main :is(.icon-action, .primary-action) svg { width: var(--ui-icon-md); height: var(--ui-icon-md); flex: 0 0 auto; }
+
+.win-app .app-main button[class*="py-2"] { min-height: var(--erp-control-h); }
+.win-app .app-main button[class~="py-2.5"] { padding-block: 6px !important; }
+.win-app .app-main button[class~="py-3"] { padding-block: 7px !important; min-height: 34px; }
+.win-app .app-main :is(button, a)[class~="px-4"] { padding-inline: 12px; }
+.win-app .app-main :is(button, a)[class~="px-5"] { padding-inline: 14px; }
+
+/* ── Form controls ───────────────────────────────────────────────────────── */
+.win-app .app-main :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']), select, textarea) {
+  min-height: var(--erp-control-h);
+  font-size: var(--erp-control-font);
+  border-radius: var(--erp-radius);
+}
+.win-app .app-main :is(input, select, textarea)[class*="rounded"] { border-radius: var(--erp-radius) !important; }
+.win-app .app-main textarea { min-height: 72px; }
+.win-app .app-main .ui-form-field > label { margin-bottom: 4px; font-size: var(--ui-font-xs); font-weight: 600; }
+.win-app .app-main .ui-form-field { gap: var(--ui-field-gap); }
+.win-app .app-main .ui-input { min-height: var(--erp-control-h); padding: 0 var(--ui-input-padding-x); font-size: var(--erp-control-font); }
+
+/* ── Toolbars, tabs and tables ───────────────────────────────────────────── */
+.win-app .app-main .ui-filter-toolbar { padding: 10px 12px; }
+.win-app .app-main .ui-filter-toolbar :is(input, select) { min-height: var(--erp-control-h); }
+.win-app .app-main table { font-size: var(--ui-font-sm); }
+.win-app .app-main table thead th { font-size: var(--ui-font-xs); }
+.win-app .app-main :is(.ui-table-scroll, [class*="overflow-x-auto"]) { max-width: 100%; }
+.win-app .app-main .ui-data-table td { line-height: 1.4; }
+
+/* Keep long toolbars and filter rows inside the viewport without horizontal
+   page scrolling. */
+.win-app .app-main :is(.ui-filter-toolbar, [role='search'], form) > :is(div, label) { min-width: 0; }
+/* Grid tracks may shrink below their longest word; flex rows keep content width
+   so labels never overlap their neighbours. */
+.win-app .app-main .grid > * { min-width: 0; }
+
+/* Scrollable pill/tab rows must scroll rather than squeeze their labels. */
+.win-app .app-main :is(.no-scrollbar, [class*="overflow-x-auto"]) > :is(button, a) { flex-shrink: 0; }
+
+/* ── Dialogs ─────────────────────────────────────────────────────────────── */
+.win-app [role='dialog'] {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  border-radius: var(--erp-radius, var(--win-radius)) !important;
+}
+.win-app [role='dialog'] .p-6 { padding: 14px 16px !important; }
+.win-app [role='dialog'] .p-5 { padding: 12px 14px !important; }
+.win-app [role='dialog'] :is([class~="rounded-2xl"], [class~="rounded-3xl"]) { border-radius: var(--win-radius) !important; }
+
+/* ── Responsive safeguards ───────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .win-app .app-main :is(header, .win-page-head) { row-gap: 6px; }
+  .win-app .app-main :is(.ui-filter-toolbar, [role='search']) { padding: 8px 10px; }
+}
+
+@media (max-width: 640px) {
+  .win-app .app-main .space-y-6 > :not([hidden]) ~ :not([hidden]),
+  .win-app .app-main .space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 10px !important; }
+  .win-app .app-main :is(.p-6, .p-5) { padding: 12px !important; }
+  .win-app .app-main :is(.px-6, .px-5) { padding-inline: 12px !important; }
+  .win-app .app-main :is(h1, h2).text-3xl { font-size: 1.2rem !important; }
+  .win-app .app-main :is(h1, h2).text-2xl { font-size: 1.125rem !important; }
+  .win-app .app-main :is(h1, h2).text-xl { font-size: 1.05rem !important; }
+  .win-app .app-main [role='dialog'] { max-width: calc(100vw - 8px); max-height: calc(100dvh - 8px); }
+  /* Action groups wrap instead of pushing the page wider than the screen. */
+  .win-app .app-main :is(header, form) > .flex:last-child { flex-wrap: wrap; }
+}
+
+@media (pointer: coarse) {
+  /* Keep comfortable touch targets on tablets and phones. */
+  .win-app .app-main :is(.icon-action, .primary-action, .win-btn, .ui-btn-primary) { min-height: 38px; }
+  .win-app .app-main :is(input, select) { min-height: 38px; }
+}
+
+.win-app .app-main .pos-touch-mode :is(button, input, select) { min-height: 44px !important; }
+
+/* Preserve the user-selected density after the compact defaults above. */
+:root[data-ui-density='compact'] .win-app .app-main :is(.win-btn, .ui-btn-primary, button[class*="py-2"]) { min-height: 30px; }
+:root[data-ui-density='comfortable'] .win-app .app-main :is(.win-btn, .ui-btn-primary) { min-height: 38px; }
+
+/* ==========================================================================
+   CeramiSys Design System v3
+   --------------------------------------------------------------------------
+   Shared primitives (page header, cards, buttons, stats, tables, modals and
+   state views) used by the application shell and feature pages. Feature pages
+   should compose these classes instead of defining their own visual language.
+   ========================================================================== */
+
+/* ── Page container ──────────────────────────────────────────────────────── */
+.erp-page {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-section-gap);
+  padding: var(--ui-space-lg);
+}
+.erp-page--flush { padding: 0; }
+.erp-page--narrow { max-width: 1180px; margin-inline: auto; }
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+.erp-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-md);
+  padding-bottom: var(--ui-space-md);
+  border-bottom: 1px solid var(--win-border);
+  min-width: 0;
+}
+.erp-page-header--plain { padding-bottom: 0; border-bottom: 0; }
+.erp-page-header__main { display: flex; align-items: center; gap: var(--ui-space-sm); min-width: 0; flex: 1 1 320px; }
+.erp-page-header__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: var(--win-radius);
+  background: var(--win-accent-soft);
+  color: var(--win-accent-readable);
+}
+.erp-page-header__icon > svg { width: 18px; height: 18px; }
+.erp-page-header__text { min-width: 0; }
+.erp-page-header__eyebrow {
+  margin: 0 0 2px;
+  color: var(--win-accent-readable);
+  font-size: var(--ui-font-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.erp-page-header__title {
+  margin: 0;
+  color: var(--win-text);
+  font-size: var(--ui-font-xl);
+  font-weight: 700;
+  line-height: var(--ui-line-tight);
+}
+.erp-page-header__description {
+  margin: 2px 0 0;
+  max-width: 90ch;
+  color: var(--win-text-muted);
+  font-size: var(--ui-font-sm);
+  line-height: var(--ui-line-normal);
+}
+.erp-page-header__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-sm); margin-top: var(--ui-space-xs); }
+.erp-page-header__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-sm); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.erp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ui-control-height);
+  padding: 0 12px;
+  border: 1px solid var(--win-border-strong);
+  border-radius: var(--win-radius);
+  background: var(--win-surface);
+  color: var(--win-text);
+  font-size: var(--ui-font-sm);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--ui-transition), border-color var(--ui-transition), color var(--ui-transition), box-shadow var(--ui-transition);
+}
+.erp-btn > svg { width: var(--ui-icon-md); height: var(--ui-icon-md); flex: 0 0 auto; }
+.erp-btn:hover { background: var(--win-surface-sunken); border-color: var(--win-border-strong); }
+.erp-btn:active { background: var(--win-accent-border); border-color: var(--win-accent); }
+.erp-btn:focus-visible { outline: 2px solid var(--win-accent); outline-offset: 1px; }
+.erp-btn:disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
+.erp-btn--primary { background: var(--win-accent); border-color: var(--win-accent); color: var(--win-accent-text, #fff); }
+.erp-btn--primary:hover { background: var(--win-accent-hover); border-color: var(--win-accent-hover); color: var(--win-accent-hover-text, #fff); }
+.erp-btn--primary:active { background: var(--win-accent-pressed); border-color: var(--win-accent-pressed); color: var(--win-accent-pressed-text, #fff); }
+.erp-btn--danger { color: var(--win-danger-text); border-color: var(--win-danger-border); background: var(--win-danger-soft); }
+.erp-btn--danger:hover { background: var(--win-danger); border-color: var(--win-danger); color: var(--win-danger-on-color); }
+.erp-btn--success { color: var(--win-success-text); border-color: var(--win-success-border); background: var(--win-success-soft); }
+.erp-btn--success:hover { background: var(--win-success); border-color: var(--win-success); color: var(--win-success-on-color); }
+.erp-btn--ghost { background: transparent; border-color: transparent; color: var(--win-text-secondary); }
+.erp-btn--ghost:hover { background: var(--win-surface-sunken); border-color: var(--win-border); color: var(--win-text); }
+.erp-btn--sm { min-height: var(--ui-control-height-sm); padding: 0 9px; font-size: var(--ui-font-xs); gap: 4px; }
+.erp-btn--lg { min-height: var(--ui-control-height-lg); padding: 0 16px; font-size: var(--ui-font-md); }
+.erp-btn--icon { padding: 0; min-width: var(--ui-control-height); }
+.erp-btn--icon.erp-btn--sm { min-width: var(--ui-control-height-sm); }
+.erp-btn--icon.erp-btn--lg { min-width: var(--ui-control-height-lg); }
+.erp-btn--block { width: 100%; }
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.erp-card {
+  min-width: 0;
+  padding: var(--ui-card-padding) var(--ui-card-padding-x);
+  border: 1px solid var(--win-border);
+  border-radius: var(--win-radius);
+  background: var(--win-surface);
+  color: var(--win-surface-text);
+  box-shadow: var(--cerami-shadow-card);
+}
+.erp-card--compact { padding: var(--ui-space-sm) var(--ui-space-md); }
+.erp-card--flush { padding: 0; overflow: hidden; }
+.erp-card--muted { background: var(--win-surface-alt); box-shadow: none; }
+.erp-card__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-space-sm); margin-bottom: var(--ui-space-md); }
+.erp-card--flush .erp-card__header { margin: 0; padding: var(--ui-space-sm) var(--ui-card-padding-x); border-bottom: 1px solid var(--win-border); }
+.erp-card__heading { display: flex; align-items: center; gap: var(--ui-space-sm); min-width: 0; }
+.erp-card__icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: var(--ui-radius-sm); background: var(--win-accent-soft); color: var(--win-accent-readable); }
+.erp-card__icon > svg { width: var(--ui-icon-sm); height: var(--ui-icon-sm); }
+.erp-card__title { margin: 0; color: var(--win-surface-text); font-size: var(--ui-font-md); font-weight: 700; line-height: var(--ui-line-tight); }
+.erp-card__description { margin: 2px 0 0; color: var(--cerami-muted); font-size: var(--ui-font-xs); line-height: var(--ui-line-normal); }
+.erp-card__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-xs); }
+
+/* ── Statistics ──────────────────────────────────────────────────────────── */
+.erp-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--ui-grid-gap); }
+.erp-stat {
+  min-width: 0;
+  padding: var(--ui-space-sm) var(--ui-space-md);
+  border: 1px solid var(--win-border);
+  border-radius: var(--win-radius);
+  background: var(--win-surface);
+}
+.erp-stat__label { display: flex; align-items: center; gap: 6px; color: var(--cerami-muted); font-size: var(--ui-font-xs); font-weight: 600; }
+.erp-stat__icon { display: inline-flex; color: var(--win-accent-readable); }
+.erp-stat__icon > svg { width: var(--ui-icon-sm); height: var(--ui-icon-sm); }
+.erp-stat__value { margin: 4px 0 0; color: var(--win-surface-text); font-size: var(--ui-font-lg); font-weight: 700; line-height: var(--ui-line-tight); overflow-wrap: anywhere; }
+.erp-stat__hint { margin: 2px 0 0; color: var(--cerami-muted); font-size: var(--ui-font-2xs); }
+.erp-stat--success .erp-stat__value { color: var(--win-success-text); }
+.erp-stat--danger .erp-stat__value { color: var(--win-danger-text); }
+.erp-stat--warning .erp-stat__value { color: var(--win-warning-text); }
+
+/* ── Section layout ──────────────────────────────────────────────────────── */
+.erp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--ui-grid-gap); min-width: 0; }
+.erp-grid > * { min-width: 0; }
+.erp-stack { display: flex; flex-direction: column; gap: var(--ui-section-gap); min-width: 0; }
+.erp-stack--tight { gap: var(--ui-space-md); }
+.erp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-sm); min-width: 0; }
+.erp-toolbar--end { justify-content: flex-end; }
+.erp-toolbar__grow { flex: 1 1 200px; min-width: 0; }
+.erp-section-title { margin: 0; color: var(--win-text); font-size: var(--ui-font-md); font-weight: 700; }
+.erp-divider { height: 1px; background: var(--win-border); border: 0; margin: 0; }
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.erp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--win-border);
+  border-radius: 999px;
+  background: var(--win-surface-alt);
+  color: var(--win-text-secondary);
+  font-size: var(--ui-font-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.erp-badge--success { background: var(--win-success-soft); border-color: var(--win-success-border); color: var(--win-success-text); }
+.erp-badge--danger { background: var(--win-danger-soft); border-color: var(--win-danger-border); color: var(--win-danger-text); }
+.erp-badge--warning { background: var(--win-warning-soft); border-color: var(--win-warning-border); color: var(--win-warning-text); }
+.erp-badge--primary { background: var(--win-accent-soft); border-color: var(--win-accent-border); color: var(--win-accent-soft-text); }
+.erp-badge > svg { width: 11px; height: 11px; }
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.erp-table-wrap { display: flex; flex-direction: column; gap: var(--ui-space-sm); min-width: 0; }
+.erp-table--sticky thead th { position: sticky; top: 0; z-index: 1; }
+.erp-table--dense tbody td { padding-top: 4px !important; padding-bottom: 4px !important; }
+.erp-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-space-sm); }
+.erp-pagination__summary { margin: 0; color: var(--cerami-muted); font-size: var(--ui-font-xs); }
+.erp-pagination__controls { display: flex; align-items: center; gap: var(--ui-space-xs); }
+.erp-pagination__page { min-width: 56px; text-align: center; color: var(--win-text-secondary); font-size: var(--ui-font-xs); font-weight: 600; }
+
+/* ── State views ─────────────────────────────────────────────────────────── */
+.erp-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: var(--ui-space-2xl) var(--ui-space-lg); text-align: center; color: var(--win-text-muted); }
+.erp-state--compact { padding: var(--ui-space-lg) var(--ui-space-md); }
+.erp-state__icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-bottom: 2px; border-radius: 999px; background: var(--win-surface-sunken); }
+.erp-state__title { margin: 0; color: var(--win-text-secondary); font-size: var(--ui-font-sm); font-weight: 700; }
+.erp-state__description { margin: 0; max-width: 56ch; color: var(--win-text-muted); font-size: var(--ui-font-xs); line-height: var(--ui-line-normal); }
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
+.erp-modal-layer { position: fixed; inset: 0; z-index: 140; display: flex; align-items: center; justify-content: center; padding: var(--ui-space-lg); }
+.erp-modal-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, 0.45); animation: erpFadeIn 120ms ease-out; }
+.erp-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  border: 1px solid var(--win-border-strong);
+  border-radius: var(--win-radius);
+  background-color: var(--win-surface, var(--cerami-surface, #ffffff));
+  color: var(--win-surface-text, var(--cerami-surface-text, var(--cerami-text, #252b36)));
+  box-shadow: var(--cerami-shadow-popover);
+  animation: erpModalIn 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.erp-modal--sm { max-width: 380px; }
+.erp-modal--md { max-width: 520px; }
+.erp-modal--lg { max-width: 720px; }
+.erp-modal--xl { max-width: 960px; }
+.erp-modal__header { display: flex; align-items: flex-start; gap: var(--ui-space-sm); padding: var(--ui-space-md) var(--ui-space-lg); border-bottom: 1px solid var(--win-border); background-color: var(--win-surface, var(--cerami-surface, #ffffff)); }
+.erp-modal__icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: var(--win-radius); background: var(--win-accent-soft); color: var(--win-accent-readable); }
+.erp-modal__heading { min-width: 0; flex: 1 1 auto; }
+.erp-modal__title { margin: 0; color: var(--win-surface-text); font-size: var(--ui-font-md); font-weight: 700; line-height: var(--ui-line-tight); }
+.erp-modal__description { margin: 2px 0 0; color: var(--win-text-muted); font-size: var(--ui-font-xs); line-height: var(--ui-line-normal); }
+.erp-modal__body { padding: var(--ui-space-lg); overflow-y: auto; overflow-x: hidden; min-height: 0; background-color: var(--win-surface, var(--cerami-surface, #ffffff)); }
+.erp-modal__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--ui-space-sm); padding: var(--ui-space-md) var(--ui-space-lg); border-top: 1px solid var(--win-border); background: var(--win-surface-alt); }
+
+@keyframes erpFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes erpModalIn { from { opacity: 0; transform: translateY(6px) scale(0.99); } to { opacity: 1; transform: none; } }
+
+/* ── Unified decorative accents ──────────────────────────────────────────── */
+/* Historical pages used multicoloured gradient tiles. Keep one accent pair so
+   the identity stays consistent without touching each page's markup. */
+.win-app .app-main [class*="bg-gradient-to-"][class*="text-white"] {
+  background-image: none !important;
+  background-color: var(--win-accent-soft) !important;
+  color: var(--win-accent-readable) !important;
+  box-shadow: none !important;
+}
+
+/* ── Responsive rules ────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .erp-page { padding: var(--ui-space-md); gap: var(--ui-space-md); }
+}
+@media (max-width: 640px) {
+  .erp-page { padding: var(--ui-space-sm); gap: var(--ui-space-md); }
+  .erp-page-header { align-items: flex-start; }
+  .erp-page-header__main { flex-basis: 100%; }
+  .erp-page-header__actions { width: 100%; }
+  .erp-page-header__actions > .erp-btn { flex: 1 1 auto; }
+  .erp-page-header__title { font-size: var(--ui-font-lg); }
+  .erp-stat-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .erp-modal-layer { padding: var(--ui-space-sm); }
+  .erp-modal { max-height: calc(100dvh - 16px); }
+  .erp-modal__header, .erp-modal__body, .erp-modal__footer { padding-inline: var(--ui-space-md); }
+  .erp-modal__footer > .erp-btn { flex: 1 1 auto; }
+}
+@media (pointer: coarse) {
+  .erp-btn { min-height: 38px; }
+  .erp-btn--sm { min-height: 34px; }
+}
+
+/* Searchable product/customer pickers share one opaque, theme-aware list surface. */
+.selection-list {
+  color: var(--cerami-surface-text, var(--cerami-text, #252b36));
+  background-color: var(--cerami-surface, #ffffff);
+  border: 1px solid var(--cerami-border, #d8dde4);
+  border-radius: var(--win-radius, var(--cerami-radius, 8px));
+  box-shadow: var(--cerami-shadow-popover, 0 8px 24px rgba(15, 23, 42, 0.16));
+}
+
+.selection-list__row {
+  position: relative;
+  color: var(--cerami-surface-text, var(--cerami-text, #252b36));
+  border-bottom: 1px solid var(--cerami-border, #e1e5ea);
+  background-color: transparent;
+  transition: background-color var(--cerami-motion-fast, 140ms) ease;
+}
+
+.selection-list__row:hover,
+.selection-list__row:focus-visible,
+.selection-list__row.is-selected,
+[role='option'][aria-selected='true'] .selection-list__row {
+  background-color: var(--cerami-accent-soft, #edf3f8);
+}
+
+.selection-list__row:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--cerami-primary-readable, #2563eb);
+  outline-offset: -2px;
+}
+
+.selection-list__options > li:last-child > .selection-list__row,
+.selection-list > .selection-list__row:last-child {
+  border-bottom-color: transparent;
+}
+
+.selection-list__meta {
+  color: var(--cerami-muted, #626c78);
 }

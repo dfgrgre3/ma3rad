@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle2, ChevronRight, FileText } from 'lucide-react';
 import { DataTable, type DataTableColumn } from '../../../components/ui/DataTable';
 import { fmtCountCurrency } from './helpers';
-import type { CountSession } from '../../../services/inventory-count/types';
+import type { CountSession } from '../../../types/inventory/countSessions';
 
 interface CountSessionsTableProps {
   loading: boolean;

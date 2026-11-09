@@ -3,9 +3,9 @@ import {
   ArrowRight, Phone, Mail, DollarSign, Pencil, Printer,
 } from 'lucide-react';
 import { Supplier } from '../../../types';
-import { CeramicMath } from '../../../utils/ceramicMath';
-import { TABS, Tab } from './types';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/useBusinessTerm';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
+import { TABS, Tab } from '../../../types/purchasing/supplierDetailPage';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
 
 export interface SupplierHeaderProps {
   supplier: Supplier;

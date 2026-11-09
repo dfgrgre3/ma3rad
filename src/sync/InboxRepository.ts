@@ -1,5 +1,5 @@
-﻿import { DatabaseManager } from '../database/db.ts';
-import type { SyncDataScope, SyncEvent, SyncInboxStatus, SyncOperation } from './types.ts';
+﻿import { DatabaseManager } from '../database/repositories/databaseManager.ts';
+import type { SyncDataScope, SyncEvent, SyncInboxStatus, SyncOperation } from '../types/sync/index.ts';
 
 interface InboxRow {
   eventId: string;

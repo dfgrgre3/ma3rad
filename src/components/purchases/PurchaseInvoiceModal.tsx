@@ -1,10 +1,11 @@
 import React from 'react';
 import { Trash2, Scale } from 'lucide-react';
 import { PaymentType, Product, Supplier, Warehouse } from '../../types';
-import { getProductUnitLabel } from '../../utils/productUnits';
-import { PurchaseInvoiceDto } from './types';
-import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
-import { OperationalFieldsForm } from '../OperationalFieldsForm';
+import { getProductUnitLabel } from '../../utils/products/productUnits';
+import { PurchaseInvoiceDto } from '../../types/purchasing/components';
+import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
+import { ProductPicker } from '../products/ProductPicker';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
 
@@ -177,12 +178,14 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
               {dto.items.map((it, idx) => {
                 const selectedProduct = products.find((product) => product.id === it.productId);
                 return <div key={idx} className="flex gap-2 items-center py-2">
-                  <select
+                  <ProductPicker
                     value={it.productId}
-                    onChange={(e) => {
-                      const p = products.find(x => x.id === e.target.value);
+                    selectedLabel={selectedProduct?.name}
+                    ariaLabel={`استعراض أصناف بند الفاتورة ${idx + 1}`}
+                    onChange={(productId, selected) => {
+                      const p = products.find(x => x.id === productId) || selected;
                       const items = [...dto.items];
-                      items[idx].productId = e.target.value;
+                      items[idx].productId = productId;
                       if (p) {
                         items[idx].unitCost = p.costPrice;
                         items[idx].quantityM2 = p.productType === 'GENERAL' ? 1 : 50;
@@ -192,12 +195,8 @@ export const PurchaseInvoiceModal: React.FC<PurchaseInvoiceModalProps> = ({
                       }
                       setDto({ ...dto, items });
                     }}
-                    className="flex-1 px-2.5 py-1.5 border rounded-lg bg-slate-50 font-bold"
-                  >
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                    ))}
-                  </select>
+                    className="flex-1"
+                  />
                   <div className="w-24">
                     <input
                       type="number"

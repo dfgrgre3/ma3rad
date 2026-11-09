@@ -4,7 +4,7 @@ import {
   HardHat, RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal,
   Sparkles, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
 } from 'lucide-react';
-import type { NavGroupDef } from './navigationTypes';
+import type { NavGroupDef } from '../types/config/navigation';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from './routePermissions';
 
 export const NAV_GROUPS_02: NavGroupDef[] = [

@@ -1,13 +1,13 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CompanyService } from '../src/services/CompanyService.ts';
-import { BranchService } from '../src/services/BranchService.ts';
-import { BranchAccessService } from '../src/services/BranchAccessService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CompanyService } from '../src/services/organization/CompanyService.ts';
+import { BranchService } from '../src/services/organization/BranchService.ts';
+import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
   id: 'usr_company_admin',

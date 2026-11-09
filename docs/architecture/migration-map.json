@@ -1,0 +1,1770 @@
+[
+  {
+    "from": "src/services/AccountingService.ts",
+    "to": "src/services/finance/AccountingService.ts"
+  },
+  {
+    "from": "src/services/DebtService.ts",
+    "to": "src/services/finance/DebtService.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterpriseContract01.ts",
+    "to": "src/services/finance/FinanceEnterpriseContract01.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart01.ts",
+    "to": "src/services/finance/FinanceEnterprisePart01.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart02.ts",
+    "to": "src/services/finance/FinanceEnterprisePart02.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart03.ts",
+    "to": "src/services/finance/FinanceEnterprisePart03.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart04.ts",
+    "to": "src/services/finance/FinanceEnterprisePart04.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart05.ts",
+    "to": "src/services/finance/FinanceEnterprisePart05.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart06.ts",
+    "to": "src/services/finance/FinanceEnterprisePart06.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart07.ts",
+    "to": "src/services/finance/FinanceEnterprisePart07.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart08.ts",
+    "to": "src/services/finance/FinanceEnterprisePart08.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart09.ts",
+    "to": "src/services/finance/FinanceEnterprisePart09.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterprisePart10.ts",
+    "to": "src/services/finance/FinanceEnterprisePart10.ts"
+  },
+  {
+    "from": "src/services/FinanceEnterpriseService.ts",
+    "to": "src/services/finance/FinanceEnterpriseService.ts"
+  },
+  {
+    "from": "src/services/FinanceExtrasService.ts",
+    "to": "src/services/finance/FinanceExtrasService.ts"
+  },
+  {
+    "from": "src/services/FinanceFiscalCloseService.ts",
+    "to": "src/services/finance/FinanceFiscalCloseService.ts"
+  },
+  {
+    "from": "src/services/FinancialCalendarEventsService.ts",
+    "to": "src/services/finance/FinancialCalendarEventsService.ts"
+  },
+  {
+    "from": "src/services/financials.ts",
+    "to": "src/services/finance/financials.ts"
+  },
+  {
+    "from": "src/services/InstallmentService.ts",
+    "to": "src/services/finance/InstallmentService.ts"
+  },
+  {
+    "from": "src/services/CashierService.ts",
+    "to": "src/services/finance/CashierService.ts"
+  },
+  {
+    "from": "src/services/OrderService.ts",
+    "to": "src/services/sales/OrderService.ts"
+  },
+  {
+    "from": "src/services/QuotationService.ts",
+    "to": "src/services/sales/QuotationService.ts"
+  },
+  {
+    "from": "src/services/ReservationService.ts",
+    "to": "src/services/sales/ReservationService.ts"
+  },
+  {
+    "from": "src/services/HeldOrderService.ts",
+    "to": "src/services/sales/HeldOrderService.ts"
+  },
+  {
+    "from": "src/services/SalesFinancialReconciliationService.ts",
+    "to": "src/services/sales/SalesFinancialReconciliationService.ts"
+  },
+  {
+    "from": "src/services/SalesService.ts",
+    "to": "src/services/sales/SalesService.ts"
+  },
+  {
+    "from": "src/services/HistoricalReturnReconciliationService.ts",
+    "to": "src/services/sales/HistoricalReturnReconciliationService.ts"
+  },
+  {
+    "from": "src/services/WarrantyClaimService.ts",
+    "to": "src/services/sales/WarrantyClaimService.ts"
+  },
+  {
+    "from": "src/services/ElectronicInvoiceService.ts",
+    "to": "src/services/sales/ElectronicInvoiceService.ts"
+  },
+  {
+    "from": "src/services/PricingService.ts",
+    "to": "src/services/sales/PricingService.ts"
+  },
+  {
+    "from": "src/services/LoyaltyService.ts",
+    "to": "src/services/sales/LoyaltyService.ts"
+  },
+  {
+    "from": "src/services/PurchaseOrderService.ts",
+    "to": "src/services/purchases/PurchaseOrderService.ts"
+  },
+  {
+    "from": "src/services/PurchaseRequestService.ts",
+    "to": "src/services/purchases/PurchaseRequestService.ts"
+  },
+  {
+    "from": "src/services/PurchaseReturnService.ts",
+    "to": "src/services/purchases/PurchaseReturnService.ts"
+  },
+  {
+    "from": "src/services/PurchaseService.ts",
+    "to": "src/services/purchases/PurchaseService.ts"
+  },
+  {
+    "from": "src/services/ProcurementService.ts",
+    "to": "src/services/procurement/ProcurementService.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart01.ts",
+    "to": "src/services/procurement/ProcurementServicePart01.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart02.ts",
+    "to": "src/services/procurement/ProcurementServicePart02.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart03.ts",
+    "to": "src/services/procurement/ProcurementServicePart03.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart04.ts",
+    "to": "src/services/procurement/ProcurementServicePart04.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart05.ts",
+    "to": "src/services/procurement/ProcurementServicePart05.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart06.ts",
+    "to": "src/services/procurement/ProcurementServicePart06.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart07.ts",
+    "to": "src/services/procurement/ProcurementServicePart07.ts"
+  },
+  {
+    "from": "src/services/ProcurementServicePart08.ts",
+    "to": "src/services/procurement/ProcurementServicePart08.ts"
+  },
+  {
+    "from": "src/services/ProcurementSupplierRfqService.ts",
+    "to": "src/services/procurement/ProcurementSupplierRfqService.ts"
+  },
+  {
+    "from": "src/services/AttributeService.ts",
+    "to": "src/services/products/AttributeService.ts"
+  },
+  {
+    "from": "src/services/BrandService.ts",
+    "to": "src/services/products/BrandService.ts"
+  },
+  {
+    "from": "src/services/CategoryService.ts",
+    "to": "src/services/products/CategoryService.ts"
+  },
+  {
+    "from": "src/services/dynamicAttributes.ts",
+    "to": "src/services/products/dynamicAttributes.ts"
+  },
+  {
+    "from": "src/services/OperationalFieldService.ts",
+    "to": "src/services/products/OperationalFieldService.ts"
+  },
+  {
+    "from": "src/services/ProductExtraService.ts",
+    "to": "src/services/products/ProductExtraService.ts"
+  },
+  {
+    "from": "src/services/ProductFormPreferencesService.ts",
+    "to": "src/services/products/ProductFormPreferencesService.ts"
+  },
+  {
+    "from": "src/services/ProductService.ts",
+    "to": "src/services/products/ProductService.ts"
+  },
+  {
+    "from": "src/services/CustomerService.ts",
+    "to": "src/services/customers/CustomerService.ts"
+  },
+  {
+    "from": "src/services/CustomerSupplyService.ts",
+    "to": "src/services/customers/CustomerSupplyService.ts"
+  },
+  {
+    "from": "src/services/PartnerService.ts",
+    "to": "src/services/customers/PartnerService.ts"
+  },
+  {
+    "from": "src/services/SupplierService.ts",
+    "to": "src/services/suppliers/SupplierService.ts"
+  },
+  {
+    "from": "src/services/BatchService.ts",
+    "to": "src/services/inventory/BatchService.ts"
+  },
+  {
+    "from": "src/services/InventoryCostingService.ts",
+    "to": "src/services/inventory/InventoryCostingService.ts"
+  },
+  {
+    "from": "src/services/InventoryService.ts",
+    "to": "src/services/inventory/InventoryService.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart01.ts",
+    "to": "src/services/inventory/InventoryServicePart01.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart02.ts",
+    "to": "src/services/inventory/InventoryServicePart02.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart03.ts",
+    "to": "src/services/inventory/InventoryServicePart03.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart04.ts",
+    "to": "src/services/inventory/InventoryServicePart04.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart05.ts",
+    "to": "src/services/inventory/InventoryServicePart05.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart06.ts",
+    "to": "src/services/inventory/InventoryServicePart06.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart07.ts",
+    "to": "src/services/inventory/InventoryServicePart07.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart08.ts",
+    "to": "src/services/inventory/InventoryServicePart08.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart09.ts",
+    "to": "src/services/inventory/InventoryServicePart09.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart10.ts",
+    "to": "src/services/inventory/InventoryServicePart10.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart11.ts",
+    "to": "src/services/inventory/InventoryServicePart11.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart12.ts",
+    "to": "src/services/inventory/InventoryServicePart12.ts"
+  },
+  {
+    "from": "src/services/InventoryServicePart13.ts",
+    "to": "src/services/inventory/InventoryServicePart13.ts"
+  },
+  {
+    "from": "src/services/InventoryValuationService.ts",
+    "to": "src/services/inventory/InventoryValuationService.ts"
+  },
+  {
+    "from": "src/services/InventoryWarehouseLocationService.ts",
+    "to": "src/services/inventory/InventoryWarehouseLocationService.ts"
+  },
+  {
+    "from": "src/services/ManufacturingService.ts",
+    "to": "src/services/manufacturing/ManufacturingService.ts"
+  },
+  {
+    "from": "src/services/AnalyticsService.ts",
+    "to": "src/services/reports/AnalyticsService.ts"
+  },
+  {
+    "from": "src/services/FinancialStatementsService.ts",
+    "to": "src/services/reports/FinancialStatementsService.ts"
+  },
+  {
+    "from": "src/services/InventoryReportService.ts",
+    "to": "src/services/reports/InventoryReportService.ts"
+  },
+  {
+    "from": "src/services/ReportCenterService.ts",
+    "to": "src/services/reports/ReportCenterService.ts"
+  },
+  {
+    "from": "src/services/CommissionService.ts",
+    "to": "src/services/hr/CommissionService.ts"
+  },
+  {
+    "from": "src/services/ContractService.ts",
+    "to": "src/services/hr/ContractService.ts"
+  },
+  {
+    "from": "src/services/EmployeeDocumentService.ts",
+    "to": "src/services/hr/EmployeeDocumentService.ts"
+  },
+  {
+    "from": "src/services/EmployeeService.ts",
+    "to": "src/services/hr/EmployeeService.ts"
+  },
+  {
+    "from": "src/services/LeaveService.ts",
+    "to": "src/services/hr/LeaveService.ts"
+  },
+  {
+    "from": "src/services/RecruitmentService.ts",
+    "to": "src/services/hr/RecruitmentService.ts"
+  },
+  {
+    "from": "src/services/CrmService.ts",
+    "to": "src/services/crm/CrmService.ts"
+  },
+  {
+    "from": "src/services/CrmServicePart01.ts",
+    "to": "src/services/crm/CrmServicePart01.ts"
+  },
+  {
+    "from": "src/services/CrmServicePart02.ts",
+    "to": "src/services/crm/CrmServicePart02.ts"
+  },
+  {
+    "from": "src/services/DailyOperationsService.ts",
+    "to": "src/services/operations/DailyOperationsService.ts"
+  },
+  {
+    "from": "src/services/OperationsService.ts",
+    "to": "src/services/operations/OperationsService.ts"
+  },
+  {
+    "from": "src/services/ProjectService.ts",
+    "to": "src/services/projects/ProjectService.ts"
+  },
+  {
+    "from": "src/services/RestaurantService.ts",
+    "to": "src/services/restaurant/RestaurantService.ts"
+  },
+  {
+    "from": "src/services/BranchService.ts",
+    "to": "src/services/organization/BranchService.ts"
+  },
+  {
+    "from": "src/services/CompanyService.ts",
+    "to": "src/services/organization/CompanyService.ts"
+  },
+  {
+    "from": "src/services/ApprovalService.ts",
+    "to": "src/services/approvals/ApprovalService.ts"
+  },
+  {
+    "from": "src/services/NotificationPreferencesService.ts",
+    "to": "src/services/notifications/NotificationPreferencesService.ts"
+  },
+  {
+    "from": "src/services/NotificationService.ts",
+    "to": "src/services/notifications/NotificationService.ts"
+  },
+  {
+    "from": "src/services/NotificationServicePart01.ts",
+    "to": "src/services/notifications/NotificationServicePart01.ts"
+  },
+  {
+    "from": "src/services/NotificationServicePart02.ts",
+    "to": "src/services/notifications/NotificationServicePart02.ts"
+  },
+  {
+    "from": "src/services/DocumentService.ts",
+    "to": "src/services/documents/DocumentService.ts"
+  },
+  {
+    "from": "src/services/dataAdminConstants.ts",
+    "to": "src/services/admin/dataAdminConstants.ts"
+  },
+  {
+    "from": "src/services/DataAdminService.ts",
+    "to": "src/services/admin/DataAdminService.ts"
+  },
+  {
+    "from": "src/services/DataAdminServicePart01.ts",
+    "to": "src/services/admin/DataAdminServicePart01.ts"
+  },
+  {
+    "from": "src/services/DataAdminServicePart02.ts",
+    "to": "src/services/admin/DataAdminServicePart02.ts"
+  },
+  {
+    "from": "src/services/DataImportService.ts",
+    "to": "src/services/admin/DataImportService.ts"
+  },
+  {
+    "from": "src/services/DynamicDataService.ts",
+    "to": "src/services/data/DynamicDataService.ts"
+  },
+  {
+    "from": "src/services/PdfImportData.ts",
+    "to": "src/services/data/PdfImportData.ts"
+  },
+  {
+    "from": "src/services/PdfImportService.ts",
+    "to": "src/services/data/PdfImportService.ts"
+  },
+  {
+    "from": "src/services/SpreadsheetImportService.ts",
+    "to": "src/services/data/SpreadsheetImportService.ts"
+  },
+  {
+    "from": "src/services/backupEncryption.ts",
+    "to": "src/services/backup/backupEncryption.ts"
+  },
+  {
+    "from": "src/services/BackupScheduler.ts",
+    "to": "src/services/backup/BackupScheduler.ts"
+  },
+  {
+    "from": "src/services/BackupService.ts",
+    "to": "src/services/backup/BackupService.ts"
+  },
+  {
+    "from": "src/services/BackupServicePart01.ts",
+    "to": "src/services/backup/BackupServicePart01.ts"
+  },
+  {
+    "from": "src/services/BackupServicePart02.ts",
+    "to": "src/services/backup/BackupServicePart02.ts"
+  },
+  {
+    "from": "src/services/xlsxBackup.ts",
+    "to": "src/services/backup/xlsxBackup.ts"
+  },
+  {
+    "from": "src/services/auditLogger.ts",
+    "to": "src/services/security/auditLogger.ts"
+  },
+  {
+    "from": "src/services/AuditService.ts",
+    "to": "src/services/security/AuditService.ts"
+  },
+  {
+    "from": "src/services/SecurityService.ts",
+    "to": "src/services/security/SecurityService.ts"
+  },
+  {
+    "from": "src/services/AuthService.ts",
+    "to": "src/services/auth/AuthService.ts"
+  },
+  {
+    "from": "src/services/BranchAccessService.ts",
+    "to": "src/services/auth/BranchAccessService.ts"
+  },
+  {
+    "from": "src/services/passwordPolicy.ts",
+    "to": "src/services/auth/passwordPolicy.ts"
+  },
+  {
+    "from": "src/services/PermissionService.ts",
+    "to": "src/services/auth/PermissionService.ts"
+  },
+  {
+    "from": "src/services/twoFactorAuth.ts",
+    "to": "src/services/auth/twoFactorAuth.ts"
+  },
+  {
+    "from": "src/services/ActionRegistryService.ts",
+    "to": "src/services/config/ActionRegistryService.ts"
+  },
+  {
+    "from": "src/services/AppConfigService.ts",
+    "to": "src/services/config/AppConfigService.ts"
+  },
+  {
+    "from": "src/services/BusinessProfileService.ts",
+    "to": "src/services/config/BusinessProfileService.ts"
+  },
+  {
+    "from": "src/services/BusinessTypeService.ts",
+    "to": "src/services/config/BusinessTypeService.ts"
+  },
+  {
+    "from": "src/services/CapabilityRegistryService.ts",
+    "to": "src/services/config/CapabilityRegistryService.ts"
+  },
+  {
+    "from": "src/services/ConfigurationVersionService.ts",
+    "to": "src/services/config/ConfigurationVersionService.ts"
+  },
+  {
+    "from": "src/services/FeatureService.ts",
+    "to": "src/services/config/FeatureService.ts"
+  },
+  {
+    "from": "src/services/ModuleRegistryService.ts",
+    "to": "src/services/config/ModuleRegistryService.ts"
+  },
+  {
+    "from": "src/services/NavigationService.ts",
+    "to": "src/services/config/NavigationService.ts"
+  },
+  {
+    "from": "src/services/SettingsService.ts",
+    "to": "src/services/config/SettingsService.ts"
+  },
+  {
+    "from": "src/services/settingsUtils.ts",
+    "to": "src/services/config/settingsUtils.ts"
+  },
+  {
+    "from": "src/services/settingsValidation.ts",
+    "to": "src/services/config/settingsValidation.ts"
+  },
+  {
+    "from": "src/services/TerminologyService.ts",
+    "to": "src/services/config/TerminologyService.ts"
+  },
+  {
+    "from": "src/services/CentralConfigApplier.ts",
+    "to": "src/services/licensing/CentralConfigApplier.ts"
+  },
+  {
+    "from": "src/services/CentralEstablishmentService.ts",
+    "to": "src/services/licensing/CentralEstablishmentService.ts"
+  },
+  {
+    "from": "src/services/CentralFeaturePermissionService.ts",
+    "to": "src/services/licensing/CentralFeaturePermissionService.ts"
+  },
+  {
+    "from": "src/services/CentralLicenseService.ts",
+    "to": "src/services/licensing/CentralLicenseService.ts"
+  },
+  {
+    "from": "src/services/CentralTelemetryService.ts",
+    "to": "src/services/licensing/CentralTelemetryService.ts"
+  },
+  {
+    "from": "src/services/CentralUsageLimitService.ts",
+    "to": "src/services/licensing/CentralUsageLimitService.ts"
+  },
+  {
+    "from": "src/services/DashboardQueryScopeService.ts",
+    "to": "src/services/dashboard/DashboardQueryScopeService.ts"
+  },
+  {
+    "from": "src/services/EscPosService.ts",
+    "to": "src/services/shared/EscPosService.ts"
+  },
+  {
+    "from": "src/services/ExportService.ts",
+    "to": "src/services/shared/ExportService.ts"
+  },
+  {
+    "from": "src/services/localCacheService.ts",
+    "to": "src/services/shared/localCacheService.ts"
+  },
+  {
+    "from": "src/services/performanceMonitor.ts",
+    "to": "src/services/shared/performanceMonitor.ts"
+  },
+  {
+    "from": "src/services/PrintService.ts",
+    "to": "src/services/shared/PrintService.ts"
+  },
+  {
+    "from": "src/services/rendererPerformanceMonitor.ts",
+    "to": "src/services/shared/rendererPerformanceMonitor.ts"
+  },
+  {
+    "from": "src/services/SystemDiagnosticsService.ts",
+    "to": "src/services/shared/SystemDiagnosticsService.ts"
+  },
+  {
+    "from": "src/services/systemHealthService.ts",
+    "to": "src/services/shared/systemHealthService.ts"
+  },
+  {
+    "from": "src/services/commissionTypes.ts",
+    "to": "src/types/hr/commission.ts"
+  },
+  {
+    "from": "src/services/crmTypes.ts",
+    "to": "src/types/crm/index.ts"
+  },
+  {
+    "from": "src/services/dataAdminTypes.ts",
+    "to": "src/types/admin/dataAdmin.ts"
+  },
+  {
+    "from": "src/services/notificationTypes.ts",
+    "to": "src/types/notifications/index.ts"
+  },
+  {
+    "from": "src/services/procurementTypes.ts",
+    "to": "src/types/procurement/index.ts"
+  },
+  {
+    "from": "src/services/procurementTypes01.ts",
+    "to": "src/types/procurement/part01.ts"
+  },
+  {
+    "from": "src/services/procurementTypes02.ts",
+    "to": "src/types/procurement/part02.ts"
+  },
+  {
+    "from": "src/services/reservationTypes.ts",
+    "to": "src/types/sales/reservation.ts"
+  },
+  {
+    "from": "src/services/types.ts",
+    "to": "src/types/backup/index.ts"
+  },
+  {
+    "from": "src/types/cash.ts",
+    "to": "src/types/treasury/cash.ts"
+  },
+  {
+    "from": "src/types/catalog.ts",
+    "to": "src/types/products/catalog.ts"
+  },
+  {
+    "from": "src/types/customerPrograms.ts",
+    "to": "src/types/customers/customerPrograms.ts"
+  },
+  {
+    "from": "src/types/documents.ts",
+    "to": "src/types/documents/index.ts"
+  },
+  {
+    "from": "src/types/finance.ts",
+    "to": "src/types/finance/index.ts"
+  },
+  {
+    "from": "src/types/financeBanking.ts",
+    "to": "src/types/finance/banking.ts"
+  },
+  {
+    "from": "src/types/financeCore.ts",
+    "to": "src/types/finance/core.ts"
+  },
+  {
+    "from": "src/types/hrContract.ts",
+    "to": "src/types/hr/contract.ts"
+  },
+  {
+    "from": "src/types/hrDocument.ts",
+    "to": "src/types/hr/document.ts"
+  },
+  {
+    "from": "src/types/hrLeave.ts",
+    "to": "src/types/hr/leave.ts"
+  },
+  {
+    "from": "src/types/hrRecruitment.ts",
+    "to": "src/types/hr/recruitment.ts"
+  },
+  {
+    "from": "src/types/identity.ts",
+    "to": "src/types/auth/identity.ts"
+  },
+  {
+    "from": "src/types/inventory.ts",
+    "to": "src/types/inventory/index.ts"
+  },
+  {
+    "from": "src/types/inventoryTransactions.ts",
+    "to": "src/types/inventory/transactions.ts"
+  },
+  {
+    "from": "src/types/organization.ts",
+    "to": "src/types/organization/index.ts"
+  },
+  {
+    "from": "src/types/pagination.ts",
+    "to": "src/types/shared/pagination.ts"
+  },
+  {
+    "from": "src/types/parties.ts",
+    "to": "src/types/parties/index.ts"
+  },
+  {
+    "from": "src/types/products.ts",
+    "to": "src/types/products/index.ts"
+  },
+  {
+    "from": "src/types/purchasing.ts",
+    "to": "src/types/purchasing/index.ts"
+  },
+  {
+    "from": "src/types/sales.ts",
+    "to": "src/types/sales/index.ts"
+  },
+  {
+    "from": "src/types/workforce.ts",
+    "to": "src/types/hr/workforce.ts"
+  },
+  {
+    "from": "src/sync/types.ts",
+    "to": "src/types/sync/index.ts"
+  },
+  {
+    "from": "src/config/navigationTypes.ts",
+    "to": "src/types/config/navigation.ts"
+  },
+  {
+    "from": "src/services/effects/EffectTypes.ts",
+    "to": "src/types/effects/index.ts"
+  },
+  {
+    "from": "src/components/dashboard/types.ts",
+    "to": "src/types/dashboard/components.ts"
+  },
+  {
+    "from": "src/components/pos/types.ts",
+    "to": "src/types/pos/index.ts"
+  },
+  {
+    "from": "src/components/purchases/types.ts",
+    "to": "src/types/purchasing/components.ts"
+  },
+  {
+    "from": "src/components/stock-transfers/types.ts",
+    "to": "src/types/inventory/stockTransfers.ts"
+  },
+  {
+    "from": "src/pages/admin/audit/types.ts",
+    "to": "src/types/admin/audit.ts"
+  },
+  {
+    "from": "src/pages/daily/today-purchases/types.ts",
+    "to": "src/types/dashboard/todayPurchases.ts"
+  },
+  {
+    "from": "src/pages/dashboard/executive/types.ts",
+    "to": "src/types/dashboard/executive.ts"
+  },
+  {
+    "from": "src/pages/operations/employees/types.ts",
+    "to": "src/types/hr/employeesPage.ts"
+  },
+  {
+    "from": "src/pages/products/product-detail/types.ts",
+    "to": "src/types/products/productDetailPage.ts"
+  },
+  {
+    "from": "src/pages/purchasing/supplier-detail/types.ts",
+    "to": "src/types/purchasing/supplierDetailPage.ts"
+  },
+  {
+    "from": "src/pages/sales/orders/types.ts",
+    "to": "src/types/sales/ordersPage.ts"
+  },
+  {
+    "from": "src/pages/sales/reservations/types.ts",
+    "to": "src/types/sales/reservationsPage.ts"
+  },
+  {
+    "from": "src/services/inventory-count/types.ts",
+    "to": "src/types/inventory/countSessions.ts"
+  },
+  {
+    "from": "src/services/sales/types.ts",
+    "to": "src/types/sales/serviceTypes.ts"
+  },
+  {
+    "from": "src/hooks/useAppConfig.ts",
+    "to": "src/hooks/config/useAppConfig.ts"
+  },
+  {
+    "from": "src/hooks/useBusinessTerm.ts",
+    "to": "src/hooks/config/useBusinessTerm.ts"
+  },
+  {
+    "from": "src/hooks/useDace.ts",
+    "to": "src/hooks/config/useDace.ts"
+  },
+  {
+    "from": "src/hooks/useNavigationGroups.ts",
+    "to": "src/hooks/config/useNavigationGroups.ts"
+  },
+  {
+    "from": "src/hooks/useAppSession.ts",
+    "to": "src/hooks/auth/useAppSession.ts"
+  },
+  {
+    "from": "src/hooks/useAppStartup.ts",
+    "to": "src/hooks/auth/useAppStartup.ts"
+  },
+  {
+    "from": "src/hooks/usePagePermissions.ts",
+    "to": "src/hooks/auth/usePagePermissions.ts"
+  },
+  {
+    "from": "src/hooks/usePermission.ts",
+    "to": "src/hooks/auth/usePermission.ts"
+  },
+  {
+    "from": "src/hooks/useCentralFeaturePermission.ts",
+    "to": "src/hooks/licensing/useCentralFeaturePermission.ts"
+  },
+  {
+    "from": "src/hooks/useCentralUsageLimit.ts",
+    "to": "src/hooks/licensing/useCentralUsageLimit.ts"
+  },
+  {
+    "from": "src/hooks/useIdempotencyKey.ts",
+    "to": "src/hooks/shared/useIdempotencyKey.ts"
+  },
+  {
+    "from": "src/hooks/useMediaQuery.ts",
+    "to": "src/hooks/shared/useMediaQuery.ts"
+  },
+  {
+    "from": "src/components/dashboard/useOverviewDashboardData.ts",
+    "to": "src/hooks/dashboard/useOverviewDashboardData.ts"
+  },
+  {
+    "from": "src/components/stock-transfers/useStockTransfers.ts",
+    "to": "src/hooks/inventory/useStockTransfers.ts"
+  },
+  {
+    "from": "src/components/stock-transfers/useStockTransfersData.ts",
+    "to": "src/hooks/inventory/useStockTransfersData.ts"
+  },
+  {
+    "from": "src/components/stock-transfers/useTransferActions.ts",
+    "to": "src/hooks/inventory/useTransferActions.ts"
+  },
+  {
+    "from": "src/pages/admin/audit/useAuditLogs.ts",
+    "to": "src/hooks/admin/useAuditLogs.ts"
+  },
+  {
+    "from": "src/pages/dashboard/executive/useExecutiveDashboard.ts",
+    "to": "src/hooks/dashboard/useExecutiveDashboard.ts"
+  },
+  {
+    "from": "src/pages/dashboard/executive/useExecutiveQueries.ts",
+    "to": "src/hooks/dashboard/useExecutiveQueries.ts"
+  },
+  {
+    "from": "src/pages/operations/cashier/useCashier.ts",
+    "to": "src/hooks/treasury/useCashier.ts"
+  },
+  {
+    "from": "src/components/pos/usePosBarcodeSearch.ts",
+    "to": "src/hooks/pos/usePosBarcodeSearch.ts"
+  },
+  {
+    "from": "src/components/pos/usePosCart.ts",
+    "to": "src/hooks/pos/usePosCart.ts"
+  },
+  {
+    "from": "src/components/pos/usePosCatalog.ts",
+    "to": "src/hooks/pos/usePosCatalog.ts"
+  },
+  {
+    "from": "src/components/pos/usePosCheckout.ts",
+    "to": "src/hooks/pos/usePosCheckout.ts"
+  },
+  {
+    "from": "src/components/pos/usePosCustomerCreation.ts",
+    "to": "src/hooks/pos/usePosCustomerCreation.ts"
+  },
+  {
+    "from": "src/components/pos/usePosCustomerDisplay.ts",
+    "to": "src/hooks/pos/usePosCustomerDisplay.ts"
+  },
+  {
+    "from": "src/components/pos/usePosHeldOrders.ts",
+    "to": "src/hooks/pos/usePosHeldOrders.ts"
+  },
+  {
+    "from": "src/components/pos/usePosInvoicePreview.ts",
+    "to": "src/hooks/pos/usePosInvoicePreview.ts"
+  },
+  {
+    "from": "src/components/pos/usePosKeyboardShortcuts.ts",
+    "to": "src/hooks/pos/usePosKeyboardShortcuts.ts"
+  },
+  {
+    "from": "src/components/pos/usePosShiftActions.ts",
+    "to": "src/hooks/pos/usePosShiftActions.ts"
+  },
+  {
+    "from": "src/components/pos/usePosTotals.ts",
+    "to": "src/hooks/pos/usePosTotals.ts"
+  },
+  {
+    "from": "src/utils/ceramicMath.ts",
+    "to": "src/utils/products/ceramicMath.ts"
+  },
+  {
+    "from": "src/utils/productUnits.ts",
+    "to": "src/utils/products/productUnits.ts"
+  },
+  {
+    "from": "src/utils/uom.ts",
+    "to": "src/utils/products/uom.ts"
+  },
+  {
+    "from": "src/utils/customerStatementSharing.ts",
+    "to": "src/utils/customers/customerStatementSharing.ts"
+  },
+  {
+    "from": "src/utils/date.ts",
+    "to": "src/utils/shared/date.ts"
+  },
+  {
+    "from": "src/utils/externalLinks.ts",
+    "to": "src/utils/shared/externalLinks.ts"
+  },
+  {
+    "from": "src/utils/printWindow.ts",
+    "to": "src/utils/shared/printWindow.ts"
+  },
+  {
+    "from": "src/utils/themeContrast.ts",
+    "to": "src/utils/shared/themeContrast.ts"
+  },
+  {
+    "from": "src/utils/excelExportWorkbook.ts",
+    "to": "src/utils/export/excelExportWorkbook.ts"
+  },
+  {
+    "from": "src/utils/export.ts",
+    "to": "src/utils/export/export.ts"
+  },
+  {
+    "from": "src/utils/resolvePageTitle.ts",
+    "to": "src/utils/navigation/resolvePageTitle.ts"
+  },
+  {
+    "from": "src/components/AuditLogView.tsx",
+    "to": "src/components/admin/AuditLogView.tsx"
+  },
+  {
+    "from": "src/components/CompaniesPanel.tsx",
+    "to": "src/components/admin/CompaniesPanel.tsx"
+  },
+  {
+    "from": "src/components/UsersView.tsx",
+    "to": "src/components/admin/UsersView.tsx"
+  },
+  {
+    "from": "src/components/BrandsView.tsx",
+    "to": "src/components/products/BrandsView.tsx"
+  },
+  {
+    "from": "src/components/CalculatorPanel.tsx",
+    "to": "src/components/products/CalculatorPanel.tsx"
+  },
+  {
+    "from": "src/components/CategoriesView.tsx",
+    "to": "src/components/products/CategoriesView.tsx"
+  },
+  {
+    "from": "src/components/CeramicCalculatorModal.tsx",
+    "to": "src/components/products/CeramicCalculatorModal.tsx"
+  },
+  {
+    "from": "src/components/OperationalFieldsFilter.tsx",
+    "to": "src/components/products/OperationalFieldsFilter.tsx"
+  },
+  {
+    "from": "src/components/OperationalFieldsForm.tsx",
+    "to": "src/components/products/OperationalFieldsForm.tsx"
+  },
+  {
+    "from": "src/components/OperationalFieldsRecordEditor.tsx",
+    "to": "src/components/products/OperationalFieldsRecordEditor.tsx"
+  },
+  {
+    "from": "src/components/OperationalFieldsSummary.tsx",
+    "to": "src/components/products/OperationalFieldsSummary.tsx"
+  },
+  {
+    "from": "src/components/ProductsView.tsx",
+    "to": "src/components/products/ProductsView.tsx"
+  },
+  {
+    "from": "src/components/CustomersView.tsx",
+    "to": "src/components/customers/CustomersView.tsx"
+  },
+  {
+    "from": "src/components/SuppliersView.tsx",
+    "to": "src/components/suppliers/SuppliersView.tsx"
+  },
+  {
+    "from": "src/components/PurchasesView.tsx",
+    "to": "src/components/purchases/PurchasesView.tsx"
+  },
+  {
+    "from": "src/components/SalesView.tsx",
+    "to": "src/components/sales/SalesView.tsx"
+  },
+  {
+    "from": "src/components/PosView.tsx",
+    "to": "src/components/pos/PosView.tsx"
+  },
+  {
+    "from": "src/components/InventoryView.tsx",
+    "to": "src/components/inventory/InventoryView.tsx"
+  },
+  {
+    "from": "src/components/StockTransfersView.tsx",
+    "to": "src/components/inventory/stock-transfers/StockTransfersView.tsx"
+  },
+  {
+    "from": "src/components/DashboardView.tsx",
+    "to": "src/components/dashboard/DashboardView.tsx"
+  },
+  {
+    "from": "src/components/ReportsView.tsx",
+    "to": "src/components/reports/ReportsView.tsx"
+  },
+  {
+    "from": "src/components/CashierView.tsx",
+    "to": "src/components/treasury/CashierView.tsx"
+  },
+  {
+    "from": "src/components/NotificationsView.tsx",
+    "to": "src/components/notifications/NotificationsView.tsx"
+  },
+  {
+    "from": "src/components/DocumentPreviewModal.tsx",
+    "to": "src/components/documents/DocumentPreviewModal.tsx"
+  },
+  {
+    "from": "src/components/CentralActivationView.tsx",
+    "to": "src/components/auth/CentralActivationView.tsx"
+  },
+  {
+    "from": "src/components/ForcePasswordChangeModal.tsx",
+    "to": "src/components/auth/ForcePasswordChangeModal.tsx"
+  },
+  {
+    "from": "src/components/ProjectControlsPanel.tsx",
+    "to": "src/components/projects/ProjectControlsPanel.tsx"
+  },
+  {
+    "from": "src/components/SetupWizard.tsx",
+    "to": "src/components/setup/SetupWizard.tsx"
+  },
+  {
+    "from": "src/components/DatabasePersistenceStatus.tsx",
+    "to": "src/components/shared/DatabasePersistenceStatus.tsx"
+  },
+  {
+    "from": "src/components/GlobalSearch.tsx",
+    "to": "src/components/shared/GlobalSearch.tsx"
+  },
+  {
+    "from": "src/components/Header.tsx",
+    "to": "src/components/shared/Header.tsx"
+  },
+  {
+    "from": "src/components/HeaderNav.tsx",
+    "to": "src/components/shared/HeaderNav.tsx"
+  },
+  {
+    "from": "src/components/NotesEditor.tsx",
+    "to": "src/components/shared/NotesEditor.tsx"
+  },
+  {
+    "from": "src/components/NotesPanel.tsx",
+    "to": "src/components/shared/NotesPanel.tsx"
+  },
+  {
+    "from": "src/components/Sidebar.tsx",
+    "to": "src/components/shared/Sidebar.tsx"
+  },
+  {
+    "from": "src/components/UpdateNotification.tsx",
+    "to": "src/components/shared/UpdateNotification.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/CreateTransferModal.tsx",
+    "to": "src/components/inventory/stock-transfers/CreateTransferModal.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/helpers.ts",
+    "to": "src/components/inventory/stock-transfers/helpers.ts"
+  },
+  {
+    "from": "src/components/stock-transfers/ReceiveTransferModal.tsx",
+    "to": "src/components/inventory/stock-transfers/ReceiveTransferModal.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/StockTransfersHeader.tsx",
+    "to": "src/components/inventory/stock-transfers/StockTransfersHeader.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/StockTransfersTabs.tsx",
+    "to": "src/components/inventory/stock-transfers/StockTransfersTabs.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/TransferDetailsModal.tsx",
+    "to": "src/components/inventory/stock-transfers/TransferDetailsModal.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/TransferHistoryTable.tsx",
+    "to": "src/components/inventory/stock-transfers/TransferHistoryTable.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/TransferStatusBadge.tsx",
+    "to": "src/components/inventory/stock-transfers/TransferStatusBadge.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/WarehouseSummaryGrid.tsx",
+    "to": "src/components/inventory/stock-transfers/WarehouseSummaryGrid.tsx"
+  },
+  {
+    "from": "src/components/stock-transfers/WorkflowTransfersTable.tsx",
+    "to": "src/components/inventory/stock-transfers/WorkflowTransfersTable.tsx"
+  },
+  {
+    "from": "src/pages/admin/AdminDataTab.tsx",
+    "to": "src/pages/admin/admin/AdminDataTab.tsx"
+  },
+  {
+    "from": "src/pages/admin/AdminDataTable.tsx",
+    "to": "src/pages/admin/admin/AdminDataTable.tsx"
+  },
+  {
+    "from": "src/pages/admin/adminDataUtils.ts",
+    "to": "src/pages/admin/admin/adminDataUtils.ts"
+  },
+  {
+    "from": "src/pages/admin/AdminNavigationTab.tsx",
+    "to": "src/pages/admin/admin/AdminNavigationTab.tsx"
+  },
+  {
+    "from": "src/pages/admin/AdminPage.tsx",
+    "to": "src/pages/admin/admin/AdminPage.tsx"
+  },
+  {
+    "from": "src/pages/admin/AdminRolesTab.tsx",
+    "to": "src/pages/admin/admin/AdminRolesTab.tsx"
+  },
+  {
+    "from": "src/pages/admin/AdminSettingsFields.tsx",
+    "to": "src/pages/admin/admin/AdminSettingsFields.tsx"
+  },
+  {
+    "from": "src/pages/admin/AdminSettingsTab.tsx",
+    "to": "src/pages/admin/admin/AdminSettingsTab.tsx"
+  },
+  {
+    "from": "src/pages/admin/AdminUsersTab.tsx",
+    "to": "src/pages/admin/admin/AdminUsersTab.tsx"
+  },
+  {
+    "from": "src/pages/admin/AuditLogPage.tsx",
+    "to": "src/pages/admin/audit/AuditLogPage.tsx"
+  },
+  {
+    "from": "src/pages/admin/DataDeletionPage.tsx",
+    "to": "src/pages/admin/data-deletion/DataDeletionPage.tsx"
+  },
+  {
+    "from": "src/pages/admin/SecurityCenterPage.tsx",
+    "to": "src/pages/admin/security-center/SecurityCenterPage.tsx"
+  },
+  {
+    "from": "src/pages/admin/SyncClientSettings.tsx",
+    "to": "src/pages/admin/sync-conflicts/SyncClientSettings.tsx"
+  },
+  {
+    "from": "src/pages/admin/SyncConflictsPage.tsx",
+    "to": "src/pages/admin/sync-conflicts/SyncConflictsPage.tsx"
+  },
+  {
+    "from": "src/pages/admin/UsersPage.tsx",
+    "to": "src/pages/admin/users/UsersPage.tsx"
+  },
+  {
+    "from": "src/pages/approvals/ApprovalsPage.tsx",
+    "to": "src/pages/approvals/approvals/ApprovalsPage.tsx"
+  },
+  {
+    "from": "src/pages/auth/LoginBrandPanel.tsx",
+    "to": "src/pages/auth/login/LoginBrandPanel.tsx"
+  },
+  {
+    "from": "src/pages/auth/LoginPage.tsx",
+    "to": "src/pages/auth/login/LoginPage.tsx"
+  },
+  {
+    "from": "src/pages/auth/FirstRunActivationPage.tsx",
+    "to": "src/pages/auth/first-run-activation/FirstRunActivationPage.tsx"
+  },
+  {
+    "from": "src/pages/common/NotFoundPage.tsx",
+    "to": "src/pages/common/not-found/NotFoundPage.tsx"
+  },
+  {
+    "from": "src/pages/common/NotificationsPage.tsx",
+    "to": "src/pages/common/notifications/NotificationsPage.tsx"
+  },
+  {
+    "from": "src/pages/common/WorkspaceHub.tsx",
+    "to": "src/pages/common/workspace-hub/WorkspaceHub.tsx"
+  },
+  {
+    "from": "src/pages/crm/CampaignsPage.tsx",
+    "to": "src/pages/crm/campaigns/CampaignsPage.tsx"
+  },
+  {
+    "from": "src/pages/crm/CrmActivitiesPage.tsx",
+    "to": "src/pages/crm/crm-activities/CrmActivitiesPage.tsx"
+  },
+  {
+    "from": "src/pages/crm/crmActivityConfig.ts",
+    "to": "src/pages/crm/crm-activities/crmActivityConfig.ts"
+  },
+  {
+    "from": "src/pages/crm/CrmActivityModal.tsx",
+    "to": "src/pages/crm/crm-activities/CrmActivityModal.tsx"
+  },
+  {
+    "from": "src/pages/crm/CrmDashboardPage.tsx",
+    "to": "src/pages/crm/crm-dashboard/CrmDashboardPage.tsx"
+  },
+  {
+    "from": "src/pages/crm/CRMHubPage.tsx",
+    "to": "src/pages/crm/crm-hub/CRMHubPage.tsx"
+  },
+  {
+    "from": "src/pages/crm/LeadsPage.tsx",
+    "to": "src/pages/crm/leads/LeadsPage.tsx"
+  },
+  {
+    "from": "src/pages/crm/PipelinePage.tsx",
+    "to": "src/pages/crm/pipeline/PipelinePage.tsx"
+  },
+  {
+    "from": "src/pages/customers/CustomerDetailPage.tsx",
+    "to": "src/pages/customers/customer-detail/CustomerDetailPage.tsx"
+  },
+  {
+    "from": "src/pages/customers/CustomerImportedProductsPage.tsx",
+    "to": "src/pages/customers/customer-imported-products/CustomerImportedProductsPage.tsx"
+  },
+  {
+    "from": "src/pages/customers/PartnersPage.tsx",
+    "to": "src/pages/customers/partners/PartnersPage.tsx"
+  },
+  {
+    "from": "src/pages/customers/ReadyDeliveriesPage.tsx",
+    "to": "src/pages/customers/ready-deliveries/ReadyDeliveriesPage.tsx"
+  },
+  {
+    "from": "src/pages/daily/DailyPage.tsx",
+    "to": "src/pages/daily/daily/DailyPage.tsx"
+  },
+  {
+    "from": "src/pages/daily/TodayPurchasesPage.tsx",
+    "to": "src/pages/daily/today-purchases/TodayPurchasesPage.tsx"
+  },
+  {
+    "from": "src/pages/dashboard/DashboardPage.tsx",
+    "to": "src/pages/dashboard/dashboard/DashboardPage.tsx"
+  },
+  {
+    "from": "src/pages/dashboard/ExecutiveDashboard.tsx",
+    "to": "src/pages/dashboard/executive/ExecutiveDashboard.tsx"
+  },
+  {
+    "from": "src/pages/documents/DocumentsDialogs.tsx",
+    "to": "src/pages/documents/documents/DocumentsDialogs.tsx"
+  },
+  {
+    "from": "src/pages/documents/DocumentsPage.tsx",
+    "to": "src/pages/documents/documents/DocumentsPage.tsx"
+  },
+  {
+    "from": "src/pages/documents/documentsShared.tsx",
+    "to": "src/pages/documents/documents/documentsShared.tsx"
+  },
+  {
+    "from": "src/pages/documents/DocumentsTables.tsx",
+    "to": "src/pages/documents/documents/DocumentsTables.tsx"
+  },
+  {
+    "from": "src/pages/finance/BankReconciliationPage.tsx",
+    "to": "src/pages/finance/bank-reconciliation/BankReconciliationPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/BudgetsCostCentersPage.tsx",
+    "to": "src/pages/finance/budgets-cost-centers/BudgetsCostCentersPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/CashFlowForecastPage.tsx",
+    "to": "src/pages/finance/cash-flow-forecast/CashFlowForecastPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/ChartOfAccountsPage.tsx",
+    "to": "src/pages/finance/chart-of-accounts/ChartOfAccountsPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/ChequesPage.tsx",
+    "to": "src/pages/finance/cheques/ChequesPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/DebtsDashboardPage.tsx",
+    "to": "src/pages/finance/debts-dashboard/DebtsDashboardPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/EPaymentSettlementPage.tsx",
+    "to": "src/pages/finance/e-payment-settlement/EPaymentSettlementPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/ExpensesPage.tsx",
+    "to": "src/pages/finance/expenses/ExpensesPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/FinanceOverviewPage.tsx",
+    "to": "src/pages/finance/finance-overview/FinanceOverviewPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/FinancialCalendarPage.tsx",
+    "to": "src/pages/finance/financial-calendar/FinancialCalendarPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/FinancialEventsCalendar.tsx",
+    "to": "src/pages/finance/financial-calendar/FinancialEventsCalendar.tsx"
+  },
+  {
+    "from": "src/pages/finance/FiscalClosingPage.tsx",
+    "to": "src/pages/finance/fiscal-closing/FiscalClosingPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/FixedAssetEditorModal.tsx",
+    "to": "src/pages/finance/fixed-assets/FixedAssetEditorModal.tsx"
+  },
+  {
+    "from": "src/pages/finance/fixedAssetsHelpers.ts",
+    "to": "src/pages/finance/fixed-assets/fixedAssetsHelpers.ts"
+  },
+  {
+    "from": "src/pages/finance/FixedAssetsPage.tsx",
+    "to": "src/pages/finance/fixed-assets/FixedAssetsPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/FixedAssetWorkflows.tsx",
+    "to": "src/pages/finance/fixed-assets/FixedAssetWorkflows.tsx"
+  },
+  {
+    "from": "src/pages/finance/InstallmentsPage.tsx",
+    "to": "src/pages/finance/installments/InstallmentsPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/JournalEntriesPage.tsx",
+    "to": "src/pages/finance/journal-entries/JournalEntriesPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/OtherReceivablesPage.tsx",
+    "to": "src/pages/finance/other-receivables/OtherReceivablesPage.tsx"
+  },
+  {
+    "from": "src/pages/finance/ReceivablesHubPage.tsx",
+    "to": "src/pages/finance/receivables-hub/ReceivablesHubPage.tsx"
+  },
+  {
+    "from": "src/pages/hr/CommissionsPage.tsx",
+    "to": "src/pages/hr/commissions/CommissionsPage.tsx"
+  },
+  {
+    "from": "src/pages/hr/EmployeeContractsPage.tsx",
+    "to": "src/pages/hr/employee-contracts/EmployeeContractsPage.tsx"
+  },
+  {
+    "from": "src/pages/hr/EmployeeDocumentsPage.tsx",
+    "to": "src/pages/hr/employee-documents/EmployeeDocumentsPage.tsx"
+  },
+  {
+    "from": "src/pages/hr/HrDashboardPage.tsx",
+    "to": "src/pages/hr/hr-dashboard/HrDashboardPage.tsx"
+  },
+  {
+    "from": "src/pages/hr/LeavePage.tsx",
+    "to": "src/pages/hr/leave/LeavePage.tsx"
+  },
+  {
+    "from": "src/pages/hr/RecruitmentPage.tsx",
+    "to": "src/pages/hr/recruitment/RecruitmentPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/DamageQuarantinePage.tsx",
+    "to": "src/pages/inventory/damage-quarantine/DamageQuarantinePage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/InventoryAdjustmentModals.tsx",
+    "to": "src/pages/inventory/inventory-adjustments/InventoryAdjustmentModals.tsx"
+  },
+  {
+    "from": "src/pages/inventory/InventoryAdjustmentsPage.tsx",
+    "to": "src/pages/inventory/inventory-adjustments/InventoryAdjustmentsPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/InventoryCountPage.tsx",
+    "to": "src/pages/inventory/inventory-count/InventoryCountPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/InventoryHubPage.tsx",
+    "to": "src/pages/inventory/inventory-hub/InventoryHubPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/InventoryReconciliationPage.tsx",
+    "to": "src/pages/inventory/inventory-reconciliation/InventoryReconciliationPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/InventoryValuationPage.tsx",
+    "to": "src/pages/inventory/inventory-valuation/InventoryValuationPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/LocationStockPage.tsx",
+    "to": "src/pages/inventory/location-stock/LocationStockPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/ReorderPlanningPage.tsx",
+    "to": "src/pages/inventory/reorder-planning/ReorderPlanningPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/reservationsDisplay.ts",
+    "to": "src/pages/inventory/stock-reservations/reservationsDisplay.ts"
+  },
+  {
+    "from": "src/pages/inventory/StockLedgerPage.tsx",
+    "to": "src/pages/inventory/stock-ledger/StockLedgerPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/StockReservationsPage.tsx",
+    "to": "src/pages/inventory/stock-reservations/StockReservationsPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/StockTransfersPage.tsx",
+    "to": "src/pages/inventory/stock-transfers/StockTransfersPage.tsx"
+  },
+  {
+    "from": "src/pages/inventory/WarehouseLocationsPage.tsx",
+    "to": "src/pages/inventory/warehouse-locations/WarehouseLocationsPage.tsx"
+  },
+  {
+    "from": "src/pages/manufacturing/ManufacturingPage.tsx",
+    "to": "src/pages/manufacturing/manufacturing/ManufacturingPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/AttendancePage.tsx",
+    "to": "src/pages/operations/attendance/AttendancePage.tsx"
+  },
+  {
+    "from": "src/pages/operations/BranchesPage.tsx",
+    "to": "src/pages/operations/branches/BranchesPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/CashierPage.tsx",
+    "to": "src/pages/operations/cashier/CashierPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/DeliveriesPage.tsx",
+    "to": "src/pages/operations/deliveries/DeliveriesPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/DeliveryCreateModal.tsx",
+    "to": "src/pages/operations/deliveries/DeliveryCreateModal.tsx"
+  },
+  {
+    "from": "src/pages/operations/deliveryStatus.ts",
+    "to": "src/pages/operations/deliveries/deliveryStatus.ts"
+  },
+  {
+    "from": "src/pages/operations/DriversPage.tsx",
+    "to": "src/pages/operations/drivers/DriversPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/EmployeesPage.tsx",
+    "to": "src/pages/operations/employees/EmployeesPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/FleetDashboardPage.tsx",
+    "to": "src/pages/operations/fleet-dashboard/FleetDashboardPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/PayrollPage.tsx",
+    "to": "src/pages/operations/payroll/PayrollPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/payrollDisplay.ts",
+    "to": "src/pages/operations/payroll/payrollDisplay.ts"
+  },
+  {
+    "from": "src/pages/operations/PayrollTransactionModal.tsx",
+    "to": "src/pages/operations/payroll/PayrollTransactionModal.tsx"
+  },
+  {
+    "from": "src/pages/operations/VehiclesPage.tsx",
+    "to": "src/pages/operations/vehicles/VehiclesPage.tsx"
+  },
+  {
+    "from": "src/pages/operations/WarehousesPage.tsx",
+    "to": "src/pages/operations/warehouses/WarehousesPage.tsx"
+  },
+  {
+    "from": "src/pages/pricing/PricingPage.tsx",
+    "to": "src/pages/pricing/pricing/PricingPage.tsx"
+  },
+  {
+    "from": "src/pages/pricing/PromotionsPage.tsx",
+    "to": "src/pages/pricing/promotions/PromotionsPage.tsx"
+  },
+  {
+    "from": "src/pages/products/BarcodesPrintPage.tsx",
+    "to": "src/pages/products/barcodes-print/BarcodesPrintPage.tsx"
+  },
+  {
+    "from": "src/pages/products/BrandsPage.tsx",
+    "to": "src/pages/products/brands/BrandsPage.tsx"
+  },
+  {
+    "from": "src/pages/products/CategoriesPage.tsx",
+    "to": "src/pages/products/categories/CategoriesPage.tsx"
+  },
+  {
+    "from": "src/pages/products/OperationalFieldsManager.tsx",
+    "to": "src/pages/products/operational-fields/OperationalFieldsManager.tsx"
+  },
+  {
+    "from": "src/pages/products/ProductAttributesPage.tsx",
+    "to": "src/pages/products/product-attributes/ProductAttributesPage.tsx"
+  },
+  {
+    "from": "src/pages/products/ProductCatalogHubPage.tsx",
+    "to": "src/pages/products/product-catalog-hub/ProductCatalogHubPage.tsx"
+  },
+  {
+    "from": "src/pages/products/ProductDetailPage.tsx",
+    "to": "src/pages/products/product-detail/ProductDetailPage.tsx"
+  },
+  {
+    "from": "src/pages/projects/ProjectDetailPage.tsx",
+    "to": "src/pages/projects/project-detail/ProjectDetailPage.tsx"
+  },
+  {
+    "from": "src/pages/projects/ProjectsPage.tsx",
+    "to": "src/pages/projects/projects/ProjectsPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/GoodsReceiptsPage.tsx",
+    "to": "src/pages/purchasing/goods-receipts/GoodsReceiptsPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/IncomingProductsPage.tsx",
+    "to": "src/pages/purchasing/incoming-products/IncomingProductsPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/PurchaseOrdersPage.tsx",
+    "to": "src/pages/purchasing/purchase-orders/PurchaseOrdersPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/PurchaseRequestsPage.tsx",
+    "to": "src/pages/purchasing/purchase-requests/PurchaseRequestsPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/PurchaseReturnsPage.tsx",
+    "to": "src/pages/purchasing/purchase-returns/PurchaseReturnsPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/SupplierClaimsPage.tsx",
+    "to": "src/pages/purchasing/supplier-claims/SupplierClaimsPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/SupplierDetailPage.tsx",
+    "to": "src/pages/purchasing/supplier-detail/SupplierDetailPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/SupplierQuotationsPage.tsx",
+    "to": "src/pages/purchasing/supplier-quotations/SupplierQuotationsPage.tsx"
+  },
+  {
+    "from": "src/pages/purchasing/SupplierStatementPage.tsx",
+    "to": "src/pages/purchasing/supplier-statement/SupplierStatementPage.tsx"
+  },
+  {
+    "from": "src/pages/reports/FinancialStatementsPage.tsx",
+    "to": "src/pages/reports/financial-statements/FinancialStatementsPage.tsx"
+  },
+  {
+    "from": "src/pages/reports/PosReportsPage.tsx",
+    "to": "src/pages/reports/pos-reports/PosReportsPage.tsx"
+  },
+  {
+    "from": "src/pages/reports/ProfitLossPage.tsx",
+    "to": "src/pages/reports/profit-loss/ProfitLossPage.tsx"
+  },
+  {
+    "from": "src/pages/reports/PurchaseInventoryReportPage.tsx",
+    "to": "src/pages/reports/purchase-inventory/PurchaseInventoryReportPage.tsx"
+  },
+  {
+    "from": "src/pages/reports/reportCatalog.ts",
+    "to": "src/pages/reports/reports-hub/reportCatalog.ts"
+  },
+  {
+    "from": "src/pages/reports/ReportsHubPage.tsx",
+    "to": "src/pages/reports/reports-hub/ReportsHubPage.tsx"
+  },
+  {
+    "from": "src/pages/reports/ReportView.tsx",
+    "to": "src/pages/reports/reports-hub/ReportView.tsx"
+  },
+  {
+    "from": "src/pages/reports/SalesReportsPage.tsx",
+    "to": "src/pages/reports/sales-reports/SalesReportsPage.tsx"
+  },
+  {
+    "from": "src/pages/reports/TaxReportPage.tsx",
+    "to": "src/pages/reports/tax-report/TaxReportPage.tsx"
+  },
+  {
+    "from": "src/pages/restaurant/RestaurantPage.tsx",
+    "to": "src/pages/restaurant/restaurant/RestaurantPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/AfterSalesPage.tsx",
+    "to": "src/pages/sales/after-sales/AfterSalesPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/CustomerStatementPage.tsx",
+    "to": "src/pages/sales/customer-statement/CustomerStatementPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/HistoricalReturnReconciliationPanel.tsx",
+    "to": "src/pages/sales/returns/HistoricalReturnReconciliationPanel.tsx"
+  },
+  {
+    "from": "src/pages/sales/InvoiceCyclePage.tsx",
+    "to": "src/pages/sales/invoice-cycle/InvoiceCyclePage.tsx"
+  },
+  {
+    "from": "src/pages/sales/OrdersPage.tsx",
+    "to": "src/pages/sales/orders/OrdersPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/QuotationModals.tsx",
+    "to": "src/pages/sales/quotations/QuotationModals.tsx"
+  },
+  {
+    "from": "src/pages/sales/QuotationsPage.tsx",
+    "to": "src/pages/sales/quotations/QuotationsPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/ReservationsDepositPage.tsx",
+    "to": "src/pages/sales/reservations/ReservationsDepositPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/ReturnsPage.tsx",
+    "to": "src/pages/sales/returns/ReturnsPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/SalesAnalyticsPage.tsx",
+    "to": "src/pages/sales/sales-analytics/SalesAnalyticsPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/SalesHubPage.tsx",
+    "to": "src/pages/sales/sales-hub/SalesHubPage.tsx"
+  },
+  {
+    "from": "src/pages/sales/SalesOrdersDepositsPage.tsx",
+    "to": "src/pages/sales/sales-orders-deposits/SalesOrdersDepositsPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/AppConfigurationPage.tsx",
+    "to": "src/pages/settings/app-configuration/AppConfigurationPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/AppearanceCustomizationTab.tsx",
+    "to": "src/pages/admin/admin/AppearanceCustomizationTab.tsx"
+  },
+  {
+    "from": "src/pages/settings/BackupHistoryTable.tsx",
+    "to": "src/pages/settings/backup/BackupHistoryTable.tsx"
+  },
+  {
+    "from": "src/pages/settings/BackupPage.tsx",
+    "to": "src/pages/settings/backup/BackupPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/ConfigurationStudioPage.tsx",
+    "to": "src/pages/settings/configuration-studio/ConfigurationStudioPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/DataImportPage.tsx",
+    "to": "src/pages/settings/data-import/DataImportPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/DynamicDataPage.tsx",
+    "to": "src/pages/settings/dynamic-data/DynamicDataPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/LicenseModeSettingsPage.tsx",
+    "to": "src/pages/settings/license-mode/LicenseModeSettingsPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/SettingsHubPage.tsx",
+    "to": "src/pages/settings/settings-hub/SettingsHubPage.tsx"
+  },
+  {
+    "from": "src/pages/settings/SystemHealthPage.tsx",
+    "to": "src/pages/settings/system-health/SystemHealthPage.tsx"
+  },
+  {
+    "from": "src/database/db.ts",
+    "to": "src/database/repositories/databaseManager.ts"
+  },
+  {
+    "from": "src/database/ledger.ts",
+    "to": "src/database/repositories/ledger.ts"
+  },
+  {
+    "from": "src/database/migrations.ts",
+    "to": "src/database/migrations/index.ts"
+  },
+  {
+    "from": "src/database/migrationSettings.ts",
+    "to": "src/database/migrations/settings.ts"
+  },
+  {
+    "from": "src/database/migrationSupport.ts",
+    "to": "src/database/migrations/support.ts"
+  },
+  {
+    "from": "src/database/schema.ts",
+    "to": "src/database/schema/index.ts"
+  }
+]

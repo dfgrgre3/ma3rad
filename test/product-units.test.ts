@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel, isServiceProduct } from '../src/utils/productUnits';
+import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel, isServiceProduct } from '../src/utils/products/productUnits';
 import { emptyForm, emptyProductEntryForm, emptyVariant } from '../src/components/products/productFormModel';
 
 test('service units read as خدمة instead of square meters', () => {

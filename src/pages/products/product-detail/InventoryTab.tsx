@@ -1,8 +1,8 @@
 import React from 'react';
 import { Product } from '../../../types';
-import { formatProductQuantity, getProductUnitLabel } from '../../../utils/productUnits';
+import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { fmt } from './format';
-import { StockSummary } from './types';
+import { StockSummary } from '../../../types/products/productDetailPage';
 
 interface InventoryTabProps {
   product: Product;

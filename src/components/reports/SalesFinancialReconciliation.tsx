@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, ClipboardCheck, Loader2, RefreshCw, Scale } from 'lucide-react';
-import { AuthService } from '../../services/AuthService';
-import { PermissionService } from '../../services/PermissionService';
+import { AuthService } from '../../services/auth/AuthService';
+import { PermissionService } from '../../services/auth/PermissionService';
 import {
   SalesFinancialReconciliationService,
-} from '../../services/SalesFinancialReconciliationService';
+} from '../../services/sales/SalesFinancialReconciliationService';
 import type {
   SalesFinancialCheck,
   SalesFinancialClosure,
-} from '../../services/SalesFinancialReconciliationService';
+} from '../../services/sales/SalesFinancialReconciliationService';
 
 const fmt = (value: number) => new Intl.NumberFormat('ar-EG', {
   minimumFractionDigits: 2,

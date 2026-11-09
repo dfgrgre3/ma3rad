@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { GitBranch, Plus, Trash2 } from 'lucide-react';
-import { ProductExtraService, ProductVariant } from '../../../services/ProductExtraService';
-import { OperationalFieldService, type ProductGradeOption } from '../../../services/OperationalFieldService';
+import { ProductExtraService, ProductVariant } from '../../../services/products/ProductExtraService';
+import { OperationalFieldService, type ProductGradeOption } from '../../../services/products/OperationalFieldService';
 import { gradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import { money } from './format';
 

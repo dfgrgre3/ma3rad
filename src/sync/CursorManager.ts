@@ -1,4 +1,4 @@
-﻿import { DatabaseManager } from '../database/db.ts';
+﻿import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 
 export class CursorManager {
   private dbManager: DatabaseManager;

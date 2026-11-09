@@ -1,5 +1,5 @@
 import React from 'react';
-import { CeramicMath } from '../../utils/ceramicMath';
+import { CeramicMath } from '../../utils/products/ceramicMath';
 
 interface TopCustomersCardProps {
   topCustomers: any[];

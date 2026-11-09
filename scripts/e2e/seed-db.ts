@@ -3,7 +3,7 @@
 import '../../test/integration.setup.ts';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseManager } from '../../src/database/db.ts';
+import { DatabaseManager } from '../../src/database/repositories/databaseManager.ts';
 
 const dataDir = process.argv[2];
 if (!dataDir) throw new Error('Usage: seed-db.ts <userDataDir>');

@@ -1,5 +1,5 @@
 import React from 'react';
-import { SECTIONS_CONFIG, type DashboardSectionConfig, type SectionId } from './types';
+import { SECTIONS_CONFIG, type DashboardSectionConfig, type SectionId } from '../../types/dashboard/components';
 
 interface DashboardSectionNavProps {
   activeTab: SectionId;

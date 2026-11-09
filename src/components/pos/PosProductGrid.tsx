@@ -3,10 +3,10 @@ import {
   Plus, Search, CheckSquare, Square, ShoppingCart, LayoutGrid, List, Package,
 } from 'lucide-react';
 import type { Product } from '../../types';
-import { CeramicMath } from '../../utils/ceramicMath';
-import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
 import { DataTable, type DataTableColumn } from '../ui/DataTable';
-import type { CartItem } from './types';
+import type { CartItem } from '../../types/pos';
 
 export type PosProductViewMode = 'grid' | 'list';
 
@@ -353,7 +353,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* شريط الوضع: Grid / List + عدد النتائج */}
-      <div className="px-4 pt-2.5 pb-1 flex items-center justify-between gap-2 shrink-0">
+      <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-1 pt-2">
         <span className="text-[11px] text-slate-500 font-bold" aria-live="polite">
           {products.length > 0 && `يعرض ${Math.min(renderedProducts.length, products.length)} من ${products.length} صنف`}
         </span>
@@ -421,7 +421,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
         </div>
       )}
 
-      <div className={`min-h-0 flex-1 p-4 pt-2 ${viewMode === 'list' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
+      <div className={`min-h-0 flex-1 p-3 pt-2 max-[900px]:pb-24 ${viewMode === 'list' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
         {products.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-slate-500">
             <Search className="w-14 h-14 mb-3 opacity-30" strokeWidth={1.5} />
@@ -455,7 +455,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
             </>
           ) : (
             <>
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start items-start gap-3">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] content-start items-start gap-2">
                 {renderedProducts.map(renderCard)}
               </div>
               {visibleLimit < products.length && (

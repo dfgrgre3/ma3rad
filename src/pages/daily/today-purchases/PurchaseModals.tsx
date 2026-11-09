@@ -2,7 +2,7 @@ import React from 'react';
 import {
   DetailsModal, PaymentModal, QuickPurchaseModal, VoidModal, type PaymentTarget,
 } from '../../../components/daily/DailyModals';
-import type { PurchaseDetailsTarget, PurchaseVoidTarget } from './types';
+import type { PurchaseDetailsTarget, PurchaseVoidTarget } from '../../../types/dashboard/todayPurchases';
 
 export interface PurchaseModalsProps {
   quickOpen: boolean;

@@ -1,7 +1,7 @@
 import { NAV_GROUPS_01 } from './navigationGroups01';
 import { NAV_GROUPS_02 } from './navigationGroups02';
-export * from './navigationTypes';
-import type { NavGroupDef } from './navigationTypes';
+export * from '../types/config/navigation';
+import type { NavGroupDef } from '../types/config/navigation';
 
 export const NAV_GROUPS: NavGroupDef[] = [...NAV_GROUPS_01, ...NAV_GROUPS_02];
 

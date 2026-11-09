@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowDownRight, ArrowUpRight, TrendingUp } from 'lucide-react';
-import type { CashFlowMonth } from '../../../services/FinancialStatementsService';
+import type { CashFlowMonth } from '../../../services/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
 export function CashFlowPanel({ cash }: {

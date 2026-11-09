@@ -1,8 +1,9 @@
 import React from 'react';
 import { BookmarkPlus, X } from 'lucide-react';
 import type { Product } from '../../../types';
-import { formatProductQuantity, getProductUnitLabel } from '../../../utils/productUnits';
-import type { NewReservationForm, ReservationAvailability, WarehouseOption } from './types';
+import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
+import type { NewReservationForm, ReservationAvailability, WarehouseOption } from '../../../types/sales/reservationsPage';
+import { ProductPicker } from '../../../components/products/ProductPicker';
 
 interface NewReservationModalProps {
   form: NewReservationForm;
@@ -44,19 +45,13 @@ export const NewReservationModal: React.FC<NewReservationModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
               اختر الصنف *
             </label>
-            <select
-              required
+            <ProductPicker
               value={form.productId}
-              onChange={(e) => onFormChange({ ...form, productId: e.target.value })}
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
-            >
-              <option value="">-- اختر الصنف --</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.sku}) — {getProductUnitLabel(p)}
-                </option>
-              ))}
-            </select>
+              required
+              selectedLabel={products.find((product) => product.id === form.productId)?.name}
+              ariaLabel="استعراض أصناف الحجز"
+              onChange={(productId) => onFormChange({ ...form, productId })}
+            />
           </div>
 
           <div>

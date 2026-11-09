@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { CashierService } from '../../services/CashierService';
+import { CashierService } from '../../services/finance/CashierService';
 import { useToast } from '../ui/Toast';
 import type { PaymentType } from '../../types';
 import { useExpenseCategories } from '../../hooks/daily/useExpenseCategories';

@@ -1,15 +1,15 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { ProcurementService } from '../src/services/ProcurementService.ts';
-import { PurchaseService } from '../src/services/PurchaseService.ts';
-import { PurchaseOrderService } from '../src/services/PurchaseOrderService.ts';
-import { PurchaseReturnService } from '../src/services/PurchaseReturnService.ts';
-import { SupplierService } from '../src/services/SupplierService.ts';
-import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { ProcurementService } from '../src/services/procurement/ProcurementService.ts';
+import { PurchaseService } from '../src/services/purchases/PurchaseService.ts';
+import { PurchaseOrderService } from '../src/services/purchases/PurchaseOrderService.ts';
+import { PurchaseReturnService } from '../src/services/purchases/PurchaseReturnService.ts';
+import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
+import { FinanceExtrasService } from '../src/services/finance/FinanceExtrasService.ts';
 
 test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matching, and Supplier Scorecard', async () => {
   const db = DatabaseManager.getInstance();

@@ -1,3 +1,3 @@
-import { BranchAccessService } from '../BranchAccessService';
+import { BranchAccessService } from '../auth/BranchAccessService';
 
 export const branchAccess = new BranchAccessService();

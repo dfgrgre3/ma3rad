@@ -1,5 +1,5 @@
-import type { DatabaseManager } from '../../database/db';
-import type { BranchAccessService } from '../BranchAccessService';
+import type { DatabaseManager } from '../../database/repositories/databaseManager';
+import type { BranchAccessService } from '../auth/BranchAccessService';
 import type { SalesInvoice, SalesInvoiceItem } from '../../types';
 
 export type InvoiceWithItems = SalesInvoice & { items: SalesInvoiceItem[] };

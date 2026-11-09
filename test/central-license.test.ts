@@ -1,8 +1,8 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CentralLicenseService } from '../src/services/CentralLicenseService.ts';
-import { CentralTelemetryService } from '../src/services/CentralTelemetryService.ts';
+import { CentralLicenseService } from '../src/services/licensing/CentralLicenseService.ts';
+import { CentralTelemetryService } from '../src/services/licensing/CentralTelemetryService.ts';
 
 const root = globalThis as any;
 root.window.ceramisys = root.window.ceramisys || {};

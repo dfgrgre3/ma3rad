@@ -1,5 +1,5 @@
 import React from 'react';
-import type { LedgerLine } from '../../../services/FinancialStatementsService';
+import type { LedgerLine } from '../../../services/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
 type LedgerAccount = { id: string; code: string; name: string; type: string };

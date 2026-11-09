@@ -2,10 +2,10 @@ import React, { Profiler, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronLeft, ChevronRight, LoaderCircle, Search, Users, X } from 'lucide-react';
 import type { Customer } from '../../types';
-import type { CustomerService } from '../../services/CustomerService';
-import { CeramicMath } from '../../utils/ceramicMath';
+import type { CustomerService } from '../../services/customers/CustomerService';
+import { CeramicMath } from '../../utils/products/ceramicMath';
 import { CUSTOMER_TYPE_LABELS } from './customerLabels';
-import { reportSlowReactRender } from '../../services/rendererPerformanceMonitor';
+import { reportSlowReactRender } from '../../services/shared/rendererPerformanceMonitor';
 
 type CustomerPage = ReturnType<CustomerService['getCustomersPage']>;
 type CustomerTypeFilter = Customer['customerType'] | 'ALL';
@@ -198,7 +198,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
               جارٍ تحميل العملاء…
             </div>
           ) : result?.items.length ? (
-            <table className="w-full min-w-[680px] text-right text-sm">
+            <table className="selection-list w-full min-w-[680px] border-separate border-spacing-0 text-right text-sm">
               <thead className="sticky top-0 z-10 bg-slate-100 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-300">
                 <tr>
                   <th className="px-4 py-3">العميل</th>
@@ -209,17 +209,21 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
                   <th className="px-4 py-3 text-center">الإجراء</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody>
                 {result.items.map((customer) => {
                   const isActive = customer.isActive !== 0;
                   const isSelected = customer.id === selectedCustomerId;
                   return (
-                    <tr key={customer.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                    <tr
+                      key={customer.id}
+                      aria-selected={isSelected}
+                      className={`selection-list__row ${isSelected ? 'is-selected' : ''}`}
+                    >
                       <td className="px-4 py-3">
                         <div className="font-bold">{customer.name}</div>
-                        <div className="mt-0.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">{customer.code}</div>
+                        <div className="selection-list__meta mt-0.5 font-mono text-[11px]">{customer.code}</div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-300">{customer.phone}</td>
+                      <td className="selection-list__meta px-4 py-3 font-mono text-xs">{customer.phone}</td>
                       <td className="px-4 py-3 text-xs">{CUSTOMER_TYPE_LABELS[customer.customerType]}</td>
                       <td className="px-4 py-3 text-xs font-bold tabular-nums">{CeramicMath.formatCurrency(customer.currentBalance)}</td>
                       <td className="px-4 py-3">

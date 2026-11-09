@@ -1,8 +1,8 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { localCache } from '../src/services/localCacheService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { localCache } from '../src/services/shared/localCacheService.ts';
 
 test('local cache honors item lifetimes, tracks hits, and purges tagged entries', async () => {
   localCache.clear();

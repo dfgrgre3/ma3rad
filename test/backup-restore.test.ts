@@ -1,17 +1,17 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { BackupService } from '../src/services/BackupService.ts';
-import { BackupServicePart01 } from '../src/services/BackupServicePart01.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { BackupService } from '../src/services/backup/BackupService.ts';
+import { BackupServicePart01 } from '../src/services/backup/BackupServicePart01.ts';
 import officeCrypto from 'officecrypto-tool';
-import { createXlsxBackupWorkbook } from '../src/services/xlsxBackup.ts';
-import { encryptExternalBackup } from '../src/services/backupEncryption.ts';
-import { MIGRATIONS } from '../src/database/migrations.ts';
+import { createXlsxBackupWorkbook } from '../src/services/backup/xlsxBackup.ts';
+import { encryptExternalBackup } from '../src/services/backup/backupEncryption.ts';
+import { MIGRATIONS } from '../src/database/migrations/index.ts';
 
 /**
  * Restoring a production backup is a destructive, all-or-nothing operation:

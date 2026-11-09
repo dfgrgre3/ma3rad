@@ -1,24 +1,24 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CompanyService } from '../src/services/CompanyService.ts';
-import { BranchService } from '../src/services/BranchService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { SupplierService } from '../src/services/SupplierService.ts';
-import { ProductService } from '../src/services/ProductService.ts';
-import { PurchaseService } from '../src/services/PurchaseService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { BranchAccessService } from '../src/services/BranchAccessService.ts';
-import { InventoryService } from '../src/services/InventoryService.ts';
-import { FinancialStatementsService } from '../src/services/FinancialStatementsService.ts';
-import { AccountingService } from '../src/services/AccountingService.ts';
-import { FinanceEnterpriseService } from '../src/services/FinanceEnterpriseService.ts';
-import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CompanyService } from '../src/services/organization/CompanyService.ts';
+import { BranchService } from '../src/services/organization/BranchService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
+import { ProductService } from '../src/services/products/ProductService.ts';
+import { PurchaseService } from '../src/services/purchases/PurchaseService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
+import { InventoryService } from '../src/services/inventory/InventoryService.ts';
+import { FinancialStatementsService } from '../src/services/reports/FinancialStatementsService.ts';
+import { AccountingService } from '../src/services/finance/AccountingService.ts';
+import { FinanceEnterpriseService } from '../src/services/finance/FinanceEnterpriseService.ts';
+import { FinanceExtrasService } from '../src/services/finance/FinanceExtrasService.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
   id: 'usr_scope_admin',

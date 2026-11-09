@@ -6,6 +6,7 @@ const electronDirectory = path.join(__dirname, '../electron');
 const defaultMainPath = path.join(electronDirectory, 'main.js');
 const defaultEntryPath = path.join(electronDirectory, 'entry.js');
 const defaultSecurityPath = path.join(electronDirectory, 'security.js');
+const BYTECODE_MANIFEST_HASH_PATTERN = /(const BYTECODE_INTEGRITY_MANIFEST_SHA256 = ')[a-f0-9]{64}(';)/;
 
 function createProtectedLoaderSource(moduleName) {
   return `// Protected binary code\nmodule.exports = require('./${moduleName}.jsc');\n`;
@@ -13,6 +14,19 @@ function createProtectedLoaderSource(moduleName) {
 
 function sha256(content) {
   return crypto.createHash('sha256').update(content).digest('hex');
+}
+
+function getEntrySourceIntegrityHash(entryPath = defaultEntryPath) {
+  const source = fs.readFileSync(entryPath, 'utf8');
+  let matches = 0;
+  const normalizedSource = source.replace(BYTECODE_MANIFEST_HASH_PATTERN, (_match, prefix, suffix) => {
+    matches++;
+    return `${prefix}${'0'.repeat(64)}${suffix}`;
+  });
+  if (matches !== 1) {
+    throw new Error(`Expected exactly one bytecode manifest hash in ${entryPath}; found ${matches}.`);
+  }
+  return sha256(normalizedSource);
 }
 
 function replacePinnedHash(source, name, hash) {
@@ -52,13 +66,13 @@ function updateSecurityIntegrityHashes({
     updatedSource = replacePinnedHash(
       updatedSource,
       'ENTRY_SOURCE_INTEGRITY_SHA256',
-      sha256(fs.readFileSync(entryPath)),
+      getEntrySourceIntegrityHash(entryPath),
     );
   }
   if (updatedSource !== mainSource) fs.writeFileSync(mainPath, updatedSource, 'utf8');
 
   return {
-    entrySourceHash: fs.existsSync(entryPath) ? sha256(fs.readFileSync(entryPath)) : null,
+    entrySourceHash: fs.existsSync(entryPath) ? getEntrySourceIntegrityHash(entryPath) : null,
     securitySourceHash,
     packagedLoaderHash,
   };
@@ -73,4 +87,8 @@ if (require.main === module) {
   }
 }
 
-module.exports = { createProtectedLoaderSource, updateSecurityIntegrityHashes };
+module.exports = {
+  createProtectedLoaderSource,
+  getEntrySourceIntegrityHash,
+  updateSecurityIntegrityHashes,
+};

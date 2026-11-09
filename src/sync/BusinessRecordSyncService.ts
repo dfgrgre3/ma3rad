@@ -1,8 +1,8 @@
-import { DatabaseManager } from '../database/db.ts';
+import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 import { InboxRepository } from './InboxRepository.ts';
 import { OutboxRepository } from './OutboxRepository.ts';
 import { SyncPolicyService } from './SyncPolicyService.ts';
-import type { SyncEvent, SyncOperation } from './types.ts';
+import type { SyncEvent, SyncOperation } from '../types/sync/index.ts';
 import type { EventDispatcher } from './PullChangesService.ts';
 
 type BusinessRecordType =

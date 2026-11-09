@@ -1,7 +1,7 @@
 import React from 'react';
 import { CheckCircle, DollarSign } from 'lucide-react';
 import type { Expense } from '../../../types';
-import { CeramicMath } from '../../../utils/ceramicMath';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
 
 interface Props {
   expenses: Expense[];

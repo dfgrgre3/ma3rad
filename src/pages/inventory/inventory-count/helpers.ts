@@ -1,4 +1,4 @@
-﻿import type { CountItem, CountSession, VisibleCountItem } from '../../../services/inventory-count/types';
+﻿import type { CountItem, CountSession, VisibleCountItem } from '../../../types/inventory/countSessions';
 
 export const fmtCountCurrency = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
 

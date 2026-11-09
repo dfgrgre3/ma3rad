@@ -8,7 +8,7 @@ import { RetryScheduler } from './RetryScheduler.ts';
 import { SyncAuditLogger } from './SyncAuditLogger.ts';
 import { EventDispatcher } from './PullChangesService.ts';
 import { EventValidator } from './EventValidator.ts';
-import type { SyncEvent, SyncTransport, SyncStatus } from './types.ts';
+import type { SyncEvent, SyncTransport, SyncStatus } from '../types/sync/index.ts';
 
 export class SyncEngine {
   public outbox: OutboxRepository;

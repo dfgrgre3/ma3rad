@@ -1,5 +1,5 @@
-import { getUomLabel, isWholeUnit } from '../../utils/uom';
-import type { CartItem } from './types';
+import { getUomLabel, isWholeUnit } from '../../utils/products/uom';
+import type { CartItem } from '../../types/pos';
 
 export const getCartQuantityStep = (item: CartItem) =>
   isWholeUnit(item.soldBy, item.product) ? 1 : 0.01;

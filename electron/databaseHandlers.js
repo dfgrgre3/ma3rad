@@ -238,6 +238,7 @@ function registerDatabaseHandlers({
   APP_DATA_DIR, BACKUP_DIR, DB_FILE, REMEMBERED_CREDENTIALS_FILE,
   ensureDirs, databaseFileExists, MAX_DB_SIZE,
 }) {
+  const maxDatabaseSizeMessage = `حجم قاعدة البيانات يتجاوز الحد المناسب لهذا الجهاز (${Math.floor(MAX_DB_SIZE / (1024 * 1024))} ميجابايت).`;
   const getKey = () => readOrCreateDatabaseKey({ appDataDir: APP_DATA_DIR, fs, safeStorage, path });
   const offsiteBackupConfig = path.join(APP_DATA_DIR, 'offsite-backup.json');
 
@@ -290,14 +291,14 @@ function registerDatabaseHandlers({
     if (!(await databaseFileExists())) return null;
     const fileBytes = await fs.readFile(DB_FILE);
     if (fileBytes.length > MAX_DB_SIZE + 64) {
-      throw new Error('Database file exceeds maximum allowed size');
+      throw new Error(maxDatabaseSizeMessage);
     }
     const plaintext = hasDatabaseMagic(fileBytes)
       ? decryptDatabaseBytes(fileBytes, await readOrCreateDatabaseKey({
           appDataDir: APP_DATA_DIR, fs, safeStorage, path, createIfMissing: false,
         }))
       : fileBytes;
-    if (plaintext.length > MAX_DB_SIZE) throw new Error('Database file exceeds maximum allowed size');
+    if (plaintext.length > MAX_DB_SIZE) throw new Error(maxDatabaseSizeMessage);
     return new Uint8Array(plaintext);
   });
 
@@ -314,12 +315,14 @@ function registerDatabaseHandlers({
   ipcMain.handle('db:decrypt-backup-with-recovery-key', async (event, backupBytes, recoveryFileBytes, password) => {
     validateIpcSender(event);
     const encrypted = Buffer.from(backupBytes || []);
-    if (encrypted.length > MAX_DB_SIZE + 64 || !hasDatabaseMagic(encrypted)) {
+    if (encrypted.length > MAX_DB_SIZE + 64) throw new Error(maxDatabaseSizeMessage);
+    if (!hasDatabaseMagic(encrypted)) {
       throw new Error('ملف النسخة المشفر غير صالح.');
     }
     const key = await decryptRecoveryKey(recoveryFileBytes, password);
     const plaintext = decryptDatabaseBytes(encrypted, key);
-    if (plaintext.length > MAX_DB_SIZE || !plaintext.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
+    if (plaintext.length > MAX_DB_SIZE) throw new Error(maxDatabaseSizeMessage);
+    if (!plaintext.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
       throw new Error('الملف المستعاد لا يحتوي على قاعدة SQLite صالحة.');
     }
     await verifySQLiteDatabaseBytes(plaintext);
@@ -364,7 +367,7 @@ function registerDatabaseHandlers({
         throw createCodedError('Database save payload must be a byte array.', 'DATABASE_INVALID_PAYLOAD');
       }
       const data = Buffer.from(bytes);
-      if (data.length > MAX_DB_SIZE) throw new Error('Database data exceeds maximum allowed size');
+      if (data.length > MAX_DB_SIZE) throw new Error(maxDatabaseSizeMessage);
       if (!data.subarray(0, SQLITE_HEADER.length).equals(SQLITE_HEADER)) {
         throw createCodedError('Database save payload must contain a valid SQLite database.', 'DATABASE_INVALID_SQLITE');
       }
@@ -425,14 +428,15 @@ function registerDatabaseHandlers({
   ipcMain.handle('db:decrypt-local-backup', async (event, bytes) => {
     validateIpcSender(event);
     const encrypted = Buffer.from(bytes || []);
-    if (encrypted.length > MAX_DB_SIZE + 64 || !hasDatabaseMagic(encrypted)) {
+    if (encrypted.length > MAX_DB_SIZE + 64) throw new Error(maxDatabaseSizeMessage);
+    if (!hasDatabaseMagic(encrypted)) {
       throw new Error('ملف النسخة المحلية ليس نسخة مشفرة صالحة.');
     }
     const key = await readOrCreateDatabaseKey({
       appDataDir: APP_DATA_DIR, fs, safeStorage, path, createIfMissing: false,
     });
     const plaintext = decryptDatabaseBytes(encrypted, key);
-    if (plaintext.length > MAX_DB_SIZE) throw new Error('Database file exceeds maximum allowed size');
+    if (plaintext.length > MAX_DB_SIZE) throw new Error(maxDatabaseSizeMessage);
     return new Uint8Array(plaintext);
   });
 

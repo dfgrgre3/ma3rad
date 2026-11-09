@@ -1,7 +1,7 @@
 import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { fmtCurrency } from './helpers';
-import { TX_TYPES, type FinancialTransaction } from './types';
+import { TX_TYPES, type FinancialTransaction } from '../../../types/hr/employeesPage';
 
 interface EmployeeHistoryModalProps {
   open: boolean;

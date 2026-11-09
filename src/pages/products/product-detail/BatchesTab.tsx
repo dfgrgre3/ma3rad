@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Palette, Plus, X, Trash2, Loader2 } from 'lucide-react';
-import { DatabaseManager } from '../../../database/db';
-import { BatchService } from '../../../services/BatchService';
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { BatchService } from '../../../services/inventory/BatchService';
 import { ProductBatch } from '../../../types';
-import { AuthService } from '../../../services/AuthService';
-import { BranchAccessService } from '../../../services/BranchAccessService';
+import { AuthService } from '../../../services/auth/AuthService';
+import { BranchAccessService } from '../../../services/auth/BranchAccessService';
 
 interface BatchesTabProps {
   productId: string;

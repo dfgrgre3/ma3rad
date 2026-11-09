@@ -1,9 +1,9 @@
 import React from 'react';
 import { X, Save, Loader2 } from 'lucide-react';
 import { Product } from '../../../types';
-import { getProductUnitLabel } from '../../../utils/productUnits';
-import { ProductEditForm } from './types';
-import { useBusinessTerm } from '../../../hooks/useBusinessTerm';
+import { getProductUnitLabel } from '../../../utils/products/productUnits';
+import { ProductEditForm } from '../../../types/products/productDetailPage';
+import { useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
 
 interface ProductEditModalProps {
   product: Product;

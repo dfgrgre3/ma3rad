@@ -7,7 +7,7 @@ const projectRoot = path.resolve(__dirname, '..');
 const electronDirectory = path.join(projectRoot, 'electron');
 const legacyElectronVersion = '22.3.27';
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-win7-'));
-const savedBytecode = new Map();
+const savedArtifacts = new Map();
 const generatedBytecode = [];
 let productionBundleStarted = false;
 
@@ -16,8 +16,8 @@ function findBytecode(directory) {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
       findBytecode(entryPath);
-    } else if (entry.name.endsWith('.jsc')) {
-      savedBytecode.set(entryPath, fs.readFileSync(entryPath));
+    } else if (entry.name.endsWith('.jsc') || entry.name === 'bytecode-integrity.json') {
+      savedArtifacts.set(entryPath, fs.readFileSync(entryPath));
     }
   }
 }
@@ -70,11 +70,11 @@ function restoreSourcesAndBytecode() {
   if (productionBundleStarted) {
     run(process.execPath, [path.join(__dirname, 'restore-source.cjs')]);
   }
-  for (const [filePath, bytecode] of savedBytecode) {
-    fs.writeFileSync(filePath, bytecode);
+  for (const [filePath, contents] of savedArtifacts) {
+    fs.writeFileSync(filePath, contents);
   }
   for (const filePath of generatedBytecode) {
-    if (!savedBytecode.has(filePath) && fs.existsSync(filePath)) {
+    if (!savedArtifacts.has(filePath) && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
   }
@@ -106,6 +106,7 @@ async function build() {
     'hardwareId.js',
     'security.js',
     'databaseHandlers.js',
+    'databaseMemoryPolicy.js',
     'appHandlers.js',
     'centralApi.js',
     'documentHandlers.js',
@@ -124,7 +125,7 @@ async function build() {
   ];
   for (const file of compiledFiles) {
     const bytecodePath = path.join(electronDirectory, file.replace(/\.js$/, '.jsc'));
-    if (!savedBytecode.has(bytecodePath)) generatedBytecode.push(bytecodePath);
+    if (!savedArtifacts.has(bytecodePath)) generatedBytecode.push(bytecodePath);
   }
 
   run(process.execPath, [

@@ -3,17 +3,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { BranchAccessService } from '../src/services/BranchAccessService.ts';
-import { OrderService } from '../src/services/OrderService.ts';
-import { ProductService } from '../src/services/ProductService.ts';
-import { ReservationService } from '../src/services/ReservationService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
+import { OrderService } from '../src/services/sales/OrderService.ts';
+import { ProductService } from '../src/services/products/ProductService.ts';
+import { ReservationService } from '../src/services/sales/ReservationService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 test('reservation pages keep sales and inventory permission domains independent', () => {
-  const page = fs.readFileSync(path.join(process.cwd(), 'src/pages/sales/ReservationsDepositPage.tsx'), 'utf8');
+  const page = fs.readFileSync(path.join(process.cwd(), 'src/pages/sales/reservations/ReservationsDepositPage.tsx'), 'utf8');
   const routes = fs.readFileSync(path.join(process.cwd(), 'src/router/routesList.tsx'), 'utf8');
   assert.match(page, /canViewPage = mode === 'sales' \? canViewOrdersDeposits : canViewReservations/);
   assert.match(page, /if \(mode === 'inventory'\)[\s\S]*setOrders\(\[\]\)/);

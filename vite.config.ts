@@ -67,6 +67,7 @@ export default defineConfig(({ command }) => {
     define: {
       __APP_VERSION__: JSON.stringify(packageJson.version),
       __BYPASS_FIRST_RUN_ACTIVATION__: JSON.stringify(activationBypass),
+      __CERAMISYS_LEGACY_BUILD__: JSON.stringify(process.env.CERAMISYS_LEGACY_BUILD === '1'),
     },
     clearScreen: false,
     logLevel: 'info',

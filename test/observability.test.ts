@@ -1,7 +1,7 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { auditLogger } from '../src/services/auditLogger.ts';
+import { auditLogger } from '../src/services/security/auditLogger.ts';
 
 test('auditLogger logs and redacts sensitive changes without crashing', () => {
   auditLogger.log('u1', 's1', 'update', 'user', 'u2', 'change', { password: 'secret', token: 'abc', name: 'x' }, true);

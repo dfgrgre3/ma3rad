@@ -1,9 +1,10 @@
 {
-  "electron/main.jsc": "31e51f013a6eabcc7c39f00a6174535a31c6fced9f9533924fddc90f31ca9448",
+  "electron/main.jsc": "a005dbf13620300de3d3c8e0a423b92f9a57317ead2252b0a77f6e140a9a9779",
   "electron/licenseGuard.jsc": "58bff341572617dd8111ef2672a870514ef297729c855f2afa2e32acb7b732e1",
   "electron/hardwareId.jsc": "893d4e4f6ec6cec2250c3930c06d8fe7bd9f7f761772338c7233168bccd33adc",
   "electron/security.jsc": "cac9b7499c21f84b80ef34eb00717449556af9f26fc35b4d46a96974d9b73991",
-  "electron/databaseHandlers.jsc": "f766cb6b40e2affa8c80ef9d7e8159fa309a852475a046a412be024e7d48e0b4",
+  "electron/databaseHandlers.jsc": "5095aee25633e8949b97ba44449cdd21b0589ed06d4278b3cdb77aebcafd7916",
+  "electron/databaseMemoryPolicy.jsc": "d9bf88065212bb3063de7203d6cb0db8cd27ded48a0bff74c81ced82930d24e4",
   "electron/appHandlers.jsc": "48566cefedde74bcfa6f55e2dbc8835fc0cce9d3fed10d3d5244226395b707a7",
   "electron/centralApi.jsc": "ef292c7a3c859c5d0f300c65ef9dc20a9ed787d7db842abd8a3ab113f60aef46",
   "electron/documentHandlers.jsc": "790fa1cf31364aaa12eb7a6f12dc43a42e1437a3e5d36f715d5a2324dfa6d6fd",
@@ -15,7 +16,7 @@
   "electron/safeStorageCompat.jsc": "7a7014c36847db1fe89e6c874e4b7bfffc5eaadc7f2b6732af7404403e4c9a52",
   "electron/security/crypto.jsc": "d2fa88bab1bbd2098724578997ce4821378bfce7631f15fd9d610cf30ca97cc5",
   "electron/security/licenseValidator.jsc": "2920a5cc5b64fe9bdba00cf5dd2fb11107c47322e641fd7c54564b3b1ec262ec",
-  "electron/security/fileIntegrity.jsc": "0861c31f465e560640fb0529d7e292a0594d985465dab6aeff704b2a1699d4aa",
+  "electron/security/fileIntegrity.jsc": "871dad2729ecf056b502a9530a9dfa040b5e7312068c3df7b2c110f886262f7f",
   "electron/security/ipcGuard.jsc": "705383916ce9ec8a94629e4b817a6db3622b37ba090025a092177a904cfdce61",
   "electron/security/auditLogger.jsc": "ee7568488a948ec00d67b903f9fe4fb0240da02fd65de68f742e32f17b30142d",
   "electron/security/index.jsc": "85d367181a715c17f1a2eabf36d5b6f2d60706921e1d97677b9913fd316a218a"

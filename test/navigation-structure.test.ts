@@ -4,7 +4,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { NAV_GROUPS } from '../src/config/navigation.tsx';
 import { appRoutes } from '../src/router/routesList.tsx';
-import { resolveNavigationBreadcrumbs } from '../src/utils/resolvePageTitle.ts';
+import { resolveNavigationBreadcrumbs } from '../src/utils/navigation/resolvePageTitle.ts';
 
 const expectedSections = [
   'الرئيسية',

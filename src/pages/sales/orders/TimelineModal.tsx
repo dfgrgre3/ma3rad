@@ -1,8 +1,8 @@
 import React from 'react';
 import { X, History } from 'lucide-react';
-import { Order, OrderStatusEntry } from '../../../services/OrderService';
+import { Order, OrderStatusEntry } from '../../../services/sales/OrderService';
 import { Modal } from './ui';
-import { STATUS_LABELS } from './types';
+import { STATUS_LABELS } from '../../../types/sales/ordersPage';
 
 interface TimelineModalProps {
   order: Order;

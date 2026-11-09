@@ -1,6 +1,6 @@
-import { Order } from '../../../services/OrderService';
-import { formatProductQuantity, getProductUnitLabel } from '../../../utils/productUnits';
-import { STATUS_LABELS } from './types';
+import { Order } from '../../../services/sales/OrderService';
+import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
+import { STATUS_LABELS } from '../../../types/sales/ordersPage';
 
 export const summarizeOrderQuantity = (items: any[], field: 'quantityM2' | 'deliveredM2') => {
   const totals = new Map<string, { product: any; quantity: number }>();

@@ -1,128 +1,29 @@
-/**
- * Central capability catalog.
- *
- * A capability is the unit of "what a tenant/client can do": it groups a
- * business module with its requirements, dependencies, permissions, screens
- * (routes) and operations (business events / actions). Setup selects a business
- * activity and the system assembles the capability (module) set required for
- * that activity. Central administration can then enable or disable any module,
- * feature, screen or action; this catalog is the single source of truth for the
- * capability surface.
- *
- * The catalog is pure data + pure functions (no database/React imports) so it
- * can be consumed by the renderer, the service layer and unit tests. Runtime
- * activation state lives in `ModuleRegistryService` / `CapabilityRegistryService`.
- */
-
-import {
-  MODULE_REGISTRY,
-  getModuleDefinition,
-  isKnownModule,
-  validateModuleSelection,
-  withModuleDependencies,
-  getModuleDependencyClosure,
-  getModulePathOwner,
-  getManagedModulePaths,
-  getHiddenModulePaths,
-  type ModuleDefinition,
-  type ModuleSettingDefinition,
-  type ModuleActivationRules,
-  type ModuleSelectionOptions,
-  type ModuleSelectionValidation,
-} from './moduleRegistry';
-
+import { getModuleDefinition, isKnownModule, validateModuleSelection, withModuleDependencies } from './moduleRegistry';
+import type { ModuleDefinition, ModuleActivationRules, ModuleSettingDefinition } from './moduleRegistry';
 import { ACTION_REGISTRY, getActionDefinition, isKnownAction } from './actionRegistry';
-import { FEATURE_REGISTRY } from './featureRegistry';
-export type CapabilityRequirements = ModuleActivationRules;
-export type CapabilitySettingDefinition = ModuleSettingDefinition;
-export type CapabilitySelectionOptions = ModuleSelectionOptions;
-export type CapabilitySelectionValidation = ModuleSelectionValidation;
-
-export interface CapabilityDefinition {
-  id: string;
-  label: string;
-  description: string;
-  /** Requirements that must hold before the capability can be enabled. */
-  requirements: CapabilityRequirements;
-  /** Alias for `requirements`, kept for compatibility with the module registry. */
-  activation: CapabilityRequirements;
-  /** Capability ids that must also be enabled. */
-  dependencies: string[];
-  /** Permission codes a user needs before they can use the capability. */
-  permissions: string[];
-  /** Route prefixes / screens owned by the capability. */
-  screens: string[];
-  /** Alias for `screens`, kept for compatibility with the module registry. */
-  paths: string[];
-  /** Business events / operations exposed by the capability. */
-  operations: string[];
-  /** Alias for `operations`, kept for compatibility. */
-  businessEvents: string[];
-  /** Configurable settings schema. */
-  settings: CapabilitySettingDefinition[];
-  /** Underlying module id (1:1 in the current implementation). */
-  module?: string;
-  /** Feature ids associated with the capability. */
-  features?: string[];
-  /** Action ids associated with the capability. */
-  actions?: string[];
-}
-
-export const CAPABILITY_CATALOG: CapabilityDefinition[] = MODULE_REGISTRY.map((module) => ({
-  id: module.id,
-  label: module.label,
-  description: module.description,
-  requirements: module.activation,
-  activation: module.activation,
-  dependencies: module.dependencies,
-  permissions: module.permissions,
-  screens: module.paths,
-  paths: module.paths,
-  operations: module.businessEvents,
-  businessEvents: module.businessEvents,
-  settings: module.settings,
-  module: module.id,
-  features: FEATURE_REGISTRY.filter((feature) => feature.module === module.id).map((feature) => feature.id),
-  actions: ACTION_REGISTRY.filter((action) => action.module === module.id).map((action) => action.id),
-}));
-
-const REGISTRY_BY_ID = new Map(CAPABILITY_CATALOG.map((capability) => [capability.id, capability]));
-
-export const getCapabilityDefinition = (id: string): CapabilityDefinition | undefined => REGISTRY_BY_ID.get(id);
-export const isKnownCapability = (id: string): boolean => REGISTRY_BY_ID.has(id);
-
-/** True only for a screen path owned by a registered module. */
-export const isKnownScreen = (pathname: string): boolean =>
-  typeof pathname === 'string' && getModulePathOwner(pathname) !== undefined;
-
-/** All capabilities a set of capabilities transitively depends on. */
-export const getCapabilityDependencyClosure = (ids: string[]): string[] => getModuleDependencyClosure(ids);
-
-/** Add missing dependencies (transitively) to a selection. Unknown ids survive so validation can report them. */
-export const withCapabilityDependencies = (ids: string[]): string[] => withModuleDependencies(ids);
-
-export const validateCapabilitySelection = (
-  ids: string[],
-  options: CapabilitySelectionOptions
-): CapabilitySelectionValidation => validateModuleSelection(ids, options);
-
-/** Resolve the capability that owns a route/screen path, using the longest matching prefix. */
-export const getCapabilityPathOwner = (pathname: string): string | undefined => getModulePathOwner(pathname);
-
-export const getManagedCapabilityPaths = (): Set<string> => getManagedModulePaths();
-
-export const getHiddenCapabilityPaths = (enabledCapabilityIds: string[]): string[] =>
-  getHiddenModulePaths(enabledCapabilityIds);
-
-// Re-export the underlying module helpers under their original names for callers
-// that still speak in terms of modules.
 export {
   getModuleDefinition,
   isKnownModule,
   validateModuleSelection,
   withModuleDependencies,
 };
-
 export type { ModuleDefinition, ModuleActivationRules, ModuleSettingDefinition };
 export { ACTION_REGISTRY, getActionDefinition, isKnownAction };
 export { FEATURE_REGISTRY } from './featureRegistry';
+import './capabilityCatalog_part01';
+import './capabilityCatalog_part02';
+export type { CapabilityRequirements } from './capabilityCatalog_part01';
+export type { CapabilitySettingDefinition } from './capabilityCatalog_part01';
+export type { CapabilitySelectionOptions } from './capabilityCatalog_part01';
+export type { CapabilitySelectionValidation } from './capabilityCatalog_part01';
+export type { CapabilityDefinition } from './capabilityCatalog_part01';
+export { CAPABILITY_CATALOG } from './capabilityCatalog_part01';
+export { getCapabilityDefinition } from './capabilityCatalog_part01';
+export { isKnownCapability } from './capabilityCatalog_part01';
+export { isKnownScreen } from './capabilityCatalog_part01';
+export { getCapabilityDependencyClosure } from './capabilityCatalog_part01';
+export { withCapabilityDependencies } from './capabilityCatalog_part01';
+export { validateCapabilitySelection } from './capabilityCatalog_part02';
+export { getCapabilityPathOwner } from './capabilityCatalog_part02';
+export { getManagedCapabilityPaths } from './capabilityCatalog_part02';
+export { getHiddenCapabilityPaths } from './capabilityCatalog_part02';

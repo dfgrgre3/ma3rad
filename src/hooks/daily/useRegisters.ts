@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CashierService } from '../../services/CashierService';
+import { CashierService } from '../../services/finance/CashierService';
 import type { CashRegister } from '../../types';
 
 export function useRegisters() {

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Wallet } from 'lucide-react';
-import type { DailySupplierPaymentRow } from '../../../services/DailyOperationsService';
+import type { DailySupplierPaymentRow } from '../../../services/operations/DailyOperationsService';
 import { METHOD_STYLE, PAY_LABEL } from './constants';
 import { MiniStat } from './primitives';
-import type { NumberFormatter } from './types';
+import type { NumberFormatter } from '../../../types/dashboard/todayPurchases';
 
 export interface PaymentsPanelProps {
   payments: DailySupplierPaymentRow[];

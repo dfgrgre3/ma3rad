@@ -1,14 +1,14 @@
 import './integration.setup.ts';
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { DatabaseManager } from '../src/database/db.ts';
-import { SettingsService } from '../src/services/SettingsService.ts';
-import { BusinessProfileService } from '../src/services/BusinessProfileService.ts';
-import { ManufacturingService } from '../src/services/ManufacturingService.ts';
-import { RestaurantService } from '../src/services/RestaurantService.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { ConfigurationVersionService } from '../src/services/ConfigurationVersionService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { SettingsService } from '../src/services/config/SettingsService.ts';
+import { BusinessProfileService } from '../src/services/config/BusinessProfileService.ts';
+import { ManufacturingService } from '../src/services/manufacturing/ManufacturingService.ts';
+import { RestaurantService } from '../src/services/restaurant/RestaurantService.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { ConfigurationVersionService } from '../src/services/config/ConfigurationVersionService.ts';
 import {
   BUSINESS_MODULES,
   BUSINESS_PROFILES,
@@ -31,8 +31,8 @@ import {
   resolveBusinessTerm,
   validateBusinessTermOverrides,
 } from '../src/config/businessTerminology.ts';
-import { NavigationService } from '../src/services/NavigationService.ts';
-import { TerminologyService } from '../src/services/TerminologyService.ts';
+import { NavigationService } from '../src/services/config/NavigationService.ts';
+import { TerminologyService } from '../src/services/config/TerminologyService.ts';
 import { validateModuleSelection } from '../src/config/moduleRegistry.ts';
 import {
   shouldShowFirstRunSetup,

@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, FileText, MessageCircle, PackageCheck, Wallet, X } from 'lucide-react';
-import type { CustomerService } from '../../services/CustomerService';
-import { CustomerSupplyService, type CustomerSupplyRequest } from '../../services/CustomerSupplyService';
-import { SalesService } from '../../services/SalesService';
+import type { CustomerService } from '../../services/customers/CustomerService';
+import { CustomerSupplyService, type CustomerSupplyRequest } from '../../services/customers/CustomerSupplyService';
+import { SalesService } from '../../services/sales/SalesService';
 import type { SalesInvoice, SalesInvoiceItem } from '../../types';
-import { CeramicMath } from '../../utils/ceramicMath';
-import { formatProductQuantity } from '../../utils/productUnits';
-import { openWhatsAppChat } from '../../utils/externalLinks';
-import { localDateString } from '../../utils/date';
-import { shareCustomerStatementOnWhatsApp } from '../../utils/customerStatementSharing';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import { formatProductQuantity } from '../../utils/products/productUnits';
+import { openWhatsAppChat } from '../../utils/shared/externalLinks';
+import { localDateString } from '../../utils/shared/date';
+import { shareCustomerStatementOnWhatsApp } from '../../utils/customers/customerStatementSharing';
 
 type CustomerStatement = ReturnType<CustomerService['getCustomerStatement']>;
 type DetailedInvoice = SalesInvoice & { items: SalesInvoiceItem[] };

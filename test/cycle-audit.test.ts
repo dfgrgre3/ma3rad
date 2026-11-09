@@ -1,18 +1,18 @@
 import './integration.setup.ts';
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { SupplierService } from '../src/services/SupplierService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { PurchaseService } from '../src/services/PurchaseService.ts';
-import { PurchaseOrderService } from '../src/services/PurchaseOrderService.ts';
-import { ProcurementService } from '../src/services/ProcurementService.ts';
-import { InventoryService } from '../src/services/InventoryService.ts';
-import { ReservationService } from '../src/services/ReservationService.ts';
-import { localDateString } from '../src/utils/date.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { PurchaseService } from '../src/services/purchases/PurchaseService.ts';
+import { PurchaseOrderService } from '../src/services/purchases/PurchaseOrderService.ts';
+import { ProcurementService } from '../src/services/procurement/ProcurementService.ts';
+import { InventoryService } from '../src/services/inventory/InventoryService.ts';
+import { ReservationService } from '../src/services/sales/ReservationService.ts';
+import { localDateString } from '../src/utils/shared/date.ts';
 
 /**
  * Systematic cycle audit: every documented mutation must leave the same

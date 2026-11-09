@@ -1,23 +1,23 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../AuthService';
-import { PermissionService } from '../PermissionService';
-import { SettingsService } from '../SettingsService';
-import { InventoryCostingService } from '../InventoryCostingService';
-import { BatchService } from '../BatchService';
-import { localDateString } from '../../utils/date';
-import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
-import { paymentAccountCode } from '../../database/ledger';
+import { AuthService } from '../auth/AuthService';
+import { PermissionService } from '../auth/PermissionService';
+import { SettingsService } from '../config/SettingsService';
+import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { BatchService } from '../inventory/BatchService';
+import { localDateString } from '../../utils/shared/date';
+import { getProductUnitLabel, isServiceProduct } from '../../utils/products/productUnits';
+import { paymentAccountCode } from '../../database/repositories/ledger';
 import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
-import { computeSaleLine, computeSaleTotals, round2 } from '../financials';
-import { ModuleRegistryService } from '../ModuleRegistryService';
-import { CentralUsageLimitService } from '../CentralUsageLimitService';
-import { PartnerService } from '../PartnerService';
+import { computeSaleLine, computeSaleTotals, round2 } from '../finance/financials';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
+import { PartnerService } from '../customers/PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
-import type { Effect } from '../effects/EffectTypes';
+import type { Effect } from '../../types/effects';
 import '../effects/handlers/salesInvoiceHandlers';
 import type { SalesInvoice, PaymentType } from '../../types';
 import type { SalesContext } from './context';
-import type { CreateSaleDTO } from './types';
+import type { CreateSaleDTO } from '../../types/sales/serviceTypes';
 
 type PreparedSaleItem = {
   id: string;

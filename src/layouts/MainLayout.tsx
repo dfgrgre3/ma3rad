@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Calculator, NotebookPen, X } from 'lucide-react';
-import { Header } from '../components/Header';
-import { Sidebar } from '../components/Sidebar';
-import { NotificationService } from '../services/NotificationService';
-import { PermissionService } from '../services/PermissionService';
-import { NavigationService } from '../services/NavigationService';
-import { useNavigationGroups } from '../hooks/useNavigationGroups';
-import { CalculatorPanel } from '../components/CalculatorPanel';
-import { NotesPanel } from '../components/NotesPanel';
+import { Header } from '../components/shared/Header';
+import { Sidebar } from '../components/shared/Sidebar';
+import { NotificationService } from '../services/notifications/NotificationService';
+import { PermissionService } from '../services/auth/PermissionService';
+import { NavigationService } from '../services/config/NavigationService';
+import { NavigationGroupsProvider, useNavigationGroups } from '../hooks/config/useNavigationGroups';
+import { CalculatorPanel } from '../components/products/CalculatorPanel';
+import { NotesPanel } from '../components/shared/NotesPanel';
 import { AppConfigRuntime } from '../components/config/AppConfigRuntime';
 import { ConfigSection } from '../components/config/ConfigSection';
 import { ConfigText } from '../components/config/ConfigText';
@@ -134,26 +134,29 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   return (
     <LayoutContext.Provider value={{ currentUser }}>
       <AppConfigRuntime />
-      <div className="app-shell win-app flex h-screen w-full min-w-0 flex-col overflow-hidden bg-[#f3f3f3] text-[#1b1b1b] dark:bg-[#1f1f1f] dark:text-[#f0f0f0]" dir={interfaceDirection}>
+      <div className="app-shell win-app flex h-screen w-full min-w-0 flex-col overflow-hidden bg-[var(--win-canvas)] text-[var(--win-text)]" dir={interfaceDirection}>
         {/* ── Top bar ──────────────────────────────────────────────────────────── */}
-        <Header
-          currentUser={currentUser}
-          unreadNotifications={unreadNotifications}
-          onLogout={onLogout}
-          onSwitchUser={onSwitchUser}
-          onOpenSidebar={() => setMobileSidebarOpen(true)}
-          navigationLayout={navigationLayout}
-        />
+        <NavigationGroupsProvider groups={accessibleGroups}>
+          <Header
+            currentUser={currentUser}
+            unreadNotifications={unreadNotifications}
+            onLogout={onLogout}
+            onSwitchUser={onSwitchUser}
+            onOpenSidebar={() => setMobileSidebarOpen(true)}
+            navigationLayout={navigationLayout}
+          />
+        </NavigationGroupsProvider>
 
         <div className="flex min-h-0 min-w-0 w-full flex-1">
           {/* ── Desktop sidebar (hidden when navigation lives in the header) ────── */}
           {navigationLayout === 'sidebar' && (
             <div className="hidden shrink-0 lg:block">
-              <Sidebar
-                currentUser={currentUser}
-                collapsed={sidebarCollapsed}
-                onToggleCollapsed={toggleSidebar}
-              />
+              <NavigationGroupsProvider groups={accessibleGroups}>
+                <Sidebar
+                  collapsed={sidebarCollapsed}
+                  onToggleCollapsed={toggleSidebar}
+                />
+              </NavigationGroupsProvider>
             </div>
           )}
 
@@ -170,14 +173,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               <span className="h-1.5 w-1.5 rounded-full bg-[#107c10]" />
               <ConfigText k="shell.status.database" fallback="قاعدة البيانات متصلة" />
             </span>
-          <span className="hidden text-[#767676] dark:text-[#a6a6a6] sm:inline">
+          <span className="hidden text-[var(--win-text-muted)] sm:inline">
             {new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}
           </span>
-          <span className="mr-auto flex items-center gap-2">
+          <span className="ms-auto flex items-center gap-2">
             <button
               type="button"
               onClick={() => setFloatingCalculatorOpen(true)}
-              className="flex h-6 w-6 items-center justify-center rounded-[2px] text-[#4d4d4d] hover:bg-[#e5f1fb] hover:text-[#005a9e] dark:text-[#c8c8c8] dark:hover:bg-[#0f3550]"
+              className="flex h-6 w-6 items-center justify-center rounded-[var(--ui-radius-sm)] text-[var(--win-text-secondary)] hover:bg-[var(--win-accent-soft)] hover:text-[var(--win-accent-readable)]"
               title="الآلة الحاسبة"
               aria-label="فتح الآلة الحاسبة"
             >
@@ -186,13 +189,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             <button
               type="button"
               onClick={() => setFloatingNotesOpen(true)}
-              className="flex h-6 w-6 items-center justify-center rounded-[2px] text-[#4d4d4d] hover:bg-[#e5f1fb] hover:text-[#005a9e] dark:text-[#c8c8c8] dark:hover:bg-[#0f3550]"
+              className="flex h-6 w-6 items-center justify-center rounded-[var(--ui-radius-sm)] text-[var(--win-text-secondary)] hover:bg-[var(--win-accent-soft)] hover:text-[var(--win-accent-readable)]"
               title="الملاحظات"
               aria-label="فتح الملاحظات"
             >
               <NotebookPen className="h-3.5 w-3.5" />
             </button>
-            <span aria-hidden="true" className="h-3 w-px bg-[#c8c8c8] dark:bg-[#4a4a4a]" />
+            <span aria-hidden="true" className="h-3 w-px bg-[var(--win-border)]" />
             {currentUser && <span className="truncate">{currentUser.fullName}</span>}
             <span className="hidden sm:inline">
               <ConfigText k="shell.brand.name" fallback="سيراميسيس" />
@@ -209,10 +212,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
               onClick={() => setMobileSidebarOpen(false)}
             />
             <div
-              className="absolute inset-y-0 flex h-full w-[264px] max-w-[85vw] flex-col bg-white dark:bg-[#2b2b2b]"
+              className="absolute inset-y-0 flex h-full w-[280px] max-w-[85vw] flex-col bg-[var(--win-surface)]"
               style={{ insetInlineStart: 0, borderInlineEnd: '1px solid var(--win-border)' }}
             >
-              <div className="flex h-10 shrink-0 items-center justify-between border-b border-[#d9d9d9] px-3 dark:border-[#3d3d3d]">
+              <div className="flex h-10 shrink-0 items-center justify-between border-b border-[var(--win-border)] px-3">
                 <span className="text-[12px] font-semibold">القائمة الرئيسية</span>
                 <button
                   type="button"
@@ -224,11 +227,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                 </button>
               </div>
               <div className="min-h-0 flex-1">
-                <Sidebar
-                  currentUser={currentUser}
-                  mobile
-                  onNavigate={() => setMobileSidebarOpen(false)}
-                />
+                <NavigationGroupsProvider groups={accessibleGroups}>
+                  <Sidebar
+                    mobile
+                    onNavigate={() => setMobileSidebarOpen(false)}
+                  />
+                </NavigationGroupsProvider>
               </div>
             </div>
           </div>

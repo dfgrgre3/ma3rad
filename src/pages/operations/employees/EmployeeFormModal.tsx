@@ -1,7 +1,7 @@
 import React from 'react';
-import type { Employee, EmployeeFormState } from './types';
-import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
-import { OperationalFieldsForm } from '../../../components/OperationalFieldsForm';
+import type { Employee, EmployeeFormState } from '../../../types/hr/employeesPage';
+import type { OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 
 interface EmployeeBranchOption {
   id: string;

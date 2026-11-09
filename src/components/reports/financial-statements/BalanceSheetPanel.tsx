@@ -1,5 +1,5 @@
 import React from 'react';
-import type { BalanceSheet, StatementLine } from '../../../services/FinancialStatementsService';
+import type { BalanceSheet, StatementLine } from '../../../services/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
 function StatementSection({ title, amount, lines, color }: {

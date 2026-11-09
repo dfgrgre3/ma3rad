@@ -2,7 +2,7 @@ import React from 'react';
 import { Truck } from 'lucide-react';
 import { timeOf } from './helpers';
 import { ShareBar } from './primitives';
-import type { NumberFormatter, SupplierStat } from './types';
+import type { NumberFormatter, SupplierStat } from '../../../types/dashboard/todayPurchases';
 
 export interface SuppliersPanelProps {
   supplierStats: SupplierStat[];

@@ -4,15 +4,15 @@ import {
   Layers, Loader2, Package, Plus, RefreshCw, Ruler, Save, SlidersHorizontal, Trash2, X,
 } from 'lucide-react';
 import type { Product, CeramicGrade, UnitType, Warehouse } from '../../types';
-import type { ProductImage } from '../../services/ProductExtraService';
-import type { AttributeCategory } from '../../services/AttributeService';
-import type { CategoryWithCount } from '../../services/CategoryService';
-import type { BrandWithCount } from '../../services/BrandService';
+import type { ProductImage } from '../../services/products/ProductExtraService';
+import type { AttributeCategory } from '../../services/products/AttributeService';
+import type { CategoryWithCount } from '../../services/products/CategoryService';
+import type { BrandWithCount } from '../../services/products/BrandService';
 import type { BusinessConfiguration } from '../../config/businessProfiles';
-import { CeramicMath } from '../../utils/ceramicMath';
+import { CeramicMath } from '../../utils/products/ceramicMath';
 import { Field } from './ProductUi';
-import { OperationalFieldsForm } from '../OperationalFieldsForm';
-import type { OperationalFieldDefinition, ProductGradeOption } from '../../services/OperationalFieldService';
+import { OperationalFieldsForm } from './OperationalFieldsForm';
+import type { OperationalFieldDefinition, ProductGradeOption } from '../../services/products/OperationalFieldService';
 import {
   SURFACES, round,
   type ProductEntryFormState, type OpeningStockRow, type TabId, type VariantDraft,

@@ -1,9 +1,9 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { ProductFormPreferencesService } from '../src/services/ProductFormPreferencesService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { ProductFormPreferencesService } from '../src/services/products/ProductFormPreferencesService.ts';
 
 test('product form defaults and tone choices persist in the database and can be cleared', async () => {
   await DatabaseManager.getInstance().initialize();

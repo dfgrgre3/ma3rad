@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { CustomerService } from '../../services/CustomerService';
-import { OperationsService } from '../../services/OperationsService';
-import { ProductService } from '../../services/ProductService';
+import { CustomerService } from '../../services/customers/CustomerService';
+import { OperationsService } from '../../services/operations/OperationsService';
+import { ProductService } from '../../services/products/ProductService';
 import type { Customer, Product } from '../../types';
-import type { WarehouseRow } from '../../services/OperationsService';
+import type { WarehouseRow } from '../../services/operations/OperationsService';
 
 export function useLists() {
   const [customers, setCustomers] = useState<Customer[]>([]);

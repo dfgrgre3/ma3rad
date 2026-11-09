@@ -1,13 +1,13 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { DocumentService } from '../src/services/DocumentService.ts';
-import { ApprovalService } from '../src/services/ApprovalService.ts';
-import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { DocumentService } from '../src/services/documents/DocumentService.ts';
+import { ApprovalService } from '../src/services/approvals/ApprovalService.ts';
+import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = { id: 'usr_appr_admin', username: 'appr-admin', fullName: 'Appr Admin', role: 'ADMIN', isActive: true, createdAt: '', updatedAt: '' };
 

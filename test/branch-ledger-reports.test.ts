@@ -1,16 +1,16 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { AccountingService } from '../src/services/AccountingService.ts';
-import { FinancialStatementsService } from '../src/services/FinancialStatementsService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { SalesFinancialReconciliationService } from '../src/services/SalesFinancialReconciliationService.ts';
-import { CommissionService } from '../src/services/CommissionService.ts';
-import { EmployeeService } from '../src/services/EmployeeService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { AccountingService } from '../src/services/finance/AccountingService.ts';
+import { FinancialStatementsService } from '../src/services/reports/FinancialStatementsService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { SalesFinancialReconciliationService } from '../src/services/sales/SalesFinancialReconciliationService.ts';
+import { CommissionService } from '../src/services/hr/CommissionService.ts';
+import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 test('financial statements only include assigned-branch ledger entries', async () => {
   const manager = DatabaseManager.getInstance();

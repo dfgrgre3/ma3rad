@@ -1,14 +1,14 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { BranchService } from '../src/services/BranchService.ts';
-import { BranchAccessService } from '../src/services/BranchAccessService.ts';
-import { ManufacturingService } from '../src/services/ManufacturingService.ts';
-import { ModuleRegistryService } from '../src/services/ModuleRegistryService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { BranchService } from '../src/services/organization/BranchService.ts';
+import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
+import { ManufacturingService } from '../src/services/manufacturing/ManufacturingService.ts';
+import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = { id: 'usr_mnt_admin', username: 'mnt-admin', fullName: 'Mnt Admin', role: 'ADMIN', isActive: true, createdAt: '', updatedAt: '' };
 const manager: User = { id: 'usr_mnt_manager', username: 'mnt-manager', fullName: 'Mnt Manager', role: 'MANAGER', isActive: true, createdAt: '', updatedAt: '' };

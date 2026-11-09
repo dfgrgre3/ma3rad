@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingDown } from 'lucide-react';
-import { CeramicMath } from '../../../utils/ceramicMath';
-import { PurchasePriceHistoryRow } from './types';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
+import { PurchasePriceHistoryRow } from '../../../types/purchasing/supplierDetailPage';
 
 export interface PriceHistoryTabProps {
   priceHistory: PurchasePriceHistoryRow[];

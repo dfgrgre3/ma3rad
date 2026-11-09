@@ -1,6 +1,6 @@
 import React from 'react';
 import { Calendar, Filter, Search } from 'lucide-react';
-import type { EmployeeTab } from './types';
+import type { EmployeeTab } from '../../../types/hr/employeesPage';
 
 interface EmployeeFiltersProps {
   activeTab: EmployeeTab;

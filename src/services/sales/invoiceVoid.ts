@@ -1,20 +1,20 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../AuthService';
-import { PermissionService } from '../PermissionService';
-import { SettingsService } from '../SettingsService';
-import { InventoryCostingService } from '../InventoryCostingService';
-import { BatchService } from '../BatchService';
-import { localDateString } from '../../utils/date';
-import { paymentAccountCode } from '../../database/ledger';
-import { round2 } from '../financials';
+import { AuthService } from '../auth/AuthService';
+import { PermissionService } from '../auth/PermissionService';
+import { SettingsService } from '../config/SettingsService';
+import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { BatchService } from '../inventory/BatchService';
+import { localDateString } from '../../utils/shared/date';
+import { paymentAccountCode } from '../../database/repositories/ledger';
+import { round2 } from '../finance/financials';
 import type { SalesInvoice } from '../../types';
-import type { DatabaseManager } from '../../database/db';
-import { isServiceProduct } from '../../utils/productUnits';
+import type { DatabaseManager } from '../../database/repositories/databaseManager';
+import { isServiceProduct } from '../../utils/products/productUnits';
 import type { InvoiceWithItems, SalesContext } from './context';
-import { ModuleRegistryService } from '../ModuleRegistryService';
-import { PartnerService } from '../PartnerService';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { PartnerService } from '../customers/PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
-import type { Effect } from '../effects/EffectTypes';
+import type { Effect } from '../../types/effects';
 import '../effects/handlers/salesInvoiceHandlers';
 
 function restoreInvoiceItem(

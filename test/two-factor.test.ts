@@ -2,14 +2,14 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService, TwoFactorRequiredError } from '../src/services/AuthService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService, TwoFactorRequiredError } from '../src/services/auth/AuthService.ts';
 import {
   base32Decode,
   base32Encode,
   generateTOTP,
   twoFactorAuth,
-} from '../src/services/twoFactorAuth.ts';
+} from '../src/services/auth/twoFactorAuth.ts';
 
 const RFC_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 

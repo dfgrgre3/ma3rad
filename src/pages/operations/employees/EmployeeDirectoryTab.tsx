@@ -1,10 +1,10 @@
 import React from 'react';
 import { AlertCircle, Calendar, DollarSign, Edit3, FileText, Mail, MapPin, Phone, Trash2 } from 'lucide-react';
 import { fmtCurrency } from './helpers';
-import { STATUS_LABELS, type Employee } from './types';
-import type { OperationalFieldDefinition } from '../../../services/OperationalFieldService';
-import { OperationalFieldsSummary } from '../../../components/OperationalFieldsSummary';
-import { OperationalFieldsRecordEditor } from '../../../components/OperationalFieldsRecordEditor';
+import { STATUS_LABELS, type Employee } from '../../../types/hr/employeesPage';
+import type { OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
 
 interface EmployeeDirectoryTabProps {
   employees: Employee[];

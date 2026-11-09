@@ -1,8 +1,8 @@
 import React from 'react';
 import { Product } from '../../../types';
-import { formatProductQuantity, getProductUnitLabel } from '../../../utils/productUnits';
+import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { money } from './format';
-import { PurchaseRow } from './types';
+import { PurchaseRow } from '../../../types/products/productDetailPage';
 
 interface PurchasesTabProps {
   product: Product;

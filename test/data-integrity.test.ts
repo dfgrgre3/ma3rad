@@ -1,12 +1,12 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { FinancialStatementsService } from '../src/services/FinancialStatementsService.ts';
-import { localDateString } from '../src/utils/date.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { FinancialStatementsService } from '../src/services/reports/FinancialStatementsService.ts';
+import { localDateString } from '../src/utils/shared/date.ts';
 import { DATA_INTEGRITY_BASELINE } from './fixtures/data-integrity-baseline.ts';
 
 test('reference balances reconcile to the ledger and detect customer, supplier, and stock drift', async () => {

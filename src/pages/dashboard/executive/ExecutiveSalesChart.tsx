@@ -3,7 +3,7 @@ import {
   CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
 } from 'recharts';
-import { CHART_COLORS, type DailySale, formatCurrency } from './types';
+import { CHART_COLORS, type DailySale, formatCurrency } from '../../../types/dashboard/executive';
 
 interface Props {
   dailySales: DailySale[];

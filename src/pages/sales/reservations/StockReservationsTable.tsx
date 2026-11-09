@@ -1,6 +1,6 @@
 import React from 'react';
-import type { StockReservation } from '../../../services/ReservationService';
-import { formatProductQuantity } from '../../../utils/productUnits';
+import type { StockReservation } from '../../../services/sales/ReservationService';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { reservationStatusLabels, reservationStatusStyles } from './constants';
 
 interface StockReservationsTableProps {

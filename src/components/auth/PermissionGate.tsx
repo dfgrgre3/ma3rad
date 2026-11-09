@@ -1,7 +1,7 @@
 import React from 'react';
-import { usePermission } from '../../hooks/usePermission';
-import { AuthService } from '../../services/AuthService';
-import { PermissionService } from '../../services/PermissionService';
+import { usePermission } from '../../hooks/auth/usePermission';
+import { AuthService } from '../../services/auth/AuthService';
+import { PermissionService } from '../../services/auth/PermissionService';
 import type { User } from '../../types';
 
 export interface PermissionGateProps {

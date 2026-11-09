@@ -4,14 +4,14 @@ import {
   Receipt, RotateCcw, Wallet, X,
 } from 'lucide-react';
 import type { CustomerPayment, PaymentType, SalesInvoice, SalesInvoiceItem } from '../../types';
-import { CeramicMath } from '../../utils/ceramicMath';
-import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
-import { DocumentPreviewModal } from '../DocumentPreviewModal';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
+import { DocumentPreviewModal } from '../documents/DocumentPreviewModal';
 import { CustomerStatementWhatsAppOptions } from './CustomerStatementWhatsAppOptions';
 import { Modal, InfoBox, SummaryRow } from './SalesUi';
-import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
-import { OperationalFieldsSummary } from '../OperationalFieldsSummary';
-import { OperationalFieldsRecordEditor } from '../OperationalFieldsRecordEditor';
+import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import { OperationalFieldsSummary } from '../products/OperationalFieldsSummary';
+import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';
 
 const fmt = (n: number) => CeramicMath.formatCurrency(Number(n) || 0);
 

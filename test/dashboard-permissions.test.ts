@@ -1,12 +1,12 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AccountingService } from '../src/services/AccountingService.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { CrmService } from '../src/services/CrmService.ts';
-import { NavigationService } from '../src/services/NavigationService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AccountingService } from '../src/services/finance/AccountingService.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { CrmService } from '../src/services/crm/CrmService.ts';
+import { NavigationService } from '../src/services/config/NavigationService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
 
 test('dashboard.view alone cannot read embedded sales, finance or CRM data', async () => {
   const db = DatabaseManager.getInstance();

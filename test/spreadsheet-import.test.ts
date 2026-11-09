@@ -6,9 +6,10 @@ import {
   parseSpreadsheetBuffer,
   validateSpreadsheetFileHeader,
   validateSpreadsheetFileMetadata,
-} from '../src/services/SpreadsheetImportService.ts';
-import { DataImportService, type ParsedImport } from '../src/services/DataImportService.ts';
-import { parsePdfExtractedText } from '../src/services/PdfImportData.ts';
+} from '../src/services/data/SpreadsheetImportService.ts';
+import { DataImportService, type ParsedImport } from '../src/services/admin/DataImportService.ts';
+import { parsePdfExtractedText } from '../src/services/data/PdfImportData.ts';
+import './data-file-import.test.ts';
 
 const toArrayBuffer = (bytes: Uint8Array | ArrayBuffer): ArrayBuffer => {
   if (bytes instanceof ArrayBuffer) return bytes;

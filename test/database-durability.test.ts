@@ -1,7 +1,7 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 
 test('startup skips unchanged database writes and transaction save failures stay visible', async () => {
   let persistedSnapshot: Uint8Array | null = null;
@@ -83,7 +83,7 @@ test('database manager state survives module re-evaluation during HMR', async ()
   );
 
   try {
-    const reloadedDatabaseModule = await import('../src/database/db.ts?hmr=database-manager-state');
+    const reloadedDatabaseModule = await import('../src/database/repositories/databaseManager.ts?hmr=database-manager-state');
     const reloadedManager = reloadedDatabaseModule.DatabaseManager.getInstance();
 
     assert.equal(reloadedManager, manager, 'module re-evaluation must reuse the live database manager');

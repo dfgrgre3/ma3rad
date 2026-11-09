@@ -1,13 +1,13 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { PurchaseOrderService } from '../src/services/PurchaseOrderService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { SupplierService } from '../src/services/SupplierService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { PurchaseOrderService } from '../src/services/purchases/PurchaseOrderService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
 import { DATA_INTEGRITY_BASELINE } from './fixtures/data-integrity-baseline.ts';
 
 test('purchase order partial and full receipts post only received stock and preserve history', async () => {

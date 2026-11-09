@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
-import { postLedgerEntry } from '../../../database/ledger';
+import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
 import { defaultEffectRegistry } from '../EffectRegistry';
-import type { EffectContext } from '../EffectTypes';
+import type { EffectContext } from '../../../types/effects';
 
 // Side-effect registration: importing this module wires the handlers onto the
 // default registry. Services emit effects; the engine dispatches them.

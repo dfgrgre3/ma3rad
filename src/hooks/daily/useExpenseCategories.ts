@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CashierService } from '../../services/CashierService';
+import { CashierService } from '../../services/finance/CashierService';
 import type { ExpenseCategory } from '../../types';
 
 export function useExpenseCategories() {

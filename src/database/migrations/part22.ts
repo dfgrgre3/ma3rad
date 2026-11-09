@@ -1,4 +1,4 @@
-import type { Migration } from '../migrationSupport';
+import type { Migration } from './support';
 
 export const MIGRATION_PART_22: Migration[] = [
   {

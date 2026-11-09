@@ -1,4 +1,4 @@
-﻿import type { SyncEvent } from './types.ts';
+﻿import type { SyncEvent } from '../types/sync/index.ts';
 
 export class EventSerializer {
   serialize(event: SyncEvent): string {

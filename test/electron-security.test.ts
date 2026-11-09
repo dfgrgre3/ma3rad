@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { DatabaseManager } from '../src/database/db.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { NavigationService } from '../src/services/NavigationService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { NavigationService } from '../src/services/config/NavigationService.ts';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from '../src/config/routePermissions.ts';
 
 const require = createRequire(import.meta.url);

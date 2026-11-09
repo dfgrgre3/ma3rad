@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { PurchaseService } from '../../services/PurchaseService';
+import { PurchaseService } from '../../services/purchases/PurchaseService';
 import { useToast } from '../ui/Toast';
-import { getProductUnitLabel } from '../../utils/productUnits';
+import { getProductUnitLabel } from '../../utils/products/productUnits';
 import type { PaymentType } from '../../types';
-import { round2 } from '../../services/financials';
+import { round2 } from '../../services/finance/financials';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
 import { useLists } from '../../hooks/daily/useLists';
 import { useSuppliers } from '../../hooks/daily/useSuppliers';
 import { fmt, input, label } from './DailyModalUtils';
 import { Plus, Trash2, Loader2, Save } from 'lucide-react';
+import { ProductPicker } from '../products/ProductPicker';
 
 interface PurchaseLine { productId: string; quantityM2: string; unitCost: string; }
 
@@ -139,10 +140,14 @@ export const QuickPurchaseModal: React.FC<{ onClose: () => void; onSaved: () => 
               <div key={index} className="p-3 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                 <div className="sm:col-span-6">
                   <label htmlFor={productId} className={label}>الصنف</label>
-                  <select id={productId} value={line.productId} onChange={(e) => chooseProduct(index, e.target.value)} className={input} disabled={Boolean(listsError)}>
-                    <option value="">اختر الصنف</option>
-                    {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.sku}</option>)}
-                  </select>
+                  <ProductPicker
+                    id={productId}
+                    value={line.productId}
+                    selectedLabel={product?.name}
+                    ariaLabel={`استعراض أصناف السطر ${index + 1}`}
+                    onChange={(id) => chooseProduct(index, id)}
+                    disabled={Boolean(listsError)}
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <label htmlFor={quantityId} className={label}>الكمية {unit}</label>

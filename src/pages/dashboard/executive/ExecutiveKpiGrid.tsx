@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
-import type { KPI } from './types';
+import type { KPI } from '../../../types/dashboard/executive';
 
 interface Props {
   kpis: KPI[];

@@ -11,6 +11,7 @@ const compiledFiles = [
   'hardwareId',
   'security',
   'databaseHandlers',
+  'databaseMemoryPolicy',
   'appHandlers',
   'centralApi',
   'documentHandlers',

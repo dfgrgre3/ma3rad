@@ -5,7 +5,7 @@ import {
   RotateCcw, Scale, ShoppingBag, ShoppingCart, ShieldCheck, Star, Tags, Target,
   TrendingDown, TrendingUp, Users, UserRound, Utensils, Wallet, Workflow,
 } from 'lucide-react';
-import type { NavGroupDef } from './navigationTypes';
+import type { NavGroupDef } from '../types/config/navigation';
 
 export const NAV_GROUPS_01: NavGroupDef[] = [
   {

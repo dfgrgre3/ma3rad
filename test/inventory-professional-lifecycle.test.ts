@@ -1,11 +1,11 @@
-﻿import './integration.setup.ts';
+import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { runMigrations } from '../src/database/migrations.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { InventoryService } from '../src/services/InventoryService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { runMigrations } from '../src/database/migrations/index.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { InventoryService } from '../src/services/inventory/InventoryService.ts';
 import { approveCountSession, cancelCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/services/inventory-count/countSessionService.ts';
 import { loadBranchCountSessions, loadCountSessionItems } from '../src/services/inventory-count/countSessionData.ts';
 
@@ -33,19 +33,19 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   const whDest = 'wh_inv_dest';
 
   db.run(`INSERT OR IGNORE INTO warehouses (id, code, name, branch_id, is_active) VALUES (?, ?, ?, 'br_main', 1)`,
-    [whSource, 'WH-SRC-01', 'Ù…Ø³ØªÙˆØ¯Ø¹ Ø§Ù„ÙˆØ¬Ù‡ Ø§Ù„Ù‚Ø¨Ù„ÙŠ Ø§Ù„Ù…Ø±ÙƒØ²ÙŠ']);
+    [whSource, 'WH-SRC-01', 'مستودع الوجه القبلي المركزي']);
   db.run(`INSERT OR IGNORE INTO warehouses (id, code, name, branch_id, is_active) VALUES (?, ?, ?, 'br_main', 1)`,
-    [whDest, 'WH-DST-01', 'Ù…Ø³ØªÙˆØ¯Ø¹ ÙØ±Ø¹ Ø§Ù„Ù…Ø¹Ø§Ø¯ÙŠ']);
+    [whDest, 'WH-DST-01', 'مستودع فرع المعادي']);
 
-  db.run(`INSERT OR IGNORE INTO categories (id, name) VALUES ('cat_tiles_inv', 'Ø³ÙŠØ±Ø§Ù…ÙŠÙƒ ÙˆØ¨ÙˆØ±Ø³Ù„ÙŠÙ† - Ø§Ø®ØªØ¨Ø§Ø±')`);
-  db.run(`INSERT OR IGNORE INTO brands (id, name) VALUES ('br_royale_inv', 'Ø±ÙˆÙŠØ§Ù„ Ø³ÙŠØ±Ø§Ù…ÙŠÙƒØ§ - Ø§Ø®ØªØ¨Ø§Ø±')`);
+  db.run(`INSERT OR IGNORE INTO categories (id, name) VALUES ('cat_tiles_inv', 'سيراميك وبورسلين - اختبار')`);
+  db.run(`INSERT OR IGNORE INTO brands (id, name) VALUES ('br_royale_inv', 'رويال سيراميكا - اختبار')`);
 
   db.run(`INSERT OR IGNORE INTO products (
     id, sku, barcode, name, category_id, brand_id, grade, size, base_unit, sell_unit,
     pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
     min_selling_price_m2, min_stock_level, is_active
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`, [
-    prodId, 'SKU-INV-TILE', 'BAR-INV-TILE', 'Ø¨ÙˆØ±Ø³Ù„ÙŠÙ† Ø¥Ø³Ø¨Ø§Ù†ÙŠ Ù„ÙŠØ²Ø± 120*60 - Ø§Ø®ØªØ¨Ø§Ø±', 'cat_tiles_inv', 'br_royale_inv',
+    prodId, 'SKU-INV-TILE', 'BAR-INV-TILE', 'بورسلين إسباني ليزر 120*60 - اختبار', 'cat_tiles_inv', 'br_royale_inv',
     'GRADE_1', '120x60', 'M2', 'M2', 2, 1.44, 150, 260, 240, 220, 40
   ]);
 
@@ -59,7 +59,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   db.run(`DELETE FROM inventory_special_stocks WHERE product_id = ?`, [prodId]);
   db.run(`DELETE FROM inventory_transactions WHERE product_id = ?`, [prodId]);
 
-  // Set initial stock in source warehouse: 100 m2 â€” sufficient for all subsequent steps
+  // Set initial stock in source warehouse: 100 m2 — sufficient for all subsequent steps
   db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES (?, ?, ?, 100, 0)`,
     ['stk_inv_src', whSource, prodId]);
 
@@ -71,10 +71,10 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
     id, transaction_number, type, product_id, warehouse_id,
     quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
     notes, performed_by, created_at
-  ) VALUES (?, 'TX-TEST-01', 'OPENING_BALANCE', ?, ?, 100, 2, 150, 15000, 'SYSTEM_INIT', 'INIT-01', 'Ø±ØµÙŠØ¯ Ø§ÙØªØªØ§Ø­ÙŠ Ù…Ø­Ù…ÙŠ', ?, CURRENT_TIMESTAMP)`,
+  ) VALUES (?, 'TX-TEST-01', 'OPENING_BALANCE', ?, ?, 100, 2, 150, 15000, 'SYSTEM_INIT', 'INIT-01', 'رصيد افتتاحي محمي', ?, CURRENT_TIMESTAMP)`,
     [txId, prodId, whSource, adminId]);
 
-  // Attempt UPDATE on immutable ledger â€” must throw trigger error
+  // Attempt UPDATE on immutable ledger — must throw trigger error
   let updateFailed = false;
   try {
     db.run(`UPDATE inventory_transactions SET quantity_m2 = 999 WHERE id = ?`, [txId]);
@@ -84,7 +84,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   }
   assert.ok(updateFailed, 'Inventory transactions must reject any UPDATE modifications');
 
-  // Attempt DELETE on immutable ledger â€” must throw trigger error
+  // Attempt DELETE on immutable ledger — must throw trigger error
   let deleteFailed = false;
   try {
     db.run(`DELETE FROM inventory_transactions WHERE id = ?`, [txId]);
@@ -151,7 +151,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   const locStock = inventoryService.getLocationProducts(locId);
   assert.equal(locStock.length, 1);
   assert.equal(locStock[0].quantityM2, 50);
-  assert.equal(locStock[0].productName, 'Ø¨ÙˆØ±Ø³Ù„ÙŠÙ† Ø¥Ø³Ø¨Ø§Ù†ÙŠ Ù„ÙŠØ²Ø± 120*60 - Ø§Ø®ØªØ¨Ø§Ø±');
+  assert.equal(locStock[0].productName, 'بورسلين إسباني ليزر 120*60 - اختبار');
 
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 4. Stock Transfer Lifecycle: Request -> Approve -> Prepare -> Dispatch -> Partial Receive with Loss
@@ -160,7 +160,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   const transferId = inventoryService.createTransferRequest({
     fromWarehouseId: whSource,
     toWarehouseId: whDest,
-    notes: 'ØªØ­ÙˆÙŠÙ„ Ø¯ÙˆØ±ÙŠ Ù„ØªØºØ°ÙŠØ© ÙØ±Ø¹ Ø§Ù„Ù…Ø¹Ø§Ø¯ÙŠ',
+    notes: 'تحويل دوري لتغذية فرع المعادي',
     items: [{ productId: prodId, quantityM2: 30 }]
   });
   assert.ok(typeof transferId === 'string' && transferId.startsWith('trf_'), 'Transfer ID must be returned');
@@ -275,7 +275,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
     productId: prodId,
     category: 'BROKEN',
     quantityM2: 5,
-    notes: 'Ø³Ù‚ÙˆØ· Ø·Ø¨Ù„ÙŠØ© Ø¨ÙˆØ±Ø³Ù„ÙŠÙ† Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªØ­Ù…ÙŠÙ„',
+    notes: 'سقوط طبلية بورسلين أثناء التحميل',
   });
   assert.ok(specialResult, 'Special stock record must be returned');
   assert.equal(specialResult.category, 'BROKEN');
@@ -284,12 +284,12 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   const specialId = specialResult.id;
 
   // Inspect special stock
-  inventoryService.inspectSpecialStock(specialId, 'Ø§Ù„Ø¨Ù„Ø§Ø· Ù…ÙƒØ³ÙˆØ± Ø¨Ø§Ù„ÙƒØ§Ù…Ù„ ÙˆÙ„Ø§ ÙŠØµÙ„Ø­ ÙƒØ¹ÙŠÙ†Ø§Øª Ø£Ùˆ Ø¨ÙˆØ§Ù‚ÙŠ');
+  inventoryService.inspectSpecialStock(specialId, 'البلاط مكسور بالكامل ولا يصلح كعينات أو بواقي');
   const inspected = queryOne<{ status: string }>(`SELECT status FROM inventory_special_stocks WHERE id = ?`, [specialId]);
   assert.equal(inspected?.status, 'INSPECTED');
 
   // Resolve with WRITE_OFF (Dr 5201 / Cr 1104)
-  inventoryService.resolveSpecialStock(specialId, 'WRITE_OFF', 'Ø§Ø¹ØªÙ…Ø§Ø¯ Ù„Ø¬Ù†Ø© Ø§Ù„Ø¬Ø±Ø¯ Ù„Ø¥Ø¹Ø¯Ø§Ù… Ø§Ù„Ø·Ø¨Ù„ÙŠØ©');
+  inventoryService.resolveSpecialStock(specialId, 'WRITE_OFF', 'اعتماد لجنة الجرد لإعدام الطبلية');
   const resolved = queryOne<{ status: string }>(`SELECT status FROM inventory_special_stocks WHERE id = ?`, [specialId]);
   assert.equal(resolved?.status, 'WRITTEN_OFF');
 
@@ -331,7 +331,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   // System stock for prodId in whSource is now: 70 (after dispatch) - 5 (breakage removed) = 65 m2
   // Physical count found 62 m2 (-3 variance)
   db.run(`INSERT INTO stock_count_items (id, count_id, product_id, product_name, system_quantity_m2, counted_quantity_m2, variance_m2, unit_cost, variance_value, discrepancy_reason, notes)
-    VALUES (?, ?, ?, 'Ø¨ÙˆØ±Ø³Ù„ÙŠÙ† Ø¥Ø³Ø¨Ø§Ù†ÙŠ Ù„ÙŠØ²Ø± 120*60 - Ø§Ø®ØªØ¨Ø§Ø±', 65, 62, -3, 150, -450, 'BROKEN', 'Ø¹Ø¬Ø² 3 Ù…ØªØ± Ù…Ø±Ø¨Ø¹ Ù†ØªÙŠØ¬Ø© ÙƒØ³Ø± ØºÙŠØ± Ù…Ø³Ø¬Ù„')`,
+    VALUES (?, ?, ?, 'بورسلين إسباني ليزر 120*60 - اختبار', 65, 62, -3, 150, -450, 'BROKEN', 'عجز 3 متر مربع نتيجة كسر غير مسجل')`,
     ['cni_inv_test_01', countId, prodId]);
 
   const countItem = queryOne<{ countedQuantityM2: number; discrepancyReason: string }>(
@@ -382,7 +382,7 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
     variancePhysicalVsFifo: recon.variancePhysicalVsFifo,
     varianceFifoVsGl: recon.varianceFifoVsGl,
     status: recon.status,
-    notes: 'Ù…Ø·Ø§Ø¨Ù‚Ø© Ø¯ÙˆØ±ÙŠØ© Ù†ØµÙ Ø³Ù†ÙˆÙŠØ© - Ø§Ø®ØªØ¨Ø§Ø±'
+    notes: 'مطابقة دورية نصف سنوية - اختبار'
   });
 
   const reconLogs = inventoryService.getReconciliationLogs();

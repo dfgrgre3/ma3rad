@@ -69,6 +69,7 @@ export const ModalShell: React.FC<{
         aria-modal="true"
         aria-labelledby="daily-modal-title"
         tabIndex={-1}
+        style={{ maxWidth: wide ? 'min(56rem, calc(100vw - 2rem))' : 'min(32rem, calc(100vw - 2rem))' }}
         className={`relative z-10 bg-white rounded-2xl border border-slate-200 shadow-2xl w-full ${wide ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] flex flex-col outline-none`}
       >
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CeramicMath } from '../../utils/ceramicMath';
+import { CeramicMath } from '../../utils/products/ceramicMath';
 
 interface PaymentMethodsCardProps {
   paymentDistribution: any[];

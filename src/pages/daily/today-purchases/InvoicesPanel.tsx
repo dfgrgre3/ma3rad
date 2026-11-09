@@ -2,12 +2,12 @@ import React from 'react';
 import {
   ChevronDown, ChevronLeft, Eye, HandCoins, Plus, Printer, ShoppingBag, Trash2,
 } from 'lucide-react';
-import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/DailyOperationsService';
-import { formatProductQuantity } from '../../../utils/productUnits';
+import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/operations/DailyOperationsService';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { PAY_LABEL } from './constants';
 import { timeOf } from './helpers';
 import { SortableTh, StatusBadge } from './primitives';
-import type { NumberFormatter, SortDir, SortKey } from './types';
+import type { NumberFormatter, SortDir, SortKey } from '../../../types/dashboard/todayPurchases';
 
 export interface InvoicesPanelProps {
   rows: DailyPurchaseRow[];

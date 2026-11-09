@@ -29,6 +29,7 @@ const tailscaleService = require('./tailscaleService');
 const { registerLicenseHandlers } = require('./licenseGuard');
 const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
 const { autoUpdater } = require('electron-updater');
+const { getMaxDatabaseSize, getMaxV8HeapSize } = require('./databaseMemoryPolicy');
 
 // ───────────────────────────── Environment ────────────────────────────────────
 //   LICENSE_MODE=account|hardwa   (default: hardwa; overridden by the protected saved mode)
@@ -119,7 +120,7 @@ app.disableHardwareAcceleration();
 
 // تحسينات استهلاك الموارد للأجهزة الضعيفة والقديمة (Low-spec optimizations)
 app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512');
+app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${getMaxV8HeapSize(process.arch)}`);
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 // Security: Allowed origins for IPC communication
@@ -155,7 +156,7 @@ ipcMain.handle('diagnostics:renderer-error', (event, report) => {
 });
 
 // Security: Validate data size limits
-const MAX_DB_SIZE = 500 * 1024 * 1024; // 500MB
+const MAX_DB_SIZE = getMaxDatabaseSize(os.totalmem(), process.arch);
 const MAX_PRINT_DATA = 10 * 1024 * 1024; // 10MB for print data
 let syncClient = null;
 let activeSyncClientConfig = null;
@@ -444,7 +445,7 @@ const licenseGuard = registerLicenseHandlers({
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
 const PRELOAD_INTEGRITY_SHA256 = '9d4ab82a0baf8300bc62221a93db2f394fd196b1caf01b364a626bebc60deb70';
-const ENTRY_SOURCE_INTEGRITY_SHA256 = '61099d4251c2542f918796244fb67228f45bed5d1547bba26d259981132e999e';
+const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
 const SECURITY_SOURCE_INTEGRITY_SHA256 = 'c88cf3df3608468259747b3078e8fc58fc51bd882114680b82fcfd6b9bf47cfd';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';
 const BYTECODE_INTEGRITY = app.isPackaged

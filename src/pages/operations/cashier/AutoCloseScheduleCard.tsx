@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CashShift } from '../../../types';
-import { CeramicMath } from '../../../utils/ceramicMath';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
 
 interface Props {
   lastClosedShift: CashShift | null;

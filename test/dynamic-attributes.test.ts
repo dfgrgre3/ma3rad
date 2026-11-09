@@ -1,16 +1,16 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { AttributeService } from '../src/services/AttributeService.ts';
-import { ProductService } from '../src/services/ProductService.ts';
-import { ProductExtraService } from '../src/services/ProductExtraService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { AttributeService } from '../src/services/products/AttributeService.ts';
+import { ProductService } from '../src/services/products/ProductService.ts';
+import { ProductExtraService } from '../src/services/products/ProductExtraService.ts';
 import {
   normalizeDynamicAttributeValue,
   type DynamicAttributeDefinition,
-} from '../src/services/dynamicAttributes.ts';
+} from '../src/services/products/dynamicAttributes.ts';
 
 const attribute = (
   dataType: DynamicAttributeDefinition['dataType'],

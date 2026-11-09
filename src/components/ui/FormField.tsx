@@ -55,7 +55,7 @@ export const FormField: React.FC<FormFieldProps> = ({
         {label} {isRequired && <span aria-hidden="true" className="text-rose-500">*</span>}
       </label>
       {fieldChildren}
-      {hint && <p id={`${controlId}-hint`} className="mt-1 text-[10px] text-[var(--cerami-muted)]">{hint}</p>}
+      {hint && <p id={`${controlId}-hint`} className="mt-1 text-[10.5px] text-[var(--cerami-muted)]">{hint}</p>}
     </div>
   );
 };

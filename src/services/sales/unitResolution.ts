@@ -1,5 +1,5 @@
-import { conversionFactor, convertQuantity, getUomLabel, type UomProduct } from '../../utils/uom';
-import { round2 } from '../financials';
+import { conversionFactor, convertQuantity, getUomLabel, type UomProduct } from '../../utils/products/uom';
+import { round2 } from '../finance/financials';
 
 /**
  * Shared unit resolution for sales documents (invoices, quotations, orders).

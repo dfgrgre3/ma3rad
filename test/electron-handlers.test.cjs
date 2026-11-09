@@ -159,10 +159,10 @@ test('registered database handlers initialize directories and load/save within t
     } finally {
       console.error = originalConsoleErrorForOversizedSave;
     }
-    assert.match(oversizedSave.error, /maximum allowed size/i);
+    assert.match(oversizedSave.error, /الحد المناسب/);
 
     await fs.writeFile(dbFile, Buffer.alloc(databaseBytes.length + 1));
-    await assert.rejects(handlers.get('db:load')(event), /maximum allowed size/i);
+    await assert.rejects(handlers.get('db:load')(event), /الحد المناسب/);
   } finally {
     await fs.rm(context.appDataDir, { recursive: true, force: true });
   }

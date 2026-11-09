@@ -41,8 +41,8 @@ test('electron startup: an unpackaged launch without a dev URL loads the built r
   assert.match(mainSource, /const devServerUrl = process\.env\.VITE_DEV_SERVER_URL/);
   assert.match(mainSource, /if \(!app\.isPackaged && devServerUrl\)/);
   assert.match(mainSource, /win\.loadFile\(APP_HTML_PATH\)/);
-  assert.equal(pkg.scripts.start, 'npm run build && electron .');
-  assert.equal(pkg.scripts['electron:start'], 'npm run build && electron .');
+  assert.equal(pkg.scripts.start, 'npm run build:local && node scripts/electron-security-integrity.cjs && electron .');
+  assert.equal(pkg.scripts['electron:start'], 'npm run build:local && node scripts/electron-security-integrity.cjs && electron .');
   assert.equal(pkg.scripts['electron:dev'], 'node scripts/electron-dev.mjs');
   assert.match(fs.readFileSync(path.join(root, 'scripts', 'electron-dev.mjs'), 'utf8'), /VITE_DEV_SERVER_URL: devUrl/);
 });

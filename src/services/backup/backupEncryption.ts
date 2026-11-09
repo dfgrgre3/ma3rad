@@ -1,0 +1,12 @@
+import './backupEncryption_part01';
+import './backupEncryption_part02';
+import './backupEncryption_part03';
+import './backupEncryption_part04';
+export { isEncryptedBackup } from './backupEncryption_part01';
+export { isEncryptedLocalDatabase } from './backupEncryption_part01';
+export { encryptExternalBackup } from './backupEncryption_part01';
+export { decryptExternalBackup } from './backupEncryption_part02';
+export { generateBackupSignature } from './backupEncryption_part02';
+export { verifyBackupSignature } from './backupEncryption_part02';
+export { encryptBackupWithSignature } from './backupEncryption_part03';
+export { decryptBackupWithSignature } from './backupEncryption_part04';

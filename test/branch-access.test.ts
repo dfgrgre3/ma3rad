@@ -1,21 +1,21 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { BranchAccessService } from '../src/services/BranchAccessService.ts';
-import { BranchService } from '../src/services/BranchService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { ApprovalService } from '../src/services/ApprovalService.ts';
-import { PurchaseRequestService } from '../src/services/PurchaseRequestService.ts';
-import { PurchaseReturnService } from '../src/services/PurchaseReturnService.ts';
-import { ProcurementService } from '../src/services/ProcurementService.ts';
-import { CashierService } from '../src/services/CashierService.ts';
-import { DailyOperationsService } from '../src/services/DailyOperationsService.ts';
-import { OperationsService } from '../src/services/OperationsService.ts';
-import { InventoryService } from '../src/services/InventoryService.ts';
-import { InventoryCostingService } from '../src/services/InventoryCostingService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
+import { BranchService } from '../src/services/organization/BranchService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { ApprovalService } from '../src/services/approvals/ApprovalService.ts';
+import { PurchaseRequestService } from '../src/services/purchases/PurchaseRequestService.ts';
+import { PurchaseReturnService } from '../src/services/purchases/PurchaseReturnService.ts';
+import { ProcurementService } from '../src/services/procurement/ProcurementService.ts';
+import { CashierService } from '../src/services/finance/CashierService.ts';
+import { DailyOperationsService } from '../src/services/operations/DailyOperationsService.ts';
+import { OperationsService } from '../src/services/operations/OperationsService.ts';
+import { InventoryService } from '../src/services/inventory/InventoryService.ts';
+import { InventoryCostingService } from '../src/services/inventory/InventoryCostingService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 test('branch access enforces assigned and explicit central scopes in service queries', async () => {
   const db = DatabaseManager.getInstance();

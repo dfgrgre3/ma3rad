@@ -1,7 +1,7 @@
-import { DatabaseManager } from '../database/db.ts';
+import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 import { OutboxRepository } from './OutboxRepository.ts';
 import { InboxRepository } from './InboxRepository.ts';
-import type { SyncDataScope, SyncEvent } from './types.ts';
+import type { SyncDataScope, SyncEvent } from '../types/sync/index.ts';
 import type { EventDispatcher } from './PullChangesService.ts';
 
 export const SUPPORTED_SYNC_ENTITIES = [

@@ -17,6 +17,7 @@ const filesToCompile = [
   'hardwareId.js',
   'security.js',
   'databaseHandlers.js',
+  'databaseMemoryPolicy.js',
   'appHandlers.js',
   'centralApi.js',
   'documentHandlers.js',

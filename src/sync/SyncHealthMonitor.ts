@@ -1,5 +1,5 @@
 ﻿import { OutboxRepository } from './OutboxRepository.ts';
-import type { SyncStatus } from './types.ts';
+import type { SyncStatus } from '../types/sync/index.ts';
 
 export class SyncHealthMonitor {
   private lastSuccessfulSyncAt: string | null = null;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Clock, Plus, RefreshCw, Wallet } from 'lucide-react';
 import type { CashShift, User } from '../../../types';
-import { PermissionService } from '../../../services/PermissionService';
+import { PermissionService } from '../../../services/auth/PermissionService';
 
 interface Props {
   currentUser: User | null;

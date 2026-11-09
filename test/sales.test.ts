@@ -1,16 +1,16 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
-import { PrintService } from '../src/services/PrintService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { PartnerService } from '../src/services/PartnerService.ts';
-import { runMigrations } from '../src/database/migrations.ts';
-import { SCHEMA_SQL } from '../src/database/schema.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { FinanceExtrasService } from '../src/services/finance/FinanceExtrasService.ts';
+import { PrintService } from '../src/services/shared/PrintService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { PartnerService } from '../src/services/customers/PartnerService.ts';
+import { runMigrations } from '../src/database/migrations/index.ts';
+import { SCHEMA_SQL } from '../src/database/schema/index.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);

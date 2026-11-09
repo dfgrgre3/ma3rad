@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import { AlertTriangle, ScanLine, Search, X } from 'lucide-react';
-import { formatProductQuantity } from '../../../utils/productUnits';
-import type { CountProductOption, CountType, WarehouseOption } from '../../../services/inventory-count/types';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
+import type { CountProductOption, CountType, WarehouseOption } from '../../../types/inventory/countSessions';
 
 interface StartCountSessionModalProps {
   errorMsg: string;

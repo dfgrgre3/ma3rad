@@ -1,7 +1,7 @@
 import React from 'react';
 import { DollarSign } from 'lucide-react';
-import { CeramicMath } from '../../../utils/ceramicMath';
-import { SupplierPaymentRow } from './types';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
+import { SupplierPaymentRow } from '../../../types/purchasing/supplierDetailPage';
 
 export interface PaymentsTabProps {
   payments: SupplierPaymentRow[];

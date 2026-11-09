@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Plus } from 'lucide-react';
-import { CeramicMath } from '../../../utils/ceramicMath';
-import { SupplierReturnRow } from './types';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
+import { SupplierReturnRow } from '../../../types/purchasing/supplierDetailPage';
 
 export interface ReturnsTabProps {
   returns: SupplierReturnRow[];

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Product } from '../../../types';
-import { formatProductQuantity, getProductUnitLabel } from '../../../utils/productUnits';
+import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { money } from './format';
-import { SalesRow } from './types';
+import { SalesRow } from '../../../types/products/productDetailPage';
 
 interface SalesTabProps {
   product: Product;

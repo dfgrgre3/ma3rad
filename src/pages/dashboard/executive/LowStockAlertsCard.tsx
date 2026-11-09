@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
-import type { LowStockItem } from './types';
-import { formatProductQuantity } from '../../../utils/productUnits';
+import type { LowStockItem } from '../../../types/dashboard/executive';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
 
 interface Props {
   lowStock: LowStockItem[];

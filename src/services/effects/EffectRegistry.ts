@@ -1,4 +1,4 @@
-import type { Effect, EffectHandler, EffectType } from './EffectTypes';
+import type { Effect, EffectHandler, EffectType } from '../../types/effects';
 
 /**
  * In-process registry of effect handlers. Mirrors the shape of

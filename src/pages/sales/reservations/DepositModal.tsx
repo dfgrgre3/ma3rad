@@ -1,8 +1,8 @@
 import React from 'react';
 import { Loader2, X, CheckCheck, DollarSign } from 'lucide-react';
-import type { Order } from '../../../services/OrderService';
+import type { Order } from '../../../services/sales/OrderService';
 import { fmtCurrency } from './helpers';
-import type { DepositPaymentType } from './types';
+import type { DepositPaymentType } from '../../../types/sales/reservationsPage';
 
 interface DepositModalProps {
   order: Order;

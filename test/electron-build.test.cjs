@@ -15,6 +15,8 @@ const {
   verifyBytecodeReproducibility,
   writeBytecodeIntegrityManifest,
 } = require('../scripts/compile-bytenode.cjs');
+const { getEntrySourceIntegrityHash } = require('../scripts/electron-security-integrity.cjs');
+const { FileIntegrityChecker } = require('../electron/security/fileIntegrity.js');
 const { prepareProductionBundle } = require('../scripts/prepare-production-bundle.cjs');
 const { restoreSource } = require('../scripts/restore-source.cjs');
 
@@ -248,13 +250,13 @@ test('bytecode integrity manifest is pinned and covers every compiled Electron m
 });
 
 test('development runtime pins the current Electron entry source hash', () => {
-  const entryHash = createHash('sha256')
-    .update(fs.readFileSync(path.join(projectRoot, 'electron', 'entry.js')))
-    .digest('hex');
+  const entryPath = path.join(projectRoot, 'electron', 'entry.js');
+  const entryHash = getEntrySourceIntegrityHash(entryPath);
   const mainSource = fs.readFileSync(path.join(projectRoot, 'electron', 'main.js'), 'utf8');
 
   assert.ok(mainSource.includes(`ENTRY_SOURCE_INTEGRITY_SHA256 = '${entryHash}'`));
   assert.match(mainSource, /!\s*app\.isPackaged\s*\?\s*\{\s*'electron\/entry\.js': ENTRY_SOURCE_INTEGRITY_SHA256\s*\}/);
+  assert.equal(new FileIntegrityChecker(projectRoot).hashFile('electron/entry.js'), entryHash);
 });
 
 test('distribution and publish commands compile Electron bytecode before packaging', () => {
@@ -278,6 +280,12 @@ test('distribution and publish commands compile Electron bytecode before packagi
   const compiler = fs.readFileSync(path.join(projectRoot, 'scripts', 'compile-bytenode.cjs'), 'utf8');
   assert.match(compiler, /'main\.js'/);
   assert.match(compiler, /'security\/crypto\.js'/);
+  assert.match(compiler, /'databaseMemoryPolicy\.js'/);
+  const legacyBuilder = fs.readFileSync(path.join(projectRoot, 'scripts', 'build-legacy-windows.cjs'), 'utf8');
+  assert.match(legacyBuilder, /'databaseMemoryPolicy\.js'/);
+  assert.match(legacyBuilder, /entry\.name === 'bytecode-integrity\.json'/);
+  const productionPreparation = fs.readFileSync(path.join(projectRoot, 'scripts', 'prepare-production-bundle.cjs'), 'utf8');
+  assert.match(productionPreparation, /'databaseMemoryPolicy'/);
   assert.ok(packageConfig.build.files.includes('electron/**/*'), 'the packaged files must include generated .jsc files');
 });
 

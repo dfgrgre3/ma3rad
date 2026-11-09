@@ -1,7 +1,7 @@
 import React from 'react';
-import { CeramicMath } from '../../utils/ceramicMath';
-import { formatProductQuantity } from '../../utils/productUnits';
-import type { TopSellingProduct } from './types';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import { formatProductQuantity } from '../../utils/products/productUnits';
+import type { TopSellingProduct } from '../../types/dashboard/components';
 
 interface TopProductsCardProps {
   topProducts: TopSellingProduct[];

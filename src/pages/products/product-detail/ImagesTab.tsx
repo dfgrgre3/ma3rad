@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Image as ImageIcon, Trash2, Upload } from 'lucide-react';
-import { ProductExtraService, ProductImage } from '../../../services/ProductExtraService';
+import { ProductExtraService, ProductImage } from '../../../services/products/ProductExtraService';
 
 interface ImagesTabProps {
   productId: string;

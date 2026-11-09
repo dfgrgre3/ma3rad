@@ -29,8 +29,8 @@ import {
 } from '../electron/security/ipcGuard.js';
 import { isAllowedAppUrl, isAllowedIpcSender } from '../electron/security.js';
 import { LicenseGuard } from '../electron/licenseGuard.js';
-import { DatabaseManager } from '../src/database/db.ts';
-import { encryptExternalBackup, decryptExternalBackup } from '../src/services/backupEncryption.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { encryptExternalBackup, decryptExternalBackup } from '../src/services/backup/backupEncryption.ts';
 
 const require = createRequire(import.meta.url);
 

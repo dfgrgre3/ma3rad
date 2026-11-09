@@ -2,10 +2,10 @@ import React from 'react';
 import { Barcode, Copy, Edit, Eye, Package, PackagePlus, Power, Trash2 } from 'lucide-react';
 import type { Product } from '../../types';
 import { DataTable, type DataTableColumn } from '../ui/DataTable';
-import { CeramicMath } from '../../utils/ceramicMath';
-import { getProductUnitLabel } from '../../utils/productUnits';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import { getProductUnitLabel } from '../../utils/products/productUnits';
 import { round, gradeLabel } from './productFormModel';
-import type { OperationalFieldDefinition } from '../../services/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
 
 export interface ProductsTableProps {
   products: Product[];

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import * as P from './lazyPages';
+import { APP_ROUTE_PATHS } from './routePaths';
 
 export interface RouteDef {
   path: string;
@@ -160,3 +161,9 @@ export const appRoutes: RouteDef[] = [
   { path: 'system-health', element: <P.SystemHealthPage /> },
   { path: '*', element: <P.NotFoundPage /> },
 ];
+
+const pathsMatch = appRoutes.length === APP_ROUTE_PATHS.length
+  && appRoutes.every((route, index) => route.path === APP_ROUTE_PATHS[index]);
+if (!pathsMatch) {
+  console.error('router/routePaths.ts is out of sync with routesList.tsx');
+}

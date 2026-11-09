@@ -1,6 +1,6 @@
 import React from 'react';
 import { BadgeCheck, Wallet } from 'lucide-react';
-import type { NumberFormatter } from './types';
+import type { NumberFormatter } from '../../../types/dashboard/todayPurchases';
 
 export interface PurchaseAlertsProps {
   remaining: number;

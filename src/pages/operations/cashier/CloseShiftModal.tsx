@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import type { CashShift } from '../../../types';
-import { CeramicMath } from '../../../utils/ceramicMath';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
 
 interface Props {
   isOpen: boolean;

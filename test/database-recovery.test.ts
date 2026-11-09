@@ -1,7 +1,7 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 
 test('database recovery preserves unreadable data and requires an explicit fresh-database choice', async () => {
   let loadMode: 'read-error' | 'corrupt' | 'missing' = 'read-error';

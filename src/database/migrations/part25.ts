@@ -1,5 +1,5 @@
-import type { Migration } from '../migrationSupport';
-import { columnExists } from '../migrationSupport';
+import type { Migration } from './support';
+import { columnExists } from './support';
 
 export const MIGRATION_PART_25: Migration[] = [
   {

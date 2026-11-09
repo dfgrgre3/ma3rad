@@ -1,7 +1,7 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EscPosService } from '../src/services/EscPosService.ts';
+import { EscPosService } from '../src/services/shared/EscPosService.ts';
 
 const invoice: any = {
   invoiceNumber: 'INV-ESC-1',

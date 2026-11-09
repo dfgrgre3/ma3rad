@@ -1,4 +1,4 @@
-import type { Migration } from '../migrationSupport';
+import type { Migration } from './support';
 
 const FIELD_RECORD_TABLES: Array<[string, string]> = [
   ['products', 'products'],

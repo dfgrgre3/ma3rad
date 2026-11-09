@@ -1,9 +1,9 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { performanceMonitor } from '../src/services/performanceMonitor.ts';
-import { systemHealth } from '../src/services/systemHealthService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { performanceMonitor } from '../src/services/shared/performanceMonitor.ts';
+import { systemHealth } from '../src/services/shared/systemHealthService.ts';
 
 test('performance monitoring reports measured database and query metrics', async () => {
   const database = DatabaseManager.getInstance();

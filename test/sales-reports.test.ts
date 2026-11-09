@@ -1,18 +1,18 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { CustomerService } from '../src/services/CustomerService.ts';
-import { SalesService } from '../src/services/SalesService.ts';
-import { AnalyticsService } from '../src/services/AnalyticsService.ts';
-import { localDateString } from '../src/utils/date.ts';
-import { loadReport } from '../src/pages/reports/SalesReportsPage.tsx';
-import { SalesFinancialReconciliationService } from '../src/services/SalesFinancialReconciliationService.ts';
-import { ReportCenterService } from '../src/services/ReportCenterService.ts';
-import { HistoricalReturnReconciliationService } from '../src/services/HistoricalReturnReconciliationService.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/customers/CustomerService.ts';
+import { SalesService } from '../src/services/sales/SalesService.ts';
+import { AnalyticsService } from '../src/services/reports/AnalyticsService.ts';
+import { localDateString } from '../src/utils/shared/date.ts';
+import { loadReport } from '../src/pages/reports/sales-reports/SalesReportsPage.tsx';
+import { SalesFinancialReconciliationService } from '../src/services/sales/SalesFinancialReconciliationService.ts';
+import { ReportCenterService } from '../src/services/reports/ReportCenterService.ts';
+import { HistoricalReturnReconciliationService } from '../src/services/sales/HistoricalReturnReconciliationService.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
 
 test('sales reports net sales, profit and daily revenue against returns by return date', async () => {
   const db = DatabaseManager.getInstance();

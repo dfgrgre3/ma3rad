@@ -1,4 +1,4 @@
-import { createExcelWorkbook, type ExcelWorkbookRequest } from '../utils/excelExportWorkbook';
+import { createExcelWorkbook, type ExcelWorkbookRequest } from '../utils/export/excelExportWorkbook';
 
 self.onmessage = (event: MessageEvent<ExcelWorkbookRequest>) => {
   try {

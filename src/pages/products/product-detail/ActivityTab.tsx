@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityRow } from './types';
+import { ActivityRow } from '../../../types/products/productDetailPage';
 
 interface ActivityTabProps {
   activity: ActivityRow[];

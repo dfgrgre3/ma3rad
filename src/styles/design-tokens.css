@@ -47,6 +47,42 @@
   --cerami-shadow-popover: 0 8px 24px rgba(15, 23, 42, 0.16);
   --cerami-focus-ring: 0 0 0 3px rgba(52, 68, 90, 0.2);
   --cerami-motion-fast: 140ms;
+
+  /* ── Compact ERP design system ─────────────────────────────────────────
+     Single source of truth for spacing, control metrics and typography.
+     Components use these tokens instead of hard-coded pixel values. */
+  --ui-space-2xs: 2px;
+  --ui-space-xs: 4px;
+  --ui-space-sm: 8px;
+  --ui-space-md: 12px;
+  --ui-space-lg: 16px;
+  --ui-space-xl: 20px;
+  --ui-space-2xl: 24px;
+  --ui-card-padding: 14px;
+  --ui-card-padding-x: 16px;
+  --ui-section-gap: 16px;
+  --ui-grid-gap: 12px;
+  --ui-field-gap: 8px;
+  --ui-control-height: 32px;
+  --ui-control-height-sm: 26px;
+  --ui-control-height-lg: 36px;
+  --ui-input-padding-x: 9px;
+  --ui-font-2xs: 10px;
+  --ui-font-xs: 11.5px;
+  --ui-font-sm: 12.5px;
+  --ui-font-md: 13.5px;
+  --ui-font-lg: 15px;
+  --ui-font-xl: 18px;
+  --ui-line-tight: 1.3;
+  --ui-line-normal: 1.5;
+  --ui-icon-sm: 14px;
+  --ui-icon-md: 16px;
+  --ui-icon-lg: 20px;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-lg: 8px;
+  --ui-radius-xl: 10px;
+  --ui-transition: 140ms ease;
 }
 
 .dark {

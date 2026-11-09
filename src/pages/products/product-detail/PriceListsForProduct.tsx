@@ -1,5 +1,5 @@
 import React from 'react';
-import { DatabaseManager } from '../../../database/db';
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
 
 interface PriceListsForProductProps {
   productId: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Product } from '../../../types';
-import { getProductUnitLabel } from '../../../utils/productUnits';
+import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { SURFACE_LABELS } from './constants';
 import { money } from './format';
 

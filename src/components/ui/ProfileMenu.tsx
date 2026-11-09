@@ -3,9 +3,9 @@ import { Bell, Building2, Check, ChevronDown, ChevronLeft, KeyRound, LogOut, Moo
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../../types';
 import { useTheme } from '../../contexts/useTheme';
-import { AuthService } from '../../services/AuthService';
-import { PermissionService } from '../../services/PermissionService';
-import { DatabaseManager } from '../../database/db';
+import { AuthService } from '../../services/auth/AuthService';
+import { PermissionService } from '../../services/auth/PermissionService';
+import { DatabaseManager } from '../../database/repositories/databaseManager';
 import { useToast } from './Toast';
 import { ChangePasswordModal } from './ChangePasswordModal';
 

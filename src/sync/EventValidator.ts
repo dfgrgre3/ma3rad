@@ -1,4 +1,4 @@
-﻿import type { SyncEvent, SyncOperation } from './types.ts';
+﻿import type { SyncEvent, SyncOperation } from '../types/sync/index.ts';
 
 const VALID_OPS: SyncOperation[] = ['CREATE','UPDATE','DELETE','UPSERT'];
 const VALID_SCOPES = ['TENANT', 'BRANCH'] as const;

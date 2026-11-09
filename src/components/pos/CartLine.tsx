@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { AlertCircle, Minus, Plus, Trash2, Tag, ChevronDown, Package } from 'lucide-react';
 import type { Product } from '../../types';
-import { CeramicMath } from '../../utils/ceramicMath';
-import { formatProductQuantity, getProductUnitLabel } from '../../utils/productUnits';
-import { getSellableUnits, getUomLabel, pricePerUnit } from '../../utils/uom';
-import { round2, type CartItem, type PosUnit } from './types';
-import { getEffectiveBusinessType } from '../../services/BusinessTypeService';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
+import { getSellableUnits, getUomLabel, pricePerUnit } from '../../utils/products/uom';
+import { round2, type CartItem, type PosUnit } from '../../types/pos';
+import { getEffectiveBusinessType } from '../../services/config/BusinessTypeService';
 import { getPricingTierFactor } from '../../config/businessProfiles';
 import { getCartPriceUnitLabel, getCartQuantityStep } from './cartUtils';
 

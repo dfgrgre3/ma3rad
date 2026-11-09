@@ -1,4 +1,4 @@
-﻿export * from './types.ts';
+﻿export * from '../types/sync/index.ts';
 export * from './OutboxRepository.ts';
 export * from './InboxRepository.ts';
 export * from './IdempotencyService.ts';

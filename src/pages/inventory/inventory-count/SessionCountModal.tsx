@@ -1,9 +1,9 @@
 ﻿import React from 'react';
 import { CheckCircle2, ClipboardList, Search, X } from 'lucide-react';
-import { formatProductQuantity } from '../../../utils/productUnits';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { fmtCountCurrency } from './helpers';
-import { exportToExcel, exportToPdf } from '../../../utils/export';
-import type { CountItem, CountSession, VisibleCountItem } from '../../../services/inventory-count/types';
+import { exportToExcel, exportToPdf } from '../../../utils/export/export';
+import type { CountItem, CountSession, VisibleCountItem } from '../../../types/inventory/countSessions';
 
 interface SessionCountModalProps {
   session: CountSession;

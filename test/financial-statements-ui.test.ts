@@ -2,8 +2,8 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
-import { DatabaseManager } from '../src/database/db.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
 
 test('financial statements screen filters cash flow and ledger and exports the balance sheet', async () => {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
@@ -28,10 +28,10 @@ test('financial statements screen filters cash flow and ledger and exports the b
   const { cleanup, fireEvent, render, screen, waitFor } = await import('@testing-library/react');
   const React = await import('react');
   const { ToastProvider } = await import('../src/components/ui/Toast.tsx');
-  const { FinancialStatementsPage } = await import('../src/pages/reports/FinancialStatementsPage.tsx');
-  const { AuthService } = await import('../src/services/AuthService.ts');
-  const { PermissionService } = await import('../src/services/PermissionService.ts');
-  const { BranchAccessService } = await import('../src/services/BranchAccessService.ts');
+  const { FinancialStatementsPage } = await import('../src/pages/reports/financial-statements/FinancialStatementsPage.tsx');
+  const { AuthService } = await import('../src/services/auth/AuthService.ts');
+  const { PermissionService } = await import('../src/services/auth/PermissionService.ts');
+  const { BranchAccessService } = await import('../src/services/auth/BranchAccessService.ts');
   const manager = DatabaseManager.getInstance();
   await manager.initialize();
   await PermissionService.seed();

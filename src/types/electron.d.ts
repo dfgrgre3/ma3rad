@@ -121,12 +121,12 @@ declare global {
         }>;
         clearClientConfig?: () => Promise<{ ok: boolean }>;
         runSyncNow?: () => Promise<void>;
-        pushEvents?: (events: import('../sync/types').SyncEvent[]) => Promise<import('../sync/types').SyncPushResult>;
+        pushEvents?: (events: import('./sync').SyncEvent[]) => Promise<import('./sync').SyncPushResult>;
         pullEvents?: (
           scope: string,
           cursor: string | null,
           limit: number
-        ) => Promise<import('../sync/types').SyncPullResult>;
+        ) => Promise<import('./sync').SyncPullResult>;
       };
       tailscale?: {
         status?: () => Promise<{

@@ -1,13 +1,13 @@
 import React from 'react';
 import { Package, Edit, ArrowRight } from 'lucide-react';
 import { Product } from '../../../types';
-import { getProductUnitLabel } from '../../../utils/productUnits';
+import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { TABS, Tab } from './constants';
 import { gradeLabel } from '../../../components/products/productFormModel';
 import { fmt } from './format';
-import { StockSummary } from './types';
-import { usePermission } from '../../../hooks/usePermission';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/useBusinessTerm';
+import { StockSummary } from '../../../types/products/productDetailPage';
+import { usePermission } from '../../../hooks/auth/usePermission';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
 
 interface ProductDetailHeaderProps {
   product: Product;

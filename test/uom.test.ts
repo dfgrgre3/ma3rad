@@ -1,7 +1,7 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import {
   baseQuantityAsM2,
   convertQuantity,
@@ -11,7 +11,7 @@ import {
   isSameUom,
   normalizeUom,
   toBaseQuantity,
-} from '../src/utils/uom.ts';
+} from '../src/utils/products/uom.ts';
 
 const ceramic = { productType: 'CERAMIC', baseUnit: 'M2', metersPerBox: 1.44, piecesPerBox: 4 };
 const generalPiece = { productType: 'GENERAL', baseUnit: 'PIECE', metersPerBox: 1, piecesPerBox: 12 };

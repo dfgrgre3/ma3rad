@@ -1,11 +1,11 @@
 import React from 'react';
 import { FileText, DollarSign } from 'lucide-react';
 import { Supplier } from '../../../types';
-import { CeramicMath } from '../../../utils/ceramicMath';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/useBusinessTerm';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
 import {
   Tab, SupplierInvoiceRow, SupplierOrderRow, SupplierPaymentRow, PAY_STATUS_BADGES,
-} from './types';
+} from '../../../types/purchasing/supplierDetailPage';
 
 export interface OverviewTabProps {
   supplier: Supplier;

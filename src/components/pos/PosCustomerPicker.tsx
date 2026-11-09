@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { UserPlus, Wallet, CreditCard, Star, Receipt, X, ListFilter } from 'lucide-react';
 import type { Customer } from '../../types';
-import { CeramicMath } from '../../utils/ceramicMath';
-import type { CustomerService } from '../../services/CustomerService';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import type { CustomerService } from '../../services/customers/CustomerService';
 import { CUSTOMER_TYPE_LABELS } from './customerLabels';
 import { PosCustomerSelectionDialog } from './PosCustomerSelectionDialog';
 
@@ -105,21 +105,21 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
           </button>
         </div>
         {!selectedCustomer && customerSearch.trim() && (
-          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+          <div className="selection-list absolute z-20 mt-1 max-h-64 w-full overflow-y-auto">
             {filteredCustomers.length === 0 ? (
-              <div className="p-3 text-xs text-slate-600 dark:text-slate-300">لا توجد نتائج مطابقة — يمكنك إنشاء عميل جديد</div>
+              <div className="selection-list__meta p-3 text-xs">لا توجد نتائج مطابقة — يمكنك إنشاء عميل جديد</div>
             ) : (
               filteredCustomers.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => onSelectCustomer(c)}
-                  className="w-full border-b border-slate-100 px-3 py-2.5 text-right text-xs text-slate-800 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:bg-sky-50 last:border-0 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:bg-slate-800"
+                  className="selection-list__row w-full px-3 py-2.5 text-right text-xs focus-visible:outline-none last:border-0"
                 >
                   <div className="font-bold flex items-center justify-between gap-2">
                     <span className="truncate">{c.name}</span>
-                    <span className="shrink-0 font-mono text-xs text-slate-500 dark:text-slate-400">{c.phone}</span>
+                    <span className="selection-list__meta shrink-0 font-mono text-xs">{c.phone}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="selection-list__meta flex items-center justify-between gap-2 text-xs">
                     <span>{CUSTOMER_TYPE_LABELS[c.customerType]}</span>
                     {c.currentBalance > 0 && <span className="font-bold text-amber-700 dark:text-amber-400">مدين: {CeramicMath.formatCurrency(c.currentBalance)}</span>}
                     {c.currentBalance < 0 && <span className="font-bold text-emerald-700 dark:text-emerald-400">دائن: {CeramicMath.formatCurrency(-c.currentBalance)}</span>}

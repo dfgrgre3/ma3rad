@@ -1,17 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Trash2, Loader2, Save, AlertTriangle } from 'lucide-react';
-import { CustomerService } from '../../services/CustomerService';
-import { SalesService } from '../../services/SalesService';
-import { PurchaseService } from '../../services/PurchaseService';
+import { CustomerService } from '../../services/customers/CustomerService';
+import { SalesService } from '../../services/sales/SalesService';
+import { PurchaseService } from '../../services/purchases/PurchaseService';
 import { useToast } from '../ui/Toast';
-import { AuthService } from '../../services/AuthService';
-import { PermissionService } from '../../services/PermissionService';
-import { formatProductQuantity } from '../../utils/productUnits';
+import { AuthService } from '../../services/auth/AuthService';
+import { PermissionService } from '../../services/auth/PermissionService';
+import { formatProductQuantity } from '../../utils/products/productUnits';
 import type { PaymentType } from '../../types';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
 import { useRegisters } from '../../hooks/daily/useRegisters';
 import { fmt, input, label } from './DailyModalUtils';
-import { useIdempotencyKey } from '../../hooks/useIdempotencyKey';
+import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 
 export type PaymentTarget =
   | { kind: 'sale'; id: string; branchId?: string; name: string; remaining: number }

@@ -3,9 +3,9 @@ import {
   Calculator, ChevronDown, Layers, ListFilter, Package, Search, X,
 } from 'lucide-react';
 import type { Product, Warehouse } from '../../types';
-import type { CategoryWithCount } from '../../services/CategoryService';
-import type { SortMode } from './types';
-import type { ProductGradeOption } from '../../services/OperationalFieldService';
+import type { CategoryWithCount } from '../../services/products/CategoryService';
+import type { SortMode } from '../../types/pos';
+import type { ProductGradeOption } from '../../services/products/OperationalFieldService';
 
 export interface PosCatalogFiltersProps {
   barcodeInputRef: React.RefObject<HTMLInputElement>;
@@ -124,7 +124,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
             )}
           </form>
           {searchQuery.trim() && searchSuggestions.length > 0 && (
-            <div className="absolute z-30 mt-1.5 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-80 overflow-y-auto">
+            <div className="selection-list absolute z-30 mt-1.5 w-full max-h-80 overflow-y-auto">
               {searchSuggestions.slice(0, 8).map((product) => (
                 <button
                   key={product.id}
@@ -133,10 +133,10 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
                     if (onSelectSuggestion) onSelectSuggestion(product);
                     else onSearchQueryChange(product.name);
                   }}
-                  className="w-full text-right px-4 py-2.5 hover:bg-sky-50 text-xs flex items-center justify-between gap-3 border-b border-slate-100 last:border-0 transition"
+                  className="selection-list__row w-full text-right px-4 py-2.5 text-xs flex items-center justify-between gap-3 last:border-0"
                 >
-                  <span className="font-bold text-slate-800 truncate">{product.name}</span>
-                  <span className="text-[11px] text-slate-500 font-mono shrink-0">{product.sku || product.barcode}</span>
+                  <span className="font-bold truncate">{product.name}</span>
+                  <span className="selection-list__meta text-[11px] font-mono shrink-0">{product.sku || product.barcode}</span>
                 </button>
               ))}
             </div>

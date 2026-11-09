@@ -2,7 +2,7 @@ import React, { Profiler } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { reportSlowReactRender, startRendererPerformanceMonitoring } from './services/rendererPerformanceMonitor';
+import { reportSlowReactRender, startRendererPerformanceMonitoring } from './services/shared/rendererPerformanceMonitor';
 
 startRendererPerformanceMonitoring();
 

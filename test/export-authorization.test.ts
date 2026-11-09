@@ -1,12 +1,12 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { ExportService } from '../src/services/ExportService.ts';
-import { buildExportHtml, exportToExcel, exportToPdf } from '../src/utils/export.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { ExportService } from '../src/services/shared/ExportService.ts';
+import { buildExportHtml, exportToExcel, exportToPdf } from '../src/utils/export/export.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 const doc = {
   title: 'تقرير اختبار',

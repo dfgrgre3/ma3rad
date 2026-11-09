@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowDownRight, Wallet } from 'lucide-react';
 import type { CashRegister, CashShift, Expense } from '../../../types';
-import { CeramicMath } from '../../../utils/ceramicMath';
+import { CeramicMath } from '../../../utils/products/ceramicMath';
 
 interface Props {
   defaultRegister?: CashRegister;

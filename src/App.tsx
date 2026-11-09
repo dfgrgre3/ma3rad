@@ -1,30 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { HashRouter } from 'react-router-dom';
-import { DatabaseManager } from './database/db';
-import { AuthService } from './services/AuthService';
-import { CentralLicenseService } from './services/CentralLicenseService';
-import { CentralConfigApplier } from './services/CentralConfigApplier';
-import { CentralEstablishmentService } from './services/CentralEstablishmentService';
-import { SettingsService } from './services/SettingsService';
-import { AppConfigService } from './services/AppConfigService';
+import { DatabaseManager } from './database/repositories/databaseManager';
+import { AuthService } from './services/auth/AuthService';
+import { CentralLicenseService } from './services/licensing/CentralLicenseService';
+import { CentralConfigApplier } from './services/licensing/CentralConfigApplier';
+import { CentralEstablishmentService } from './services/licensing/CentralEstablishmentService';
+import { SettingsService } from './services/config/SettingsService';
+import { AppConfigService } from './services/config/AppConfigService';
 import {
   shouldShowFirstRunSetup,
   BYPASS_FIRST_RUN_ACTIVATION,
   BYPASS_FIRST_RUN_SETUP,
 } from './config/setupLifecycle';
 import { APP_VERSION } from './config/appVersion';
-import { DatabasePersistenceStatus } from './components/DatabasePersistenceStatus';
+import { DatabasePersistenceStatus } from './components/shared/DatabasePersistenceStatus';
 import { AppRouter } from './router';
-import { LoginPage } from './pages/auth/LoginPage';
-import { FirstRunActivationPage } from './pages/auth/FirstRunActivationPage';
-import { SetupWizard } from './components/SetupWizard';
-import { ForcePasswordChangeModal } from './components/ForcePasswordChangeModal';
+import { LoginPage } from './pages/auth/login/LoginPage';
+import { FirstRunActivationPage } from './pages/auth/first-run-activation/FirstRunActivationPage';
+import { SetupWizard } from './components/setup/SetupWizard';
+import { ForcePasswordChangeModal } from './components/auth/ForcePasswordChangeModal';
 import { ThemeProvider } from './contexts/ThemeProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import { UpdateNotification } from './components/UpdateNotification';
-import { useAppStartup } from './hooks/useAppStartup';
-import { useAppSession } from './hooks/useAppSession';
+import { UpdateNotification } from './components/shared/UpdateNotification';
+import { useAppStartup } from './hooks/auth/useAppStartup';
+import { useAppSession } from './hooks/auth/useAppSession';
 import { securityService, auditLogger, performanceMonitor, localCache, systemHealth, CentralTelemetryService } from './services';
 
 export const App: React.FC = () => {

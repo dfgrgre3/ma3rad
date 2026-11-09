@@ -1,7 +1,7 @@
 import React from 'react';
 import { Cell, Pie, PieChart as PieChartRecharts, ResponsiveContainer, Tooltip } from 'recharts';
-import { CeramicMath } from '../../utils/ceramicMath';
-import { CHART_COLORS } from './types';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import { CHART_COLORS } from '../../types/dashboard/components';
 
 interface CategoryDistributionCardProps {
   categorySales: any[];

@@ -1,24 +1,24 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { BranchAccessService } from '../src/services/BranchAccessService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { SupplierService } from '../src/services/SupplierService.ts';
-import { AnalyticsService } from '../src/services/AnalyticsService.ts';
-import { ProcurementService } from '../src/services/ProcurementService.ts';
-import { runExecutiveQueries } from '../src/pages/dashboard/executive/useExecutiveQueries.ts';
-import { queryFinanceOverviewMetrics } from '../src/services/DashboardQueryScopeService.ts';
-import { DebtService } from '../src/services/DebtService.ts';
-import { InventoryValuationService } from '../src/services/InventoryValuationService.ts';
-import { InstallmentService } from '../src/services/InstallmentService.ts';
-import { loadReport } from '../src/pages/reports/SalesReportsPage.tsx';
-import { loadPurchaseKpi, loadInventoryKpi } from '../src/services/InventoryReportService.ts';
-import { loadBranchAdjustments } from '../src/pages/inventory/InventoryAdjustmentsPage.tsx';
-import { loadBranchCountSessions } from '../src/pages/inventory/InventoryCountPage.tsx';
-import { localDateString } from '../src/utils/date.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
+import { AnalyticsService } from '../src/services/reports/AnalyticsService.ts';
+import { ProcurementService } from '../src/services/procurement/ProcurementService.ts';
+import { runExecutiveQueries } from '../src/hooks/dashboard/useExecutiveQueries.ts';
+import { queryFinanceOverviewMetrics } from '../src/services/dashboard/DashboardQueryScopeService.ts';
+import { DebtService } from '../src/services/finance/DebtService.ts';
+import { InventoryValuationService } from '../src/services/inventory/InventoryValuationService.ts';
+import { InstallmentService } from '../src/services/finance/InstallmentService.ts';
+import { loadReport } from '../src/pages/reports/sales-reports/SalesReportsPage.tsx';
+import { loadPurchaseKpi, loadInventoryKpi } from '../src/services/reports/InventoryReportService.ts';
+import { loadBranchAdjustments } from '../src/pages/inventory/inventory-adjustments/InventoryAdjustmentsPage.tsx';
+import { loadBranchCountSessions } from '../src/pages/inventory/inventory-count/InventoryCountPage.tsx';
+import { localDateString } from '../src/utils/shared/date.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 const assignedUser: User = {
   id: 'usr_page_scope',

@@ -1,5 +1,5 @@
-﻿import { DatabaseManager } from '../database/db.ts';
-import type { SyncDataScope, SyncEvent, SyncOperation } from './types.ts';
+﻿import { DatabaseManager } from '../database/repositories/databaseManager.ts';
+import type { SyncDataScope, SyncEvent, SyncOperation } from '../types/sync/index.ts';
 import { v4 as uuidv4 } from 'uuid';
 
 interface OutboxRow {

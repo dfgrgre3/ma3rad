@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from 'xlsx';
-import { createExcelWorkbook } from '../src/utils/excelExportWorkbook.ts';
+import { createExcelWorkbook } from '../src/utils/export/excelExportWorkbook.ts';
 
 test('background Excel workbook preserves export metadata, values, and RTL layout', () => {
   const bytes = createExcelWorkbook({

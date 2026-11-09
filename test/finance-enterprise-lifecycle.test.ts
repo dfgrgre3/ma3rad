@@ -1,13 +1,13 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { FinanceEnterpriseService } from '../src/services/FinanceEnterpriseService.ts';
-import { FinanceExtrasService } from '../src/services/FinanceExtrasService.ts';
-import { postLedgerEntry } from '../src/database/ledger.ts';
-import { MIGRATIONS } from '../src/database/migrations.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { FinanceEnterpriseService } from '../src/services/finance/FinanceEnterpriseService.ts';
+import { FinanceExtrasService } from '../src/services/finance/FinanceExtrasService.ts';
+import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
+import { MIGRATIONS } from '../src/database/migrations/index.ts';
 
 function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
   return DatabaseManager.getInstance().query<T>(sql, params)[0];

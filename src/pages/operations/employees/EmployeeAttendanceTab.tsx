@@ -1,6 +1,6 @@
 import React from 'react';
 import { countAttendanceByStatus } from './helpers';
-import type { AttendanceRecord, Employee } from './types';
+import type { AttendanceRecord, Employee } from '../../../types/hr/employeesPage';
 
 interface EmployeeAttendanceTabProps {
   employees: Employee[];

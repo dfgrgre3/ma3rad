@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-this-alias -- `this` must be captured for generator closures */
 // Minimal Iterator-helpers polyfill for legacy Chromium (< 117, e.g. the
 // Electron 22 / Windows 7 ia32 build). pdfjs-dist evaluates
 // `typeof Iterator.prototype.join !== "function"` at module load, which

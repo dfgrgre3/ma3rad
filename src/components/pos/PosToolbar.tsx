@@ -4,7 +4,7 @@ import {
   MoreHorizontal, MonitorSmartphone, Users, Undo2, Tv,
 } from 'lucide-react';
 import type { CashShift } from '../../types';
-import { CeramicMath } from '../../utils/ceramicMath';
+import { CeramicMath } from '../../utils/products/ceramicMath';
 
 export interface PosToolbarProps {
   activeShift: CashShift | null;
@@ -68,10 +68,10 @@ export const PosToolbar: React.FC<PosToolbarProps> = ({
   }, [moreOpen]);
 
   return (
-    <div className="px-4 py-2.5 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 max-[1100px]:flex-col max-[1100px]:items-stretch">
       {/* الهوية + حالة الوردية */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 shrink-0">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 shadow-md shadow-sky-500/20">
           <ShoppingCart className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0">
@@ -100,7 +100,7 @@ export const PosToolbar: React.FC<PosToolbarProps> = ({
       </div>
 
       {/* الإجراءات الأساسية */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5 max-[1100px]:justify-start">
         {activeShift && canCloseShift && (
           <button onClick={onCloseShift} title="إغلاق الوردية" className={`${btnBase} bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100`}>
             <Lock className="w-4 h-4" /> <span className="hidden sm:inline">إغلاق الوردية</span>

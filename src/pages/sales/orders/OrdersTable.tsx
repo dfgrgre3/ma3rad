@@ -3,9 +3,9 @@ import {
   Eye, Printer, History, MessageCircle, Pencil, PackageCheck, Receipt,
   Trash2, User, Phone, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { Order } from '../../../services/OrderService';
+import { Order } from '../../../services/sales/OrderService';
 import { IconBtn } from './ui';
-import { STATUS_LABELS, fmt } from './types';
+import { STATUS_LABELS, fmt } from '../../../types/sales/ordersPage';
 
 interface OrdersTableProps {
   orders: Order[];

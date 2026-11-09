@@ -1,7 +1,7 @@
 import React from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CeramicMath } from '../../utils/ceramicMath';
-import type { SalesTrendPoint } from './types';
+import { CeramicMath } from '../../utils/products/ceramicMath';
+import type { SalesTrendPoint } from '../../types/dashboard/components';
 
 interface SalesTrendCardProps {
   chartData: SalesTrendPoint[];

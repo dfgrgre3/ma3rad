@@ -1,6 +1,6 @@
 ﻿import { InboxRepository } from './InboxRepository.ts';
 import { EventValidator } from './EventValidator.ts';
-import type { SyncEvent } from './types.ts';
+import type { SyncEvent } from '../types/sync/index.ts';
 
 export class EventDispatcher {
   private handlers = new Map<string, (event: SyncEvent) => void | 'DEFERRED' | Promise<void | 'DEFERRED'>>();

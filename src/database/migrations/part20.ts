@@ -1,4 +1,4 @@
-import type { Migration } from '../migrationSupport';
+import type { Migration } from './support';
 
 /**
  * Partner accounts, phase 2.

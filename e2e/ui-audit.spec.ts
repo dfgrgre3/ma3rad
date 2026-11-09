@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { launchAuthenticatedApp } from './support/app.fixture';
+import { activate, launchSeededApp, login } from './support/app.fixture';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -62,7 +62,9 @@ const EXPECTED_HEADINGS: Record<(typeof HIGH_RISK_ROUTES)[number], string> = {
 };
 
 test('high-risk routes render without uncaught page errors (single app session)', async () => {
-  const { app, page, closeMockServer } = await launchAuthenticatedApp();
+  const { app, page, closeMockServer } = await launchSeededApp();
+  await activate(page);
+  await login(page);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
@@ -103,8 +105,8 @@ test('high-risk routes render without uncaught page errors (single app session)'
         pageContentChanged = previousHash === `#/${route}`
           || (await main.innerText()) !== previousContent;
         routeSpecificReady = route !== 'users'
-          || (await main.getByRole('button', { name: 'المستخدمون', exact: true })
-            .getAttribute('class'))?.includes('bg-sky-600') === true;
+          || (await main.getByRole('tablist').getByRole('button', { name: 'المستخدمون', exact: true })
+            .getAttribute('aria-selected')) === 'true';
         if (!interactive || !heading.includes(expectedHeading) || !pageContentChanged
           || !routeSpecificReady || currentHash !== `#/${route}`) {
           await page.waitForTimeout(250);

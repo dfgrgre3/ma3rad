@@ -1,4 +1,4 @@
-﻿import { DatabaseManager } from '../database/db.ts';
+﻿import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 import { v4 as uuidv4 } from 'uuid';
 
 export class BranchRegistry {

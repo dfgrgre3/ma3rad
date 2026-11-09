@@ -2,11 +2,11 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { v4 as uuidv4 } from 'uuid';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { FinancialCalendarEventsService } from '../src/services/FinancialCalendarEventsService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import type { User } from '../src/types/identity.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { FinancialCalendarEventsService } from '../src/services/finance/FinancialCalendarEventsService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 test('financial calendar stores scoped events, audited partial payments, and unique references', async () => {
   const db = DatabaseManager.getInstance();

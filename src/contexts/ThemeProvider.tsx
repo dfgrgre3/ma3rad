@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { SettingsService } from '../services/SettingsService';
-import { AuthService } from '../services/AuthService';
-import { PermissionService } from '../services/PermissionService';
+import { SettingsService } from '../services/config/SettingsService';
+import { AuthService } from '../services/auth/AuthService';
+import { PermissionService } from '../services/auth/PermissionService';
 import type { SystemSettings } from '../types';
 import { ThemeContext, type ThemeMode, type ThemeContextValue } from './ThemeContext';
-import { accessibleForeground, mixHexColors, normalizeHexColor, readableColorOnSurface } from '../utils/themeContrast';
+import { accessibleForeground, mixHexColors, normalizeHexColor, readableColorOnSurface } from '../utils/shared/themeContrast';
 
 const LOCAL_OVERRIDE_KEY = 'ceramisys_theme_override';
 

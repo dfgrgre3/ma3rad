@@ -1,7 +1,7 @@
 ﻿import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { OutboxRepository } from '../src/sync/OutboxRepository.ts';
 import { InboxRepository } from '../src/sync/InboxRepository.ts';
 import { CursorManager } from '../src/sync/CursorManager.ts';
@@ -15,9 +15,9 @@ import { SyncWorker } from '../src/sync/SyncWorker.ts';
 import { MasterDataSyncService } from '../src/sync/MasterDataSyncService.ts';
 import { SyncPolicyService } from '../src/sync/SyncPolicyService.ts';
 import { BusinessRecordSyncService } from '../src/sync/BusinessRecordSyncService.ts';
-import { MIGRATIONS } from '../src/database/migrations.ts';
-import type { SyncEvent } from '../src/sync/types.ts';
-import { NavigationService } from '../src/services/NavigationService.ts';
+import { MIGRATIONS } from '../src/database/migrations/index.ts';
+import type { SyncEvent } from '../src/types/sync/index.ts';
+import { NavigationService } from '../src/services/config/NavigationService.ts';
 import { v4 as uuidv4 } from 'uuid';
 
 async function boot() {

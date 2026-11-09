@@ -1,12 +1,12 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseManager } from '../src/database/db.ts';
-import { AuthService } from '../src/services/AuthService.ts';
-import { PermissionService } from '../src/services/PermissionService.ts';
-import { AppConfigService } from '../src/services/AppConfigService.ts';
-import { ActionRegistryService } from '../src/services/ActionRegistryService.ts';
-import { FeatureService } from '../src/services/FeatureService.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { AuthService } from '../src/services/auth/AuthService.ts';
+import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { AppConfigService } from '../src/services/config/AppConfigService.ts';
+import { ActionRegistryService } from '../src/services/config/ActionRegistryService.ts';
+import { FeatureService } from '../src/services/config/FeatureService.ts';
 
 test('scoped configuration resolves by scope precedence and tracks origin', async () => {
   await DatabaseManager.getInstance().initialize();

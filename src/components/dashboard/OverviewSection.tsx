@@ -1,7 +1,7 @@
 import React from 'react';
 import { Activity, AlertTriangle } from 'lucide-react';
-import { AuthService } from '../../services/AuthService';
-import { PermissionService } from '../../services/PermissionService';
+import { AuthService } from '../../services/auth/AuthService';
+import { PermissionService } from '../../services/auth/PermissionService';
 import { AttentionRequiredSection } from './AttentionRequiredSection';
 import { CategoryDistributionCard } from './CategoryDistributionCard';
 import { OverviewKpiGrid } from './OverviewKpiGrid';
@@ -12,7 +12,7 @@ import { TodayPurchasesPanel } from './TodayPurchasesPanel';
 import { TopCustomersCard } from './TopCustomersCard';
 import { TopProductsCard } from './TopProductsCard';
 import { ProfileKpiPanel } from './ProfileKpiPanel';
-import { useOverviewDashboardData } from './useOverviewDashboardData';
+import { useOverviewDashboardData } from '../../hooks/dashboard/useOverviewDashboardData';
 
 export const OverviewSection: React.FC = () => {
   const {

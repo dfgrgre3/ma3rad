@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DatabaseManager } from '../../database/db';
+import { DatabaseManager } from '../../database/repositories/databaseManager';
 import type { Supplier } from '../../types';
 
 export function useSuppliers() {

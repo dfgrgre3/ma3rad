@@ -1,10 +1,10 @@
 import React from 'react';
 import { Package } from 'lucide-react';
-import type { DailyPurchaseItemRow } from '../../../services/DailyOperationsService';
-import { formatProductQuantity } from '../../../utils/productUnits';
+import type { DailyPurchaseItemRow } from '../../../services/operations/DailyOperationsService';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { sumItemQuantityByUnit } from './helpers';
 import { ShareBar } from './primitives';
-import type { NumberFormatter } from './types';
+import type { NumberFormatter } from '../../../types/dashboard/todayPurchases';
 
 export interface ItemsPanelProps {
   items: DailyPurchaseItemRow[];

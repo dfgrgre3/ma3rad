@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, Trash2, Upload } from 'lucide-react';
-import { ProductExtraService, ProductDocument } from '../../../services/ProductExtraService';
+import { ProductExtraService, ProductDocument } from '../../../services/products/ProductExtraService';
 import { DOC_TYPES } from './constants';
 
 interface DocumentsTabProps {

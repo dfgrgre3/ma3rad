@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ReconciliationCheck } from '../../../services/FinancialStatementsService';
+import type { ReconciliationCheck } from '../../../services/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
 export function ReconciliationPanel({ checks }: { checks: ReconciliationCheck[] }) {

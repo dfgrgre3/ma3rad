@@ -7,7 +7,7 @@ import fsPromises from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { DatabaseManager } from '../src/database/db.ts';
+import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 
 const require = createRequire(import.meta.url);
 const {

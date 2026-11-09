@@ -1,22 +1,22 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../AuthService';
-import { PermissionService } from '../PermissionService';
-import { SettingsService } from '../SettingsService';
-import { InventoryCostingService } from '../InventoryCostingService';
-import { BatchService } from '../BatchService';
-import { localDateString } from '../../utils/date';
-import { getProductUnitLabel, isServiceProduct } from '../../utils/productUnits';
-import { convertQuantity } from '../../utils/uom';
-import { paymentAccountCode } from '../../database/ledger';
-import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../financials';
+import { AuthService } from '../auth/AuthService';
+import { PermissionService } from '../auth/PermissionService';
+import { SettingsService } from '../config/SettingsService';
+import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { BatchService } from '../inventory/BatchService';
+import { localDateString } from '../../utils/shared/date';
+import { getProductUnitLabel, isServiceProduct } from '../../utils/products/productUnits';
+import { convertQuantity } from '../../utils/products/uom';
+import { paymentAccountCode } from '../../database/repositories/ledger';
+import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../finance/financials';
 import type { SalesReturn } from '../../types';
-import type { DatabaseManager } from '../../database/db';
+import type { DatabaseManager } from '../../database/repositories/databaseManager';
 import type { InvoiceWithItems, SalesContext } from './context';
-import type { ReturnRequestItem } from './types';
-import { ModuleRegistryService } from '../ModuleRegistryService';
-import { PartnerService } from '../PartnerService';
+import type { ReturnRequestItem } from '../../types/sales/serviceTypes';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { PartnerService } from '../customers/PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
-import type { Effect } from '../effects/EffectTypes';
+import type { Effect } from '../../types/effects';
 import '../effects/handlers/salesInvoiceHandlers';
 
 type ReturnOptions = {
