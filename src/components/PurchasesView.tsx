@@ -206,7 +206,7 @@ export const PurchasesView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 overflow-y-auto h-full text-slate-900 bg-slate-50" dir="rtl">
+    <div className="erp-page text-slate-900" dir="rtl">
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">

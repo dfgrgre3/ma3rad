@@ -103,7 +103,7 @@ export const SalesAnalyticsPage: React.FC = () => {
     return <div className="p-8 text-center text-slate-500">ليس لديك صلاحية عرض تحليلات المبيعات.</div>;
   }
 
-  return <main className="h-full overflow-y-auto bg-slate-50 p-4 md:p-7" dir="rtl">
+  return <main className="erp-page" dir="rtl">
     <div className="w-full space-y-6">
       <header className="flex flex-col justify-between gap-4 rounded-3xl bg-gradient-to-l from-slate-950 via-slate-900 to-emerald-950 p-6 text-white shadow-xl md:flex-row md:items-center md:p-8">
         <div><div className="mb-3 flex items-center gap-2 text-emerald-300"><Activity size={18}/><span className="text-sm font-bold">مركز أداء المبيعات</span></div><h1 className="text-2xl font-black md:text-3xl">كل حركة البيع في مكان واحد</h1><p className="mt-2 text-sm text-slate-300">تابع الإيرادات والتحصيل والربحية والعملاء والأصناف الأعلى أداءً.</p></div>

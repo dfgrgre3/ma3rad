@@ -92,7 +92,7 @@ export const PosCatalogFilters: React.FC<PosCatalogFiltersProps> = ({
   ].filter(Boolean).length;
 
   return (
-    <div className="px-4 pt-3 pb-2.5 bg-white border-b border-slate-200 space-y-2 shrink-0">
+    <div className="shrink-0 space-y-2 border-b border-slate-200 bg-white px-3 pb-2 pt-2">
       {/* ═══ الصف الأول: البحث (مركز العمل) + المخزن + الترتيب ═══ */}
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0 relative">

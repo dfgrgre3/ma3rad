@@ -253,7 +253,7 @@ export const SuppliersView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 overflow-y-auto h-full">
+    <div className="erp-page" dir="rtl">
       {/* Header Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

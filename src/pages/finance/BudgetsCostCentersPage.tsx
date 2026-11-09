@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   PieChart,
   Plus,
@@ -156,7 +156,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
   const percentUsed = totalAllocated > 0 ? Math.round((totalActual / totalAllocated) * 100) : 0;
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen text-slate-900 space-y-6" dir="rtl">
+    <div className="p-3 lg:p-4 bg-slate-50 min-h-0 text-slate-900 space-y-4" dir="rtl">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">

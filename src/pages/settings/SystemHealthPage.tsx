@@ -247,7 +247,7 @@ export const SystemHealthPage: React.FC = () => {
         </div>
       </header>
 
-      <main className="space-y-5 p-4 sm:p-6">
+      <main className="space-y-4 p-3 sm:p-4">
         {errorMessage && (
           <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

@@ -117,7 +117,7 @@ export const AuditLogPage: React.FC = () => {
   const activeFilters = Boolean(search || dateFrom || dateTo || selectedModule || selectedSource);
 
   return (
-    <main className="h-full overflow-y-auto bg-slate-50/70 p-4 text-slate-900 sm:p-6" dir="rtl">
+    <main className="erp-page" dir="rtl">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-start gap-3">
@@ -347,7 +347,7 @@ export const AuditLogPage: React.FC = () => {
               <div>
                 <p className="flex items-center justify-between gap-2 border-b border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-900 md:hidden">
                   <span>اسحب الجدول أفقيًا لعرض بقية الأعمدة</span>
-                  <span className="shrink-0 text-base" aria-hidden="true">↔</span>
+                  <span className="shrink-0 text-base" aria-hidden="true">â†”</span>
                 </p>
                 <div className="overflow-x-auto overscroll-x-contain">
                 <table className="w-full min-w-[920px] text-right text-sm">

@@ -126,7 +126,7 @@ export const ReportsView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 overflow-y-auto h-full">
+    <div className="erp-page" dir="rtl">
       <div>
         <h2 className="text-xl font-extrabold text-slate-900">مركز التقارير</h2>
         <p className="text-xs text-slate-500">تقارير شاملة للمبيعات والمشتريات والمصروفات والأرباح والمالية</p>

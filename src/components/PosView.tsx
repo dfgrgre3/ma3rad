@@ -19,7 +19,7 @@ import { CeramicCalculatorModal } from './CeramicCalculatorModal';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { LayoutContext } from '../contexts/LayoutContext';
 import {
-  type InvoicePreview, type Toast,
+  type InvoicePreview, type Toast, round2,
 } from './pos/types';
 import {
   CloseShiftModal, HeldOrdersModal, ManagerOverrideModal, NewCustomerModal, OpenShiftModal, PinLoginModal,
@@ -66,7 +66,10 @@ export const PosView: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [discountMode, setDiscountMode] = useState<'percent' | 'amount'>('amount');
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [shippingCost, setShippingCost] = useState<number>(0);
+  const [extraFees, setExtraFees] = useState<number>(0);
   const [taxPercentage, setTaxPercentage] = useState<number>(0);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
@@ -74,6 +77,9 @@ export const PosView: React.FC = () => {
   const [splitCard, setSplitCard] = useState<number>(0);
   const [splitBank, setSplitBank] = useState<number>(0);
   const [splitCheque, setSplitCheque] = useState<number>(0);
+  const [splitCredit, setSplitCredit] = useState<number>(0);
+  const [activeCartIndex, setActiveCartIndex] = useState<number | null>(null);
+  const [productViewMode, setProductViewMode] = useState<'grid' | 'list'>('grid');
   const [couponCode, setCouponCode] = useState<string>('');
   const [appliedPromotion, setAppliedPromotion] = useState<AppliedPromotion | null>(null);
   const [promotionDiscount, setPromotionDiscount] = useState<number>(0);
@@ -200,7 +206,6 @@ export const PosView: React.FC = () => {
     can,
     notify,
     customerService,
-    customers,
     setCustomers,
     applyCustomerPricing,
     setSelectedCustomer,
@@ -235,6 +240,7 @@ export const PosView: React.FC = () => {
     try {
       const allProds = productService.getAllProducts();
       const allCusts = customerService.getAllCustomers();
+      const listCustomers = allCusts.filter((customer) => customer.id !== 'cust_cash');
       const allWhs = inventoryService.getAllWarehouses();
       const allCats = categoryService.getAllCategories();
       const allRegs = cashierService.getAllRegisters();
@@ -247,7 +253,7 @@ export const PosView: React.FC = () => {
       const shift = cashierService.getActiveShift();
 
       setProducts(allProds);
-      setCustomers(allCusts);
+      setCustomers(listCustomers);
       setWarehouses(allWhs);
       setCategories(allCats);
       setRegisters(allRegs);
@@ -262,7 +268,7 @@ export const PosView: React.FC = () => {
       setSelectedWarehouseId(defaultWarehouseId);
       if (defaultWarehouseId) loadStock(defaultWarehouseId);
 
-      const walkIn = allCusts.find((c) => c.id === 'cust_cash') || allCusts[0] || null;
+      const walkIn = customerService.getCustomerById('cust_cash') || allCusts[0] || null;
       setSelectedCustomer(walkIn);
 
       const defaultReg = allRegs.find((r) => r.isDefault) || allRegs[0];
@@ -284,7 +290,7 @@ export const PosView: React.FC = () => {
     setCart,
     selectedCustomer,
     setSelectedCustomer,
-    customers,
+    customerService,
     selectedWarehouseId,
     setSelectedWarehouseId,
     discountAmount,
@@ -294,6 +300,18 @@ export const PosView: React.FC = () => {
     defaultTaxPercentage: settings?.defaultTaxPercentage,
     shippingCost,
     setShippingCost,
+    extraFees,
+    setExtraFees,
+    splitCash,
+    setSplitCash,
+    splitCard,
+    setSplitCard,
+    splitBank,
+    setSplitBank,
+    splitCheque,
+    setSplitCheque,
+    splitCredit,
+    setSplitCredit,
     notes,
     setNotes,
     paidAmount,
@@ -320,7 +338,14 @@ export const PosView: React.FC = () => {
     if (!window.confirm('هل تريد إفراغ سلة البيع بالكامل؟')) return;
     setCart([]);
     setDiscountAmount(0);
+    setDiscountPercent(0);
     setShippingCost(0);
+    setExtraFees(0);
+    setSplitCash(0);
+    setSplitCard(0);
+    setSplitBank(0);
+    setSplitCheque(0);
+    setSplitCredit(0);
     setNotes('');
     setPaidAmount(0);
     setCouponCode('');
@@ -333,8 +358,45 @@ export const PosView: React.FC = () => {
     remainingAmount, changeDue, expectedClosingCash, cartQuantitySummary,
   } = usePosTotals({
     cart, discountAmount, promotionDiscount, loyaltyDiscount, taxPercentage,
-    shippingCost, paidAmount, activeShift,
+    shippingCost, extraFees, paidAmount, activeShift,
   });
+
+  const visiblePaymentTypes = useMemo<PaymentType[]>(() => {
+    const types: PaymentType[] = [];
+    if (settings?.posShowCashButton !== false) types.push('CASH');
+    if (settings?.posShowCardButton !== false) types.push('CARD');
+    if (settings?.posShowBankTransferButton !== false) types.push('BANK_TRANSFER');
+    if (settings?.posShowChequeButton !== false) types.push('CHEQUE');
+    if (settings?.posShowCreditButton !== false) types.push('CREDIT');
+    if (settings?.posShowMixedPaymentButton !== false) types.push('MIXED');
+    return types.length > 0 ? types : ['CASH'];
+  }, [settings]);
+
+  // Keep the percentage discount and the stored amount in sync.
+  useEffect(() => {
+    if (discountMode !== 'percent') return;
+    const base = Math.max(0, lineSubtotal - lineDiscountTotal);
+    setDiscountAmount(round2(base * (discountPercent || 0) / 100));
+  }, [discountMode, discountPercent, lineSubtotal, lineDiscountTotal]);
+
+  // Never leave a hidden payment method selected.
+  useEffect(() => {
+    if (!visiblePaymentTypes.includes(paymentType)) {
+      setPaymentType(visiblePaymentTypes[0]);
+    }
+  }, [visiblePaymentTypes, paymentType]);
+
+  const handleDiscountPercentChange = useCallback((value: number) => {
+    setDiscountPercent(value);
+  }, []);
+
+  const cyclePaymentType = useCallback(() => {
+    if (visiblePaymentTypes.length === 0) return;
+    setPaymentType((current) => {
+      const index = visiblePaymentTypes.indexOf(current);
+      return visiblePaymentTypes[(index + 1) % visiblePaymentTypes.length];
+    });
+  }, [visiblePaymentTypes]);
   const { isProcessing, setIsProcessing, handleCheckout } = usePosCheckout({
     can,
     notify,
@@ -361,6 +423,9 @@ export const PosView: React.FC = () => {
     taxAmount,
     shippingCost,
     setShippingCost,
+    extraFees,
+    setExtraFees,
+    discountPercentage: discountPercent,
     paidAmount,
     setPaidAmount,
     paymentType,
@@ -368,18 +433,17 @@ export const PosView: React.FC = () => {
     splitCard,
     splitBank,
     splitCheque,
+    splitCredit,
     notes,
     setNotes,
     remainingAmount,
     lineSubtotal,
     lineDiscountTotal,
     setSuccessInvoice,
-    setProducts,
     setActiveShift,
     setToneConflicts,
     setIsToneWarningOpen,
     salesService,
-    productService,
     cashierService,
     batchService,
     loyaltyService,
@@ -531,7 +595,6 @@ export const PosView: React.FC = () => {
 
   usePosKeyboardShortcuts({
     handleCheckout,
-    hasCeramicCatalog,
     isCalculatorOpen,
     setIsCalculatorOpen,
     isCustomerModalOpen,
@@ -548,14 +611,26 @@ export const PosView: React.FC = () => {
     successInvoice,
     barcodeInputRef,
     paidInputRef,
+    refreshCatalog: loadInitialData,
+    cyclePaymentType,
+    holdCurrentOrder,
+    deleteActiveCartLine: () => {
+      if (activeCartIndex === null) return;
+      removeFromCart(activeCartIndex);
+      setActiveCartIndex(null);
+    },
+    stepActiveCartLine: (direction) => {
+      if (activeCartIndex === null) return;
+      stepCartQuantity(activeCartIndex, direction);
+    },
   });
 
   const gradeLabel = (grade: Product['grade']) => configuredGradeLabel(grade);
 
   return (
-    <div className={`flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col ${touchMode ? 'pos-touch-mode' : ''}`} dir="rtl">
+    <div className={`flex h-full min-h-0 overflow-hidden bg-slate-50 text-slate-900 max-[900px]:flex-col ${touchMode ? 'pos-touch-mode' : ''}`}>
       {/* ═══ Left: Catalog ═══ */}
-      <div className="flex-1 flex flex-col overflow-hidden border-l border-slate-200 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden border-l border-slate-200 min-w-0">
         <PosToolbar
           activeShift={activeShift}
           actingUserName={actingUser?.fullName}
@@ -631,11 +706,13 @@ export const PosView: React.FC = () => {
             notify(`تمت إضافة ${prods.length} أصناف إلى السلة بنجاح`, 'success');
           }}
           multiSelectEnabled={!!settings?.posMultiSelectSearch}
+          viewMode={productViewMode}
+          onViewModeChange={setProductViewMode}
         />
       </div>
 
       {/* ═══ Right: Cart & Checkout ═══ */}
-      <div className="w-[26rem] max-w-[90vw] bg-white flex flex-col h-full border-r border-slate-200 shadow-2xl shrink-0 max-[900px]:w-full max-[900px]:max-w-none max-[900px]:h-[48%] max-[900px]:border-t max-[900px]:border-r-0">
+      <div className="w-[26rem] max-w-[90vw] bg-white flex flex-col h-full min-h-0 border-r border-slate-200 shadow-2xl shrink-0 max-[900px]:w-full max-[900px]:max-w-none max-[900px]:h-[48%] max-[900px]:border-t max-[900px]:border-r-0">
         <PosCartPanel
           selectedCustomer={selectedCustomer}
           customerSearch={customerSearch}
@@ -646,15 +723,15 @@ export const PosView: React.FC = () => {
             setSelectedCustomer(null);
             setRedeemPoints(0);
             setLoyaltyDiscount(0);
-          }}
+          } }
           onSelectCustomer={(customer) => {
             setSelectedCustomer(customer);
             applyCustomerPricing(customer);
             setCustomerSearch('');
             setRedeemPoints(0);
             setLoyaltyDiscount(0);
-          }}
-          onCreateNewCustomer={() => { setCustomerError(''); setIsCustomerModalOpen(true); }}
+          } }
+          onCreateNewCustomer={() => { setCustomerError(''); setIsCustomerModalOpen(true); } }
           cart={cart}
           cartQuantitySummary={cartQuantitySummary}
           enableNegativeStock={settings?.enableNegativeStock ?? false}
@@ -667,6 +744,9 @@ export const PosView: React.FC = () => {
           onUpdateLineDiscount={updateCartLineDiscount}
           sellingPriceTiersCount={settings?.sellingPriceTiersCount ?? 1}
           sellingPriceTierNames={settings?.sellingPriceTierNames}
+          customerService={customerService}
+          activeCartIndex={activeCartIndex}
+          onSelectCartLine={setActiveCartIndex}
         />
 
         <PosCheckoutPanel
@@ -676,6 +756,14 @@ export const PosView: React.FC = () => {
           lineDiscountTotal={lineDiscountTotal}
           discountAmount={discountAmount}
           setDiscountAmount={setDiscountAmount}
+          discountMode={discountMode}
+          onDiscountModeChange={setDiscountMode}
+          discountPercent={discountPercent}
+          onDiscountPercentChange={handleDiscountPercentChange}
+          promotionDiscount={promotionDiscount}
+          loyaltyDiscount={loyaltyDiscount}
+          extraFees={extraFees}
+          setExtraFees={setExtraFees}
           taxPercentage={taxPercentage}
           setTaxPercentage={setTaxPercentage}
           taxAmount={taxAmount}
@@ -683,7 +771,9 @@ export const PosView: React.FC = () => {
           setShippingCost={setShippingCost}
           paymentType={paymentType}
           setPaymentType={setPaymentType}
-          showCashButton={settings?.posShowCashButton !== false}
+          visiblePaymentTypes={visiblePaymentTypes}
+          showCouponCode={settings?.posShowCouponCode !== false}
+          showLoyaltyPoints={settings?.posShowLoyaltyPoints !== false}
           splitCash={splitCash}
           setSplitCash={setSplitCash}
           splitCard={splitCard}
@@ -692,6 +782,8 @@ export const PosView: React.FC = () => {
           setSplitBank={setSplitBank}
           splitCheque={splitCheque}
           setSplitCheque={setSplitCheque}
+          splitCredit={splitCredit}
+          setSplitCredit={setSplitCredit}
           couponCode={couponCode}
           setCouponCode={setCouponCode}
           appliedPromotion={appliedPromotion}

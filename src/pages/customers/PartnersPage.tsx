@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, Banknote, BarChart3, Building2, ClipboardList, Download,
-  History, Pencil, Plus, Printer, RefreshCw, RotateCcw, Search, TrendingUp, Users, Wallet, X,
+  History, Pencil, Plus, Printer, RefreshCw, RotateCcw, Search, TrendingUp, Users, Wallet,
 } from 'lucide-react';
 import { usePermission } from '../../hooks/usePermission';
 import { useToast } from '../../components/ui/Toast';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import { localDateString } from '../../utils/date';
 import {
   PartnerService,
@@ -531,7 +534,7 @@ export const PartnersPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 p-4 sm:p-6" dir="rtl">
+    <div className="erp-page" dir="rtl">
       <style>{`
         @media print {
           body * { visibility: hidden !important; }
@@ -548,36 +551,35 @@ export const PartnersPage: React.FC = () => {
         }
       `}</style>
 
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">حسابات الشركاء</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            نسب الملكية ورأس المال والقروض والمسحوبات والأرباح والتسويات وكشوف الحساب.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={refresh} disabled={loading} className="icon-action">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> تحديث
-          </button>
-          {canExport && (
-            <button type="button" onClick={exportCsv} disabled={loading} className="icon-action">
-              <Download className="h-4 w-4" /> تصدير CSV
-            </button>
-          )}
-          {canDistribute && (
-            <button type="button" onClick={openProfitDistribution} disabled={!partners.some((partner) => partner.isActive)} className="primary-action">
-              <Banknote className="h-4 w-4" /> توزيع أرباح
-            </button>
-          )}
-          {canManage && (
-            <button type="button" onClick={openNewPartner} className="primary-action">
-              <Plus className="h-4 w-4" /> إضافة شريك
-            </button>
-          )}
-        </div>
-      </header>
+      <PageHeader
+        icon={<Users className="h-5 w-5" />}
+        title="حسابات الشركاء"
+        description="نسب الملكية ورأس المال والقروض والمسحوبات والأرباح والتسويات وكشوف الحساب."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={refresh} disabled={loading} leadingIcon={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}>
+              تحديث
+            </Button>
+            {canExport && (
+              <Button variant="secondary" size="sm" onClick={exportCsv} disabled={loading} leadingIcon={<Download className="h-4 w-4" />}>
+                تصدير CSV
+              </Button>
+            )}
+            {canDistribute && (
+              <Button variant="secondary" size="sm" onClick={openProfitDistribution} disabled={!partners.some((partner) => partner.isActive)} leadingIcon={<Banknote className="h-4 w-4" />}>
+                توزيع أرباح
+              </Button>
+            )}
+            {canManage && (
+              <Button variant="primary" size="sm" onClick={openNewPartner} leadingIcon={<Plus className="h-4 w-4" />}>
+                إضافة شريك
+              </Button>
+            )}
+          </>
+        }
+      />
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="ملخص حسابات الشركاء">
+      <section className="erp-stat-grid" aria-label="ملخص حسابات الشركاء">
         <SummaryCard label="الشركاء النشطون" value={`${formatNumber.format(overview.activePartnersCount)} من ${formatNumber.format(overview.partnersCount)}`} icon={Users} />
         <SummaryCard label="إجمالي رأس المال المساهم" value={formatMoney(overview.totalContributions)} icon={Building2} />
         <SummaryCard label="أرباح مستحقة غير موزعة" value={formatMoney(pendingProfits)} icon={Banknote} tone="emerald" />
@@ -586,9 +588,9 @@ export const PartnersPage: React.FC = () => {
         <SummaryCard label="إجمالي صافي أرصدة الشركاء" value={formatMoney(overview.totalNetBalance)} icon={ClipboardList} tone={overview.totalNetBalance < 0 ? 'rose' : 'sky'} />
       </section>
 
-      {error && <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">{error}</div>}
+      {error && <div role="alert" className="rounded-[var(--win-radius)] border border-[var(--win-danger-border)] bg-[var(--win-danger-soft)] px-3 py-2 text-[var(--ui-font-sm)] text-[var(--win-danger-text)]">{error}</div>}
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)]">
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
           <div className="border-b border-slate-200 p-3 dark:border-slate-700">
             <label className="relative block">
@@ -756,7 +758,7 @@ export const PartnersPage: React.FC = () => {
           {tab === 'statement' && (
             <>
               {!selected ? (
-                <div className="flex min-h-64 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
+                <div className="flex min-h-44 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900">
                   اختر شريكًا لعرض حسابه وتفاصيل حركاته.
                 </div>
               ) : (
@@ -1245,26 +1247,23 @@ const SummaryCard: React.FC<{
   tone?: 'sky' | 'emerald' | 'amber' | 'rose';
 }> = ({ label, value, icon: Icon, tone = 'sky' }) => {
   const tones = {
-    sky: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300',
-    emerald: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
-    amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
-    rose: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+    sky: 'bg-[var(--win-accent-soft)] text-[var(--win-accent-readable)]',
+    emerald: 'bg-[var(--win-success-soft)] text-[var(--win-success-text)]',
+    amber: 'bg-[var(--win-warning-soft)] text-[var(--win-warning-text)]',
+    rose: 'bg-[var(--win-danger-soft)] text-[var(--win-danger-text)]',
   };
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-      <span className={`rounded-lg p-2 ${tones[tone]}`}><Icon className="h-5 w-5" /></span>
-      <div className="min-w-0"><p className="truncate text-xs font-bold text-slate-500 dark:text-slate-400">{label}</p><p className="mt-1 truncate text-base font-extrabold text-slate-900 dark:text-slate-100">{value}</p></div>
+    <div className="flex min-w-0 items-center gap-3 rounded-[var(--win-radius)] border border-[var(--win-border)] bg-[var(--win-surface)] p-3">
+      <span className={`rounded-[var(--ui-radius-sm)] p-1.5 ${tones[tone]}`}><Icon className="h-4 w-4" /></span>
+      <div className="min-w-0"><p className="truncate text-[var(--ui-font-xs)] font-bold text-[var(--win-text-muted)]">{label}</p><p className="mt-0.5 truncate text-[var(--ui-font-md)] font-extrabold text-[var(--win-text)]">{value}</p></div>
     </div>
   );
 };
 
 const ModalShell: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({ title, onClose, children }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section role="dialog" aria-modal="true" aria-label={title} className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl dark:bg-slate-900">
-      <div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-extrabold text-slate-900 dark:text-slate-100">{title}</h2><button type="button" onClick={onClose} aria-label="إغلاق" className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button></div>
-      {children}
-    </section>
-  </div>
+  <Modal open onClose={onClose} title={title} size="lg">
+    {children}
+  </Modal>
 );
 
 const Field: React.FC<{ label: string; required?: boolean; children: React.ReactNode }> = ({ label, required, children }) => (

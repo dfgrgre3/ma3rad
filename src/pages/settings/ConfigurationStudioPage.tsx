@@ -98,7 +98,7 @@ export const ConfigurationStudioPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 p-6" dir="rtl">
+    <div className="space-y-4 p-3 lg:p-4" dir="rtl">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">استوديو التكوين الديناميكي</h1>

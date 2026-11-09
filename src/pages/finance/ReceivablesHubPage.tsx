@@ -36,7 +36,7 @@ export const ReceivablesHubPage: React.FC<{ initialTab?: TabId }> = ({ initialTa
 
   if (!tab) return <div className="flex h-full items-center justify-center p-6 text-sm font-bold text-slate-500">لا تملك صلاحية لأي قسم من مركز الذمم.</div>;
 
-  return <div className="h-full overflow-y-auto bg-slate-100 p-4 lg:p-6" dir="rtl">
+  return <div className="h-full overflow-y-auto bg-slate-100 p-3 lg:p-4" dir="rtl">
     <div className="w-full space-y-4">
       <header><h1 className="text-xl font-black text-slate-900">مركز الذمم والتحصيل</h1><p className="mt-1 text-sm text-slate-500">مساحة موحدة للوصول إلى الذمم والمطالبات وخطط السداد، مع بقاء بيانات كل عملية مستقلة.</p></header>
       <nav className="flex flex-wrap gap-2" aria-label="أقسام مركز الذمم">
