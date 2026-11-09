@@ -12,7 +12,7 @@ export const SuccessInvoiceModal: React.FC<{
 }> = ({ invoice, onPrintThermal, onPreview, onClose, onVoid, canVoid }) => {
   const changeDue = Math.max(0, (invoice.paidAmount || 0) - (invoice.totalAmount || 0));
   return (
-  <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full text-center space-y-4">
       <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mx-auto">
         <CheckCircle2 className="w-10 h-10" />

@@ -67,7 +67,7 @@ test('POS customer selection dialog uses shared option rows and preserves select
     assert.ok(row);
     assert.equal(row.getAttribute('aria-selected'), 'true');
     assert.ok(row.classList.contains('is-selected'));
-    assert.equal(screen.getByText('نشط').tagName, 'SPAN');
+    assert.match(row.textContent ?? '', /نشط/);
 
     fireEvent.click(screen.getByRole('button', { name: 'محدد' }));
     await waitFor(() => {

@@ -288,7 +288,7 @@ export const PosCustomerSelectionDialog: React.FC<PosCustomerSelectionDialogProp
     document.body,
   );
 
-  return import.meta.env.DEV ? (
+  return import.meta.env?.DEV ? (
     <Profiler id="POS customer selection dialog" onRender={reportSlowReactRender}>
       {dialog}
     </Profiler>

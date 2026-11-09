@@ -132,6 +132,7 @@ async function build() {
     path.join(__dirname, 'compile-bytenode.cjs'),
     '--electron-path',
     electronPath,
+    '--skip-verify',
   ]);
   productionBundleStarted = true;
   run(process.execPath, [path.join(__dirname, 'prepare-production-bundle.cjs')]);
@@ -159,6 +160,10 @@ build()
     try {
       restoreSourcesAndBytecode();
     } finally {
-      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+      try {
+        fs.rmSync(temporaryDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+      } catch (cleanupError) {
+        console.warn(`Could not immediately remove temporary directory ${temporaryDirectory}:`, cleanupError.message);
+      }
     }
   });

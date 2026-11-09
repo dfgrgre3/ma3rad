@@ -30,6 +30,7 @@ const { registerLicenseHandlers } = require('./licenseGuard');
 const { configureAutoUpdater, createRollbackBackup } = require('./autoUpdater');
 const { autoUpdater } = require('electron-updater');
 const { getMaxDatabaseSize, getMaxV8HeapSize } = require('./databaseMemoryPolicy');
+const { configureHwidCache, warmUpHardwareId } = require('./hardwareId');
 
 // ───────────────────────────── Environment ────────────────────────────────────
 //   LICENSE_MODE=account|hardwa   (default: hardwa; overridden by the protected saved mode)
@@ -77,6 +78,10 @@ const APP_DATA_DIR = configuredDataDir && path.isAbsolute(configuredDataDir)
   ? path.resolve(process.env.CERAMISYS_USER_DATA_DIR)
   : path.join(app.getPath('appData'), 'CeramiSysERP');
 app.setPath('userData', APP_DATA_DIR);
+// بدء حساب بصمة العتاد (HWID) في الخلفية بأسرع وقت ممكن لتجنب تجميد
+// Main Process لاحقاً عند أول استدعاء متزامن لـ getHardwareId().
+configureHwidCache(APP_DATA_DIR);
+void warmUpHardwareId();
 function isIsolatedE2ERun() {
   if (process.env.CERAMISYS_E2E !== '1' || !configuredDataDir || !path.isAbsolute(configuredDataDir)) {
     return false;

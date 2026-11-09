@@ -34,14 +34,14 @@ export const Modal: React.FC<{
     <button
       type="button"
       aria-label="إغلاق النافذة"
-      className="absolute inset-0 h-full w-full border-0 bg-white p-0 backdrop-blur-sm"
+      className="absolute inset-0 h-full w-full border-0 bg-slate-900/50 p-0 backdrop-blur-sm"
       onClick={onClose}
     />
     <div
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="relative bg-white border border-slate-200 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+      className="relative bg-white border border-slate-200 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl"
     >
       <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sky-600">

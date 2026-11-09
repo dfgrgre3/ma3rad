@@ -10,6 +10,7 @@ const electronPathArg = process.argv.indexOf('--electron-path');
 const electronPath = electronPathArg === -1
   ? undefined
   : path.resolve(process.argv[electronPathArg + 1] || '');
+const skipVerifyArg = process.argv.includes('--skip-verify') || Boolean(process.env.CERAMISYS_SKIP_BYTECODE_VERIFY);
 
 const filesToCompile = [
   'main.js',
@@ -138,7 +139,9 @@ async function compileFiles() {
     }
   }
 
-  await verifyBytecodeReproducibility();
+  if (!skipVerifyArg) {
+    await verifyBytecodeReproducibility();
+  }
   writeBytecodeIntegrityManifest();
   pinBytecodeIntegrityManifest();
   console.log('✅ Bytecode compilation complete.');

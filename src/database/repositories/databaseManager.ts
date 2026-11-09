@@ -558,11 +558,8 @@ export class DatabaseManager {
     if (!this.db) return;
 
     // Hash admin default password (admin123)
-    // SECURITY: Default password should be changed immediately after first login
-    // Consider using environment variable or prompting user on first run
-    const DEFAULT_ADMIN_PASSWORD = 'admin123';
-    const salt = bcrypt.genSaltSync(10);
-    const adminHash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, salt);
+    // Pre-computed hash for 'admin123' to eliminate synchronous bcrypt overhead during initial startup:
+    const adminHash = '$2a$10$uURy9H8RJQFCDiqtDkMxWewz1KO8N8Psb6xos3wzxgECbo0Yel0ra';
 
     // 1. Initial Admin User
     this.db.run(`
@@ -641,7 +638,7 @@ export class DatabaseManager {
     }
   }
 
-  public scheduleDebouncedSave(delayMs = 750): void {
+  public scheduleDebouncedSave(delayMs = 1500): void {
     if (this.transactionDepth > 0) return;
     if (this.debounceSaveTimer) clearTimeout(this.debounceSaveTimer);
     this.cancelIdleSave();

@@ -84,6 +84,9 @@ export default defineConfig(({ command }) => {
     server: {
       port: 5173,
       strictPort: true,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
       watch: {
         ignored: [
           '**/.electron-data/**',

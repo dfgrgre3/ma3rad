@@ -18,7 +18,7 @@ export const ManagerOverrideModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full space-y-4">
         <h3 className="text-lg font-black text-slate-900 text-center">اعتماد مدير</h3>
         <p className="text-xs text-slate-500 text-center">أدخل بيانات مدير (مستخدم يملك صلاحية إلغاء الفاتورة)</p>
