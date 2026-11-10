@@ -6,6 +6,7 @@ import {
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { BranchService } from '../../../services/domains/organization/BranchService';
+import { EmployeeDepartmentAccessService, type DepartmentScope } from '../../../services/domains/auth/EmployeeDepartmentAccessService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
 import { useToast } from '../../../components/ui/Toast';
@@ -44,13 +45,16 @@ export const AdminUsersTab: React.FC = () => {
   const [pinChangeRequests, setPinChangeRequests] = useState<ReturnType<AuthService['getPendingLoginPinChanges']>>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
-  const [modal, setModal] = useState<'create' | 'edit' | 'password' | 'permissions' | 'branch-scope' | null>(null);
+  const [modal, setModal] = useState<'create' | 'edit' | 'password' | 'permissions' | 'branch-scope' | 'department-scope' | null>(null);
   const [active, setActive] = useState<User | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
   const [newPassword, setNewPassword] = useState('');
   const [branchOptions, setBranchOptions] = useState<ReturnType<BranchService['getAllBranches']>>([]);
   const [branchScope, setBranchScope] = useState<'ASSIGNED' | 'ALL'>('ASSIGNED');
   const [assignedBranchIds, setAssignedBranchIds] = useState<string[]>([]);
+  const [departmentScope, setDepartmentScope] = useState<DepartmentScope>('ALL');
+  const [departmentOptions, setDepartmentOptions] = useState<Array<{ id: string; name: string; branchId: string | null }>>([]);
+  const [assignedDepartmentIds, setAssignedDepartmentIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const currentUserIsAdmin = AuthService.getCurrentUser()?.role === 'ADMIN';
 
@@ -140,6 +144,28 @@ export const AdminUsersTab: React.FC = () => {
         branchService.updateUserBranchAccess(active.id, branchScope, assignedBranchIds);
       },
       'تم تحديث نطاق الفروع.'
+    );
+  };
+
+  const openDepartmentScope = (user: User) => {
+    try {
+      const service = new EmployeeDepartmentAccessService();
+      setActive(user);
+      setDepartmentScope(service.getScope(user.id));
+      setAssignedDepartmentIds(service.getAssignedDepartmentIds(user.id));
+      setDepartmentOptions(service.getAvailableDepartments(user.id));
+      setModal('department-scope');
+    } catch (error: any) {
+      toast.error('تعذر تحميل نطاق الأقسام', error?.message || String(error));
+    }
+  };
+
+  const submitDepartmentScope = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!active) return;
+    void run(
+      () => new EmployeeDepartmentAccessService().updateAccess(active.id, departmentScope, assignedDepartmentIds),
+      'تم تحديث نطاق أقسام الموارد البشرية.'
     );
   };
 
@@ -328,13 +354,20 @@ export const AdminUsersTab: React.FC = () => {
                     </span>
                   </td>
                   <td className="p-3.5">
-                    {user.role === 'ADMIN'
-                      ? <span className="text-[10px] font-bold text-slate-500">وصول مركزي (مدير)</span>
-                      : can('branches.manage_users') && can('branches.view')
-                      ? <button onClick={() => openBranchScope(user)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-slate-800">
-                          <Building2 className="h-3.5 w-3.5" /> إدارة النطاق
+                    <div className="flex flex-col items-start">
+                      {user.role === 'ADMIN'
+                        ? <span className="text-[10px] font-bold text-slate-500">وصول مركزي (مدير)</span>
+                        : can('branches.manage_users') && can('branches.view')
+                        ? <button onClick={() => openBranchScope(user)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-slate-800">
+                            <Building2 className="h-3.5 w-3.5" /> نطاق الفروع
+                          </button>
+                        : '—'}
+                      {user.role !== 'ADMIN' && can('branches.manage_users') && (
+                        <button onClick={() => openDepartmentScope(user)} className="rounded-lg px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-50 dark:text-violet-300 dark:hover:bg-slate-800">
+                          نطاق الأقسام
                         </button>
-                      : '—'}
+                      )}
+                    </div>
                   </td>
                   <td className="p-3.5 font-mono text-slate-500 dark:text-slate-400">{user.phone || '-'}</td>
                   {currentUserIsAdmin && (
@@ -521,6 +554,38 @@ export const AdminUsersTab: React.FC = () => {
             </div>
             <p className="text-[11px] leading-5 text-slate-500">النطاق يفرضه النظام داخل الخدمات والاستعلامات. الحساب المركزي يحتاج صلاحية «الوصول المركزي إلى جميع الفروع» بالإضافة إلى تعيين هذا النطاق.</p>
             <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق الفروع" />
+          </form>
+        </Modal>
+      )}
+
+      {modal === 'department-scope' && active && (
+        <Modal title={`نطاق أقسام الموارد البشرية: ${active.fullName}`} onClose={() => setModal(null)}>
+          <form onSubmit={submitDepartmentScope} className="space-y-4">
+            <Field label="نطاق الأقسام">
+              <select value={departmentScope} onChange={(event) => setDepartmentScope(event.target.value as DepartmentScope)} className={inputCls}>
+                <option value="ALL">كل الأقسام ضمن نطاق الفروع المسموحة</option>
+                <option value="ASSIGNED">الأقسام المسندة فقط</option>
+              </select>
+            </Field>
+            <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">الأقسام المسندة</p>
+              {departmentOptions.length ? departmentOptions.map((department) => (
+                <label key={department.id} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={assignedDepartmentIds.includes(department.id)}
+                    onChange={(event) => setAssignedDepartmentIds((current) =>
+                      event.target.checked
+                        ? [...new Set([...current, department.id])]
+                        : current.filter((id) => id !== department.id)
+                    )}
+                  />
+                  {department.name}
+                </label>
+              )) : <p className="text-xs text-slate-500">لا توجد أقسام نشطة ضمن فروعك.</p>}
+            </div>
+            <p className="text-[11px] leading-5 text-slate-500">تظل صلاحية الفرع مطبقة دائمًا. عند اختيار «الأقسام المسندة فقط» لن يرى المستخدم سجلات الموظفين غير المرتبطة بأحد الأقسام المسندة.</p>
+            <ModalActions busy={busy} onCancel={() => setModal(null)} submitLabel="حفظ نطاق الأقسام" />
           </form>
         </Modal>
       )}

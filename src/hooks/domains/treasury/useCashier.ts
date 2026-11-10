@@ -1,15 +1,21 @@
 import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { CashierService } from '../../../services/domains/finance/CashierService';
+import {
+  OperationsShiftService,
+  type OperationShiftInstance,
+} from '../../../services/domains/operations/OperationsShiftService';
 import { CashRegister, CashShift, Expense, ExpenseCategory, PaymentType } from '../../../types';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { LayoutContext } from '../../../contexts/LayoutContext';
 
 const cashierService = new CashierService();
+const operationsShiftService = new OperationsShiftService();
 
 export function useCashier() {
   const { currentUser } = useContext(LayoutContext);
   const [registers, setRegisters] = useState<CashRegister[]>([]);
   const [activeShift, setActiveShift] = useState<CashShift | null>(null);
+  const [operationsShift, setOperationsShift] = useState<OperationShiftInstance | null>(null);
   const [lastClosedShift, setLastClosedShift] = useState<CashShift | null>(null);
   const [shiftRegisterId, setShiftRegisterId] = useState('');
   const [autoCloseEnabled, setAutoCloseEnabled] = useState(true);
@@ -32,6 +38,12 @@ export function useCashier() {
       setIsLoading(true);
       const regs = cashierService.getAllRegisters();
       const shift = cashierService.getActiveShift(currentUser?.id);
+      let currentOperationsShift: OperationShiftInstance | null = null;
+      try {
+        currentOperationsShift = operationsShiftService.getOpenShiftForBranch();
+      } catch {
+        currentOperationsShift = null;
+      }
       const exps = cashierService.getAllExpenses();
       const cats = cashierService.getExpenseCategories();
       const defaultRegister = regs.find((register) => register.isDefault) || regs[0];
@@ -39,6 +51,7 @@ export function useCashier() {
 
       setRegisters(regs);
       setActiveShift(shift);
+      setOperationsShift(currentOperationsShift);
       if (defaultRegister) {
         setShiftRegisterId((selected) => (regs.some((r) => r.id === selected) ? selected : defaultRegister.id));
         setLastClosedShift(cashierService.getLastClosedShift(shift?.registerId || defaultRegister.id));
@@ -89,7 +102,11 @@ export function useCashier() {
 
   const openShift = async (registerId: string, openingBalance: number) => {
     if (!currentUser) throw new Error('يجب تسجيل الدخول قبل فتح الوردية.');
-    cashierService.openShift(registerId, currentUser.id, openingBalance);
+    const register = registers.find((row) => row.id === registerId);
+    const operationShiftId = operationsShift && register?.branchId === operationsShift.branchId
+      ? operationsShift.id
+      : undefined;
+    cashierService.openShift(registerId, currentUser.id, openingBalance, operationShiftId);
     setIsOpenShiftModal(false);
     await loadData();
     showNotification('success', 'تم فتح الوردية بنجاح.');
@@ -112,7 +129,7 @@ export function useCashier() {
   };
 
   return {
-    currentUser, registers, activeShift, lastClosedShift, shiftRegisterId, setShiftRegisterId,
+    currentUser, registers, activeShift, operationsShift, lastClosedShift, shiftRegisterId, setShiftRegisterId,
     autoCloseEnabled, setAutoCloseEnabled, autoCloseTime, setAutoCloseTime,
     expenses, categories, isLoading, isOpenShiftModal, setIsOpenShiftModal,
     isCloseShiftModal, setIsCloseShiftModal, isExpenseModalOpen, setIsExpenseModalOpen,

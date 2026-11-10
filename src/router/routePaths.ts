@@ -102,6 +102,7 @@ export const APP_ROUTE_PATHS = [
   "employees/documents",
   "employees/recruitment",
   "manufacturing",
+  "operations/shifts",
   "hr/dashboard",
   "reports",
   "reports/category/:categoryId",

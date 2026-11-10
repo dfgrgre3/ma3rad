@@ -119,7 +119,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الفروع والمخازن والموظفون والحضور والرواتب والتوصيل.',
     dependencies: [],
     permissions: ['branches.view'],
-    paths: ['/fleet/dashboard', '/branches', '/warehouses', '/deliveries', '/drivers', '/vehicles'],
+    paths: ['/fleet/dashboard', '/branches', '/warehouses', '/deliveries', '/drivers', '/vehicles', '/operations/shifts'],
     businessEvents: ['payroll.posted', 'attendance.recorded', 'delivery.completed'],
     settings: [
       { key: 'payrollCurrency', label: 'عملة الرواتب', type: 'string', defaultValue: '' },

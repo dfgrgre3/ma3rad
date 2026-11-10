@@ -397,17 +397,6 @@ export const EmployeesPage: React.FC = () => {
     setIsEmployeeModalOpen(false);
   };
 
-  const handleDeleteEmployee = (id: string) => {
-    if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا الموظف؟ سيتم حذف كامل سجلاته المالية.')) {
-      try {
-        EmployeeService.delete(id);
-        loadAll();
-      } catch (err: any) {
-        alert(err?.message || 'تعذر حذف الموظف.');
-      }
-    }
-  };
-
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEmpForTx || txForm.amount <= 0) return;
@@ -536,7 +525,6 @@ export const EmployeesPage: React.FC = () => {
                 setValuesByEmployee((previous) => ({ ...previous, [employeeId]: values }));
               }}
               onEditEmployee={handleOpenEditEmployee}
-              onDeleteEmployee={handleDeleteEmployee}
               onOpenHistory={handleOpenHistory}
             />
           )}

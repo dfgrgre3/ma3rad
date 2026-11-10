@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Calendar, DollarSign, Edit3, FileText, Mail, MapPin, Phone, Trash2 } from 'lucide-react';
+import { AlertCircle, Calendar, DollarSign, Edit3, FileText, Mail, MapPin, Phone } from 'lucide-react';
 import { fmtCurrency } from './helpers';
 import { STATUS_LABELS, type Employee } from '../../../types/hr/employeesPage';
 import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
@@ -10,7 +10,6 @@ interface EmployeeDirectoryTabProps {
   employees: Employee[];
   canManageEmployees: boolean;
   onEditEmployee: (emp: Employee) => void;
-  onDeleteEmployee: (id: string) => void;
   onOpenHistory: (empId: string) => void;
   operationalFields: OperationalFieldDefinition[];
   operationalValuesByRecord: Record<string, Record<string, string>>;
@@ -21,7 +20,6 @@ export const EmployeeDirectoryTab: React.FC<EmployeeDirectoryTabProps> = ({
   employees,
   canManageEmployees,
   onEditEmployee,
-  onDeleteEmployee,
   onOpenHistory,
   operationalFields,
   operationalValuesByRecord,
@@ -96,13 +94,6 @@ export const EmployeeDirectoryTab: React.FC<EmployeeDirectoryTabProps> = ({
                   title="تعديل بيانات العامل"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => onDeleteEmployee(emp.id)}
-                  className="p-2 bg-rose-950/20 hover:bg-rose-950/40 border border-rose-500/10 rounded-lg text-rose-600 hover:text-rose-600 transition"
-                  title="حذف العامل"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
 

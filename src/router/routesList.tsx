@@ -127,6 +127,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'employees/documents', element: <P.EmployeeDocumentsPage /> },
   { path: 'employees/recruitment', element: <P.RecruitmentPage /> },
   { path: 'manufacturing', element: <P.ManufacturingPage /> },
+  { path: 'operations/shifts', element: <P.OperationsShiftsPage /> },
   { path: 'hr/dashboard', element: <P.HrDashboardPage /> },
 
   // Reports

@@ -3,6 +3,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { localDateString } from '../../../utils/shared/date';
 import { AuthService } from '../auth/AuthService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { PermissionService } from '../auth/PermissionService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { AttendanceStatus } from './EmployeeService';
@@ -193,6 +194,16 @@ function snapshot(row: any): AttendanceSnapshot {
 export class AttendanceService {
   private static db = DatabaseManager.getInstance();
   private static branchAccess = new BranchAccessService();
+  private static departmentAccess = new EmployeeDepartmentAccessService();
+
+  private static employeeDataScope(actor: ReturnType<typeof AuthService.requireAuth>) {
+    const branch = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const department = this.departmentAccess.sqlScope('e.department_id', actor);
+    return {
+      clause: `(${branch.clause}) AND (${department.clause})`,
+      params: [...branch.params, ...department.params],
+    };
+  }
 
   private static requireView() {
     const actor = AuthService.requireAuth();
@@ -217,18 +228,25 @@ export class AttendanceService {
   }
 
   private static requireEmployeeBranch(employeeId: string, actor: ReturnType<typeof AuthService.requireAuth>): string {
-    const branchId = this.db.query<{ branchId: string | null }>(
-      'SELECT branch_id AS branchId FROM employees WHERE id = ?',
+    const employee = this.db.query<{ branchId: string | null; departmentId: string | null }>(
+      'SELECT branch_id AS branchId, department_id AS departmentId FROM employees WHERE id = ?',
       [employeeId]
-    )[0]?.branchId;
+    )[0];
+    const branchId = employee?.branchId;
     if (!branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(branchId, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    const allowed = this.db.query(
+      `SELECT 1 FROM employees e WHERE e.id = ? AND ${departmentScope.clause}`,
+      [employeeId, ...departmentScope.params]
+    ).length > 0;
+    if (!allowed) throw new Error('الموظف خارج نطاق الأقسام المصرح بها.');
     return branchId;
   }
 
   static getEmployees(): AttendanceEmployee[] {
     const actor = this.requireView();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceEmployee>(
       `SELECT e.id, e.branch_id AS branchId, e.name, e.role, e.phone, e.status
        FROM employees e WHERE e.status != 'SUSPENDED' AND ${scope.clause}
@@ -360,7 +378,7 @@ export class AttendanceService {
   static getAttendanceByDate(date: string): AttendanceEntry[] {
     const actor = this.requireView();
     if (!isValidDate(date)) throw new Error('تاريخ الحضور غير صالح.');
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceEntry>(
       `SELECT a.id, a.employee_id AS employeeId, e.name AS employeeName, e.code AS employeeCode,
               e.branch_id AS branchId, a.date, a.status, a.check_in_at AS checkInAt,
@@ -382,7 +400,7 @@ export class AttendanceService {
   static getMonthlyReport(period: string): AttendanceReportRow[] {
     const actor = this.requireView();
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceReportRow>(
       `SELECT a.id, a.employee_id AS employeeId, e.name AS employeeName, e.code AS employeeCode,
               e.branch_id AS branchId, a.date, a.status, a.check_in_at AS checkInAt,
@@ -506,7 +524,7 @@ export class AttendanceService {
 
   static getBreaks(attendanceId: string): Array<{ id: string; startedAt: string; endedAt: string | null; minutes: number }> {
     const actor = this.requireView();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     const breaks = this.db.query<{ id: string; startedAt: string; endedAt: string | null; employeeId: string; date: string }>(
       `SELECT b.id, b.started_at AS startedAt, b.ended_at AS endedAt,
               a.employee_id AS employeeId, a.date
@@ -524,7 +542,7 @@ export class AttendanceService {
 
   static getBreaksByDate(date: string): AttendanceBreakEntry[] {
     const actor = this.requireView();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceBreakEntry>(
       `SELECT b.id, b.attendance_id AS attendanceId, b.started_at AS startedAt,
               b.ended_at AS endedAt,
@@ -637,7 +655,7 @@ export class AttendanceService {
 
   static getCorrectionRequests(): AttendanceCorrection[] {
     const actor = this.requireView();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceCorrection>(
       `SELECT r.id, r.employee_id AS employeeId, e.name AS employeeName,
               r.attendance_date AS attendanceDate, r.before_json AS beforeJson,
@@ -654,7 +672,7 @@ export class AttendanceService {
 
   static getCorrectionHistory(period: string): AttendanceCorrectionHistory[] {
     const actor = this.requireView();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceCorrectionHistory>(
       `SELECT r.id, r.employee_id AS employeeId, e.name AS employeeName,
               r.attendance_date AS attendanceDate, r.before_json AS beforeJson,
@@ -676,7 +694,7 @@ export class AttendanceService {
   static getAuditHistory(period: string): AttendanceAuditEntry[] {
     const actor = this.requireView();
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceAuditEntry>(
       `SELECT l.id, e.name AS employeeName, l.attendance_date AS date,
               l.action, l.before_json AS beforeJson, l.after_json AS afterJson,
@@ -702,7 +720,7 @@ export class AttendanceService {
       [id]
     )[0];
     if (!request) throw new Error('طلب تصحيح الحضور غير موجود أو سبق البت فيه.');
-    this.branchAccess.requireBranchAccess(request.branchId, actor);
+    this.requireEmployeeBranch(request.employeeId, actor);
     this.assertPeriodEditable(request.branchId, request.attendanceDate);
     const current = this.getAttendanceRow(request.employeeId, request.attendanceDate);
     const before = request.beforeJson ? JSON.parse(request.beforeJson) as AttendanceSnapshot : null;
@@ -761,7 +779,7 @@ export class AttendanceService {
       [attendanceId]
     )[0];
     if (!row) throw new Error('سجل الحضور غير موجود.');
-    this.branchAccess.requireBranchAccess(row.branchId, actor);
+    this.requireEmployeeBranch(row.employeeId, actor);
     this.assertPeriodEditable(row.branchId, row.date);
     if (!row.checkOutAt || Number(row.overtimeMinutes) <= 0) throw new Error('لا توجد ساعات إضافية مكتملة لاعتمادها.');
     if (row.overtimeApproved) throw new Error('تم اعتماد العمل الإضافي لهذا السجل بالفعل.');
@@ -876,7 +894,7 @@ export class AttendanceService {
     shiftName: string; effectiveFrom: string; effectiveTo: string | null;
   }> {
     const actor = this.requireView();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query(
       `SELECT a.id, a.employee_id AS employeeId, e.name AS employeeName,
               a.shift_id AS shiftId, s.name AS shiftName,
@@ -984,7 +1002,7 @@ export class AttendanceService {
     operationShiftId?: string;
   } = {}): AttendancePeriod[] {
     const actor = this.requireView();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     const conditions = [scope.clause];
     const params: string[] = [...scope.params];
     if (filters.employeeId) {

@@ -139,6 +139,10 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/employees/documents', all: ['hr.documents.view'] },
   { path: '/employees/recruitment', all: ['hr.recruitment.view'] },
   { path: '/manufacturing', all: ['manufacturing.view'] },
+  {
+    path: '/operations/shifts',
+    any: ['operations.view', 'cashier.view', 'employees.attendance.view', 'manufacturing.view'],
+  },
   { path: '/hr/dashboard', any: ['hr.dashboard.view', 'employees.view'] },
 
   // التقارير

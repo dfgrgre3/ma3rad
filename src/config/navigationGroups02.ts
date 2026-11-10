@@ -1,6 +1,6 @@
 import {
   Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Building2, CalendarDays, Car,
-  CheckSquare, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
+  CheckSquare, Clock3, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
   HardHat, RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal,
   Sparkles, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
 } from 'lucide-react';
@@ -21,6 +21,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'المخازن', to: '/warehouses', icon: Warehouse, perm: 'warehouses.view' },
       { label: 'الموظفون', to: '/employees', icon: HardHat, perm: 'employees.view' },
       { label: 'الحضور والانصراف', to: '/employees/attendance', icon: CheckSquare, perm: 'employees.view' },
+      { label: 'ورديات التشغيل 24/7', to: '/operations/shifts', icon: Clock3, perm: 'operations.view' },
       { label: 'الرواتب والمسحوبات', to: '/employees/payroll', icon: Wallet, perm: 'employees.payroll.view' },
       { label: 'عمولات المبيعات', to: '/employees/commissions', icon: BadgeDollarSign, perm: 'employees.payroll.view' },
       { label: 'الإجازات', to: '/employees/leave', icon: CalendarDays, perm: 'hr.leave.view' },
