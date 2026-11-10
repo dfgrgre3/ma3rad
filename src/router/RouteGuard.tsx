@@ -1,15 +1,15 @@
 import React, { Suspense, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { SettingsService } from '../services/config/SettingsService';
-import { getEffectiveBusinessType } from '../services/config/BusinessTypeService';
-import { AppConfigService } from '../services/config/AppConfigService';
+import { SettingsService } from '../services/domains/config/SettingsService';
+import { getEffectiveBusinessType } from '../services/domains/config/BusinessTypeService';
+import { AppConfigService } from '../services/domains/config/AppConfigService';
 import { ConfigText } from '../components/config/ConfigText';
 import { getBusinessModuleForPath, parseBusinessConfiguration, parseEnabledModules } from '../config/businessProfiles';
 import { withModuleDependencies } from '../config/moduleRegistry';
 import { OPEN_ALL_PAGES } from '../config/setupLifecycle';
-import { CentralLicenseService } from '../services/licensing/CentralLicenseService';
-import { CentralFeaturePermissionService } from '../services/licensing/CentralFeaturePermissionService';
-import { PermissionService } from '../services/auth/PermissionService';
+import { CentralLicenseService } from '../services/domains/licensing/CentralLicenseService';
+import { CentralFeaturePermissionService } from '../services/domains/licensing/CentralFeaturePermissionService';
+import { PermissionService } from '../services/domains/auth/PermissionService';
 import type { User } from '../types';
 
 export const PageLoader: React.FC = () => (

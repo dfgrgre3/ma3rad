@@ -2,12 +2,12 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { ProductService } from '../src/services/products/ProductService.ts';
-import { OperationalFieldService } from '../src/services/products/OperationalFieldService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { ProductService } from '../src/services/domains/products/ProductService.ts';
+import { OperationalFieldService } from '../src/services/domains/products/OperationalFieldService.ts';
 import { MasterDataSyncService } from '../src/sync/MasterDataSyncService.ts';
-import { CrmService } from '../src/services/crm/CrmService.ts';
+import { CrmService } from '../src/services/domains/crm/CrmService.ts';
 import { parseGrade } from '../src/components/products/productFormModel.ts';
 
 test('operational field definitions validate, persist, export, and protect stored values', async () => {

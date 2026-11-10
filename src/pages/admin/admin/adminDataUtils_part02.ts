@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { DataImportSheet } from '../../../types/admin/dataAdmin';
-import { validateSpreadsheetFileHeader } from '../../../services/data/SpreadsheetImportService';
+import { validateSpreadsheetFileHeader } from '../../../services/infrastructure/data/SpreadsheetImportService';
 import { MAX_ADMIN_DATA_IMPORT_FILE_SIZE } from './adminDataUtils_part01';
 
 export function parseAdminDataWorkbook(buffer: ArrayBuffer, fileName: string): DataImportSheet[] {

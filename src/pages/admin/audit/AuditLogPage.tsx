@@ -19,10 +19,10 @@ import {
   UserRound,
   XCircle,
 } from 'lucide-react';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { AuthService } from '../../../services/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
 import { exportToExcel } from '../../../utils/export/export';
-import { useAuditLogs } from '../../../hooks/admin/useAuditLogs';
+import { useAuditLogs } from '../../../hooks/domains/admin/useAuditLogs';
 import { formatJson, getModuleColor } from '../../../types/admin/audit';
 
 const formatTimestamp = (value: string) => {

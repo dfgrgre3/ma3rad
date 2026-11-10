@@ -2,13 +2,13 @@ import './integration.setup.ts';
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { SettingsService } from '../src/services/config/SettingsService.ts';
-import { BusinessProfileService } from '../src/services/config/BusinessProfileService.ts';
-import { ManufacturingService } from '../src/services/manufacturing/ManufacturingService.ts';
-import { RestaurantService } from '../src/services/restaurant/RestaurantService.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { ConfigurationVersionService } from '../src/services/config/ConfigurationVersionService.ts';
+import { SettingsService } from '../src/services/domains/config/SettingsService.ts';
+import { BusinessProfileService } from '../src/services/domains/config/BusinessProfileService.ts';
+import { ManufacturingService } from '../src/services/domains/manufacturing/ManufacturingService.ts';
+import { RestaurantService } from '../src/services/domains/restaurant/RestaurantService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { ConfigurationVersionService } from '../src/services/domains/config/ConfigurationVersionService.ts';
 import {
   BUSINESS_MODULES,
   BUSINESS_PROFILES,
@@ -31,8 +31,8 @@ import {
   resolveBusinessTerm,
   validateBusinessTermOverrides,
 } from '../src/config/businessTerminology.ts';
-import { NavigationService } from '../src/services/config/NavigationService.ts';
-import { TerminologyService } from '../src/services/config/TerminologyService.ts';
+import { NavigationService } from '../src/services/domains/config/NavigationService.ts';
+import { TerminologyService } from '../src/services/domains/config/TerminologyService.ts';
 import { validateModuleSelection } from '../src/config/moduleRegistry.ts';
 import {
   shouldShowFirstRunSetup,

@@ -2,12 +2,13 @@ import './integration.setup.ts';
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { InventoryService } from '../src/services/inventory/InventoryService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { QuotationService } from '../src/services/sales/QuotationService.ts';
-import { OrderService } from '../src/services/sales/OrderService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { QuotationService } from '../src/services/domains/sales/QuotationService.ts';
+import { OrderService } from '../src/services/domains/sales/OrderService.ts';
+import { getQuantity, getRoomLineTotal, getRoomMeasures } from '../src/pages/construction/estimateCalculations.ts';
 
 async function boot(): Promise<DatabaseManager> {
   const manager = DatabaseManager.getInstance();
@@ -16,6 +17,34 @@ async function boot(): Promise<DatabaseManager> {
   AuthService.login('admin', 'admin123');
   return manager;
 }
+
+test('apartment estimate deducts openings and applies waste, discount, and profit in order', () => {
+  const room = {
+    id: 'room-1', name: 'غرفة', length: 4, width: 3, height: 3,
+    doorCount: 1, doorWidth: 0.9, doorHeight: 2.1,
+    windowCount: 1, windowWidth: 1.2, windowHeight: 1.2,
+  };
+  const measures = getRoomMeasures(room);
+  assert.equal(measures.floor, 12);
+  assert.equal(measures.ceiling, 12);
+  assert.equal(measures.perimeter, 14);
+  assert.equal(measures.walls, 38.67, 'door and window openings are excluded from net wall area');
+
+  const line = {
+    id: 'line-1', category: 'تشطيب', name: 'بند', measure: 'floor' as const, unit: 'م²',
+    manualQuantity: 1, materialProductId: '', materialRate: 20, laborRate: 5,
+    wastePercent: 10, discountPercent: 10, profitPercent: 20,
+  };
+  assert.deepEqual(getRoomLineTotal(line, room, 1), {
+    quantity: 12,
+    materialQuantity: 13.2,
+    materialCost: 264,
+    laborCost: 60,
+    beforeAdjustments: 324,
+    total: 349.92,
+  });
+  assert.equal(getQuantity({ ...line, measure: 'manual', manualQuantity: 8 }, room, 2), 4);
+});
 
 function seedProduct(manager: DatabaseManager, input: {
   id: string;
@@ -76,6 +105,63 @@ test('a quotation priced per box is stored and invoiced in base units without ch
     costPrice: 70,
     price: 100,
     stock: 100,
+  });
+
+  test('service and labor quotation lines persist, update, and cannot be invoiced as stock', async () => {
+    const manager = await boot();
+    const productId = seedProduct(manager, {
+      id: 'prod_quote_service_link',
+      name: 'خامة مرتبطة بمقايسة',
+      baseUnit: 'M2',
+      sellUnit: 'M2',
+      piecesPerBox: 1,
+      metersPerBox: 1,
+      costPrice: 10,
+      price: 20,
+      stock: 100,
+    });
+    const customerId = seedCustomer('عميل مقايسة خدمات', '01000000899');
+    const quotationService = new QuotationService();
+
+    const quotation = quotationService.createQuotation({
+      customerId,
+      serviceItems: [{
+        productId,
+        description: 'أعمال المحارة والدهانات',
+        unit: 'م²',
+        quantity: 24,
+        unitPrice: 85,
+      }],
+    });
+    assert.equal(quotation.items?.length, 0);
+    assert.equal(quotation.serviceItems?.length, 1);
+    assert.equal(quotation.serviceItems?.[0].productId, productId);
+    assert.equal(quotation.subtotal, 2040);
+    assert.equal(quotation.totalAmount, 2040);
+
+    quotationService.updateQuotation(quotation.id, {
+      customerId,
+      serviceItems: [{
+        productId,
+        description: 'محارة ودهانات بعد التعديل',
+        unit: 'م²',
+        quantity: 20,
+        unitPrice: 90,
+      }],
+    });
+    const updated = quotationService.getQuotation(quotation.id)!;
+    assert.equal(updated.totalAmount, 1800);
+    assert.equal(updated.serviceItems?.[0].description, 'محارة ودهانات بعد التعديل');
+    assert.equal(updated.serviceItems?.[0].productId, productId);
+    assert.equal(quotationService.getQuotations().find((row) => row.id === quotation.id)?.itemsCount, 1);
+    assert.throws(
+      () => quotationService.convertToInvoice(quotation.id, { warehouseId: 'wh_main' }),
+      /بنود خدمات أو عمالة/
+    );
+    assert.equal(manager.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM quotation_service_items WHERE quotation_id = ?',
+      [quotation.id]
+    )[0].count, 1);
   });
   const customerId = seedCustomer('عميل عرض سعر بالكرتونة', '01000000881');
 

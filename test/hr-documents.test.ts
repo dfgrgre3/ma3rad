@@ -2,13 +2,13 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { BranchService } from '../src/services/organization/BranchService.ts';
-import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
-import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
-import { EmployeeDocumentService } from '../src/services/hr/EmployeeDocumentService.ts';
-import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { BranchService } from '../src/services/domains/organization/BranchService.ts';
+import { BranchAccessService } from '../src/services/domains/auth/BranchAccessService.ts';
+import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
+import { EmployeeDocumentService } from '../src/services/domains/hr/EmployeeDocumentService.ts';
+import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
@@ -147,6 +147,79 @@ test('employee documents track expiry and archive without hard delete', async ()
   const summary = service.getSummary(employeeId);
   assert.equal(summary.expired, 1);
   assert.equal(summary.archived, 1);
+});
+
+test('employee document files retain immutable versions and enforce confidentiality on reads', async () => {
+  const db = await boot();
+  const service = new EmployeeDocumentService();
+  const employeeId = createEmployee();
+  const checksum = 'a'.repeat(64);
+  const document = service.createDocument({
+    employeeId,
+    title: 'Confidential identity scan',
+    confidentiality: 'CONFIDENTIAL',
+    expiresAt: isoOffset(20),
+    attachment: {
+      fileName: 'identity.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 1024,
+      checksum,
+      storageName: `hrdoc_${'a'.repeat(32)}.pdf`,
+      notes: null,
+    },
+    attachmentNotes: 'Original scan',
+  });
+  assert.equal(document.versionCount, 1);
+  assert.equal(document.latestVersionNumber, 1);
+  assert.equal(document.latestFileName, 'identity.pdf');
+  assert.equal(document.latestUploaderName, admin.fullName);
+  assert.equal(document.createdByName, admin.fullName);
+
+  const nextVersion = service.addVersion(document.id, {
+    fileName: 'identity-v2.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 2048,
+    checksum: 'b'.repeat(64),
+    storageName: `hrdoc_${'b'.repeat(32)}.pdf`,
+    notes: null,
+  }, 'Renewed ID');
+  assert.equal(nextVersion.versionNumber, 2);
+  assert.equal(service.getVersions(document.id).length, 2);
+  assert.equal(service.getDocument(document.id).latestVersionId, nextVersion.id);
+  assert.throws(() => service.createDocument({
+    employeeId,
+    title: 'Invalid expiration',
+    expiresAt: '2026-02-30',
+  }), /تاريخ الانتهاء غير صالح/);
+
+  asSales();
+  db.run(
+    `INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect)
+     VALUES ('usr_hrdocs_sales', 'hr.documents.view', 'GRANT')`
+  );
+  PermissionService.invalidate(sales);
+  assert.ok(!service.getDocuments().some((row) => row.id === document.id));
+  assert.throws(() => service.getVersions(document.id), /غير موجود أو ليس لديك صلاحية/);
+  assert.throws(() => service.getVersionForAccess(document.id, nextVersion.id, 'OPEN'), /غير موجود أو ليس لديك صلاحية/);
+  asAdmin();
+
+  db.run(
+    `INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect)
+     VALUES ('usr_hrdocs_sales', 'hr.documents.confidential.view', 'GRANT')`
+  );
+  PermissionService.invalidate(sales);
+  asSales();
+  assert.ok(service.getDocuments().some((row) => row.id === document.id));
+  assert.equal(service.getVersions(document.id).length, 2);
+  assert.throws(() => service.getVersionForAccess(document.id, nextVersion.id, 'DOWNLOAD'), /صلاحية/);
+  db.run(
+    `INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect)
+     VALUES ('usr_hrdocs_sales', 'ui.hr.documents.documents.download', 'GRANT')`
+  );
+  PermissionService.invalidate(sales);
+  assert.equal(service.getVersionForAccess(document.id, nextVersion.id, 'DOWNLOAD').id, nextVersion.id);
+  assert.equal(service.getAuditHistory(document.id).some((entry) => entry.action === 'رفع نسخة مستند موظف'), true);
+  asAdmin();
 });
 
 test('document permissions separate viewing from managing', async () => {

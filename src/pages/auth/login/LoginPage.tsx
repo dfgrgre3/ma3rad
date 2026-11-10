@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   User as UserIcon,
 } from 'lucide-react';
-import { AuthService, TwoFactorRequiredError, type LoginGuardStatus } from '../../../services/auth/AuthService';
+import { AuthService, TwoFactorRequiredError, type LoginGuardStatus } from '../../../services/domains/auth/AuthService';
 import type { User } from '../../../types';
 import { LoginBrandPanel } from './LoginBrandPanel';
 

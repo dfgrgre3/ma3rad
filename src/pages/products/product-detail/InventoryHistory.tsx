@@ -1,7 +1,7 @@
 import React from 'react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 
 interface InventoryHistoryProps {
   productId: string;

@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { refreshBytecodeIntegrityManifest } = require('./compile-bytenode.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
 const packageJson = require(path.join(projectRoot, 'package.json'));
@@ -67,6 +68,7 @@ function buildWithTemporaryOutput(args, {
   runBuilder: runBuilderProcess = runBuilder,
   restoreSource: restoreSourceFiles = () => require('./restore-source.cjs').restoreSource(),
   assertCommercialBuild: assertCommercialFrontend = assertCommercialBuild,
+  refreshPackageIntegrity = refreshBytecodeIntegrityManifest,
   createTemporaryOutput = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ceramisys-electron-builder-')),
   outputDirectory = path.resolve(projectRoot, packageJson.build.directories.output || 'release'),
   copyOutput = (source, destination) => fs.cpSync(source, destination, { recursive: true, force: true }),
@@ -110,6 +112,8 @@ function buildWithTemporaryOutput(args, {
   let succeeded = false;
 
   try {
+    refreshPackageIntegrity();
+
     const windowsBuildConfig = {
       ...packageJson.build.win,
       ...(windowsBuild && unsignedBuild

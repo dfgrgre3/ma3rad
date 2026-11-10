@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Barcode, Printer, Search, Check, Layers, Sliders, RefreshCw, Eye, Tag, FileText, CheckCircle2
 } from 'lucide-react';
-import { ProductService } from '../../../services/products/ProductService';
-import { SettingsService } from '../../../services/config/SettingsService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { ProductService } from '../../../services/domains/products/ProductService';
+import { SettingsService } from '../../../services/domains/config/SettingsService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { Product } from '../../../types';
 import { gradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
-import { OperationalFieldService } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService } from '../../../services/domains/products/OperationalFieldService';
 
 interface LabelSettings {
   labelSize: '50x30' | '60x40' | '80x50' | 'A4_SHEET';

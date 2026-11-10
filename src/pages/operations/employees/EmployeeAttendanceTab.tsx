@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { countAttendanceByStatus } from './helpers';
 import type { AttendanceRecord, Employee } from '../../../types/hr/employeesPage';
 
@@ -24,8 +25,11 @@ export const EmployeeAttendanceTab: React.FC<EmployeeAttendanceTabProps> = ({
       <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
           <h3 className="text-sm font-black text-slate-900">تسجيل دفتر حضور يوم {attendanceDate}</h3>
-          <p className="text-xs text-slate-500 mt-1">قم بتحديد حضور وغياب العمال لتحديث كشف الرواتب تلقائياً وحساب اليوميات بدقة</p>
+          <p className="text-xs text-slate-500 mt-1">تسجيل الوقت والورديات والاستراحات وإدارة طلبات التصحيح من سجل الحضور والانصراف.</p>
         </div>
+        <Link to="/employees/attendance" className="text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+          فتح سجل الوقت والورديات
+        </Link>
 
         {/* Attendance Summary */}
         <div className="flex gap-4">

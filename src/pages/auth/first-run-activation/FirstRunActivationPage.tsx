@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, KeyRound, Loader2, Lock, Phone, ShieldCheck, User as UserIcon } from 'lucide-react';
-import { CentralLicenseService } from '../../../services/licensing/CentralLicenseService';
-import { CentralConfigApplier } from '../../../services/licensing/CentralConfigApplier';
-import { AuthService } from '../../../services/auth/AuthService';
+import { CentralLicenseService } from '../../../services/domains/licensing/CentralLicenseService';
+import { CentralConfigApplier } from '../../../services/domains/licensing/CentralConfigApplier';
+import { AuthService } from '../../../services/domains/auth/AuthService';
 
 interface FirstRunActivationPageProps {
   onSuccess: () => void;

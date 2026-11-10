@@ -4,14 +4,14 @@ import {
   Package, MapPin, Award, Loader2, AlertCircle, RefreshCw, Star, Scale,
 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel } from '../../../utils/export/export';
 import { useToast } from '../../../components/ui/Toast';
 import { SalesFinancialReconciliation } from '../../../components/reports/SalesFinancialReconciliation';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
-import { round2 } from '../../../services/finance/financials';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { round2 } from '../../../services/domains/finance/financials';
 
 const db = DatabaseManager.getInstance();
 const branchAccess = new BranchAccessService();

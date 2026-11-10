@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Search, Filter, Download, TrendingUp, TrendingDown, ArrowRight, Package } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { format } from 'date-fns';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { exportToExcel } from '../../../utils/export/export';
 
 interface LedgerEntry {

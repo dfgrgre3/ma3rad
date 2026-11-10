@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Warehouse, Plus, Search, MapPin, Database, Loader2, X, Package } from 'lucide-react';
-import { OperationsService, WarehouseRow } from '../../../services/operations/OperationsService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { OperationsService, WarehouseRow } from '../../../services/domains/operations/OperationsService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';

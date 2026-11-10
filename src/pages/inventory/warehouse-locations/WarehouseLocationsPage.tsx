@@ -3,12 +3,12 @@ import {
   Building2, Barcode, Plus, Search, RefreshCw, Printer, 
   Layers, Package, AlertCircle, Edit3, Trash2, X, Check, Eye
 } from 'lucide-react';
-import { InventoryService } from '../../../services/inventory/InventoryService';
-import { ProductService } from '../../../services/products/ProductService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { useToast } from '../../../components/ui/Toast';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const WarehouseLocationsPage: React.FC = () => {
   const inventoryService = new InventoryService();

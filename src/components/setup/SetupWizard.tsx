@@ -12,10 +12,10 @@ import {
 } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../database/repositories/databaseManager';
-import { SettingsService } from '../../services/config/SettingsService';
-import { AuthService } from '../../services/auth/AuthService';
-import { CompanyService } from '../../services/organization/CompanyService';
-import { BranchService } from '../../services/organization/BranchService';
+import { SettingsService } from '../../services/domains/config/SettingsService';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { CompanyService } from '../../services/domains/organization/CompanyService';
+import { BranchService } from '../../services/domains/organization/BranchService';
 import { useToast } from '../ui/Toast';
 import { BusinessProfileSupportNotice } from '../business/BusinessProfileSupportNotice';
 import {
@@ -32,11 +32,11 @@ import {
   type BusinessConfiguration,
 } from '../../config/businessProfiles';
 import { getModuleDefinition, validateModuleSelection, withModuleDependencies } from '../../config/moduleRegistry';
-import { ModuleRegistryService } from '../../services/config/ModuleRegistryService';
-import { BusinessProfileService } from '../../services/config/BusinessProfileService';
-import { getEffectiveBusinessType } from '../../services/config/BusinessTypeService';
-import { ConfigurationVersionService } from '../../services/config/ConfigurationVersionService';
-import { auditLogger } from '../../services/security/auditLogger';
+import { ModuleRegistryService } from '../../services/domains/config/ModuleRegistryService';
+import { BusinessProfileService } from '../../services/domains/config/BusinessProfileService';
+import { getEffectiveBusinessType } from '../../services/domains/config/BusinessTypeService';
+import { ConfigurationVersionService } from '../../services/domains/config/ConfigurationVersionService';
+import { auditLogger } from '../../services/domains/security/auditLogger';
 import type { User } from '../../types';
 
 interface SetupWizardProps {

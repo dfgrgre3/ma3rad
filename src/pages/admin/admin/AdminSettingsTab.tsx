@@ -4,9 +4,9 @@ import {
   Save, Palette, Table as TableIcon, Columns, Info, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History, Download,
   Printer, Eye, Star, CheckCircle, RefreshCw, Layers, LayoutTemplate, FileText, CheckCircle2, X, ExternalLink, SlidersHorizontal, Sparkles, Plus, ArrowUp, ArrowDown,
 } from 'lucide-react';
-import { SettingsService } from '../../../services/config/SettingsService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { SettingsService } from '../../../services/domains/config/SettingsService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { BusinessProfileSupportNotice } from '../../../components/business/BusinessProfileSupportNotice';
 import type { InvoiceSectionId, InvoiceTableColumnId, SystemSettings, User } from '../../../types';
@@ -25,9 +25,9 @@ import {
   serializeBusinessConfiguration,
   type BusinessConfiguration,
 } from '../../../config/businessProfiles';
-import { ModuleRegistryService } from '../../../services/config/ModuleRegistryService';
-import { BusinessProfileService } from '../../../services/config/BusinessProfileService';
-import { getEffectiveBusinessType } from '../../../services/config/BusinessTypeService';
+import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
+import { BusinessProfileService } from '../../../services/domains/config/BusinessProfileService';
+import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { CompaniesPanel } from '../../../components/admin/CompaniesPanel';
 import { BackupPage } from '../../settings/backup/BackupPage';
 import { AppearanceCustomizationTab } from './AppearanceCustomizationTab';
@@ -39,11 +39,11 @@ import {
   type BusinessTermKey,
   type BusinessTermOverrides,
 } from '../../../config/businessTerminology';
-import { TerminologyService } from '../../../services/config/TerminologyService';
+import { TerminologyService } from '../../../services/domains/config/TerminologyService';
 import {
   ConfigurationVersionService,
   type ActivityConfigurationVersion,
-} from '../../../services/config/ConfigurationVersionService';
+} from '../../../services/domains/config/ConfigurationVersionService';
 import { ColorInput, Field, inputCls, labelCls, NavigationLayoutPreview, Toggle } from './AdminSettingsFields';
 
 type Tab = 'general' | 'business' | 'branding' | 'customization' | 'invoice' | 'inventory' | 'operations' | 'security' | 'backup';

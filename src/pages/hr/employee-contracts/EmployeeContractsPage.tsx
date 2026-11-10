@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CheckCircle2, FileSignature, Loader2, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
-import { ContractService } from '../../../services/hr/ContractService';
-import { EmployeeService } from '../../../services/hr/EmployeeService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { CheckCircle2, Clock3, FileSignature, Loader2, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
+import { ContractService } from '../../../services/domains/hr/ContractService';
+import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { localDateString } from '../../../utils/shared/date';
 import type {
@@ -11,6 +11,7 @@ import type {
   ContractStatus,
   ContractType,
   EmployeeContract,
+  EmployeeLifecycleHistory,
 } from '../../../types/hr/contract';
 
 const statusLabels: Record<ContractEffectiveStatus, string> = {
@@ -43,6 +44,12 @@ const money = (value: number, currency: string) =>
 
 const today = () => localDateString();
 
+const addDateDays = (date: string, days: number) => {
+  const result = new Date(`${date}T00:00:00Z`);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result.toISOString().slice(0, 10);
+};
+
 const emptyForm = {
   employeeId: '',
   contractType: 'PERMANENT' as ContractType,
@@ -61,8 +68,13 @@ export const EmployeeContractsPage: React.FC = () => {
   const can = usePermission();
   const canManage = can('hr.contracts.manage');
   const canTerminate = can('hr.contracts.terminate');
+  const canApprove = can('hr.contracts.approve');
 
   const [rows, setRows] = useState<EmployeeContract[]>([]);
+  const [settlements, setSettlements] = useState<Array<{
+    id: string; employeeName: string; contractNumber: string; terminationDate: string;
+    earnedWages: number; unusedAnnualLeaveDays: number; leavePayout: number; totalAmount: number;
+  }>>([]);
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([]);
   const [status, setStatus] = useState<ContractStatus | 'ALL'>('ALL');
   const [employeeFilter, setEmployeeFilter] = useState(searchParams.get('employeeId') || '');
@@ -70,16 +82,22 @@ export const EmployeeContractsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [salaryComponents, setSalaryComponents] = useState<Array<{ name: string; amount: string }>>([]);
   const [summary, setSummary] = useState({ active: 0, expiring: 0, expired: 0, draft: 0 });
+  const [lifecycleHistory, setLifecycleHistory] = useState<EmployeeLifecycleHistory | null>(null);
+  const [historyEmployeeName, setHistoryEmployeeName] = useState('');
 
   const load = useCallback(() => {
     setLoading(true);
     try {
       setRows(service.getContracts({ status, employeeId: employeeFilter || undefined }));
+      setSettlements(service.getFinalSettlements(employeeFilter || undefined));
       const data = service.getSummary();
       setSummary({ active: data.active, expiring: data.expiring, expired: data.expired, draft: data.draft });
       if (canManage && can('employees.view')) {
-        setEmployees(EmployeeService.getAll().map((employee) => ({ id: employee.id, name: employee.name })));
+        setEmployees(EmployeeService.getAll()
+          .filter((employee) => !['RESIGNED', 'TERMINATED'].includes(employee.status))
+          .map((employee) => ({ id: employee.id, name: employee.name })));
       }
     } catch (error: any) {
       toast.error(error?.message || 'تعذر تحميل عقود الموظفين.');
@@ -106,11 +124,15 @@ export const EmployeeContractsPage: React.FC = () => {
         startDate: form.startDate,
         endDate: form.endDate || null,
         salary: Number(form.salary) || 0,
+        salaryComponents: salaryComponents
+          .filter((component) => component.name.trim() || component.amount.trim())
+          .map((component) => ({ name: component.name.trim(), amount: Number(component.amount) })),
         renewalNoticeDays: Number(form.renewalNoticeDays) || 0,
         notes: form.notes,
       });
       toast.success('تم إنشاء العقد كمسودة.');
       setForm(emptyForm);
+      setSalaryComponents([]);
       setShowForm(false);
       load();
     } catch (error: any) {
@@ -131,13 +153,30 @@ export const EmployeeContractsPage: React.FC = () => {
     }
   };
 
+  const approve = (row: EmployeeContract) => {
+    try {
+      service.approveContract(row.id);
+      toast.success('تم اعتماد العقد، ويمكن تفعيله.');
+      load();
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر اعتماد العقد.');
+    }
+  };
+
   const renew = (row: EmployeeContract) => {
-    const suggested = row.endDate || today();
-    const endDate = window.prompt('تاريخ نهاية التجديد (YYYY-MM-DD):', suggested);
+    const suggestedStart = row.endDate && row.endDate >= today()
+      ? addDateDays(row.endDate, 1)
+      : row.startDate >= today() ? addDateDays(row.startDate, 1) : today();
+    const startDate = window.prompt('تاريخ بداية العقد المجدد (YYYY-MM-DD):', suggestedStart);
+    if (!startDate) return;
+    const suggestedEnd = new Date(`${startDate}T00:00:00Z`);
+    suggestedEnd.setUTCFullYear(suggestedEnd.getUTCFullYear() + 1);
+    const endDate = window.prompt('تاريخ نهاية العقد المجدد (YYYY-MM-DD):', suggestedEnd.toISOString().slice(0, 10));
     if (!endDate) return;
     const salaryInput = window.prompt('الراتب الجديد (اتركه فارغاً للإبقاء على الحالي):', '');
     try {
       service.renewContract(row.id, {
+        startDate,
         endDate,
         salary: salaryInput?.trim() ? Number(salaryInput) : undefined,
       });
@@ -151,9 +190,17 @@ export const EmployeeContractsPage: React.FC = () => {
   const terminate = (row: EmployeeContract) => {
     const reason = window.prompt(`سبب إنهاء العقد ${row.contractNumber}:`, '');
     if (!reason) return;
+    const terminationDate = window.prompt('تاريخ إنهاء الخدمة (YYYY-MM-DD):', today());
+    if (!terminationDate) return;
+    const employeeStatus = window.prompt('اكتب RESIGNED للاستقالة أو TERMINATED لإنهاء الخدمة:', 'RESIGNED');
+    if (!employeeStatus) return;
     try {
-      service.terminateContract(row.id, reason);
-      toast.success('تم إنهاء العقد.');
+      service.terminateContract(row.id, {
+        reason,
+        terminationDate,
+        employeeStatus: employeeStatus.trim().toUpperCase() as 'RESIGNED' | 'TERMINATED',
+      });
+      toast.success('تم إنهاء الخدمة وحفظ التسوية النهائية.');
       load();
     } catch (error: any) {
       toast.error(error?.message || 'تعذر إنهاء العقد.');
@@ -168,6 +215,15 @@ export const EmployeeContractsPage: React.FC = () => {
       load();
     } catch (error: any) {
       toast.error(error?.message || 'تعذر حذف العقد.');
+    }
+  };
+
+  const showHistory = (row: EmployeeContract) => {
+    try {
+      setLifecycleHistory(service.getEmployeeLifecycleHistory(row.employeeId));
+      setHistoryEmployeeName(row.employeeName || '');
+    } catch (error: any) {
+      toast.error(error?.message || 'تعذر تحميل سجل الموظف.');
     }
   };
 
@@ -264,6 +320,47 @@ export const EmployeeContractsPage: React.FC = () => {
                 onChange={(event) => setForm({ ...form, salary: event.target.value })}
               />
             </label>
+            {salaryComponents.map((component, index) => (
+              <div key={index} className="flex items-end gap-1">
+                <label className="flex-1 text-xs text-slate-600">
+                  مكون راتب
+                  <input
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                    placeholder="بدل سكن"
+                    value={component.name}
+                    onChange={(event) => setSalaryComponents((current) => current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, name: event.target.value } : item
+                    ))}
+                  />
+                </label>
+                <label className="w-28 text-xs text-slate-600">
+                  المبلغ
+                  <input
+                    type="number" min="0" step="0.01"
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2 text-sm"
+                    value={component.amount}
+                    onChange={(event) => setSalaryComponents((current) => current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, amount: event.target.value } : item
+                    ))}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="mb-1 rounded p-2 text-rose-600 hover:bg-rose-50"
+                  title="حذف المكون"
+                  onClick={() => setSalaryComponents((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="self-end rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600"
+              onClick={() => setSalaryComponents((current) => [...current, { name: '', amount: '' }])}
+            >
+              + إضافة مكون راتب
+            </button>
             <label className="text-xs text-slate-600">
               تاريخ البداية
               <input
@@ -347,14 +444,23 @@ export const EmployeeContractsPage: React.FC = () => {
                 </td>
                 <td className="p-3">
                   <div className="flex flex-wrap gap-1">
-                    {canManage && row.status === 'DRAFT' && (
+                    {row.status === 'DRAFT' && (
                       <>
-                        <button className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700" onClick={() => activate(row)}>
-                          تفعيل
-                        </button>
-                        <button className="rounded bg-rose-50 p-1 text-rose-700" title="حذف المسودة" onClick={() => remove(row)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {canApprove && !row.approvedAt && (
+                          <button className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700" onClick={() => approve(row)}>
+                            اعتماد
+                          </button>
+                        )}
+                        {canManage && row.approvedAt && (
+                          <button className="rounded bg-emerald-50 px-2 py-1 text-xs text-emerald-700" onClick={() => activate(row)}>
+                            تفعيل
+                          </button>
+                        )}
+                        {canManage && (
+                          <button className="rounded bg-rose-50 p-1 text-rose-700" title="حذف المسودة" onClick={() => remove(row)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </>
                     )}
                     {canManage && row.status === 'ACTIVE' && (
@@ -362,9 +468,17 @@ export const EmployeeContractsPage: React.FC = () => {
                         تجديد
                       </button>
                     )}
-                    {canTerminate && row.status === 'ACTIVE' && (
+                    {canTerminate && row.status === 'ACTIVE' && ['ACTIVE', 'EXPIRING'].includes(row.effectiveStatus || '') && (
                       <button className="flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs text-rose-700" onClick={() => terminate(row)}>
                         <XCircle className="h-3.5 w-3.5" /> إنهاء
+                      </button>
+                    )}
+                    {can('hr.contracts.view') && (
+                      <button
+                        className="flex items-center gap-1 rounded bg-slate-50 px-2 py-1 text-xs text-slate-600"
+                        onClick={() => showHistory(row)}
+                      >
+                        <Clock3 className="h-3.5 w-3.5" /> السجل
                       </button>
                     )}
                   </div>
@@ -374,6 +488,84 @@ export const EmployeeContractsPage: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {settlements.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-amber-200 bg-white">
+          <div className="border-b border-amber-100 bg-amber-50 px-4 py-3">
+            <h2 className="font-bold text-amber-900">التسويات النهائية</h2>
+            <p className="text-xs text-amber-800">تشمل الأجور المكتسبة حتى تاريخ الخدمة ورصيد الإجازة السنوية غير المستخدم.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="p-3">الموظف</th><th className="p-3">العقد</th><th className="p-3">تاريخ الخدمة</th>
+                  <th className="p-3">الأجور</th><th className="p-3">رصيد الإجازة</th><th className="p-3">مقابل الإجازة</th><th className="p-3">الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody>
+                {settlements.map((settlement) => (
+                  <tr key={settlement.id} className="border-t border-slate-100">
+                    <td className="p-3">{settlement.employeeName}</td>
+                    <td className="p-3 font-mono text-xs">{settlement.contractNumber}</td>
+                    <td className="p-3">{settlement.terminationDate}</td>
+                    <td className="p-3">{money(settlement.earnedWages, 'EGP')}</td>
+                    <td className="p-3">{settlement.unusedAnnualLeaveDays}</td>
+                    <td className="p-3">{money(settlement.leavePayout, 'EGP')}</td>
+                    <td className="p-3 font-bold">{money(settlement.totalAmount, 'EGP')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {lifecycleHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" role="presentation">
+          <section className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl" dir="rtl" role="dialog" aria-modal="true">
+            <header className="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white p-4">
+              <div>
+                <h2 className="font-bold text-slate-800">السجل الوظيفي: {historyEmployeeName}</h2>
+                <p className="text-xs text-slate-500">تغييرات الحالة والراتب المسجلة مع تاريخ السريان والمستخدم المنفذ.</p>
+              </div>
+              <button className="rounded p-2 text-slate-500 hover:bg-slate-100" onClick={() => setLifecycleHistory(null)} aria-label="إغلاق">
+                <XCircle className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="grid gap-4 p-4 md:grid-cols-2">
+              <section>
+                <h3 className="mb-2 font-semibold text-slate-700">تاريخ الرواتب</h3>
+                <div className="space-y-2">
+                  {lifecycleHistory.salaryChanges.length === 0 ? (
+                    <p className="text-sm text-slate-500">لا توجد تغييرات راتب مسجلة.</p>
+                  ) : lifecycleHistory.salaryChanges.map((change) => (
+                    <article key={change.id} className="rounded-lg border border-slate-100 p-3 text-sm">
+                      <p className="font-semibold">{change.previousSalary ?? '—'} → {change.nextSalary} ({change.salaryType})</p>
+                      <p className="text-xs text-slate-500">السريان: {change.effectiveDate} · {change.actorName}</p>
+                      <p className="mt-1 text-xs text-slate-600">{change.reason}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+              <section>
+                <h3 className="mb-2 font-semibold text-slate-700">تاريخ الحالة الوظيفية</h3>
+                <div className="space-y-2">
+                  {lifecycleHistory.statusChanges.length === 0 ? (
+                    <p className="text-sm text-slate-500">لا توجد تغييرات حالة مسجلة.</p>
+                  ) : lifecycleHistory.statusChanges.map((change) => (
+                    <article key={change.id} className="rounded-lg border border-slate-100 p-3 text-sm">
+                      <p className="font-semibold">{change.previousStatus || '—'} → {change.nextStatus}</p>
+                      <p className="text-xs text-slate-500">السريان: {change.effectiveDate} · {change.actorName}</p>
+                      <p className="mt-1 text-xs text-slate-600">{change.reason}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

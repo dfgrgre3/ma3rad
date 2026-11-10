@@ -21,16 +21,17 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
+  ReferenceLine,
 } from 'recharts';
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 import { useToast } from '../../../components/ui/Toast';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
-import type { ReportColumn, ReportParams, ReportResult } from '../../../services/reports/ReportCenterService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import type { ReportColumn, ReportParams, ReportResult } from '../../../services/domains/reports/ReportCenterService';
 import { runReport } from './reportCatalog';
 import type { ReportDefinition } from './reportCatalog';
 import { ProductPicker } from '../../../components/products/ProductPicker';
@@ -107,6 +108,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
   const [result, setResult] = useState<ReportResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
@@ -114,32 +116,21 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
 
   const products = useMemo(() => {
     if (!definition.controls?.some((control) => control.kind === 'product')) return [];
-    try {
-      const scope = branchAccess.sqlScope(
-        'w.branch_id',
-        undefined,
-      );
-      return db.query<any>(`
-        SELECT DISTINCT p.id, p.name, p.sku
-        FROM products p
-        LEFT JOIN warehouse_stock ws ON ws.product_id = p.id
-        LEFT JOIN warehouses w ON w.id = ws.warehouse_id
-        WHERE p.is_active = 1 AND (${scope.clause} OR ws.id IS NULL)
-        ORDER BY p.name
-      `, scope.params);
-    } catch {
-      return db.query<any>('SELECT id, name, sku FROM products WHERE is_active = 1 ORDER BY name');
-    }
+    const scope = branchAccess.sqlScope('w.branch_id', undefined);
+    return db.query<any>(`
+      SELECT DISTINCT p.id, p.name, p.sku
+      FROM products p
+      LEFT JOIN warehouse_stock ws ON ws.product_id = p.id
+      LEFT JOIN warehouses w ON w.id = ws.warehouse_id
+      WHERE p.is_active = 1 AND (${scope.clause} OR ws.id IS NULL)
+      ORDER BY p.name
+    `, scope.params);
   }, [definition]);
 
   const registers = useMemo(() => {
     if (!definition.controls?.some((control) => control.kind === 'register')) return [];
-    try {
-      const scope = branchAccess.sqlScope('branch_id');
-      return db.query<any>(`SELECT id, name FROM cash_registers WHERE is_active = 1 AND ${scope.clause} ORDER BY name`, scope.params);
-    } catch {
-      return db.query<any>('SELECT id, name FROM cash_registers WHERE is_active = 1 ORDER BY name');
-    }
+    const scope = branchAccess.sqlScope('branch_id');
+    return db.query<any>(`SELECT id, name FROM cash_registers WHERE is_active = 1 AND ${scope.clause} ORDER BY name`, scope.params);
   }, [definition]);
 
   useEffect(() => {
@@ -169,6 +160,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
         ...filters,
       };
       setResult(runReport(definition.id, params));
+      setLastUpdatedAt(new Date());
     } catch (caught: any) {
       setResult(null);
       setError(caught?.message || 'تعذر تحميل التقرير.');
@@ -219,7 +211,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
 
     return rows.slice(0, 10).map(r => ({
       name: String(r[labelCol.key] || 'غير محدد').slice(0, 18),
-      value: Math.abs(Number(r[numCol.key]) || 0),
+      value: Number(r[numCol.key]) || 0,
       label: numCol.label,
     }));
   }, [rows, columns]);
@@ -257,6 +249,27 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
       });
     } catch (caught: any) {
       toast.error(caught?.message || 'تعذر طباعة التقرير.');
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (!result) return;
+    try {
+      PermissionService.require(AuthService.requireAuth(), 'reports.export', '/reports');
+      const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const lines = [
+        result.columns.map((column) => escape(column.label)).join(','),
+        ...rows.map((row) => result.columns.map((column) => escape(row[column.key])).join(',')),
+      ];
+      const blob = new Blob([`\uFEFF${lines.join('\r\n')}`], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${definition.id}.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (caught: any) {
+      toast.error(caught?.message || 'تعذر تصدير التقرير.');
     }
   };
 
@@ -326,6 +339,14 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
           >
             <Download className="h-4 w-4" /> تصدير Excel
           </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={!result || rows.length === 0}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" /> CSV
+          </button>
         </div>
       </div>
 
@@ -386,6 +407,9 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
             </label>
           );
         })}
+        <span className="mr-auto text-[10px] font-medium text-slate-400" aria-live="polite">
+          {lastUpdatedAt ? `آخر تحديث: ${lastUpdatedAt.toLocaleTimeString('ar-EG')}` : ''}
+        </span>
 
         <div className="relative mr-auto w-full sm:w-64">
           <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -451,6 +475,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                         textAnchor="end"
                       />
                       <YAxis stroke="#64748b" fontSize={11} />
+                      <ReferenceLine y={0} stroke="#64748b" />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: '#0f172a',
@@ -461,7 +486,11 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                         }}
                         formatter={(val: any) => [numberFormatter.format(Number(val) || 0), chartData[0]?.label || 'القيمة']}
                       />
-                      <Bar dataKey="value" fill="#0d9488" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                        {chartData.map((entry) => (
+                          <Cell key={entry.name} fill={entry.value < 0 ? '#e11d48' : '#0d9488'} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

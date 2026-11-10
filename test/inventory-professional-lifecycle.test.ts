@@ -3,11 +3,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { runMigrations } from '../src/database/migrations/index.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { InventoryService } from '../src/services/inventory/InventoryService.ts';
-import { approveCountSession, cancelCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/services/inventory-count/countSessionService.ts';
-import { loadBranchCountSessions, loadCountSessionItems } from '../src/services/inventory-count/countSessionData.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
+import { approveCountSession, cancelCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/services/domains/inventory-count/countSessionService.ts';
+import { loadBranchCountSessions, loadCountSessionItems } from '../src/services/domains/inventory-count/countSessionData.ts';
 
 function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
   return DatabaseManager.getInstance().query<T>(sql, params)[0];

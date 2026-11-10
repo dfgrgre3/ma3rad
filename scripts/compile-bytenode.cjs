@@ -68,6 +68,11 @@ function pinBytecodeIntegrityManifest(directory = electronDir) {
   }
 }
 
+function refreshBytecodeIntegrityManifest(directory = electronDir) {
+  writeBytecodeIntegrityManifest(directory);
+  pinBytecodeIntegrityManifest(directory);
+}
+
 async function verifyBytecodeReproducibility({
   directory = electronDir,
   files = filesToCompile,
@@ -142,8 +147,7 @@ async function compileFiles() {
   if (!skipVerifyArg) {
     await verifyBytecodeReproducibility();
   }
-  writeBytecodeIntegrityManifest();
-  pinBytecodeIntegrityManifest();
+  refreshBytecodeIntegrityManifest();
   console.log('✅ Bytecode compilation complete.');
 }
 
@@ -157,6 +161,7 @@ if (require.main === module) {
 module.exports = {
   filesToCompile,
   pinBytecodeIntegrityManifest,
+  refreshBytecodeIntegrityManifest,
   verifyBytecodeReproducibility,
   writeBytecodeIntegrityManifest,
 };

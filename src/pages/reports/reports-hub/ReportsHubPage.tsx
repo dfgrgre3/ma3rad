@@ -4,7 +4,7 @@ import { ArrowLeft, BarChart3, Search, Sparkles } from 'lucide-react';
 import { REPORT_CATEGORIES, REPORT_DEFINITIONS } from './reportCatalog';
 import type { ReportCategoryId, ReportDefinition } from './reportCatalog';
 import { ReportView } from './ReportView';
-import { getEffectiveBusinessType } from '../../../services/config/BusinessTypeService';
+import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { getBusinessProfile, getProfileReports } from '../../../config/businessProfiles';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { NoResultsState } from '../../../components/ui/StateViews';

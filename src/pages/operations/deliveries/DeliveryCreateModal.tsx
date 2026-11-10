@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2, X } from 'lucide-react';
-import type { Driver, Vehicle } from '../../../services/operations/OperationsService';
+import type { Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
 interface Customer { id: string; name: string; phone?: string | null; address?: string | null; city?: string | null }
 interface DeliveryForm { customerId: string; address: string; city: string; driverId: string; vehicleId: string; scheduledAt: string; deliveryFee: string; notes: string }
 interface Props { form: DeliveryForm; setForm: React.Dispatch<React.SetStateAction<DeliveryForm>>; customers: Customer[]; drivers: Driver[]; vehicles: Vehicle[]; saving: boolean; onClose: () => void; onSubmit: (event: React.FormEvent) => void; onPickCustomer: (customerId: string) => void }

@@ -1,6 +1,6 @@
 import {
   Banknote, BarChart3, BookmarkPlus, BookOpen, Boxes, Building2, CalendarDays,
-  ClipboardList, CreditCard, FileText, FolderTree, Layers, LayoutDashboard, Lock,
+  Calculator, ClipboardList, CreditCard, FileText, FolderTree, Layers, LayoutDashboard, Lock,
   MessageCircle, Package, Package2, PackageCheck, Percent, PieChart, Receipt,
   RotateCcw, Scale, ShoppingBag, ShoppingCart, ShieldCheck, Star, Tags, Target,
   TrendingDown, TrendingUp, Users, UserRound, Utensils, Wallet, Workflow,
@@ -45,6 +45,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'الحجوزات والعربونات', to: '/sales/orders-deposits', icon: BookmarkPlus, anyPerms: ['sales.orders_deposits.view', 'sales.reservations.view', 'sales.view'] },
       { label: 'خدمة ما بعد البيع والضمان', to: '/sales/after-sales', icon: ShieldCheck, perm: 'sales.view' },
       { label: 'عروض الأسعار', to: '/quotations', icon: FileText, perm: 'quotations.view' },
+      { label: 'حاسبة الشقة والمقايسة الهندسية', to: '/construction-estimate', icon: Calculator, anyPerms: ['quotations.view', 'projects.view'] },
       { label: 'الطلبات', to: '/orders', icon: Package2, perm: 'orders.view' },
       { label: 'المرتجعات', to: '/returns', icon: RotateCcw, perm: 'returns.view' },
     ],

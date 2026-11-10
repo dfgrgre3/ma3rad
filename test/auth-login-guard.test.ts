@@ -2,7 +2,7 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 
 test('auth guard: remaining attempts are reported before lockout and the lock lifts after the window', async () => {
   const db = DatabaseManager.getInstance();

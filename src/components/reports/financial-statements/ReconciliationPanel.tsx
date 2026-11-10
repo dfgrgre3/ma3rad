@@ -1,13 +1,18 @@
 import React from 'react';
-import type { ReconciliationCheck } from '../../../services/reports/FinancialStatementsService';
+import type { ReconciliationCheck } from '../../../services/domains/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
 export function ReconciliationPanel({ checks }: { checks: ReconciliationCheck[] }) {
   const issues = checks.filter((check) => check.status === 'DIFFERENCE').length;
+  const unavailable = checks.filter((check) => check.status === 'NOT_COMPARABLE').length;
   return (
     <div className="space-y-4">
-      <div className={`rounded-xl border px-5 py-4 ${issues ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
-        <p className="font-black text-sm">{issues ? `توجد ${issues} نقاط تحتاج إلى مراجعة` : 'الفحوصات المحاسبية متطابقة'}</p>
+      <div className={`rounded-xl border px-5 py-4 ${issues || unavailable ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
+        <p className="font-black text-sm">
+          {issues || unavailable
+            ? [issues ? `${issues} نقاط تحتاج إلى مراجعة` : '', unavailable ? `${unavailable} فحوصات غير قابلة للمقارنة ضمن نطاق الفرع` : ''].filter(Boolean).join(' · ')
+            : 'الفحوصات المحاسبية متطابقة'}
+        </p>
         <p className="text-xs text-slate-600 mt-1">تعرض هذه الصفحة فروقات الأستاذ العام مع سجلات العملاء والموردين وطبقات تكلفة المخزون.</p>
       </div>
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -29,12 +34,12 @@ export function ReconciliationPanel({ checks }: { checks: ReconciliationCheck[] 
                     <p className="font-bold text-slate-800">{check.label}</p>
                     <p className="text-xs text-slate-500 mt-1">{check.detail}</p>
                   </td>
-                  <td className="px-4 py-3 text-left font-mono">{formatCurrency(check.ledger)}</td>
-                  <td className="px-4 py-3 text-left font-mono">{formatCurrency(check.source)}</td>
-                  <td className={`px-4 py-3 text-left font-mono ${check.status === 'MATCH' ? 'text-emerald-700' : 'text-rose-700'}`}>{formatCurrency(check.difference)}</td>
+                  <td className="px-4 py-3 text-left font-mono">{check.status === 'NOT_COMPARABLE' ? '—' : formatCurrency(check.ledger)}</td>
+                  <td className="px-4 py-3 text-left font-mono">{check.status === 'NOT_COMPARABLE' ? '—' : formatCurrency(check.source)}</td>
+                  <td className={`px-4 py-3 text-left font-mono ${check.status === 'MATCH' ? 'text-emerald-700' : check.status === 'NOT_COMPARABLE' ? 'text-amber-700' : 'text-rose-700'}`}>{check.status === 'NOT_COMPARABLE' ? '—' : formatCurrency(check.difference)}</td>
                   <td className="px-4 py-3 text-right">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${check.status === 'MATCH' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {check.status === 'MATCH' ? 'متطابق' : 'فرق'}
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${check.status === 'MATCH' ? 'bg-emerald-100 text-emerald-700' : check.status === 'NOT_COMPARABLE' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {check.status === 'MATCH' ? 'متطابق' : check.status === 'NOT_COMPARABLE' ? 'غير قابل للمقارنة' : 'فرق'}
                     </span>
                   </td>
                 </tr>

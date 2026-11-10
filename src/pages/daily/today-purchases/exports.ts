@@ -5,7 +5,7 @@ import type {
   DailyPurchaseResult,
   DailyPurchaseRow,
   DailySupplierPaymentRow,
-} from '../../../services/operations/DailyOperationsService';
+} from '../../../services/domains/operations/DailyOperationsService';
 import type { useToast } from '../../../components/ui/Toast';
 import { PAY_LABEL } from './constants';
 import { buildPurchaseInvoiceHtml, formatDay, timeOf } from './helpers';

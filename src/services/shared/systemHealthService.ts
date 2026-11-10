@@ -3,9 +3,9 @@
  * دمج كل عناصر الأمان والأداء والنسخ الاحتياطي في وحدة واحدة
  */
 
-import { auditLogger } from '../security/auditLogger';
+import { auditLogger } from '../domains/security/auditLogger';
 import { performanceMonitor } from './performanceMonitor';
-import { securityService } from '../security/SecurityService';
+import { securityService } from '../domains/security/SecurityService';
 import { APP_VERSION } from '../../config/appVersion';
 
 

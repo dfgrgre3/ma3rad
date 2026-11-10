@@ -5,11 +5,12 @@ import {
   DollarSign, CheckCircle2, Percent, Building2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { EmployeeService, Employee, AttendanceStatus } from '../../../services/hr/EmployeeService';
+import { EmployeeService, Employee, AttendanceStatus } from '../../../services/domains/hr/EmployeeService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { localDateString } from '../../../utils/shared/date';
 
 const db = DatabaseManager.getInstance();
 const branchAccess = new BranchAccessService();
@@ -36,7 +37,7 @@ interface HrStats {
 function buildHrStats(): HrStats {
   const employees = EmployeeService.getAll();
   const active = employees.filter(e => e.status === 'ACTIVE');
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateString();
 
   const scope = branchAccess.sqlScope('e.branch_id');
   const todayAttendance = db.query<{ status: AttendanceStatus; count: number }>(

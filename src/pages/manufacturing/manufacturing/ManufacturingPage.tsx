@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Factory, Loader2, Plus, RefreshCw } from 'lucide-react';
-import { ManufacturingService } from '../../../services/manufacturing/ManufacturingService';
-import { ProductService } from '../../../services/products/ProductService';
+import { ManufacturingService } from '../../../services/domains/manufacturing/ManufacturingService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
-import { BranchService } from '../../../services/organization/BranchService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { BranchService } from '../../../services/domains/organization/BranchService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
-import { getEffectiveBusinessType } from '../../../services/config/BusinessTypeService';
+import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { getProfileWorkflows } from '../../../config/businessProfiles';
 
 export const ManufacturingPage: React.FC = () => {

@@ -5,7 +5,7 @@ import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { getSellableUnits, getUomLabel, isWholeUnit } from '../../../utils/products/uom';
 import { Modal, Field } from './ui';
 import { FormState, Line, fmt } from '../../../types/sales/ordersPage';
-import type { OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 

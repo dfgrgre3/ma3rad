@@ -1,5 +1,5 @@
-import type { StockReservation } from '../../services/sales/ReservationService';
-import type { Order } from '../../services/sales/OrderService';
+import type { StockReservation } from '../../services/domains/sales/ReservationService';
+import type { Order } from '../../services/domains/sales/OrderService';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 
 export type ReservationReferenceType = 'ORDER' | 'QUOTATION' | 'PROJECT' | 'MANUAL';

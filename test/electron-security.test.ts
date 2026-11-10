@@ -5,9 +5,9 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { NavigationService } from '../src/services/config/NavigationService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { NavigationService } from '../src/services/domains/config/NavigationService.ts';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from '../src/config/routePermissions.ts';
 
 const require = createRequire(import.meta.url);

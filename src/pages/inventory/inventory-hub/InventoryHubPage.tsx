@@ -4,14 +4,14 @@ import {
   Activity, ArrowLeftRight, Barcode, BookmarkPlus, Building2, ClipboardList, Layers,
   PackageSearch, Scale, ShieldAlert, Warehouse, Wrench,
 } from 'lucide-react';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 
 const InventoryView = lazy(() => import('../../../components/inventory/InventoryView').then((module) => ({ default: module.InventoryView })));
 const LocationStockPage = lazy(() => import('../location-stock/LocationStockPage').then((module) => ({ default: module.LocationStockPage })));
 const StockLedgerPage = lazy(() => import('../stock-ledger/StockLedgerPage').then((module) => ({ default: module.StockLedgerPage })));
-const StockTransfersView = lazy(() => import('../../../components/inventory/stock-transfers/StockTransfersView').then((module) => ({ default: module.StockTransfersView })));
+const StockTransfersView = lazy(() => import('../stock-transfers/StockTransfersPage').then((module) => ({ default: module.StockTransfersPage })));
 const InventoryCountPage = lazy(() => import('../inventory-count/InventoryCountPage').then((module) => ({ default: module.InventoryCountPage })));
 const InventoryValuationPage = lazy(() => import('../inventory-valuation/InventoryValuationPage').then((module) => ({ default: module.InventoryValuationPage })));
 const InventoryAdjustmentsPage = lazy(() => import('../inventory-adjustments/InventoryAdjustmentsPage').then((module) => ({ default: module.InventoryAdjustmentsPage })));

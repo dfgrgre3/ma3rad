@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { EmployeeService } from '../../../services/hr/EmployeeService';
+import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
+import { EmployeeOrganizationService } from '../../../services/domains/hr/EmployeeOrganizationService';
 import { exportToExcel } from '../../../utils/export/export';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
 import { EmployeeAnalyticsTab } from './EmployeeAnalyticsTab';
 import { EmployeeAttendanceTab } from './EmployeeAttendanceTab';
@@ -17,7 +18,7 @@ import { EmployeeTabs } from './EmployeeTabs';
 import { EmployeeTransactionModal } from './EmployeeTransactionModal';
 import { EmployeesHeader } from './EmployeesHeader';
 import { calculateTotalWagesBill, filterEmployees, getEmployeeFinancials } from './helpers';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
@@ -41,6 +42,13 @@ export const EmployeesPage: React.FC = () => {
   const [payrollPayables, setPayrollPayables] = useState<PayrollPayable[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employeeBranches, setEmployeeBranches] = useState<Array<{ id: string; name: string }>>([]);
+  const [departments, setDepartments] = useState<Array<{
+    id: string;
+    name: string;
+    branchId: string | null;
+    description: string | null;
+  }>>([]);
+  const [jobTitles, setJobTitles] = useState<Array<{ id: string; title: string; departmentId: string | null }>>([]);
   const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
   const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
   const [valuesByEmployee, setValuesByEmployee] = useState<Record<string, Record<string, string>>>({});
@@ -58,6 +66,9 @@ export const EmployeesPage: React.FC = () => {
           .filter((branch) => branch.id === currentBranchId)
           .map(({ id, name }) => ({ id, name }))
       );
+      const organizationService = new EmployeeOrganizationService();
+      setDepartments(organizationService.getDepartments(currentBranchId));
+      setJobTitles(organizationService.getJobTitles());
       const currentEmployees = EmployeeService.getAll() as unknown as Employee[];
       setEmployees(currentEmployees);
       const fieldService = new OperationalFieldService();
@@ -125,12 +136,30 @@ export const EmployeesPage: React.FC = () => {
     branchId: '',
     employmentType: 'FULL_TIME',
     name: '',
+    nationalId: '',
+    birthDate: '',
+    gender: 'OTHER',
     location: '',
     role: '',
     phone: '',
+    phone2: '',
     email: '',
+    address: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    departmentId: '',
+    managerEmployeeId: '',
+    probationStartDate: '',
+    probationEndDate: '',
     baseSalary: 6000,
     salaryType: 'MONTHLY' as Employee['salaryType'],
+    salaryPaymentMethod: 'CASH',
+    bankName: '',
+    bankAccountNumber: '',
+    socialInsuranceNumber: '',
+    taxFileNumber: '',
+    education: '',
+    previousExperience: '',
     status: 'ACTIVE' as Employee['status'],
     joinedDate: localDateString(),
     notes: '',
@@ -150,18 +179,37 @@ export const EmployeesPage: React.FC = () => {
   // --- Actions handlers ---
   const handleOpenAddEmployee = () => {
     setEditingEmployee(null);
+    setJobTitles(new EmployeeOrganizationService().getJobTitles());
     setOperationalFieldValues({});
     setEmployeeFormError(null);
     setEmpForm({
       branchId: employeeBranches[0]?.id || '',
       employmentType: 'FULL_TIME',
       name: '',
+      nationalId: '',
+      birthDate: '',
+      gender: 'OTHER',
       location: employeeBranches[0]?.name || '',
       role: '',
       phone: '',
+      phone2: '',
       email: '',
+      address: '',
+      emergencyContactName: '',
+      emergencyContactPhone: '',
+      departmentId: '',
+      managerEmployeeId: '',
+      probationStartDate: '',
+      probationEndDate: '',
       baseSalary: 6000,
       salaryType: 'MONTHLY',
+      salaryPaymentMethod: 'CASH',
+      bankName: '',
+      bankAccountNumber: '',
+      socialInsuranceNumber: '',
+      taxFileNumber: '',
+      education: '',
+      previousExperience: '',
       status: 'ACTIVE',
       joinedDate: localDateString(),
       notes: '',
@@ -171,23 +219,139 @@ export const EmployeesPage: React.FC = () => {
 
   const handleOpenEditEmployee = (emp: Employee) => {
     setEditingEmployee(emp);
+    setJobTitles(new EmployeeOrganizationService().getJobTitles(emp.departmentId || undefined));
     setOperationalFieldValues(new OperationalFieldService().getRecordValues('employees', emp.id));
     setEmployeeFormError(null);
     setEmpForm({
       branchId: emp.branchId || employeeBranches[0]?.id || '',
       employmentType: emp.employmentType || 'FULL_TIME',
       name: emp.name,
+      nationalId: emp.nationalId || '',
+      birthDate: emp.birthDate || '',
+      gender: emp.gender || 'OTHER',
       location: employeeBranches.find((branch) => branch.id === (emp.branchId || employeeBranches[0]?.id))?.name || emp.location,
       role: emp.role,
       phone: emp.phone,
+      phone2: emp.phone2 || '',
       email: emp.email,
+      address: emp.address || '',
+      emergencyContactName: emp.emergencyContactName || '',
+      emergencyContactPhone: emp.emergencyContactPhone || '',
+      departmentId: emp.departmentId || '',
+      managerEmployeeId: emp.managerEmployeeId || '',
+      probationStartDate: emp.probationStartDate || '',
+      probationEndDate: emp.probationEndDate || '',
       baseSalary: emp.baseSalary,
       salaryType: emp.salaryType,
+      salaryPaymentMethod: emp.salaryPaymentMethod || 'CASH',
+      bankName: emp.bankName || '',
+      bankAccountNumber: emp.bankAccountNumber || '',
+      socialInsuranceNumber: emp.socialInsuranceNumber || '',
+      taxFileNumber: emp.taxFileNumber || '',
+      education: emp.education || '',
+      previousExperience: emp.previousExperience || '',
       status: emp.status,
       joinedDate: emp.joinedDate,
       notes: emp.notes || '',
     });
     setIsEmployeeModalOpen(true);
+  };
+
+  const handleCreateDepartment = () => {
+    const name = window.prompt('اسم القسم الجديد:');
+    if (!name?.trim()) return;
+    try {
+      const department = new EmployeeOrganizationService().createDepartment({
+        name,
+        branchId: empForm.branchId,
+      });
+      setDepartments((current) => [...current.filter((item) => item.id !== department.id), department]);
+      setEmpForm((current) => ({ ...current, departmentId: department.id }));
+      setJobTitles(new EmployeeOrganizationService().getJobTitles(department.id));
+    } catch (error: any) {
+      setEmployeeFormError(error?.message || 'تعذر إنشاء القسم.');
+    }
+  };
+
+  const handleUpdateDepartment = () => {
+    const department = departments.find((item) => item.id === empForm.departmentId);
+    if (!department) {
+      setEmployeeFormError('اختر قسماً صالحاً لتعديله.');
+      return;
+    }
+    const name = window.prompt('اسم القسم:', department.name);
+    if (!name?.trim()) return;
+    try {
+      const updated = new EmployeeOrganizationService().updateDepartment(department.id, {
+        name,
+        description: department.description || undefined,
+      });
+      setDepartments((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (error: any) {
+      setEmployeeFormError(error?.message || 'تعذر تعديل القسم.');
+    }
+  };
+
+  const handleDeactivateDepartment = () => {
+    const department = departments.find((item) => item.id === empForm.departmentId);
+    if (!department || !window.confirm(`تعطيل القسم «${department.name}»؟ سيظل القسم محفوظاً في السجلات السابقة.`)) return;
+    try {
+      new EmployeeOrganizationService().deactivateDepartment(department.id);
+      setDepartments((current) => current.filter((item) => item.id !== department.id));
+      setEmpForm((current) => ({ ...current, departmentId: '' }));
+      setJobTitles(new EmployeeOrganizationService().getJobTitles());
+    } catch (error: any) {
+      setEmployeeFormError(error?.message || 'تعذر تعطيل القسم.');
+    }
+  };
+
+  const handleCreateJobTitle = () => {
+    const title = window.prompt('المسمى الوظيفي الجديد:');
+    if (!title?.trim()) return;
+    try {
+      const jobTitle = new EmployeeOrganizationService().createJobTitle({
+        title,
+        departmentId: empForm.departmentId || null,
+      });
+      setJobTitles((current) => [...current.filter((item) => item.id !== jobTitle.id), jobTitle]);
+      setEmpForm((current) => ({ ...current, role: jobTitle.title }));
+    } catch (error: any) {
+      setEmployeeFormError(error?.message || 'تعذر إنشاء المسمى الوظيفي.');
+    }
+  };
+
+  const handleUpdateJobTitle = () => {
+    const jobTitle = jobTitles.find((item) =>
+      item.title === empForm.role
+      && (item.departmentId === empForm.departmentId || item.departmentId === null)
+    );
+    if (!jobTitle) {
+      setEmployeeFormError('اختر مسمى محفوظاً لتعديله.');
+      return;
+    }
+    const title = window.prompt('المسمى الوظيفي:', jobTitle.title);
+    if (!title?.trim()) return;
+    try {
+      const updated = new EmployeeOrganizationService().updateJobTitle(jobTitle.id, title);
+      setJobTitles((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setEmpForm((current) => ({ ...current, role: updated.title }));
+    } catch (error: any) {
+      setEmployeeFormError(error?.message || 'تعذر تعديل المسمى الوظيفي.');
+    }
+  };
+
+  const handleDeactivateJobTitle = () => {
+    const jobTitle = jobTitles.find((item) =>
+      item.title === empForm.role
+      && (item.departmentId === empForm.departmentId || item.departmentId === null)
+    );
+    if (!jobTitle || !window.confirm(`تعطيل المسمى «${jobTitle.title}»؟ سيظل محفوظاً في ملفات الموظفين السابقة.`)) return;
+    try {
+      new EmployeeOrganizationService().deactivateJobTitle(jobTitle.id);
+      setJobTitles((current) => current.filter((item) => item.id !== jobTitle.id));
+    } catch (error: any) {
+      setEmployeeFormError(error?.message || 'تعذر تعطيل المسمى الوظيفي.');
+    }
   };
 
   const handleSaveEmployee = (e: React.FormEvent) => {
@@ -208,7 +372,10 @@ export const EmployeesPage: React.FC = () => {
         'employees', operationalFieldValues, editingEmployee ? 'update' : 'create', editingEmployee?.id,
       );
       if (editingEmployee) {
-        EmployeeService.update(editingEmployee.id, empForm);
+        const status = ['RESIGNED', 'TERMINATED'].includes(editingEmployee.status)
+          ? undefined
+          : empForm.status;
+        EmployeeService.update(editingEmployee.id, { ...empForm, status });
         new OperationalFieldService().setRecordValues('employees', editingEmployee.id, operationalFieldValues, 'update');
       } else {
         const created = EmployeeService.create(empForm);
@@ -266,24 +433,15 @@ export const EmployeesPage: React.FC = () => {
     }
   };
 
-  const handleAccruePayroll = () => {
-    try {
-      const result = EmployeeService.accrueMonthlyPayroll(payrollPeriod);
-      alert(`تم ترحيل استحقاق الرواتب: ${result.created} موظف، مع تخطي ${result.skipped} قيدًا موجودًا.`);
-      loadAll();
-    } catch (err: any) {
-      alert(err?.message || 'تعذر ترحيل استحقاق الرواتب.');
-    }
-  };
-
   const handleUpdateAttendance = (empId: string, status: AttendanceRecord['status']) => {
     try {
-      EmployeeService.upsertAttendance({
+      const result = EmployeeService.upsertAttendance({
         employeeId: empId,
         date: attendanceDate,
         status,
         recordedBy: AuthService.getCurrentUser()?.id || 'usr_admin',
       });
+      if (result.pendingApproval) alert('أُرسل تعديل الحضور للموافقة، ولن يتغير السجل قبل اعتماده.');
       loadAll();
     } catch (err: any) {
       alert(err?.message || 'تعذر تسجيل الحضور.');
@@ -323,10 +481,10 @@ export const EmployeesPage: React.FC = () => {
   const txEmployeeName = employees.find(e => e.id === selectedEmpForTx)?.name;
   const historyEmployeeName = employees.find(e => e.id === selectedEmpForHistory)?.name;
   const historyTransactions = isHistoryModalOpen
-    ? transactions.filter(t => t.employeeId === selectedEmpForHistory)
+    ? transactions.filter(t => t.employeeId === selectedEmpForHistory && t.date.slice(0, 7) === payrollPeriod)
     : [];
   const historyNetDue = isHistoryModalOpen
-    ? getEmployeeFinancials(employees, transactions, selectedEmpForHistory).netDue
+    ? getEmployeeFinancials(employees, transactions, selectedEmpForHistory, payrollPeriod).netDue
     : 0;
 
   return (
@@ -394,7 +552,6 @@ export const EmployeesPage: React.FC = () => {
               totalWagesBill={totalWagesBill}
               canManageEmployees={canManageEmployees}
               onPayrollPeriodChange={setPayrollPeriod}
-              onAccruePayroll={handleAccruePayroll}
               onOpenTransaction={handleOpenTransaction}
               onOpenHistory={handleOpenHistory}
             />
@@ -430,6 +587,15 @@ export const EmployeesPage: React.FC = () => {
         editingEmployee={editingEmployee}
         form={empForm}
         branches={employeeBranches}
+        departments={departments.filter((department) =>
+          !department.branchId || department.branchId === empForm.branchId
+        )}
+        jobTitles={jobTitles}
+        managers={employees.filter((employee) =>
+          employee.id !== editingEmployee?.id
+          && employee.branchId === empForm.branchId
+          && ['ACTIVE', 'PROBATION', 'ON_LEAVE'].includes(employee.status)
+        )}
         isSaving={isEmployeeSaving}
         error={employeeFormError}
         onFormChange={setEmpForm}
@@ -438,6 +604,15 @@ export const EmployeesPage: React.FC = () => {
         operationalFields={operationalFields}
         operationalFieldValues={operationalFieldValues}
         onOperationalFieldValuesChange={setOperationalFieldValues}
+        onDepartmentChange={(departmentId) => {
+          setJobTitles(new EmployeeOrganizationService().getJobTitles(departmentId || undefined));
+        }}
+        onCreateDepartment={handleCreateDepartment}
+        onUpdateDepartment={handleUpdateDepartment}
+        onDeactivateDepartment={handleDeactivateDepartment}
+        onCreateJobTitle={handleCreateJobTitle}
+        onUpdateJobTitle={handleUpdateJobTitle}
+        onDeactivateJobTitle={handleDeactivateJobTitle}
       />
 
       {/* --- MODAL 2: ADD FINANCIAL TRANSACTION (تسجيل حركة مالية) --- */}
@@ -454,6 +629,7 @@ export const EmployeesPage: React.FC = () => {
       <EmployeeHistoryModal
         open={isHistoryModalOpen}
         employeeName={historyEmployeeName}
+        period={payrollPeriod}
         transactions={historyTransactions}
         netDue={historyNetDue}
         onClose={() => setIsHistoryModalOpen(false)}

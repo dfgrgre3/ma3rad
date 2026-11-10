@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { registerConfigTarget } from '../../config/appConfigTargets';
-import { useFieldConfig } from '../../hooks/config/useAppConfig';
+import { useFieldConfig } from '../../hooks/domains/config/useAppConfig';
 
 export interface ConfigFieldProps {
   /** Stable form id, e.g. `sales.invoice`. */

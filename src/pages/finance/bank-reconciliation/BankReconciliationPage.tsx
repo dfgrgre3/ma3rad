@@ -12,11 +12,11 @@ import {
   Check,
   Scale,
 } from 'lucide-react';
-import { FinanceEnterpriseService } from '../../../services/finance/FinanceEnterpriseService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import type { BankAccount, BankReconciliation } from '../../../types/finance';
 import { localDateString } from '../../../utils/shared/date';
 import { useToast } from '../../../components/ui/Toast';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const BankReconciliationPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);

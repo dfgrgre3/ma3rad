@@ -5,11 +5,11 @@ import {
   Receipt, CreditCard, Banknote, Eye, X, Printer, Download, MessageCircle,
   CheckCircle2, Clock, AlertCircle, Filter,
 } from 'lucide-react';
-import { SalesService } from '../../../services/sales/SalesService';
-import { CustomerService } from '../../../services/customers/CustomerService';
+import { SalesService } from '../../../services/domains/sales/SalesService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
 import { PrintService } from '../../../services/shared/PrintService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { Customer, SalesInvoice } from '../../../types';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';

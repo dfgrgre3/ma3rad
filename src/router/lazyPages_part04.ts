@@ -45,3 +45,5 @@ export const BackupPage = lazy(() => import('../pages/settings/backup/BackupPage
 export const SystemHealthPage = lazy(() => import('../pages/settings/system-health/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
 
 export const NotFoundPage = lazy(() => import('../pages/common/not-found/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+
+export const ApartmentEstimatePage = lazy(() => import('../pages/construction/ApartmentEstimatePage').then(m => ({ default: m.ApartmentEstimatePage })));

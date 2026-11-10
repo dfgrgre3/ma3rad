@@ -4,8 +4,17 @@ const safeStorageCompat = require('./safeStorageCompat');
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const MAX_OCR_IMAGE_BYTES = 12 * 1024 * 1024;
 const STORAGE_NAME_PATTERN = /^doc_[a-f0-9]{32}\.[a-z0-9]{1,10}$/i;
+const EMPLOYEE_STORAGE_NAME_PATTERN = /^hrdoc_[a-f0-9]{32}\.(pdf|png|jpg|jpeg|webp|gif)$/i;
 const ENCRYPTED_DOCUMENT_MAGIC = Buffer.from('CERAMISYS-DOC\0v1\0');
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const EMPLOYEE_MIME_BY_EXTENSION = {
+  '.pdf': 'application/pdf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+};
 
 const MIME_BY_EXTENSION = {
   '.pdf': 'application/pdf',
@@ -22,6 +31,16 @@ const MIME_BY_EXTENSION = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.zip': 'application/zip',
 };
+
+function isSafeFileName(fileName) {
+  return typeof fileName === 'string'
+    && !fileName.includes('/')
+    && !fileName.includes('\\')
+    && !Array.from(fileName).some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    });
+}
 
 function isInside(parent, candidate) {
   const base = pathResolveWithSeparator(parent);
@@ -56,6 +75,7 @@ function registerDocumentHandlers({
   const pathModule = configurePath(path);
   const DOCUMENTS_DIR = pathModule.join(appDataDir, 'documents');
   const OPEN_DIR = pathModule.join(appDataDir, '.document-open');
+  const pendingEmployeeImports = new Set();
   let ocrWorkerPromise = null;
   let ocrQueue = Promise.resolve();
   let vaultInitialization = null;
@@ -143,7 +163,7 @@ function registerDocumentHandlers({
     if (fsSync.existsSync(OPEN_DIR)) fsSync.rmSync(OPEN_DIR, { recursive: true, force: true });
 
     for (const entry of await fs.readdir(DOCUMENTS_DIR, { withFileTypes: true })) {
-      if (!entry.isFile() || !STORAGE_NAME_PATTERN.test(entry.name)) continue;
+      if (!entry.isFile() || (!STORAGE_NAME_PATTERN.test(entry.name) && !EMPLOYEE_STORAGE_NAME_PATTERN.test(entry.name))) continue;
       const target = pathModule.join(DOCUMENTS_DIR, entry.name);
       const storedBytes = await fs.readFile(target);
       if (storedBytes.subarray(0, ENCRYPTED_DOCUMENT_MAGIC.length).equals(ENCRYPTED_DOCUMENT_MAGIC)) continue;
@@ -213,8 +233,9 @@ function registerDocumentHandlers({
     return task;
   };
 
-  ipcMain.handle('documents:import', async (event) => {
+  ipcMain.handle('documents:import', async (event, options = {}) => {
     validateIpcSender(event);
+    const employeeDocument = options?.purpose === 'employee';
     try {
       await ensureVault();
     } catch (error) {
@@ -225,10 +246,12 @@ function registerDocumentHandlers({
     const selection = await dialog.showOpenDialog({
       title: 'اختيار ملف المستند',
       properties: ['openFile'],
-      filters: [
-        { name: 'المستندات', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'zip'] },
-        { name: 'كل الملفات', extensions: ['*'] },
-      ],
+      filters: employeeDocument
+        ? [{ name: 'مستندات الموظفين (PDF وصور)', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'gif'] }]
+        : [
+          { name: 'المستندات', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'zip'] },
+          { name: 'كل الملفات', extensions: ['*'] },
+        ],
     });
     if (selection.canceled || !selection.filePaths?.length) {
       return { ok: false, canceled: true };
@@ -243,8 +266,11 @@ function registerDocumentHandlers({
       }
 
       const extension = pathModule.extname(sourcePath).toLowerCase();
+      if (employeeDocument && !EMPLOYEE_MIME_BY_EXTENSION[extension]) {
+        return { ok: false, error: 'يسمح فقط بملفات PDF والصور المدعومة.' };
+      }
       const safeExtension = /^\.[a-z0-9]{1,10}$/.test(extension) ? extension : '';
-      const storageName = `doc_${crypto.randomUUID().replace(/-/g, '')}${safeExtension}`;
+      const storageName = `${employeeDocument ? 'hrdoc_' : 'doc_'}${crypto.randomUUID().replace(/-/g, '')}${safeExtension}`;
       const destination = pathModule.join(DOCUMENTS_DIR, storageName);
       if (!isInside(DOCUMENTS_DIR, destination)) {
         return { ok: false, error: 'مسار التخزين غير صالح.' };
@@ -254,19 +280,106 @@ function registerDocumentHandlers({
       if (bytes.length > MAX_ATTACHMENT_BYTES) {
         return { ok: false, error: 'حجم الملف يتجاوز الحد المسموح (25 ميجابايت).' };
       }
+      if (employeeDocument) {
+        const validContent = extension === '.pdf'
+          ? bytes.subarray(0, 5).toString() === '%PDF-'
+          : extension === '.png'
+            ? bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)
+            : extension === '.jpg' || extension === '.jpeg'
+              ? bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+              : extension === '.webp'
+                ? bytes.length >= 12 && bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP'
+                : bytes.subarray(0, 6).toString() === 'GIF87a' || bytes.subarray(0, 6).toString() === 'GIF89a';
+        if (!validContent) return { ok: false, error: 'محتوى الملف لا يطابق نوع PDF أو الصورة المحدد.' };
+      }
       await writeEncryptedDocument(destination, bytes);
       const checksum = crypto.createHash('sha256').update(bytes).digest('hex');
+      if (employeeDocument) pendingEmployeeImports.add(storageName);
 
       return {
         ok: true,
         storageName,
         fileName: pathModule.basename(sourcePath).slice(0, 255),
-        mimeType: MIME_BY_EXTENSION[safeExtension] || 'application/octet-stream',
+        mimeType: (employeeDocument ? EMPLOYEE_MIME_BY_EXTENSION[safeExtension] : MIME_BY_EXTENSION[safeExtension]) || 'application/octet-stream',
         fileSize: bytes.length,
         checksum,
       };
     } catch (error) {
       console.error('Document import failed:', error);
+      return { ok: false, error: String(error?.message || error) };
+    }
+  });
+
+  ipcMain.handle('documents:employee-import-commit', async (event, storageName) => {
+    validateIpcSender(event);
+    if (typeof storageName !== 'string' || !EMPLOYEE_STORAGE_NAME_PATTERN.test(storageName)
+      || !pendingEmployeeImports.has(storageName)) {
+      return { ok: false, error: 'الملف ليس رفعًا مؤقتًا صالحًا.' };
+    }
+    pendingEmployeeImports.delete(storageName);
+    return { ok: true };
+  });
+
+  ipcMain.handle('documents:employee-import-discard', async (event, storageName) => {
+    validateIpcSender(event);
+    if (typeof storageName !== 'string' || !EMPLOYEE_STORAGE_NAME_PATTERN.test(storageName)
+      || !pendingEmployeeImports.has(storageName)) {
+      return { ok: false, error: 'الملف ليس رفعًا مؤقتًا صالحًا.' };
+    }
+    const target = pathModule.resolve(DOCUMENTS_DIR, storageName);
+    if (!EMPLOYEE_STORAGE_NAME_PATTERN.test(storageName) || !isInside(DOCUMENTS_DIR, target)) {
+      return { ok: false, error: 'اسم الملف غير صالح.' };
+    }
+    try {
+      await fs.unlink(target);
+      pendingEmployeeImports.delete(storageName);
+      return { ok: true };
+    } catch (error) {
+      console.error('Could not discard staged employee document:', error);
+      return { ok: false, error: String(error?.message || error) };
+    }
+  });
+
+  ipcMain.handle('documents:read', async (event, storageName) => {
+    validateIpcSender(event);
+    if (typeof storageName !== 'string' || !EMPLOYEE_STORAGE_NAME_PATTERN.test(storageName)) {
+      return { ok: false, error: 'اسم الملف غير صالح.' };
+    }
+    const target = pathModule.resolve(DOCUMENTS_DIR, storageName);
+    if (!isInside(DOCUMENTS_DIR, target)) return { ok: false, error: 'مسار الملف غير صالح.' };
+    try {
+      await ensureVault();
+      const plaintext = await decryptDocument(await fs.readFile(target));
+      if (plaintext.length > MAX_ATTACHMENT_BYTES) return { ok: false, error: 'حجم الملف يتجاوز الحد المسموح.' };
+      return { ok: true, bytes: Uint8Array.from(plaintext) };
+    } catch (error) {
+      console.error('Document read failed:', error);
+      return { ok: false, error: String(error?.message || error) };
+    }
+  });
+
+  ipcMain.handle('documents:download', async (event, storageName, fileName) => {
+    validateIpcSender(event);
+    if (typeof storageName !== 'string' || !EMPLOYEE_STORAGE_NAME_PATTERN.test(storageName)
+      || !isSafeFileName(fileName) || !fileName.trim() || fileName.length > 255) {
+      return { ok: false, error: 'بيانات تنزيل الملف غير صالحة.' };
+    }
+    const target = pathModule.resolve(DOCUMENTS_DIR, storageName);
+    if (!isInside(DOCUMENTS_DIR, target)) return { ok: false, error: 'مسار الملف غير صالح.' };
+    const selection = await dialog.showSaveDialog({
+      title: 'تنزيل مستند الموظف',
+      defaultPath: fileName,
+      filters: [{ name: pathModule.extname(fileName).toLowerCase() === '.pdf' ? 'PDF' : 'صورة', extensions: [pathModule.extname(fileName).slice(1).toLowerCase()] }],
+    });
+    if (selection.canceled || !selection.filePath) return { ok: false, canceled: true };
+    try {
+      await ensureVault();
+      const plaintext = await decryptDocument(await fs.readFile(target));
+      if (plaintext.length > MAX_ATTACHMENT_BYTES) return { ok: false, error: 'حجم الملف يتجاوز الحد المسموح.' };
+      await fs.writeFile(selection.filePath, plaintext, { mode: 0o600 });
+      return { ok: true };
+    } catch (error) {
+      console.error('Document download failed:', error);
       return { ok: false, error: String(error?.message || error) };
     }
   });

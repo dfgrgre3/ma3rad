@@ -2,11 +2,11 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { ProductService } from '../src/services/products/ProductService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
-import { FinancialStatementsService } from '../src/services/reports/FinancialStatementsService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { ProductService } from '../src/services/domains/products/ProductService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { FinancialStatementsService } from '../src/services/domains/reports/FinancialStatementsService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {

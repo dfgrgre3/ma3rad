@@ -1,8 +1,8 @@
 import React from 'react';
 import { LockKeyhole } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import FinancialEventsCalendar from './FinancialEventsCalendar';
 
 export const FinancialCalendarPage: React.FC = () => {

@@ -48,8 +48,12 @@ test('document vault imports into its own directory, hashes the file and rejects
   const appDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-docs-'));
   const sourceDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ceramisys-src-'));
   const sourceFile = path.join(sourceDir, 'contract.pdf');
+  const employeeImage = path.join(sourceDir, 'identity.png');
+  const downloadedFile = path.join(sourceDir, 'identity-downloaded.png');
   const bytes = Buffer.from('contract contents');
+  const imageBytes = blankPng();
   await fs.writeFile(sourceFile, bytes);
+  await fs.writeFile(employeeImage, imageBytes);
 
   const handlers = new Map();
   const ipcMain = { handle: (name, handler) => handlers.set(name, handler) };
@@ -72,7 +76,10 @@ test('document vault imports into its own directory, hashes the file and rejects
     fs,
     fsSync,
     shell: { openPath: async (target) => { opened.push(target); return ''; } },
-    dialog: { showOpenDialog: async () => dialogResponse },
+    dialog: {
+      showOpenDialog: async () => dialogResponse,
+      showSaveDialog: async () => ({ canceled: false, filePath: downloadedFile }),
+    },
     app,
     safeStorage,
     appDataDir,
@@ -93,6 +100,34 @@ test('document vault imports into its own directory, hashes the file and rejects
     const storedBytes = await fs.readFile(storedPath);
     assert.notDeepEqual(storedBytes, bytes);
     assert.equal(storedBytes.subarray(0, 17).toString(), 'CERAMISYS-DOC\0v1\0');
+
+    dialogResponse = { canceled: false, filePaths: [employeeImage] };
+    const employeeImport = await handlers.get('documents:import')(event, { purpose: 'employee' });
+    assert.equal(employeeImport.ok, true);
+    assert.match(employeeImport.storageName, /^hrdoc_[a-f0-9]{32}\.png$/);
+    assert.equal(employeeImport.mimeType, 'image/png');
+    assert.equal(employeeImport.fileSize, imageBytes.length);
+    const employeeStoredPath = path.join(appDataDir, 'documents', employeeImport.storageName);
+    assert.equal((await fs.readFile(employeeStoredPath)).subarray(0, 17).toString(), 'CERAMISYS-DOC\0v1\0');
+    assert.equal((await handlers.get('documents:employee-import-commit')(event, employeeImport.storageName)).ok, true);
+    const readEmployeeFile = await handlers.get('documents:read')(event, employeeImport.storageName);
+    assert.equal(readEmployeeFile.ok, true);
+    assert.deepEqual(Buffer.from(readEmployeeFile.bytes), imageBytes);
+    assert.equal((await handlers.get('documents:open')(event, employeeImport.storageName)).ok, false);
+    assert.equal((await handlers.get('documents:read')(event, imported.storageName)).ok, false);
+    const downloadEmployeeFile = await handlers.get('documents:download')(event, employeeImport.storageName, 'identity.png');
+    assert.equal(downloadEmployeeFile.ok, true);
+    assert.deepEqual(await fs.readFile(downloadedFile), imageBytes);
+
+    const stagedImport = await handlers.get('documents:import')(event, { purpose: 'employee' });
+    assert.equal(stagedImport.ok, true);
+    assert.equal((await handlers.get('documents:employee-import-discard')(event, stagedImport.storageName)).ok, true);
+    assert.equal(fsSync.existsSync(path.join(appDataDir, 'documents', stagedImport.storageName)), false);
+
+    dialogResponse = { canceled: false, filePaths: [sourceFile] };
+    const rejectedEmployeeImport = await handlers.get('documents:import')(event, { purpose: 'employee' });
+    assert.equal(rejectedEmployeeImport.ok, false);
+    assert.match(rejectedEmployeeImport.error, /لا يطابق نوع/);
 
     const openedResult = await handlers.get('documents:open')(event, imported.storageName);
     assert.equal(openedResult.ok, true);
@@ -126,7 +161,7 @@ test('document vault imports into its own directory, hashes the file and rejects
     const finishedOcr = await handlers.get('documents:ocr-finish')(event);
     assert.equal(finishedOcr.ok, true);
 
-    assert.ok(senderChecks >= 8, 'every IPC handler validates the sender');
+    assert.ok(senderChecks >= 14, 'every IPC handler validates the sender');
   } finally {
     await fs.rm(appDataDir, { recursive: true, force: true });
     await fs.rm(sourceDir, { recursive: true, force: true });

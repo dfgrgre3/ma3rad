@@ -5,10 +5,10 @@ import {
   DollarSign, TrendingUp, UserRound,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/operations/OperationsService';
+import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 const db = DatabaseManager.getInstance();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);

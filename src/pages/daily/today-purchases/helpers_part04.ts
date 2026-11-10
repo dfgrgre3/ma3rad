@@ -1,4 +1,4 @@
-import type { DailyPurchaseItemRow, DailyPurchaseRow, DailySupplierPaymentRow } from '../../../services/operations/DailyOperationsService';
+import type { DailyPurchaseItemRow, DailyPurchaseRow, DailySupplierPaymentRow } from '../../../services/domains/operations/DailyOperationsService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import type { PurchaseFilters, SupplierStat } from '../../../types/dashboard/todayPurchases';
 

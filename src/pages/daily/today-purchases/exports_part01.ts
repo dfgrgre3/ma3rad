@@ -1,5 +1,5 @@
 import { exportToExcel } from '../../../utils/export/export';
-import type { DailyPurchaseItemRow, DailyPurchaseResult, DailyPurchaseRow, DailySupplierPaymentRow } from '../../../services/operations/DailyOperationsService';
+import type { DailyPurchaseItemRow, DailyPurchaseResult, DailyPurchaseRow, DailySupplierPaymentRow } from '../../../services/domains/operations/DailyOperationsService';
 import type { useToast } from '../../../components/ui/Toast';
 import { PAY_LABEL } from './constants';
 import { formatDay, timeOf } from './helpers';

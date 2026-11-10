@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck, Plus, Trash2, Pencil, Save, Search, Lock, ListChecks, Eraser, ChevronDown, ChevronLeft, Layers } from 'lucide-react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import type { Role } from '../../../types';
 

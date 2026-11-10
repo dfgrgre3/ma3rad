@@ -4,13 +4,13 @@ import {
   CheckCircle2, XCircle, Truck, Sparkles, AlertTriangle, ShieldCheck,
   ArrowRight, ArrowUpRight, Layers, FileSpreadsheet
 } from 'lucide-react';
-import { PurchaseRequestService, PurchaseRequest, PurchaseRequestStatus, RequestPriority } from '../../../services/purchases/PurchaseRequestService';
-import { ProcurementService, ReorderSuggestion } from '../../../services/procurement/ProcurementService';
-import { ProductService } from '../../../services/products/ProductService';
+import { PurchaseRequestService, PurchaseRequest, PurchaseRequestStatus, RequestPriority } from '../../../services/domains/purchases/PurchaseRequestService';
+import { ProcurementService, ReorderSuggestion } from '../../../services/domains/procurement/ProcurementService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
-import { OperationsService } from '../../../services/operations/OperationsService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { OperationsService } from '../../../services/domains/operations/OperationsService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../../../types';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';

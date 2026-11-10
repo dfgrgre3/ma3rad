@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckSquare, Search, Check, X, Clock, Loader2, Plus, Filter } from 'lucide-react';
-import { ApprovalService, ApprovalRequest, ApprovalType } from '../../../services/approvals/ApprovalService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { ApprovalService, ApprovalRequest, ApprovalType } from '../../../services/domains/approvals/ApprovalService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 const TYPE_CONFIG: Record<ApprovalType, { label: string; color: string }> = {
   DISCOUNT: { label: 'خصم استثنائي', color: 'text-amber-700 bg-amber-50 border-amber-200' },

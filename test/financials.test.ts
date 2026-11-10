@@ -13,7 +13,7 @@ import {
   calculateDiscountedReturnAmount,
   inclusiveReturnTaxSql,
   returnTaxSql,
-} from '../src/services/finance/financials.ts';
+} from '../src/services/domains/finance/financials.ts';
 
 test('round2 eliminates IEEE-754 drift (brief §224)', () => {
   assert.equal(round2(0.1 + 0.2), 0.3);

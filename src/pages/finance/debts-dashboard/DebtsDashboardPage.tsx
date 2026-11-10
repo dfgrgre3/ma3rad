@@ -13,18 +13,18 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { DatabaseManager } from "../../../database/repositories/databaseManager";
-import { DebtService, DebtRow } from "../../../services/finance/DebtService";
-import { CustomerService } from "../../../services/customers/CustomerService";
-import { SupplierService } from "../../../services/suppliers/SupplierService";
-import { CashierService } from "../../../services/finance/CashierService";
-import { AuthService } from "../../../services/auth/AuthService";
+import { DebtService, DebtRow } from "../../../services/domains/finance/DebtService";
+import { CustomerService } from "../../../services/domains/customers/CustomerService";
+import { SupplierService } from "../../../services/domains/suppliers/SupplierService";
+import { CashierService } from "../../../services/domains/finance/CashierService";
+import { AuthService } from "../../../services/domains/auth/AuthService";
 import { localDateString } from "../../../utils/shared/date";
-import { PermissionService } from "../../../services/auth/PermissionService";
-import { SalesService } from "../../../services/sales/SalesService";
+import { PermissionService } from "../../../services/domains/auth/PermissionService";
+import { SalesService } from "../../../services/domains/sales/SalesService";
 import { useNavigate } from "react-router-dom";
 import { exportToExcel, exportToPdf } from "../../../utils/export/export";
 import { v4 as uuidv4 } from "uuid";
-import { BranchAccessService } from "../../../services/auth/BranchAccessService";
+import { BranchAccessService } from "../../../services/domains/auth/BranchAccessService";
 
 const TYPE_LABELS: Record<DebtRow["type"], { label: string; color: string }> = {
   CUSTOMER_RECEIVABLE: {

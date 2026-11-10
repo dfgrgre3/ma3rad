@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Megaphone, Plus, Loader2, X, Trash2, Search, Users, CalendarDays, Wallet } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
 import { v4 as uuidv4 } from 'uuid';
 
 type CampaignStatus = 'PLANNED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';

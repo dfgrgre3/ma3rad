@@ -1,6 +1,6 @@
 import React from 'react';
 import { Receipt, DollarSign, ArrowUpRight } from 'lucide-react';
-import type { Order } from '../../../services/sales/OrderService';
+import type { Order } from '../../../services/domains/sales/OrderService';
 import { fmtCurrency } from './helpers';
 import { orderStatusBadges, orderStatusLabels } from './constants';
 

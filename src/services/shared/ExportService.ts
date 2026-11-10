@@ -1,5 +1,5 @@
-import { AuthService } from '../auth/AuthService';
-import { PermissionService } from '../auth/PermissionService';
+import { AuthService } from '../domains/auth/AuthService';
+import { PermissionService } from '../domains/auth/PermissionService';
 import type { User } from '../../types';
 
 /**

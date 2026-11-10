@@ -6,12 +6,12 @@ import {
   Loader2, RefreshCw, Wallet, TrendingUp, Banknote, CheckCircle2, AlertTriangle,
   ShoppingCart, CalendarDays, Percent, Users, Warehouse, FileBarChart, XCircle, Info,
 } from 'lucide-react';
-import { SalesService, InvoiceFilters, InvoiceStats } from '../../services/sales/SalesService';
-import { CustomerService } from '../../services/customers/CustomerService';
-import { InventoryService } from '../../services/inventory/InventoryService';
+import { SalesService, InvoiceFilters, InvoiceStats } from '../../services/domains/sales/SalesService';
+import { CustomerService } from '../../services/domains/customers/CustomerService';
+import { InventoryService } from '../../services/domains/inventory/InventoryService';
 import { PrintService } from '../../services/shared/PrintService';
-import { AuthService } from '../../services/auth/AuthService';
-import { PermissionService } from '../../services/auth/PermissionService';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { SalesInvoice, SalesInvoiceItem, CustomerPayment, PaymentType, Customer, Warehouse as WarehouseType } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
@@ -21,8 +21,8 @@ import { SalesModals } from './SalesModals';
 import { StatCard, IconButton, Modal, InfoBox, SummaryRow } from './SalesUi';
 import { localDateString } from '../../utils/shared/date';
 import { openWhatsAppChat } from '../../utils/shared/externalLinks';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/config/useBusinessTerm';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
 
 type InvoiceRow = SalesInvoice & { itemsCount?: number; returnedAmount?: number };

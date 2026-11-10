@@ -4,10 +4,10 @@ import {
   User, CreditCard, DollarSign, Clock, Check, Printer, FileText, ArrowUpRight
 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { InstallmentService } from '../../../services/finance/InstallmentService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { CustomerService } from '../../../services/customers/CustomerService';
+import { InstallmentService } from '../../../services/domains/finance/InstallmentService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
 import { Customer } from '../../../types';
 import { localDateString } from '../../../utils/shared/date';
 

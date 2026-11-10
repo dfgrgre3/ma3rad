@@ -4,15 +4,15 @@ import {
   Users, Plus, Search, DollarSign, FileText, 
   Printer, ArrowUpRight, ArrowDownRight, Phone, MapPin, Trash2
 } from 'lucide-react';
-import { CustomerService } from '../../services/customers/CustomerService';
-import { AuthService } from '../../services/auth/AuthService';
+import { CustomerService } from '../../services/domains/customers/CustomerService';
+import { AuthService } from '../../services/domains/auth/AuthService';
 import { Customer } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/config/useBusinessTerm';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
-import { usePermission } from '../../hooks/auth/usePermission';
+import { usePermission } from '../../hooks/domains/auth/usePermission';
 import { ConfiguredActionButton } from '../config/ConfiguredActionButton';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
 const CustomerPagination: React.FC<{ page: number; totalPages: number; totalItems: number; pageSize: number; onPageChange: (page: number) => void; onPageSizeChange: (size: number) => void }> = ({ page, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange }) => (

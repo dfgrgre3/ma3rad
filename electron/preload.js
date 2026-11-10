@@ -81,8 +81,12 @@ contextBridge.exposeInMainWorld('ceramisys', {
     rawCups: (bytes, printerName) => ipcRenderer.invoke('print:rawCups', { bytes: Array.from(bytes || []), printerName }),
   },
   documents: {
-    importFile: () => ipcRenderer.invoke('documents:import'),
+    importFile: (options) => ipcRenderer.invoke('documents:import', options),
     openFile: (storageName) => ipcRenderer.invoke('documents:open', storageName),
+    readFile: (storageName) => ipcRenderer.invoke('documents:read', storageName),
+    downloadFile: (storageName, fileName) => ipcRenderer.invoke('documents:download', storageName, fileName),
+    commitEmployeeImport: (storageName) => ipcRenderer.invoke('documents:employee-import-commit', storageName),
+    discardEmployeeImport: (storageName) => ipcRenderer.invoke('documents:employee-import-discard', storageName),
     recognizePage: (imageData) => ipcRenderer.invoke('documents:ocr-page', imageData),
     finishOcr: () => ipcRenderer.invoke('documents:ocr-finish'),
     info: () => ipcRenderer.invoke('documents:info'),

@@ -3,7 +3,7 @@ import {
   ArrowDownLeft, ArrowUpRight, Banknote, BarChart3, Building2, ClipboardList, Download,
   History, Pencil, Plus, Printer, RefreshCw, RotateCcw, Search, TrendingUp, Users, Wallet,
 } from 'lucide-react';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
@@ -25,7 +25,7 @@ import {
   type PartnerTransactionAction,
   type PartnerTransactionType,
   type ProfitAllocation,
-} from '../../../services/customers/PartnerService';
+} from '../../../services/domains/customers/PartnerService';
 
 const formatNumber = new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 });
 const formatMoney = (value: number) => `${formatNumber.format(value || 0)} ج.م`;

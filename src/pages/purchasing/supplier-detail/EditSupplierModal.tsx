@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pencil } from 'lucide-react';
 import { EditSupplierFormData } from '../../../types/purchasing/supplierDetailPage';
-import type { OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 
 export interface EditSupplierModalProps {

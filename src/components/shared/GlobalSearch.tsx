@@ -2,9 +2,9 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Command, Search, ArrowDown, ArrowUp, Clock3, CornerDownLeft, Star, X, Package, Users, Receipt, LayoutDashboard, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { DatabaseManager } from '../../database/repositories/databaseManager';
-import { useSharedNavigationGroups } from '../../hooks/config/useNavigationGroups';
-import { PermissionService } from '../../services/auth/PermissionService';
-import { useBusinessTerm } from '../../hooks/config/useBusinessTerm';
+import { useSharedNavigationGroups } from '../../hooks/domains/config/useNavigationGroups';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
+import { useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { getNavigationShortcuts, toggleNavigationFavorite, type NavigationShortcuts } from '../../router/navigationShortcuts';
 import type { User } from '../../types';
 

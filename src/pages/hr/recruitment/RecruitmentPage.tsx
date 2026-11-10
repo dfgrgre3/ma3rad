@@ -4,8 +4,8 @@ import {
   Search, UserRound, UserRoundCheck, Users, X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { RecruitmentService } from '../../../services/hr/RecruitmentService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { RecruitmentService } from '../../../services/domains/hr/RecruitmentService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { localDateString } from '../../../utils/shared/date';
 import type {

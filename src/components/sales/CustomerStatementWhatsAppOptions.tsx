@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, FileText, MessageCircle, PackageCheck, Wallet, X } from 'lucide-react';
-import type { CustomerService } from '../../services/customers/CustomerService';
-import { CustomerSupplyService, type CustomerSupplyRequest } from '../../services/customers/CustomerSupplyService';
-import { SalesService } from '../../services/sales/SalesService';
+import type { CustomerService } from '../../services/domains/customers/CustomerService';
+import { CustomerSupplyService, type CustomerSupplyRequest } from '../../services/domains/customers/CustomerSupplyService';
+import { SalesService } from '../../services/domains/sales/SalesService';
 import type { SalesInvoice, SalesInvoiceItem } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';

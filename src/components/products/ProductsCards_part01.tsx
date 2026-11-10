@@ -1,5 +1,5 @@
 import type { Product } from '../../types';
-import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 
 export interface ProductsCardsProps {
   products: Product[];

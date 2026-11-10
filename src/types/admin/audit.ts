@@ -1,4 +1,4 @@
-import type { AuditLogEntry, AuditStats } from '../../services/security/AuditService';
+import type { AuditLogEntry, AuditStats } from '../../services/domains/security/AuditService';
 
 export interface AuditFilterState {
   selectedModule: string;

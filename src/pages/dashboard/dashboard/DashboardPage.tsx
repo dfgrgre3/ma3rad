@@ -10,10 +10,10 @@ import { OverviewSection } from '../../../components/dashboard/OverviewSection';
 import { QuickActions } from '../../../components/dashboard/QuickActions';
 import { SectionCard } from '../../../components/dashboard/SectionCard';
 import { SECTIONS_CONFIG, type SectionId } from '../../../types/dashboard/components';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { ModuleRegistryService } from '../../../services/config/ModuleRegistryService';
-import { CentralFeaturePermissionService } from '../../../services/licensing/CentralFeaturePermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
+import { CentralFeaturePermissionService } from '../../../services/domains/licensing/CentralFeaturePermissionService';
 
 // Lazy loaded integrated dashboards
 const ExecutiveDashboard = lazy(() => import('../executive/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));

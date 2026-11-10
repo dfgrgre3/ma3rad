@@ -12,22 +12,24 @@ export interface EmployeeFinancials {
 export const getEmployeeFinancials = (
   employees: Employee[],
   transactions: FinancialTransaction[],
-  empId: string
+  empId: string,
+  period: string
 ): EmployeeFinancials => {
   const emp = employees.find(e => e.id === empId);
   if (!emp) return { base: 0, advances: 0, bonuses: 0, deductions: 0, payouts: 0, netDue: 0 };
 
-  const empTxs = transactions.filter(t => t.employeeId === empId);
+  const empTxs = transactions.filter(t => t.employeeId === empId && t.date.slice(0, 7) === period);
   const advances = empTxs.filter(t => t.type === 'ADVANCE').reduce((sum, t) => sum + t.amount, 0);
   const bonuses = empTxs.filter(t => t.type === 'BONUS').reduce((sum, t) => sum + t.amount, 0);
   const deductions = empTxs.filter(t => t.type === 'DEDUCTION').reduce((sum, t) => sum + t.amount, 0);
   const payouts = empTxs.filter(t => t.type === 'SALARY_PAYOUT').reduce((sum, t) => sum + t.amount, 0);
 
   // netDue calculation: baseSalary + bonuses - (deductions + advances + payouts)
-  const netDue = emp.baseSalary + bonuses - (deductions + advances + payouts);
+  const base = emp.salaryType === 'DAILY' ? emp.baseSalary * 26 : emp.baseSalary;
+  const netDue = base + bonuses - (deductions + advances + payouts);
 
   return {
-    base: emp.baseSalary,
+    base,
     advances,
     bonuses,
     deductions,

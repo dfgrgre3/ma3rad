@@ -1,6 +1,6 @@
 import React from 'react';
 import { Wallet } from 'lucide-react';
-import type { DailySupplierPaymentRow } from '../../../services/operations/DailyOperationsService';
+import type { DailySupplierPaymentRow } from '../../../services/domains/operations/DailyOperationsService';
 import { METHOD_STYLE, PAY_LABEL } from './constants';
 import { MiniStat } from './primitives';
 import type { NumberFormatter } from '../../../types/dashboard/todayPurchases';

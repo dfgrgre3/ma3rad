@@ -2,12 +2,12 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
-import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { ProductService } from '../src/services/products/ProductService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { ProductService } from '../src/services/domains/products/ProductService.ts';
 import { getDefaultBusinessConfiguration } from '../src/config/businessProfiles.ts';
 import { getProductUnitLabel, getStockQuantityLabel } from '../src/utils/products/productUnits.ts';
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EffectEngine, EffectRegistry } from '../src/services/effects';
+import { EffectEngine, EffectRegistry } from '../src/services/domains/effects';
 
 test('EffectEngine runs handlers in declaration order', () => {
   const registry = new EffectRegistry();

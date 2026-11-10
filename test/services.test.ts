@@ -2,27 +2,30 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
-import { PricingService } from '../src/services/sales/PricingService.ts';
-import { FinancialStatementsService } from '../src/services/reports/FinancialStatementsService.ts';
-import { CommissionService } from '../src/services/hr/CommissionService.ts';
-import { ReservationService } from '../src/services/sales/ReservationService.ts';
-import { ApprovalService } from '../src/services/approvals/ApprovalService.ts';
-import { DailyOperationsService } from '../src/services/operations/DailyOperationsService.ts';
-import { AccountingService } from '../src/services/finance/AccountingService.ts';
-import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { PricingService } from '../src/services/domains/sales/PricingService.ts';
+import { FinancialStatementsService } from '../src/services/domains/reports/FinancialStatementsService.ts';
+import { CommissionService } from '../src/services/domains/hr/CommissionService.ts';
+import { LeaveService } from '../src/services/domains/hr/LeaveService.ts';
+import { ReservationService } from '../src/services/domains/sales/ReservationService.ts';
+import { ApprovalService } from '../src/services/domains/approvals/ApprovalService.ts';
+import { DailyOperationsService } from '../src/services/domains/operations/DailyOperationsService.ts';
+import { AccountingService } from '../src/services/domains/finance/AccountingService.ts';
+import { SupplierService } from '../src/services/domains/suppliers/SupplierService.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
-import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
-import { InventoryCostingService } from '../src/services/inventory/InventoryCostingService.ts';
-import { FinanceExtrasService } from '../src/services/finance/FinanceExtrasService.ts';
-import { CustomerSupplyService } from '../src/services/customers/CustomerSupplyService.ts';
-import { SettingsService } from '../src/services/config/SettingsService.ts';
-import { CashierService } from '../src/services/finance/CashierService.ts';
-import { BackupService } from '../src/services/backup/BackupService.ts';
+import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
+import { AttendanceService } from '../src/services/domains/hr/AttendanceService.ts';
+import { InventoryCostingService } from '../src/services/domains/inventory/InventoryCostingService.ts';
+import { FinanceExtrasService } from '../src/services/domains/finance/FinanceExtrasService.ts';
+import { CustomerSupplyService } from '../src/services/domains/customers/CustomerSupplyService.ts';
+import { SettingsService } from '../src/services/domains/config/SettingsService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
+import { BackupService } from '../src/services/infrastructure/backup/BackupService.ts';
+import { MIGRATION_PART_28 } from '../src/database/migrations/part28.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -30,6 +33,59 @@ function q(sql: string, params: any[] = []): any[] {
 
 test('business date uses the local calendar day', () => {
   assert.equal(localDateString(new Date(2026, 9, 24, 0, 0, 0)), '2026-10-24');
+});
+
+test('attendance migration consolidates legacy punches and status records without losing either', async () => {
+  const SQL = await (globalThis as any).initSqlJs();
+  const database = new SQL.Database();
+  database.exec(`
+    CREATE TABLE employees (id TEXT PRIMARY KEY);
+    CREATE TABLE users (id TEXT PRIMARY KEY);
+    CREATE TABLE branches (id TEXT PRIMARY KEY);
+    CREATE TABLE attendance (
+      id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, date TEXT NOT NULL, status TEXT NOT NULL,
+      notes TEXT, recorded_by TEXT, created_at TEXT, late_minutes INTEGER DEFAULT 0,
+      overtime_minutes INTEGER DEFAULT 0, UNIQUE(employee_id, date)
+    );
+    CREATE TABLE employee_attendance (
+      id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, date TEXT NOT NULL, check_in TEXT,
+      check_out TEXT, worked_minutes INTEGER DEFAULT 0, late_minutes INTEGER DEFAULT 0,
+      overtime_minutes INTEGER DEFAULT 0, status TEXT, notes TEXT, recorded_by TEXT,
+      created_at TEXT, UNIQUE(employee_id, date)
+    );
+    CREATE INDEX idx_attendance_date ON attendance(date);
+    CREATE INDEX idx_attendance_employee ON attendance(employee_id);
+    CREATE INDEX idx_attendance_emp_date ON employee_attendance(employee_id, date);
+    INSERT INTO employees VALUES ('legacy_employee');
+    INSERT INTO users VALUES ('legacy_user');
+    INSERT INTO branches VALUES ('legacy_branch');
+    INSERT INTO attendance
+      (id, employee_id, date, status, recorded_by, created_at)
+      VALUES ('simple', 'legacy_employee', '2026-01-05', 'PRESENT', 'legacy_user', '2026-01-05');
+    INSERT INTO employee_attendance
+      (id, employee_id, date, check_in, check_out, worked_minutes, late_minutes,
+       overtime_minutes, status, recorded_by, created_at)
+      VALUES ('rich_duplicate', 'legacy_employee', '2026-01-05', '09:00:00', '18:00:00',
+        480, 12, 30, 'LATE', 'legacy_user', '2026-01-05'),
+        ('weekend', 'legacy_employee', '2026-01-04', '09:00', NULL, 0, 0, 0,
+        'WEEKEND', 'legacy_user', '2026-01-04');
+  `);
+
+  MIGRATION_PART_28[0].up(database);
+  const rows = database.exec(
+    `SELECT date, status, check_in_at, check_out_at, worked_minutes, late_minutes,
+            overtime_minutes, overtime_approved FROM attendance ORDER BY date`
+  )[0].values;
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1][2], '2026-01-05T09:00:00');
+  assert.equal(rows[1][3], '2026-01-05T18:00:00');
+  assert.equal(rows[1][4], 480);
+  assert.equal(rows[1][5], 12);
+  assert.equal(rows[1][6], 30);
+  assert.equal(rows[1][7], 1, 'legacy extra minutes remain payroll-approved for compatibility');
+  assert.equal(rows[0][1], 'WEEKEND');
+  assert.equal(database.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='employee_attendance'`).length, 0);
+  database.close();
 });
 
 test('dashboard sales and gross profit reconcile invoice returns and same-period growth', async () => {
@@ -715,6 +771,7 @@ test('monthly payroll accrual is idempotent and settles advances before salary p
   await manager.initialize();
   await PermissionService.seed();
   AuthService.login('admin', 'admin123');
+  const period = localDateString().slice(0, 7);
   const employee = EmployeeService.create({
     name: 'موظف اختبار الرواتب',
     location: 'اختبار',
@@ -724,9 +781,8 @@ test('monthly payroll accrual is idempotent and settles advances before salary p
     baseSalary: 6000,
     salaryType: 'MONTHLY',
     status: 'ACTIVE',
-    joinedDate: localDateString(),
+    joinedDate: `${period}-01`,
   });
-  const period = localDateString().slice(0, 7);
   const date = localDateString();
 
   assert.deepEqual(EmployeeService.accrueMonthlyPayroll(period), { created: 1, skipped: 0 });
@@ -750,6 +806,266 @@ test('monthly payroll accrual is idempotent and settles advances before salary p
   `, [`${employee.id}:${period}`, employee.id])[0]?.amount;
   assert.equal(Number(balance), 0);
   assert.equal(EmployeeService.getPayrollPayables().find((row) => row.employeeId === employee.id)?.balance ?? 0, 0);
+});
+
+test('payroll run snapshots period attendance, contract pay and policy deductions through close', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const employee = EmployeeService.create({
+    name: 'موظف دورة رواتب',
+    location: 'اختبار',
+    role: 'محاسب',
+    phone: '0109191919',
+    email: '',
+    baseSalary: 2500,
+    salaryType: 'MONTHLY',
+    status: 'ACTIVE',
+    joinedDate: '2020-06-15',
+  });
+
+  const companyId = q('SELECT company_id AS companyId FROM branches WHERE id=?', [employee.branchId])[0].companyId;
+  const previousSettings = q(
+    'SELECT payroll_tax_rate AS taxRate, overtime_multiplier AS overtimeMultiplier, working_days_per_month AS workingDays FROM companies WHERE id=?',
+    [companyId]
+  )[0];
+
+  try {
+    manager.run(
+      'UPDATE companies SET payroll_tax_rate=10, overtime_multiplier=2, working_days_per_month=26 WHERE id=?',
+      [companyId]
+    );
+    manager.run(
+      `INSERT INTO employee_contracts
+         (id, employee_id, branch_id, contract_number, contract_type, start_date, job_title,
+          salary, status, created_by)
+       VALUES (?, ?, ?, ?, 'PERMANENT', ?, ?, ?, 'ACTIVE', ?)`,
+      ['contract_payroll_run_test', employee.id, employee.branchId, 'CTR_PAYROLL_RUN_TEST', '2020-06-15', employee.role, 3000, 'usr_admin']
+    );
+    manager.run(
+      `INSERT INTO attendance
+       (id, employee_id, date, status, late_minutes, overtime_minutes, overtime_approved, source)
+       VALUES (?, ?, ?, 'ABSENT', 0, 0, 0, 'TEST'),
+              (?, ?, ?, 'LATE', 60, 120, 1, 'TEST')`,
+      ['att_payroll_absent_test', employee.id, '2020-06-17', 'att_payroll_late_test', employee.id, '2020-06-18']
+    );
+    manager.run(
+      `INSERT INTO employee_leave_requests
+         (id, employee_id, branch_id, leave_type, start_date, end_date, days, status, requested_by)
+       VALUES (?, ?, ?, 'UNPAID', ?, ?, 3, 'APPROVED', ?)`,
+      ['leave_payroll_run_test', employee.id, employee.branchId, '2020-06-19', '2020-06-21', 'usr_admin']
+    );
+    EmployeeService.addTransaction({
+      employeeId: employee.id, type: 'BONUS', amount: 100, date: '2020-06-22', notes: 'مكافأة اختبار',
+    });
+    EmployeeService.addTransaction({
+      employeeId: employee.id, type: 'DEDUCTION', amount: 20, date: '2020-06-22', notes: 'خصم اختبار',
+    });
+    manager.run(
+      `INSERT INTO commissions
+         (id, employee_id, branch_id, source_type, period_month, commission_amount, status, created_by)
+       VALUES (?, ?, ?, 'MANUAL', ?, 250, 'PENDING', ?)`,
+      ['commission_payroll_run_test', employee.id, employee.branchId, '2020-06', 'usr_admin']
+    );
+    new CommissionService().setStatus('commission_payroll_run_test', 'APPROVED');
+
+    const draft = EmployeeService.calculatePayrollRun('2020-06');
+    const item = draft.items.find((row) => row.employeeId === employee.id);
+    assert.ok(item);
+    assert.equal(item.baseSalary, 3000);
+    assert.equal(item.absentDays, 1);
+    assert.equal(item.unpaidLeaveDays, 3, 'without a shift, unpaid leave uses calendar days rather than an assumed workweek');
+    assert.equal(item.lateMinutes, 60);
+    assert.equal(item.overtimeMinutes, 120);
+    assert.equal(item.bonusAmount, 100);
+    assert.equal(item.commissionAmount, 250);
+    assert.equal(item.manualDeductionAmount, 20);
+    assert.equal(item.details.taxRate, 10);
+    assert.equal(item.details.overtimeMultiplier, 2);
+    assert.equal(item.baseAmount, 1600);
+    assert.ok(item.netAmount > 0);
+    assert.equal(draft.status, 'DRAFT');
+
+    EmployeeService.addTransaction({
+      employeeId: employee.id, type: 'BONUS', amount: 1, date: '2020-06-22', notes: 'حركة بعد الاحتساب',
+    });
+    assert.throws(() => EmployeeService.approvePayrollRun(draft.id), /تغيرت بيانات الرواتب/);
+    const refreshedDraft = EmployeeService.calculatePayrollRun('2020-06');
+    assert.equal(refreshedDraft.id, draft.id);
+    assert.equal(refreshedDraft.items.find((row) => row.employeeId === employee.id)?.bonusAmount, 101);
+    const approved = EmployeeService.approvePayrollRun(refreshedDraft.id);
+    assert.equal(approved.status, 'APPROVED');
+    assert.throws(
+      () => new CommissionService().setStatus('commission_payroll_run_test', 'CANCELLED'),
+      /دورة رواتب معتمدة/
+    );
+    assert.throws(
+      () => new LeaveService().cancel('leave_payroll_run_test'),
+      /فترة رواتب معتمدة/
+    );
+    const paid = EmployeeService.payPayrollRun(draft.id);
+    assert.equal(paid.status, 'PAID');
+    assert.ok(paid.items.find((row) => row.employeeId === employee.id)?.payoutTransactionId);
+    assert.equal(q('SELECT status FROM commissions WHERE id=?', ['commission_payroll_run_test'])[0].status, 'PAID');
+    assert.equal(EmployeeService.getPayrollPayables().find((row) => row.employeeId === employee.id)?.balance ?? 0, 0);
+
+    const closed = EmployeeService.closePayrollRun(draft.id);
+    assert.equal(closed.status, 'CLOSED');
+    assert.throws(() => EmployeeService.addTransaction({
+      employeeId: employee.id, type: 'BONUS', amount: 1, date: '2020-06-23', notes: 'بعد الإغلاق',
+    }), /دورة رواتب معتمدة/);
+    assert.throws(() => EmployeeService.upsertAttendance({
+      employeeId: employee.id, date: '2020-06-23', status: 'PRESENT',
+    }), /دورة رواتب معتمدة/);
+  } finally {
+    manager.run(
+      'UPDATE companies SET payroll_tax_rate=?, overtime_multiplier=?, working_days_per_month=? WHERE id=?',
+      [previousSettings.taxRate, previousSettings.overtimeMultiplier, previousSettings.workingDays, companyId]
+    );
+  }
+});
+
+test('time attendance uses assigned shifts, approves corrections and gates overtime payroll', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const employee = EmployeeService.create({
+    name: 'موظف اختبار البصمة',
+    location: 'اختبار',
+    role: 'موظف',
+    phone: '0109191918',
+    email: '',
+    baseSalary: 3000,
+    salaryType: 'MONTHLY',
+    status: 'ACTIVE',
+    joinedDate: localDateString(),
+  });
+  const date = localDateString();
+  const shift = AttendanceService.saveShift({
+    name: `وردية اختبار ${employee.id}`,
+    startTime: '09:00',
+    endTime: '17:00',
+    breakMinutes: 30,
+    graceMinutes: 5,
+    overtimeAfterMinutes: 15,
+    workdays: [0, 1, 2, 3, 4, 5, 6],
+  });
+  AttendanceService.assignShift(employee.id, shift.id, date);
+  const monthEnd = new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0).getDate();
+  const holidayDate = `${date.slice(0, 7)}-${String(monthEnd).padStart(2, '0')}`;
+  AttendanceService.addHoliday(holidayDate, 'عطلة اختبار');
+
+  const created = AttendanceService.saveManualRecord({
+    employeeId: employee.id,
+    date,
+    status: 'PRESENT',
+    checkInAt: `${date}T09:05:00`,
+    checkOutAt: `${date}T18:30:00`,
+  });
+  assert.equal(created.pendingApproval, false);
+  let attendance = AttendanceService.getAttendanceByDate(date).find((row) => row.employeeId === employee.id)!;
+  assert.equal(attendance.lateMinutes, 0, 'grace time should suppress lateness');
+  assert.equal(attendance.overtimeMinutes, 75, 'overtime excludes the configured 15-minute threshold');
+  assert.equal(attendance.overtimeApproved, false);
+
+  const correction = AttendanceService.saveManualRecord({
+    employeeId: employee.id,
+    date,
+    status: 'PRESENT',
+    checkInAt: `${date}T08:40:00`,
+    checkOutAt: `${date}T19:00:00`,
+    notes: 'تصحيح معتمد',
+  });
+  assert.equal(correction.pendingApproval, true);
+  assert.equal(AttendanceService.getAttendanceByDate(date).find((row) => row.employeeId === employee.id)?.checkOutAt, `${date}T18:30:00`);
+  const request = AttendanceService.getCorrectionRequests().find((row) => row.employeeId === employee.id)!;
+  AttendanceService.decideCorrection(request.id, true);
+  attendance = AttendanceService.getAttendanceByDate(date).find((row) => row.employeeId === employee.id)!;
+  assert.equal(attendance.checkOutAt, `${date}T19:00:00`);
+  assert.equal(attendance.overtimeMinutes, 105);
+  const decidedCorrection = AttendanceService.getCorrectionHistory(date.slice(0, 7))
+    .find((row) => row.id === request.id);
+  assert.equal(decidedCorrection?.status, 'APPROVED');
+  assert.ok(decidedCorrection?.beforeJson);
+  assert.ok(decidedCorrection?.decidedByName);
+  assert.ok(AttendanceService.getAuditHistory(date.slice(0, 7))
+    .some((row) => row.employeeName === employee.name && row.action === 'CORRECTION_APPROVED'));
+  assert.equal(AttendanceService.getHolidays(date.slice(0, 7)).some((row) => row.date === holidayDate), true);
+
+  let run = EmployeeService.calculatePayrollRun(date.slice(0, 7));
+  assert.equal(run.items.find((row) => row.employeeId === employee.id)?.overtimeMinutes, 0);
+  AttendanceService.approveOvertime(attendance.id);
+  run = EmployeeService.calculatePayrollRun(date.slice(0, 7));
+  assert.equal(run.items.find((row) => row.employeeId === employee.id)?.overtimeMinutes, 105);
+  assert.equal(
+    db.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM attendance_audit_log
+       WHERE employee_id = ? AND action IN ('MANUAL_ENTRY', 'CORRECTION_APPROVED', 'OVERTIME_APPROVED')`,
+      [employee.id]
+    )[0].count,
+    3
+  );
+});
+
+test('punch workflow records breaks and permits next-day checkout for overnight shifts', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const employee = EmployeeService.create({
+    name: 'موظف اختبار تسجيل الوقت',
+    location: 'اختبار',
+    role: 'موظف',
+    phone: '0109191917',
+    email: '',
+    baseSalary: 2000,
+    salaryType: 'MONTHLY',
+    status: 'ACTIVE',
+    joinedDate: localDateString(),
+  });
+  const started = AttendanceService.punchIn(employee.id);
+  assert.ok(started.checkInAt);
+  AttendanceService.startBreak(employee.id);
+  let record = AttendanceService.getAttendanceByDate(localDateString()).find((row) => row.employeeId === employee.id)!;
+  assert.equal(record.activeBreak, true);
+  const breakStarted = new Date(Date.now() - 10 * 60 * 1000);
+  db.run(
+    'UPDATE attendance_breaks SET started_at = ? WHERE attendance_id = ? AND ended_at IS NULL',
+    [`${localDateString(breakStarted)}T${breakStarted.toTimeString().slice(0, 8)}`, record.id]
+  );
+  AttendanceService.endBreak(employee.id);
+  AttendanceService.punchOut(employee.id);
+  record = AttendanceService.getAttendanceByDate(localDateString()).find((row) => row.employeeId === employee.id)!;
+  assert.equal(record.activeBreak, false);
+  assert.ok(record.breakMinutes >= 9 && record.breakMinutes <= 11);
+  assert.equal(AttendanceService.getBreaks(record.id).length, 1);
+  const breakEntry = AttendanceService.getBreaksByDate(localDateString()).find((item) => item.attendanceId === record.id);
+  assert.ok(breakEntry && breakEntry.minutes >= 9 && breakEntry.minutes <= 11);
+
+  const overnightEmployee = EmployeeService.create({
+    name: 'موظف اختبار الوردية الليلية',
+    location: 'اختبار',
+    role: 'موظف',
+    phone: '0109191916',
+    email: '',
+    baseSalary: 2000,
+    salaryType: 'MONTHLY',
+    status: 'ACTIVE',
+    joinedDate: localDateString(),
+  });
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayString = localDateString(yesterday);
+  db.run(
+    `INSERT INTO attendance (id, employee_id, date, status, check_in_at, source, recorded_by)
+     VALUES (?, ?, ?, 'PRESENT', ?, 'PUNCH', ?)`,
+    ['att_overnight_test', overnightEmployee.id, yesterdayString, `${yesterdayString}T22:00:00`, 'usr_admin']
+  );
+  const overnight = AttendanceService.punchOut(overnightEmployee.id);
+  assert.equal(overnight.date, yesterdayString);
+  assert.ok(overnight.checkOutAt?.startsWith(localDateString()));
 });
 
 test('fixed asset acquisition uses the approved clearing liability by default', async () => {

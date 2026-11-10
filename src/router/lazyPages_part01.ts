@@ -6,7 +6,7 @@ export const DashboardView = lazy(() => import('../components/dashboard/Dashboar
 export const ExecutiveDashboard = lazy(() => import('../pages/dashboard/executive/ExecutiveDashboard').then(m => ({ default: m.ExecutiveDashboard })));
 
 // Sales & POS
-export const PosView = lazy(() => import('../components/pos/PosView').then(m => ({ default: m.PosView })));
+export const PosView = lazy(() => import('../pages/sales/pos/PosPage').then(m => ({ default: m.PosView })));
 
 export const RestaurantPage = lazy(() => import('../pages/restaurant/restaurant/RestaurantPage').then(m => ({ default: m.RestaurantPage })));
 
@@ -67,6 +67,6 @@ export const LocationStockPage = lazy(() => import('../pages/inventory/location-
 
 export const StockLedgerPage = lazy(() => import('../pages/inventory/stock-ledger/StockLedgerPage').then(m => ({ default: m.StockLedgerPage })));
 
-export const StockTransfersView = lazy(() => import('../components/inventory/stock-transfers/StockTransfersView').then(m => ({ default: m.StockTransfersView })));
+export const StockTransfersView = lazy(() => import('../pages/inventory/stock-transfers/StockTransfersPage').then(m => ({ default: m.StockTransfersPage })));
 
 export const InventoryCountPage = lazy(() => import('../pages/inventory/inventory-count/InventoryCountPage').then(m => ({ default: m.InventoryCountPage })));

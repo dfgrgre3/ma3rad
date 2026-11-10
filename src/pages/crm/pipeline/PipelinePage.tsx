@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Workflow, Phone, Clock, User, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { CrmService, Lead, LeadStage } from '../../../services/crm/CrmService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { CrmService, Lead, LeadStage } from '../../../services/domains/crm/CrmService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 const STAGES: { id: LeadStage; label: string; color: string; bg: string; border: string }[] = [
   { id: 'NEW',         label: 'عميل محتمل',  color: 'text-slate-600',   bg: 'bg-slate-100',  border: 'border-slate-300' },

@@ -26,7 +26,7 @@ test('POS customer selection dialog uses shared option rows and preserves select
 
   const { cleanup, fireEvent, render, screen, waitFor } = await import('@testing-library/react');
   const React = await import('react');
-  const { PosCustomerSelectionDialog } = await import('../src/components/pos/PosCustomerSelectionDialog.tsx');
+  const { PosCustomerSelectionDialog } = await import('../src/pages/sales/pos/components/PosCustomerSelectionDialog.tsx');
   const customer: Customer = {
     id: 'customer-selection-test',
     code: 'CUS-001',

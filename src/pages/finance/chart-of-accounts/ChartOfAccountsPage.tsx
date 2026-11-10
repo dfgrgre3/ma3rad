@@ -3,9 +3,9 @@ import {
   BookOpen, ChevronDown, ChevronLeft, ChevronsDownUp, ChevronsUpDown,
   Loader2, Pencil, Plus, Power, RotateCcw, Search, Trash2, X,
 } from 'lucide-react';
-import { FinanceExtrasService, Account, AccountType } from '../../../services/finance/FinanceExtrasService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { FinanceExtrasService, Account, AccountType } from '../../../services/domains/finance/FinanceExtrasService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 const TYPE_LABELS: Record<AccountType, string> = {
   ASSET: 'أصول',

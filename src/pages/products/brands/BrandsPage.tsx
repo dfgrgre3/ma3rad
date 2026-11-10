@@ -3,8 +3,8 @@ import {
   Tags, Plus, Search, Edit, Trash2, 
   Globe, X, CheckCircle, AlertCircle, Package, Loader2
 } from 'lucide-react';
-import { BrandService, BrandWithCount } from '../../../services/products/BrandService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { BrandService, BrandWithCount } from '../../../services/domains/products/BrandService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 // Singleton instance to prevent re-creation on every render
 const brandService = new BrandService();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, FileText, MapPin } from 'lucide-react';
+import { FileText, MapPin } from 'lucide-react';
 import { EmployeeFinanceStatCards } from './EmployeeFinanceStatCards';
 import { fmtCurrency, getEmployeeFinancials } from './helpers';
 import type { Employee, FinancialTransaction, PayrollPayable } from '../../../types/hr/employeesPage';
@@ -13,7 +13,6 @@ interface EmployeeFinanceTabProps {
   totalWagesBill: number;
   canManageEmployees: boolean;
   onPayrollPeriodChange: (value: string) => void;
-  onAccruePayroll: () => void;
   onOpenTransaction: (empId: string) => void;
   onOpenHistory: (empId: string) => void;
 }
@@ -27,10 +26,10 @@ export const EmployeeFinanceTab: React.FC<EmployeeFinanceTabProps> = ({
   totalWagesBill,
   canManageEmployees,
   onPayrollPeriodChange,
-  onAccruePayroll,
   onOpenTransaction,
   onOpenHistory,
 }) => {
+  const periodTransactions = transactions.filter((transaction) => transaction.date.slice(0, 7) === payrollPeriod);
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
@@ -43,20 +42,13 @@ export const EmployeeFinanceTab: React.FC<EmployeeFinanceTabProps> = ({
             className="mt-1 block px-3 py-2 rounded-lg border border-slate-200 bg-slate-50"
           />
         </label>
-        <button
-          type="button"
-          onClick={onAccruePayroll}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          ترحيل استحقاق الرواتب
-        </button>
+        <p className="text-xs text-slate-500">هذه مؤشرات حركات الفترة فقط؛ كشف الراتب الرسمي يشمل الحضور والبدلات من دورة الرواتب.</p>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="p-4 border-b border-slate-200">
-          <h3 className="text-sm font-black text-slate-800">أرصدة الرواتب المستحقة في دفتر الأستاذ حسب الموظف</h3>
-          <p className="text-xs text-slate-500 mt-1">من قيود حساب 2104، وتشمل الاستحقاق والسلف والخصومات والصرف والقيود العكسية.</p>
+          <h3 className="text-sm font-black text-slate-800">أرصدة الرواتب المفتوحة في دفتر الأستاذ</h3>
+          <p className="text-xs text-slate-500 mt-1">هذه أرصدة تراكمية غير مرتبطة بفترة؛ كشف الفترة التفصيلي موجود في دورة الرواتب.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
@@ -76,7 +68,7 @@ export const EmployeeFinanceTab: React.FC<EmployeeFinanceTabProps> = ({
       </div>
 
       {/* Financial Quick Summaries */}
-      <EmployeeFinanceStatCards totalWagesBill={totalWagesBill} transactions={transactions} />
+      <EmployeeFinanceStatCards totalWagesBill={totalWagesBill} transactions={periodTransactions} />
 
       {/* Table list of wages ledger */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -96,7 +88,7 @@ export const EmployeeFinanceTab: React.FC<EmployeeFinanceTabProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-200 text-sm">
               {employees.map(emp => {
-                const fin = getEmployeeFinancials(allEmployees, transactions, emp.id);
+                const fin = getEmployeeFinancials(allEmployees, transactions, emp.id, payrollPeriod);
                 return (
                   <tr key={emp.id} className="hover:bg-slate-100 transition">
                     <td className="p-4">

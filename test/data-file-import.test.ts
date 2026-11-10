@@ -5,9 +5,9 @@ import { JSDOM } from 'jsdom';
 import {
   MAX_DATA_FILE_IMPORT_BYTES,
   parseDataFileBuffer,
-} from '../src/services/data/DataFileImportService.ts';
-import { MAX_IMAGE_IMPORT_BYTES, validateImageImportFile } from '../src/services/data/ImageImportService.ts';
-import { parseSpreadsheetBuffer } from '../src/services/data/SpreadsheetImportService.ts';
+} from '../src/services/infrastructure/data/DataFileImportService.ts';
+import { MAX_IMAGE_IMPORT_BYTES, validateImageImportFile } from '../src/services/infrastructure/data/ImageImportService.ts';
+import { parseSpreadsheetBuffer } from '../src/services/infrastructure/data/SpreadsheetImportService.ts';
 
 Object.defineProperty(globalThis, 'DOMParser', {
   configurable: true,

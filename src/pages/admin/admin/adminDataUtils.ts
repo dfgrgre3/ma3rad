@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { DataImportSheet } from '../../../types/admin/dataAdmin';
-import { validateSpreadsheetFileHeader } from '../../../services/data/SpreadsheetImportService';
+import { validateSpreadsheetFileHeader } from '../../../services/infrastructure/data/SpreadsheetImportService';
 import './adminDataUtils_part01';
 import './adminDataUtils_part02';
 export { downloadExcel } from './adminDataUtils_part01';

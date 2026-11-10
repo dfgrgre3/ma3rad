@@ -4,9 +4,9 @@ import {
   FileText, ShieldCheck, Database, Layers, ArrowLeftRight, Building2,
   Calendar, Check, X
 } from 'lucide-react';
-import { InventoryService } from '../../../services/inventory/InventoryService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { useToast } from '../../../components/ui/Toast';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const InventoryReconciliationPage: React.FC = () => {
   const inventoryService = new InventoryService();

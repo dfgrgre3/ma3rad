@@ -1,0 +1,410 @@
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from '../../domains/auth/AuthService';
+import { PermissionService } from '../../domains/auth/PermissionService';
+import { AuditService } from '../../domains/security/AuditService';
+import { localDateString } from '../../../utils/shared/date';
+import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup, isEncryptedLocalDatabase } from './backupEncryption';
+import {
+  createXlsxBackupWorkbook,
+  extractDatabaseFromXlsxBackup,
+  hasOfficeCompoundFileSignature,
+} from './xlsxBackup';
+
+const MAX_BACKUP_FILE_SIZE = 700 * 1024 * 1024;
+const MAX_RECOVERY_KEY_FILE_SIZE = 16 * 1024;
+
+export class BackupServicePart01 {
+protected db = DatabaseManager.getInstance();
+
+private require(): { id: string; fullName: string } {
+    const user = AuthService.requireAuth();
+    PermissionService.require(user, 'settings.backup');
+    return user;
+  }
+
+public async exportBackupFile(password?: string): Promise<void> {
+    const user = this.require();
+    let pwd: string | undefined = password;
+    if (!pwd) {
+      if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+        try {
+          const prompted = window.prompt('أنشئ كلمة مرور لملف XLSX المشفر (12 حرفًا على الأقل). لن تُحفظ كلمة المرور داخل التطبيق:');
+          if (!prompted) throw new Error('أُلغي تصدير النسخة المشفرة.');
+          if (prompted.length < 12 || prompted.length > 255) throw new Error('يجب أن تتراوح كلمة مرور النسخة بين 12 و255 حرفًا.');
+          const repeatedPassword = window.prompt('أعد إدخال كلمة مرور النسخة للتأكيد:');
+          if (prompted !== repeatedPassword) throw new Error('كلمتا المرور غير متطابقتين.');
+          pwd = prompted;
+        } catch (e: any) {
+          if (e?.message?.includes('prompt() is not supported')) {
+            throw new Error('يرجى إدخال كلمة مرور النسخة الاحتياطية من خلال نافذة التصدير.');
+          }
+          throw e;
+        }
+      } else {
+        throw new Error('كلمة المرور مطلوبة لتصدير النسخة المشفرة (12 حرفًا على الأقل).');
+      }
+    } else {
+      if (pwd.length < 12 || pwd.length > 255) {
+        throw new Error('يجب أن تتراوح كلمة مرور النسخة بين 12 و255 حرفًا.');
+      }
+    }
+    await this.db.flush();
+    const binary = this.db.exportDatabaseBinary();
+    const inspection = this.verifyBackupFile(binary);
+    if (!inspection.valid) throw new Error(`تعذر التحقق من النسخة الحالية: ${inspection.error || inspection.integrity}`);
+    const workbook = createXlsxBackupWorkbook(binary);
+    const encryptXlsx = window.ceramisys?.db?.encryptXlsxBackup;
+    if (!encryptXlsx) throw new Error('تشفير ملف XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
+    const encrypted = await encryptXlsx(workbook, pwd);
+    const blobBytes = new ArrayBuffer(encrypted.byteLength);
+    new Uint8Array(blobBytes).set(encrypted);
+    const blob = new Blob([blobBytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fileName = `ceramisys_backup_${localDateString()}_${Date.now().toString().slice(-4)}.xlsx`;
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    this.db.run(
+      `INSERT INTO backup_history (id, file_name, file_path, file_size_bytes, backup_type, status)
+       VALUES (?, ?, ?, ?, 'MANUAL_DOWNLOAD_ENCRYPTED_XLSX', 'SUCCESS')`,
+      [`bak_${uuidv4().substring(0, 8)}`, fileName, 'Browser / User Download', encrypted.length]
+    );
+
+    new AuditService().log({
+      userId: user.id,
+      userName: user.fullName,
+      action: 'تصدير نسخة احتياطية',
+      module: 'SYSTEM',
+      newValues: JSON.stringify({ fileName, bytes: encrypted.length, encryption: 'Office OOXML password encryption' }),
+    });
+  }
+
+  public async exportRecoveryKeyFile(password: string): Promise<void> {
+    const user = this.require();
+    if (password.length < 12 || password.length > 255) {
+      throw new Error('يجب أن تتراوح كلمة مرور ملف الاسترداد بين 12 و255 حرفًا.');
+    }
+    const exportRecoveryKey = window.ceramisys?.db?.exportRecoveryKey;
+    if (!exportRecoveryKey) throw new Error('تصدير ملف الاسترداد يتطلب تشغيل تطبيق سطح المكتب.');
+    const bytes = await exportRecoveryKey(password);
+    const blobBytes = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(blobBytes).set(bytes);
+    const blob = new Blob([blobBytes], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ceramisys-recovery-key-${localDateString()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    new AuditService().log({
+      userId: user.id,
+      userName: user.fullName,
+      action: 'تصدير ملف استرداد مفتاح النسخ',
+      module: 'SYSTEM',
+      newValues: JSON.stringify({ encryption: 'scrypt + AES-256-GCM' }),
+    });
+  }
+
+public async isEncryptedBackupFile(file: File): Promise<boolean> {
+    const headerBytes = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+    return hasOfficeCompoundFileSignature(headerBytes) || isEncryptedBackup(headerBytes) || isEncryptedLocalDatabase(headerBytes);
+  }
+
+public verifyBackupFile(bytes: Uint8Array) {
+    return this.db.inspectDatabaseBinary(bytes);
+  }
+
+private async readBackupBytes(
+    file: File,
+    password?: string,
+    recoveryKeyFile?: File,
+    recoveryPassword?: string
+  ): Promise<Uint8Array> {
+      if (!Number.isFinite(file.size) || file.size <= 0 || file.size > MAX_BACKUP_FILE_SIZE) {
+        throw new Error('حجم ملف النسخة الاحتياطية فارغ أو يتجاوز الحد المسموح.');
+      }
+      const fileBytes = new Uint8Array(await file.arrayBuffer());
+    if (hasOfficeCompoundFileSignature(fileBytes)) {
+      let pwd: string | undefined = password;
+      if (!pwd) {
+        if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+          try {
+            pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:') || undefined;
+          } catch {
+            // Prompt failure is reported by the missing-password check below.
+          }
+        }
+      }
+      if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية XLSX مطلوبة.');
+      const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
+      if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
+      return extractDatabaseFromXlsxBackup(await decryptXlsx(fileBytes, pwd));
+    }
+    if (isEncryptedBackup(fileBytes)) {
+      let pwd: string | undefined = password;
+      if (!pwd) {
+        if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+          try {
+            pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:') || undefined;
+          } catch {
+            // Prompt failure is reported by the missing-password check below.
+          }
+        }
+      }
+      if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية مطلوبة.');
+      return decryptExternalBackup(fileBytes, pwd);
+    }
+
+    if (isEncryptedLocalDatabase(fileBytes)) {
+      if (recoveryKeyFile) {
+        if (!Number.isFinite(recoveryKeyFile.size) || recoveryKeyFile.size <= 0 || recoveryKeyFile.size > MAX_RECOVERY_KEY_FILE_SIZE) {
+          throw new Error('حجم ملف الاسترداد فارغ أو يتجاوز الحد المسموح.');
+        }
+        const decryptWithRecoveryKey = window.ceramisys?.db?.decryptBackupWithRecoveryKey;
+        if (!decryptWithRecoveryKey) throw new Error('استعادة النسخة بملف المفتاح تتطلب تشغيل تطبيق سطح المكتب.');
+        return decryptWithRecoveryKey(
+          fileBytes,
+          new Uint8Array(await recoveryKeyFile.arrayBuffer()),
+          recoveryPassword || ''
+        );
+      }
+      const decryptLocal = typeof window !== 'undefined' ? window.ceramisys?.db?.decryptLocalBackup : undefined;
+      if (!decryptLocal) throw new Error('هذه نسخة محلية مرتبطة بمفتاح هذا الجهاز؛ استعدها من تطبيق سطح المكتب الذي أنشأها.');
+      return decryptLocal(fileBytes);
+    }
+
+    if (!window.confirm('هذا ملف SQLite قديم غير مشفر. استيراده قد يعرّض بياناته للقراءة خارج التطبيق. هل تريد المتابعة؟')) {
+      throw new Error('أُلغي استيراد الملف غير المشفر.');
+    }
+    return fileBytes;
+  }
+
+private async importBackupWithRollback(bytes: Uint8Array, currentSnapshot: Uint8Array, snapshotPath?: string): Promise<void> {
+    try {
+      this.db.importDatabaseBinary(bytes);
+      await this.db.flush();
+    } catch (restoreError) {
+      try {
+        this.db.importDatabaseBinary(currentSnapshot);
+        await this.db.flush();
+      } catch (rollbackError) {
+        throw new Error(`Restore failed (${restoreError instanceof Error ? restoreError.message : String(restoreError)}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}). The pre-restore snapshot remains at ${snapshotPath || 'the configured backup location'}.`);
+      }
+      throw restoreError;
+    }
+  }
+
+private async verifyRestoredDatabase(currentSnapshot: Uint8Array): Promise<void> {
+    const restored = this.verifyBackupFile(this.db.exportDatabaseBinary());
+    if (!restored.valid) {
+      this.db.importDatabaseBinary(currentSnapshot);
+      await this.db.flush();
+      throw new Error(`فشل التحقق بعد الاستعادة، وتمت إعادة قاعدة البيانات السابقة: ${restored.error || restored.integrity}`);
+    }
+  }
+
+public async restoreBackupFromFile(
+    file: File,
+    password?: string,
+    recoveryKeyFile?: File,
+    recoveryPassword?: string
+  ): Promise<{
+    productsCount: number;
+    invoicesCount: number;
+    customersCount: number;
+    journalEntriesCount: number;
+  }> {
+    const user = this.require();
+    const bytes = await this.readBackupBytes(file, password, recoveryKeyFile, recoveryPassword);
+
+    // Validate integrity and inspect contents before replacing live database
+    const inspection = this.verifyBackupFile(bytes);
+    if (!inspection.valid) {
+      throw new Error(`الملف تالف أو غير صالح للاستعادة: ${inspection.error || inspection.integrity}`);
+    }
+
+    // Preserve the current, fully flushed database before replacing it.
+    await this.db.flush();
+    const currentSnapshot = this.db.exportDatabaseBinary();
+    const preRestore = await this.createLocalSnapshot('pre_restore', user);
+    if (!preRestore.ok) {
+      throw new Error(`لم يتم الاستعادة لأن إنشاء نسخة ما قبل الاستعادة فشل: ${preRestore.error || 'unknown error'}`);
+    }
+
+    await this.importBackupWithRollback(bytes, currentSnapshot, preRestore.path);
+    await this.verifyRestoredDatabase(currentSnapshot);
+
+    new AuditService().log({
+      userId: user.id,
+      userName: user.fullName,
+      action: 'استعادة نسخة احتياطية (استبدال قاعدة البيانات)',
+      module: 'SYSTEM',
+      newValues: JSON.stringify({
+        fileName: file.name,
+        bytes: bytes.length,
+        invoices: inspection.invoicesCount,
+        products: inspection.productsCount,
+      }),
+    });
+
+    return {
+      productsCount: inspection.productsCount,
+      invoicesCount: inspection.invoicesCount,
+      customersCount: inspection.customersCount,
+      journalEntriesCount: inspection.journalEntriesCount,
+    };
+  }
+
+  public async readBackupDataForImport(file: File, password?: string): Promise<Array<{
+      name: string;
+      columns: string[];
+      rows: Array<Record<string, unknown>>;
+    }>> {
+      this.require();
+      const extension = file.name.split('.').pop()?.toLocaleLowerCase();
+      if (extension !== 'ceramisys-backup' && extension !== 'xlsx') {
+        throw new Error('اختر نسخة مشفرة بصيغة XLSX أو بامتداد ‎.ceramisys-backup‎.');
+      }
+      if (!file.size || file.size > 100 * 1024 * 1024) {
+        throw new Error('حجم ملف النسخة فارغ أو يتجاوز الحد المسموح (100 ميجابايت).');
+      }
+      const encryptedBytes = new Uint8Array(await file.arrayBuffer());
+      const isEncryptedXlsx = hasOfficeCompoundFileSignature(encryptedBytes);
+      if (isEncryptedXlsx) {
+        let pwd: string | undefined = password;
+        if (!pwd) {
+          if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+            try {
+              pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية XLSX:') || undefined;
+            } catch {
+              // Prompt failure is reported by the missing-password check below.
+            }
+          }
+        }
+        if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية XLSX مطلوبة.');
+        const decryptXlsx = window.ceramisys?.db?.decryptXlsxBackup;
+        if (!decryptXlsx) throw new Error('فك تشفير نسخة XLSX يتطلب تشغيل التطبيق من نسخة سطح المكتب.');
+        const bytes = extractDatabaseFromXlsxBackup(await decryptXlsx(encryptedBytes, pwd));
+        const inspection = this.verifyBackupFile(bytes);
+        if (!inspection.valid) {
+          throw new Error(`الملف تالف أو غير صالح للاستيراد: ${inspection.error || inspection.integrity}`);
+        }
+        return this.db.readImportTablesBinary(bytes);
+      }
+      if (!isEncryptedBackup(encryptedBytes)) throw new Error('محتوى الملف ليس نسخة مشفرة صالحة.');
+      let pwd: string | undefined = password;
+      if (!pwd) {
+        if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+          try {
+            pwd = window.prompt('أدخل كلمة مرور ملف النسخة الاحتياطية:') || undefined;
+          } catch {
+            // Prompt failure is reported by the missing-password check below.
+          }
+        }
+      }
+      if (!pwd) throw new Error('كلمة مرور ملف النسخة الاحتياطية مطلوبة.');
+      const bytes = await decryptExternalBackup(encryptedBytes, pwd);
+      const inspection = this.verifyBackupFile(bytes);
+      if (!inspection.valid) {
+        throw new Error(`الملف تالف أو غير صالح للاستيراد: ${inspection.error || inspection.integrity}`);
+      }
+      return this.db.readImportTablesBinary(bytes);
+    }
+
+  public async createLocalSnapshot(label = 'manual', actor?: { id: string; fullName: string }): Promise<{
+    ok: boolean;
+    path?: string;
+    error?: string;
+    strategy?: {
+      actions: Array<{ type: string; target: string | null; status: string; description: string }>;
+      recommendations: Array<{ type: string; action: string }>;
+    };
+  }> {
+    const api = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    if (!api?.backup) return { ok: false, error: 'النسخ التلقائي متاح داخل تطبيق سطح المكتب فقط' };
+
+    await this.db.flush();
+    const result = await api.backup(label);
+    if (result?.ok) {
+      this.db.run(
+        `INSERT INTO backup_history (id, file_name, file_path, file_size_bytes, backup_type, status)
+         VALUES (?, ?, ?, ?, ?, 'SUCCESS')`,
+        [
+          `bak_${uuidv4().substring(0, 8)}`,
+          result.path ? result.path.split(/[\\/]/).pop() : label,
+          result.path || null,
+          result.bytes || 0,
+          label.toUpperCase(),
+        ]
+      );
+      new AuditService().log({
+        userId: actor?.id || 'system',
+        userName: actor?.fullName || 'النظام',
+        action: 'نسخة احتياطية تلقائية',
+        module: 'SYSTEM',
+        newValues: JSON.stringify({ path: result.path, bytes: result.bytes }),
+      });
+    } else {
+      this.db.run(
+        `INSERT INTO backup_history (id, file_name, file_path, file_size_bytes, backup_type, status)
+         VALUES (?, ?, ?, 0, ?, 'FAILED')`,
+        [`bak_${uuidv4().substring(0, 8)}`, label, 'N/A', label.toUpperCase()]
+      );
+    }
+    return result;
+  }
+
+public async runAutoBackupIfDue(intervalHours: number): Promise<{
+  created: boolean;
+  path?: string;
+  error?: string;
+  externalBackupWarning?: string;
+}> {
+    try {
+      if (!this.isBackupDue(intervalHours)) return { created: false };
+      const result = await this.createLocalSnapshot('auto');
+      const externalActions = result.strategy?.actions.filter(
+        (action) => action.type === 'offsite' || action.type === 'external'
+      ) || [];
+      const failedExternalActions = externalActions.filter((action) => action.status !== 'complete');
+      return {
+        created: Boolean(result.ok),
+        path: result.path,
+        error: result.error,
+        externalBackupWarning: failedExternalActions.length
+          ? failedExternalActions.map((action) => action.description).join(' ')
+          : undefined,
+      };
+    } catch (e) {
+      return { created: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+public async openBackupFolder(): Promise<void> {
+    await window.ceramisys?.app?.openFolder?.('backups');
+  }
+
+public getBackupHistory(): any[] {
+    this.require();
+    return this.db.query(`SELECT * FROM backup_history ORDER BY created_at DESC LIMIT 50`);
+  }
+
+public getLastBackup(): any | null {
+    const rows = this.db.query(
+      `SELECT * FROM backup_history WHERE backup_type = 'AUTO' AND status = 'SUCCESS' ORDER BY created_at DESC LIMIT 1`
+    );
+    return rows[0] || null;
+  }
+
+public isBackupDue(intervalHours: number): boolean {
+    const last = this.getLastBackup();
+    if (!last) return true;
+    const lastAt = new Date(last.createdAt || last.created_at).getTime();
+    if (!Number.isFinite(lastAt)) return true;
+    return Date.now() - lastAt >= Math.max(1, intervalHours) * 60 * 60 * 1000;
+  }
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { getEffectiveBusinessType } from '../../services/config/BusinessTypeService';
+import { getEffectiveBusinessType } from '../../services/domains/config/BusinessTypeService';
 import { getBusinessProfile } from '../../config/businessProfiles';
 
 /**

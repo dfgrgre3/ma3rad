@@ -2,13 +2,13 @@ import React, { useMemo, useState } from 'react';
 import {
   Activity, Layers, ShieldCheck, SlidersHorizontal, Target, Wrench, Zap,
 } from 'lucide-react';
-import { useAppConfig } from '../../../hooks/config/useAppConfig';
-import { usePermission } from '../../../hooks/auth/usePermission';
-import { AuthService } from '../../../services/auth/AuthService';
-import { ActionRegistryService } from '../../../services/config/ActionRegistryService';
-import { FeatureService } from '../../../services/config/FeatureService';
-import { ModuleRegistryService } from '../../../services/config/ModuleRegistryService';
-import { AppConfigService } from '../../../services/config/AppConfigService';
+import { useAppConfig } from '../../../hooks/domains/config/useAppConfig';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { ActionRegistryService } from '../../../services/domains/config/ActionRegistryService';
+import { FeatureService } from '../../../services/domains/config/FeatureService';
+import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
+import { AppConfigService } from '../../../services/domains/config/AppConfigService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { CONFIGURATION_SCOPE_LABELS, CONFIGURATION_SCOPE_PRECEDENCE } from '../../../config/configurationScopes';
 import { ACTION_REGISTRY } from '../../../config/actionRegistry';

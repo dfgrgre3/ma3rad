@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BookmarkPlus, Loader2, Clock, Plus } from 'lucide-react';
-import { ReservationService, StockReservation } from '../../../services/sales/ReservationService';
-import { OrderService, Order } from '../../../services/sales/OrderService';
-import { ProductService } from '../../../services/products/ProductService';
-import { OperationsService } from '../../../services/operations/OperationsService';
-import { CustomerService } from '../../../services/customers/CustomerService';
+import { ReservationService, StockReservation } from '../../../services/domains/sales/ReservationService';
+import { OrderService, Order } from '../../../services/domains/sales/OrderService';
+import { ProductService } from '../../../services/domains/products/ProductService';
+import { OperationsService } from '../../../services/domains/operations/OperationsService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
 import { useToast } from '../../../components/ui/Toast';
 import { Product, Customer } from '../../../types';
 import { PrintService } from '../../../services/shared/PrintService';
@@ -25,7 +25,7 @@ import { OrdersDepositsTable } from './OrdersDepositsTable';
 import { StockReservationsTable } from './StockReservationsTable';
 import { DepositModal } from './DepositModal';
 import { NewReservationModal } from './NewReservationModal';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export type ReservationPageMode = 'sales' | 'inventory';
 interface ReservationsDepositPageProps { mode?: ReservationPageMode; }

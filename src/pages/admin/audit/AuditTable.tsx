@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2, Search } from 'lucide-react';
-import type { AuditLogEntry } from '../../../services/security/AuditService';
+import type { AuditLogEntry } from '../../../services/domains/security/AuditService';
 import { AuditTableRow } from './AuditTableRow';
 
 interface Props {

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReceiptText, Loader2, Download, CalendarDays } from 'lucide-react';
-import { FinanceExtrasService } from '../../../services/finance/FinanceExtrasService';
+import { FinanceExtrasService } from '../../../services/domains/finance/FinanceExtrasService';
 import { localDateString } from '../../../utils/shared/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
@@ -16,16 +16,16 @@ export const TaxReportPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setSummary(service.getTaxSummary(from, to));
       setMonths(service.getTaxByMonth(from, to));
       setError(null);
-    } catch (e: any) { setError(e?.message || 'تعذر تحميل تقرير الضريبة.'); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'تعذر تحميل تقرير الضريبة.'); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, [from, to]);
+  }, [from, service, to]);
+  useEffect(() => { load(); }, [load]);
 
   const exportCsv = () => {
     const rows = [
@@ -50,7 +50,7 @@ export const TaxReportPage: React.FC = () => {
           <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center"><ReceiptText className="w-5 h-5 text-teal-600" /></div>
           <div>
             <h1 className="text-base font-black">تقرير ضريبة القيمة المضافة</h1>
-            <p className="text-xs text-slate-500 font-medium">ملخص ضريبة المخرجات والمدخلات وصافي المستحق عن الفترة</p>
+            <p className="text-xs text-slate-500 font-medium">ملخص ضريبة المخرجات والمدخلات المسجلة للفترة — للمراجعة وليس إقرارًا ضريبيًا نهائيًا</p>
           </div>
         </div>
         <button onClick={exportCsv} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-bold transition shrink-0">
@@ -78,6 +78,9 @@ export const TaxReportPage: React.FC = () => {
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {error && <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">{error}</div>}
+        <div role="note" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900">
+          هذا ملخص تحليلي من بيانات الفواتير المسجلة، وليس إقرارًا ضريبيًا نهائيًا. قبل التقديم راجع المستندات الأصلية، والفواتير المعفاة والتعديلات والإشعارات الدائنة، وتأكد من قواعد الفترة الضريبية المعتمدة.
+        </div>
         {loading ? <div className="py-16 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-teal-500" /></div> : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

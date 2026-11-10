@@ -4,7 +4,7 @@ import type { Product } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import { round, gradeLabel } from './productFormModel';
-import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import './ProductsCards_part01';
 import './ProductsCards_part02';
 export type { ProductsCardsProps } from './ProductsCards_part01';

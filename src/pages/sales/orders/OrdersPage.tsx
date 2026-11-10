@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { OrderService, Order, OrderStatus, OrderStats, OrderStatusEntry } from '../../../services/sales/OrderService';
-import { CustomerService } from '../../../services/customers/CustomerService';
-import { ProductService } from '../../../services/products/ProductService';
-import { InventoryService } from '../../../services/inventory/InventoryService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { OrderService, Order, OrderStatus, OrderStats, OrderStatusEntry } from '../../../services/domains/sales/OrderService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
+import { ProductService } from '../../../services/domains/products/ProductService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { PrintService } from '../../../services/shared/PrintService';
 import { Customer, Product, Warehouse, PaymentType } from '../../../types';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
@@ -25,7 +25,7 @@ import { OrderDetailModal } from './OrderDetailModal';
 import { DeliveryModal } from './DeliveryModal';
 import { TimelineModal } from './TimelineModal';
 import { ConvertInvoiceModal } from './ConvertInvoiceModal';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
 export const OrdersPage: React.FC = () => {

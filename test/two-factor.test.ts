@@ -3,13 +3,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService, TwoFactorRequiredError } from '../src/services/auth/AuthService.ts';
+import { AuthService, TwoFactorRequiredError } from '../src/services/domains/auth/AuthService.ts';
 import {
   base32Decode,
   base32Encode,
   generateTOTP,
   twoFactorAuth,
-} from '../src/services/auth/twoFactorAuth.ts';
+} from '../src/services/domains/auth/twoFactorAuth.ts';
 
 const RFC_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 

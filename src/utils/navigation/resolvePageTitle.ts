@@ -1,6 +1,6 @@
 import { canonicalNavigationPath } from '../../router/navigationShortcuts';
 import type { NavGroupDef } from '../../types/config/navigation';
-import { NavigationService } from '../../services/config/NavigationService';
+import { NavigationService } from '../../services/domains/config/NavigationService';
 import type { User } from '../../types';
 
 export interface PageBreadcrumb {

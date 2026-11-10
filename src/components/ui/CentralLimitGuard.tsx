@@ -1,6 +1,6 @@
 import React from 'react';
-import { useCentralUsageLimit } from '../../hooks/licensing/useCentralUsageLimit';
-import type { CentralUsageMetric } from '../../services/licensing/CentralUsageLimitService';
+import { useCentralUsageLimit } from '../../hooks/domains/licensing/useCentralUsageLimit';
+import type { CentralUsageMetric } from '../../services/domains/licensing/CentralUsageLimitService';
 
 interface CentralLimitGuardProps {
   metric: CentralUsageMetric;

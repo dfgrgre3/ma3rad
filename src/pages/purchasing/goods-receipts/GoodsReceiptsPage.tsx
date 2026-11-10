@@ -6,13 +6,13 @@ import {
 } from 'lucide-react';
 import {
   ProcurementService, GoodsReceiptRow, GoodsReceiptItem
-} from '../../../services/procurement/ProcurementService';
-import { PurchaseOrderService } from '../../../services/purchases/PurchaseOrderService';
-import { SupplierService } from '../../../services/suppliers/SupplierService';
-import { OperationsService } from '../../../services/operations/OperationsService';
-import { ProductService } from '../../../services/products/ProductService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+} from '../../../services/domains/procurement/ProcurementService';
+import { PurchaseOrderService } from '../../../services/domains/purchases/PurchaseOrderService';
+import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
+import { OperationsService } from '../../../services/domains/operations/OperationsService';
+import { ProductService } from '../../../services/domains/products/ProductService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useToast } from '../../../components/ui/Toast';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { useNavigate } from 'react-router-dom';

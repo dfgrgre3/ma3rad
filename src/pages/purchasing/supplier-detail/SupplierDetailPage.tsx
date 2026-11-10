@@ -3,11 +3,11 @@ import { useIdempotencyKey } from '../../../hooks/shared/useIdempotencyKey';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { SupplierService } from '../../../services/suppliers/SupplierService';
-import { ProcurementService, SupplierScorecard } from '../../../services/procurement/ProcurementService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
+import { ProcurementService, SupplierScorecard } from '../../../services/domains/procurement/ProcurementService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { Supplier, PaymentType } from '../../../types';
 import {
   Tab,
@@ -31,9 +31,9 @@ import { ScorecardTab } from './ScorecardTab';
 import { PriceHistoryTab } from './PriceHistoryTab';
 import { RecordPaymentModal } from './RecordPaymentModal';
 import { EditSupplierModal } from './EditSupplierModal';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
-import { normalizeDynamicAttributeValue } from '../../../services/products/dynamicAttributes';
+import { normalizeDynamicAttributeValue } from '../../../services/domains/products/dynamicAttributes';
 
 export const SupplierDetailPage: React.FC = () => {
   const paymentIdempotency = useIdempotencyKey();

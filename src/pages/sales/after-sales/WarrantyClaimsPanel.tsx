@@ -6,7 +6,7 @@ import {
 import {
   WarrantyClaimService, WarrantyClaim, WarrantyClaimStatus, WarrantyClaimType,
   WarrantyClaimAction, WarrantyClaimsStats, EligibleWarrantyItem, WarrantyResolutionType,
-} from '../../../services/sales/WarrantyClaimService';
+} from '../../../services/domains/sales/WarrantyClaimService';
 import { PermissionGate } from '../../../components/auth/PermissionGate';
 import { useToast } from '../../../components/ui/Toast';
 import { formatProductQuantity } from '../../../utils/products/productUnits';

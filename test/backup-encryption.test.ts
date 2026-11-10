@@ -1,8 +1,8 @@
 ﻿import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup } from '../src/services/backup/backupEncryption.ts';
-import { createXlsxBackupWorkbook, extractDatabaseFromXlsxBackup } from '../src/services/backup/xlsxBackup.ts';
-import { SecurityService } from '../src/services/security/SecurityService.ts';
+import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup } from '../src/services/infrastructure/backup/backupEncryption.ts';
+import { createXlsxBackupWorkbook, extractDatabaseFromXlsxBackup } from '../src/services/infrastructure/backup/xlsxBackup.ts';
+import { SecurityService } from '../src/services/domains/security/SecurityService.ts';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { MIGRATIONS, validateMigrationCatalog } from '../src/database/migrations/index.ts';
 

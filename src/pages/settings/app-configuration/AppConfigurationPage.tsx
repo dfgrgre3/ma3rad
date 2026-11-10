@@ -19,11 +19,11 @@ import {
 import { getRegisteredConfigTargets } from '../../../config/appConfigTargets';
 import { APP_ROUTE_PATHS } from '../../../router/routePaths';
 import { NAV_GROUPS } from '../../../config/navigation';
-import { AppConfigService, type AppConfigVersion, type AppConfigState } from '../../../services/config/AppConfigService';
-import { ModuleRegistryService } from '../../../services/config/ModuleRegistryService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { usePermission } from '../../../hooks/auth/usePermission';
-import { useAppConfig } from '../../../hooks/config/useAppConfig';
+import { AppConfigService, type AppConfigVersion, type AppConfigState } from '../../../services/domains/config/AppConfigService';
+import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { useAppConfig } from '../../../hooks/domains/config/useAppConfig';
 import { useToast } from '../../../components/ui/Toast';
 
 const inputCls =

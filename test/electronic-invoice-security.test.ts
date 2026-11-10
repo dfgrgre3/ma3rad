@@ -2,9 +2,9 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { ElectronicInvoiceService } from '../src/services/sales/ElectronicInvoiceService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { ElectronicInvoiceService } from '../src/services/domains/sales/ElectronicInvoiceService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 
 test('electronic invoice reads require the dedicated view permission', async () => {
   await DatabaseManager.getInstance().initialize();

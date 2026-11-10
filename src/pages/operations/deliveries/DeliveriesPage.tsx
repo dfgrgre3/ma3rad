@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Truck, Plus, Search, Loader2, MapPin, User, Phone, Calendar } from 'lucide-react';
-import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/operations/OperationsService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { STATUS_LABEL, STATUS_STYLE } from './deliveryStatus';
 import { DeliveryCreateModal } from './DeliveryCreateModal';
 type Customer = { id: string; name: string; phone?: string | null; address?: string | null; city?: string | null };

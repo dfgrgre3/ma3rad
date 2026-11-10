@@ -2,13 +2,15 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { BranchService } from '../src/services/organization/BranchService.ts';
-import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
-import { ProjectService } from '../src/services/projects/ProjectService.ts';
-import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
-import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { BranchService } from '../src/services/domains/organization/BranchService.ts';
+import { BranchAccessService } from '../src/services/domains/auth/BranchAccessService.ts';
+import { ProjectService } from '../src/services/domains/projects/ProjectService.ts';
+import { ApartmentEstimateService } from '../src/services/domains/projects/ApartmentEstimateService.ts';
+import { QuotationService } from '../src/services/domains/sales/QuotationService.ts';
+import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
+import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
@@ -127,6 +129,49 @@ test('project reads and writes require explicit projects permissions', async () 
   assert.throws(() => service.updateProject(project.id, { name: 'Nope' }), /صلاحية/);
 });
 
+test('apartment designs persist under a project and link to project quotations', async () => {
+  await boot();
+  const projectService = new ProjectService();
+  const customerId = createCustomer('Apartment Design Customer');
+  const project = projectService.createProject({ name: 'Apartment building', customerId });
+  const estimates = new ApartmentEstimateService();
+  const rooms = [{
+    id: 'room-living', name: 'الريسبشن', length: 5, width: 4, height: 3,
+    doorCount: 1, doorWidth: 0.9, doorHeight: 2.1,
+    windowCount: 2, windowWidth: 1.2, windowHeight: 1.2,
+  }];
+  const costLines = [{
+    id: 'line-floor', category: 'الأرضيات', name: 'تركيب أرضيات', measure: 'floor' as const,
+    unit: 'م²', manualQuantity: 1, materialProductId: '', materialRate: 250, laborRate: 50,
+    wastePercent: 5, discountPercent: 0, profitPercent: 10,
+  }];
+  const saved = estimates.save({
+    projectId: project.id, name: 'الشقة ١', areaM2: 20, totalAmount: 5800, rooms, costLines,
+  });
+  assert.equal(estimates.getByProject(project.id)[0].id, saved.id);
+  assert.deepEqual(estimates.getByProject(project.id)[0].rooms, rooms);
+
+  const updated = estimates.save({
+    id: saved.id, projectId: project.id, name: 'الشقة ١ - محدثة',
+    areaM2: 22, totalAmount: 6000, rooms, costLines,
+  });
+  assert.equal(updated.name, 'الشقة ١ - محدثة');
+  assert.equal(updated.areaM2, 22);
+
+  const quotation = new QuotationService().createQuotation({
+    customerId,
+    projectId: project.id,
+    serviceItems: [{ description: 'مقايسة تشطيب الشقة', quantity: 1, unitPrice: 6000 }],
+  });
+  estimates.linkQuotation(saved.id, project.id, quotation.id);
+  assert.equal(estimates.getByProject(project.id)[0].quotationId, quotation.id);
+  estimates.save({
+    id: saved.id, projectId: project.id, name: 'الشقة ١ - تعديل جديد',
+    areaM2: 22, totalAmount: 6100, rooms, costLines,
+  });
+  assert.equal(estimates.getByProject(project.id)[0].quotationId, null);
+});
+
 test('project branch scope prevents cross-branch reads and writes', async () => {
   await boot();
   const service = new ProjectService();
@@ -145,6 +190,14 @@ test('project branch scope prevents cross-branch reads and writes', async () => 
     customerId,
     branchId: betaBranch.id,
   });
+  new ApartmentEstimateService().save({
+    projectId: betaProject.id,
+    name: 'Restricted apartment design',
+    areaM2: 10,
+    totalAmount: 1000,
+    rooms: [],
+    costLines: [],
+  });
   access.setCurrentBranchId('br_main', admin);
 
   asLimited();
@@ -152,6 +205,10 @@ test('project branch scope prevents cross-branch reads and writes', async () => 
   assert.ok(visible.some((project) => project.id === mainProject.id));
   assert.ok(!visible.some((project) => project.id === betaProject.id));
   assert.equal(service.getProjectById(betaProject.id), null);
+  assert.throws(
+    () => new ApartmentEstimateService().getByProject(betaProject.id),
+    /غير موجود أو ليس لديك صلاحية/
+  );
   assert.throws(
     () => service.createProject({ name: 'Cross branch', customerId, branchId: betaBranch.id }),
     /صلاحية/

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Ruler, Plus, Search, Layers, Sparkles, Tag, Shield, Compass, Loader2, X } from 'lucide-react';
-import { AttributeService, AttributeCategory } from '../../../services/products/AttributeService';
-import type { DynamicAttributeDataType } from '../../../services/products/dynamicAttributes';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { AttributeService, AttributeCategory } from '../../../services/domains/products/AttributeService';
+import type { DynamicAttributeDataType } from '../../../services/domains/products/dynamicAttributes';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { OperationalFieldsManager } from '../operational-fields/OperationalFieldsManager';
 
 const ICONS: Record<string, React.ElementType> = {

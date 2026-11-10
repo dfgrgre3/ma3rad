@@ -4,16 +4,16 @@ import {
   Phone, Plus, Power, RefreshCw, Search, ShieldCheck, Smartphone, Star,
   UserRound, Users, Warehouse, X,
 } from 'lucide-react';
-import { OperationsService, type Branch, type WarehouseRow } from '../../../services/operations/OperationsService';
-import { BranchService } from '../../../services/organization/BranchService';
-import { CompanyService } from '../../../services/organization/CompanyService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { OperationsService, type Branch, type WarehouseRow } from '../../../services/domains/operations/OperationsService';
+import { BranchService } from '../../../services/domains/organization/BranchService';
+import { CompanyService } from '../../../services/domains/organization/CompanyService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { useToast } from '../../../components/ui/Toast';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
 import type { Company, User } from '../../../types';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';

@@ -5,10 +5,10 @@ import {
   UserCheck, UserX, Star, Wallet, CheckCircle2, XCircle, Building2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { CrmService, Lead, LeadStage } from '../../../services/crm/CrmService';
+import { CrmService, Lead, LeadStage } from '../../../services/domains/crm/CrmService';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 const db = DatabaseManager.getInstance();
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Truck } from 'lucide-react';
-import type { DailyPurchaseResult } from '../../services/operations/DailyOperationsService';
+import type { DailyPurchaseResult } from '../../services/domains/operations/DailyOperationsService';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';
 import type {

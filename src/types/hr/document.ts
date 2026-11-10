@@ -19,9 +19,48 @@ export interface EmployeeDocument {
   confidentiality: HrDocumentConfidentiality;
   notes: string | null;
   createdBy: string | null;
+  createdByName?: string | null;
   createdAt: string;
   updatedAt: string;
+  updatedBy?: string | null;
+  updatedByName?: string | null;
+  versionCount?: number;
+  latestVersionId?: string | null;
+  latestVersionNumber?: number | null;
+  latestFileName?: string | null;
+  latestMimeType?: string | null;
+  latestFileSize?: number | null;
+  latestUploaderName?: string | null;
 }
+
+export interface EmployeeDocumentVersion {
+  id: string;
+  documentId: string;
+  versionNumber: number;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  checksum: string;
+  storageName: string;
+  notes: string | null;
+  createdBy: string;
+  createdByName: string | null;
+  createdAt: string;
+}
+
+export interface EmployeeDocumentAuditEntry {
+  id: string;
+  userName: string;
+  action: string;
+  oldValues: string | null;
+  newValues: string | null;
+  createdAt: string;
+}
+
+export type EmployeeDocumentVersionInput = Omit<
+  EmployeeDocumentVersion,
+  'id' | 'documentId' | 'versionNumber' | 'createdBy' | 'createdByName' | 'createdAt'
+>;
 
 export interface CreateEmployeeDocumentDTO {
   employeeId: string;
@@ -32,6 +71,8 @@ export interface CreateEmployeeDocumentDTO {
   expiresAt?: string | null;
   confidentiality?: HrDocumentConfidentiality;
   notes?: string | null;
+  attachment?: EmployeeDocumentVersionInput;
+  attachmentNotes?: string | null;
 }
 
 export interface UpdateEmployeeDocumentDTO {

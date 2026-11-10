@@ -2,13 +2,14 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { BranchService } from '../src/services/organization/BranchService.ts';
-import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
-import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
-import { LeaveService } from '../src/services/hr/LeaveService.ts';
-import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { BranchService } from '../src/services/domains/organization/BranchService.ts';
+import { BranchAccessService } from '../src/services/domains/auth/BranchAccessService.ts';
+import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
+import { LeaveService } from '../src/services/domains/hr/LeaveService.ts';
+import { AttendanceService } from '../src/services/domains/hr/AttendanceService.ts';
+import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
@@ -90,6 +91,14 @@ test('leave requests follow pending, approved and overlap rules', async () => {
   await boot();
   const service = new LeaveService();
   const employeeId = createEmployee();
+  service.adjustAnnualBalance({
+    employeeId,
+    year: 2026,
+    daysDelta: 5,
+    transactionType: 'ALLOCATION',
+    effectiveDate: '2026-01-01',
+    reason: 'Annual allowance',
+  });
 
   const request = service.requestLeave({
     employeeId,
@@ -127,7 +136,7 @@ test('leave permissions separate viewing, requesting and approval', async () => 
   const db = DatabaseManager.getInstance();
   const service = new LeaveService();
   const employeeId = createEmployee();
-  const request = service.requestLeave({ employeeId, startDate: '2026-04-01', endDate: '2026-04-02' });
+  const request = service.requestLeave({ employeeId, leaveType: 'SICK', startDate: '2026-04-01', endDate: '2026-04-02' });
 
   asLimited();
   assert.ok(service.getRequests().some((row) => row.id === request.id));
@@ -153,10 +162,10 @@ test('leave requests are isolated by branch', async () => {
   const mainEmployee = createEmployee();
   const betaEmployee = createEmployee(betaBranch.id);
 
-  const mainRequest = service.requestLeave({ employeeId: mainEmployee, startDate: '2026-05-01', endDate: '2026-05-02' });
+  const mainRequest = service.requestLeave({ employeeId: mainEmployee, leaveType: 'SICK', startDate: '2026-05-01', endDate: '2026-05-02' });
   const access = new BranchAccessService();
   access.setCurrentBranchId(betaBranch.id, admin);
-  const betaRequest = service.requestLeave({ employeeId: betaEmployee, startDate: '2026-05-01', endDate: '2026-05-02' });
+  const betaRequest = service.requestLeave({ employeeId: betaEmployee, leaveType: 'SICK', startDate: '2026-05-01', endDate: '2026-05-02' });
   access.setCurrentBranchId('br_main', admin);
 
   asLimited();
@@ -174,7 +183,7 @@ test('deactivating hr blocks new leave writes but preserves history', async () =
   await boot();
   const service = new LeaveService();
   const employeeId = createEmployee();
-  const request = service.requestLeave({ employeeId, startDate: '2026-07-01', endDate: '2026-07-02' });
+  const request = service.requestLeave({ employeeId, leaveType: 'SICK', startDate: '2026-07-01', endDate: '2026-07-02' });
 
   ModuleRegistryService.deactivate('hr', admin);
   assert.ok(service.getRequests().some((row) => row.id === request.id));
@@ -187,4 +196,134 @@ test('deactivating hr blocks new leave writes but preserves history', async () =
   ModuleRegistryService.activate('hr', admin);
   asAdmin();
   assert.equal(ModuleRegistryService.isModuleEnabled('hr'), true);
+});
+
+test('leave dates are strict and annual balances reserve, approve and restore attendance', async () => {
+  const db = await boot();
+  const service = new LeaveService();
+  const employeeId = createEmployee();
+  assert.throws(
+    () => service.requestLeave({ employeeId, leaveType: 'SICK', startDate: '2026-02-30', endDate: '2026-03-01' }),
+    /تاريخ البداية غير صالح/
+  );
+
+  const shift = AttendanceService.saveShift({
+    name: 'Leave test weekday shift',
+    startTime: '09:00',
+    endTime: '17:00',
+    breakMinutes: 0,
+    graceMinutes: 0,
+    overtimeAfterMinutes: 0,
+    workdays: [1, 2, 3, 4, 5],
+  });
+  AttendanceService.assignShift(employeeId, shift.id, '2026-01-01');
+  AttendanceService.addHoliday('2026-03-02', 'Leave test holiday');
+  service.adjustAnnualBalance({
+    employeeId,
+    year: 2026,
+    daysDelta: 1,
+    transactionType: 'ALLOCATION',
+    effectiveDate: '2026-01-01',
+    reason: 'Manual annual balance',
+  });
+  db.run(
+    `INSERT INTO attendance (id, employee_id, date, status, source, recorded_by)
+     VALUES ('leave_previous_absence', ?, '2026-03-03', 'ABSENT', 'MANUAL', 'usr_leave_admin')`,
+    [employeeId]
+  );
+
+  const request = service.requestLeave({
+    employeeId,
+    leaveType: 'ANNUAL',
+    startDate: '2026-03-01',
+    endDate: '2026-03-03',
+  });
+  assert.equal(request.days, 1, 'weekend and registered holiday are not charged');
+  assert.equal(service.getBalanceSummary(employeeId, 2026).pendingDays, 1);
+  assert.throws(
+    () => service.requestLeave({
+      employeeId, leaveType: 'ANNUAL', startDate: '2026-03-04', endDate: '2026-03-04',
+    }),
+    /رصيد الإجازة السنوية غير كافٍ/
+  );
+
+  service.decide(request.id, 'APPROVED');
+  assert.equal(
+    db.query<{ status: string }>("SELECT status FROM attendance WHERE employee_id = ? AND date = '2026-03-03'", [employeeId])[0]?.status,
+    'LEAVE'
+  );
+  assert.equal(
+    db.query<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM attendance WHERE employee_id = ? AND date IN ('2026-03-01', '2026-03-02')",
+      [employeeId]
+    )[0].count,
+    0
+  );
+  assert.equal(service.getBalanceSummary(employeeId, 2026).availableDays, 0);
+
+  service.cancel(request.id);
+  assert.equal(
+    db.query<{ status: string }>("SELECT status FROM attendance WHERE employee_id = ? AND date = '2026-03-03'", [employeeId])[0]?.status,
+    'ABSENT'
+  );
+  assert.equal(service.getBalanceSummary(employeeId, 2026).availableDays, 1);
+
+  const unscheduledEmployeeId = createEmployee();
+  service.saveTypePolicy('SICK', 1);
+  assert.throws(
+    () => service.requestLeave({
+      employeeId: unscheduledEmployeeId, leaveType: 'SICK', startDate: '2026-03-01', endDate: '2026-03-03',
+    }),
+    /يتجاوز الطلب الحد السنوي/
+  );
+  service.saveTypePolicy('SICK', 2);
+  assert.equal(
+    service.requestLeave({
+      employeeId: unscheduledEmployeeId, leaveType: 'SICK', startDate: '2026-03-01', endDate: '2026-03-03',
+    }).days,
+    2,
+    'without a shift use calendar dates but still exclude the company holiday'
+  );
+  db.run(
+    `INSERT INTO attendance (id, employee_id, date, status, source, recorded_by)
+     VALUES ('leave_calendar_absence', ?, '2026-03-04', 'ABSENT', 'MANUAL', 'usr_leave_admin')`,
+    [unscheduledEmployeeId]
+  );
+  assert.ok(service.getCalendar('2026-03').some((entry) =>
+    entry.employeeId === unscheduledEmployeeId && entry.status === 'ABSENT'
+  ));
+});
+
+test('approved unpaid leave updates attendance and is deducted from the period payroll', async () => {
+  const db = await boot();
+  const service = new LeaveService();
+  const employeeId = createEmployee();
+  const shift = AttendanceService.saveShift({
+    name: 'Unpaid leave test shift',
+    startTime: '09:00',
+    endTime: '17:00',
+    breakMinutes: 0,
+    graceMinutes: 0,
+    overtimeAfterMinutes: 0,
+    workdays: [1, 2, 3, 4, 5, 6, 0],
+  });
+  AttendanceService.assignShift(employeeId, shift.id, '2026-01-01');
+  const request = service.requestLeave({
+    employeeId,
+    leaveType: 'UNPAID',
+    startDate: '2026-03-10',
+    endDate: '2026-03-11',
+  });
+  service.decide(request.id, 'APPROVED');
+  const run = EmployeeService.calculatePayrollRun('2026-03');
+  const item = run.items.find((row) => row.employeeId === employeeId);
+  assert.equal(item?.unpaidLeaveDays, 2);
+  assert.ok(Number(item?.attendanceDeductionAmount) > 0);
+  assert.equal(
+    db.query<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM attendance WHERE employee_id = ? AND date BETWEEN '2026-03-10' AND '2026-03-11' AND status = 'LEAVE'",
+      [employeeId]
+    )[0].count,
+    2
+  );
 });

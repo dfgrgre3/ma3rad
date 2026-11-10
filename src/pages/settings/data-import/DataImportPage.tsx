@@ -2,12 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { AlertCircle, CheckCircle2, Download, Eye, EyeOff, FileSpreadsheet, Loader2, Upload, WandSparkles } from 'lucide-react';
-import { DataImportService, ENTITY_META, ImportEntity, ParsedImport, ImportIssue } from '../../../services/admin/DataImportService';
-import { BackupService } from '../../../services/backup/BackupService';
-import { DataAdminService, type DataImportPreview, type DataImportSheet } from '../../../services/admin/DataAdminService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { DynamicDataService, DynamicImportResult } from '../../../services/data/DynamicDataService';
+import { DataImportService, ENTITY_META, ImportEntity, ParsedImport, ImportIssue } from '../../../services/domains/admin/DataImportService';
+import { BackupService } from '../../../services/infrastructure/backup/BackupService';
+import { DataAdminService, type DataImportPreview, type DataImportSheet } from '../../../services/domains/admin/DataAdminService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { DynamicDataService, DynamicImportResult } from '../../../services/infrastructure/data/DynamicDataService';
 import {
   MAX_SPREADSHEET_COLUMNS,
   MAX_SPREADSHEET_FILE_SIZE,
@@ -15,13 +15,13 @@ import {
   ParsedSpreadsheetSheet,
   validateSpreadsheetFileHeader,
   validateSpreadsheetFileMetadata,
-} from '../../../services/data/SpreadsheetImportService';
+} from '../../../services/infrastructure/data/SpreadsheetImportService';
 import { formatImportValue } from '../../admin/admin/adminDataUtils';
-import { hasOfficeCompoundFileSignature } from '../../../services/backup/xlsxBackup';
-import { parsePdfExtractedText } from '../../../services/data/PdfImportData';
-import { extractPdfText, MAX_PDF_IMPORT_BYTES } from '../../../services/data/PdfImportService';
-import { extractImageText, MAX_IMAGE_IMPORT_BYTES } from '../../../services/data/ImageImportService';
-import { MAX_DATA_FILE_IMPORT_BYTES, parseDataFileBuffer } from '../../../services/data/DataFileImportService';
+import { hasOfficeCompoundFileSignature } from '../../../services/infrastructure/backup/xlsxBackup';
+import { parsePdfExtractedText } from '../../../services/infrastructure/data/PdfImportData';
+import { extractPdfText, MAX_PDF_IMPORT_BYTES } from '../../../services/infrastructure/data/PdfImportService';
+import { extractImageText, MAX_IMAGE_IMPORT_BYTES } from '../../../services/infrastructure/data/ImageImportService';
+import { MAX_DATA_FILE_IMPORT_BYTES, parseDataFileBuffer } from '../../../services/infrastructure/data/DataFileImportService';
 
 const parseSpreadsheetInWorker = (buffer: ArrayBuffer, fileName: string): Promise<{ buffer: ArrayBuffer; sheets: ParsedSpreadsheetSheet[] }> =>
   new Promise((resolve, reject) => {

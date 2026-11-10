@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { ArrowDownAZ, Download, FilePlus2, Pencil, RotateCcw, Search, Trash2 } from 'lucide-react';
-import { DynamicDataService, DynamicEntity, DynamicField, DynamicRecord } from '../../../services/data/DynamicDataService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { DynamicDataService, DynamicEntity, DynamicField, DynamicRecord } from '../../../services/infrastructure/data/DynamicDataService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const DynamicDataPage: React.FC = () => {
   const service=useMemo(()=>new DynamicDataService(),[]);

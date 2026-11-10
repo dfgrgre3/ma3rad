@@ -1,5 +1,5 @@
-import { Order } from '../../../services/sales/OrderService';
-import type { OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { Order } from '../../../services/domains/sales/OrderService';
+import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 
 export interface OrderDetailModalProps {
   order: Order;

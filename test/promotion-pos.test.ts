@@ -3,12 +3,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { MIGRATIONS } from '../src/database/migrations/index.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { LoyaltyService } from '../src/services/sales/LoyaltyService.ts';
-import { PricingService, type PromotionCartItem } from '../src/services/sales/PricingService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { LoyaltyService } from '../src/services/domains/sales/LoyaltyService.ts';
+import { PricingService, type PromotionCartItem } from '../src/services/domains/sales/PricingService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { calculatePosTotals } from '../src/hooks/pages/sales/pos/usePosTotals.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 
 test('promotions created in pricing evaluate to the same discounts POS applies', async () => {
@@ -67,6 +68,68 @@ test('promotions created in pricing evaluate to the same discounts POS applies',
   canonicalize.up(manager.getDatabase());
   assert.equal(pricing.evaluatePromotions(cart)?.promotionId, 'legacy-promo');
   assert.equal(pricing.evaluatePromotions(cart)?.discountAmount, 5);
+});
+
+test('POS totals cap combined discounts to the net subtotal', () => {
+  const totals = calculatePosTotals({
+    cart: [{
+      product: { id: 'p1', name: 'Test', productType: 'CERAMIC', baseUnit: 'M2', sellUnit: 'M2', sellingPriceM2: 10, price: 10 } as any,
+      soldBy: 'M2',
+      soldQuantity: 3,
+      quantityM2: 3,
+      boxesCount: 1,
+      piecesCount: 0,
+      unitPrice: 10,
+      discountAmount: 0,
+      availableStockM2: 10,
+    }],
+    discountAmount: 100,
+    promotionDiscount: 10,
+    loyaltyDiscount: 5,
+    taxPercentage: 15,
+    shippingCost: 0,
+    paidAmount: 0,
+    activeShift: null,
+  });
+
+  assert.equal(totals.subtotal, 30);
+  assert.equal(totals.taxableBase, 0);
+  assert.equal(totals.taxAmount, 0);
+  assert.equal(totals.totalAmount, 0);
+});
+
+test('POS expected closing cash includes partner cash movements', () => {
+  const totals = calculatePosTotals({
+    cart: [],
+    discountAmount: 0,
+    promotionDiscount: 0,
+    loyaltyDiscount: 0,
+    taxPercentage: 0,
+    shippingCost: 0,
+    paidAmount: 0,
+    activeShift: {
+      id: 'partner-cash-shift',
+      shiftNumber: 'SHIFT-TEST',
+      registerId: 'register-test',
+      userId: 'user-test',
+      userName: 'POS test',
+      openedAt: '2026-01-01T00:00:00.000Z',
+      openingBalance: 100,
+      totalSalesCash: 500,
+      totalSalesCard: 0,
+      totalSalesTransfer: 0,
+      totalCustomerPayments: 80,
+      totalSupplierPayments: 40,
+      totalExpenses: 20,
+      totalRefunds: 10,
+      totalPartnerInflows: 60,
+      totalPartnerOutflows: 25,
+      expectedEndingCash: 0,
+      status: 'OPEN',
+    },
+  });
+
+  assert.equal(totals.expectedClosingCash, 645);
 });
 
 test('POS customer pages search and filter real customers by type and active status', async () => {

@@ -65,26 +65,6 @@ CREATE INDEX IF NOT EXISTS idx_employees_branch ON employees(branch_id);
 CREATE INDEX IF NOT EXISTS idx_employees_rep ON employees(is_sales_rep);
 CREATE INDEX IF NOT EXISTS idx_employees_active ON employees(is_active);
 
-CREATE TABLE IF NOT EXISTS employee_attendance (
-  id TEXT PRIMARY KEY,
-  employee_id TEXT NOT NULL,
-  date TEXT NOT NULL,
-  check_in TEXT,
-  check_out TEXT,
-  worked_minutes INTEGER DEFAULT 0,
-  late_minutes INTEGER DEFAULT 0,
-  overtime_minutes INTEGER DEFAULT 0,
-  status TEXT DEFAULT 'PRESENT' CHECK(status IN ('PRESENT', 'ABSENT', 'LATE', 'LEAVE', 'HOLIDAY', 'WEEKEND')),
-  notes TEXT,
-  recorded_by TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(employee_id, date),
-  FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
-  FOREIGN KEY (recorded_by) REFERENCES users(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_attendance_emp_date ON employee_attendance(employee_id, date);
-
 CREATE TABLE IF NOT EXISTS employee_leaves (
   id TEXT PRIMARY KEY,
   request_number TEXT UNIQUE NOT NULL,

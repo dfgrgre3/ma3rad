@@ -17,7 +17,7 @@ import { SyncPolicyService } from '../src/sync/SyncPolicyService.ts';
 import { BusinessRecordSyncService } from '../src/sync/BusinessRecordSyncService.ts';
 import { MIGRATIONS } from '../src/database/migrations/index.ts';
 import type { SyncEvent } from '../src/types/sync/index.ts';
-import { NavigationService } from '../src/services/config/NavigationService.ts';
+import { NavigationService } from '../src/services/domains/config/NavigationService.ts';
 import { v4 as uuidv4 } from 'uuid';
 
 async function boot() {

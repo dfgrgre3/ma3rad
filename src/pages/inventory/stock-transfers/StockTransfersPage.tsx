@@ -1,13 +1,13 @@
 import React from 'react';
-import { StockTransfersHeader } from '../../../components/inventory/stock-transfers/StockTransfersHeader';
-import { StockTransfersTabs } from '../../../components/inventory/stock-transfers/StockTransfersTabs';
-import { WorkflowTransfersTable } from '../../../components/inventory/stock-transfers/WorkflowTransfersTable';
-import { TransferHistoryTable } from '../../../components/inventory/stock-transfers/TransferHistoryTable';
-import { WarehouseSummaryGrid } from '../../../components/inventory/stock-transfers/WarehouseSummaryGrid';
-import { CreateTransferModal } from '../../../components/inventory/stock-transfers/CreateTransferModal';
-import { ReceiveTransferModal } from '../../../components/inventory/stock-transfers/ReceiveTransferModal';
-import { TransferDetailsModal } from '../../../components/inventory/stock-transfers/TransferDetailsModal';
-import { useStockTransfers } from '../../../hooks/inventory/useStockTransfers';
+import { StockTransfersHeader } from './components/StockTransfersHeader';
+import { StockTransfersTabs } from './components/StockTransfersTabs';
+import { WorkflowTransfersTable } from './components/WorkflowTransfersTable';
+import { TransferHistoryTable } from './components/TransferHistoryTable';
+import { WarehouseSummaryGrid } from './components/WarehouseSummaryGrid';
+import { CreateTransferModal } from './components/CreateTransferModal';
+import { ReceiveTransferModal } from './components/ReceiveTransferModal';
+import { TransferDetailsModal } from './components/TransferDetailsModal';
+import { useStockTransfers } from '../../../hooks/pages/inventory/stock-transfers/useStockTransfers';
 
 export const StockTransfersPage: React.FC = () => {
   const {

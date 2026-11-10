@@ -1,5 +1,5 @@
 import React from 'react';
-import type { AgingBucket, AgingRow } from '../../../services/reports/FinancialStatementsService';
+import type { AgingBucket, AgingRow } from '../../../services/domains/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
 export function AgingPanel({ aging }: { aging: { rows: AgingRow[]; bucket: AgingBucket } }) {

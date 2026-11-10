@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, History } from 'lucide-react';
-import { Order, OrderStatusEntry } from '../../../services/sales/OrderService';
+import { Order, OrderStatusEntry } from '../../../services/domains/sales/OrderService';
 import { Modal } from './ui';
 import { STATUS_LABELS } from '../../../types/sales/ordersPage';
 

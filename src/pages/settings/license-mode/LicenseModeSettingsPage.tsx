@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Shield, Globe, Lock, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { usePermission } from '../../../hooks/auth/usePermission';
-import { AuthService } from '../../../services/auth/AuthService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { AuthService } from '../../../services/domains/auth/AuthService';
 
 export const LicenseModeSettingsPage: React.FC = () => {
   const can = usePermission();

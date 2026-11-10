@@ -3,7 +3,7 @@ import { X, Save, Loader2 } from 'lucide-react';
 import { Product } from '../../../types';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { ProductEditForm } from '../../../types/products/productDetailPage';
-import { useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
+import { useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 interface ProductEditModalProps {
   product: Product;

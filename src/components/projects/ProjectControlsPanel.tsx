@@ -19,7 +19,7 @@ import {
   type ProjectTaskStatus,
   type ProjectTimeEntry,
   type ProjectTimeSummary,
-} from '../../services/projects/ProjectService';
+} from '../../services/domains/projects/ProjectService';
 import { useToast } from '../ui/Toast';
 import { localDateString } from '../../utils/shared/date';
 

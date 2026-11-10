@@ -2,12 +2,12 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { PurchaseService } from '../src/services/purchases/PurchaseService.ts';
-import { ProcurementService } from '../src/services/procurement/ProcurementService.ts';
-import { ProductService } from '../src/services/products/ProductService.ts';
-import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { PurchaseService } from '../src/services/domains/purchases/PurchaseService.ts';
+import { ProcurementService } from '../src/services/domains/procurement/ProcurementService.ts';
+import { ProductService } from '../src/services/domains/products/ProductService.ts';
+import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
 import { getDefaultBusinessConfiguration } from '../src/config/businessProfiles.ts';
 
 const supplierId = 'sup_no_inventory';

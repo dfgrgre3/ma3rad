@@ -4,11 +4,11 @@ import {
   Search, SlidersHorizontal, ShoppingCart, ArrowUpDown, ChevronRight,
   ShieldAlert, Clock, BarChart3, Building2, Edit3, X, Check
 } from 'lucide-react';
-import { InventoryService } from '../../../services/inventory/InventoryService';
-import { PurchaseRequestService } from '../../../services/purchases/PurchaseRequestService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { PurchaseRequestService } from '../../../services/domains/purchases/PurchaseRequestService';
 import { useToast } from '../../../components/ui/Toast';
 import { getStockQuantityLabel } from '../../../utils/products/productUnits';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const ReorderPlanningPage: React.FC = () => {
   const inventoryService = new InventoryService();

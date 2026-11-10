@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Download, History, Pencil, Plus, Search, Save } from "lucide-react";
 import { DatabaseManager } from "../../../database/repositories/databaseManager";
-import { AuthService } from "../../../services/auth/AuthService";
-import { PermissionService } from "../../../services/auth/PermissionService";
-import { BranchAccessService } from "../../../services/auth/BranchAccessService";
+import { AuthService } from "../../../services/domains/auth/AuthService";
+import { PermissionService } from "../../../services/domains/auth/PermissionService";
+import { BranchAccessService } from "../../../services/domains/auth/BranchAccessService";
 import { useToast } from "../../../components/ui/Toast";
 import { v4 as uuidv4 } from "uuid";
 import { exportToExcel, exportToPdf } from "../../../utils/export/export";

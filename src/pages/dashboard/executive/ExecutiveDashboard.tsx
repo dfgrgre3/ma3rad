@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { useExecutiveDashboard } from '../../../hooks/dashboard/useExecutiveDashboard';
+import { useExecutiveDashboard } from '../../../hooks/domains/dashboard/useExecutiveDashboard';
 import { ExecutiveKpiGrid } from './ExecutiveKpiGrid';
 import { ExecutiveSalesChart } from './ExecutiveSalesChart';
 import { LowStockAlertsCard } from './LowStockAlertsCard';

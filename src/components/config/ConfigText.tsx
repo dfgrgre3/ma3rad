@@ -1,5 +1,5 @@
 import React from 'react';
-import { useConfigText } from '../../hooks/config/useAppConfig';
+import { useConfigText } from '../../hooks/domains/config/useAppConfig';
 
 export interface ConfigTextProps {
   k: string;

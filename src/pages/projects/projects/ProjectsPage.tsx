@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Boxes, Plus, Calendar, User, DollarSign, Search, Loader2, X, Wallet, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ProjectService, Project, ProjectStatus } from '../../../services/projects/ProjectService';
-import { CustomerService } from '../../../services/customers/CustomerService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { ProjectService, Project, ProjectStatus } from '../../../services/domains/projects/ProjectService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import type { Customer } from '../../../types';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';

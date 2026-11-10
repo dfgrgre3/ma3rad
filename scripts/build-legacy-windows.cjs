@@ -38,11 +38,15 @@ function run(command, args, env = process.env) {
 
 async function downloadLegacyElectron() {
   const { downloadArtifact } = await import('@electron/get');
+  const mirrorOptions = process.env.ELECTRON_MIRROR
+    ? {}
+    : { mirrorOptions: { mirror: 'https://npmmirror.com/mirrors/electron/' } };
   const archivePath = await downloadArtifact({
     version: legacyElectronVersion,
     artifactName: 'electron',
     platform: 'win32',
     arch: 'ia32',
+    ...mirrorOptions,
   });
   const extractedDirectory = path.join(temporaryDirectory, 'electron');
   fs.mkdirSync(extractedDirectory, { recursive: true });
@@ -96,6 +100,7 @@ async function build() {
   const legacyEnvironment = {
     ...process.env,
     CERAMISYS_LEGACY_BUILD: '1',
+    ELECTRON_MIRROR: process.env.ELECTRON_MIRROR || 'https://npmmirror.com/mirrors/electron/',
   };
 
   run(process.execPath, [npmCliPath, 'run', 'build'], legacyEnvironment);

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChefHat, CirclePlus, Coffee, RefreshCw, Utensils } from 'lucide-react';
 import type { Customer, PaymentType, Product, Warehouse } from '../../../types';
-import { CustomerService } from '../../../services/customers/CustomerService';
-import { InventoryService } from '../../../services/inventory/InventoryService';
-import { ManufacturingService, type BillOfMaterials } from '../../../services/manufacturing/ManufacturingService';
-import { ProductService } from '../../../services/products/ProductService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { ManufacturingService, type BillOfMaterials } from '../../../services/domains/manufacturing/ManufacturingService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { isServiceProduct } from '../../../utils/products/productUnits';
 import {
@@ -14,10 +14,10 @@ import {
   type RestaurantOrder,
   type RestaurantServiceMode,
   type RestaurantTable,
-} from '../../../services/restaurant/RestaurantService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+} from '../../../services/domains/restaurant/RestaurantService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
-import { getEffectiveBusinessType } from '../../../services/config/BusinessTypeService';
+import { getEffectiveBusinessType } from '../../../services/domains/config/BusinessTypeService';
 import { getProfileWorkflows } from '../../../config/businessProfiles';
 
 type OrderLineDraft = { productId: string; quantity: string; notes: string };

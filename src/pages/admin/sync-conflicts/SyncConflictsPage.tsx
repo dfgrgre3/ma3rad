@@ -4,8 +4,8 @@ import {
   Sparkles, History, GitMerge, Wifi, WifiOff, Clock, AlertCircle, X,
   CheckCircle2, ArrowRightLeft, Database, SlidersHorizontal
 } from 'lucide-react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import {
   MasterDataSyncService,
   type SyncConflict,

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { UserRound, Plus, Search, Filter, Phone, Mail, Building2, Tag, Calendar, X, Loader2, ArrowLeftRight, Trash2 } from 'lucide-react';
-import { CrmService, Lead, LeadStage } from '../../../services/crm/CrmService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { CrmService, Lead, LeadStage } from '../../../services/domains/crm/CrmService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';

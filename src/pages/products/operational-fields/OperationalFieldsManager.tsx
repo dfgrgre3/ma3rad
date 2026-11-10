@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Edit, Plus, Save, Trash2 } from 'lucide-react';
-import { OperationalFieldService, type OperationalFieldDefinition, type ProductGradeOption } from '../../../services/products/OperationalFieldService';
-import type { DynamicAttributeDataType } from '../../../services/products/dynamicAttributes';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { OperationalFieldService, type OperationalFieldDefinition, type ProductGradeOption } from '../../../services/domains/products/OperationalFieldService';
+import type { DynamicAttributeDataType } from '../../../services/domains/products/dynamicAttributes';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 const TYPES: Array<{ value: DynamicAttributeDataType; label: string }> = [
   { value: 'TEXT', label: 'نص' },

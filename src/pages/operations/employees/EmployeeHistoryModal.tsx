@@ -6,6 +6,7 @@ import { TX_TYPES, type FinancialTransaction } from '../../../types/hr/employees
 interface EmployeeHistoryModalProps {
   open: boolean;
   employeeName: string | undefined;
+  period: string;
   transactions: FinancialTransaction[];
   netDue: number;
   onClose: () => void;
@@ -15,6 +16,7 @@ interface EmployeeHistoryModalProps {
 export const EmployeeHistoryModal: React.FC<EmployeeHistoryModalProps> = ({
   open,
   employeeName,
+  period,
   transactions,
   netDue,
   onClose,
@@ -28,12 +30,12 @@ export const EmployeeHistoryModal: React.FC<EmployeeHistoryModalProps> = ({
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
           <div>
             <h2 className="text-sm font-black text-slate-900">
-              السجل المالي التفصيلي للعامل:{' '}
+              حركات العامل خلال الفترة:{' '}
               <span className="text-orange-600">
                 {employeeName}
               </span>
             </h2>
-            <p className="text-[10px] text-slate-500 mt-0.5">كافة العمليات والدفعات المالية المسجلة على الحساب</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{period}</p>
           </div>
           <button
             onClick={onClose}
@@ -84,7 +86,7 @@ export const EmployeeHistoryModal: React.FC<EmployeeHistoryModalProps> = ({
         </div>
 
         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-between items-center text-xs">
-          <span className="text-slate-500 font-bold">الحساب الحالي:</span>
+          <span className="text-slate-500 font-bold">صافي الحركات في الفترة (تقديري):</span>
           <span className="font-black text-orange-600 text-sm">
             {fmtCurrency(netDue)}
           </span>

@@ -45,6 +45,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   { path: '/sales/reservations', any: ['sales.reservations.view', 'sales.view'] },
   { path: '/sales/after-sales', any: ['sales.after_sales.view', 'sales.view'] },
   { path: '/quotations', all: ['quotations.view'] },
+  { path: '/construction-estimate', any: ['quotations.view', 'quotations.create', 'projects.view'] },
   { path: '/orders', all: ['orders.view'] },
   { path: '/returns', all: ['returns.view'] },
 

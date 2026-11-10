@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Scale, Download, TrendingUp, DollarSign, Layers, PieChart } from 'lucide-react';
-import { InventoryValuationService, type WarehouseValuation } from '../../../services/inventory/InventoryValuationService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { InventoryValuationService, type WarehouseValuation } from '../../../services/domains/inventory/InventoryValuationService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { exportToExcel } from '../../../utils/export/export';
 
 export const InventoryValuationPage: React.FC = () => {

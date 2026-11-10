@@ -5,14 +5,14 @@ import {
   ArrowUpRight, ArrowDownRight, Phone, Building2, Pencil, Power,
   CalendarDays, Upload, ExternalLink
 } from 'lucide-react';
-import { SupplierService } from '../../services/suppliers/SupplierService';
+import { SupplierService } from '../../services/domains/suppliers/SupplierService';
 import { Supplier, PaymentType } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
-import { AuthService } from '../../services/auth/AuthService';
-import { PermissionService } from '../../services/auth/PermissionService';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/config/useBusinessTerm';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { Link } from 'react-router-dom';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
 

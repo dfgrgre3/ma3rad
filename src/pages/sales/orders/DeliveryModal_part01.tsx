@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, OrderItem } from '../../../services/sales/OrderService';
+import { Order, OrderItem } from '../../../services/domains/sales/OrderService';
 
 export interface DeliveryModalProps {
   target: Order;

@@ -2,10 +2,10 @@ import { DatabaseManager } from '../../database/repositories/databaseManager';
 import type { SalesInvoice, SystemSettings } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
-import { AppConfigService } from '../config/AppConfigService';
+import { AppConfigService } from '../domains/config/AppConfigService';
 import { EscPosService } from './EscPosService';
-import { SettingsService } from '../config/SettingsService';
-import { getEffectiveBusinessType } from '../config/BusinessTypeService';
+import { SettingsService } from '../domains/config/SettingsService';
+import { getEffectiveBusinessType } from '../domains/config/BusinessTypeService';
 import { getProfilePrintTemplate } from '../../config/businessProfiles';
 import type { InvoiceSectionId, InvoiceTableColumnId } from '../../types';
 import { writeAndPrintWindow } from '../../utils/shared/printWindow';
@@ -1506,7 +1506,7 @@ export class PrintService {
     const settings = this.getSettings();
     const quotationTitle = this.printOverride('quotation.a4', 'عرض سعر / مقايسة');
     const quotationFooter = this.printOverride('quotation.a4.footer', settings.receiptFooter || '');
-    const items = (quotation.items || []).map((item: any, i: number) => `
+    const productItems = (quotation.items || []).map((item: any, i: number) => `
       <tr>
         <td>${i + 1}</td>
         <td class="name">${this.esc(item.productName)}${item.size ? ` (${this.esc(item.size)})` : ''}</td>
@@ -1516,6 +1516,18 @@ export class PrintService {
         <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
         <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
       </tr>`).join('');
+    const serviceItems = (quotation.serviceItems || []).map((item: any, i: number) => `
+      <tr>
+        <td>${(quotation.items || []).length + i + 1}</td>
+        <td class="name">${this.esc(item.description || 'خدمة / عمالة')}</td>
+        <td>خدمة</td>
+        <td>${this.esc(item.quantity || 0)} ${this.esc(item.unit || 'بند')}</td>
+        <td>—</td>
+        <td>${CeramicMath.formatCurrency(item.unitPrice || 0)}</td>
+        <td>${CeramicMath.formatCurrency(item.totalPrice || 0)}</td>
+      </tr>`).join('');
+    const items = productItems + serviceItems;
+    const itemCount = (quotation.items || []).length + (quotation.serviceItems || []).length;
     const statusLabel = quotation.status === 'CONVERTED' ? 'محوّل إلى فاتورة'
       : quotation.status === 'EXPIRED' ? 'منتهي الصلاحية'
       : quotation.status === 'CANCELLED' ? 'ملغي' : 'بانتظار الموافقة';
@@ -1526,7 +1538,7 @@ export class PrintService {
         <div><b>العميل:</b> ${this.esc(quotation.customerName || 'عميل نقدي')}</div>
         <div><b>الهاتف:</b> ${this.esc(quotation.customerPhone || '-')}</div>
         <div><b>الحالة:</b> ${this.esc(statusLabel)}</div>
-        <div><b>عدد البنود:</b> ${(quotation.items || []).length}</div>
+        <div><b>عدد البنود:</b> ${itemCount}</div>
       </div>
       <table>
         <thead><tr><th>#</th><th>الصنف والبيان</th><th>الفرز</th><th>الكمية</th><th>الكراتين</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>

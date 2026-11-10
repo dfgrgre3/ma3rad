@@ -3,11 +3,11 @@ import {
   ShieldCheck, Users, MonitorSmartphone, AlertTriangle, Lock, RefreshCw,
   LogOut, Search, Loader2, Clock, KeyRound, FileWarning,
 } from 'lucide-react';
-import { SecurityService, ActiveSession, LoginRecord, SecurityOverview } from '../../../services/security/SecurityService';
-import { AuthService } from '../../../services/auth/AuthService';
+import { SecurityService, ActiveSession, LoginRecord, SecurityOverview } from '../../../services/domains/security/SecurityService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
 import { useToast } from '../../../components/ui/Toast';
-import { usePermission } from '../../../hooks/auth/usePermission';
-import type { TwoFactorSetup } from '../../../services/auth/twoFactorAuth';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import type { TwoFactorSetup } from '../../../services/domains/auth/twoFactorAuth';
 
 const fmtDate = (value?: string | null) => {
   if (!value) return '—';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Package } from 'lucide-react';
-import type { DailyPurchaseItemRow } from '../../../services/operations/DailyOperationsService';
+import type { DailyPurchaseItemRow } from '../../../services/domains/operations/DailyOperationsService';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { sumItemQuantityByUnit } from './helpers';
 import { ShareBar } from './primitives';

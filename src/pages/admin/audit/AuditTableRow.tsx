@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown, ChevronUp, User } from 'lucide-react';
-import type { AuditLogEntry } from '../../../services/security/AuditService';
+import type { AuditLogEntry } from '../../../services/domains/security/AuditService';
 import { formatJson, getModuleColor } from '../../../types/admin/audit';
 
 interface Props {

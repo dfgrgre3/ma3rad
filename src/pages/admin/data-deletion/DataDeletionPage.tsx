@@ -6,8 +6,8 @@ import {
 import {
   DataAdminService, RESET_KEEP_BY_DEFAULT,
   type TableInfo, type ColumnInfo, type DeleteResult,
-} from '../../../services/admin/DataAdminService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+} from '../../../services/domains/admin/DataAdminService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 
 type Mode = 'all' | 'table' | 'rows' | 'range';

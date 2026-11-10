@@ -32,8 +32,8 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
-import { ReportCenterService } from '../../../services/reports/ReportCenterService';
-import type { ReportParams, ReportResult } from '../../../services/reports/ReportCenterService';
+import { ReportCenterService } from '../../../services/domains/reports/ReportCenterService';
+import type { ReportParams, ReportResult } from '../../../services/domains/reports/ReportCenterService';
 
 export type ReportCategoryId =
   | 'core'
@@ -323,7 +323,7 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   {
     id: 'ar-aging',
     title: 'أعمار الديون',
-    description: 'المستحق على كل عميل موزَّع على شرائح 0-30 / 31-60 / 61-90 / 91-180 / أكثر من 180 يوم.',
+    description: 'المستحق على كل عميل موزَّع على شرائح 0-30 / 31-60 / 61-90 / 91-120 / أكثر من 120 يوم، محسوبًا من تاريخ الاستحقاق.',
     category: 'credit',
     icon: CalendarClock,
     dateMode: 'asOf',
@@ -465,8 +465,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
 
   {
     id: 'sales-rep-performance',
-    title: 'أداء مندوبي وفريق المبيعات',
-    description: 'تحليل إنتاجية كل موظف ومندوب مبيعات: حجم المبيعات، نسب التحصيل، الأرباح التقديرية وتقييم الأداء.',
+    title: 'أداء منشئي الفواتير',
+    description: 'تحليل حجم الفواتير والتحصيل والربحية حسب منشئ الفاتورة؛ لا يمثل مندوب البيع ما لم يُسجّل المندوب بشكل مستقل.',
     category: 'sales',
     icon: Award,
     dateMode: 'range',

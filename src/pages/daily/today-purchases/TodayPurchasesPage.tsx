@@ -5,10 +5,10 @@ import {
   DailyOperationsService,
   type DailyPurchaseResult,
   type DailyPurchaseRow,
-} from '../../../services/operations/DailyOperationsService';
-import { SettingsService } from '../../../services/config/SettingsService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+} from '../../../services/domains/operations/DailyOperationsService';
+import { SettingsService } from '../../../services/domains/config/SettingsService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import type { PaymentTarget } from '../../../components/daily/DailyModals';
 import { useToast } from '../../../components/ui/Toast';
 import { PurchasesHeader } from './PurchasesHeader';

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Percent, Plus, Search, Trash2, Loader2, X, Power } from 'lucide-react';
-import { PricingService, PriceList, PriceListItem } from '../../../services/sales/PricingService';
-import { ProductService } from '../../../services/products/ProductService';
+import { PricingService, PriceList, PriceListItem } from '../../../services/domains/sales/PricingService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import type { Product } from '../../../types';
 
 const CATEGORY_LABELS: Record<PriceList['customerType'], { label: string; color: string }> = {

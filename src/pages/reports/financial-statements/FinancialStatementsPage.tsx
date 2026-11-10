@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { FinancialStatementsService } from '../../../services/reports/FinancialStatementsService';
-import type { BalanceSheet, CashFlowMonth, AgingRow, AgingBucket, LedgerLine, ReconciliationCheck } from '../../../services/reports/FinancialStatementsService';
+import { FinancialStatementsService } from '../../../services/domains/reports/FinancialStatementsService';
+import type { BalanceSheet, CashFlowMonth, AgingRow, AgingBucket, LedgerLine, ReconciliationCheck } from '../../../services/domains/reports/FinancialStatementsService';
 import { exportToExcel } from '../../../utils/export/export';
 import { useToast } from '../../../components/ui/Toast';
 import { localDateString } from '../../../utils/shared/date';
@@ -20,7 +20,7 @@ type FinancialStatementsContentProps = {
   loading: boolean;
   tab: FinancialStatementsTab;
   balance: BalanceSheet | null;
-  cash: { months: CashFlowMonth[]; totals: CashFlowMonth } | null;
+  cash: { months: CashFlowMonth[]; totals: CashFlowMonth; balances: { opening: number; closing: number } } | null;
   aging: { rows: AgingRow[]; bucket: AgingBucket } | null;
   accounts: Array<{ id: string; code: string; name: string; type: string }>;
   accountId: string;
@@ -79,7 +79,11 @@ export const FinancialStatementsPage: React.FC = () => {
 
   const [from, setFrom] = useState(yearStart());
   const [to, setTo] = useState(today());
-  const [cash, setCash] = useState<{ months: CashFlowMonth[]; totals: CashFlowMonth } | null>(null);
+  const [cash, setCash] = useState<{
+    months: CashFlowMonth[];
+    totals: CashFlowMonth;
+    balances: { opening: number; closing: number };
+  } | null>(null);
 
   const [agingType, setAgingType] = useState<AgingType>('customer');
   const [aging, setAging] = useState<{ rows: AgingRow[]; bucket: AgingBucket } | null>(null);
@@ -89,16 +93,16 @@ export const FinancialStatementsPage: React.FC = () => {
   const [ledger, setLedger] = useState<{ opening: number; lines: LedgerLine[]; closing: number } | null>(null);
   const [reconciliation, setReconciliation] = useState<ReconciliationCheck[] | null>(null);
 
-  const loadLedger = () => {
+  const loadLedger = useCallback(() => {
     const list = accounts.length ? accounts : service.getAccountsForLedger();
     if (!accounts.length) setAccounts(list);
     const selected = accountId || list[0]?.id || '';
     if (!selected) return;
     if (!accountId) setAccountId(selected);
     setLedger(service.getGeneralLedger(selected, from, to));
-  };
+  }, [accountId, accounts, from, service, to]);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setScopeWarning(service.getBranchScopeWarning());
@@ -124,9 +128,9 @@ export const FinancialStatementsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [agingType, asOf, from, loadLedger, service, tab, toast, to]);
 
-  useEffect(() => { load();   }, [tab, agingType, asOf, from, to, accountId]);
+  useEffect(() => { load(); }, [load]);
 
   const exportBalance = () => {
     if (!balance) return;
@@ -154,9 +158,112 @@ export const FinancialStatementsPage: React.FC = () => {
         { key: 'days90', label: '91-120' }, { key: 'over90', label: 'أكثر من 120' },
         { key: 'total', label: 'الإجمالي' },
       ],
-      rows: aging.rows.map(({ id, name, phone, ...rest }) => ({ name, ...rest })),
+      rows: aging.rows.map((row) => ({
+        name: row.name,
+        current: row.current,
+        days30: row.days30,
+        days60: row.days60,
+        days90: row.days90,
+        over90: row.over90,
+        total: row.total,
+      })),
     });
   };
+
+  const exportCash = () => {
+    if (!cash) return;
+    exportToExcel({
+      title: 'قائمة التدفقات النقدية',
+      subtitle: `من ${from} إلى ${to}`,
+      fileName: 'cash-flow',
+      permission: 'reports.export',
+      columns: [
+        { key: 'period', label: 'الفترة' },
+        { key: 'inflows', label: 'التدفقات الداخلة' },
+        { key: 'outflows', label: 'التدفقات الخارجة' },
+        { key: 'net', label: 'صافي التدفق' },
+        { key: 'balance', label: 'رصيد النقدية' },
+      ],
+      rows: [
+        { period: 'الرصيد الافتتاحي', inflows: '', outflows: '', net: '', balance: cash.balances.opening },
+        ...cash.months.map((month) => ({
+          period: month.month,
+          inflows: month.inflows,
+          outflows: month.outflows,
+          net: month.net,
+          balance: '',
+        })),
+        { period: 'الإجمالي', inflows: cash.totals.inflows, outflows: cash.totals.outflows, net: cash.totals.net, balance: '' },
+        { period: 'الرصيد الختامي', inflows: '', outflows: '', net: '', balance: cash.balances.closing },
+      ],
+    });
+  };
+
+  const exportLedger = () => {
+    if (!ledger || !accountId) return;
+    const account = accounts.find((item) => item.id === accountId);
+    exportToExcel({
+      title: `دفتر الأستاذ — ${account ? `${account.code} ${account.name}` : accountId}`,
+      subtitle: `من ${from} إلى ${to}`,
+      fileName: 'general-ledger',
+      permission: 'reports.export',
+      columns: [
+        { key: 'date', label: 'التاريخ' },
+        { key: 'entryNumber', label: 'رقم القيد' },
+        { key: 'description', label: 'البيان' },
+        { key: 'debit', label: 'مدين' },
+        { key: 'credit', label: 'دائن' },
+        { key: 'balance', label: 'الرصيد' },
+      ],
+      rows: [
+        { date: '', entryNumber: '', description: 'الرصيد الافتتاحي', debit: '', credit: '', balance: ledger.opening },
+        ...ledger.lines.map((line) => ({
+          date: line.date,
+          entryNumber: line.entryNumber,
+          description: line.description,
+          debit: line.debit,
+          credit: line.credit,
+          balance: line.balance,
+        })),
+        { date: '', entryNumber: '', description: 'الرصيد الختامي', debit: '', credit: '', balance: ledger.closing },
+      ],
+    });
+  };
+
+  const exportReconciliation = () => {
+    if (!reconciliation) return;
+    exportToExcel({
+      title: 'مصالحة القوائم المالية',
+      fileName: 'financial-reconciliation',
+      permission: 'reports.export',
+      columns: [
+        { key: 'label', label: 'الفحص' },
+        { key: 'detail', label: 'التفاصيل' },
+        { key: 'ledger', label: 'الأستاذ العام' },
+        { key: 'source', label: 'المصدر المقارن' },
+        { key: 'difference', label: 'الفرق' },
+        { key: 'status', label: 'النتيجة' },
+      ],
+      rows: reconciliation.map((check) => ({
+        ...check,
+        status: check.status === 'MATCH' ? 'متطابق'
+          : check.status === 'NOT_COMPARABLE' ? 'غير قابل للمقارنة' : 'فرق',
+      })),
+    });
+  };
+
+  const exportCurrentTab = () => {
+    if (tab === 'balance') exportBalance();
+    else if (tab === 'cash') exportCash();
+    else if (tab === 'aging') exportAging();
+    else if (tab === 'ledger') exportLedger();
+    else exportReconciliation();
+  };
+  const canExportCurrentTab = tab === 'balance' ? Boolean(balance)
+    : tab === 'cash' ? Boolean(cash)
+      : tab === 'aging' ? Boolean(aging)
+        : tab === 'ledger' ? Boolean(ledger && accountId)
+          : Boolean(reconciliation);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -173,7 +280,7 @@ export const FinancialStatementsPage: React.FC = () => {
         onFromChange={setFrom}
         onToChange={setTo}
         onRefresh={load}
-        onExport={tab === 'balance' ? exportBalance : tab === 'aging' ? exportAging : undefined}
+        onExport={canExportCurrentTab ? exportCurrentTab : undefined}
       />
 
       <div className="flex-1 overflow-auto p-6">

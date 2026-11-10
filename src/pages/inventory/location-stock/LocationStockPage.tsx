@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Building2, Package, RefreshCw, Search, Warehouse as WarehouseIcon } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
-import { InventoryService } from '../../../services/inventory/InventoryService';
-import { ProductService } from '../../../services/products/ProductService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { ProductService } from '../../../services/domains/products/ProductService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import type { Product, Warehouse } from '../../../types';
 
 type LocationStockPageProps = {

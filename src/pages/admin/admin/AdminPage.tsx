@@ -19,10 +19,10 @@ import {
   Activity,
 } from "lucide-react";
 import { DatabaseManager } from "../../../database/repositories/databaseManager";
-import { AuthService } from "../../../services/auth/AuthService";
-import { AuditService, type AuditLogEntry } from "../../../services/security/AuditService";
-import { DataAdminService } from "../../../services/admin/DataAdminService";
-import { usePermission } from "../../../hooks/auth/usePermission";
+import { AuthService } from "../../../services/domains/auth/AuthService";
+import { AuditService, type AuditLogEntry } from "../../../services/domains/security/AuditService";
+import { DataAdminService } from "../../../services/domains/admin/DataAdminService";
+import { usePermission } from "../../../hooks/domains/auth/usePermission";
 import { AdminUsersTab } from "./AdminUsersTab";
 import { AdminRolesTab } from "./AdminRolesTab";
 import { AdminNavigationTab } from "./AdminNavigationTab";

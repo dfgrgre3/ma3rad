@@ -3,13 +3,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { AccountingService } from '../src/services/finance/AccountingService.ts';
-import { FinancialStatementsService } from '../src/services/reports/FinancialStatementsService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { SalesFinancialReconciliationService } from '../src/services/sales/SalesFinancialReconciliationService.ts';
-import { CommissionService } from '../src/services/hr/CommissionService.ts';
-import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { AccountingService } from '../src/services/domains/finance/AccountingService.ts';
+import { FinancialStatementsService } from '../src/services/domains/reports/FinancialStatementsService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { SalesFinancialReconciliationService } from '../src/services/domains/sales/SalesFinancialReconciliationService.ts';
+import { CommissionService } from '../src/services/domains/hr/CommissionService.ts';
+import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 test('financial statements only include assigned-branch ledger entries', async () => {
@@ -88,6 +88,7 @@ test('financial statements only include assigned-branch ledger entries', async (
     const cashFlow = service.getCashFlow('2037-05-14', '2037-05-14');
     assert.equal(cashFlow.totals.inflows, 100);
     assert.equal(cashFlow.totals.net, 100);
+    assert.equal(cashFlow.balances.closing, cashFlow.balances.opening + cashFlow.totals.net);
     assert.equal(new AccountingService().getProfitAndLossReport('2037-05-14', '2037-05-14').revenue, 100);
 
     const cashAccount = manager.query<{ id: string }>(

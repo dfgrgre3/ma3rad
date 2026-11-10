@@ -1,5 +1,5 @@
 import React from 'react';
-import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 
 export type OperationalFieldFilters = Record<string, string>;
 

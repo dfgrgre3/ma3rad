@@ -1,4 +1,4 @@
-import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/operations/DailyOperationsService';
+import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/domains/operations/DailyOperationsService';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { PAY_LABEL } from './constants';
 import { escapeHtml, timeOf } from './helpers_part01';

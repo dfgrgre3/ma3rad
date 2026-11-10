@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, ChevronDown, Clock3, PackageCheck, Search, Truck, Warehouse } from 'lucide-react';
-import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderItem } from '../../../services/purchases/PurchaseOrderService';
+import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderItem } from '../../../services/domains/purchases/PurchaseOrderService';
 import { useToast } from '../../../components/ui/Toast';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 import { localDateString } from '../../../utils/shared/date';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 
 type IncomingOrder = PurchaseOrderRow & { items: PurchaseOrderItem[] };
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);

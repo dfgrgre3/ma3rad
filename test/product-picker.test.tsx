@@ -4,11 +4,11 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import type { Product } from '../src/types/index.ts';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { ProductService } from '../src/services/products/ProductService.ts';
-import { CategoryService } from '../src/services/products/CategoryService.ts';
-import { BrandService } from '../src/services/products/BrandService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { ProductService } from '../src/services/domains/products/ProductService.ts';
+import { CategoryService } from '../src/services/domains/products/CategoryService.ts';
+import { BrandService } from '../src/services/domains/products/BrandService.ts';
 
 test('product picker searches, filters, paginates, and returns the selected product', async () => {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {

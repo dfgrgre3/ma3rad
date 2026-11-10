@@ -379,6 +379,7 @@ export class DatabaseManager {
         const loadedDb = new this.SQL.Database(savedBytes);
         // Verify file is a valid readable SQLite database immediately
         loadedDb.exec("SELECT 1 FROM sqlite_master LIMIT 1");
+        this.applyPerformancePragmas(loadedDb);
         this.db = loadedDb;
         console.log(`[database] Loaded existing SQLite database (${this.storageBackend === 'file' ? 'file' : 'legacy storage'}).`);
       } catch (e) {
@@ -387,8 +388,23 @@ export class DatabaseManager {
       return false;
     } else {
       console.log('Creating fresh SQLite database and running migrations...');
-      this.db = new this.SQL.Database();
+      const freshDb = new this.SQL.Database();
+      this.applyPerformancePragmas(freshDb);
+      this.db = freshDb;
       return true;
+    }
+  }
+
+  private applyPerformancePragmas(database: Database): void {
+    try {
+      database.exec(`
+        PRAGMA foreign_keys = ON;
+        PRAGMA synchronous = NORMAL;
+        PRAGMA temp_store = MEMORY;
+        PRAGMA cache_size = -4000;
+      `);
+    } catch {
+      // Keep going if a pragma is unsupported by the engine build
     }
   }
 
@@ -1021,6 +1037,13 @@ export class DatabaseManager {
   }
 
   private cloneCachedValue<T>(value: T): T {
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(value);
+      } catch {
+        // Fall back to JSON serialization if object contains non-cloneable items
+      }
+    }
     return JSON.parse(JSON.stringify(value)) as T;
   }
 

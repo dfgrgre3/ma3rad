@@ -5,10 +5,10 @@ import {
   DollarSign, FileText, ArrowRightLeft, Sparkles, Building2, User,
   PieChart as PieIcon, Award, MessageSquare, Wrench
 } from 'lucide-react';
-import { SalesService, ReturnStats, ReturnableItem } from '../../../services/sales/SalesService';
+import { SalesService, ReturnStats, ReturnableItem } from '../../../services/domains/sales/SalesService';
 import { PrintService } from '../../../services/shared/PrintService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../../types';
 import { useToast } from '../../../components/ui/Toast';
 import { formatProductQuantity } from '../../../utils/products/productUnits';

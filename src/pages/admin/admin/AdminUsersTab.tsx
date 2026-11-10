@@ -3,10 +3,10 @@ import {
   Search, UserPlus, Pencil, KeyRound, Trash2, ShieldCheck, RefreshCw,
   ChevronDown, ChevronLeft, UserCog, Power, Building2,
 } from 'lucide-react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { BranchService } from '../../../services/organization/BranchService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { BranchService } from '../../../services/domains/organization/BranchService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { CentralLimitGuard } from '../../../components/ui/CentralLimitGuard';
 import { useToast } from '../../../components/ui/Toast';
 import type { Role, User, UserRole } from '../../../types';

@@ -2,10 +2,10 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { CashierService } from '../src/services/finance/CashierService.ts';
-import { PartnerService } from '../src/services/customers/PartnerService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
+import { PartnerService } from '../src/services/domains/customers/PartnerService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {

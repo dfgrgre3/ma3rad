@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CentralLicenseService } from '../../services/licensing/CentralLicenseService';
-import { CentralConfigApplier } from '../../services/licensing/CentralConfigApplier';
-import { AuthService } from '../../services/auth/AuthService';
-import { PermissionService } from '../../services/auth/PermissionService';
+import { CentralLicenseService } from '../../services/domains/licensing/CentralLicenseService';
+import { CentralConfigApplier } from '../../services/domains/licensing/CentralConfigApplier';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
 
 export const CentralActivationView: React.FC = () => {
   const [account, setAccount] = useState('');

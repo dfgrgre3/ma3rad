@@ -29,6 +29,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'daily/expenses', element: <P.TodayExpensesPage /> },
   { path: 'daily/debts', element: <P.TodayDebtsPage /> },
   { path: 'quotations', element: <P.QuotationsPage /> },
+  { path: 'construction-estimate', element: <P.ApartmentEstimatePage /> },
   { path: 'orders', element: <P.OrdersPage /> },
   { path: 'returns', element: <P.ReturnsPage /> },
 

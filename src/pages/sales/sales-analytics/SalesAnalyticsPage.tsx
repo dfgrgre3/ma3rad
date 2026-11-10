@@ -2,9 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AnalyticsService } from '../../../services/reports/AnalyticsService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { AnalyticsService } from '../../../services/domains/reports/AnalyticsService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 
 type Summary = { count: number; revenue: number; collected: number; outstanding: number; profit: number };

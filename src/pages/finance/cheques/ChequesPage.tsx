@@ -15,10 +15,10 @@ import {
   Undo2,
   Scale,
 } from 'lucide-react';
-import { FinanceExtrasService, Cheque, ChequeType } from '../../../services/finance/FinanceExtrasService';
-import { FinanceEnterpriseService } from '../../../services/finance/FinanceEnterpriseService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { FinanceExtrasService, Cheque, ChequeType } from '../../../services/domains/finance/FinanceExtrasService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { addLocalDays, localDateString } from '../../../utils/shared/date';
 import type { ExtendedChequeStatus, ChequeStatusHistory, BankAccount } from '../../../types/finance';
 

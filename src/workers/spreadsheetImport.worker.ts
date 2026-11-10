@@ -1,4 +1,4 @@
-import { parseSpreadsheetBuffer } from '../services/data/SpreadsheetImportService';
+import { parseSpreadsheetBuffer } from '../services/infrastructure/data/SpreadsheetImportService';
 
 self.onmessage = (event: MessageEvent<{ buffer: ArrayBuffer; fileName: string }>) => {
   try {

@@ -1,4 +1,4 @@
-import { OrderStatus } from '../../services/sales/OrderService';
+import { OrderStatus } from '../../services/domains/sales/OrderService';
 
 export const PAGE_SIZE = 15;
 

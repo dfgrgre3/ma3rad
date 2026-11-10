@@ -3,8 +3,8 @@ import {
   Activity, AlertTriangle, CheckCircle2, CircleHelp, Cpu, Database, Download,
   HardDrive, RefreshCw, ShieldCheck, Wrench, XCircle,
 } from 'lucide-react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import {
   SystemDiagnosticsService,
   type DiagnosticCheck,

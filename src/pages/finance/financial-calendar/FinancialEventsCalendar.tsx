@@ -18,9 +18,9 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { FinancialCalendarEventsService, type FinancialCalendarEvent, type FinancialCalendarEventInput, type FinancialEventType, type FinancialPartyType } from '../../../services/finance/FinancialCalendarEventsService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { FinancialCalendarEventsService, type FinancialCalendarEvent, type FinancialCalendarEventInput, type FinancialEventType, type FinancialPartyType } from '../../../services/domains/finance/FinancialCalendarEventsService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useToast } from '../../../components/ui/Toast';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 

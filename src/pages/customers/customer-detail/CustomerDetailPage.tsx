@@ -6,18 +6,18 @@ import {
   Clock, Phone, MapPin, AlertTriangle, Loader2, Tag, Plus, Trash2,
 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { CustomerService } from '../../../services/customers/CustomerService';
-import { CustomerSupplyService, type CustomerSupplyRequest } from '../../../services/customers/CustomerSupplyService';
-import { PricingService } from '../../../services/sales/PricingService';
-import { ProductService } from '../../../services/products/ProductService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
+import { CustomerSupplyService, type CustomerSupplyRequest } from '../../../services/domains/customers/CustomerSupplyService';
+import { PricingService } from '../../../services/domains/sales/PricingService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { format, isValid } from 'date-fns';
 import { Customer, Product } from '../../../types';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 
 type Tab = 'overview' | 'sales' | 'quotations' | 'orders' | 'needs' | 'payments' | 'returns' | 'debts' | 'projects' | 'activities' | 'timeline' | 'prices';

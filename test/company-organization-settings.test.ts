@@ -2,9 +2,9 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { CompanyService } from '../src/services/organization/CompanyService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CompanyService } from '../src/services/domains/organization/CompanyService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = { id: 'usr_org_admin', username: 'org-admin', fullName: 'Org Admin', role: 'ADMIN', isActive: true, createdAt: '', updatedAt: '' };

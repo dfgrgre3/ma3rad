@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, Clock3, Loader2, MapPin, MessageCircle, PackageCheck, Phone, RefreshCw, Search, X } from 'lucide-react';
-import { CustomerSupplyService } from '../../../services/customers/CustomerSupplyService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { CustomerSupplyService } from '../../../services/domains/customers/CustomerSupplyService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { openWhatsAppChat, normalizeWhatsAppPhone } from '../../../utils/shared/externalLinks';
 

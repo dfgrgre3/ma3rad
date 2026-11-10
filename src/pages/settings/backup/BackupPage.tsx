@@ -3,9 +3,9 @@ import {
   Download, Upload, HardDrive, ShieldCheck, CheckCircle2,
   AlertTriangle, RefreshCw, FileText, Lock, X, Eye, EyeOff, Key
 } from 'lucide-react';
-import { BackupService } from '../../../services/backup/BackupService';
+import { BackupService } from '../../../services/infrastructure/backup/BackupService';
 import { BackupHistoryTable } from './BackupHistoryTable';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const BackupPage: React.FC = () => {
   const canManage = usePermission()('settings.backup');

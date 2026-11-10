@@ -1,6 +1,6 @@
 import { localDateString } from '../shared/date';
 import { ExportService } from '../../services/shared/ExportService';
-import { SettingsService } from '../../services/config/SettingsService';
+import { SettingsService } from '../../services/domains/config/SettingsService';
 import { createExcelWorkbook } from './excelExportWorkbook';
 import type { ExportColumn } from './exportTypes';
 

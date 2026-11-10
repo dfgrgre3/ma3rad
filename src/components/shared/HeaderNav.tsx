@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
-import { useSharedNavigationGroups } from '../../hooks/config/useNavigationGroups';
+import { useSharedNavigationGroups } from '../../hooks/domains/config/useNavigationGroups';
 
 interface HeaderNavProps {
   onOpenQuickCommand: () => void;

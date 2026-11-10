@@ -1,4 +1,4 @@
-import type { Delivery } from '../../../services/operations/OperationsService';
+import type { Delivery } from '../../../services/domains/operations/OperationsService';
 
 export const STATUS_LABEL: Record<Delivery['status'], string> = {
   PENDING: 'قيد الانتظار', SCHEDULED: 'مجدولة', IN_TRANSIT: 'في الطريق',

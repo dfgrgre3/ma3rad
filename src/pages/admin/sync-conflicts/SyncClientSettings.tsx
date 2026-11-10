@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useToast } from '../../../components/ui/Toast';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { Copy, Check, Info, ShieldCheck, Laptop, HelpCircle, ExternalLink, KeyRound, DownloadCloud, Sparkles } from 'lucide-react';
 import { openExternalShare } from '../../../utils/shared/externalLinks';
 

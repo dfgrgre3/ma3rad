@@ -29,9 +29,9 @@ test('financial statements screen filters cash flow and ledger and exports the b
   const React = await import('react');
   const { ToastProvider } = await import('../src/components/ui/Toast.tsx');
   const { FinancialStatementsPage } = await import('../src/pages/reports/financial-statements/FinancialStatementsPage.tsx');
-  const { AuthService } = await import('../src/services/auth/AuthService.ts');
-  const { PermissionService } = await import('../src/services/auth/PermissionService.ts');
-  const { BranchAccessService } = await import('../src/services/auth/BranchAccessService.ts');
+  const { AuthService } = await import('../src/services/domains/auth/AuthService.ts');
+  const { PermissionService } = await import('../src/services/domains/auth/PermissionService.ts');
+  const { BranchAccessService } = await import('../src/services/domains/auth/BranchAccessService.ts');
   const manager = DatabaseManager.getInstance();
   await manager.initialize();
   await PermissionService.seed();

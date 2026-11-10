@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowUpRight, Clock, Package } from 'lucide-react';
-import type { DashboardMetrics } from '../../services/finance/AccountingService';
+import type { DashboardMetrics } from '../../services/domains/finance/AccountingService';
 
 interface AttentionRequiredSectionProps {
   metrics: DashboardMetrics;

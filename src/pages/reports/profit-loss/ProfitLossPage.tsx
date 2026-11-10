@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PieChart, Loader2, Download, CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
-import { AccountingService } from '../../../services/finance/AccountingService';
+import { AccountingService } from '../../../services/domains/finance/AccountingService';
 import { localDateString } from '../../../utils/shared/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';
@@ -17,6 +17,8 @@ type PnL = {
   costOfGoodsSold: number;
   grossProfit: number;
   expenses: number;
+  sourceExpenses: number;
+  expenseReconciliationDifference: number;
   netProfit: number;
   margin: number;
 };
@@ -27,14 +29,15 @@ export const ProfitLossPage: React.FC = () => {
   const [to, setTo] = useState(today());
   const [pnl, setPnl] = useState<PnL>({
     revenue: 0, merchandiseRevenue: 0, shippingRevenue: 0, otherRevenue: 0,
-    costOfGoodsSold: 0, grossProfit: 0, expenses: 0, netProfit: 0, margin: 0,
+    costOfGoodsSold: 0, grossProfit: 0, expenses: 0, sourceExpenses: 0,
+    expenseReconciliationDifference: 0, netProfit: 0, margin: 0,
   });
   const [expenses, setExpenses] = useState<Array<{ category: string; total: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scopeWarning, setScopeWarning] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setScopeWarning(service.getBranchScopeWarning());
@@ -43,8 +46,8 @@ export const ProfitLossPage: React.FC = () => {
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل قائمة الأرباح والخسائر.'); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, [from, to]);
+  }, [from, service, to]);
+  useEffect(() => { load(); }, [load]);
 
   const expenseTotal = expenses.reduce((s, e) => s + Number(e.total), 0);
   const maxExpense = Math.max(1, ...expenses.map((e) => Number(e.total)));
@@ -56,6 +59,8 @@ export const ProfitLossPage: React.FC = () => {
       ['تكلفة البضاعة المباعة', String(pnl.costOfGoodsSold)],
       ['إجمالي الربح', String(pnl.grossProfit)],
       ['المصروفات التشغيلية', String(pnl.expenses)],
+      ['مصروفات جدول المصدر', String(pnl.sourceExpenses)],
+      ['فرق المصالحة (المصدر - الأستاذ)', String(pnl.expenseReconciliationDifference)],
       ['صافي الربح', String(pnl.netProfit)],
       ['هامش الربح %', String(pnl.margin)],
       [],
@@ -155,9 +160,20 @@ export const ProfitLossPage: React.FC = () => {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className={`mb-4 rounded-xl border px-4 py-3 text-xs ${Math.abs(pnl.expenseReconciliationDifference) < 0.01 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                <div className="font-black">مصالحة المصروفات للفترة {from} — {to}</div>
+                <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
+                  <span>القيود المرحلة (قائمة الدخل): {fmt(pnl.expenses)}</span>
+                  <span>جدول المصروفات: {fmt(pnl.sourceExpenses)}</span>
+                  <span className="font-black">الفرق (المصدر − الأستاذ): {fmt(pnl.expenseReconciliationDifference)}</span>
+                </div>
+                {Math.abs(pnl.expenseReconciliationDifference) >= 0.01 && (
+                  <div className="mt-1">يوجد فرق بين سجل المصروفات والقيود المرحلة؛ راجع القيود اليدوية والتسويات والمصروفات غير المرحلة قبل اعتماد التقرير.</div>
+                )}
+              </div>
               <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
                 <h3 className="text-sm font-black">توزيع المصروفات</h3>
-                <span className="text-[10px] font-bold text-slate-400">{fmt(expenseTotal)}</span>
+                <span className="text-[10px] font-bold text-slate-400">مصدر المصروفات: {fmt(expenseTotal)}</span>
               </div>
               <div className="p-4 space-y-3">
                 {expenses.map((e) => (

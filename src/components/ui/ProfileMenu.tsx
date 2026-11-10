@@ -3,8 +3,8 @@ import { Bell, Building2, Check, ChevronDown, ChevronLeft, KeyRound, LogOut, Moo
 import { useNavigate } from 'react-router-dom';
 import type { User } from '../../types';
 import { useTheme } from '../../contexts/useTheme';
-import { AuthService } from '../../services/auth/AuthService';
-import { PermissionService } from '../../services/auth/PermissionService';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { DatabaseManager } from '../../database/repositories/databaseManager';
 import { useToast } from './Toast';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -94,7 +94,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
     }
     setBusy(true);
     try {
-      new AuthService().changeOwnPassword(currentUser.id, current, next);
+      await new AuthService().changeOwnPasswordAsync(currentUser.id, current, next);
       toast.success('تم تغيير كلمة المرور', 'استخدم كلمة المرور الجديدة في تسجيل الدخول القادم.');
       setPasswordOpen(false);
       resetForm();

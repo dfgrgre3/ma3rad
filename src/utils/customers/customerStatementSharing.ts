@@ -1,4 +1,4 @@
-import type { CustomerService } from '../../services/customers/CustomerService';
+import type { CustomerService } from '../../services/domains/customers/CustomerService';
 import { CeramicMath } from '../products/ceramicMath';
 import { buildExportHtml, downloadPdf, type ExportOptions } from '../export/export';
 import { buildWhatsAppUrl, openExternalShare } from '../shared/externalLinks';

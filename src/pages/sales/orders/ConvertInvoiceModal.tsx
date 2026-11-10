@@ -1,6 +1,6 @@
 import React from 'react';
 import { Receipt, AlertTriangle, Loader2 } from 'lucide-react';
-import { Order } from '../../../services/sales/OrderService';
+import { Order } from '../../../services/domains/sales/OrderService';
 import { PaymentType } from '../../../types';
 import { Modal } from './ui';
 import { fmt } from '../../../types/sales/ordersPage';

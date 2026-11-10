@@ -5,13 +5,13 @@ import {
   ChevronRight, Percent, Ban as CancelIcon, Receipt, Clock, CheckCircle2, AlertTriangle,
   MessageCircle, CalendarClock, ShoppingBag, PhoneCall,
 } from 'lucide-react';
-import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../../services/sales/QuotationService';
-import { CustomerService } from '../../../services/customers/CustomerService';
-import { ProductService } from '../../../services/products/ProductService';
-import { InventoryService } from '../../../services/inventory/InventoryService';
+import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
+import { ProductService } from '../../../services/domains/products/ProductService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { PrintService } from '../../../services/shared/PrintService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { Customer, Product, Warehouse, PaymentType } from '../../../types';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
@@ -24,7 +24,7 @@ import { openWhatsAppChat } from '../../../utils/shared/externalLinks';
 import { QuotationModals } from './QuotationModals';
 import { emptyForm } from './QuotationModals';
 import type { FormState, Line } from './QuotationModals';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
@@ -169,6 +169,14 @@ export const QuotationsPage: React.FC = () => {
           unitPrice: i.unitPrice,
           discountAmount: i.discountAmount || 0,
         })),
+        serviceLines: (full.serviceItems || []).map((item) => ({
+          productId: item.productId || undefined,
+          description: item.description,
+          unit: item.unit,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discountAmount: item.discountAmount || 0,
+        })),
       });
       setFormOpen(true);
     } catch (e: any) { alert(e?.message || 'تعذر تحميل عرض السعر.'); }
@@ -206,14 +214,16 @@ export const QuotationsPage: React.FC = () => {
     }
   };
 
-  const subtotal = form.lines.reduce((s, l) => s + l.quantity * l.unitPrice - (l.discountAmount || 0), 0);
+  const subtotal = form.lines.reduce((s, l) => s + l.quantity * l.unitPrice - (l.discountAmount || 0), 0)
+    + form.serviceLines.reduce((s, l) => s + l.quantity * l.unitPrice - (l.discountAmount || 0), 0);
   const total = Math.max(0, subtotal - (Number(form.discount) || 0) + (Number(form.tax) || 0));
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault();
     const items = form.lines.filter((l) => l.productId && l.quantity > 0);
+    const serviceItems = form.serviceLines.filter((line) => line.description.trim() && line.quantity > 0);
     if (!form.customerId) return alert('اختر العميل.');
-    if (items.length === 0) return alert('أضف بنداً واحداً على الأقل بكمية أكبر من صفر.');
+    if (items.length === 0 && serviceItems.length === 0) return alert('أضف بنداً واحداً على الأقل بكمية أكبر من صفر.');
     setSaving(true);
     try {
       fieldService.validateRecordValues(
@@ -233,6 +243,14 @@ export const QuotationsPage: React.FC = () => {
           uom: l.uom || undefined,
           unitPrice: l.unitPrice,
           discountAmount: l.discountAmount || 0,
+        })),
+        serviceItems: serviceItems.map((line) => ({
+          productId: line.productId || undefined,
+          description: line.description,
+          unit: line.unit,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          discountAmount: line.discountAmount || 0,
         })),
       };
       if (editingId) {

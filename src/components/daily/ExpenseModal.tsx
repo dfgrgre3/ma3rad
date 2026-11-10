@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Save } from 'lucide-react';
-import { CashierService } from '../../services/finance/CashierService';
+import { CashierService } from '../../services/domains/finance/CashierService';
 import { useToast } from '../ui/Toast';
 import type { PaymentType } from '../../types';
-import { useExpenseCategories } from '../../hooks/daily/useExpenseCategories';
+import { useExpenseCategories } from '../../hooks/domains/daily/useExpenseCategories';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
-import { useRegisters } from '../../hooks/daily/useRegisters';
+import { useRegisters } from '../../hooks/domains/daily/useRegisters';
 import { input, label } from './DailyModalUtils';
 
 export const ExpenseModal: React.FC<{ initial?: any; onClose: () => void; onSaved: () => void }> = ({ initial, onClose, onSaved }) => {

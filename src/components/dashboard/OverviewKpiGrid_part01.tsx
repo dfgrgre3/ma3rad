@@ -1,5 +1,5 @@
 import React from 'react';
-import type { DashboardMetrics } from '../../services/finance/AccountingService';
+import type { DashboardMetrics } from '../../services/domains/finance/AccountingService';
 
 export interface OverviewKpiGridProps {
   metrics: DashboardMetrics;

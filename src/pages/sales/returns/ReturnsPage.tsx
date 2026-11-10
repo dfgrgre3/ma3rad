@@ -6,11 +6,11 @@ import {
   RefreshCw, FileSpreadsheet, FileDown, ChevronLeft, ChevronRight, Banknote,
   Wallet, TrendingDown, FileText, CheckCircle2, PackageX,
 } from 'lucide-react';
-import { SalesService, ReturnableItem, ReturnStats } from '../../../services/sales/SalesService';
-import { ProductService } from '../../../services/products/ProductService';
+import { SalesService, ReturnableItem, ReturnStats } from '../../../services/domains/sales/SalesService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { PrintService } from '../../../services/shared/PrintService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { SalesInvoice, SalesReturn, SalesReturnItem, Product } from '../../../types';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
@@ -18,9 +18,9 @@ import { formatProductQuantity } from '../../../utils/products/productUnits';
 import {
   convertQuantity, fromBaseQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
 } from '../../../utils/products/uom';
-import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../../../services/finance/financials';
+import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpact, round2 } from '../../../services/domains/finance/financials';
 import { HistoricalReturnReconciliationPanel } from './HistoricalReturnReconciliationPanel';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';

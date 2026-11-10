@@ -2,15 +2,15 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
-import { BackupService } from '../src/services/backup/BackupService.ts';
-import { BackupServicePart01 } from '../src/services/backup/BackupServicePart01.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { BackupService } from '../src/services/infrastructure/backup/BackupService.ts';
+import { BackupServicePart01 } from '../src/services/infrastructure/backup/BackupServicePart01.ts';
 import officeCrypto from 'officecrypto-tool';
-import { createXlsxBackupWorkbook } from '../src/services/backup/xlsxBackup.ts';
-import { encryptExternalBackup } from '../src/services/backup/backupEncryption.ts';
+import { createXlsxBackupWorkbook } from '../src/services/infrastructure/backup/xlsxBackup.ts';
+import { encryptExternalBackup } from '../src/services/infrastructure/backup/backupEncryption.ts';
 import { MIGRATIONS } from '../src/database/migrations/index.ts';
 
 /**

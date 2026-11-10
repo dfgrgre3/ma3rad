@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   FolderTree, Plus, Search, Edit, Trash2, Package, ChevronRight, X, Layers
 } from 'lucide-react';
-import { CategoryService, CategoryWithCount } from '../../../services/products/CategoryService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { CategoryService, CategoryWithCount } from '../../../services/domains/products/CategoryService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const CategoriesPage: React.FC = () => {
   const can = usePermission();

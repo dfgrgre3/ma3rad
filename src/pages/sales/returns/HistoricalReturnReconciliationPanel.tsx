@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import {
   HistoricalReturnReconciliationService,
   type HistoricalReturnCandidate,
-} from '../../../services/sales/HistoricalReturnReconciliationService';
+} from '../../../services/domains/sales/HistoricalReturnReconciliationService';
 
 type ApprovalForm = {
   cash: string;

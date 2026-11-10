@@ -11,9 +11,8 @@ const packageConfig = require('../package.json');
 const { acquireBuildLock, resolveBuildFlavor } = require('../scripts/build-frontend.cjs');
 const {
   filesToCompile,
-  pinBytecodeIntegrityManifest,
+  refreshBytecodeIntegrityManifest,
   verifyBytecodeReproducibility,
-  writeBytecodeIntegrityManifest,
 } = require('../scripts/compile-bytenode.cjs');
 const { getEntrySourceIntegrityHash } = require('../scripts/electron-security-integrity.cjs');
 const { FileIntegrityChecker } = require('../electron/security/fileIntegrity.js');
@@ -216,8 +215,7 @@ test('bytecode integrity manifest is pinned and covers every compiled Electron m
   const entryPath = path.join(electronDir, 'entry.js');
   const originalEntry = `const BYTECODE_INTEGRITY_MANIFEST_SHA256 = '${'0'.repeat(64)}';\n`;
   fs.writeFileSync(entryPath, originalEntry);
-  writeBytecodeIntegrityManifest(electronDir);
-  pinBytecodeIntegrityManifest(electronDir);
+  refreshBytecodeIntegrityManifest(electronDir);
 
   const manifest = JSON.parse(fs.readFileSync(path.join(electronDir, 'bytecode-integrity.json'), 'utf8'));
   const entrySource = fs.readFileSync(entryPath, 'utf8');
@@ -347,6 +345,7 @@ test('electron-builder restores sources after the process exits on success and f
     const [mode, projectRoot, fixtureRoot, outputDirectory] = process.argv.slice(1);
     const { buildWithTemporaryOutput } = require(path.join(projectRoot, 'scripts/electron-builder-with-temp-output.cjs'));
     const { restoreSource } = require(path.join(projectRoot, 'scripts/restore-source.cjs'));
+    const { refreshBytecodeIntegrityManifest } = require(path.join(projectRoot, 'scripts/compile-bytenode.cjs'));
     const temporaryOutput = path.join(fixtureRoot, 'temporary-output');
     let copyAttempts = 0;
 
@@ -355,7 +354,16 @@ test('electron-builder restores sources after the process exits on success and f
       outputDirectory,
       assertCommercialBuild: () => {},
       restoreSource: () => restoreSource(path.join(fixtureRoot, 'electron')),
+      refreshPackageIntegrity: () => refreshBytecodeIntegrityManifest(path.join(fixtureRoot, 'electron')),
       runBuilder: (args) => {
+        const manifestPath = path.join(fixtureRoot, 'electron', 'bytecode-integrity.json');
+        const entryPath = path.join(fixtureRoot, 'electron', 'entry.js');
+        const manifestContents = fs.readFileSync(manifestPath);
+        const manifestHash = require('node:crypto').createHash('sha256').update(manifestContents).digest('hex');
+        const pinnedHash = fs.readFileSync(entryPath, 'utf8')
+          .match(/BYTECODE_INTEGRITY_MANIFEST_SHA256 = '([a-f0-9]{64})'/)?.[1];
+        if (pinnedHash !== manifestHash) throw new Error('Packaged entry integrity hash is stale');
+
         if (mode === 'failure') return false;
         const configPath = args[args.indexOf('--config') + 1];
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -388,6 +396,13 @@ test('electron-builder restores sources after the process exits on success and f
     fs.mkdirSync(securityDir, { recursive: true });
     fs.writeFileSync(path.join(electronDir, 'main.js'), "module.exports = require('./main.jsc');\n");
     fs.writeFileSync(path.join(electronDir, 'main.js.bak'), 'main source');
+    const originalEntry = `const BYTECODE_INTEGRITY_MANIFEST_SHA256 = '${'0'.repeat(64)}';\n`;
+    fs.writeFileSync(path.join(electronDir, 'entry.js'), originalEntry);
+    for (const file of filesToCompile) {
+      const bytecodePath = path.join(electronDir, file.replace(/\.js$/, '.jsc'));
+      fs.mkdirSync(path.dirname(bytecodePath), { recursive: true });
+      fs.writeFileSync(bytecodePath, `compiled:${file}`);
+    }
     fs.writeFileSync(path.join(securityDir, 'crypto.js'), "module.exports = require('./crypto.jsc');\n");
     fs.writeFileSync(path.join(securityDir, 'crypto.js.bak'), 'nested source');
 
@@ -414,6 +429,8 @@ test('electron-builder restores sources after the process exits on success and f
     }
     assert.equal(fs.readFileSync(sourceFiles[0], 'utf8'), 'main source');
     assert.equal(fs.readFileSync(sourceFiles[1], 'utf8'), 'nested source');
+    assert.equal(fs.readFileSync(path.join(electronDir, 'entry.js'), 'utf8'), originalEntry);
+    assert.equal(fs.existsSync(path.join(electronDir, 'entry.js.bak')), false);
     if (mode === 'copy-retry' || mode === 'copy-failure') {
       assert.equal(
         fs.readFileSync(path.join(fixtureRoot, 'copy-attempts'), 'utf8'),

@@ -2,16 +2,16 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
-import { AnalyticsService } from '../src/services/reports/AnalyticsService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { AnalyticsService } from '../src/services/domains/reports/AnalyticsService.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 import { loadReport } from '../src/pages/reports/sales-reports/SalesReportsPage.tsx';
-import { SalesFinancialReconciliationService } from '../src/services/sales/SalesFinancialReconciliationService.ts';
-import { ReportCenterService } from '../src/services/reports/ReportCenterService.ts';
-import { HistoricalReturnReconciliationService } from '../src/services/sales/HistoricalReturnReconciliationService.ts';
+import { SalesFinancialReconciliationService } from '../src/services/domains/sales/SalesFinancialReconciliationService.ts';
+import { ReportCenterService } from '../src/services/domains/reports/ReportCenterService.ts';
+import { HistoricalReturnReconciliationService } from '../src/services/domains/sales/HistoricalReturnReconciliationService.ts';
 import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
 
 test('sales reports net sales, profit and daily revenue against returns by return date', async () => {
@@ -419,4 +419,75 @@ test('historical return reconciliation requires verified values and leaves histo
     'SELECT customer_purchase_tax_included AS taxIncluded FROM sales_return_reconciliations WHERE return_id = ?',
     [legacyV4ReturnId],
   )[0], { taxIncluded: 0 });
+});
+
+test('report-center cash and sales-rep reports use current tables and check permission before cache reads', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const admin = AuthService.login('admin', 'admin123');
+  const service = new ReportCenterService();
+  ReportCenterService.clearCache();
+  const params = { from: '2000-01-01', to: '2099-12-31' };
+
+  const customer = new CustomerService().createCustomer({
+    name: 'Historical aging report customer',
+    phone: '0199000088',
+    customerType: 'RETAIL',
+    creditLimit: 0,
+  });
+  db.run(`INSERT INTO sales_invoices (
+    id, invoice_number, date, due_date, customer_id, warehouse_id, branch_id, company_id,
+    subtotal, discount_amount, tax_amount, total_amount, paid_amount, remaining_amount,
+    payment_type, payment_status, invoice_status, total_cost, gross_profit, created_by
+  ) VALUES (
+    'aging_report_historical_invoice', 'AGING-REPORT-HISTORICAL', '2099-01-01', '2099-01-10',
+    ?, 'wh_main', 'br_main', 'cmp_main', 1000, 0, 0, 1000, 1000, 0,
+    'CREDIT', 'PAID', 'COMPLETED', 0, 1000, ?
+  )`, [customer.id, admin.id]);
+  db.run(`INSERT INTO customer_payments (
+    id, receipt_number, customer_id, invoice_id, amount, payment_type, date, performed_by
+  ) VALUES (
+    'aging_report_future_payment', 'AGING-REPORT-FUTURE-PAYMENT', ?,
+    'aging_report_historical_invoice', 1000, 'CASH', '2099-02-01', ?
+  )`, [customer.id, admin.id]);
+  db.run(`INSERT INTO customer_payment_allocations (id, payment_id, sales_invoice_id, amount)
+    VALUES ('aging_report_future_allocation', 'aging_report_future_payment',
+      'aging_report_historical_invoice', 1000)`);
+
+  const aging = service.arAging({ from: '2099-01-30', to: '2099-01-30' });
+  const historicalAgingRow = aging.rows.find((row) => row.customerId === customer.id);
+  assert.ok(historicalAgingRow);
+  assert.equal(historicalAgingRow.total, 1000, 'future payment must not reduce the historical receivable');
+  assert.equal(historicalAgingRow.bucket0, 1000, 'aging should use the contractual due date');
+  assert.equal(historicalAgingRow.dueDate, '2099-01-10');
+
+  const sales = service.salesRepPerformance(params);
+  assert.ok(Array.isArray(sales.rows));
+  assert.ok(sales.columns.some((column) => column.key === 'totalSales'));
+
+  const cash = service.cashFlowDetailed(params);
+  assert.ok(Array.isArray(cash.rows));
+  assert.ok(cash.columns.some((column) => column.key === 'inflow'));
+
+  const role = PermissionService.createRole({ code: 'REPORT_CACHE_DENIED', name: 'Report cache denied test' }, admin);
+  PermissionService.setRolePermissions(role.code, ['sales.view'], admin);
+  const limited = {
+    id: 'report_cache_denied_user',
+    username: 'report-cache-denied',
+    fullName: 'Report cache denied',
+    role: role.code,
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  try {
+    AuthService.setCurrentUser(limited);
+    assert.throws(() => service.salesRepPerformance(params), /غير مصرح/);
+    assert.throws(() => service.cashFlowDetailed(params), /غير مصرح/);
+  } finally {
+    AuthService.setCurrentUser(admin);
+    PermissionService.invalidate(limited);
+    db.run('DELETE FROM roles WHERE id = ?', [role.id]);
+  }
 });

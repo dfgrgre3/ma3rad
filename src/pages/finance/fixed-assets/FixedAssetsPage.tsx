@@ -3,9 +3,9 @@ import {
   ArrowDownUp, Building2, CalendarDays, Check, ClipboardList, Download, Loader2,
   MapPin, Pencil, Plus, Search, SlidersHorizontal, Trash2, TrendingDown, Wallet,
 } from 'lucide-react';
-import { FinanceExtrasService, type FixedAsset } from '../../../services/finance/FinanceExtrasService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { FinanceExtrasService, type FixedAsset } from '../../../services/domains/finance/FinanceExtrasService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 import { fmt, CATEGORY_LABELS } from './fixedAssetsHelpers';

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Lock, ShieldAlert, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { AuthService } from '../../services/auth/AuthService';
+import { AuthService } from '../../services/domains/auth/AuthService';
 import { useToast } from '../ui/Toast';
 import type { User } from '../../types';
 
@@ -68,7 +68,7 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
     setLoading(true);
     try {
       const authService = new AuthService();
-      authService.changeOwnPassword(user.id, currentPassword, newPassword);
+      await authService.changeOwnPasswordAsync(user.id, currentPassword, newPassword);
       toast.success('تم تغيير كلمة المرور بنجاح وتم تأمين حساب المدير.');
       const updatedUser: User = { ...user, mustChangePassword: false };
       AuthService.setCurrentUser(updatedUser);

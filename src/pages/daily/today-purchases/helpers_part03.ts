@@ -1,4 +1,4 @@
-import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/operations/DailyOperationsService';
+import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/domains/operations/DailyOperationsService';
 import type { PurchaseFilters, SortDir, SortKey } from '../../../types/dashboard/todayPurchases';
 
 /** Amount range check shared by the invoice and item scopes. */

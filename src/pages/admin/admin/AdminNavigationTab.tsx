@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowUp, ArrowDown, Eye, EyeOff, Save, RotateCcw, GripVertical } from 'lucide-react';
-import { NavigationService, type NavOverrides } from '../../../services/config/NavigationService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { NavigationService, type NavOverrides } from '../../../services/domains/config/NavigationService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 
 export const AdminNavigationTab: React.FC = () => {

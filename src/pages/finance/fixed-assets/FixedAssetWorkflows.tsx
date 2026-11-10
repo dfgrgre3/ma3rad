@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, ExternalLink, FileUp, Printer, X } from 'lucide-react';
 import QRCode from 'qrcode';
-import { AuthService } from '../../../services/auth/AuthService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
 import {
   FinanceExtrasService, type FixedAsset, type FixedAssetCountCampaign,
   type FixedAssetCountAudit, type FixedAssetCountObservation, type FixedAssetCountSnapshot,
   type FixedAssetAttachment, type FixedAssetDepreciationPeriod, type FixedAssetDepreciationRequest,
   type FixedAssetDisposal, type FixedAssetSettlementSource,
   type FixedAssetMaintenance, type FixedAssetTimelineEvent, type FixedAssetTransfer,
-} from '../../../services/finance/FinanceExtrasService';
+} from '../../../services/domains/finance/FinanceExtrasService';
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 

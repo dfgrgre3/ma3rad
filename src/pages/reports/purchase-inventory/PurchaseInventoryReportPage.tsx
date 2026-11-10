@@ -4,10 +4,10 @@ import {
   Loader2, AlertCircle, RefreshCw, BarChart3, Handshake,
   Scale, Star, PackageCheck, DollarSign,
 } from 'lucide-react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { loadInventoryKpi, loadPurchaseKpi, type PurchaseKpi } from '../../../services/reports/InventoryReportService';
-import type { InventoryKpi } from '../../../services/inventory/InventoryValuationService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { loadInventoryKpi, loadPurchaseKpi, type PurchaseKpi } from '../../../services/domains/reports/InventoryReportService';
+import type { InventoryKpi } from '../../../services/domains/inventory/InventoryValuationService';
 import { localDateString } from '../../../utils/shared/date';
 import { useNavigate } from 'react-router-dom';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
@@ -220,12 +220,17 @@ export const PurchaseInventoryReportPage: React.FC = () => {
         ) : purchaseKpi ? (
           <div className="space-y-5">
             {(tab === 'purchases' || tab === 'returns') && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="إجمالي المشتريات" value={fmtM(purchaseKpi.totalPurchases) + ' ج'} sub={`${fmt(purchaseKpi.totalInvoices)} فاتورة`} icon={ShoppingBag} color="text-orange-600" bg="bg-orange-50" />
-                <StatCard label="المبلغ المدفوع" value={fmtM(purchaseKpi.totalPaid) + ' ج'} sub="إجمالي الدفعات" icon={PackageCheck} color="text-emerald-600" bg="bg-emerald-50" />
-                <StatCard label="المستحق للموردين" value={fmtM(purchaseKpi.totalDue) + ' ج'} sub="ذمم دائنة" icon={DollarSign} color="text-rose-600" bg="bg-rose-50" />
-                <StatCard label="مرتجعات الشراء" value={fmtM(purchaseKpi.returnsTotal) + ' ج'} sub={`${fmt(purchaseKpi.returnsCount)} مرتجع`} icon={TrendingDown} color="text-amber-600" bg="bg-amber-50" />
-              </div>
+              <>
+                <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800">
+                  صافي المشتريات محسوب من إجمالي الفواتير مطروحًا منه المرتجعات حسب تاريخ حركة المرتجع. هذه قيمة مالية ولا تعني كمية البضاعة المستلمة فعليًا أو المرحلة إلى المخزن.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <StatCard label="صافي المشتريات بعد المرتجعات" value={fmtM(purchaseKpi.totalPurchases) + ' ج'} sub={`فواتير: ${fmtM(purchaseKpi.grossPurchases)} ج · ${fmt(purchaseKpi.totalInvoices)} فاتورة`} icon={ShoppingBag} color="text-orange-600" bg="bg-orange-50" />
+                  <StatCard label="المدفوع بعد المبالغ المستردة" value={fmtM(purchaseKpi.totalPaid) + ' ج'} sub="دفعات الموردين مطروحًا منها المبالغ المستردة" icon={PackageCheck} color="text-emerald-600" bg="bg-emerald-50" />
+                  <StatCard label="المستحق للموردين" value={fmtM(purchaseKpi.totalDue) + ' ج'} sub="بعد أرصدة المرتجعات" icon={DollarSign} color="text-rose-600" bg="bg-rose-50" />
+                  <StatCard label="مرتجعات الشراء" value={fmtM(purchaseKpi.returnsTotal) + ' ج'} sub={`${fmt(purchaseKpi.returnsCount)} مرتجع`} icon={TrendingDown} color="text-amber-600" bg="bg-amber-50" />
+                </div>
+              </>
             )}
             {tab === 'purchases' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

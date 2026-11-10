@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { SettingsService } from '../services/config/SettingsService';
-import { AuthService } from '../services/auth/AuthService';
-import { PermissionService } from '../services/auth/PermissionService';
+import { SettingsService } from '../services/domains/config/SettingsService';
+import { AuthService } from '../services/domains/auth/AuthService';
+import { PermissionService } from '../services/domains/auth/PermissionService';
 import type { SystemSettings } from '../types';
 import { ThemeContext, type ThemeMode, type ThemeContextValue } from './ThemeContext';
 import { accessibleForeground, mixHexColors, normalizeHexColor, readableColorOnSurface } from '../utils/shared/themeContrast';

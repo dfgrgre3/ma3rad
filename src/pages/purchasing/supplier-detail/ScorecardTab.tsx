@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShieldCheck, Clock, PackageCheck, AlertTriangle, Scale, Sparkles } from 'lucide-react';
-import { SupplierScorecard } from '../../../services/procurement/ProcurementService';
+import { SupplierScorecard } from '../../../services/domains/procurement/ProcurementService';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 
 export interface ScorecardTabProps {

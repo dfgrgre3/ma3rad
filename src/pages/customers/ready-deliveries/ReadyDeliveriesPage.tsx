@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Loader2, MessageCircle, Search, Truck } from 'lucide-react';
-import { CustomerSupplyService, CustomerSupplyRequest } from '../../../services/customers/CustomerSupplyService';
+import { CustomerSupplyService, CustomerSupplyRequest } from '../../../services/domains/customers/CustomerSupplyService';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { normalizeWhatsAppPhone, openWhatsAppChat } from '../../../utils/shared/externalLinks';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
 

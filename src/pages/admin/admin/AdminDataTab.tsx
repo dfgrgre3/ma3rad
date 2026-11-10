@@ -3,14 +3,14 @@ import { Database, Download, HardDrive, Table2, RefreshCw, ShieldCheck, Wrench, 
 import {
   DataAdminService, type StorageStats, type TableInfo,
   type DataImportPreview, type DataImportSheet,
-} from '../../../services/admin/DataAdminService';
-import { BackupService } from '../../../services/backup/BackupService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+} from '../../../services/domains/admin/DataAdminService';
+import { BackupService } from '../../../services/infrastructure/backup/BackupService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 
 import { downloadExcel, formatBytes, formatImportValue, parseAdminDataWorkbook } from './adminDataUtils';
 import { AdminDataTable } from './AdminDataTable';
-import { hasOfficeCompoundFileSignature } from '../../../services/backup/xlsxBackup';
+import { hasOfficeCompoundFileSignature } from '../../../services/infrastructure/backup/xlsxBackup';
 
 export const AdminDataTab: React.FC = () => {
   const toast = useToast();

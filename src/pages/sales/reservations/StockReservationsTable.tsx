@@ -1,5 +1,5 @@
 import React from 'react';
-import type { StockReservation } from '../../../services/sales/ReservationService';
+import type { StockReservation } from '../../../services/domains/sales/ReservationService';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { reservationStatusLabels, reservationStatusStyles } from './constants';
 

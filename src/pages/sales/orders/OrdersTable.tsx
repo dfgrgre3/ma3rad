@@ -3,7 +3,7 @@ import {
   Eye, Printer, History, MessageCircle, Pencil, PackageCheck, Receipt,
   Trash2, User, Phone, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { Order } from '../../../services/sales/OrderService';
+import { Order } from '../../../services/domains/sales/OrderService';
 import { IconBtn } from './ui';
 import { STATUS_LABELS, fmt } from '../../../types/sales/ordersPage';
 

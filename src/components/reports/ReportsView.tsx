@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart3, Calendar, DollarSign, Package, ShoppingCart, Truck, PieChart, FileSpreadsheet, FileDown } from 'lucide-react';
-import { SalesService } from '../../services/sales/SalesService';
-import { AccountingService } from '../../services/finance/AccountingService';
+import { SalesService } from '../../services/domains/sales/SalesService';
+import { AccountingService } from '../../services/domains/finance/AccountingService';
 import { SalesInvoice } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';

@@ -6,8 +6,8 @@ import { TABS, Tab } from './constants';
 import { gradeLabel } from '../../../components/products/productFormModel';
 import { fmt } from './format';
 import { StockSummary } from '../../../types/products/productDetailPage';
-import { usePermission } from '../../../hooks/auth/usePermission';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 interface ProductDetailHeaderProps {
   product: Product;

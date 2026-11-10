@@ -5,7 +5,7 @@ import {
 import { Supplier } from '../../../types';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
 import { TABS, Tab } from '../../../types/purchasing/supplierDetailPage';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 
 export interface SupplierHeaderProps {
   supplier: Supplier;

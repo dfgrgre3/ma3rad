@@ -4,14 +4,14 @@ import {
   ArrowRight, Boxes, Building2, Calendar, CheckCircle2, DollarSign, Loader2,
   MapPin, Package, Plus, Trash2, User, Wallet, X, Activity,
 } from 'lucide-react';
-import { ProjectService, Project, ProjectUnit, ProjectProduct, ProjectStatus } from '../../../services/projects/ProjectService';
+import { ProjectService, Project, ProjectUnit, ProjectProduct, ProjectStatus } from '../../../services/domains/projects/ProjectService';
 import { ProjectControlsPanel } from '../../../components/projects/ProjectControlsPanel';
-import { ProductService } from '../../../services/products/ProductService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { ProductService } from '../../../services/domains/products/ProductService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import type { Product } from '../../../types';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/config/useBusinessTerm';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';

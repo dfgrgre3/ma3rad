@@ -2,14 +2,14 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
-import { BranchService } from '../src/services/organization/BranchService.ts';
-import { ContractService } from '../src/services/hr/ContractService.ts';
-import { EmployeeService } from '../src/services/hr/EmployeeService.ts';
-import { ModuleRegistryService } from '../src/services/config/ModuleRegistryService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { RecruitmentService } from '../src/services/hr/RecruitmentService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { BranchAccessService } from '../src/services/domains/auth/BranchAccessService.ts';
+import { BranchService } from '../src/services/domains/organization/BranchService.ts';
+import { ContractService } from '../src/services/domains/hr/ContractService.ts';
+import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
+import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { RecruitmentService } from '../src/services/domains/hr/RecruitmentService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {

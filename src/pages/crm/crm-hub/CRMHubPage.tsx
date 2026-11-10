@@ -1,7 +1,7 @@
 import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Activity, LayoutDashboard, Megaphone, Users, Workflow } from 'lucide-react';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
 

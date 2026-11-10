@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { normalizePagePath, type AppConfigRule } from '../../config/appConfiguration';
-import { useAppConfig } from '../../hooks/config/useAppConfig';
+import { useAppConfig } from '../../hooks/domains/config/useAppConfig';
 
 const EXCLUDED_PAGES = ['/settings/app-configuration'];
 

@@ -9,7 +9,7 @@ import { formatProductQuantity, getProductUnitLabel } from '../../utils/products
 import { DocumentPreviewModal } from '../documents/DocumentPreviewModal';
 import { CustomerStatementWhatsAppOptions } from './CustomerStatementWhatsAppOptions';
 import { Modal, InfoBox, SummaryRow } from './SalesUi';
-import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsSummary } from '../products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';
 

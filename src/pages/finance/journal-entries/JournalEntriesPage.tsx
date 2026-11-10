@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FileText, Plus, Loader2, X, Trash2, Scale, Search, ChevronDown } from 'lucide-react';
-import { FinanceExtrasService, Account, JournalEntry, JournalLine } from '../../../services/finance/FinanceExtrasService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { FinanceExtrasService, Account, JournalEntry, JournalLine } from '../../../services/domains/finance/FinanceExtrasService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(n || 0) + ' ج';

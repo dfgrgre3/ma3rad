@@ -13,11 +13,11 @@ import {
   Target,
   BarChart3,
 } from 'lucide-react';
-import { FinanceEnterpriseService } from '../../../services/finance/FinanceEnterpriseService';
-import { FinanceExtrasService } from '../../../services/finance/FinanceExtrasService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
+import { FinanceExtrasService } from '../../../services/domains/finance/FinanceExtrasService';
 import type { CostCenter, Budget, FiscalYear } from '../../../types/finance';
 import { useToast } from '../../../components/ui/Toast';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const BudgetsCostCentersPage: React.FC = () => {
   const service = useMemo(() => new FinanceEnterpriseService(), []);

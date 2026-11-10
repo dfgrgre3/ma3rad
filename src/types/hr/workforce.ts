@@ -1,4 +1,4 @@
-export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
+export type EmployeeStatus = 'PROBATION' | 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'RESIGNED' | 'TERMINATED';
 export type SalaryType = 'MONTHLY' | 'DAILY';
 export type PayrollTxType = 'ADVANCE' | 'BONUS' | 'DEDUCTION' | 'SALARY_PAYOUT';
 export type AttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE';

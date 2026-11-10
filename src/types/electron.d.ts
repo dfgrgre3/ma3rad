@@ -213,7 +213,7 @@ declare global {
         clear?: () => Promise<{ ok: boolean }>;
       };
       documents?: {
-        importFile?: () => Promise<{
+        importFile?: (options?: { purpose?: 'employee' }) => Promise<{
           ok: boolean;
           canceled?: boolean;
           storageName?: string;
@@ -224,6 +224,10 @@ declare global {
           error?: string;
         }>;
         openFile?: (storageName: string) => Promise<{ ok: boolean; error?: string }>;
+        readFile?: (storageName: string) => Promise<{ ok: boolean; bytes?: Uint8Array; error?: string }>;
+        downloadFile?: (storageName: string, fileName: string) => Promise<{ ok: boolean; canceled?: boolean; error?: string }>;
+        commitEmployeeImport?: (storageName: string) => Promise<{ ok: boolean; error?: string }>;
+        discardEmployeeImport?: (storageName: string) => Promise<{ ok: boolean; error?: string }>;
         recognizePage?: (imageData: Uint8Array) => Promise<{ ok: boolean; text?: string; error?: string }>;
         finishOcr?: () => Promise<{ ok: boolean; error?: string }>;
         info?: () => Promise<{ ok: boolean; directory?: string; maxBytes?: number }>;

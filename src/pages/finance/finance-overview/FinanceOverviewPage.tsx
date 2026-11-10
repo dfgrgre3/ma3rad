@@ -8,8 +8,8 @@ import {
   Tooltip, ResponsiveContainer
 } from 'recharts';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
-import { queryFinanceOverviewMetrics } from '../../../services/dashboard/DashboardQueryScopeService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { queryFinanceOverviewMetrics } from '../../../services/domains/dashboard/DashboardQueryScopeService';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 interface Metrics {

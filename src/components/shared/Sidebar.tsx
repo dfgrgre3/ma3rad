@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronLeft, Moon, PanelRightClose, PanelRightOpen, Sun } from 'lucide-react';
-import { useSharedNavigationGroups } from '../../hooks/config/useNavigationGroups';
+import { useSharedNavigationGroups } from '../../hooks/domains/config/useNavigationGroups';
 import { useTheme } from '../../contexts/useTheme';
 
 interface SidebarProps {

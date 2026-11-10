@@ -3,16 +3,16 @@ import {
   ArrowLeftRight, Warehouse, Plus, RefreshCw, 
   History, AlertTriangle, CheckCircle2, Search, SlidersHorizontal
 } from 'lucide-react';
-import { InventoryService } from '../../services/inventory/InventoryService';
-import { ProductService } from '../../services/products/ProductService';
-import { AuthService } from '../../services/auth/AuthService';
-import { PermissionService } from '../../services/auth/PermissionService';
+import { InventoryService } from '../../services/domains/inventory/InventoryService';
+import { ProductService } from '../../services/domains/products/ProductService';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { WarehouseStock, InventoryTransaction, Warehouse as IWarehouse, Product } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
 import { gradeLabel } from '../products/productFormModel';
 import { ProductPicker } from '../products/ProductPicker';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/config/useBusinessTerm';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 
 export const InventoryView: React.FC = () => {
   const inventoryLabel = useBusinessTerm('modules.inventory');

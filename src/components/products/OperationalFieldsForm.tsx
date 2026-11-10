@@ -1,6 +1,6 @@
 import React from 'react';
 import { SlidersHorizontal } from 'lucide-react';
-import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 
 export interface OperationalFieldsFormProps {
   fields: OperationalFieldDefinition[];

@@ -2,11 +2,11 @@ import './integration.setup.ts';
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { InventoryService } from '../src/services/inventory/InventoryService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 
 test('general product sales decrement stock using the selected unit', async () => {
   const manager = DatabaseManager.getInstance();

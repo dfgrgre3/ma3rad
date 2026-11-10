@@ -4,13 +4,13 @@ import {
   RefreshCw, Download, Loader2, AlertTriangle, Clock, Users,
   Plus, Search, Eye, Trash2, Pencil, HandCoins, Ban, ExternalLink,
 } from 'lucide-react';
-import { DailyOperationsService } from '../../../services/operations/DailyOperationsService';
-import { SettingsService } from '../../../services/config/SettingsService';
-import { CustomerService } from '../../../services/customers/CustomerService';
-import { SalesService } from '../../../services/sales/SalesService';
-import { CashierService } from '../../../services/finance/CashierService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { DailyOperationsService } from '../../../services/domains/operations/DailyOperationsService';
+import { SettingsService } from '../../../services/domains/config/SettingsService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
+import { SalesService } from '../../../services/domains/sales/SalesService';
+import { CashierService } from '../../../services/domains/finance/CashierService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useNavigate } from 'react-router-dom';
 import { exportToExcel } from '../../../utils/export/export';
 import { useToast } from '../../../components/ui/Toast';

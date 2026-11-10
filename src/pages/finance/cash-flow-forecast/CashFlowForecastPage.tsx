@@ -13,7 +13,7 @@ import {
   Clock,
   Layers,
 } from 'lucide-react';
-import { FinanceEnterpriseService } from '../../../services/finance/FinanceEnterpriseService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import type { CashForecastDaySummary } from '../../../types/finance';
 import { useToast } from '../../../components/ui/Toast';
 

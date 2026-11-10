@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BadgeDollarSign, Calculator, Check, Banknote, X, Loader2, FileSpreadsheet, RefreshCw } from 'lucide-react';
-import { CommissionService, CommissionRow, CommissionStats } from '../../../services/hr/CommissionService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { CommissionService, CommissionRow, CommissionStats } from '../../../services/domains/hr/CommissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useToast } from '../../../components/ui/Toast';
 import { exportToExcel } from '../../../utils/export/export';
 

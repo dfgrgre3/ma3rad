@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Loader2, Save, Percent, Truck, Barcode } from 'lucide-react';
-import { SalesService } from '../../services/sales/SalesService';
-import { InventoryService } from '../../services/inventory/InventoryService';
+import { SalesService } from '../../services/domains/sales/SalesService';
+import { InventoryService } from '../../services/domains/inventory/InventoryService';
 import { useToast } from '../ui/Toast';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import type { PaymentType } from '../../types';
-import { round2 } from '../../services/finance/financials';
+import { round2 } from '../../services/domains/finance/financials';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
-import { useLists } from '../../hooks/daily/useLists';
+import { useLists } from '../../hooks/domains/daily/useLists';
 import { fmt, input, label } from './DailyModalUtils';
 import { ProductPicker } from '../products/ProductPicker';
 

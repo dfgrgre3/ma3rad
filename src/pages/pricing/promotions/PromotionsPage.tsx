@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Plus, Search, Calendar, Tag, Loader2, X, Power, Trash2 } from 'lucide-react';
-import { PricingService, Promotion } from '../../../services/sales/PricingService';
+import { PricingService, Promotion } from '../../../services/domains/sales/PricingService';
 import { localDateString } from '../../../utils/shared/date';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 const TYPE_LABELS: Record<Promotion['promotionType'], string> = {
   PERCENTAGE: 'نسبة خصم %',

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Download, Loader2, Pencil, Plus, Search, Tag, Trash2, TrendingDown, Wallet } from 'lucide-react';
-import { CashierService } from '../../../services/finance/CashierService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { AuthService } from '../../../services/auth/AuthService';
+import { CashierService } from '../../../services/domains/finance/CashierService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
 import { ExpenseModal } from '../../../components/daily/ExpenseModal';
 import { exportToExcel } from '../../../utils/export/export';
 import type { Expense } from '../../../types';

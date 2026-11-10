@@ -2,7 +2,9 @@
 
 Date: 2026-11-09
 Scope: `src/` renderer application plus the renderer-side service/database ("backend") layers.
-Status: Executed, typechecked, linted, production-built, and regression-tested.
+Status: Renderer structure reorganized; TypeScript and production build pass. The full test
+suite reports one unrelated existing failure, and full lint reports one error in unchanged
+Electron source.
 
 ---
 
@@ -19,12 +21,13 @@ actually exist:
 | Requested backend layer | Actual implementation in this repository |
 | --- | --- |
 | routes / controllers | Electron IPC handler registrars (`electron/*Handlers.js`, `electron/printing.js`, `electron/licenseGuard.js`) |
-| services | `src/services/<domain>/` (business logic, permissions, transactions) |
+| services | `src/services/domains/<domain>/` (business logic, permissions, transactions) |
+| infrastructure services | `src/services/infrastructure/` (backup and data import infrastructure) |
 | repositories | `src/database/repositories/` (`databaseManager.ts`, `ledger.ts`) |
 | models / schema | `src/database/schema/` |
 | migrations | `src/database/migrations/` |
-| validators | `src/services/config/settingsValidation.ts`, `src/services/auth/passwordPolicy.ts`, domain validators inside services |
-| events / jobs | `src/services/effects/`, `src/services/backup/BackupScheduler.ts`, `src/sync/` |
+| validators | `src/services/domains/config/settingsValidation.ts`, `src/services/domains/auth/passwordPolicy.ts`, domain validators inside services |
+| events / jobs | `src/services/domains/effects/`, `src/services/infrastructure/backup/BackupScheduler.ts`, `src/sync/` |
 
 The Electron main-process source was deliberately **not moved**. It is currently in its
 packaged "Protected binary code" state, its file paths are pinned by
@@ -66,23 +69,32 @@ src/
 src/
   components/
     admin/  auth/  business/  config/  customers/  daily/  dashboard/
-    documents/  inventory/stock-transfers/  notifications/  pos/  products/
+    documents/  inventory/  notifications/  products/
     projects/  purchases/  reports/financial-statements/  sales/  setup/
     shared/  suppliers/  treasury/  ui/
+  pages/
+    inventory/stock-transfers/{StockTransfersPage.tsx,components/}
+    sales/pos/{PosPage.tsx,components/}
   hooks/
-    admin/  auth/  config/  daily/  dashboard/  inventory/  licensing/
-    pos/  shared/  treasury/
+    domains/
+      admin/  auth/  config/  daily/  dashboard/  licensing/  treasury/
+    pages/
+      inventory/stock-transfers/  sales/pos/
+    shared/
   pages/<domain>/<page-name>/<PageEntry>.tsx
     e.g. finance/expenses/ExpensesPage.tsx
          sales/orders/OrdersPage.tsx
          inventory/inventory-count/InventoryCountPage.tsx
     plus page-specific helpers, modals, tables and constants in the same folder
   services/
-    admin/  approvals/  auth/  backup/  config/  crm/  customers/  dashboard/
-    data/  documents/  effects/  finance/  hr/  inventory/  inventory-count/
-    licensing/  manufacturing/  notifications/  operations/  organization/
-    procurement/  products/  projects/  purchases/  reports/  restaurant/
-    sales/  security/  shared/  suppliers/
+    domains/
+      admin/ approvals/ auth/ config/ crm/ customers/ dashboard/ documents/
+      effects/ finance/ hr/ inventory/ inventory-count/ licensing/ manufacturing/
+      notifications/ operations/ organization/ procurement/ products/ projects/
+      purchases/ reports/ restaurant/ sales/ security/ suppliers/
+    infrastructure/
+      backup/  data/
+    shared/
   types/<domain>/
     admin/  auth/  backup/  config/  crm/  customers/  dashboard/  documents/
     effects/  finance/  hr/  inventory/  notifications/  organization/  parties/
@@ -96,12 +108,13 @@ src/
   config/  contexts/  errors/  layouts/  router/  shims/  styles/  sync/  workers/
 ```
 
-`src/App.tsx`, `src/main.tsx`, and `src/index.css` remain at the Vite entry root, as required by
-the framework convention.
+`src/main.tsx` and `src/index.css` remain at the Vite entry root. The existing router and
+provider composition remain in their established `router/`, `contexts/`, and `layouts/`
+subsystems.
 
 ---
 
-## 3. Migration statistics
+## 3. Initial migration statistics
 
 | Layer | Files moved |
 | --- | ---: |
@@ -117,8 +130,36 @@ the framework convention.
 - Import specifiers rewritten: **569 files** (including `test/` and `e2e/` consumers).
 - Target directories created: **204**.
 - Exact duplicate source files found: **0**.
-- Full machine-readable mapping: [`migration-map.json`](./migration-map.json)
+- Initial machine-readable mapping: [`migration-map.json`](./migration-map.json)
   (each entry is `{ "from": "src/...", "to": "src/..." }`).
+
+### Follow-up page and layer organization
+
+The follow-up migration moves the remaining page-specific POS and stock-transfer UI into
+their page folders, classifies page/domain hooks centrally, and separates domain services
+from infrastructure services:
+
+| Follow-up change | Files |
+| --- | ---: |
+| Services moved under `domains/` or `infrastructure/` | 205 |
+| Hooks moved under `domains/` or `pages/` | 39 |
+| POS and stock-transfer UI files relocated | 37 |
+| Application composition moved into `src/app/` | 1 |
+| **Additional migration-map entries** | **282** |
+
+- The migration map now records **724** chained moves across both migrations.
+- **287** module specifiers in **261** files were rebased for the follow-up migration;
+  `test/` and `e2e/` consumers are included.
+- Page-specific Hooks are in `src/hooks/pages/`; domain Hooks are in
+  `src/hooks/domains/`; generic Hooks remain in `src/hooks/shared/`.
+- The POS route now loads `src/pages/sales/pos/PosPage.tsx`; stock-transfer UI is local to
+  `src/pages/inventory/stock-transfers/`.
+- The existing stock-transfer view import remains as a compatibility re-export; new route
+  and page code imports the page entry directly.
+- Existing domain-shared UI remains in `src/components/<domain>/`; only page-specific UI
+  was moved into page folders.
+- `src/config/impactRegistry.ts` path metadata was rebased to the new module locations.
+- Electron main/preload files and SQLite schema/migrations were not moved or changed.
 
 No business logic, SQL, API contract, route path, permission string, or calculation was
 changed. Only file locations and module specifiers changed, with three mechanical fixes:
@@ -133,9 +174,9 @@ changed. Only file locations and module specifiers changed, with three mechanica
 
 ```text
 Page entry (pages/<domain>/<page>/)
-  -> components/<domain>/  +  hooks/<domain>/
-       -> services/<domain>/
-            -> services/shared|auth|config
+  -> page-local components/  +  hooks/pages/<domain>/<page>/
+       -> services/domains/<domain>/
+            -> services/shared|domains/auth|domains/config
             -> database/repositories/databaseManager.ts
                  -> database/schema/ + database/migrations/
   -> types/<domain>/  (type-only)
@@ -160,9 +201,9 @@ changing any business logic:
 
 | Cycle | Break | New module |
 | --- | --- | --- |
-| `AuthService` ↔ `PermissionService` ↔ `AuditService` | `PermissionService` audits through a low-level writer instead of `AuditService` | `src/services/security/auditWriter.ts` |
-| `PermissionService` ↔ `CentralFeaturePermissionService` ↔ `CentralLicenseService` | feature checks read the cached config directly | `src/services/licensing/centralConfigStore.ts` |
-| `AuthService` ↔ `BranchAccessService` | branch scoping reads the session directly | `src/services/auth/session.ts` |
+| `AuthService` ↔ `PermissionService` ↔ `AuditService` | `PermissionService` audits through a low-level writer instead of `AuditService` | `src/services/domains/security/auditWriter.ts` |
+| `PermissionService` ↔ `CentralFeaturePermissionService` ↔ `CentralLicenseService` | feature checks read the cached config directly | `src/services/domains/licensing/centralConfigStore.ts` |
+| `AuthService` ↔ `BranchAccessService` | branch scoping reads the session directly | `src/services/domains/auth/session.ts` |
 | `utils/export/export.ts` ↔ `excelExportWorkbook.ts` | shared `ExportColumn` type moved out of the implementation | `src/utils/export/exportTypes.ts` |
 | `AppConfigurationPage` ↔ `routesList` ↔ `lazyPages` | page catalog reads a component-free path manifest | `src/router/routePaths.ts` |
 | `types/finance/index` ↔ `types/finance/banking` | banking imports `core` directly instead of the barrel | — |
@@ -182,17 +223,10 @@ router tables, services, hooks, and TSX components. Generated parts use `_partNN
 `.partNN`) so extensionless imports resolve in both Vite and the Node test runner, and
 cross-part type imports use `import type` to keep runtime exports valid.
 
-Progress: `src/` files over 100 lines went from **434 → 377** (batch 1: 46 files, batch 2: 12 files).
-Batch 2 (max statement 81–100) split 12 more files; 8 files with a single statement over 100 lines were reverted to avoid oversized parts.
-
-The remaining **377** cannot be split at top-level statement boundaries and need
-semantic refactoring per category:
-- 263 files whose largest statement is over 150 lines (mostly large components/services).
-- 105 files whose largest statement is 101–150 lines.
-- 8 files deferred from batch 2 (single oversized statement).
-
-These require method/function extraction, component decomposition, or data-array chunking,
-and are processed in later batches with verification after each batch.
+The prior batches reduced the count of files over 100 lines from **434 to 377**. In this
+follow-up, the tagged POS toolbar was decomposed into shift status, primary actions, and
+the secondary-actions menu. Other large legacy modules, including existing `_partNN` files,
+were not split as part of this location-focused refactor; no new `_partNN` files were added.
 
 The splitter and backups are kept outside the repo:
 - splitter: `%TEMP%/opencode/split-large.mjs`
@@ -235,25 +269,24 @@ Aspects that were intentionally kept in place:
 
 | Check | Result |
 | --- | --- |
-| `npx tsc --noEmit` (frontend) | ✅ Pass |
-| `npm run lint` | ✅ 0 errors (1,298 warnings; unused imports in barrels/parts) |
-| `npm run build` | ✅ Pass — 194 chunks obfuscated |
-| Unit/integration suite (`npm test`) | ✅ Pass except 1 pre-existing behavioural failure (below) |
-| Broken import scan | ✅ None (TypeScript resolves all modules) |
-| Database durability test | ✅ Pass |
-| Cycle scan (`madge --circular`) | ✅ 0 cycles |
+| `npx tsc --noEmit` (renderer) | ✅ Pass |
+| Targeted ESLint on reorganized modules | ✅ Pass (0 errors; 576 warnings) |
+| `npm run lint` | ⚠️ Fails on unchanged `electron/hardwareId.js:1` (`execFile` unused); 1,387 warnings |
+| `npm run build` | ✅ Pass |
+| Unit/integration suite (`npm test`) | ⚠️ 495/496 pass; one existing activation-bypass assertion fails |
+| Migration-map chain | ✅ 724 entries; no duplicate sources/targets or missing final destinations |
+| `git diff --check` | ✅ Pass |
+| Cycle scan (`madge --circular`) | ✅ Previously reported as 0 cycles |
 
-### Pre-existing failure confirmed against a clean `HEAD` worktree
+The failing test is `test/business-profiles.test.ts:71`:
+`activation bypass is disabled unless a local build flavor is injected`. It expects
+`BYPASS_FIRST_RUN_ACTIVATION` to be `false`, while the unchanged
+`src/config/setupLifecycle.ts` currently exports `true`. This refactor deliberately did not
+change activation behavior.
 
-This fails identically before the restructuring and is not caused by it:
-
-1. `test/business-profiles.test.ts::terminology settings drive navigation labels...`
-   - Navigation groups filtered out for `businessType = services` never receive their
-     explicit `nav.labels` override. Fixing it changes navigation behaviour, so it is
-     intentionally left for a separate behavioural change.
-
-The previously stale `test/single-device.test.ts` expectation was updated to the current
-`package.json` scripts (`build:local` + integrity check) without changing runtime behaviour.
+The earlier migration also updated a stale `test/single-device.test.ts` expectation to the
+current `package.json` scripts (`build:local` + integrity check) without changing runtime
+behaviour.
 
 
 ### Pre-existing Electron typecheck note

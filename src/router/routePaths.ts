@@ -18,6 +18,7 @@ export const APP_ROUTE_PATHS = [
   "daily/expenses",
   "daily/debts",
   "quotations",
+  "construction-estimate",
   "orders",
   "returns",
   "products/catalog",

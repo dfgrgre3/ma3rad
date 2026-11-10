@@ -1,8 +1,8 @@
 import React, { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Banknote, CalendarDays, ClipboardList, Clock3, ExternalLink } from 'lucide-react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 const DebtsDashboardPage = lazy(() => import('../debts-dashboard/DebtsDashboardPage').then(m => ({ default: m.DebtsDashboardPage })));
 const OtherReceivablesPage = lazy(() => import('../other-receivables/OtherReceivablesPage').then(m => ({ default: m.OtherReceivablesPage })));

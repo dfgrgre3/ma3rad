@@ -3,9 +3,9 @@ import {
   AlertCircle, ArrowDownRight, ArrowUpRight, Check, CheckCircle2, Clock,
   Download, FileText, Printer, RefreshCw, Search, SlidersHorizontal, X
 } from 'lucide-react';
-import { SupplierService } from '../../../services/suppliers/SupplierService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useToast } from '../../../components/ui/Toast';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
 import type { Supplier } from '../../../types';

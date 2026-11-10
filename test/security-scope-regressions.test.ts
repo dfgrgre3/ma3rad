@@ -4,12 +4,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { BranchAccessService } from '../src/services/auth/BranchAccessService.ts';
-import { OrderService } from '../src/services/sales/OrderService.ts';
-import { ProductService } from '../src/services/products/ProductService.ts';
-import { ReservationService } from '../src/services/sales/ReservationService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { BranchAccessService } from '../src/services/domains/auth/BranchAccessService.ts';
+import { OrderService } from '../src/services/domains/sales/OrderService.ts';
+import { ProductService } from '../src/services/domains/products/ProductService.ts';
+import { ReservationService } from '../src/services/domains/sales/ReservationService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 test('reservation pages keep sales and inventory permission domains independent', () => {

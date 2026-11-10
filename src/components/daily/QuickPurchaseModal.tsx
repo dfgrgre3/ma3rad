@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { PurchaseService } from '../../services/purchases/PurchaseService';
+import { PurchaseService } from '../../services/domains/purchases/PurchaseService';
 import { useToast } from '../ui/Toast';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import type { PaymentType } from '../../types';
-import { round2 } from '../../services/finance/financials';
+import { round2 } from '../../services/domains/finance/financials';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
-import { useLists } from '../../hooks/daily/useLists';
-import { useSuppliers } from '../../hooks/daily/useSuppliers';
+import { useLists } from '../../hooks/domains/daily/useLists';
+import { useSuppliers } from '../../hooks/domains/daily/useSuppliers';
 import { fmt, input, label } from './DailyModalUtils';
 import { Plus, Trash2, Loader2, Save } from 'lucide-react';
 import { ProductPicker } from '../products/ProductPicker';

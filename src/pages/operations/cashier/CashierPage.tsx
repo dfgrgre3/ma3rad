@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertCircle, CheckCircle, Loader2, X } from 'lucide-react';
-import { useCashier } from '../../../hooks/treasury/useCashier';
+import { useCashier } from '../../../hooks/domains/treasury/useCashier';
 import { CashierHeader } from './CashierHeader';
 import { CashStatusCards } from './CashStatusCards';
 import { AutoCloseScheduleCard } from './AutoCloseScheduleCard';
@@ -8,7 +8,7 @@ import { ExpensesTable } from './ExpensesTable';
 import { OpenShiftModal } from './OpenShiftModal';
 import { CloseShiftModal } from './CloseShiftModal';
 import { AddExpenseModal } from './AddExpenseModal';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 export const CashierPage: React.FC = () => {
   const {

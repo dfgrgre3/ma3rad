@@ -1,14 +1,18 @@
 import React from 'react';
 import { ArrowDownRight, ArrowUpRight, TrendingUp } from 'lucide-react';
-import type { CashFlowMonth } from '../../../services/reports/FinancialStatementsService';
+import type { CashFlowMonth } from '../../../services/domains/reports/FinancialStatementsService';
 import { formatCurrency } from './format';
 
 export function CashFlowPanel({ cash }: {
-  cash: { months: CashFlowMonth[]; totals: CashFlowMonth };
+  cash: { months: CashFlowMonth[]; totals: CashFlowMonth; balances: { opening: number; closing: number } };
 }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="text-xs font-bold text-slate-500">رصيد النقدية الافتتاحي</div>
+          <p className="mt-1 text-lg font-black">{formatCurrency(cash.balances.opening)}</p>
+        </div>
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <div className="flex items-center gap-2 text-emerald-600 text-xs font-bold"><ArrowDownRight className="w-4 h-4" /> إجمالي التدفقات الداخلة</div>
           <p className="mt-1 text-lg font-black">{formatCurrency(cash.totals.inflows)}</p>
@@ -20,6 +24,10 @@ export function CashFlowPanel({ cash }: {
         <div className="bg-white border border-slate-200 rounded-xl p-4">
           <div className="flex items-center gap-2 text-teal-600 text-xs font-bold"><TrendingUp className="w-4 h-4" /> صافي التدفق النقدي</div>
           <p className={`mt-1 text-lg font-black ${cash.totals.net < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{formatCurrency(cash.totals.net)}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4">
+          <div className="text-xs font-bold text-slate-500">رصيد النقدية الختامي</div>
+          <p className="mt-1 text-lg font-black">{formatCurrency(cash.balances.closing)}</p>
         </div>
       </div>
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">

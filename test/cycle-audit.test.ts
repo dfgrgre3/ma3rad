@@ -2,16 +2,16 @@ import './integration.setup.ts';
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { SupplierService } from '../src/services/suppliers/SupplierService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
-import { PurchaseService } from '../src/services/purchases/PurchaseService.ts';
-import { PurchaseOrderService } from '../src/services/purchases/PurchaseOrderService.ts';
-import { ProcurementService } from '../src/services/procurement/ProcurementService.ts';
-import { InventoryService } from '../src/services/inventory/InventoryService.ts';
-import { ReservationService } from '../src/services/sales/ReservationService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { SupplierService } from '../src/services/domains/suppliers/SupplierService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { PurchaseService } from '../src/services/domains/purchases/PurchaseService.ts';
+import { PurchaseOrderService } from '../src/services/domains/purchases/PurchaseOrderService.ts';
+import { ProcurementService } from '../src/services/domains/procurement/ProcurementService.ts';
+import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
+import { ReservationService } from '../src/services/domains/sales/ReservationService.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 
 /**

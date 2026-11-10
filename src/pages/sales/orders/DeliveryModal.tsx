@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, PackageCheck, Loader2 } from 'lucide-react';
-import { Order, OrderItem } from '../../../services/sales/OrderService';
+import { Order, OrderItem } from '../../../services/domains/sales/OrderService';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { Modal } from './ui';
 import { summarizeOrderQuantity } from './helpers';

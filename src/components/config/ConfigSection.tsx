@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { normalizePagePath } from '../../config/appConfiguration';
 import { registerConfigTarget } from '../../config/appConfigTargets';
-import { useSectionConfig } from '../../hooks/config/useAppConfig';
+import { useSectionConfig } from '../../hooks/domains/config/useAppConfig';
 
 export interface ConfigSectionProps {
   /** Stable section id, unique inside the page. */

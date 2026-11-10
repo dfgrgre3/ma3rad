@@ -4,8 +4,8 @@ import {
   CalendarClock, CheckCircle2, Download, FileText,
   Loader2, LockKeyhole, Plus, RefreshCw, Search, ShieldCheck,
 } from 'lucide-react';
-import { DocumentService } from '../../../services/documents/DocumentService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { DocumentService } from '../../../services/domains/documents/DocumentService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { useToast } from '../../../components/ui/Toast';
 import { exportToExcel } from '../../../utils/export/export';
 import type {

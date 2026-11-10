@@ -126,7 +126,7 @@ app.disableHardwareAcceleration();
 // تحسينات استهلاك الموارد للأجهزة الضعيفة والقديمة (Low-spec optimizations)
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${getMaxV8HeapSize(process.arch)}`);
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,Translate,InterestFeedContentSuggestions');
 
 // Security: Allowed origins for IPC communication
 const ALLOWED_ORIGINS = new Set([
@@ -218,7 +218,9 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
-      allowRunningInsecureContent: false
+      allowRunningInsecureContent: false,
+      backgroundThrottling: true,
+      spellcheck: false,
     }
   });
 
@@ -449,7 +451,7 @@ const licenseGuard = registerLicenseHandlers({
 
 const { FileIntegrityChecker } = require('./security/fileIntegrity');
 const integrityChecker = new FileIntegrityChecker(path.join(__dirname, '..'));
-const PRELOAD_INTEGRITY_SHA256 = '9d4ab82a0baf8300bc62221a93db2f394fd196b1caf01b364a626bebc60deb70';
+const PRELOAD_INTEGRITY_SHA256 = '3a4683def8e7fee0031589deb39d199347bddaae1cf240861083682085b2aab6';
 const ENTRY_SOURCE_INTEGRITY_SHA256 = '3b1873352455d5a2d2132b3d677fb41df810410c9467a7e0b5477023148b134e';
 const SECURITY_SOURCE_INTEGRITY_SHA256 = 'c88cf3df3608468259747b3078e8fc58fc51bd882114680b82fcfd6b9bf47cfd';
 const SECURITY_PACKAGED_LOADER_INTEGRITY_SHA256 = 'a9c3529f826ef81f74b6f8638af4ca9595f18d3663c3c03999e68ad13605c463';

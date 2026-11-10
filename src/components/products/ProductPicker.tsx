@@ -9,9 +9,9 @@ import {
   Search,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { ProductService, type ProductQueryOptions } from '../../services/products/ProductService';
-import { CategoryService } from '../../services/products/CategoryService';
-import { BrandService } from '../../services/products/BrandService';
+import { ProductService, type ProductQueryOptions } from '../../services/domains/products/ProductService';
+import { CategoryService } from '../../services/domains/products/CategoryService';
+import { BrandService } from '../../services/domains/products/BrandService';
 import type { Product } from '../../types';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import { Modal } from '../ui/Modal';

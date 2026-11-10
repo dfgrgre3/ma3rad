@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Trash2, Loader2, Save, AlertTriangle } from 'lucide-react';
-import { CustomerService } from '../../services/customers/CustomerService';
-import { SalesService } from '../../services/sales/SalesService';
-import { PurchaseService } from '../../services/purchases/PurchaseService';
+import { CustomerService } from '../../services/domains/customers/CustomerService';
+import { SalesService } from '../../services/domains/sales/SalesService';
+import { PurchaseService } from '../../services/domains/purchases/PurchaseService';
 import { useToast } from '../ui/Toast';
-import { AuthService } from '../../services/auth/AuthService';
-import { PermissionService } from '../../services/auth/PermissionService';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { formatProductQuantity } from '../../utils/products/productUnits';
 import type { PaymentType } from '../../types';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
-import { useRegisters } from '../../hooks/daily/useRegisters';
+import { useRegisters } from '../../hooks/domains/daily/useRegisters';
 import { fmt, input, label } from './DailyModalUtils';
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 

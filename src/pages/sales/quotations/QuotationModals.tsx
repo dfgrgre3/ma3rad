@@ -5,7 +5,7 @@ import {
   ChevronRight, Percent, Ban as CancelIcon, Receipt, Clock, CheckCircle2, AlertTriangle,
   MessageCircle, CalendarClock, ShoppingBag, PhoneCall, X, Printer,
 } from 'lucide-react';
-import { Quotation, QuotationStats, QuotationStatus } from '../../../services/sales/QuotationService';
+import { Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
 import { Customer, Product, Warehouse, PaymentType } from '../../../types';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
@@ -15,7 +15,7 @@ import {
   basePriceFromUnitPrice, convertQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
 } from '../../../utils/products/uom';
 import { buildWhatsAppUrl, openExternalShare } from '../../../utils/shared/externalLinks';
-import type { OperationalFieldDefinition } from '../../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
@@ -31,6 +31,7 @@ export const STATUS_LABELS: Record<QuotationStatus, { label: string; color: stri
 export const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
 
 export type Line = { productId: string; uom: string; quantity: number; unitPrice: number; discountAmount: number };
+export type ServiceLine = { productId?: string; description: string; unit: string; quantity: number; unitPrice: number; discountAmount: number };
 
 export interface FormState {
   customerId: string;
@@ -40,11 +41,13 @@ export interface FormState {
   tax: string;
   notes: string;
   lines: Line[];
+  serviceLines: ServiceLine[];
 }
 
 export const emptyForm = (): FormState => ({
   customerId: '', warehouseId: '', validDays: '15', discount: '', tax: '', notes: '',
   lines: [{ productId: '', uom: '', quantity: 0, unitPrice: 0, discountAmount: 0 }],
+  serviceLines: [],
 });
 
 const Modal: React.FC<{ children: React.ReactNode; onClose: () => void; wide?: boolean }> = ({ children, onClose, wide }) => (
@@ -297,6 +300,32 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
         </div>
       </div>
 
+      <div className="border border-sky-200 rounded-xl overflow-hidden">
+        <div className="px-3 py-2 bg-sky-50 text-[11px] font-black text-sky-800">الخدمات والعمالة</div>
+        <table className="w-full text-right text-[11px]">
+          <thead className="bg-slate-50 text-slate-500 font-bold">
+            <tr><th className="px-3 py-2">البيان</th><th className="px-3 py-2">الصنف المرتبط</th><th className="px-3 py-2">الكمية</th><th className="px-3 py-2">الوحدة</th><th className="px-3 py-2">سعر الوحدة</th><th className="px-3 py-2">الخصم</th><th className="px-3 py-2">الإجمالي</th><th className="px-3 py-2 w-8"></th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {form.serviceLines.map((line, idx) => (
+              <tr key={idx}>
+                <td className="px-3 py-2"><input value={line.description} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, description: e.target.value } : x) }))} className="w-full min-w-36 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" placeholder="مثال: أجور تركيب السيراميك" /></td>
+                <td className="px-3 py-2"><select value={line.productId || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, productId: e.target.value || undefined } : x) }))} className="w-40 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg"><option value="">بدون ربط</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></td>
+                <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.quantity || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) || 0 } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                <td className="px-3 py-2"><input value={line.unit} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, unit: e.target.value } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg" /></td>
+                <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.unitPrice || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, unitPrice: Number(e.target.value) || 0 } : x) }))} className="w-24 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                <td className="px-3 py-2"><input type="number" min={0} step="0.01" value={line.discountAmount || ''} onChange={(e) => setForm((p) => ({ ...p, serviceLines: p.serviceLines.map((x, i) => i === idx ? { ...x, discountAmount: Number(e.target.value) || 0 } : x) }))} className="w-20 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono" /></td>
+                <td className="px-3 py-2 font-bold">{fmt(line.quantity * line.unitPrice - line.discountAmount)}</td>
+                <td className="px-3 py-2"><button type="button" onClick={() => setForm((p) => ({ ...p, serviceLines: p.serviceLines.filter((_, i) => i !== idx) }))} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="p-2 border-t border-slate-100">
+          <button type="button" onClick={() => setForm((p) => ({ ...p, serviceLines: [...p.serviceLines, { description: '', unit: 'بند', quantity: 1, unitPrice: 0, discountAmount: 0 }] }))} className="text-[11px] font-bold text-sky-700 flex items-center gap-1"><Plus className="w-3 h-3" /> إضافة خدمة أو عمالة</button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <NumField label="خصم إجمالي (ج)" value={form.discount} onChange={(v) => setForm((p) => ({ ...p, discount: v }))} />
         <NumField label="ضريبة (ج)" value={form.tax} onChange={(v) => setForm((p) => ({ ...p, tax: v }))} />
@@ -332,7 +361,7 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
       <Info label="العميل" value={detail.customerName || '—'} sub={detail.customerPhone || ''} />
       <Info label="المخزن المرجعي" value={warehouses.find((w) => w.id === detail.warehouseId)?.name || '—'} sub={detail.convertedInvoiceNumber ? `الفاتورة: ${detail.convertedInvoiceNumber}` : 'لم تُفوتر بعد'} />
-      <Info label="القيمة" value={fmt(detail.totalAmount)} sub={`${detail.items?.length || 0} بند`} />
+      <Info label="القيمة" value={fmt(detail.totalAmount)} sub={`${(detail.items?.length || 0) + (detail.serviceItems?.length || 0)} بند`} />
     </div>
     <div className="mb-4 space-y-2">
       <OperationalFieldsSummary fields={operationalFields} values={operationalFieldValues} />
@@ -358,9 +387,24 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
               <td className="px-3 py-2 font-bold">{fmt(i.totalPrice)}</td>
             </tr>
           ))}
+          {(detail.serviceItems || []).map((item) => (
+            <tr key={item.id}>
+              <td className="px-3 py-2 font-bold text-slate-800">{item.description}<div className="text-[9px] text-slate-400 font-normal">خدمة / عمالة{item.productId ? ' • مرتبطة بصنف مخزني' : ''}</div></td>
+              <td className="px-3 py-2 font-mono">{item.quantity} {item.unit}</td>
+              <td className="px-3 py-2 font-mono">—</td>
+              <td className="px-3 py-2 font-mono">{fmt(item.unitPrice)} / {item.unit}</td>
+              <td className="px-3 py-2 font-mono text-rose-600">{item.discountAmount ? `-${fmt(item.discountAmount)}` : '—'}</td>
+              <td className="px-3 py-2 font-bold">{fmt(item.totalPrice)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
+    {(detail.serviceItems || []).length > 0 && (
+      <div role="status" className="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-3 text-[11px] text-sky-800">
+        يحتوي العرض على خدمات أو عمالة؛ يمكن تعديله وطباعته، ولا يمكن تحويله إلى فاتورة أو طلب مخزني.
+      </div>
+    )}
     {detail.notes && <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-800 mb-4"><b>ملاحظات:</b> {detail.notes}</div>}
     {(detail.followUpDate || detail.followUpNotes || detail.convertedOrderNumber) && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -379,10 +423,10 @@ export const QuotationModals: React.FC<QuotationModalsProps> = ({
       {canUpdate && ['PENDING', 'EXPIRED'].includes(detail.status) && (
         <button onClick={() => { setDetail(null); openEdit(detail); }} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5" /> تعديل</button>
       )}
-      {canCreate && detail.status === 'PENDING' && !detail.convertedOrderNumber && (
+      {canCreate && detail.status === 'PENDING' && !detail.convertedOrderNumber && !(detail.serviceItems || []).length && (
         <button onClick={() => { setDetail(null); openConvertOrder(detail); }} className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><ShoppingBag className="w-3.5 h-3.5" /> تحويل لطلب</button>
       )}
-      {canCreate && detail.status === 'PENDING' && (
+      {canCreate && detail.status === 'PENDING' && !(detail.serviceItems || []).length && (
         <button onClick={() => { setDetail(null); openConvert(detail); }} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> تحويل لفاتورة</button>
       )}
       {canUpdate && detail.status === 'EXPIRED' && (

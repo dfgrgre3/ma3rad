@@ -5,11 +5,11 @@ import {
   Bell, BellOff, Check, CheckCheck, Trash2, 
   AlertTriangle, Package, DollarSign, Clock, Settings, UserRoundX, ExternalLink
 } from 'lucide-react';
-import { NotificationService, Notification, NotificationType } from '../../../services/notifications/NotificationService';
-import { NotificationPreferencesService } from '../../../services/notifications/NotificationPreferencesService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { NotificationService, Notification, NotificationType } from '../../../services/domains/notifications/NotificationService';
+import { NotificationPreferencesService } from '../../../services/domains/notifications/NotificationPreferencesService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const NotificationsPage: React.FC = () => {
   const navigate = useNavigate();

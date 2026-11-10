@@ -1,6 +1,6 @@
 import React from 'react';
 import { Activity, Box, FileText, Users } from 'lucide-react';
-import type { AuditStats } from '../../../services/security/AuditService';
+import type { AuditStats } from '../../../services/domains/security/AuditService';
 
 interface Props {
   stats: AuditStats | null;

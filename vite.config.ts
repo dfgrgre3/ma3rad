@@ -12,6 +12,7 @@ const CSP_COMMON = [
   "default-src 'self'",
   "style-src 'self' 'unsafe-inline'", // React inline style attributes
   "img-src 'self' data: blob:",
+  "frame-src 'self' blob:",
   "font-src 'self' data:",
   "object-src 'none'",
   "base-uri 'none'",

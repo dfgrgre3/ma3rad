@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BarChart3, CreditCard, Clock, Users, Package, RefreshCw, Download } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel } from '../../../utils/export/export';
 
@@ -27,13 +27,14 @@ export function PosReportsPage() {
   const [from, setFrom] = useState(localDateString());
   const [to, setTo] = useState(localDateString());
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [paymentMix, setPaymentMix] = useState<PaymentMixRow[]>([]);
   const [hourly, setHourly] = useState<HourlyRow[]>([]);
   const [topItems, setTopItems] = useState<TopItemRow[]>([]);
   const [cashiers, setCashiers] = useState<CashierRow[]>([]);
-  const [totals, setTotals] = useState({ invoices: 0, amount: 0, voids: 0, voidAmount: 0, discounts: 0 });
+  const [totals, setTotals] = useState({ invoices: 0, amount: 0, collected: 0, refunds: 0, voids: 0, voidAmount: 0, discounts: 0 });
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       PermissionService.require(AuthService.requireAuth(), 'reports.view', '/reports');
@@ -42,10 +43,25 @@ export function PosReportsPage() {
 
       // Payment mix
       const pm = db.query<any>(
-        `SELECT payment_type AS method, COUNT(*) AS count, COALESCE(SUM(total_amount),0) AS amount
-         FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' ${scope.clause}
-         GROUP BY payment_type ORDER BY amount DESC`,
-        [from, to, ...sp]
+        `SELECT method, COUNT(*) AS count, COALESCE(SUM(amount),0) AS amount FROM (
+           SELECT sip.method, sip.amount
+           FROM sales_invoice_payments sip
+           JOIN sales_invoices si ON si.id = sip.invoice_id
+           WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND sip.amount > 0 ${scope.clause}
+           UNION ALL
+           SELECT si.payment_type AS method, si.paid_amount AS amount
+           FROM sales_invoices si
+           WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND si.paid_amount > 0
+             AND NOT EXISTS (SELECT 1 FROM sales_invoice_payments sip WHERE sip.invoice_id = si.id)
+             ${scope.clause}
+           UNION ALL
+           SELECT cp.payment_type AS method, cp.amount
+           FROM customer_payments cp
+           JOIN sales_invoices si ON si.id = cp.invoice_id
+           WHERE cp.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND cp.amount > 0 ${scope.clause}
+         ) payments
+         GROUP BY method ORDER BY amount DESC`,
+        [from, to, ...sp, from, to, ...sp, from, to, ...sp]
       );
       setPaymentMix(pm.map((r: any) => ({ method: r.method, count: r.count, amount: r.amount })));
 
@@ -70,8 +86,18 @@ export function PosReportsPage() {
 
       // Cashier performance
       const ca = db.query<any>(
-        `SELECT u.full_name AS name, COUNT(*) AS invoices, COALESCE(SUM(si.total_amount),0) AS amount, COALESCE(SUM(si.paid_amount),0) AS cash
+        `SELECT u.full_name AS name, COUNT(*) AS invoices, COALESCE(SUM(si.total_amount),0) AS amount,
+                COALESCE(SUM(CASE
+                  WHEN pay.invoiceId IS NOT NULL THEN pay.cash
+                  WHEN si.payment_type = 'CASH' THEN si.paid_amount
+                  ELSE 0
+                END),0) AS cash
          FROM sales_invoices si LEFT JOIN users u ON u.id = si.created_by
+         LEFT JOIN (
+           SELECT invoice_id AS invoiceId,
+             SUM(CASE WHEN method = 'CASH' THEN amount ELSE 0 END) AS cash
+           FROM sales_invoice_payments GROUP BY invoice_id
+         ) pay ON pay.invoiceId = si.id
          WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' ${scope.clause}
          GROUP BY u.full_name ORDER BY amount DESC`,
         [from, to, ...sp]
@@ -90,15 +116,32 @@ export function PosReportsPage() {
          WHERE si.date BETWEEN ? AND ? AND si.invoice_status = 'VOID' ${scope.clause}`,
         [from, to, ...sp]
       )[0];
-      setTotals({ invoices: t.invoices, amount: t.amount, voids: v.c, voidAmount: v.amount, discounts: t.discounts });
+      const refunds = db.query<any>(
+        `SELECT COALESCE(SUM(sr.refunded_amount),0) AS amount FROM sales_returns sr
+         JOIN sales_invoices si ON si.id = sr.original_invoice_id
+         WHERE sr.date BETWEEN ? AND ? ${scope.clause}`,
+        [from, to, ...sp]
+      )[0]?.amount || 0;
+      const collected = pm.reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+      setTotals({
+        invoices: t.invoices, amount: t.amount, collected, refunds,
+        voids: v.c, voidAmount: v.amount, discounts: t.discounts,
+      });
+      setLoadError(null);
     } catch (e) {
       console.error(e);
+      setPaymentMix([]);
+      setHourly([]);
+      setTopItems([]);
+      setCashiers([]);
+      setTotals({ invoices: 0, amount: 0, collected: 0, refunds: 0, voids: 0, voidAmount: 0, discounts: 0 });
+      setLoadError(e instanceof Error ? e.message : 'تعذر تحميل تقرير نقطة البيع.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [from, to]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const exportPaymentMix = () => exportToExcel({
     title: 'تقرير طرق الدفع (POS)',
@@ -130,8 +173,14 @@ export function PosReportsPage() {
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          تعذر تحميل التقرير: {loadError}
+        </div>
+      )}
+
       {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="text-xs text-slate-500">الفواتير</div>
           <div className="text-2xl font-black text-slate-900">{fmt(totals.invoices)}</div>
@@ -139,6 +188,14 @@ export function PosReportsPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="text-xs text-slate-500">الإجمالي</div>
           <div className="text-2xl font-black text-sky-600">{fmtMoney(totals.amount)}</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <div className="text-xs text-slate-500">التحصيل المسجل فعلياً</div>
+          <div className="text-2xl font-black text-emerald-600">{fmtMoney(totals.collected)}</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <div className="text-xs text-slate-500">متوسط الفاتورة</div>
+          <div className="text-2xl font-black text-slate-900">{fmtMoney(totals.invoices ? totals.amount / totals.invoices : 0)}</div>
         </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="text-xs text-slate-500">الخصومات</div>
@@ -151,6 +208,10 @@ export function PosReportsPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="text-xs text-slate-500">قيمة الملغاة</div>
           <div className="text-2xl font-black text-amber-600">{fmtMoney(totals.voidAmount)}</div>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <div className="text-xs text-slate-500">المبالغ المستردة نقداً</div>
+          <div className="text-2xl font-black text-rose-600">{fmtMoney(totals.refunds)}</div>
         </div>
       </div>
 
@@ -226,7 +287,7 @@ export function PosReportsPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-4">
           <h2 className="font-bold text-slate-900 flex items-center gap-2 mb-3"><Users className="w-4 h-4 text-sky-600" /> أداء الكاشيرات</h2>
           <table className="w-full text-sm">
-            <thead><tr className="text-slate-500 text-xs"><th className="text-right py-1">الكاشير</th><th className="text-center py-1">فواتير</th><th className="text-left py-1">الإجمالي</th><th className="text-left py-1">النقد</th></tr></thead>
+            <thead><tr className="text-slate-500 text-xs"><th className="text-right py-1">منشئ الفاتورة</th><th className="text-center py-1">فواتير</th><th className="text-left py-1">الإجمالي</th><th className="text-left py-1">النقد المسجل بالفواتير</th></tr></thead>
             <tbody>
               {cashiers.map((r, i) => (
                 <tr key={i} className="border-t border-slate-100">

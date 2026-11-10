@@ -1,5 +1,5 @@
 import { printHtml } from '../../../utils/export/export';
-import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/operations/DailyOperationsService';
+import type { DailyPurchaseItemRow, DailyPurchaseRow } from '../../../services/domains/operations/DailyOperationsService';
 import { buildPurchaseInvoiceHtml } from './helpers';
 import type { ToastApi } from './exports_part01';
 

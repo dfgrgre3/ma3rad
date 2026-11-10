@@ -1,6 +1,6 @@
 import React from 'react';
 import { Loader2, X, CheckCheck, DollarSign } from 'lucide-react';
-import type { Order } from '../../../services/sales/OrderService';
+import type { Order } from '../../../services/domains/sales/OrderService';
 import { fmtCurrency } from './helpers';
 import type { DepositPaymentType } from '../../../types/sales/reservationsPage';
 

@@ -1,4 +1,4 @@
-import { Order } from '../../../services/sales/OrderService';
+import { Order } from '../../../services/domains/sales/OrderService';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { STATUS_LABELS } from '../../../types/sales/ordersPage';
 

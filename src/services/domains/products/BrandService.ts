@@ -1,0 +1,134 @@
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import type { Brand } from '../../../types';
+import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from '../auth/AuthService';
+import { PermissionService } from '../auth/PermissionService';
+import { MasterDataSyncService } from '../../../sync/MasterDataSyncService';
+
+export interface BrandWithCount extends Brand {
+  productCount: number;
+}
+
+export class BrandService {
+  private db = DatabaseManager.getInstance();
+  private sync = new MasterDataSyncService(this.db);
+
+  public getAllBrands(): BrandWithCount[] {
+    PermissionService.require(AuthService.requireAuth(), 'ui.brands.brands.view');
+    const rows = this.db.query<any>(`
+      SELECT 
+        b.id, b.name, b.country, b.created_at,
+        COALESCE(pc.product_count, 0) as productCount
+      FROM brands b
+      LEFT JOIN (
+        SELECT brand_id, COUNT(*) as product_count
+        FROM products WHERE is_active = 1
+        GROUP BY brand_id
+      ) pc ON b.id = pc.brand_id
+      ORDER BY b.name ASC
+    `);
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      country: r.country,
+      createdAt: r.createdAt,
+      productCount: r.productCount || 0
+    }));
+  }
+
+  public getBrandById(id: string): Brand | null {
+    PermissionService.require(AuthService.requireAuth(), 'ui.brands.brands.view');
+    const rows = this.db.query<Brand>(
+      'SELECT id, name, country, created_at FROM brands WHERE id = ?',
+      [id]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  public createBrand(name: string, country?: string): Brand {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.brands.brands.create');
+
+    const cleanName = String(name || '').trim();
+    if (!cleanName) throw new Error('اسم الماركة مطلوب.');
+    name = cleanName;
+
+    const existing = this.db.query('SELECT id FROM brands WHERE name = ?', [name]);
+    if (existing.length > 0) {
+      throw new Error('اسم الماركة مسجل مسبقاً.');
+    }
+
+    const id = `br_${uuidv4().substring(0, 8)}`;
+    this.db.executeTransaction((transaction) => {
+      transaction.run(
+        'INSERT INTO brands (id, name, country) VALUES (?, ?, ?)',
+        [id, name, country || null]
+      );
+      this.sync.capture(transaction, 'brand', id, 'CREATE');
+      transaction.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, 'إضافة ماركة جديدة', 'PRODUCTS', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify({ name, country })]
+      );
+    });
+
+    return { id, name, country, createdAt: new Date().toISOString() };
+  }
+
+  public updateBrand(id: string, updates: { name?: string; country?: string }): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.brands.brands.update');
+
+    const old = this.getBrandById(id);
+    if (!old) throw new Error('الماركة غير موجودة.');
+
+    if (updates.name !== undefined) {
+      const cleanName = String(updates.name || '').trim();
+      if (!cleanName) throw new Error('اسم الماركة مطلوب.');
+      updates.name = cleanName;
+    }
+    if (updates.name && updates.name !== old.name) {
+      const dup = this.db.query('SELECT id FROM brands WHERE name = ? AND id != ?', [updates.name, id]);
+      if (dup.length > 0) throw new Error('اسم الماركة مسجل مسبقاً.');
+    }
+
+    this.db.executeTransaction((transaction) => {
+      transaction.run(
+        `UPDATE brands SET
+          name = COALESCE(?, name),
+          country = COALESCE(?, country)
+         WHERE id = ?`,
+        [updates.name || null, updates.country !== undefined ? updates.country : old.country, id]
+      );
+      this.sync.capture(transaction, 'brand', id, 'UPDATE');
+      transaction.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+         VALUES (?, ?, ?, 'تعديل ماركة', 'PRODUCTS', ?, ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(old), JSON.stringify(updates)]
+      );
+    });
+  }
+
+  public deleteBrand(id: string): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.brands.brands.delete');
+
+    const brand = this.getBrandById(id);
+    if (!brand) throw new Error('الماركة غير موجودة.');
+
+    const productCount = this.db.query('SELECT COUNT(*) as cnt FROM products WHERE brand_id = ?', [id])[0] as any;
+    if (productCount && productCount.cnt > 0) {
+      throw new Error('لا يمكن حذف ماركة مرتبط بمنتجات. قم بتعديل أو حذف المنتجات أولاً.');
+    }
+
+    this.db.executeTransaction((transaction) => {
+      this.sync.capture(transaction, 'brand', id, 'DELETE');
+      transaction.run('DELETE FROM brands WHERE id = ?', [id]);
+      transaction.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values)
+         VALUES (?, ?, ?, 'حذف ماركة', 'PRODUCTS', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify(brand)]
+      );
+    });
+  }
+}

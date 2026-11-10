@@ -1,4 +1,4 @@
-import type { PayrollTxType } from '../../../services/hr/EmployeeService';
+import type { PayrollTxType } from '../../../services/domains/hr/EmployeeService';
 import { localDateString } from '../../../utils/shared/date';
 
 export const TX_LABELS: Record<PayrollTxType, string> = { SALARY_PAYOUT: 'صرف راتب', ADVANCE: 'سلفة', BONUS: 'مكافأة', DEDUCTION: 'خصم' };

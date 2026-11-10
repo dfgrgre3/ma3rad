@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
-import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from './OperationalFieldsForm';
 
 export const OperationalFieldsRecordEditor: React.FC<{

@@ -3,7 +3,7 @@ import { Trash2, Scale } from 'lucide-react';
 import { PaymentType, Product, Supplier, Warehouse } from '../../types';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import { PurchaseInvoiceDto } from '../../types/purchasing/components';
-import type { OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import type { OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
 import { ProductPicker } from '../products/ProductPicker';
 

@@ -5,21 +5,21 @@ import {
   DollarSign, Sparkles, CheckCircle2,
   AlertTriangle, ShieldAlert, ChevronDown, PackageCheck
 } from 'lucide-react';
-import { PurchaseService, CreatePurchaseDTO } from '../../services/purchases/PurchaseService';
-import { SupplierService } from '../../services/suppliers/SupplierService';
-import { ProductService } from '../../services/products/ProductService';
-import { InventoryService } from '../../services/inventory/InventoryService';
-import { ProcurementService } from '../../services/procurement/ProcurementService';
-import { PurchaseOrderService } from '../../services/purchases/PurchaseOrderService';
-import { AuthService } from '../../services/auth/AuthService';
-import { PermissionService } from '../../services/auth/PermissionService';
+import { PurchaseService, CreatePurchaseDTO } from '../../services/domains/purchases/PurchaseService';
+import { SupplierService } from '../../services/domains/suppliers/SupplierService';
+import { ProductService } from '../../services/domains/products/ProductService';
+import { InventoryService } from '../../services/domains/inventory/InventoryService';
+import { ProcurementService } from '../../services/domains/procurement/ProcurementService';
+import { PurchaseOrderService } from '../../services/domains/purchases/PurchaseOrderService';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { PurchaseInvoice, Supplier, Product, Warehouse } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/config/useBusinessTerm';
+import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { PurchaseInvoiceModal } from './PurchaseInvoiceModal';
 import { PurchaseInvoiceDto } from '../../types/purchasing/components';
-import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/products/OperationalFieldService';
+import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
 import { OperationalFieldsSummary } from '../products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';

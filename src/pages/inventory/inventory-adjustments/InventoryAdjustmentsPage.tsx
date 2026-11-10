@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Wrench, Plus, Search, FileText, CheckCircle2, ChevronRight, AlertTriangle } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
-import { InventoryCostingService } from '../../../services/inventory/InventoryCostingService';
-import { BranchAccessService } from '../../../services/auth/BranchAccessService';
+import { InventoryCostingService } from '../../../services/domains/inventory/InventoryCostingService';
+import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel } from '../../../utils/products/productUnits';
 import { AdjustmentModals } from './InventoryAdjustmentModals';
 

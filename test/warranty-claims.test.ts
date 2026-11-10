@@ -2,11 +2,11 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { CustomerService } from '../src/services/customers/CustomerService.ts';
-import { SalesService } from '../src/services/sales/SalesService.ts';
-import { WarrantyClaimService } from '../src/services/sales/WarrantyClaimService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
+import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { WarrantyClaimService } from '../src/services/domains/sales/WarrantyClaimService.ts';
 
 function seedProduct(db: any, id: string): void {
   db.run(

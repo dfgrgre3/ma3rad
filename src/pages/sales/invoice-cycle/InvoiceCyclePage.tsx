@@ -6,11 +6,11 @@ import {
   ArrowRight, Filter, Calendar, Users, Warehouse, CheckSquare,
   XCircle, Receipt, Package, TrendingUp, ShoppingCart,
 } from 'lucide-react';
-import { SalesService, InvoiceFilters } from '../../../services/sales/SalesService';
-import { CustomerService } from '../../../services/customers/CustomerService';
-import { InventoryService } from '../../../services/inventory/InventoryService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { SalesService, InvoiceFilters } from '../../../services/domains/sales/SalesService';
+import { CustomerService } from '../../../services/domains/customers/CustomerService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { PrintService } from '../../../services/shared/PrintService';
 import { SalesInvoice, Customer, Warehouse as WarehouseType, PaymentType } from '../../../types';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';

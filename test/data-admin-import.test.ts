@@ -3,12 +3,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from 'xlsx';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
-import { AuthService } from '../src/services/auth/AuthService.ts';
-import { PermissionService } from '../src/services/auth/PermissionService.ts';
-import { DataAdminService } from '../src/services/admin/DataAdminService.ts';
+import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
+import { DataAdminService } from '../src/services/domains/admin/DataAdminService.ts';
 import type { DataImportSheet } from '../src/types/admin/dataAdmin.ts';
-import { BackupService } from '../src/services/backup/BackupService.ts';
-import { encryptExternalBackup } from '../src/services/backup/backupEncryption.ts';
+import { BackupService } from '../src/services/infrastructure/backup/BackupService.ts';
+import { encryptExternalBackup } from '../src/services/infrastructure/backup/backupEncryption.ts';
 import { parseAdminDataWorkbook } from '../src/pages/admin/admin/adminDataUtils.ts';
 import type { User } from '../src/types/auth/identity.ts';
 

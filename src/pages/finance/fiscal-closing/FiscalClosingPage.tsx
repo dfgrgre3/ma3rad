@@ -14,9 +14,9 @@ import {
   X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { FinanceEnterpriseService } from '../../../services/finance/FinanceEnterpriseService';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
+import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { useToast } from '../../../components/ui/Toast';
 import type { FiscalPeriod, FiscalYear } from '../../../types/finance';
 

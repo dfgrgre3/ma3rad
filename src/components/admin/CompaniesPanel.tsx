@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Building2, Plus, Save, Ban, RefreshCw } from 'lucide-react';
-import { CompanyService } from '../../services/organization/CompanyService';
-import { usePermission } from '../../hooks/auth/usePermission';
+import { CompanyService } from '../../services/domains/organization/CompanyService';
+import { usePermission } from '../../hooks/domains/auth/usePermission';
 import { useToast } from '../ui/Toast';
 import { CentralLimitGuard } from '../ui/CentralLimitGuard';
 import type { Company } from '../../types';

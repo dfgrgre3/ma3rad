@@ -1,9 +1,9 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { AuthService } from '../../../services/auth/AuthService';
-import { PermissionService } from '../../../services/auth/PermissionService';
-import { branchAccess } from '../../../services/inventory-count/branchAccess';
-import { loadBranchCountSessions, loadCountProducts, loadCountSessionItems, loadCountWarehouses } from '../../../services/inventory-count/countSessionData';
-import { approveCountSession, cancelCountSession, rejectCountSession, saveCountDraft, startCountSession, submitCountSession } from '../../../services/inventory-count/countSessionService';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { branchAccess } from '../../../services/domains/inventory-count/branchAccess';
+import { loadBranchCountSessions, loadCountProducts, loadCountSessionItems, loadCountWarehouses } from '../../../services/domains/inventory-count/countSessionData';
+import { approveCountSession, cancelCountSession, rejectCountSession, saveCountDraft, startCountSession, submitCountSession } from '../../../services/domains/inventory-count/countSessionService';
 import { countCountedItems, countVarianceItems, filterCountSessions, getVisibleCountItems } from './helpers';
 import { InventoryCountHeader } from './InventoryCountHeader';
 import { CountSessionsToolbar } from './CountSessionsToolbar';
@@ -12,7 +12,7 @@ import { StartCountSessionModal } from './StartCountSessionModal';
 import { SessionCountModal } from './SessionCountModal';
 import type { CountItem, CountProductOption, CountSession, CountType, WarehouseOption } from '../../../types/inventory/countSessions';
 
-export { loadBranchCountSessions } from '../../../services/inventory-count/countSessionData';
+export { loadBranchCountSessions } from '../../../services/domains/inventory-count/countSessionData';
 
 export const InventoryCountPage: React.FC = () => {
   const [sessions, setSessions] = useState<CountSession[]>([]);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { usePermission } from '../../hooks/auth/usePermission';
+import { usePermission } from '../../hooks/domains/auth/usePermission';
 import type { User } from '../../types';
 
 interface CanProps {

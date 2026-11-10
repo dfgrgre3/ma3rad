@@ -4,12 +4,12 @@ import {
   RefreshCw, Plus, Search, Filter, FileText, Check, DollarSign,
   Package, Trash2, ArrowRightCircle, Sparkles, Building2
 } from 'lucide-react';
-import { InventoryService } from '../../../services/inventory/InventoryService';
-import { ProductService } from '../../../services/products/ProductService';
+import { InventoryService } from '../../../services/domains/inventory/InventoryService';
+import { ProductService } from '../../../services/domains/products/ProductService';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { useToast } from '../../../components/ui/Toast';
 import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel } from '../../../utils/products/productUnits';
-import { usePermission } from '../../../hooks/auth/usePermission';
+import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const DamageQuarantinePage: React.FC = () => {
   const inventoryService = new InventoryService();
