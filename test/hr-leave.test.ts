@@ -332,83 +332,86 @@ test('annual leave accrues monthly, prorates on service, and caps year-end carry
   const db = await boot();
   const service = new LeaveService();
   const employeeId = createEmployee();
+  db.run("UPDATE employees SET joined_date = '2024-01-01' WHERE id = ?", [employeeId]);
   service.saveAnnualAccrualPolicy({
-    effectiveFrom: '2026-01-01',
+    effectiveFrom: '2024-01-01',
     annualEntitlementDays: 24,
     carryoverLimitDays: 5,
     prorateOnService: true,
   });
   const carryoverEmployeeId = createEmployee();
+  db.run("UPDATE employees SET joined_date = '2024-01-01' WHERE id = ?", [carryoverEmployeeId]);
 
-  assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-03-31').grantedDays, 6);
-  assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-03-31').grantedDays, 6);
+  assert.equal(service.getBalanceSummary(employeeId, 2024, '2024-03-31').grantedDays, 6);
+  assert.equal(service.getBalanceSummary(employeeId, 2024, '2024-03-31').grantedDays, 6);
   const request = service.requestLeave({
     employeeId,
     leaveType: 'ANNUAL',
-    startDate: '2026-04-15',
-    endDate: '2026-04-16',
+    startDate: '2024-04-15',
+    endDate: '2024-04-16',
   });
   service.decide(request.id, 'APPROVED');
 
-  assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-12-31').grantedDays, 24);
+  assert.equal(service.getBalanceSummary(employeeId, 2024, '2024-12-31').grantedDays, 24);
   assert.equal(
     db.query<{ count: number }>(
       `SELECT COUNT(*) AS count FROM employee_leave_balance_transactions
-       WHERE employee_id = ? AND source_key LIKE 'ACCRUAL:2026-%'`,
+       WHERE employee_id = ? AND source_key LIKE 'ACCRUAL:2024-%'`,
       [employeeId]
     )[0].count,
     12
   );
   assert.throws(
     () => service.saveAnnualAccrualPolicy({
-      effectiveFrom: '2026-01-01',
+      effectiveFrom: '2024-01-01',
       annualEntitlementDays: 30,
       carryoverLimitDays: 5,
       prorateOnService: true,
     }),
     /بأثر رجعي/
   );
-  assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2026, '2026-12-31').grantedDays, 24);
-  assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2027, '2027-01-31').grantedDays, 7);
+  assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2024, '2024-12-31').grantedDays, 24);
+  assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2025, '2025-01-31').grantedDays, 7);
   assert.equal(
     db.query<{ days: number }>(
       `SELECT days_delta AS days FROM employee_leave_balance_transactions
-       WHERE employee_id = ? AND source_key = 'CARRYOVER:2027'`,
+       WHERE employee_id = ? AND source_key = 'CARRYOVER:2025'`,
       [carryoverEmployeeId]
     )[0].days,
     5
   );
+  assert.equal(service.getAnnualBalanceAsOf(carryoverEmployeeId, '2025-01-31'), 7);
   service.saveAnnualAccrualPolicy({
     employeeId,
-    effectiveFrom: '2027-01-01',
+    effectiveFrom: '2025-01-01',
     annualEntitlementDays: 36,
     carryoverLimitDays: 0,
     prorateOnService: false,
   });
-  const nextYearBalance = service.getBalanceSummary(employeeId, 2027, '2027-01-31');
+  const nextYearBalance = service.getBalanceSummary(employeeId, 2025, '2025-01-31');
   assert.equal(nextYearBalance.grantedDays, 3);
   assert.equal(
-    service.getAnnualAccrualPolicyState(employeeId, '2027-01-01').effectivePolicy?.annualEntitlementDays,
+    service.getAnnualAccrualPolicyState(employeeId, '2025-01-01').effectivePolicy?.annualEntitlementDays,
     36
   );
 
   const employeeProrateId = createEmployee();
-  db.run("UPDATE employees SET joined_date = '2026-01-16' WHERE id = ?", [employeeProrateId]);
+  db.run("UPDATE employees SET joined_date = '2024-01-16' WHERE id = ?", [employeeProrateId]);
   service.saveAnnualAccrualPolicy({
     employeeId: employeeProrateId,
-    effectiveFrom: '2026-01-01',
+    effectiveFrom: '2024-01-01',
     annualEntitlementDays: 31,
     carryoverLimitDays: 0,
     prorateOnService: true,
   });
   assert.equal(
-    service.getBalanceSummary(employeeProrateId, 2026, '2026-01-31').grantedDays,
+    service.getBalanceSummary(employeeProrateId, 2024, '2024-01-31').grantedDays,
     1.3333
   );
   assert.equal(
     db.query<{ count: number }>(
       `SELECT COUNT(*) AS count FROM employee_leave_balance_transactions
-       WHERE employee_id = ? AND source_key = 'ACCRUAL:2026-01'`,
+       WHERE employee_id = ? AND source_key = 'ACCRUAL:2024-01'`,
       [employeeProrateId]
     )[0].count,
     1
@@ -416,15 +419,15 @@ test('annual leave accrues monthly, prorates on service, and caps year-end carry
 
   const terminatedEmployeeId = createEmployee();
   db.run(
-    "UPDATE employees SET joined_date = '2026-01-01', terminated_at = '2026-01-16' WHERE id = ?",
+    "UPDATE employees SET joined_date = '2024-01-01', terminated_at = '2024-01-16' WHERE id = ?",
     [terminatedEmployeeId]
   );
   service.saveAnnualAccrualPolicy({
     employeeId: terminatedEmployeeId,
-    effectiveFrom: '2026-01-01',
+    effectiveFrom: '2024-01-01',
     annualEntitlementDays: 31,
     carryoverLimitDays: 0,
     prorateOnService: true,
   });
-  assert.equal(service.getAnnualBalanceAsOf(terminatedEmployeeId, '2026-01-16'), 1.3333);
+  assert.equal(service.getAnnualBalanceAsOf(terminatedEmployeeId, '2024-01-16'), 1.3333);
 });

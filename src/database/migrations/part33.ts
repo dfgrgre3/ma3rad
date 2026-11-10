@@ -20,7 +20,7 @@ export const MIGRATION_PART_33: Migration[] = [
           effective_from TEXT NOT NULL,
           annual_entitlement_days REAL,
           carryover_limit_days REAL,
-          prorate_on_service INTEGER,
+          prorate_on_service INTEGER CHECK(prorate_on_service IS NULL OR prorate_on_service IN (0, 1)),
           updated_by TEXT NOT NULL,
           updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CHECK(scope_key = COALESCE(employee_id, 'BRANCH')),

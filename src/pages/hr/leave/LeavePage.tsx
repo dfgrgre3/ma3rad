@@ -428,6 +428,7 @@ export const LeavePage: React.FC = () => {
               <span className="mr-2 text-xs text-sky-700">
                 (مخصص {requestBalance.grantedDays} · معتمد {requestBalance.approvedDays} · معلق {requestBalance.pendingDays})
               </span>
+              <p className="mt-1 text-xs text-sky-700">الرصيد لا يشمل الاستحقاق الشهري الذي لم يحل تاريخ إضافته بعد.</p>
             </div>
           )}
           <p className="mt-2 text-xs text-amber-700">

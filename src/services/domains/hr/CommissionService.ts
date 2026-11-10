@@ -142,17 +142,24 @@ export class CommissionService {
     PermissionService.requireAny(actor, status === 'APPROVED' || status === 'PAID'
       ? ['employees.payroll.approve', 'employees.manage']
       : ['employees.payroll.manage', 'employees.manage']);
-    const row = this.db.query<any>(`
+    const row = this.db.query<{
+      status: CommissionRow['status'];
+      amount: number;
+      employee_id: string;
+      periodMonth: string;
+      branchId: string | null;
+    }>(`
       SELECT c.status, c.commission_amount AS amount, c.employee_id, c.period_month AS periodMonth,
              COALESCE(c.branch_id, e.branch_id) AS branchId
       FROM commissions c JOIN employees e ON e.id = c.employee_id WHERE c.id = ?
     `, [id])[0];
     if (!row) throw new Error('العمولة غير موجودة.');
     if (!row.branchId) throw new Error('العمولة غير مرتبطة بفرع.');
-    this.branchAccess.requireBranchAccess(row.branchId, actor);
+    const branchId = row.branchId;
+    this.branchAccess.requireBranchAccess(branchId, actor);
     if (this.db.query(
       `SELECT id FROM payroll_runs WHERE branch_id = ? AND period = ? AND status != 'DRAFT'`,
-      [row.branchId, row.periodMonth]
+      [branchId, row.periodMonth]
     ).length) {
       throw new Error('العمولة مرتبطة بدورة رواتب معتمدة؛ لا يمكن تعديلها خارج دورة الرواتب.');
     }
@@ -164,51 +171,94 @@ export class CommissionService {
     if (amount <= 0) throw new Error('Commission amount must be greater than zero.');
     const today = localDateString();
     this.db.executeTransaction((db) => {
+      const current = db.query<{ status: CommissionRow['status'] }>(
+        'SELECT status FROM commissions WHERE id = ?',
+        [id]
+      )[0];
+      if (!current) throw new Error('العمولة غير موجودة.');
+      if (current.status === 'PAID') throw new Error('العمولة مدفوعة بالفعل.');
+      if (status === 'APPROVED' && current.status !== 'PENDING') {
+        throw new Error('لا يمكن اعتماد عمولة بهذه الحالة.');
+      }
+      if (status === 'PAID' && current.status !== 'APPROVED') {
+        throw new Error('يجب اعتماد العمولة قبل صرفها.');
+      }
+      if (status === 'CANCELLED' && !['PENDING', 'APPROVED'].includes(current.status)) {
+        throw new Error('لا يمكن إلغاء عمولة بهذه الحالة.');
+      }
+
       if (status === 'APPROVED') {
         postLedgerEntry(db.getDatabase(), {
           date: today, description: `Accrue commission for employee ${row.employee_id}`,
-          referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id,
+          referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id, branchId,
           lines: [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2103', debit: 0, credit: amount }],
         });
       } else if (status === 'PAID') {
-        const registerId = this.branchAccess.getDefaultRegisterId(row.branchId, actor);
-        const register = db.query<any>('SELECT id FROM cash_registers WHERE id=? AND is_active=1', [registerId])[0];
+        const registerId = this.branchAccess.getDefaultRegisterId(branchId, actor);
+        const register = db.query<{ id: string }>(
+          'SELECT id FROM cash_registers WHERE id=? AND is_active=1',
+          [registerId]
+        )[0];
         if (!register) throw new Error('خزينة فرع العمولة غير متاحة.');
-        const accrued = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];
+        const accrued = db.query<{ id: string }>(
+          `SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`,
+          [id]
+        )[0];
         if (!accrued) postLedgerEntry(db.getDatabase(), {
           date: today, description: `Accrue commission before payment ${id}`,
-          referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id,
+          referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id, branchId,
           lines: [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2103', debit: 0, credit: amount }],
         });
-        postLedgerEntry(db.getDatabase(), {
-          date: today, description: `Pay commission ${id}`,
-          referenceType: 'COMMISSION_PAYMENT', referenceId: id, createdBy: actor.id,
-          lines: [{ accountCode: '2103', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }],
-        });
-        db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, register.id]);
-        const shift = db.query<any>(`SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND status='OPEN' ORDER BY opened_at DESC LIMIT 1`, [actor.id, register.id])[0];
-        if (shift) db.run('UPDATE cash_shifts SET total_expenses=total_expenses+? WHERE id=?', [amount, shift.id]);
+        const paymentEntry = db.query<{ id: string }>(
+          `SELECT id FROM journal_entries WHERE reference_type='COMMISSION_PAYMENT' AND reference_id=?`,
+          [id]
+        )[0];
+        if (!paymentEntry) {
+          postLedgerEntry(db.getDatabase(), {
+            date: today, description: `Pay commission ${id}`,
+            referenceType: 'COMMISSION_PAYMENT', referenceId: id, createdBy: actor.id, branchId,
+            lines: [{ accountCode: '2103', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }],
+          });
+          db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, register.id]);
+          const shift = db.query<{ id: string }>(
+            `SELECT id FROM cash_shifts WHERE user_id=? AND register_id=? AND status='OPEN'
+             ORDER BY opened_at DESC LIMIT 1`,
+            [actor.id, register.id]
+          )[0];
+          if (shift) db.run('UPDATE cash_shifts SET total_expenses=total_expenses+? WHERE id=?', [amount, shift.id]);
+        }
       } else if (row.status === 'APPROVED') {
-        const approval = db.query<any>(`SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`, [id])[0];
+        const payment = db.query<{ id: string }>(
+          `SELECT id FROM journal_entries WHERE reference_type='COMMISSION_PAYMENT' AND reference_id=?`,
+          [id]
+        )[0];
+        if (payment) throw new Error('لا يمكن إلغاء عمولة لها حركة صرف مسجلة.');
+        const approval = db.query<{ id: string }>(
+          `SELECT id FROM journal_entries WHERE reference_type='COMMISSION_APPROVAL' AND reference_id=?`,
+          [id]
+        )[0];
         if (approval) reverseLedgerEntry(db.getDatabase(), approval.id, {
           date: today, description: `Reverse cancelled commission ${id}`,
           referenceType: 'COMMISSION_CANCELLATION', referenceId: `${id}:${uuidv4()}`, createdBy: actor.id,
         });
       }
+
+      db.run(
+        `UPDATE commissions SET status = ?, paid_at = ? WHERE id = ? AND status = ?`,
+        [status, status === 'PAID' ? today : null, id, current.status]
+      );
+      const updated = db.query<{ status: string }>('SELECT status FROM commissions WHERE id = ?', [id])[0];
+      if (updated?.status !== status) throw new Error('تعذر تحديث حالة العمولة؛ تم التراجع عن العملية المالية.');
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, ?, 'COMMISSIONS', ?, ?)`,
+        [
+          `aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName,
+          status === 'APPROVED' ? 'اعتماد عمولة' : status === 'PAID' ? 'صرف عمولة' : 'إلغاء عمولة',
+          id, JSON.stringify({ previousStatus: current.status, status }),
+        ]
+      );
     });
-    this.db.run(
-      `UPDATE commissions SET status = ?, paid_at = ? WHERE id = ?`,
-      [status, status === 'PAID' ? today : null, id]
-    );
-    this.db.run(
-      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
-       VALUES (?, ?, ?, ?, 'COMMISSIONS', ?, ?)`,
-      [
-        `aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName,
-        status === 'APPROVED' ? 'اعتماد عمولة' : status === 'PAID' ? 'صرف عمولة' : 'إلغاء عمولة',
-        id, JSON.stringify({ status }),
-      ]
-    );
   }
 
   public deleteCommission(id: string): void {

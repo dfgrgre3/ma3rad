@@ -644,7 +644,50 @@ test('commissions and stock reservations lifecycle', async () => {
   const commission = rows.find((row) => row.employeeId === 'emp_test_1' && row.commissionAmount > 0);
   assert.ok(commission, 'the test sales representative should have a positive commission');
   commissions.setStatus(commission!.id, 'APPROVED');
+  const commissionRegister = q(
+    `SELECT cr.id, cr.current_balance AS balance
+     FROM cash_registers cr
+     JOIN commissions c ON c.branch_id = cr.branch_id
+     WHERE c.id = ? AND cr.is_active = 1
+     ORDER BY cr.is_default DESC, cr.id ASC LIMIT 1`,
+    [commission!.id]
+  )[0];
+  assert.ok(commissionRegister, 'the commission branch should have an active register');
+  db.run(
+    `CREATE TRIGGER fail_commission_status_update
+     BEFORE UPDATE OF status ON commissions
+     WHEN NEW.status = 'PAID'
+     BEGIN
+       SELECT RAISE(ABORT, 'forced commission status failure');
+     END`
+  );
+  assert.throws(() => commissions.setStatus(commission!.id, 'PAID'), /forced commission status failure/);
+  assert.equal(q(
+    `SELECT COUNT(*) AS count FROM journal_entries
+     WHERE reference_type = 'COMMISSION_PAYMENT' AND reference_id = ?`,
+    [commission!.id]
+  )[0].count, 0, 'failed state update must roll back the payment journal entry');
+  assert.equal(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', [commissionRegister.id])[0].balance,
+    commissionRegister.balance, 'failed state update must roll back the cash movement');
+  db.run('DROP TRIGGER fail_commission_status_update');
+
   commissions.setStatus(commission!.id, 'PAID');
+  const balanceAfterPayment = q(
+    'SELECT current_balance AS balance FROM cash_registers WHERE id = ?',
+    [commissionRegister.id]
+  )[0].balance;
+  assert.equal(Number(commissionRegister.balance) - Number(balanceAfterPayment), commission!.commissionAmount);
+  assert.throws(() => commissions.setStatus(commission!.id, 'PAID'), /مدفوعة بالفعل/);
+  assert.equal(
+    q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', [commissionRegister.id])[0].balance,
+    balanceAfterPayment,
+    'retrying a paid commission must not deduct cash again'
+  );
+  assert.equal(q(
+    `SELECT COUNT(*) AS count FROM journal_entries
+     WHERE reference_type = 'COMMISSION_PAYMENT' AND reference_id = ?`,
+    [commission!.id]
+  )[0].count, 1, 'a commission can only have one payment journal entry');
   assert.equal(commissions.getCommissions({ month, status: 'PAID' }).length, 1);
 
   const reservations = new ReservationService();

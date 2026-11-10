@@ -199,25 +199,22 @@ export class LeaveService {
     asOfDate: string,
     actorId: string
   ): void {
+    const today = new Date().toISOString().slice(0, 10);
+    const accrualThroughDate = asOfDate < today ? asOfDate : today;
     const employee = this.db.query<{ joinedDate: string; terminatedAt: string | null }>(
       'SELECT joined_date AS joinedDate, terminated_at AS terminatedAt FROM employees WHERE id = ? AND branch_id = ?',
       [employeeId, branchId]
     )[0];
-    if (!employee || employee.joinedDate > asOfDate) return;
+    if (!employee || employee.joinedDate > accrualThroughDate) return;
 
     const firstYear = Number(employee.joinedDate.slice(0, 4));
-    const finalYear = Number(asOfDate.slice(0, 4));
+    const finalYear = Number(accrualThroughDate.slice(0, 4));
     for (let year = firstYear; year <= finalYear; year += 1) {
       const janFirst = yearStart(year);
-      if (year > firstYear && janFirst <= asOfDate) {
+      if (year > firstYear && janFirst <= accrualThroughDate) {
         const carryPolicy = this.effectiveAnnualLeavePolicy(employeeId, branchId, janFirst);
         const carrySource = `CARRYOVER:${year}`;
-        const alreadyCarried = this.db.query<{ id: string }>(
-          `SELECT id FROM employee_leave_balance_transactions
-           WHERE employee_id = ? AND source_key = ?`,
-          [employeeId, carrySource]
-        )[0];
-        if (carryPolicy && !alreadyCarried) {
+        if (carryPolicy) {
           const previousYear = year - 1;
           const priorBalance = Number(this.db.query<{ days: number }>(
             `SELECT COALESCE(SUM(days_delta), 0) AS days
@@ -250,15 +247,16 @@ export class LeaveService {
 
       for (let month = 1; month <= 12; month += 1) {
         const periodEnd = monthEnd(year, month);
+        const periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
+        if (employee.terminatedAt && employee.terminatedAt < periodStart) break;
         const effectiveDate = employee.terminatedAt && employee.terminatedAt < periodEnd
           ? employee.terminatedAt
           : periodEnd;
-        if (effectiveDate > asOfDate) break;
+        if (effectiveDate > accrualThroughDate) break;
         if (effectiveDate < employee.joinedDate) continue;
         const serviceEnd = employee.terminatedAt && employee.terminatedAt < periodEnd
           ? employee.terminatedAt
           : periodEnd;
-        const periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
         if (serviceEnd < periodStart) continue;
 
         const policy = this.effectiveAnnualLeavePolicy(employeeId, branchId, periodStart);
@@ -302,8 +300,14 @@ export class LeaveService {
     reason: string;
     actorId: string;
   }): void {
+    const existing = this.db.query<{ id: string }>(
+      `SELECT id FROM employee_leave_balance_transactions
+       WHERE employee_id = ? AND source_key = ?`,
+      [input.employeeId, input.sourceKey]
+    )[0];
+    if (existing) return;
     this.db.run(
-      `INSERT OR IGNORE INTO employee_leave_balance_transactions
+      `INSERT INTO employee_leave_balance_transactions
        (id, employee_id, branch_id, leave_year, days_delta, transaction_type,
         effective_date, reason, created_by, source_key)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -763,6 +767,21 @@ export class LeaveService {
       startDate: input.effectiveDate,
       endDate: input.effectiveDate,
     });
+    if (input.transactionType === 'CARRYOVER') {
+      const policy = this.effectiveAnnualLeavePolicy(input.employeeId, employee.branchId, input.effectiveDate);
+      if (policy) {
+        const existingCarryover = Number(this.db.query<{ days: number }>(
+          `SELECT COALESCE(SUM(days_delta), 0) AS days
+           FROM employee_leave_balance_transactions
+           WHERE employee_id = ? AND leave_year = ? AND transaction_type = 'CARRYOVER'
+             AND effective_date <= ?`,
+          [input.employeeId, input.year, input.effectiveDate]
+        )[0]?.days ?? 0);
+        if (existingCarryover + input.daysDelta > Number(policy.carryoverLimitDays ?? 0) + 1e-8) {
+          throw new Error(`حركة الترحيل تتجاوز الحد المسموح (${policy.carryoverLimitDays} يوم).`);
+        }
+      }
+    }
     const balanceAtEffectiveDate = Number(this.db.query<{ days: number }>(
       `SELECT COALESCE(SUM(days_delta), 0) AS days
        FROM employee_leave_balance_transactions
