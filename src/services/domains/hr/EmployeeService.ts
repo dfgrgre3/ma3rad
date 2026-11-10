@@ -8,6 +8,7 @@ import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
 import { localDateString } from '../../../utils/shared/date';
 import { AttendanceService } from './AttendanceService';
+import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 
 export type EmployeeStatus = 'PROBATION' | 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'RESIGNED' | 'TERMINATED';
 export type SalaryType = 'MONTHLY' | 'DAILY';
@@ -263,6 +264,7 @@ function fingerprintPayrollSources(value: unknown): string {
 export class EmployeeService {
   private static db = DatabaseManager.getInstance();
   private static branchAccess = new BranchAccessService();
+  private static departmentAccess = new EmployeeDepartmentAccessService();
 
   private static requireView() {
     const actor = AuthService.requireAuth();
@@ -273,17 +275,24 @@ export class EmployeeService {
     return actor;
   }
 
-  private static requireManage() {
+  private static requireCreate() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.require(actor, 'ui.employees.employees.manage');
+    PermissionService.require(actor, 'employees.create');
+    return actor;
+  }
+
+  private static requireUpdate() {
+    const actor = AuthService.requireAuth();
+    ModuleRegistryService.assertModuleEnabled('hr');
+    PermissionService.require(actor, 'employees.update');
     return actor;
   }
 
   private static requirePayrollView() {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
-      'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage',
+      'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve',
     ]);
     return actor;
   }
@@ -291,7 +300,7 @@ export class EmployeeService {
   private static requireFinancialView() {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
-      'employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage',
+      'employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve',
     ]);
     return actor;
   }
@@ -299,24 +308,30 @@ export class EmployeeService {
   private static requirePayrollManage() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.requireAny(actor, ['employees.payroll.manage', 'ui.employees.employees.manage']);
+    PermissionService.require(actor, 'employees.payroll.manage');
     return actor;
   }
 
   private static requirePayrollApproval() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.requireAny(actor, ['employees.payroll.approve', 'ui.employees.employees.manage']);
+    PermissionService.require(actor, 'employees.payroll.approve');
     return actor;
   }
 
   private static requireEmployeeBranch(employeeId: string, actor = AuthService.requireAuth()): string {
-    const branchId = this.db.query<{ branchId: string | null }>(
+    const employee = this.db.query<{ branchId: string | null }>(
       'SELECT branch_id AS branchId FROM employees WHERE id = ?',
       [employeeId]
-    )[0]?.branchId;
+    )[0];
+    const branchId = employee?.branchId;
     if (!branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(branchId, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    if (!this.db.query(
+      `SELECT 1 FROM employees e WHERE e.id = ? AND ${departmentScope.clause}`,
+      [employeeId, ...departmentScope.params]
+    ).length) throw new Error('الموظف خارج نطاق الأقسام المصرح بها.');
     return branchId;
   }
 

@@ -3,7 +3,7 @@ import { addColumn } from './support';
 
 export const MIGRATION_PART_36: Migration[] = [
   {
-    id: '148_hr_department_access_scope',
+    id: '147_hr_department_access_scope',
     description: 'Add explicit user-to-department access assignments for HR records',
     up: (db) => {
       addColumn(db, 'users', 'department_scope', "TEXT NOT NULL DEFAULT 'ALL' CHECK(department_scope IN ('ALL', 'ASSIGNED'))");

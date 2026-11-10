@@ -564,11 +564,36 @@ export class ManufacturingService {
     return this.getProductionOrder(id);
   }
 
-  public startOrder(id: string): ProductionOrder {
+  /** Link a released production order to an operations shift without starting it. */
+  public assignOrderToShift(orderId: string, operationShiftId: string | null): ProductionOrder {
+    this.guardWrites();
+    this.require('manufacturing.manage');
+    const order = this.getProductionOrder(orderId);
+    if (operationShiftId) {
+      const shift = this.db.query<{ branchId: string; status: string }>(
+        'SELECT branch_id AS branchId, status FROM operation_shifts WHERE id = ?',
+        [operationShiftId]
+      )[0];
+      if (!shift) throw new Error('وردية التشغيل غير موجودة.');
+      if (shift.branchId !== order.branchId) throw new Error('وردية التشغيل لا تتبع فرع أمر الإنتاج.');
+      if (!['OPEN', 'HANDOVER_PENDING'].includes(shift.status)) {
+        throw new Error('يمكن ربط أمر الإنتاج بوردية تشغيل مفتوحة فقط.');
+      }
+    }
+    this.db.run(
+      'UPDATE production_orders SET operation_shift_id = ?, updated_at = ? WHERE id = ?',
+      [operationShiftId, new Date().toISOString(), orderId]
+    );
+    this.audit('ربط أمر إنتاج بوردية تشغيل', orderId, { operationShiftId });
+    return this.getProductionOrder(orderId);
+  }
+
+  public startOrder(id: string, operationShiftId?: string | null): ProductionOrder {
     this.guardWrites();
     const actor = this.require('manufacturing.manage');
     const order = this.getProductionOrder(id);
     if (order.status !== 'RELEASED') throw new Error('لا يمكن بدء أمر إنتاج إلا بعد إصداره.');
+    if (operationShiftId != null) this.assignOrderToShift(id, operationShiftId);
     const now = new Date().toISOString();
     this.db.run(
       `UPDATE production_orders SET status = 'IN_PROGRESS', start_date = COALESCE(start_date, ?), updated_at = ? WHERE id = ?`,
