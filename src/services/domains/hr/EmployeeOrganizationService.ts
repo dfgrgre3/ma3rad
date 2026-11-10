@@ -3,6 +3,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { User } from '../../../types/auth/identity';
 
@@ -27,6 +28,7 @@ type EmployeeJobTitleRow = Omit<EmployeeJobTitle, 'isActive'> & { isActive: numb
 export class EmployeeOrganizationService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+  private departmentAccess = new EmployeeDepartmentAccessService();
 
   private requireManage(): User {
     const actor = AuthService.requireAuth();
@@ -63,23 +65,29 @@ export class EmployeeOrganizationService {
     )[0];
     if (!department || !department.isActive) throw new Error('القسم غير موجود أو غير نشط.');
     if (department.branchId) this.branchAccess.requireBranchAccess(department.branchId, actor);
+    const scope = this.departmentAccess.sqlScope('d.id', actor);
+    if (!this.db.query(`SELECT 1 FROM departments d WHERE d.id = ? AND ${scope.clause}`, [id, ...scope.params]).length) {
+      throw new Error('القسم خارج نطاق الأقسام المصرح بها.');
+    }
     return { ...department, isActive: Boolean(department.isActive) };
   }
 
   public getDepartments(branchId = this.branchAccess.getCurrentBranchId()): EmployeeDepartment[] {
     const actor = this.requireView();
     this.branchAccess.requireBranchAccess(branchId, actor);
+    const departmentScope = this.departmentAccess.sqlScope('d.id', actor);
     return this.db.query<EmployeeDepartmentRow>(
-      `SELECT id, name, branch_id AS branchId, description, is_active AS isActive
-       FROM departments
-       WHERE is_active = 1 AND (branch_id = ? OR branch_id IS NULL)
-       ORDER BY name`,
-      [branchId]
+      `SELECT d.id, d.name, d.branch_id AS branchId, d.description, d.is_active AS isActive
+       FROM departments d
+       WHERE d.is_active = 1 AND (d.branch_id = ? OR d.branch_id IS NULL) AND ${departmentScope.clause}
+       ORDER BY d.name`,
+      [branchId, ...departmentScope.params]
     ).map((row) => ({ ...row, isActive: Boolean(row.isActive) }));
   }
 
   public createDepartment(input: { name: string; branchId?: string; description?: string }): EmployeeDepartment {
     const actor = this.requireManage();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     const name = input.name?.trim();
     if (!name) throw new Error('اسم القسم مطلوب.');
     if (name.length > 100) throw new Error('اسم القسم لا يتجاوز 100 حرف.');
@@ -129,14 +137,16 @@ export class EmployeeOrganizationService {
     const branchId = this.branchAccess.getCurrentBranchId(actor);
     this.branchAccess.requireBranchAccess(branchId, actor);
     if (departmentId) this.requireDepartment(departmentId, actor);
+    const departmentScope = this.departmentAccess.sqlScope('d.id', actor);
     return this.db.query<EmployeeJobTitleRow>(
       `SELECT jt.id, jt.department_id AS departmentId, jt.title, jt.is_active AS isActive
        FROM employee_job_titles jt
        LEFT JOIN departments d ON d.id = jt.department_id
        WHERE jt.is_active = 1 AND (jt.department_id = ? OR jt.department_id IS NULL)
          AND (d.branch_id = ? OR d.branch_id IS NULL OR jt.department_id IS NULL)
+         AND (jt.department_id IS NULL OR ${departmentScope.clause})
        ORDER BY jt.title`,
-      [departmentId || '', branchId]
+      [departmentId || '', branchId, ...departmentScope.params]
     ).map((row) => ({ ...row, isActive: Boolean(row.isActive) }));
   }
 

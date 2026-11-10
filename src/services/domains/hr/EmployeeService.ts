@@ -270,7 +270,7 @@ export class EmployeeService {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
       'ui.employees.employees.view', 'employees.payroll.view', 'employees.financials.view',
-      'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage',
+      'employees.payroll.manage', 'employees.payroll.approve',
     ]);
     return actor;
   }
@@ -346,7 +346,7 @@ export class EmployeeService {
   static getAll(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Employee[] {
     const actor = this.requireView();
     const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']);
-    const canSeePrivateProfile = PermissionService.canAny(actor, ['employees.profile.view', 'employees.update']);
+    const canSeePrivateProfile = PermissionService.can(actor, 'employees.profile.view');
     const salaryColumns = canSeeFinancials
       ? 'e.base_salary AS baseSalary, e.salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
@@ -415,7 +415,7 @@ export class EmployeeService {
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']);
-    const canSeePrivateProfile = PermissionService.canAny(actor, ['employees.profile.view', 'employees.update']);
+    const canSeePrivateProfile = PermissionService.can(actor, 'employees.profile.view');
     const salaryColumns = canSeeFinancials
       ? 'e.base_salary AS baseSalary, e.salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
@@ -769,24 +769,25 @@ export class EmployeeService {
   static getTransactions(employeeId?: string): PayrollTransaction[] {
     const actor = this.requirePayrollView();
     const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     if (employeeId) {
       this.requireEmployeeBranch(employeeId, actor);
       return this.db.query<PayrollTransaction>(
         `SELECT pt.*, e.name AS employee_name
          FROM payroll_transactions pt
          LEFT JOIN employees e ON e.id = pt.employee_id
-         WHERE pt.employee_id = ? AND ${scope.clause}
+         WHERE pt.employee_id = ? AND ${scope.clause} AND ${departmentScope.clause}
          ORDER BY pt.date DESC, pt.created_at DESC`,
-        [employeeId, ...scope.params]
+        [employeeId, ...scope.params, ...departmentScope.params]
       );
     }
     return this.db.query<PayrollTransaction>(
       `SELECT pt.*, e.name AS employee_name
        FROM payroll_transactions pt
        LEFT JOIN employees e ON e.id = pt.employee_id
-       WHERE ${scope.clause}
+       WHERE ${scope.clause} AND ${departmentScope.clause}
        ORDER BY pt.date DESC, pt.created_at DESC`,
-      scope.params
+      [...scope.params, ...departmentScope.params]
     );
   }
 
@@ -972,7 +973,13 @@ export class EmployeeService {
 
   static accrueMonthlyPayroll(period: string): { created: number; skipped: number } {
     const actor = this.requirePayrollManage();
-    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    this.departmentAccess.requireAllDepartmentAccess(actor);
+    const branchScope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    const scope = {
+      clause: `(${branchScope.clause}) AND (${departmentScope.clause})`,
+      params: [...branchScope.params, ...departmentScope.params],
+    };
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('Payroll period must be YYYY-MM.');
     if (period > localDateString().slice(0, 7)) throw new Error('Future payroll periods cannot be accrued.');
     if (this.db.query(
@@ -1087,6 +1094,7 @@ export class EmployeeService {
 
   static getPayrollRun(period: string): PayrollRun | null {
     const actor = this.requirePayrollView();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     if (!isValidPayrollPeriod(period)) throw new Error('Payroll period must be YYYY-MM.');
     const branchId = this.branchAccess.getCurrentBranchId(actor);
     const run = this.db.query<any>(
@@ -1102,6 +1110,7 @@ export class EmployeeService {
 
   static getPayrollRunById(id: string): PayrollRun {
     const actor = this.requirePayrollView();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
     const run = this.db.query<any>(
       `SELECT pr.id, pr.period, pr.branch_id AS branchId, pr.status,
@@ -1250,6 +1259,7 @@ export class EmployeeService {
 
   static calculatePayrollRun(period: string): PayrollRun {
     const actor = this.requirePayrollManage();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     if (!isValidPayrollPeriod(period)) throw new Error('Payroll period must be YYYY-MM.');
     if (period > localDateString().slice(0, 7)) throw new Error('لا يمكن احتساب فترة رواتب مستقبلية.');
 
@@ -1468,6 +1478,7 @@ export class EmployeeService {
 
   static approvePayrollRun(id: string): PayrollRun {
     const actor = this.requirePayrollApproval();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     const run = this.getPayrollRunById(id);
     this.branchAccess.requireBranchAccess(run.branchId, actor);
     if (run.status !== 'DRAFT') throw new Error('لا يمكن اعتماد دورة رواتب ليست مسودة.');
@@ -1588,6 +1599,7 @@ export class EmployeeService {
 
   static payPayrollRun(id: string): PayrollRun {
     const actor = this.requirePayrollApproval();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     const run = this.getPayrollRunById(id);
     this.branchAccess.requireBranchAccess(run.branchId, actor);
     if (run.status !== 'APPROVED') throw new Error('يجب اعتماد دورة الرواتب قبل صرفها.');
@@ -1630,6 +1642,7 @@ export class EmployeeService {
 
   static closePayrollRun(id: string): PayrollRun {
     const actor = this.requirePayrollApproval();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     const run = this.getPayrollRunById(id);
     this.branchAccess.requireBranchAccess(run.branchId, actor);
     if (run.status !== 'PAID') throw new Error('يجب صرف دورة الرواتب قبل إغلاقها.');
@@ -1650,6 +1663,7 @@ export class EmployeeService {
   static getPayrollPayables(): EmployeePayrollPayable[] {
     const actor = this.requireFinancialView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('emp.department_id', actor);
     return this.db.query<EmployeePayrollPayable>(`
       WITH payroll_lines AS (
         SELECT
@@ -1680,18 +1694,20 @@ export class EmployeeService {
       LEFT JOIN employees emp ON emp.id = p.employee_id
       GROUP BY p.employee_id, emp.name
       HAVING ABS(SUM(p.balance)) > 0.009
+        AND (emp.id IS NULL OR ${departmentScope.clause})
       ORDER BY employeeName
-    `, scope.params);
+    `, [...scope.params, ...departmentScope.params]);
   }
 
   static deleteTransaction(id: string): void {
     const actor = this.requirePayrollManage();
     const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     const row = this.db.query<any>(`
       SELECT pt.*, COALESCE(pt.branch_id, e.branch_id) AS effective_branch_id FROM payroll_transactions pt
       LEFT JOIN employees e ON e.id = pt.employee_id
-      WHERE pt.id = ? AND ${scope.clause}
-    `, [id, ...scope.params])[0];
+      WHERE pt.id = ? AND ${scope.clause} AND ${departmentScope.clause}
+    `, [id, ...scope.params, ...departmentScope.params])[0];
     if (!row) throw new Error('عملية الرواتب غير موجودة ضمن نطاق فروعك.');
     this.assertPayrollPeriodEditable(row.effective_branch_id, row.date);
     this.db.executeTransaction((db) => {
@@ -1710,15 +1726,17 @@ export class EmployeeService {
   static getEmployeeFinancials(employeeId: string, period = localDateString().slice(0, 7)): EmployeeFinancials {
     const actor = this.requireFinancialView();
     if (!isValidPayrollPeriod(period)) throw new Error('Payroll period must be YYYY-MM.');
-    const emp = this.getById(employeeId);
+    const emp = this.getScopedById(employeeId, actor);
     if (!emp) throw new Error('الموظف غير موجود ضمن نطاق فروعك.');
 
     const scope = this.branchAccess.sqlScope('pt.branch_id', 'e.branch_id', actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     const rows = this.db.query<{ type: PayrollTxType; total: number }>(
       `SELECT pt.type, SUM(pt.amount) AS total
        FROM payroll_transactions pt JOIN employees e ON e.id = pt.employee_id
-       WHERE pt.employee_id = ? AND substr(pt.date, 1, 7) = ? AND ${scope.clause} GROUP BY pt.type`,
-      [employeeId, period, ...scope.params]
+       WHERE pt.employee_id = ? AND substr(pt.date, 1, 7) = ? AND ${scope.clause}
+         AND ${departmentScope.clause} GROUP BY pt.type`,
+      [employeeId, period, ...scope.params, ...departmentScope.params]
     );
 
     const map: Record<string, number> = {};

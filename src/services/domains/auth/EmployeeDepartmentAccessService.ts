@@ -48,6 +48,17 @@ export class EmployeeDepartmentAccessService {
     }
   }
 
+  public requireAllDepartmentAccess(actor = AuthService.requireAuth()): void {
+    if (actor.role === 'ADMIN') return;
+    const scope = this.db.query<{ departmentScope: DepartmentScope }>(
+      'SELECT department_scope AS departmentScope FROM users WHERE id = ? AND is_active = 1',
+      [actor.id]
+    )[0]?.departmentScope;
+    if (scope !== 'ALL') {
+      throw new Error('إدارة دورة الرواتب تتطلب نطاق جميع الأقسام؛ عيّن لها حسابًا مخولًا على مستوى الفرع.');
+    }
+  }
+
   public getScope(userId: string): DepartmentScope {
     const actor = this.requireManageUsers();
     const scope = this.db.query<{ departmentScope: DepartmentScope }>(
