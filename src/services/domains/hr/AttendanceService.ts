@@ -198,7 +198,6 @@ export class AttendanceService {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
       'employees.attendance.view', 'employees.attendance.manage', 'employees.attendance.approve',
-      'ui.employees.employees.manage',
     ]);
     return actor;
   }
@@ -206,14 +205,14 @@ export class AttendanceService {
   private static requireManage() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.requireAny(actor, ['employees.attendance.manage', 'ui.employees.employees.manage']);
+    PermissionService.require(actor, 'employees.attendance.manage');
     return actor;
   }
 
   private static requireApproval() {
     const actor = AuthService.requireAuth();
     ModuleRegistryService.assertModuleEnabled('hr');
-    PermissionService.requireAny(actor, ['employees.attendance.approve', 'ui.employees.employees.manage']);
+    PermissionService.require(actor, 'employees.attendance.approve');
     return actor;
   }
 

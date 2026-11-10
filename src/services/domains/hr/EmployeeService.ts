@@ -297,6 +297,12 @@ export class EmployeeService {
     return actor;
   }
 
+  private static requireAttendanceView() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.attendance.view');
+    return actor;
+  }
+
   private static requireFinancialView() {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, [
@@ -339,8 +345,8 @@ export class EmployeeService {
 
   static getAll(opts: { search?: string; location?: string; status?: EmployeeStatus } = {}): Employee[] {
     const actor = this.requireView();
-    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage']);
-    const canSeePrivateProfile = PermissionService.can(actor, 'ui.employees.employees.manage');
+    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']);
+    const canSeePrivateProfile = PermissionService.canAny(actor, ['employees.profile.view', 'employees.update']);
     const salaryColumns = canSeeFinancials
       ? 'e.base_salary AS baseSalary, e.salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
@@ -358,6 +364,7 @@ export class EmployeeService {
     const params: any[] = [];
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
 
     if (opts.search && opts.search.trim()) {
       conditions.push(`(e.name LIKE ? OR e.role LIKE ? OR e.phone LIKE ?)`);
@@ -376,6 +383,8 @@ export class EmployeeService {
     params.push(...scope.params);
     conditions.push(companyScope.clause);
     params.push(...companyScope.params);
+    conditions.push(departmentScope.clause);
+    params.push(...departmentScope.params);
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const financialColumns = canSeeFinancials
@@ -400,8 +409,9 @@ export class EmployeeService {
     const actor = this.requireView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
-    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.manage', 'employees.payroll.approve', 'ui.employees.employees.manage']);
-    const canSeePrivateProfile = PermissionService.can(actor, 'ui.employees.employees.manage');
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    const canSeeFinancials = PermissionService.canAny(actor, ['employees.financials.view', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']);
+    const canSeePrivateProfile = PermissionService.canAny(actor, ['employees.profile.view', 'employees.update']);
     const salaryColumns = canSeeFinancials
       ? 'e.base_salary AS baseSalary, e.salary_type AS salaryType'
       : "0 AS baseSalary, 'MONTHLY' AS salaryType";
@@ -429,14 +439,14 @@ export class EmployeeService {
        FROM employees e
        LEFT JOIN departments d ON d.id = e.department_id
        LEFT JOIN employees m ON m.id = e.manager_employee_id
-       WHERE e.id = ? AND ${scope.clause} AND ${companyScope.clause}`,
-      [id, ...scope.params, ...companyScope.params]
+       WHERE e.id = ? AND ${scope.clause} AND ${companyScope.clause} AND ${departmentScope.clause}`,
+      [id, ...scope.params, ...companyScope.params, ...departmentScope.params]
     );
     return rows[0] ?? null;
   }
 
   static create(data: Omit<Employee, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'notes'> & { notes?: string }): Employee {
-    const actor = this.requireManage();
+    const actor = this.requireCreate();
     CentralUsageLimitService.assertWithin('maxEmployees');
     if (!data.name?.trim()) throw new Error('اسم الموظف مطلوب.');
     if (!data.role?.trim()) throw new Error('المسمى الوظيفي مطلوب.');
@@ -492,12 +502,18 @@ export class EmployeeService {
          VALUES (?, ?, NULL, ?, ?, ?, 'MANUAL', 'الراتب عند إنشاء الموظف', ?)`,
         [`emps_${uuidv4().replace(/-/g, '').slice(0, 16)}`, id, data.baseSalary, data.salaryType, joinedDate, actor.id]
       );
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, 'إضافة موظف', 'HR', ?, ?)`,
+        [`aud_${uuidv4().replace(/-/g, '').slice(0, 12)}`, actor.id, actor.fullName, id,
+          JSON.stringify({ branchId, departmentId: data.departmentId || null, status: data.status })]
+      );
       return this.getById(id)!;
     });
   }
 
   static update(id: string, data: Partial<Omit<Employee, 'id' | 'code' | 'createdAt'>>): Employee {
-    const actor = this.requireManage();
+    const actor = this.requireUpdate();
     const existing = this.getById(id);
     if (!existing) throw new Error('الموظف غير موجود.');
     if (data.branchId) this.branchAccess.requireBranchAccess(data.branchId, actor);
@@ -594,6 +610,17 @@ export class EmployeeService {
         ]
       );
     }
+    db.run(
+      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+       VALUES (?, ?, ?, 'تعديل ملف موظف', 'HR', ?, ?)`,
+      [`aud_${uuidv4().replace(/-/g, '').slice(0, 12)}`, actor.id, actor.fullName, id,
+        JSON.stringify({
+          fields: Object.keys(data),
+          previousStatus: stored?.status,
+          status: nextStatus,
+          salaryChanged: data.baseSalary !== undefined && stored?.baseSalary !== data.baseSalary,
+        })]
+    );
     });
     return this.getById(id)!;
   }
@@ -720,9 +747,10 @@ export class EmployeeService {
   }
 
   static delete(id: string): void {
-    const actor = this.requireManage();
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.delete');
     this.requireEmployeeBranch(id, actor);
-    this.db.run(`DELETE FROM employees WHERE id = ?`, [id]);
+    throw new Error('الحذف النهائي للموظفين معطل للحفاظ على السجلات المالية والتاريخية. استخدم إنهاء الخدمة أو الأرشفة.');
   }
 
   // ─── Payroll Transactions ─────────────────────────────────────────────────────
@@ -1706,29 +1734,31 @@ export class EmployeeService {
   // ─── Attendance ────────────────────────────────────────────────────────────────
 
   static getAllAttendance(): Attendance[] {
-    const actor = this.requireView();
+    const actor = this.requireAttendanceView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     return this.db.query<Attendance>(`
       SELECT a.id, a.employee_id AS employeeId, a.date, a.status,
              COALESCE(a.late_minutes, 0) AS lateMinutes,
              COALESCE(a.overtime_minutes, 0) AS overtimeMinutes,
              a.notes, a.recorded_by AS recordedBy, a.created_at AS createdAt
       FROM attendance a JOIN employees e ON e.id = a.employee_id
-      WHERE ${scope.clause} ORDER BY a.date DESC
-    `, scope.params);
+      WHERE ${scope.clause} AND ${departmentScope.clause} ORDER BY a.date DESC
+    `, [...scope.params, ...departmentScope.params]);
   }
 
   static getAttendanceByDate(date: string): Attendance[] {
-    const actor = this.requireView();
+    const actor = this.requireAttendanceView();
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     return this.db.query<Attendance>(
       `SELECT a.id, a.employee_id AS employeeId, a.date, a.status,
               COALESCE(a.late_minutes, 0) AS lateMinutes,
               COALESCE(a.overtime_minutes, 0) AS overtimeMinutes,
               a.notes, a.recorded_by AS recordedBy, a.created_at AS createdAt
        FROM attendance a JOIN employees e ON e.id = a.employee_id
-       WHERE a.date = ? AND ${scope.clause} ORDER BY a.created_at`,
-      [date, ...scope.params]
+       WHERE a.date = ? AND ${scope.clause} AND ${departmentScope.clause} ORDER BY a.created_at`,
+      [date, ...scope.params, ...departmentScope.params]
     );
   }
 
