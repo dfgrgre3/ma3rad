@@ -1,6 +1,9 @@
 export type RecruitmentJobStatus = 'OPEN' | 'ON_HOLD' | 'CLOSED';
+export type RecruitmentApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type RecruitmentEmploymentType = 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'TEMPORARY' | 'INTERNSHIP';
 export type RecruitmentCandidateStatus = 'NEW' | 'SCREENING' | 'INTERVIEW' | 'OFFER' | 'HIRED' | 'REJECTED';
+export type RecruitmentInterviewResult = 'PASS' | 'FAIL' | 'PENDING';
+export type RecruitmentOfferStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'DECLINED' | 'WITHDRAWN';
 
 export interface RecruitmentJob {
   id: string;
@@ -13,6 +16,10 @@ export interface RecruitmentJob {
   description: string | null;
   requirements: string | null;
   status: RecruitmentJobStatus;
+  approvalStatus: RecruitmentApprovalStatus;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  isPublished: number;
   branchId: string;
   branchName?: string | null;
   createdBy: string;
@@ -38,6 +45,10 @@ export interface RecruitmentCandidate {
   hiredAt: string | null;
   appliedAt: string;
   notes: string | null;
+  resumeStorageName: string | null;
+  resumeFileName: string | null;
+  resumeMimeType: string | null;
+  resumeFileSize: number | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -60,6 +71,58 @@ export interface CreateRecruitmentCandidateDTO {
   email?: string | null;
   source?: string | null;
   notes?: string | null;
+  resume?: RecruitmentResumeInput | null;
+}
+
+export interface RecruitmentResumeInput {
+  storageName: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  checksum: string;
+}
+
+export interface RecruitmentInterview {
+  id: string;
+  candidateId: string;
+  scheduledAt: string;
+  interviewer: string;
+  location: string | null;
+  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
+  score: number | null;
+  result: RecruitmentInterviewResult | null;
+  evaluation: string | null;
+}
+
+export interface RecruitmentOffer {
+  id: string;
+  candidateId: string;
+  salary: number;
+  salaryType: 'MONTHLY' | 'DAILY';
+  offeredAt: string;
+  expiresAt: string | null;
+  status: RecruitmentOfferStatus;
+  terms: string | null;
+}
+
+export interface CreateRecruitmentInterviewDTO {
+  scheduledAt: string;
+  interviewer: string;
+  location?: string | null;
+}
+
+export interface EvaluateRecruitmentInterviewDTO {
+  score: number;
+  result: RecruitmentInterviewResult;
+  evaluation?: string | null;
+}
+
+export interface CreateRecruitmentOfferDTO {
+  salary: number;
+  salaryType: 'MONTHLY' | 'DAILY';
+  offeredAt: string;
+  expiresAt?: string | null;
+  terms?: string | null;
 }
 
 export interface HireRecruitmentCandidateDTO {

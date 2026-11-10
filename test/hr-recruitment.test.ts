@@ -44,7 +44,11 @@ test('recruitment jobs and candidates follow validation and hiring stages', asyn
     employmentType: 'FULL_TIME',
     openings: 1,
   });
-  assert.equal(job.status, 'OPEN');
+  assert.equal(job.status, 'ON_HOLD');
+  assert.equal(job.approvalStatus, 'PENDING');
+  assert.throws(() => service.setJobPublished(job.id, true), /اعتماد/);
+  service.approveJob(job.id, true);
+  service.setJobPublished(job.id, true);
   assert.equal(job.openings, 1);
 
   assert.throws(
@@ -70,9 +74,19 @@ test('recruitment jobs and candidates follow validation and hiring stages', asyn
   );
 
   assert.equal(service.setCandidateStatus(candidate.id, 'SCREENING').status, 'SCREENING');
-  assert.equal(service.setCandidateStatus(candidate.id, 'INTERVIEW').status, 'INTERVIEW');
-  assert.equal(service.setCandidateStatus(candidate.id, 'OFFER').status, 'OFFER');
-  assert.throws(() => service.setCandidateStatus(candidate.id, 'HIRED'), /إجراء التعيين/);
+  assert.throws(() => service.setCandidateStatus(candidate.id, 'INTERVIEW'), /إجراءاتها المخصصة/);
+  const interview = service.scheduleInterview(candidate.id, {
+    scheduledAt: '2026-11-11T09:30:00+02:00',
+    interviewer: 'مدير الموارد البشرية',
+  });
+  service.evaluateInterview(interview.id, { score: 88, result: 'PASS', evaluation: 'مناسب للوظيفة' });
+  assert.throws(() => service.setCandidateStatus(candidate.id, 'HIRED'), /إجراءاتها المخصصة/);
+  service.createOffer(candidate.id, {
+    salary: 9000, salaryType: 'MONTHLY', offeredAt: '2026-11-10', expiresAt: '2026-11-15',
+  });
+  service.setOfferStatus(candidate.id, 'SENT');
+  service.setOfferStatus(candidate.id, 'ACCEPTED');
+  assert.throws(() => service.setCandidateStatus(candidate.id, 'OFFER'), /إجراءاتها المخصصة/);
   const hired = service.hireCandidate(candidate.id, {
     phone: '01011112222',
     location: 'فرع بنها',
@@ -163,6 +177,8 @@ test('recruitment data is restricted to the active branch and module permission'
     employmentType: 'FULL_TIME',
     openings: 1,
   });
+  service.approveJob(mainJob.id, true);
+  service.setJobPublished(mainJob.id, true);
   assert.equal(mainJob.branchId, 'br_main');
   const secondBranch = new BranchService().createBranch({
     name: 'Recruitment Second Branch',
@@ -177,6 +193,8 @@ test('recruitment data is restricted to the active branch and module permission'
     employmentType: 'CONTRACT',
     openings: 1,
   });
+  service.approveJob(otherJob.id, true);
+  service.setJobPublished(otherJob.id, true);
   const otherCandidate = service.createCandidate({
     jobId: otherJob.id,
     fullName: 'سارة حسن',
@@ -189,8 +207,16 @@ test('recruitment data is restricted to the active branch and module permission'
     phone: '01000000002',
   });
   service.setCandidateStatus(pendingHire.id, 'SCREENING');
-  service.setCandidateStatus(pendingHire.id, 'INTERVIEW');
-  service.setCandidateStatus(pendingHire.id, 'OFFER');
+  const pendingInterview = service.scheduleInterview(pendingHire.id, {
+    scheduledAt: '2026-11-12T10:00:00+02:00',
+    interviewer: 'مدير التوظيف',
+  });
+  service.evaluateInterview(pendingInterview.id, { score: 75, result: 'PASS' });
+  service.createOffer(pendingHire.id, {
+    salary: 7000, salaryType: 'MONTHLY', offeredAt: '2026-11-10',
+  });
+  service.setOfferStatus(pendingHire.id, 'SENT');
+  service.setOfferStatus(pendingHire.id, 'ACCEPTED');
 
   access.setCurrentBranchId('br_main', admin);
   assert.equal(access.getCurrentBranchId(admin), 'br_main');
@@ -200,7 +226,9 @@ test('recruitment data is restricted to the active branch and module permission'
   assert.ok(visibleJobs.some((job) => job.id === mainJob.id));
   assert.ok(!visibleJobs.some((job) => job.id === otherJob.id));
   assert.ok(visibleJobs.every((job) => job.branchId === 'br_main'));
-  assert.throws(() => service.setCandidateStatus(otherCandidate.id, 'INTERVIEW'), /نطاق صلاحيتك/);
+  assert.throws(() => service.scheduleInterview(otherCandidate.id, {
+    scheduledAt: '2026-11-12T10:00:00+02:00', interviewer: 'مدير التوظيف',
+  }), /نطاق صلاحيتك/);
 
   db.run(
     `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active, branch_scope)

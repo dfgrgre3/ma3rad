@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  BriefcaseBusiness, Clock3, FilePlus2, Loader2, Plus, RefreshCw,
+  BriefcaseBusiness, CalendarPlus, Clock3, FilePlus2, Loader2, Plus, RefreshCw,
   Search, UserRound, UserRoundCheck, Users, X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -12,12 +12,16 @@ import type {
   RecruitmentCandidate,
   RecruitmentCandidateStatus,
   RecruitmentEmploymentType,
+  RecruitmentInterview,
   RecruitmentJob,
   RecruitmentJobStatus,
+  RecruitmentOffer,
+  RecruitmentResumeInput,
   RecruitmentSummary,
 } from '../../../types/hr/recruitment';
 
 type Tab = 'jobs' | 'candidates';
+type WorkflowTab = 'interview' | 'offer';
 
 const employmentLabels: Record<RecruitmentEmploymentType, string> = {
   FULL_TIME: 'دوام كامل',
@@ -59,9 +63,9 @@ const candidateStatusStyles: Record<RecruitmentCandidateStatus, string> = {
 
 const candidateNextStatuses: Record<Exclude<RecruitmentCandidateStatus, 'HIRED'>, RecruitmentCandidateStatus[]> = {
   NEW: ['SCREENING', 'REJECTED'],
-  SCREENING: ['INTERVIEW', 'REJECTED'],
-  INTERVIEW: ['SCREENING', 'OFFER', 'REJECTED'],
-  OFFER: ['INTERVIEW', 'REJECTED'],
+  SCREENING: ['REJECTED'],
+  INTERVIEW: ['SCREENING', 'REJECTED'],
+  OFFER: [],
   REJECTED: ['SCREENING'],
 };
 
@@ -131,7 +135,28 @@ export const RecruitmentPage: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [jobForm, setJobForm] = useState(emptyJob);
   const [candidateForm, setCandidateForm] = useState(emptyCandidate);
+  const [resume, setResume] = useState<RecruitmentResumeInput | null>(null);
   const [candidateToHire, setCandidateToHire] = useState<RecruitmentCandidate | null>(null);
+  const [workflowCandidate, setWorkflowCandidate] = useState<RecruitmentCandidate | null>(null);
+  const [workflowTab, setWorkflowTab] = useState<WorkflowTab>('interview');
+  const [workflowInterviews, setWorkflowInterviews] = useState<RecruitmentInterview[]>([]);
+  const [workflowOffer, setWorkflowOffer] = useState<RecruitmentOffer | null>(null);
+  const [interviewForm, setInterviewForm] = useState({
+    scheduledAt: '',
+    interviewer: '',
+    location: '',
+    score: '0',
+    result: 'PENDING' as 'PASS' | 'FAIL' | 'PENDING',
+    evaluation: '',
+    selectedInterviewId: '',
+  });
+  const [offerForm, setOfferForm] = useState({
+    salary: '',
+    salaryType: 'MONTHLY' as 'MONTHLY' | 'DAILY',
+    offeredAt: localDateString(),
+    expiresAt: '',
+    terms: '',
+  });
   const [hireForm, setHireForm] = useState({
     phone: '',
     location: '',
@@ -183,13 +208,53 @@ export const RecruitmentPage: React.FC = () => {
     }
   };
 
-  const submitCandidate = (event: React.FormEvent) => {
+  const importResume = async () => {
+    try {
+      const bridge = window.ceramisys?.documents;
+      if (!bridge?.importFile) throw new Error('رفع الملفات غير متاح في هذه البيئة.');
+      const result = await bridge.importFile({ purpose: 'employee' });
+      if (!result.ok) {
+        if (result.canceled) return;
+        throw new Error(result.error || 'تعذر رفع السيرة الذاتية.');
+      }
+      if (!result.storageName || !result.fileName || !result.mimeType || !result.fileSize || !result.checksum) {
+        throw new Error('لم تكتمل بيانات ملف السيرة الذاتية.');
+      }
+      if (!['application/pdf', 'image/jpeg', 'image/png'].includes(result.mimeType)) {
+        await bridge.discardEmployeeImport?.(result.storageName);
+        throw new Error('الملفات المسموحة للسيرة الذاتية PDF وJPG وPNG.');
+      }
+      if (result.fileSize > 25 * 1024 * 1024) {
+        await bridge.discardEmployeeImport?.(result.storageName);
+        throw new Error('الحد الأقصى لحجم السيرة الذاتية 25 ميجابايت.');
+      }
+      if (resume) await bridge.discardEmployeeImport?.(resume.storageName);
+      setResume({
+        storageName: result.storageName,
+        fileName: result.fileName,
+        mimeType: result.mimeType,
+        fileSize: result.fileSize,
+        checksum: result.checksum,
+      });
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر رفع السيرة الذاتية.'));
+    }
+  };
+
+  const submitCandidate = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
     try {
-      service.createCandidate(candidateForm);
+      service.createCandidate({ ...candidateForm, resume });
+      if (resume) {
+        const result = await window.ceramisys?.documents?.commitEmployeeImport?.(resume.storageName);
+        if (!result?.ok) {
+          throw new Error(result?.error || `تم تسجيل المرشح، لكن تعذر تثبيت ملف السيرة الذاتية ${resume.fileName}.`);
+        }
+      }
       toast.success('تم تسجيل المرشح.');
       setCandidateForm(emptyCandidate);
+      setResume(null);
       setShowForm(false);
       setTab('candidates');
       setCandidateJobId('');
@@ -221,7 +286,124 @@ export const RecruitmentPage: React.FC = () => {
     }
   };
 
+  const changeJobApproval = (job: RecruitmentJob, approved: boolean) => {
+    try {
+      service.approveJob(job.id, approved);
+      toast.success(approved ? 'تم اعتماد طلب الاحتياج الوظيفي.' : 'تم رفض طلب الاحتياج الوظيفي.');
+      load();
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر تحديث اعتماد الوظيفة.'));
+    }
+  };
+
+  const changeJobPublication = (job: RecruitmentJob, published: boolean) => {
+    try {
+      service.setJobPublished(job.id, published);
+      toast.success(published ? 'تم نشر إعلان الوظيفة واستقبال الطلبات.' : 'تم إيقاف استقبال الطلبات.');
+      load();
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر تحديث نشر الوظيفة.'));
+    }
+  };
+
+  const beginWorkflow = (candidate: RecruitmentCandidate, selectedTab: WorkflowTab) => {
+    try {
+      setWorkflowCandidate(candidate);
+      setWorkflowTab(selectedTab);
+      setWorkflowInterviews(service.getInterviews(candidate.id));
+      setWorkflowOffer(service.getOffer(candidate.id));
+      setInterviewForm({
+        scheduledAt: '',
+        interviewer: '',
+        location: '',
+        score: '0',
+        result: 'PENDING',
+        evaluation: '',
+        selectedInterviewId: '',
+      });
+      setOfferForm({
+        salary: '',
+        salaryType: 'MONTHLY',
+        offeredAt: localDateString(),
+        expiresAt: '',
+        terms: '',
+      });
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر تحميل بيانات المرشح.'));
+    }
+  };
+
+  const submitInterview = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!workflowCandidate) return;
+    try {
+      service.scheduleInterview(workflowCandidate.id, {
+        scheduledAt: interviewForm.scheduledAt,
+        interviewer: interviewForm.interviewer,
+        location: interviewForm.location,
+      });
+      toast.success('تم تحديد المقابلة.');
+      setWorkflowCandidate(null);
+      load();
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر تحديد المقابلة.'));
+    }
+  };
+
+  const submitInterviewEvaluation = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!interviewForm.selectedInterviewId) {
+      toast.error('اختر المقابلة المراد تقييمها.');
+      return;
+    }
+    try {
+      service.evaluateInterview(interviewForm.selectedInterviewId, {
+        score: Number(interviewForm.score),
+        result: interviewForm.result,
+        evaluation: interviewForm.evaluation,
+      });
+      toast.success('تم حفظ تقييم المقابلة.');
+      setWorkflowCandidate(null);
+      load();
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر حفظ تقييم المقابلة.'));
+    }
+  };
+
+  const submitOffer = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!workflowCandidate) return;
+    try {
+      const offer = workflowOffer || service.createOffer(workflowCandidate.id, {
+        salary: Number(offerForm.salary),
+        salaryType: offerForm.salaryType,
+        offeredAt: offerForm.offeredAt,
+        expiresAt: offerForm.expiresAt || null,
+        terms: offerForm.terms,
+      });
+      const next = offer.status === 'DRAFT'
+        ? service.setOfferStatus(workflowCandidate.id, 'SENT')
+        : offer.status === 'SENT'
+          ? service.setOfferStatus(workflowCandidate.id, 'ACCEPTED')
+          : offer;
+      toast.success(next.status === 'SENT' ? 'تم إرسال العرض الوظيفي.' : 'تم تسجيل قبول العرض.');
+      setWorkflowCandidate(null);
+      load();
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر تحديث العرض الوظيفي.'));
+    }
+  };
+
   const beginHiring = (candidate: RecruitmentCandidate) => {
+    try {
+      if (service.getOffer(candidate.id)?.status !== 'ACCEPTED') {
+        toast.error('يجب تسجيل قبول العرض الوظيفي أولًا.');
+        return;
+      }
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر التحقق من حالة العرض.'));
+      return;
+    }
     setCandidateToHire(candidate);
     setHireForm({
       phone: candidate.phone || '',
@@ -231,6 +413,16 @@ export const RecruitmentPage: React.FC = () => {
       salaryType: 'MONTHLY',
       createDraftContract: canCreateContracts,
     });
+  };
+
+  const openResume = async (candidate: RecruitmentCandidate) => {
+    if (!candidate.resumeStorageName) return;
+    try {
+      const result = await window.ceramisys?.documents?.openFile?.(candidate.resumeStorageName);
+      if (!result?.ok) throw new Error(result?.error || 'تعذر فتح السيرة الذاتية.');
+    } catch (error) {
+      toast.error(errorMessage(error, 'تعذر فتح السيرة الذاتية.'));
+    }
   };
 
   const submitHire = (event: React.FormEvent) => {
@@ -373,7 +565,7 @@ export const RecruitmentPage: React.FC = () => {
       {showForm && canManage && (
         tab === 'jobs' ? (
           <form onSubmit={submitJob} className="rounded-xl border border-slate-200 bg-white p-4">
-            <h2 className="mb-4 font-bold text-slate-800">فتح وظيفة شاغرة</h2>
+            <h2 className="mb-4 font-bold text-slate-800">طلب احتياج وظيفي جديد</h2>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               <label className="text-xs text-slate-600">المسمى الوظيفي *
                 <input required maxLength={120} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={jobForm.title} onChange={(event) => setJobForm({ ...jobForm, title: event.target.value })} />
@@ -431,6 +623,20 @@ export const RecruitmentPage: React.FC = () => {
                 <textarea rows={2} maxLength={2000} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={candidateForm.notes} onChange={(event) => setCandidateForm({ ...candidateForm, notes: event.target.value })} />
               </label>
             </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button type="button" onClick={importResume} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                إرفاق السيرة الذاتية
+              </button>
+              <span className="text-xs text-slate-500">{resume ? resume.fileName : 'PDF أو JPG أو PNG، بحد أقصى 25 ميجابايت'}</span>
+              {resume && (
+                <button type="button" onClick={async () => {
+                  await window.ceramisys?.documents?.discardEmployeeImport?.(resume.storageName);
+                  setResume(null);
+                }} className="text-xs text-rose-600 hover:text-rose-800">
+                  إزالة الملف
+                </button>
+              )}
+            </div>
             {openJobs.length === 0 && <p className="mt-3 text-xs text-amber-700">افتح وظيفة شاغرة أولًا لإضافة مرشح.</p>}
             <div className="mt-4 flex justify-end">
               <button disabled={saving || openJobs.length === 0} className="flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
@@ -439,6 +645,115 @@ export const RecruitmentPage: React.FC = () => {
             </div>
           </form>
         )
+      )}
+
+      {workflowCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <section className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl" dir="rtl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-slate-900">استكمال إجراءات {workflowCandidate.fullName}</h2>
+                <p className="mt-1 text-xs text-slate-500">{workflowCandidate.jobTitle}</p>
+              </div>
+              <button type="button" onClick={() => setWorkflowCandidate(null)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100" aria-label="إغلاق">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mb-4 flex gap-2 border-b border-slate-200">
+              <button type="button" onClick={() => setWorkflowTab('interview')} className={`border-b-2 px-3 py-2 text-sm font-semibold ${workflowTab === 'interview' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500'}`}>المقابلات والتقييم</button>
+              <button type="button" onClick={() => setWorkflowTab('offer')} className={`border-b-2 px-3 py-2 text-sm font-semibold ${workflowTab === 'offer' ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500'}`}>العرض الوظيفي</button>
+            </div>
+
+            {workflowTab === 'interview' ? (
+              <div className="space-y-5">
+                <form onSubmit={submitInterview} className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs text-slate-600">موعد المقابلة *
+                    <input required type="datetime-local" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={interviewForm.scheduledAt} onChange={(event) => setInterviewForm({ ...interviewForm, scheduledAt: event.target.value })} />
+                  </label>
+                  <label className="text-xs text-slate-600">القائم بالمقابلة *
+                    <input required maxLength={150} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={interviewForm.interviewer} onChange={(event) => setInterviewForm({ ...interviewForm, interviewer: event.target.value })} />
+                  </label>
+                  <label className="text-xs text-slate-600 sm:col-span-2">المكان أو رابط المقابلة
+                    <input maxLength={200} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={interviewForm.location} onChange={(event) => setInterviewForm({ ...interviewForm, location: event.target.value })} />
+                  </label>
+                  <div className="sm:col-span-2 flex justify-end">
+                    <button className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white">تحديد المقابلة</button>
+                  </div>
+                </form>
+                <div className="border-t border-slate-100 pt-4">
+                  <h3 className="mb-3 text-sm font-bold text-slate-800">تسجيل نتيجة وتقييم</h3>
+                  {workflowInterviews.length ? (
+                    <form onSubmit={submitInterviewEvaluation} className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs text-slate-600 sm:col-span-2">المقابلة
+                        <select required className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={interviewForm.selectedInterviewId} onChange={(event) => setInterviewForm({ ...interviewForm, selectedInterviewId: event.target.value })}>
+                          <option value="">اختر مقابلة</option>
+                          {workflowInterviews.filter((interview) => interview.status !== 'CANCELLED').map((interview) => (
+                            <option key={interview.id} value={interview.id}>
+                              {formatDate(interview.scheduledAt.slice(0, 10))} — {interview.interviewer} {interview.result ? `(${interview.result})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-xs text-slate-600">التقييم (0–100)
+                        <input required min="0" max="100" step="1" type="number" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={interviewForm.score} onChange={(event) => setInterviewForm({ ...interviewForm, score: event.target.value })} />
+                      </label>
+                      <label className="text-xs text-slate-600">النتيجة
+                        <select className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={interviewForm.result} onChange={(event) => setInterviewForm({ ...interviewForm, result: event.target.value as 'PASS' | 'FAIL' | 'PENDING' })}>
+                          <option value="PASS">اجتاز</option><option value="FAIL">لم يجتز</option><option value="PENDING">معلّق</option>
+                        </select>
+                      </label>
+                      <label className="text-xs text-slate-600 sm:col-span-2">ملاحظات التقييم
+                        <textarea rows={2} maxLength={2000} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={interviewForm.evaluation} onChange={(event) => setInterviewForm({ ...interviewForm, evaluation: event.target.value })} />
+                      </label>
+                      <div className="sm:col-span-2 flex justify-end">
+                        <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">حفظ التقييم</button>
+                      </div>
+                    </form>
+                  ) : <p className="text-xs text-slate-500">حدد مقابلة أولًا لتسجيل نتيجتها.</p>}
+                </div>
+              </div>
+            ) : workflowOffer ? (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-slate-50 p-4 text-sm">
+                  <p>الراتب المعروض: <strong>{workflowOffer.salary.toLocaleString('ar-EG')} {workflowOffer.salaryType === 'MONTHLY' ? 'شهريًا' : 'يوميًا'}</strong></p>
+                  <p className="mt-1 text-xs text-slate-500">حالة العرض: {workflowOffer.status === 'DRAFT' ? 'مسودة' : workflowOffer.status === 'SENT' ? 'مرسل — بانتظار الموافقة' : workflowOffer.status === 'ACCEPTED' ? 'مقبول' : workflowOffer.status === 'DECLINED' ? 'مرفوض' : 'مسحوب'}</p>
+                  {workflowOffer.terms && <p className="mt-2 text-xs text-slate-600">{workflowOffer.terms}</p>}
+                </div>
+                {['DRAFT', 'SENT'].includes(workflowOffer.status) && (
+                  <form onSubmit={submitOffer} className="flex justify-end">
+                    <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">
+                      {workflowOffer.status === 'DRAFT' ? 'إرسال العرض للمرشح' : 'تسجيل موافقة المرشح'}
+                    </button>
+                  </form>
+                )}
+                {workflowOffer.status === 'ACCEPTED' && <p className="text-sm font-semibold text-emerald-700">تم قبول العرض؛ يمكن استكمال إنشاء ملف الموظف والعقد.</p>}
+              </div>
+            ) : (
+              <form onSubmit={submitOffer} className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-slate-600">الراتب المعروض *
+                  <input required min="0" step="0.01" type="number" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={offerForm.salary} onChange={(event) => setOfferForm({ ...offerForm, salary: event.target.value })} />
+                </label>
+                <label className="text-xs text-slate-600">دورة الراتب
+                  <select className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm" value={offerForm.salaryType} onChange={(event) => setOfferForm({ ...offerForm, salaryType: event.target.value as 'MONTHLY' | 'DAILY' })}>
+                    <option value="MONTHLY">شهري</option><option value="DAILY">يومي</option>
+                  </select>
+                </label>
+                <label className="text-xs text-slate-600">تاريخ العرض *
+                  <input required type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={offerForm.offeredAt} onChange={(event) => setOfferForm({ ...offerForm, offeredAt: event.target.value })} />
+                </label>
+                <label className="text-xs text-slate-600">صالح حتى
+                  <input type="date" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={offerForm.expiresAt} onChange={(event) => setOfferForm({ ...offerForm, expiresAt: event.target.value })} />
+                </label>
+                <label className="text-xs text-slate-600 sm:col-span-2">الشروط والمزايا
+                  <textarea rows={2} maxLength={2000} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={offerForm.terms} onChange={(event) => setOfferForm({ ...offerForm, terms: event.target.value })} />
+                </label>
+                <div className="sm:col-span-2 flex justify-end">
+                  <button className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">حفظ وإرسال العرض</button>
+                </div>
+              </form>
+            )}
+          </section>
+        </div>
       )}
 
       {candidateToHire && (
@@ -503,6 +818,13 @@ export const RecruitmentPage: React.FC = () => {
                   </div>
                   <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${jobStatusStyles[job.status]}`}>{jobStatusLabels[job.status]}</span>
                 </div>
+                <p className={`mt-2 text-xs font-semibold ${
+                  job.approvalStatus === 'APPROVED' ? 'text-emerald-700'
+                    : job.approvalStatus === 'REJECTED' ? 'text-rose-700' : 'text-amber-700'
+                }`}>
+                  اعتماد الاحتياج: {job.approvalStatus === 'APPROVED' ? 'معتمد' : job.approvalStatus === 'REJECTED' ? 'مرفوض' : 'بانتظار الاعتماد'}
+                  {job.isPublished ? ' • الإعلان منشور' : ''}
+                </p>
                 <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
                   <span>{employmentLabels[job.employmentType]}</span>
                   <span>{job.hiredCount || 0} من {job.openings} تم تعيينهم</span>
@@ -512,14 +834,35 @@ export const RecruitmentPage: React.FC = () => {
                 <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
                   <span className="text-xs text-slate-400">أضيفت {formatDate(job.createdAt.slice(0, 10))}</span>
                   {canManage && (
-                    <select
-                      aria-label={`حالة الوظيفة ${job.title}`}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
-                      value={job.status}
-                      onChange={(event) => changeJobStatus(job, event.target.value as RecruitmentJobStatus)}
-                    >
-                      {Object.entries(jobStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {job.approvalStatus === 'PENDING' && (
+                        <>
+                          <button type="button" onClick={() => changeJobApproval(job, true)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white">اعتماد الطلب</button>
+                          <button type="button" onClick={() => changeJobApproval(job, false)} className="rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-semibold text-rose-700">رفض</button>
+                        </>
+                      )}
+                      {job.approvalStatus === 'APPROVED' && job.status !== 'CLOSED' && (
+                        <button
+                          type="button"
+                          onClick={() => changeJobPublication(job, !job.isPublished)}
+                          className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${
+                            job.isPublished ? 'border border-amber-200 text-amber-700' : 'bg-sky-600 text-white'
+                          }`}
+                        >
+                          {job.isPublished ? 'إيقاف استقبال الطلبات' : 'نشر الإعلان'}
+                        </button>
+                      )}
+                      {job.approvalStatus === 'APPROVED' && job.isPublished && job.status !== 'CLOSED' && (
+                        <select
+                          aria-label={`حالة الوظيفة ${job.title}`}
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                          value={job.status}
+                          onChange={(event) => changeJobStatus(job, event.target.value as RecruitmentJobStatus)}
+                        >
+                          {Object.entries(jobStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                      )}
+                    </div>
                   )}
                 </div>
               </article>
@@ -551,6 +894,11 @@ export const RecruitmentPage: React.FC = () => {
                       <div>
                         <p className="font-semibold text-slate-800">{candidate.fullName}</p>
                         {candidate.notes && <p className="mt-0.5 max-w-48 truncate text-xs text-slate-400">{candidate.notes}</p>}
+                        {candidate.resumeStorageName && (
+                          <button type="button" onClick={() => openResume(candidate)} className="mt-1 text-xs font-medium text-sky-700 hover:text-sky-900">
+                            السيرة الذاتية: {candidate.resumeFileName || 'فتح الملف'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -561,7 +909,7 @@ export const RecruitmentPage: React.FC = () => {
                   <td className="px-4 py-3">
                     {candidate.status === 'HIRED' ? (
                       <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${candidateStatusStyles[candidate.status]}`}>{candidateStatusLabels[candidate.status]}</span>
-                    ) : canManage ? (
+                    ) : canManage && candidate.status !== 'OFFER' ? (
                       <select
                         aria-label={`مرحلة المرشح ${candidate.fullName}`}
                         className={`rounded-full border px-2.5 py-1.5 text-xs font-semibold ${candidateStatusStyles[candidate.status]}`}
@@ -576,32 +924,50 @@ export const RecruitmentPage: React.FC = () => {
                     )}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
-                    {candidate.employeeId ? (
-                      <div className="flex flex-col items-start gap-1">
+                    <div className="flex flex-col items-start gap-1.5">
+                      {candidate.employeeId ? (
                         <Link
                           to={`/employees?search=${encodeURIComponent(candidate.fullName)}`}
                           className="text-xs font-semibold text-sky-700 hover:text-sky-900"
                         >
                           عرض سجل الموظف
                         </Link>
-                        {candidate.employeeContractId && (
+                      ) : canManage && ['SCREENING', 'INTERVIEW'].includes(candidate.status) ? (
+                        <button
+                          type="button"
+                          onClick={() => beginWorkflow(candidate, 'interview')}
+                          className="flex items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-xs font-semibold text-amber-800"
+                        >
+                          <CalendarPlus className="h-3.5 w-3.5" />
+                          {candidate.status === 'SCREENING' ? 'تحديد مقابلة' : 'المقابلات والتقييم'}
+                        </button>
+                      ) : null}
+                      {candidate.employeeContractId && (
                           <Link
                             to={`/employees/contracts?employeeId=${encodeURIComponent(candidate.employeeId)}`}
                             className="text-xs font-semibold text-violet-700 hover:text-violet-900"
                           >
                             عرض العقد
                           </Link>
-                        )}
-                      </div>
-                    ) : candidate.status === 'OFFER' && canHire ? (
-                      <button type="button" onClick={() => beginHiring(candidate)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
-                        إتمام التعيين
-                      </button>
-                    ) : candidate.status === 'OFFER' && !canHire ? (
-                      <span className="text-xs text-slate-400">يلزم صلاحية إدارة الموظفين</span>
-                    ) : (
-                      <span className="text-slate-300">—</span>
-                    )}
+                      )}
+                      {canManage && ['INTERVIEW', 'OFFER'].includes(candidate.status) && (
+                        <button
+                          type="button"
+                          onClick={() => beginWorkflow(candidate, 'offer')}
+                          className="rounded-lg border border-indigo-200 px-2.5 py-1.5 text-xs font-semibold text-indigo-700"
+                        >
+                          العرض الوظيفي
+                        </button>
+                      )}
+                      {!candidate.employeeId && candidate.status === 'OFFER' && canHire && (
+                        <button type="button" onClick={() => beginHiring(candidate)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+                          إتمام التعيين
+                        </button>
+                      )}
+                      {!candidate.employeeId && candidate.status === 'OFFER' && !canHire && (
+                        <span className="text-xs text-slate-400">يلزم صلاحية إدارة الموظفين</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

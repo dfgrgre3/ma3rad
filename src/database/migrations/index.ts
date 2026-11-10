@@ -34,6 +34,7 @@ import { MIGRATION_PART_30 } from './part30';
 import { MIGRATION_PART_31 } from './part31';
 import { MIGRATION_PART_32 } from './part32';
 import { MIGRATION_PART_33 } from './part33';
+import { MIGRATION_PART_34 } from './part34';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
 
@@ -2525,6 +2526,7 @@ export const MIGRATIONS: Migration[] = [
   ...MIGRATION_PART_31,
   ...MIGRATION_PART_32,
   ...MIGRATION_PART_33,
+  ...MIGRATION_PART_34,
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */
