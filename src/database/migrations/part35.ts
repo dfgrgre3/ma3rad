@@ -187,7 +187,7 @@ export const MIGRATION_PART_35: Migration[] = [
 
         -- Independent time log: an employee may have many in/out periods per
         -- day (for example a double shift or a mid-shift replacement). The
-        -- legacy `attendance` table remains the daily summary and is untouched.
+        -- legacy attendance table remains the daily summary and is untouched.
         CREATE TABLE IF NOT EXISTS employee_attendance_periods (
           id TEXT PRIMARY KEY,
           employee_id TEXT NOT NULL,
