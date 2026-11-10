@@ -9,6 +9,9 @@ import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService'
 import { localDateString } from '../../../utils/shared/date';
 import { AttendanceService } from './AttendanceService';
 import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
+import { AttendanceTimeService } from './AttendanceTimeService';
+import { PayrollTaxService } from './PayrollTaxService';
+import type { PayrollTaxBasis, PayrollTaxBreakdownLine, PayrollTaxSource } from './PayrollTaxService';
 
 export type EmployeeStatus = 'PROBATION' | 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'RESIGNED' | 'TERMINATED';
 export type SalaryType = 'MONTHLY' | 'DAILY';
@@ -45,8 +48,13 @@ export interface Employee {
   salaryPaymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'WALLET';
   bankName?: string | null;
   bankAccountNumber?: string | null;
+  walletProvider?: string | null;
+  walletNumber?: string | null;
   socialInsuranceNumber?: string | null;
   taxFileNumber?: string | null;
+  taxExempt?: boolean;
+  taxExemptionAmount?: number;
+  taxDependents?: number;
   education?: string | null;
   previousExperience?: string | null;
   status: EmployeeStatus;
@@ -67,6 +75,13 @@ export interface PayrollTransaction {
   notes: string;
   createdBy: string;
   createdAt: string;
+  paymentMethod?: PayrollPaymentMethod;
+  bankAccountId?: string | null;
+  walletProvider?: string | null;
+  walletNumber?: string | null;
+  referenceNumber?: string | null;
+  proofReference?: string | null;
+  paymentStatus?: string;
 }
 
 export interface Attendance {
@@ -103,6 +118,51 @@ export interface EmployeePayrollPayable {
 }
 
 export type PayrollRunStatus = 'DRAFT' | 'APPROVED' | 'PAID' | 'CLOSED';
+export type PayrollPaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'WALLET';
+export type PayrollPayoutStatus = 'PENDING' | 'PAID';
+
+export interface PayrollPaymentInstruction {
+  method?: PayrollPaymentMethod;
+  registerId?: string;
+  bankAccountId?: string;
+  walletProvider?: string;
+  walletNumber?: string;
+  referenceNumber?: string;
+  proofReference?: string;
+}
+
+export interface PayrollPayOptions {
+  batchReference?: string;
+  defaultRegisterId?: string;
+  defaultBankAccountId?: string;
+  payments?: Record<string, PayrollPaymentInstruction>;
+}
+
+export interface PayrollPaymentReconciliationItem {
+  itemId: string;
+  employeeId: string;
+  employeeName: string;
+  paymentMethod: PayrollPaymentMethod;
+  expectedAmount: number;
+  paidAmount: number;
+  difference: number;
+  payoutStatus: PayrollPayoutStatus;
+  payoutTransactionId: string | null;
+  paymentReference: string | null;
+  paymentProof: string | null;
+  issues: string[];
+}
+
+export interface PayrollPaymentReconciliation {
+  runId: string;
+  period: string;
+  expectedTotal: number;
+  paidTotal: number;
+  difference: number;
+  isBalanced: boolean;
+  items: PayrollPaymentReconciliationItem[];
+  byMethod: Array<{ method: PayrollPaymentMethod; count: number; amount: number }>;
+}
 
 export interface PayrollRunItem {
   id: string;
@@ -120,6 +180,8 @@ export interface PayrollRunItem {
   overtimeAmount: number;
   bonusAmount: number;
   commissionAmount: number;
+  allowanceAmount: number;
+  loanDeductionAmount: number;
   advanceAmount: number;
   manualDeductionAmount: number;
   attendanceDeductionAmount: number;
@@ -127,6 +189,11 @@ export interface PayrollRunItem {
   grossAmount: number;
   netAmount: number;
   warnings: string[];
+  paymentMethod: PayrollPaymentMethod;
+  paymentReference: string | null;
+  paymentProof: string | null;
+  paidAmount: number;
+  payoutStatus: PayrollPayoutStatus;
   details: {
     workingDaysPerMonth: number;
     workingHoursPerDay: number;
@@ -134,8 +201,23 @@ export interface PayrollRunItem {
     taxRate: number;
     previousPayoutAmount: number;
     commissionIds: string[];
+    loanInstallmentIds?: string[];
     salaryComponents?: Array<{ name: string; amount: number }>;
     salaryComponentTotal?: number;
+    salaryPaymentMethod?: PayrollPaymentMethod;
+    bankName?: string | null;
+    bankAccountNumber?: string | null;
+    walletProvider?: string | null;
+    walletNumber?: string | null;
+    taxRuleId?: string | null;
+    taxRuleName?: string;
+    taxSource?: PayrollTaxSource;
+    taxBasis?: PayrollTaxBasis;
+    taxableAmount?: number;
+    taxExemptionAmount?: number;
+    taxDependentAllowance?: number;
+    taxDependents?: number;
+    taxBreakdown?: PayrollTaxBreakdownLine[];
   };
   payoutTransactionId: string | null;
 }
@@ -160,6 +242,12 @@ type PayrollTransactionInput = {
   notes: string;
   createdBy?: string;
   registerId?: string;
+  paymentMethod?: PayrollPaymentMethod;
+  bankAccountId?: string;
+  walletProvider?: string;
+  walletNumber?: string;
+  referenceNumber?: string;
+  proofReference?: string;
 };
 
 function roundMoney(value: number): number {
@@ -388,8 +476,8 @@ export class EmployeeService {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const financialColumns = canSeeFinancials
-      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber'
-      : "'CASH' AS salaryPaymentMethod, NULL AS bankName, NULL AS bankAccountNumber, NULL AS socialInsuranceNumber, NULL AS taxFileNumber";
+      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider, e.wallet_number AS walletNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber, e.tax_exempt AS taxExempt, e.tax_exemption_amount AS taxExemptionAmount, e.tax_dependents AS taxDependents'
+      : "'CASH' AS salaryPaymentMethod, NULL AS bankName, NULL AS bankAccountNumber, NULL AS walletProvider, NULL AS walletNumber, NULL AS socialInsuranceNumber, NULL AS taxFileNumber, 0 AS taxExempt, 0 AS taxExemptionAmount, 0 AS taxDependents";
     const sql = `SELECT e.id, e.code, e.branch_id AS branchId, e.employment_type AS employmentType,
                         COALESCE(e.name, e.full_name) AS name, ${privateProfileColumns},
                         e.location, e.role, e.phone, e.email,
@@ -430,8 +518,8 @@ export class EmployeeService {
          NULL AS education, NULL AS previousExperience,
          NULL AS probationStartDate, NULL AS probationEndDate`;
     const financialColumns = canSeeFinancials
-      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber'
-      : "'CASH' AS salaryPaymentMethod, NULL AS bankName, NULL AS bankAccountNumber, NULL AS socialInsuranceNumber, NULL AS taxFileNumber";
+      ? 'e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName, e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider, e.wallet_number AS walletNumber, e.social_insurance_number AS socialInsuranceNumber, e.tax_file_number AS taxFileNumber, e.tax_exempt AS taxExempt, e.tax_exemption_amount AS taxExemptionAmount, e.tax_dependents AS taxDependents'
+      : "'CASH' AS salaryPaymentMethod, NULL AS bankName, NULL AS bankAccountNumber, NULL AS walletProvider, NULL AS walletNumber, NULL AS socialInsuranceNumber, NULL AS taxFileNumber, 0 AS taxExempt, 0 AS taxExemptionAmount, 0 AS taxDependents";
     const rows = this.db.query<Employee>(
       `SELECT e.id, e.code, e.branch_id AS branchId, e.employment_type AS employmentType,
               COALESCE(e.name, e.full_name) AS name, ${privateProfileColumns},
@@ -480,8 +568,8 @@ export class EmployeeService {
            employment_type, hired_at, joined_date, base_salary, salary_type, status, is_active, notes, company_id,
            national_id, phone2, address, birth_date, gender, emergency_contact_name, emergency_contact_phone,
            department_id, manager_employee_id, probation_start_date, probation_end_date, bank_account_number,
-           bank_name, salary_payment_method, social_insurance_number, tax_file_number, education, previous_experience
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           bank_name, wallet_provider, wallet_number, salary_payment_method, social_insurance_number, tax_file_number, tax_exempt, tax_exemption_amount, tax_dependents, education, previous_experience
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, code, data.name.trim(), data.name.trim(), this.normalizePhone(data.phone), data.email?.trim() || null, data.role.trim(), data.role.trim(),
          data.location?.trim() || '', branchId, data.employmentType || 'FULL_TIME', joinedDate, joinedDate, data.baseSalary,
          data.salaryType, data.status, data.status === 'ACTIVE' ? 1 : 0, data.notes?.trim() || null,
@@ -491,8 +579,11 @@ export class EmployeeService {
          data.emergencyContactPhone?.trim() ? this.normalizePhone(data.emergencyContactPhone) : null,
          data.departmentId || null, data.managerEmployeeId || null, data.probationStartDate || null,
          data.probationEndDate || null, data.bankAccountNumber?.trim() || null, data.bankName?.trim() || null,
+         data.walletProvider?.trim() || null, data.walletNumber?.trim() || null,
          data.salaryPaymentMethod || 'CASH', data.socialInsuranceNumber?.trim() || null,
-         data.taxFileNumber?.trim() || null, data.education?.trim() || null, data.previousExperience?.trim() || null]
+         data.taxFileNumber?.trim() || null, data.taxExempt ? 1 : 0,
+         Math.max(0, Number(data.taxExemptionAmount) || 0), Math.max(0, Math.round(Number(data.taxDependents) || 0)),
+         data.education?.trim() || null, data.previousExperience?.trim() || null]
       );
       db.run(
         `INSERT INTO employee_status_history
@@ -576,9 +667,14 @@ export class EmployeeService {
       ['probationEndDate', 'probation_end_date', (value) => value || null],
       ['bankAccountNumber', 'bank_account_number', (value) => value?.trim() || null],
       ['bankName', 'bank_name', (value) => value?.trim() || null],
+      ['walletProvider', 'wallet_provider', (value) => value?.trim() || null],
+      ['walletNumber', 'wallet_number', (value) => value?.trim() || null],
       ['salaryPaymentMethod', 'salary_payment_method', (value) => value || 'CASH'],
       ['socialInsuranceNumber', 'social_insurance_number', (value) => value?.trim() || null],
       ['taxFileNumber', 'tax_file_number', (value) => value?.trim() || null],
+      ['taxExempt', 'tax_exempt', (value) => value ? 1 : 0],
+      ['taxExemptionAmount', 'tax_exemption_amount', (value) => Math.max(0, Number(value) || 0)],
+      ['taxDependents', 'tax_dependents', (value) => Math.max(0, Math.round(Number(value) || 0))],
       ['education', 'education', (value) => value?.trim() || null],
       ['previousExperience', 'previous_experience', (value) => value?.trim() || null],
     ];
@@ -861,7 +957,7 @@ export class EmployeeService {
       JOIN chart_of_accounts a ON a.id=l.account_id
       WHERE a.code='2104' AND (
         (e.reference_type IN ('PAYROLL_SALARY_ACCRUAL','PAYROLL_ADVANCE_APPLICATION') AND e.reference_id=?)
-        OR (e.reference_type IN ('PAYROLL_RUN_ACCRUAL','PAYROLL_RUN_ATTENDANCE_DEDUCTION','PAYROLL_RUN_TAX','PAYROLL_RUN_COMMISSION') AND e.reference_id=?)
+        OR (e.reference_type IN ('PAYROLL_RUN_ACCRUAL','PAYROLL_RUN_ATTENDANCE_DEDUCTION','PAYROLL_RUN_TAX','PAYROLL_RUN_COMMISSION','PAYROLL_RUN_LOAN_DEDUCTION') AND e.reference_id=?)
         OR (e.reference_type='PAYROLL_TRANSACTION' AND e.reference_id IN (
           SELECT id FROM payroll_transactions
           WHERE employee_id=? AND substr(date,1,7)=? AND type IN ('BONUS','DEDUCTION','SALARY_PAYOUT')
@@ -870,10 +966,15 @@ export class EmployeeService {
     `, [`${employeeId}:${period}`, `${employeeId}:${period}`, employeeId, period])[0]?.amount || 0);
   }
 
-  private static getPayrollPostingLines(type: PayrollTxType, amount: number, payable: number) {
+  private static getPayrollPostingLines(
+    type: PayrollTxType,
+    amount: number,
+    payable: number,
+    paymentAccountCode = '1101'
+  ) {
     switch (type) {
       case 'ADVANCE':
-        return [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: '1101', debit: 0, credit: amount }];
+        return [{ accountCode: '1202', debit: amount, credit: 0 }, { accountCode: paymentAccountCode, debit: 0, credit: amount }];
       case 'BONUS':
         return [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2104', debit: 0, credit: amount }];
       case 'DEDUCTION':
@@ -881,9 +982,106 @@ export class EmployeeService {
       case 'SALARY_PAYOUT':
         return [
           { accountCode: '2104', debit: Math.min(amount, Math.max(0, payable)), credit: 0 },
-          { accountCode: '1101', debit: 0, credit: amount },
+          { accountCode: paymentAccountCode, debit: 0, credit: amount },
         ];
     }
+  }
+
+  private static resolveBankAccount(
+    db: DatabaseManager,
+    bankAccountId: string,
+    branchId: string
+  ): { id: string; accountNumber: string; bankName: string; glAccountCode: string } {
+    const row = db.query<any>(
+      `SELECT ba.id, ba.account_number AS accountNumber, ba.bank_name AS bankName,
+              ba.branch_id AS branchId, coa.code AS glAccountCode
+       FROM bank_accounts ba
+       JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id
+       WHERE ba.id = ? AND ba.is_active = 1`,
+      [bankAccountId]
+    )[0];
+    if (!row) throw new Error('الحساب البنكي المحدد غير موجود أو غير نشط.');
+    if (row.branchId && row.branchId !== branchId) {
+      throw new Error('الحساب البنكي المحدد لا يتبع فرع دورة الرواتب.');
+    }
+    return row;
+  }
+
+  private static resolvePayrollPayment(
+    db: DatabaseManager,
+    data: PayrollTransactionInput,
+    branchId: string,
+    actor: ReturnType<typeof AuthService.requireAuth>,
+    registerId: string | null
+  ): {
+    method: PayrollPaymentMethod;
+    registerId: string | null;
+    bankAccountId: string | null;
+    walletProvider: string | null;
+    walletNumber: string | null;
+    referenceNumber: string | null;
+    proofReference: string | null;
+    creditAccountCode: string;
+  } {
+    const employee = db.query<any>(
+      `SELECT salary_payment_method AS salaryPaymentMethod, bank_name AS bankName,
+              bank_account_number AS bankAccountNumber, wallet_provider AS walletProvider,
+              wallet_number AS walletNumber
+       FROM employees WHERE id = ?`,
+      [data.employeeId]
+    )[0];
+    const method: PayrollPaymentMethod = data.paymentMethod
+      || (employee?.salaryPaymentMethod === 'BANK_TRANSFER' || employee?.salaryPaymentMethod === 'WALLET'
+        ? employee.salaryPaymentMethod
+        : 'CASH');
+    const referenceNumber = data.referenceNumber?.trim() || null;
+    const proofReference = data.proofReference?.trim() || null;
+
+    if (method === 'BANK_TRANSFER') {
+      let bankAccountId = data.bankAccountId?.trim() || null;
+      if (!bankAccountId && employee?.bankAccountNumber) {
+        const matched = db.query<{ id: string }>(
+          `SELECT id FROM bank_accounts
+           WHERE is_active = 1 AND replace(replace(upper(account_number), ' ', ''), '-', '') =
+                 replace(replace(upper(?), ' ', ''), '-', '')
+             AND (branch_id = ? OR branch_id IS NULL)
+           ORDER BY branch_id IS NULL LIMIT 1`,
+          [employee.bankAccountNumber, branchId]
+        )[0];
+        bankAccountId = matched?.id ?? null;
+      }
+      if (!bankAccountId) {
+        throw new Error(`حدد الحساب البنكي لصرف راتب الموظف ${data.employeeId}؛ لا يوجد حساب مطابق لرقم حسابه.`);
+      }
+      const bank = this.resolveBankAccount(db, bankAccountId, branchId);
+      return {
+        method, registerId: null, bankAccountId: bank.id,
+        walletProvider: null, walletNumber: null, referenceNumber, proofReference,
+        creditAccountCode: bank.glAccountCode || '1102',
+      };
+    }
+
+    if (method === 'WALLET') {
+      const walletProvider = data.walletProvider?.trim() || employee?.walletProvider || employee?.bankName || null;
+      const walletNumber = data.walletNumber?.trim() || employee?.walletNumber || employee?.bankAccountNumber || null;
+      if (!walletProvider || !walletNumber) {
+        throw new Error(`بيانات المحفظة الإلكترونية غير مكتملة للموظف ${data.employeeId}.`);
+      }
+      return {
+        method, registerId: null, bankAccountId: null,
+        walletProvider, walletNumber, referenceNumber, proofReference,
+        creditAccountCode: '1107',
+      };
+    }
+
+    if (registerId) this.branchAccess.requireRegisterAccess(registerId, actor, branchId);
+    if (!registerId && (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT')) {
+      throw new Error('يجب تحديد خزينة فرع الموظف للصرف النقدي.');
+    }
+    return {
+      method: 'CASH', registerId, bankAccountId: null, walletProvider: null,
+      walletNumber: null, referenceNumber, proofReference, creditAccountCode: '1101',
+    };
   }
 
   private static persistPayrollTransaction(
@@ -896,13 +1094,15 @@ export class EmployeeService {
     actor: ReturnType<typeof AuthService.requireAuth>,
     accountingPeriod?: string
   ): void {
-    if (registerId) this.branchAccess.requireRegisterAccess(registerId, actor, branchId);
-    if ((data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') && !registerId) {
-      throw new Error('يجب تحديد خزينة فرع الموظف لهذه الحركة النقدية.');
-    }
+    const payment = this.resolvePayrollPayment(db, data, branchId, actor, registerId);
     db.run(
-      `INSERT INTO payroll_transactions (id,employee_id,type,amount,date,notes,created_by,register_id,branch_id) VALUES (?,?,?,?,?,?,?,?,?)`,
-      [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, registerId, branchId]
+      `INSERT INTO payroll_transactions
+         (id,employee_id,type,amount,date,notes,created_by,register_id,branch_id,
+          payment_method,bank_account_id,wallet_provider,wallet_number,reference_number,proof_reference,payment_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [id, data.employeeId, data.type, amount, data.date, data.notes, actor.id, payment.registerId,
+        branchId, payment.method, payment.bankAccountId, payment.walletProvider, payment.walletNumber,
+        payment.referenceNumber, payment.proofReference, 'PAID']
     );
 
     const accountingDate = accountingPeriod ? `${accountingPeriod}-01` : data.date;
@@ -919,7 +1119,7 @@ export class EmployeeService {
     if (data.type === 'SALARY_PAYOUT' && amount > payable + 0.009) {
       throw new Error(`Salary payout exceeds accrued payroll payable (${payable}).`);
     }
-    const lines = this.getPayrollPostingLines(data.type, amount, payable);
+    const lines = this.getPayrollPostingLines(data.type, amount, payable, payment.creditAccountCode);
     postLedgerEntry(db.getDatabase(), {
       date: data.date,
       description: `Payroll ${data.type} for ${this.getById(data.employeeId)?.name || data.employeeId}`,
@@ -930,12 +1130,22 @@ export class EmployeeService {
     });
 
     if (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT') {
-      db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, registerId]);
+      if (payment.method === 'CASH' && payment.registerId) {
+        db.run('UPDATE cash_registers SET current_balance=current_balance-? WHERE id=?', [amount, payment.registerId]);
+      } else if (payment.method === 'BANK_TRANSFER' && payment.bankAccountId) {
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [amount, payment.bankAccountId]);
+      }
     }
     db.run(
       `INSERT INTO audit_logs (id,user_id,user_name,action,module,record_id,new_values) VALUES (?,?,?,?,?,?,?)`,
       [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, `Payroll ${data.type}`, 'HR', id,
-        JSON.stringify({ employeeId: data.employeeId, amount, date: data.date })]
+        JSON.stringify({
+          employeeId: data.employeeId, amount, date: data.date, paymentMethod: payment.method,
+          bankAccountId: payment.bankAccountId, walletProvider: payment.walletProvider,
+          walletNumber: payment.walletNumber, referenceNumber: payment.referenceNumber,
+          proofReference: payment.proofReference,
+        })]
     );
   }
 
@@ -957,7 +1167,12 @@ export class EmployeeService {
     const id = `ptx_${uuidv4().substring(0, 8)}`;
     const amount = Math.round(Number(data.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0) throw new Error('Payroll amount must be greater than zero.');
-    const hasCashMovement = data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT';
+    const requestedMethod = data.paymentMethod || this.db.query<{ salaryPaymentMethod: string }>(
+      'SELECT salary_payment_method AS salaryPaymentMethod FROM employees WHERE id = ?',
+      [data.employeeId]
+    )[0]?.salaryPaymentMethod || 'CASH';
+    const hasCashMovement = (data.type === 'ADVANCE' || data.type === 'SALARY_PAYOUT')
+      && requestedMethod !== 'BANK_TRANSFER' && requestedMethod !== 'WALLET';
     const registerId = data.registerId
       ? data.registerId
       : hasCashMovement
@@ -1130,10 +1345,13 @@ export class EmployeeService {
               late_minutes AS lateMinutes, overtime_minutes AS overtimeMinutes,
               base_amount AS baseAmount, overtime_amount AS overtimeAmount,
               bonus_amount AS bonusAmount, commission_amount AS commissionAmount,
+              allowance_amount AS allowanceAmount, loan_deduction_amount AS loanDeductionAmount,
               advance_amount AS advanceAmount, manual_deduction_amount AS manualDeductionAmount,
               attendance_deduction_amount AS attendanceDeductionAmount, tax_amount AS taxAmount,
               gross_amount AS grossAmount, net_amount AS netAmount, warning_json AS warningJson,
-              detail_json AS detailJson, payout_transaction_id AS payoutTransactionId
+              detail_json AS detailJson, payout_transaction_id AS payoutTransactionId,
+              payment_method AS paymentMethod, payment_reference AS paymentReference,
+              payment_proof AS paymentProof, paid_amount AS paidAmount, payout_status AS payoutStatus
        FROM payroll_run_items WHERE payroll_run_id = ? ORDER BY employee_name`,
       [run.id]
     ).map((row): PayrollRunItem => ({
@@ -1150,6 +1368,10 @@ export class EmployeeService {
     const periodEnd = localDateString(new Date(year, month, 0));
     const employees = this.db.query<any>(
       `SELECT e.id, e.name, e.branch_id AS branchId, e.salary_type AS salaryType,
+              e.salary_payment_method AS salaryPaymentMethod, e.bank_name AS bankName,
+              e.bank_account_number AS bankAccountNumber, e.wallet_provider AS walletProvider,
+              e.wallet_number AS walletNumber,
+              COALESCE(e.company_id, b.company_id) AS companyId,
               COALESCE((
                 SELECT sh.next_salary FROM employee_salary_history sh
                 WHERE sh.employee_id = e.id AND sh.effective_date <= ?
@@ -1190,16 +1412,7 @@ export class EmployeeService {
        ORDER BY e.name, e.id`,
       [periodEnd, periodEnd, periodEnd, periodEnd, periodStart, branchId, periodEnd, periodStart, period]
     );
-    const attendanceRows = this.db.query<any>(
-      `SELECT a.employee_id AS employeeId, a.date, a.status,
-              COALESCE(a.late_minutes, 0) AS lateMinutes,
-              COALESCE(a.overtime_minutes, 0) AS overtimeMinutes,
-              COALESCE(a.overtime_approved, 0) AS overtimeApproved
-       FROM attendance a JOIN employees e ON e.id = a.employee_id
-       WHERE e.branch_id = ? AND a.date BETWEEN ? AND ?
-       ORDER BY a.employee_id, a.date`,
-      [branchId, periodStart, periodEnd]
-    );
+    const attendanceRows = AttendanceTimeService.getUnifiedRows(branchId, periodStart, periodEnd);
     const shiftRows = this.db.query<any>(
       `SELECT a.employee_id AS employeeId, a.effective_from AS effectiveFrom,
               a.effective_to AS effectiveTo, s.workdays_json AS workdaysJson,
@@ -1359,8 +1572,7 @@ export class EmployeeService {
           ? sum + Math.max(0, Number(row.lateMinutes) || 0) : sum, 0);
       const overtimeMinutes = attendance.reduce((sum, row) =>
         row.date >= eligibleStart && row.date <= eligibleEnd && ['PRESENT', 'LATE'].includes(row.status)
-          && Boolean(row.overtimeApproved)
-          ? sum + Math.max(0, Number(row.overtimeMinutes) || 0) : sum, 0);
+          ? sum + Math.max(0, Number(row.approvedOvertimeMinutes) || 0) : sum, 0);
       const hourlyRate = dailyRate / WORKING_HOURS_PER_DAY;
       const overtimeAmount = roundMoney(hourlyRate * (overtimeMinutes / 60) * overtimeMultiplier);
       const attendanceDeductionAmount = roundMoney(
@@ -1376,17 +1588,44 @@ export class EmployeeService {
       const commissions = commissionsByEmployee.get(employee.id) ?? [];
       const approvedCommissions = commissions.filter((row) => row.status === 'APPROVED');
       const commissionAmount = roundMoney(approvedCommissions.reduce((sum, row) => sum + Number(row.amount || 0), 0));
-      const grossAmount = roundMoney(baseAmount + overtimeAmount + bonusAmount + commissionAmount);
-      const taxAmount = roundMoney(grossAmount * taxRate / 100);
+      const allowanceAmount = roundMoney(Number(this.db.query<{ amount: number }>(
+        `SELECT COALESCE(SUM(amount), 0) AS amount FROM hr_allowances
+         WHERE employee_id = ? AND is_active = 1 AND frequency = 'MONTHLY'
+           AND effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)`,
+        [employee.id, periodEnd, periodStart]
+      )[0]?.amount) || 0);
+      const dueLoanInstallments = this.db.query<{ id: string; amount: number }>(
+        `SELECT i.id, i.amount FROM hr_loan_installments i
+         JOIN hr_loans l ON l.id = i.loan_id
+         WHERE l.employee_id = ? AND l.status = 'ACTIVE' AND i.status = 'PENDING' AND i.due_date <= ?`,
+        [employee.id, periodEnd]
+      );
+      const loanDeductionAmount = roundMoney(dueLoanInstallments.reduce(
+        (sum, row) => sum + (Number(row.amount) || 0), 0
+      ));
+      const grossAmount = roundMoney(baseAmount + overtimeAmount + bonusAmount + commissionAmount + allowanceAmount);
+      const tax = PayrollTaxService.calculate({
+        employeeId: employee.id,
+        companyId: employee.companyId || null,
+        date: periodEnd,
+        grossAmount,
+        baseAmount,
+        legacyRate: Number(taxRate) || 0,
+      });
+      const taxAmount = tax.taxAmount;
       const netAmount = roundMoney(
-        grossAmount - attendanceDeductionAmount - manualDeductionAmount - advanceAmount - previousPayoutAmount - taxAmount
+        grossAmount - attendanceDeductionAmount - manualDeductionAmount - advanceAmount - previousPayoutAmount - taxAmount - loanDeductionAmount
       );
 
       if (!employee.contractSalary && !employee.hasContractHistory && salaryType !== 'DAILY') warnings.push('لا يوجد عقد نشط يغطي الفترة؛ استُخدم الراتب الأساسي المسجل.');
       if (salaryComponents.length) warnings.push('يتضمن الراتب الأساسي المحسوب مكونات ثابتة من العقد.');
       if (!employeeShifts.length) warnings.push('لم تُعيّن وردية للموظف؛ استُخدم متوسط أيام الشركة ولم يُتحقق من أيام الأسبوع والعطلات.');
       if (attendance.length < Math.floor(expectedWorkdays)) warnings.push('سجلات الحضور أقل من أيام العمل المتوقعة؛ لم يُحتسب اليوم غير المسجل غيابًا.');
+      if (tax.source === 'LEGACY_FLAT' && Number(taxRate) > 0) warnings.push('الضريبة محسوبة بالنسبة الثابتة للشركة؛ أنشئ قاعدة ضريبية لتفعيل الشرائح والمعفيات.');
+      if (tax.source === 'LEGACY_FLAT' && Number(taxRate) <= 0 && !tax.ruleId) warnings.push('لا توجد قاعدة ضريبة سارية؛ لم تُحتسب ضريبة.');
       if (commissions.some((row) => row.status === 'PENDING')) warnings.push('توجد عمولات معلقة لم تدخل في صافي الراتب.');
+      if (allowanceAmount > 0) warnings.push(`أُضيفت بدلات شهرية بقيمة ${allowanceAmount} إلى إجمالي الراتب.`);
+      if (loanDeductionAmount > 0) warnings.push(`خُصمت أقساط قروض بقيمة ${loanDeductionAmount} من صافي الراتب.`);
       if (previousPayoutAmount > 0) warnings.push('توجد دفعات راتب سابقة في الفترة وخُصمت من الصافي.');
       if (netAmount < 0) warnings.push('صافي الراتب سالب؛ يجب تسوية السلف أو الخصومات قبل الاعتماد.');
 
@@ -1408,6 +1647,8 @@ export class EmployeeService {
           overtimeAmount,
           bonusAmount,
           commissionAmount,
+          allowanceAmount,
+          loanDeductionAmount,
           advanceAmount,
           manualDeductionAmount,
           attendanceDeductionAmount,
@@ -1415,6 +1656,13 @@ export class EmployeeService {
           grossAmount,
           netAmount,
           warnings,
+          paymentMethod: (employee.salaryPaymentMethod === 'BANK_TRANSFER' || employee.salaryPaymentMethod === 'WALLET')
+            ? employee.salaryPaymentMethod
+            : 'CASH',
+          paymentReference: null,
+          paymentProof: null,
+          paidAmount: 0,
+          payoutStatus: 'PENDING',
           details: {
             workingDaysPerMonth: workingDays,
             workingHoursPerDay: WORKING_HOURS_PER_DAY,
@@ -1424,6 +1672,21 @@ export class EmployeeService {
             salaryComponentTotal: fixedComponentTotal,
             previousPayoutAmount,
             commissionIds: approvedCommissions.map((row) => row.id),
+            loanInstallmentIds: dueLoanInstallments.map((row) => row.id),
+            salaryPaymentMethod: employee.salaryPaymentMethod || 'CASH',
+            bankName: employee.bankName || null,
+            bankAccountNumber: employee.bankAccountNumber || null,
+            walletProvider: employee.walletProvider || null,
+            walletNumber: employee.walletNumber || null,
+            taxRuleId: tax.ruleId,
+            taxRuleName: tax.ruleName,
+            taxSource: tax.source,
+            taxBasis: tax.taxableBasis,
+            taxableAmount: tax.taxableAmount,
+            taxExemptionAmount: tax.exemptionAmount,
+            taxDependentAllowance: tax.dependentAllowanceAmount,
+            taxDependents: tax.dependents,
+            taxBreakdown: tax.lines,
           },
           payoutTransactionId: null,
         },
@@ -1449,16 +1712,19 @@ export class EmployeeService {
           `INSERT INTO payroll_run_items (
              id, payroll_run_id, employee_id, branch_id, employee_name, salary_type, base_salary,
              expected_workdays, absent_days, unpaid_leave_days, late_minutes, overtime_minutes,
-             base_amount, overtime_amount, bonus_amount, commission_amount, advance_amount,
+             base_amount, overtime_amount, bonus_amount, commission_amount, allowance_amount,
+             loan_deduction_amount, advance_amount,
              manual_deduction_amount, attendance_deduction_amount, tax_amount, gross_amount,
-             net_amount, warning_json, detail_json
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             net_amount, warning_json, detail_json, payment_method, payout_status
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             item.id, existingRunId, item.employeeId, item.branchId, item.employeeName, item.salaryType,
             item.baseSalary, item.expectedWorkdays, item.absentDays, item.unpaidLeaveDays, item.lateMinutes,
             item.overtimeMinutes, item.baseAmount, item.overtimeAmount, item.bonusAmount, item.commissionAmount,
-            item.advanceAmount, item.manualDeductionAmount, item.attendanceDeductionAmount, item.taxAmount,
+            item.allowanceAmount, item.loanDeductionAmount, item.advanceAmount,
+            item.manualDeductionAmount, item.attendanceDeductionAmount, item.taxAmount,
             item.grossAmount, item.netAmount, JSON.stringify(item.warnings), JSON.stringify(item.details),
+            item.paymentMethod, item.payoutStatus,
           ]
         );
       }
@@ -1499,7 +1765,7 @@ export class EmployeeService {
            WHERE reference_type = 'PAYROLL_SALARY_ACCRUAL' AND reference_id = ?`,
           [referenceId]
         )[0];
-        const wages = roundMoney(item.baseAmount + item.overtimeAmount);
+        const wages = roundMoney(item.baseAmount + item.overtimeAmount + item.allowanceAmount);
         const legacyAmount = legacyAccrual
           ? Number(db.query<{ amount: number }>(
             `SELECT COALESCE(SUM(l.credit - l.debit), 0) AS amount
@@ -1581,6 +1847,40 @@ export class EmployeeService {
             ],
           });
         }
+        if (item.allowanceAmount > 0) {
+          const currentAllowances = roundMoney(Number(db.query<{ amount: number }>(
+            `SELECT COALESCE(SUM(amount), 0) AS amount FROM hr_allowances
+             WHERE employee_id = ? AND is_active = 1 AND frequency = 'MONTHLY'
+               AND effective_from <= ? AND (effective_to IS NULL OR effective_to >= ?)`,
+            [item.employeeId, `${run.period}-31`, `${run.period}-01`]
+          )[0]?.amount) || 0);
+          if (Math.abs(currentAllowances - item.allowanceAmount) > 0.009) {
+            throw new Error(`تغيرت بدلات الموظف ${item.employeeName} بعد احتساب الدورة؛ أعد الاحتساب.`);
+          }
+        }
+        const loanInstallmentIds = item.details.loanInstallmentIds ?? [];
+        if (loanInstallmentIds.length) {
+          const stillPending = db.query<{ count: number }>(
+            `SELECT COUNT(*) AS count FROM hr_loan_installments
+             WHERE id IN (${loanInstallmentIds.map(() => '?').join(', ')}) AND status = 'PENDING'`,
+            loanInstallmentIds
+          )[0]?.count ?? 0;
+          if (Number(stillPending) !== loanInstallmentIds.length) {
+            throw new Error(`تغيرت حالة أقساط قروض الموظف ${item.employeeName} بعد احتساب الدورة؛ أعد الاحتساب.`);
+          }
+          postLedgerEntry(db.getDatabase(), {
+            date: `${run.period}-01`,
+            description: `Payroll loan installment deduction for ${item.employeeName} (${run.period})`,
+            referenceType: 'PAYROLL_RUN_LOAN_DEDUCTION',
+            referenceId,
+            createdBy: actor.id,
+            branchId: item.branchId,
+            lines: [
+              { accountCode: '2104', debit: item.loanDeductionAmount, credit: 0 },
+              { accountCode: '1202', debit: 0, credit: item.loanDeductionAmount },
+            ],
+          });
+        }
       }
       db.run(
         `UPDATE payroll_runs SET status = 'APPROVED', approved_by = ?, approved_at = ? WHERE id = ? AND status = 'DRAFT'`,
@@ -1595,28 +1895,62 @@ export class EmployeeService {
     return this.getPayrollRunById(id);
   }
 
-  static payPayrollRun(id: string): PayrollRun {
+  static payPayrollRun(id: string, options: PayrollPayOptions = {}): PayrollRun {
     const actor = this.requirePayrollApproval();
     this.departmentAccess.requireAllDepartmentAccess(actor);
     const run = this.getPayrollRunById(id);
     this.branchAccess.requireBranchAccess(run.branchId, actor);
     if (run.status !== 'APPROVED') throw new Error('يجب اعتماد دورة الرواتب قبل صرفها.');
     const today = localDateString();
+    const batchReference = options.batchReference?.trim()
+      || `PAY-${run.period}-${uuidv4().replace(/-/g, '').slice(0, 8).toUpperCase()}`;
+    const resolved = run.items.filter((item) => item.netAmount > 0).map((item) => {
+      const instruction = options.payments?.[item.employeeId] ?? {};
+      const method = instruction.method || item.paymentMethod || 'CASH';
+      const registerId = method === 'CASH'
+        ? (instruction.registerId
+          || options.defaultRegisterId
+          || this.branchAccess.getDefaultRegisterId(item.branchId, actor))
+        : null;
+      const bankAccountId = method === 'BANK_TRANSFER'
+        ? (instruction.bankAccountId || options.defaultBankAccountId || null)
+        : null;
+      const data: PayrollTransactionInput = {
+        employeeId: item.employeeId,
+        type: 'SALARY_PAYOUT',
+        amount: item.netAmount,
+        date: today,
+        notes: `صرف دورة الرواتب ${run.period} - ${batchReference}`,
+        paymentMethod: method,
+        registerId: registerId || undefined,
+        bankAccountId: bankAccountId || undefined,
+        walletProvider: instruction.walletProvider,
+        walletNumber: instruction.walletNumber,
+        referenceNumber: instruction.referenceNumber || batchReference,
+        proofReference: instruction.proofReference,
+      };
+      // Resolve every destination before writing anything so a missing bank
+      // account or wallet never leaves a half-paid payroll run.
+      const payment = this.resolvePayrollPayment(
+        this.db, data, item.branchId, actor, registerId
+      );
+      return { item, data, payment };
+    });
+    const paidTotal = resolved.reduce((sum, row) => sum + row.item.netAmount, 0);
     this.db.executeTransaction((db) => {
-      for (const item of run.items) {
-        if (item.netAmount <= 0) continue;
-        const branchId = this.requireEmployeeBranch(item.employeeId, actor);
-        const registerId = this.branchAccess.getDefaultRegisterId(branchId, actor);
+      for (const row of resolved) {
+        const { item, data, payment } = row;
         const txId = `ptx_${uuidv4().substring(0, 8)}`;
-        this.persistPayrollTransaction(db, {
-          employeeId: item.employeeId,
-          type: 'SALARY_PAYOUT',
-          amount: item.netAmount,
-          date: today,
-          notes: `صرف دورة الرواتب ${run.period}`,
-          registerId,
-        }, item.netAmount, txId, registerId, branchId, actor, run.period);
-        db.run('UPDATE payroll_run_items SET payout_transaction_id = ? WHERE id = ?', [txId, item.id]);
+        this.persistPayrollTransaction(db, data, item.netAmount, txId, payment.registerId, item.branchId,
+          actor, run.period);
+        db.run(
+          `UPDATE payroll_run_items SET payout_transaction_id = ?, payment_method = ?,
+             bank_account_id = ?, wallet_provider = ?, wallet_number = ?, payment_reference = ?,
+             payment_proof = ?, paid_amount = ?, payout_status = 'PAID'
+           WHERE id = ?`,
+          [txId, payment.method, payment.bankAccountId, payment.walletProvider, payment.walletNumber,
+            payment.referenceNumber, payment.proofReference, item.netAmount, item.id]
+        );
         if (item.details.commissionIds.length) {
           db.run(
             `UPDATE commissions SET status = 'PAID', paid_at = ?
@@ -1624,18 +1958,138 @@ export class EmployeeService {
             [today, ...item.details.commissionIds]
           );
         }
+        const paidLoanInstallmentIds = item.details.loanInstallmentIds ?? [];
+        if (paidLoanInstallmentIds.length) {
+          db.run(
+            `UPDATE hr_loan_installments SET status = 'PAID', payroll_transaction_id = ?
+             WHERE id IN (${paidLoanInstallmentIds.map(() => '?').join(', ')}) AND status = 'PENDING'`,
+            [txId, ...paidLoanInstallmentIds]
+          );
+          const paidLoans = db.query<{ loanId: string }>(
+            `SELECT DISTINCT loan_id AS loanId FROM hr_loan_installments
+             WHERE id IN (${paidLoanInstallmentIds.map(() => '?').join(', ')})`,
+            paidLoanInstallmentIds
+          );
+          for (const loan of paidLoans) {
+            const remaining = Number(db.query<{ remaining: number }>(
+              `SELECT COALESCE(SUM(amount), 0) AS remaining FROM hr_loan_installments
+               WHERE loan_id = ? AND status = 'PENDING'`,
+              [loan.loanId]
+            )[0]?.remaining) || 0;
+            db.run(
+              `UPDATE hr_loans SET remaining_balance = ?,
+                 status = CASE WHEN ? <= 0.009 THEN 'COMPLETED' ELSE status END
+               WHERE id = ?`,
+              [remaining, remaining, loan.loanId]
+            );
+          }
+        }
       }
       db.run(
-        `UPDATE payroll_runs SET status = 'PAID', paid_by = ?, paid_at = ? WHERE id = ? AND status = 'APPROVED'`,
-        [actor.id, new Date().toISOString(), id]
+        `UPDATE payroll_runs SET status = 'PAID', paid_by = ?, paid_at = ?,
+           payment_batch_reference = ?, paid_total = ?
+         WHERE id = ? AND status = 'APPROVED'`,
+        [actor.id, new Date().toISOString(), batchReference, paidTotal, id]
       );
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
          VALUES (?, ?, ?, 'Pay payroll run', 'HR', ?, ?)`,
-        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id, JSON.stringify({ period: run.period })]
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, id,
+          JSON.stringify({
+            period: run.period, batchReference, paidTotal,
+            methods: resolved.reduce((counts, row) => {
+              counts[row.payment.method] = (counts[row.payment.method] || 0) + 1;
+              return counts;
+            }, {} as Record<string, number>),
+          })]
       );
     });
     return this.getPayrollRunById(id);
+  }
+
+  static getPayrollPaymentReconciliation(id: string): PayrollPaymentReconciliation {
+    const actor = this.requirePayrollView();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
+    const run = this.getPayrollRunById(id);
+    this.branchAccess.requireBranchAccess(run.branchId, actor);
+    const items = run.items.map((item): PayrollPaymentReconciliationItem => {
+      const issues: string[] = [];
+      const paidAmount = roundMoney(Number(item.paidAmount) || 0);
+      const difference = roundMoney(paidAmount - item.netAmount);
+      if (item.netAmount > 0 && item.payoutStatus !== 'PAID') issues.push('لم تُسجل عملية صرف لهذا الموظف.');
+      if (Math.abs(difference) > 0.009) issues.push('المبلغ المصروف لا يطابق صافي المستحق.');
+      if (item.paymentMethod === 'BANK_TRANSFER' && item.payoutStatus === 'PAID' && !item.paymentReference) {
+        issues.push('لا يوجد مرجع تحويل بنكي.');
+      }
+      if (item.paymentMethod === 'BANK_TRANSFER' && item.payoutStatus === 'PAID' && !item.paymentProof) {
+        issues.push('لا يوجد إثبات تحويل.');
+      }
+      if (item.paymentMethod === 'WALLET' && item.payoutStatus === 'PAID' && !item.paymentReference) {
+        issues.push('لا يوجد مرجع عملية المحفظة.');
+      }
+      return {
+        itemId: item.id,
+        employeeId: item.employeeId,
+        employeeName: item.employeeName,
+        paymentMethod: item.paymentMethod,
+        expectedAmount: item.netAmount,
+        paidAmount,
+        difference,
+        payoutStatus: item.payoutStatus,
+        payoutTransactionId: item.payoutTransactionId,
+        paymentReference: item.paymentReference,
+        paymentProof: item.paymentProof,
+        issues,
+      };
+    });
+    const byMethod = items.reduce((rows, item) => {
+      if (item.payoutStatus !== 'PAID') return rows;
+      const existing = rows.find((row) => row.method === item.paymentMethod);
+      if (existing) {
+        existing.count += 1;
+        existing.amount = roundMoney(existing.amount + item.paidAmount);
+      } else {
+        rows.push({ method: item.paymentMethod, count: 1, amount: item.paidAmount });
+      }
+      return rows;
+    }, [] as Array<{ method: PayrollPaymentMethod; count: number; amount: number }>);
+    const expectedTotal = roundMoney(items.reduce((sum, item) => sum + item.expectedAmount, 0));
+    const paidTotal = roundMoney(items.reduce((sum, item) => sum + item.paidAmount, 0));
+    const difference = roundMoney(paidTotal - expectedTotal);
+    return {
+      runId: run.id,
+      period: run.period,
+      expectedTotal,
+      paidTotal,
+      difference,
+      isBalanced: Math.abs(difference) <= 0.009 && items.every((item) => !item.issues.length),
+      items,
+      byMethod,
+    };
+  }
+
+  static getPayrollPayoutOptions(): {
+    bankAccounts: Array<{ id: string; accountName: string; bankName: string; accountNumber: string; currentBalance: number }>;
+    registers: Array<{ id: string; name: string; currentBalance: number }>;
+  } {
+    const actor = this.requirePayrollApproval();
+    const branchId = this.branchAccess.getCurrentBranchId(actor);
+    this.branchAccess.requireBranchAccess(branchId, actor);
+    const bankAccounts = this.db.query<any>(
+      `SELECT id, account_name AS accountName, bank_name AS bankName,
+              account_number AS accountNumber, COALESCE(current_balance, 0) AS currentBalance
+       FROM bank_accounts
+       WHERE is_active = 1 AND (branch_id = ? OR branch_id IS NULL)
+       ORDER BY branch_id IS NULL, account_name`,
+      [branchId]
+    ).map((row) => ({ ...row, currentBalance: Number(row.currentBalance) || 0 }));
+    const registers = this.db.query<any>(
+      `SELECT id, name, COALESCE(current_balance, 0) AS currentBalance
+       FROM cash_registers WHERE branch_id = ? AND is_active = 1
+       ORDER BY is_default DESC, name`,
+      [branchId]
+    ).map((row) => ({ ...row, currentBalance: Number(row.currentBalance) || 0 }));
+    return { bankAccounts, registers };
   }
 
   static closePayrollRun(id: string): PayrollRun {

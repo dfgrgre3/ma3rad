@@ -169,3 +169,22 @@ test('central releases surface only the latest version newer than the installed 
     restoreCentralRequest();
   }
 });
+
+test('central error telemetry is skipped when the secured Electron bridge is unavailable', async () => {
+  const central = root.window.ceramisys.central;
+  const originalWarn = console.warn;
+  const warnings: unknown[][] = [];
+  root.window.ceramisys.central = undefined;
+  console.warn = (...args) => { warnings.push(args); };
+
+  try {
+    await assert.doesNotReject(() => CentralTelemetryService.reportError({
+      title: 'Renderer error',
+      description: 'Bridge is unavailable',
+    }));
+    assert.equal(warnings.length, 0, 'missing Electron bridge is an expected no-op');
+  } finally {
+    root.window.ceramisys.central = central;
+    console.warn = originalWarn;
+  }
+});

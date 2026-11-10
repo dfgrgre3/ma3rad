@@ -15,6 +15,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
     color: 'text-sky-600',
     items: [
       { label: 'لوحة المعلومات والتحليلات الشاملة', to: '/dashboard', icon: LayoutDashboard, perm: 'dashboard.view' },
+      { label: 'بوابة الموظف الذاتية', to: '/hr/self-service', icon: UserRound, perm: 'hr.selfservice.view' },
     ],
   },
   {

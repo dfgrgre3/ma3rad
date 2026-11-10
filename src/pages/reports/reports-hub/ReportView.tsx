@@ -14,15 +14,21 @@ import {
   Table,
 } from 'lucide-react';
 import {
-  BarChart,
+  Area,
+  AreaChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  ReferenceLine,
 } from 'recharts';
 import { localDateString } from '../../../utils/shared/date';
 import { exportToExcel, exportToPdf } from '../../../utils/export/export';
@@ -97,6 +103,118 @@ const KPI_VALUE = (value: number | string): string => {
   return String(value);
 };
 
+const DATE_PRESETS = [
+  { key: 'today', label: 'اليوم' },
+  { key: 'yesterday', label: 'أمس' },
+  { key: 'week', label: 'هذا الأسبوع' },
+  { key: 'month', label: 'هذا الشهر' },
+  { key: 'quarter', label: 'هذا الربع' },
+  { key: 'year', label: 'هذا العام' },
+] as const;
+
+const INVOICE_STATUS_OPTIONS = [
+  { value: 'all', label: 'كل الحالات' },
+  { value: 'completed', label: 'مكتملة' },
+  { value: 'pending', label: 'معلقة' },
+  { value: 'cancelled', label: 'ملغاة' },
+  { value: 'returned', label: 'مرتجعة' },
+  { value: 'partial', label: 'جزئية' },
+] as const;
+
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'all', label: 'كل وسائل الدفع' },
+  { value: 'cash', label: 'نقدي' },
+  { value: 'card', label: 'بطاقة' },
+  { value: 'bank', label: 'حوالة/تحويل' },
+  { value: 'cheque', label: 'شيك' },
+  { value: 'installment', label: 'أقساط' },
+] as const;
+
+const getRowFilterValue = (row: Record<string, any>, key: string): unknown => {
+  const aliases = new Set<string>([
+    key,
+    key.toLowerCase(),
+    key.replace(/([A-Z])/g, '_$1').toLowerCase(),
+    key.replace(/Id$/i, '_id'),
+    key.replace(/Id$/i, 'Id'),
+  ]);
+
+  for (const alias of aliases) {
+    if (row[alias] !== undefined) return row[alias];
+  }
+
+  if (key === 'branchId') return row.branch_id ?? row.branchId ?? row.branch ?? row.branch_name;
+  if (key === 'warehouseId') return row.warehouse_id ?? row.warehouseId ?? row.warehouse ?? row.warehouse_name;
+  if (key === 'registerId') return row.register_id ?? row.registerId ?? row.cash_register_id ?? row.cashRegisterId;
+  if (key === 'customerId') return row.customer_id ?? row.customerId ?? row.client_id ?? row.clientId;
+  if (key === 'supplierId') return row.supplier_id ?? row.supplierId;
+  if (key === 'employeeId') return row.employee_id ?? row.employeeId ?? row.user_id ?? row.userId;
+  if (key === 'status') return row.invoice_status ?? row.status ?? row.payment_status ?? row.state;
+  if (key === 'paymentMethod') return row.payment_method ?? row.paymentMethod ?? row.means_of_payment ?? row.method;
+  if (key === 'compareBranchId') return row.compare_branch_id ?? row.compareBranchId ?? row.branch_id;
+  return row[key];
+};
+
+const addDays = (value: Date, days: number): Date => {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+};
+
+const startOfWeek = (value: Date): Date => {
+  const date = new Date(value);
+  const day = date.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + offset);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const startOfMonth = (value: Date): Date => new Date(value.getFullYear(), value.getMonth(), 1);
+const endOfMonth = (value: Date): Date => new Date(value.getFullYear(), value.getMonth() + 1, 0);
+
+const applyPreset = (preset: string, definition: ReportDefinition, setFrom: (v: string) => void, setTo: (v: string) => void, setAsOf: (v: string) => void) => {
+  const now = new Date();
+  const range = (() => {
+    switch (preset) {
+      case 'today':
+        return { from: localDateString(now), to: localDateString(now) };
+      case 'yesterday': {
+        const date = addDays(now, -1);
+        return { from: localDateString(date), to: localDateString(date) };
+      }
+      case 'week': {
+        const start = startOfWeek(now);
+        const end = addDays(start, 6);
+        return { from: localDateString(start), to: localDateString(end) };
+      }
+      case 'month': {
+        const start = startOfMonth(now);
+        const end = endOfMonth(now);
+        return { from: localDateString(start), to: localDateString(end) };
+      }
+      case 'quarter': {
+        const startMonth = Math.floor(now.getMonth() / 3) * 3;
+        const start = new Date(now.getFullYear(), startMonth, 1);
+        const end = new Date(now.getFullYear(), startMonth + 3, 0);
+        return { from: localDateString(start), to: localDateString(end) };
+      }
+      case 'year':
+        return { from: `${now.getFullYear()}-01-01`, to: `${now.getFullYear()}-12-31` };
+      default:
+        return null;
+    }
+  })();
+
+  if (!range) return;
+  if (definition.dateMode === 'range') {
+    setFrom(range.from);
+    setTo(range.to);
+  } else {
+    setAsOf(range.to);
+  }
+};
+
 export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => void }> = ({ definition, onBack }) => {
   const toast = useToast();
   const [from, setFrom] = useState(monthStart());
@@ -113,6 +231,55 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 50;
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  const branches = useMemo(() => {
+    const scope = branchAccess.sqlScope('id');
+    return db.query<any>(`SELECT id, name FROM branches WHERE ${scope.clause} ORDER BY name`, scope.params);
+  }, []);
+
+  const warehouses = useMemo(() => {
+    const scope = branchAccess.sqlScope('branch_id');
+    return db.query<any>(`SELECT id, name FROM warehouses WHERE is_active = 1 AND ${scope.clause} ORDER BY name`, scope.params);
+  }, []);
+
+  const customers = useMemo(() => {
+    const scope = branchAccess.sqlScope('branch_id');
+    return db.query<any>(`SELECT id, name FROM customers WHERE is_active = 1 AND ${scope.clause} ORDER BY name`, scope.params);
+  }, []);
+
+  const suppliers = useMemo(() => {
+    const scope = branchAccess.companyScope('company_id');
+    return db.query<any>(`SELECT id, name FROM suppliers WHERE is_active = 1 AND ${scope.clause} ORDER BY name`, scope.params);
+  }, []);
+
+  const employees = useMemo(() => {
+    const scope = branchAccess.sqlScope('branch_id');
+    return db.query<any>(`SELECT id, full_name AS name FROM users WHERE is_active = 1 AND ${scope.clause} ORDER BY full_name`, scope.params);
+  }, []);
+
+  const registers = useMemo(() => {
+    if (!definition.controls?.some((control) => control.kind === 'register')) return [];
+    const scope = branchAccess.sqlScope('branch_id');
+    return db.query<any>(`SELECT id, name FROM cash_registers WHERE is_active = 1 AND ${scope.clause} ORDER BY name`, scope.params);
+  }, [definition]);
+
+  const advancedFilterFields = useMemo(() => {
+    const baseFields = [
+      { key: 'branchId', label: 'الفرع', options: [{ value: '', label: 'كل الفروع' }, ...branches.map((branch) => ({ value: String(branch.id), label: String(branch.name) }))] },
+      { key: 'warehouseId', label: 'المخزن', options: [{ value: '', label: 'كل المخازن' }, ...warehouses.map((warehouse) => ({ value: String(warehouse.id), label: String(warehouse.name) }))] },
+      { key: 'registerId', label: 'الخزينة', options: [{ value: '', label: 'كل الخزائن' }, ...registers.map((register) => ({ value: String(register.id), label: String(register.name) }))] },
+      { key: 'customerId', label: 'العميل', options: [{ value: '', label: 'كل العملاء' }, ...customers.map((customer) => ({ value: String(customer.id), label: String(customer.name) }))] },
+      { key: 'supplierId', label: 'المورد', options: [{ value: '', label: 'كل الموردين' }, ...suppliers.map((supplier) => ({ value: String(supplier.id), label: String(supplier.name) }))] },
+      { key: 'employeeId', label: 'الموظف', options: [{ value: '', label: 'كل الموظفين' }, ...employees.map((employee) => ({ value: String(employee.id), label: String(employee.name) }))] },
+      { key: 'status', label: 'حالة الفاتورة', options: INVOICE_STATUS_OPTIONS.map((option) => ({ value: option.value, label: option.label })) },
+      { key: 'paymentMethod', label: 'طريقة الدفع', options: PAYMENT_METHOD_OPTIONS.map((option) => ({ value: option.value, label: option.label })) },
+      { key: 'compareBranchId', label: 'مقارنة فرع', options: [{ value: '', label: 'بدون مقارنة' }, ...branches.map((branch) => ({ value: String(branch.id), label: String(branch.name) }))] },
+    ];
+
+    return baseFields.filter((field) => !definition.controls?.some((control) => control.key === field.key));
+  }, [branches, customers, definition.controls, employees, registers, suppliers, warehouses]);
 
   const products = useMemo(() => {
     if (!definition.controls?.some((control) => control.kind === 'product')) return [];
@@ -127,12 +294,6 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
     `, scope.params);
   }, [definition]);
 
-  const registers = useMemo(() => {
-    if (!definition.controls?.some((control) => control.kind === 'register')) return [];
-    const scope = branchAccess.sqlScope('branch_id');
-    return db.query<any>(`SELECT id, name FROM cash_registers WHERE is_active = 1 AND ${scope.clause} ORDER BY name`, scope.params);
-  }, [definition]);
-
   useEffect(() => {
     setFilters({});
     setSort(null);
@@ -142,7 +303,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, filters, from, to, asOf]);
+  }, [search, filters, from, to, asOf, refreshToken]);
 
   useEffect(() => {
     if (definition.controls?.some((control) => control.kind === 'product') && productOptions(filters, products)) {
@@ -167,15 +328,25 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
     } finally {
       setLoading(false);
     }
-  }, [definition, from, to, asOf, filters]);
+  }, [definition, from, to, asOf, filters, refreshToken]);
 
   const columns = useMemo(() => result?.columns || [], [result]);
   const rows = useMemo(() => {
     const source = result?.rows || [];
     const needle = search.trim();
-    const filtered = needle
+    let filtered = needle
       ? source.filter((row) => columns.some((column) => String(row[column.key] ?? '').toLowerCase().includes(needle.toLowerCase())))
       : source;
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (!value || value === 'all' || value === 'all-branches' || value === 'none') return;
+      filtered = filtered.filter((row) => {
+        const candidate = getRowFilterValue(row, key);
+        if (candidate === undefined || candidate === null || candidate === '') return false;
+        return String(candidate).trim().toLowerCase() === String(value).trim().toLowerCase();
+      });
+    });
+
     if (!sort) return filtered;
     const sorted = [...filtered].sort((a, b) => {
       const left = a[sort.key];
@@ -186,7 +357,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
       return String(left ?? '').localeCompare(String(right ?? ''), 'ar');
     });
     return sort.direction === 'asc' ? sorted : sorted.reverse();
-  }, [result, search, sort, columns]);
+  }, [result, search, sort, columns, filters]);
 
   const toggleSort = (key: string) => {
     setSort((current) => {
@@ -202,19 +373,32 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
     return rows.slice(start, start + pageSize);
   }, [rows, currentPage, pageSize]);
 
-  // Chart data extraction (top 8 numeric entries)
+  const chartKind: 'bar' | 'line' | 'area' | 'pie' = useMemo(() => {
+    if (definition.chart) return definition.chart;
+    const hasDateAxis = columns.some((column) => column.type === 'date');
+    const hasTextAxis = columns.some((column) => column.type !== 'currency' && column.type !== 'number' && column.type !== 'qty' && column.type !== 'percent' && column.type !== 'date');
+    if (hasDateAxis && rows.length >= 2) return 'line';
+    if (hasTextAxis && rows.length <= 8) return 'pie';
+    return 'bar';
+  }, [columns, definition.chart, rows.length]);
+
+  const rowValue = (key: string) => rows[0]?.[key];
+
   const chartData = useMemo(() => {
     if (!rows.length || !columns.length) return [];
-    const numCol = columns.find(c => c.type === 'currency' || c.type === 'number' || c.type === 'qty');
-    const labelCol = columns.find(c => c.type !== 'currency' && c.type !== 'number' && c.type !== 'qty' && c.type !== 'date') || columns[0];
-    if (!numCol || !labelCol) return [];
+    const numericColumns = columns.filter((column) => column.type === 'currency' || column.type === 'number' || column.type === 'qty' || column.type === 'percent');
+    const labelColumn = columns.find((column) => column.type !== 'currency' && column.type !== 'number' && column.type !== 'qty' && column.type !== 'percent' && column.type !== 'date') || columns[0];
 
-    return rows.slice(0, 10).map(r => ({
-      name: String(r[labelCol.key] || 'غير محدد').slice(0, 18),
-      value: Number(r[numCol.key]) || 0,
-      label: numCol.label,
+    const valueColumn = numericColumns[0] || columns.find((column) => typeof rowValue(column.key) !== 'string');
+
+    if (!valueColumn || !labelColumn) return [];
+
+    return rows.slice(0, 10).map((row) => ({
+      name: String(row[labelColumn.key] ?? 'غير محدد').slice(0, 18),
+      value: Number(row[valueColumn.key]) || 0,
+      label: valueColumn.label,
     }));
-  }, [rows, columns]);
+  }, [rows, columns, rowValue]);
 
   const handleExport = () => {
     if (!result) return;
@@ -274,6 +458,12 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
   };
 
   const Icon = definition.icon;
+  const handleRowClick = () => {
+    if (definition.drilldown) {
+      const routeMessage = definition.drilldown.route ? `الانتقال إلى ${definition.drilldown.route}` : definition.drilldown.label;
+      toast.info(`${definition.drilldown.note || definition.drilldown.label} • ${routeMessage}`);
+    }
+  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-slate-50 text-slate-900" dir="rtl">
@@ -318,7 +508,14 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
           </div>
           <button
             type="button"
-            onClick={() => setFilters((current) => ({ ...current }))}
+            onClick={() => setShowAdvancedFilters((current) => !current)}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+          >
+            <SlidersHorizontal className="h-4 w-4" /> فلترة متقدمة
+          </button>
+          <button
+            type="button"
+            onClick={() => setRefreshToken((current) => current + 1)}
             className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
           >
             <RefreshCw className="h-4 w-4" /> تحديث
@@ -359,6 +556,21 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
         ) : definition.dateMode === 'asOf' ? (
           <DateField label="كما في تاريخ" value={asOf} onChange={setAsOf} />
         ) : null}
+
+        {definition.dateMode !== 'none' && (
+          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            {DATE_PRESETS.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => applyPreset(preset.key, definition, setFrom, setTo, setAsOf)}
+                className="rounded-lg px-2.5 py-1 text-[10px] font-bold text-slate-600 transition hover:bg-white hover:text-teal-700"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {definition.controls?.map((control) => {
           if (control.kind === 'dimension') {
@@ -426,6 +638,39 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
         </div>
       </div>
 
+      {showAdvancedFilters && advancedFilterFields.length > 0 && (
+        <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-black text-slate-700">
+              <SlidersHorizontal className="h-3.5 w-3.5" /> فلترة متقدمة
+            </div>
+            <button
+              type="button"
+              onClick={() => setFilters((current) => Object.fromEntries(Object.entries(current).filter(([key]) => key === 'productId' || key === 'registerId' || key === 'dimension')))}
+              className="text-[10px] font-bold text-slate-500 transition hover:text-teal-700"
+            >
+              مسح الفلاتر
+            </button>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {advancedFilterFields.map((field) => (
+              <label key={field.key} className="block min-w-0">
+                <span className="mb-1 block text-[10px] font-bold text-slate-500">{field.label}</span>
+                <select
+                  value={filters[field.key] || ''}
+                  onChange={(event) => setFilters((current) => ({ ...current, [field.key]: event.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700"
+                >
+                  {field.options.map((option) => (
+                    <option key={option.value || 'empty'} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto p-5">
         {error && (
           <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold text-rose-700">
@@ -454,44 +699,67 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
               </div>
             ) : null}
 
+            {definition.drilldown ? (
+              <div className="mb-4 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-[11px] font-bold text-indigo-700">
+                <span>{definition.drilldown.label}</span>
+                <span className="text-indigo-500">{definition.drilldown.note}</span>
+              </div>
+            ) : null}
+
             {viewMode === 'chart' && chartData.length > 0 ? (
               <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-5">
                 <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
                   <h3 className="text-sm font-black">تحليل بياني (أعلى العناصر)</h3>
                   <span className="text-[11px] font-bold text-slate-500">
-                    مقارنة: {chartData[0]?.label || ''}
+                    نوع الرسم: {chartKind === 'bar' ? 'أعمدة' : chartKind === 'line' ? 'خطي' : chartKind === 'area' ? 'مساحة' : 'توزيعي'}
                   </span>
                 </div>
                 <div className="h-72 w-full" dir="ltr">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis
-                        dataKey="name"
-                        stroke="#64748b"
-                        fontSize={11}
-                        interval={0}
-                        angle={-25}
-                        textAnchor="end"
-                      />
-                      <YAxis stroke="#64748b" fontSize={11} />
-                      <ReferenceLine y={0} stroke="#64748b" />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#0f172a',
-                          borderRadius: '8px',
-                          color: '#fff',
-                          border: 'none',
-                          fontSize: '12px',
-                        }}
-                        formatter={(val: any) => [numberFormatter.format(Number(val) || 0), chartData[0]?.label || 'القيمة']}
-                      />
-                      <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                        {chartData.map((entry) => (
-                          <Cell key={entry.name} fill={entry.value < 0 ? '#e11d48' : '#0d9488'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
+                    {chartKind === 'pie' ? (
+                      <PieChart>
+                        <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={42} label>
+                          {chartData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.value < 0 ? '#f43f5e' : '#0d9488'} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: any) => [numberFormatter.format(Number(value) || 0), chartData[0]?.label || 'القيمة']}
+                          contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: '12px' }}
+                        />
+                      </PieChart>
+                    ) : chartKind === 'line' ? (
+                      <LineChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" stroke="#64748b" fontSize={11} interval={0} angle={-25} textAnchor="end" />
+                        <YAxis stroke="#64748b" fontSize={11} />
+                        <ReferenceLine y={0} stroke="#64748b" />
+                        <Tooltip formatter={(value: any) => [numberFormatter.format(Number(value) || 0), chartData[0]?.label || 'القيمة']} contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: '12px' }} />
+                        <Line type="monotone" dataKey="value" stroke="#0d9488" strokeWidth={2.5} dot={{ r: 3 }} />
+                      </LineChart>
+                    ) : chartKind === 'area' ? (
+                      <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" stroke="#64748b" fontSize={11} interval={0} angle={-25} textAnchor="end" />
+                        <YAxis stroke="#64748b" fontSize={11} />
+                        <ReferenceLine y={0} stroke="#64748b" />
+                        <Tooltip formatter={(value: any) => [numberFormatter.format(Number(value) || 0), chartData[0]?.label || 'القيمة']} contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: '12px' }} />
+                        <Area type="monotone" dataKey="value" stroke="#14b8a6" fill="#99f6e4" strokeWidth={2.5} />
+                      </AreaChart>
+                    ) : (
+                      <BarChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="name" stroke="#64748b" fontSize={11} interval={0} angle={-25} textAnchor="end" />
+                        <YAxis stroke="#64748b" fontSize={11} />
+                        <ReferenceLine y={0} stroke="#64748b" />
+                        <Tooltip formatter={(value: any) => [numberFormatter.format(Number(value) || 0), chartData[0]?.label || 'القيمة']} contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff', border: 'none', fontSize: '12px' }} />
+                        <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                          {chartData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.value < 0 ? '#e11d48' : '#0d9488'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
@@ -524,7 +792,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {pagedRows.map((row, index) => (
-                      <tr key={index} className="transition hover:bg-slate-50/70">
+                      <tr key={index} onClick={handleRowClick} className={`transition hover:bg-slate-50/70 ${definition.drilldown ? 'cursor-pointer' : ''}`}>
                         {columns.map((column) => {
                           const value = row[column.key];
                           const isNumeric = column.type === 'currency' || column.type === 'number' || column.type === 'qty' || column.type === 'percent';

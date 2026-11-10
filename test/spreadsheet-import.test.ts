@@ -125,3 +125,58 @@ test('data import validation checks positive product measurements and duplicate 
     { row: 3, messages: ['كود مكرر داخل الملف'] },
   ]);
 });
+
+test('data import accepts Arabic-Indic and Persian numeric values', () => {
+  const data = new DataImportService().parseRows(
+    ['اسم العميل', 'الهاتف', 'حد الائتمان', 'الرصيد الافتتاحي'],
+    [{ 'اسم العميل': 'عميل', الهاتف: '0100', 'حد الائتمان': '١٬٢٣٤٫٥٠', 'الرصيد الافتتاحي': '۱۲۳٫۵۰' }],
+    'customers',
+  );
+
+  assert.deepEqual(new DataImportService().validate(data), []);
+});
+
+test('data import rejects invalid numeric fields, negative values, and duplicate customer phones', () => {
+  const data = new DataImportService().parseRows(
+    ['اسم العميل', 'الهاتف', 'حد الائتمان', 'كود العميل'],
+    [
+      { 'اسم العميل': 'الأول', الهاتف: '0100', 'حد الائتمان': 'غير صالح', 'كود العميل': 'C1' },
+      { 'اسم العميل': 'الثاني', الهاتف: '0100', 'حد الائتمان': '-1', 'كود العميل': 'C2' },
+    ],
+    'customers',
+  );
+
+  assert.deepEqual(new DataImportService().validate(data), [
+    { row: 2, messages: ['حد الائتمان يجب أن يكون رقمًا صالحًا'] },
+    { row: 3, messages: ['حد الائتمان يجب أن يكون على الأقل 0', 'سجل مكرر داخل الملف'] },
+  ]);
+});
+
+test('data import prevents duplicate field mappings and invalid optional product prices', () => {
+  const service = new DataImportService();
+  const data = service.parseRows(
+    ['الكود', 'اسم الصنف', 'التصنيف', 'الماركة', 'المقاس', 'قطع بالكرتونة', 'متر/كرتونة', 'سعر التكلفة', 'سعر البيع', 'سعر الجملة'],
+    [{
+      الكود: 'P1',
+      'اسم الصنف': 'صنف',
+      التصنيف: 'تصنيف',
+      الماركة: 'ماركة',
+      المقاس: '60x60',
+      'قطع بالكرتونة': '6',
+      'متر/كرتونة': '2.16',
+      'سعر التكلفة': '10',
+      'سعر البيع': '20',
+      'سعر الجملة': '-5',
+    }],
+    'products',
+  );
+  data.mapping.costPrice = data.mapping.sellingPriceM2;
+
+  assert.deepEqual(service.validate(data), [{
+    row: 2,
+    messages: [
+      'لا يمكن ربط العمود نفسه بأكثر من حقل',
+      'سعر الجملة يجب أن يكون على الأقل 0',
+    ],
+  }]);
+});

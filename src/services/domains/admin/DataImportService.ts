@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { CustomerService } from '../customers/CustomerService';
@@ -23,34 +22,41 @@ export interface ImportIssue { row: number; messages: string[] }
 export const ENTITY_META: Record<Exclude<ImportEntity, 'dynamic'>, { label: string; permission: string; fields: ImportField[] }> = {
   customers: { label: 'العملاء', permission: 'customers.create', fields: [
     { key: 'name', label: 'اسم العميل', aliases: ['name','customer','customer name','اسم العميل','العميل','الاسم'], required: true }, { key: 'code', label: 'كود العميل', aliases: ['code','customer code','كود العميل','الكود'] },
-    { key: 'phone', label: 'الهاتف', aliases: ['phone','mobile','telephone','الهاتف','الموبايل','رقم الهاتف'], required: true }, { key: 'phone2', label: 'هاتف إضافي', aliases: ['phone2','secondary phone','هاتف اضافي'] },
+    { key: 'phone', label: 'الهاتف', aliases: ['phone','mobile','telephone','الهاتف','الموبايل','رقم الهاتف'], required: true }, { key: 'phone2', label: 'هاتف إضافي', aliases: ['phone2','secondary phone','هاتف إضافي','هاتف اضافي'] },
     { key: 'nationalId', label: 'الرقم القومي', aliases: ['national id','national_id','الرقم القومي'] }, { key: 'address', label: 'العنوان', aliases: ['address','العنوان'] }, { key: 'city', label: 'المدينة', aliases: ['city','المدينة'] },
     { key: 'customerType', label: 'نوع العميل', aliases: ['customer type','type','نوع العميل'] }, { key: 'creditLimit', label: 'حد الائتمان', aliases: ['credit limit','credit_limit','حد الائتمان'] }, { key: 'initialBalance', label: 'رصيد افتتاحي', aliases: ['initial balance','opening balance','الرصيد الافتتاحي','رصيد افتتاحي'] }, { key: 'notes', label: 'ملاحظات', aliases: ['notes','ملاحظات'] },
   ] },
   suppliers: { label: 'الموردون', permission: 'suppliers.create', fields: [
     { key: 'name', label: 'اسم المورد', aliases: ['name','supplier','supplier name','اسم المورد','المورد','الاسم'], required: true }, { key: 'code', label: 'كود المورد', aliases: ['code','supplier code','كود المورد','الكود'] },
     { key: 'companyName', label: 'الشركة', aliases: ['company','company name','company_name','الشركة'] }, { key: 'phone', label: 'الهاتف', aliases: ['phone','mobile','الهاتف','الموبايل','رقم الهاتف'], required: true },
-    { key: 'email', label: 'البريد الإلكتروني', aliases: ['email','البريد الالكتروني'] }, { key: 'taxNumber', label: 'الرقم الضريبي', aliases: ['tax number','tax_number','الرقم الضريبي'] }, { key: 'commercialRecord', label: 'السجل التجاري', aliases: ['commercial record','commercial_record','السجل التجاري'] },
-    { key: 'address', label: 'العنوان', aliases: ['address','العنوان'] }, { key: 'paymentTermsDays', label: 'مدة السداد بالأيام', aliases: ['payment terms','payment terms days','مدة السداد'] }, { key: 'initialBalance', label: 'رصيد افتتاحي', aliases: ['initial balance','opening balance','الرصيد الافتتاحي','رصيد افتتاحي'] }, { key: 'notes', label: 'ملاحظات', aliases: ['notes','ملاحظات'] },
+    { key: 'email', label: 'البريد الإلكتروني', aliases: ['email','البريد الإلكتروني','البريد الالكتروني'] }, { key: 'taxNumber', label: 'الرقم الضريبي', aliases: ['tax number','tax_number','الرقم الضريبي'] }, { key: 'commercialRecord', label: 'السجل التجاري', aliases: ['commercial record','commercial_record','السجل التجاري'] },
+    { key: 'address', label: 'العنوان', aliases: ['address','العنوان'] }, { key: 'paymentTermsDays', label: 'مدة السداد بالأيام', aliases: ['payment terms','payment terms days','مدة السداد بالأيام','مدة السداد'] }, { key: 'initialBalance', label: 'رصيد افتتاحي', aliases: ['initial balance','opening balance','الرصيد الافتتاحي','رصيد افتتاحي'] }, { key: 'notes', label: 'ملاحظات', aliases: ['notes','ملاحظات'] },
   ] },
   categories: { label: 'التصنيفات', permission: 'categories.create', fields: [ { key: 'name', label: 'اسم التصنيف', aliases: ['name','category','category name','اسم التصنيف','التصنيف','الاسم'], required: true }, { key: 'description', label: 'الوصف', aliases: ['description','الوصف'] } ] },
   brands: { label: 'الماركات', permission: 'brands.create', fields: [ { key: 'name', label: 'اسم الماركة', aliases: ['name','brand','brand name','اسم الماركة','الماركة','الاسم'], required: true }, { key: 'country', label: 'بلد المنشأ', aliases: ['country','بلد المنشأ','البلد'] } ] },
   products: { label: 'الأصناف والسيراميك والمنتجات', permission: 'products.create', fields: [
     { key: 'sku', label: 'الكود', aliases: ['sku','code','product code','الكود','كود الصنف','كود المنتج'], required: true }, { key: 'barcode', label: 'الباركود', aliases: ['barcode','bar code','الباركود'] }, { key: 'name', label: 'اسم الصنف', aliases: ['name','product','product name','item name','اسم الصنف','اسم المنتج','الصنف','المنتج'], required: true },
     { key: 'category', label: 'التصنيف الموجود', aliases: ['category','category name','التصنيف','الفئة'], required: true }, { key: 'brand', label: 'الماركة الموجودة', aliases: ['brand','brand name','الماركة','العلامة التجارية'], required: true }, { key: 'grade', label: 'الفرز', aliases: ['grade','الفرز','الدرجة'] }, { key: 'size', label: 'المقاس', aliases: ['size','المقاس'], required: true },
-    { key: 'piecesPerBox', label: 'قطع بالكرتونة', aliases: ['pieces per box','pieces_per_box','قطع/كرتونة','عدد القطع'], required: true }, { key: 'metersPerBox', label: 'متر مربع بالكرتونة', aliases: ['meters per box','meters_per_box','م²/كرتونة','متر/كرتونة','المتر/كرتونة','المترات'], required: true },
+    { key: 'piecesPerBox', label: 'قطع بالكرتونة', aliases: ['pieces per box','pieces_per_box','قطع بالكرتونة','قطع/كرتونة','عدد القطع'], required: true }, { key: 'metersPerBox', label: 'متر مربع بالكرتونة', aliases: ['meters per box','meters_per_box','متر مربع بالكرتونة','م²/كرتونة','متر/كرتونة','المتر/كرتونة','المترات'], required: true },
     { key: 'costPrice', label: 'سعر التكلفة', aliases: ['cost price','cost_price','التكلفة','سعر التكلفة'], required: true }, { key: 'sellingPriceM2', label: 'سعر البيع للمتر', aliases: ['selling price','selling_price_m2','سعر المتر','سعر البيع','سعر البيع للمتر'], required: true }, { key: 'wholesalePriceM2', label: 'سعر الجملة', aliases: ['wholesale price','wholesale_price_m2','سعر الجملة'] }, { key: 'minSellingPriceM2', label: 'أقل سعر', aliases: ['min price','min_selling_price_m2','أقل سعر','الحد الأدنى للسعر'] }, { key: 'initialStockM2', label: 'رصيد افتتاحي بالمتر', aliases: ['stock','initial stock','initial_stock','المخزون','الكمية','رصيد افتتاحي بالمتر'] },
   ] },
   employees: { label: 'الموظفون', permission: 'employees.manage', fields: [
-    { key: 'name', label: 'اسم الموظف', aliases: ['name','employee','employee name','اسم الموظف','الموظف','الاسم'], required: true }, { key: 'phone', label: 'الهاتف', aliases: ['phone','mobile','الهاتف','الموبايل'], required: true }, { key: 'email', label: 'البريد الإلكتروني', aliases: ['email','البريد الالكتروني'] }, { key: 'role', label: 'الوظيفة', aliases: ['role','job title','job_title','الوظيفة','المسمى الوظيفي'] }, { key: 'location', label: 'الموقع', aliases: ['location','branch','الموقع','الفرع'] }, { key: 'baseSalary', label: 'الراتب الأساسي', aliases: ['salary','base salary','base_salary','الراتب','الراتب الأساسي'] }, { key: 'salaryType', label: 'دورية الراتب', aliases: ['salary type','salary_type','دورية الراتب'] }, { key: 'joinedDate', label: 'تاريخ التعيين', aliases: ['joined date','joined_date','hire date','تاريخ التعيين'] }, { key: 'notes', label: 'ملاحظات', aliases: ['notes','ملاحظات'] },
+    { key: 'name', label: 'اسم الموظف', aliases: ['name','employee','employee name','اسم الموظف','الموظف','الاسم'], required: true }, { key: 'phone', label: 'الهاتف', aliases: ['phone','mobile','الهاتف','الموبايل'], required: true }, { key: 'email', label: 'البريد الإلكتروني', aliases: ['email','البريد الإلكتروني','البريد الالكتروني'] }, { key: 'role', label: 'الوظيفة', aliases: ['role','job title','job_title','الوظيفة','المسمى الوظيفي'] }, { key: 'location', label: 'الموقع', aliases: ['location','branch','الموقع','الفرع'] }, { key: 'baseSalary', label: 'الراتب الأساسي', aliases: ['salary','base salary','base_salary','الراتب','الراتب الأساسي'] }, { key: 'salaryType', label: 'دورية الراتب', aliases: ['salary type','salary_type','دورية الراتب'] }, { key: 'joinedDate', label: 'تاريخ التعيين', aliases: ['joined date','joined_date','hire date','تاريخ التعيين'] }, { key: 'notes', label: 'ملاحظات', aliases: ['notes','ملاحظات'] },
   ] },
   warehouses: { label: 'المخازن', permission: 'warehouses.manage', fields: [ { key: 'name', label: 'اسم المخزن', aliases: ['name','warehouse','warehouse name','اسم المخزن','المخزن','الاسم'], required: true }, { key: 'location', label: 'الموقع', aliases: ['location','الموقع','العنوان'] } ] },
 };
 
 const cleanHeader = (value: string) => value.trim().toLocaleLowerCase().replace(/[\s_-]+/g, ' ');
 const text = (value: unknown) => String(value ?? '').trim();
-const number = (value: unknown) => { const n = Number(String(value ?? '').replace(/[,٬]/g, '').replace(/[٫]/g, '.')); return Number.isFinite(n) ? n : NaN; };
-const truthy = (v: unknown) => ['1','true','yes','نعم','ذكر'].includes(text(v).toLowerCase());
+const number = (value: unknown) => {
+  const normalized = String(value ?? '')
+    .replace(/[٠-٩]/g, digit => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, digit => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/[٬,]/g, '')
+    .replace(/[٫]/g, '.');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
 type ImportValue = (key: string) => string;
 type ImportOptions = { allowInitialBalances: boolean; allowProductStock: boolean };
 type ImportRowValues = {
@@ -80,6 +86,27 @@ const validateUniqueValue = (
   seen.add(value);
 };
 
+const validateNumericValue = (
+  value: ImportValue,
+  key: string,
+  label: string,
+  messages: string[],
+  minimum?: number,
+  exclusiveMinimum = false,
+  invalidMessage?: string,
+): void => {
+  const raw = value(key);
+  if (!raw) return;
+  const parsed = number(raw);
+  if (!Number.isFinite(parsed)) {
+    messages.push(invalidMessage || `${label} يجب أن يكون رقمًا صالحًا`);
+    return;
+  }
+  if (minimum !== undefined && (exclusiveMinimum ? parsed <= minimum : parsed < minimum)) {
+    messages.push(`${label} يجب أن يكون ${exclusiveMinimum ? 'أكبر من' : 'على الأقل'} ${minimum}`);
+  }
+};
+
 const validateCustomerOrSupplier = (
   value: ImportValue,
   seen: Set<string>,
@@ -88,11 +115,8 @@ const validateCustomerOrSupplier = (
   const code = value('code');
   const phone = value('phone');
   if (!phone) messages.push('رقم الهاتف مطلوب');
-  const duplicateKey = code ? `code:${code}` : phone ? `phone:${phone}` : '';
-  validateUniqueValue(duplicateKey, seen, 'سجل مكرر داخل الملف', messages);
-
-  const balance = value('initialBalance');
-  if (balance && !Number.isFinite(number(balance))) messages.push('الرصيد الافتتاحي غير صالح');
+  validateUniqueValue(code ? `code:${code.toLocaleLowerCase()}` : '', seen, 'سجل مكرر داخل الملف', messages);
+  validateUniqueValue(phone ? `phone:${phone}` : '', seen, 'سجل مكرر داخل الملف', messages);
 };
 
 const validateNamedEntity = (
@@ -109,22 +133,47 @@ const validateEmployee = (
   messages: string[],
 ): void => {
   validateUniqueValue(value('phone'), seen, 'رقم هاتف مكرر داخل الملف', messages);
-  const salary = value('baseSalary');
-  if (salary && !Number.isFinite(number(salary))) messages.push('الراتب غير صالح');
+};
+
+const validateNumericFields = (
+  entity: ExistingImportEntity,
+  value: ImportValue,
+  messages: string[],
+): void => {
+  const validators: Record<ExistingImportEntity, Array<[string, string, number?, boolean?, string?]>> = {
+    customers: [
+      ['creditLimit', 'حد الائتمان', 0],
+      ['initialBalance', 'الرصيد الافتتاحي', undefined, false, 'الرصيد الافتتاحي غير صالح'],
+    ],
+    suppliers: [
+      ['paymentTermsDays', 'مدة السداد بالأيام', 0],
+      ['initialBalance', 'الرصيد الافتتاحي', undefined, false, 'الرصيد الافتتاحي غير صالح'],
+    ],
+    categories: [],
+    brands: [],
+    products: [
+      ['costPrice', 'سعر التكلفة', 0],
+      ['wholesalePriceM2', 'سعر الجملة', 0],
+      ['minSellingPriceM2', 'أقل سعر', 0],
+      ['initialStockM2', 'الرصيد الافتتاحي بالمتر', 0],
+    ],
+    employees: [['baseSalary', 'الراتب الأساسي', 0, false, 'الراتب غير صالح']],
+    warehouses: [],
+  };
+  for (const [key, label, minimum, exclusiveMinimum, invalidMessage] of validators[entity]) {
+    validateNumericValue(value, key, label, messages, minimum, exclusiveMinimum, invalidMessage);
+  }
 };
 
 const validateProduct = (
-  row: Record<string, unknown>,
-  mapping: Record<string, string>,
-  fields: ImportField[],
   value: ImportValue,
   seen: Set<string>,
   messages: string[],
 ): void => {
   for (const key of ['piecesPerBox', 'metersPerBox', 'sellingPriceM2']) {
-    const amount = number(row[mapping[key]]);
+    const amount = number(value(key));
     if (!Number.isFinite(amount) || amount <= 0) {
-      const label = fields.find(field => field.key === key)?.label;
+      const label = ENTITY_META.products.fields.find(field => field.key === key)?.label;
       messages.push(`${label} يجب أن يكون أكبر من صفر`);
     }
   }
@@ -133,9 +182,6 @@ const validateProduct = (
 
 const validateEntitySpecificFields = (
   entity: ExistingImportEntity,
-  row: Record<string, unknown>,
-  mapping: Record<string, string>,
-  fields: ImportField[],
   value: ImportValue,
   seen: Set<string>,
   messages: string[],
@@ -154,7 +200,7 @@ const validateEntitySpecificFields = (
       validateEmployee(value, seen, messages);
       break;
     case 'products':
-      validateProduct(row, mapping, fields, value, seen, messages);
+      validateProduct(value, seen, messages);
       break;
   }
 };
@@ -184,23 +230,27 @@ export class DataImportService {
     const entity = data.entity;
     const fields = ENTITY_META[entity].fields;
     const seen = new Set<string>();
+    const mappedHeaders = Object.values(data.mapping).filter(Boolean);
+    const hasDuplicateMapping = new Set(mappedHeaders).size !== mappedHeaders.length;
 
     return data.rows.flatMap((row, index) => {
       const messages: string[] = [];
       const value: ImportValue = key => text(row[data.mapping[key]]);
       validateRequiredFields(fields, value, messages);
-      validateEntitySpecificFields(entity, row, data.mapping, fields, value, seen, messages);
+      if (hasDuplicateMapping) messages.push('لا يمكن ربط العمود نفسه بأكثر من حقل');
+      validateNumericFields(entity, value, messages);
+      validateEntitySpecificFields(entity, value, seen, messages);
       return messages.length ? [{ row: index + 2, messages }] : [];
     });
   }
 
-  import(data: ParsedImport, issues: ImportIssue[], options: ImportOptions): { created: number; skipped: number; errors: ImportIssue[] } {
+  import(data: ParsedImport, options: ImportOptions): { created: number; skipped: number; errors: ImportIssue[] } {
     if (data.entity === 'dynamic') throw new Error('استخدم مسار استيراد البيانات المرنة لهذا الملف.');
     const entity = data.entity;
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, ENTITY_META[entity].permission);
 
-    const issueMap = new Map(issues.map(issue => [issue.row, issue.messages]));
+    const issueMap = new Map(this.validate(data).map(issue => [issue.row, issue.messages]));
     const result = { created: 0, skipped: 0, errors: [] as ImportIssue[] };
     const db = DatabaseManager.getInstance();
     const categories = new CategoryService();

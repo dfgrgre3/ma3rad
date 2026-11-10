@@ -90,6 +90,7 @@ export const APP_ROUTE_PATHS = [
   "projects",
   "projects/:id",
   "fleet/dashboard",
+  "facility-management",
   "deliveries",
   "drivers",
   "vehicles",

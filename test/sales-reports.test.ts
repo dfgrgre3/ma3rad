@@ -9,6 +9,7 @@ import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { AnalyticsService } from '../src/services/domains/reports/AnalyticsService.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 import { loadReport } from '../src/pages/reports/sales-reports/SalesReportsPage.tsx';
+import { runReport } from '../src/pages/reports/reports-hub/reportCatalog.ts';
 import { SalesFinancialReconciliationService } from '../src/services/domains/sales/SalesFinancialReconciliationService.ts';
 import { ReportCenterService } from '../src/services/domains/reports/ReportCenterService.ts';
 import { HistoricalReturnReconciliationService } from '../src/services/domains/sales/HistoricalReturnReconciliationService.ts';
@@ -419,6 +420,40 @@ test('historical return reconciliation requires verified values and leaves histo
     'SELECT customer_purchase_tax_included AS taxIncluded FROM sales_return_reconciliations WHERE return_id = ?',
     [legacyV4ReturnId],
   )[0], { taxIncluded: 0 });
+});
+
+test('report-center operation reports open without SQL branch scope errors', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const productId = 'report_center_ops_product';
+  db.run(`INSERT INTO products (id,sku,barcode,name,category_id,brand_id,grade,size,base_unit,sell_unit,
+    pieces_per_box,meters_per_box,cost_price,selling_price_m2,wholesale_price_m2,min_selling_price_m2,
+    min_stock_level,is_active)
+    VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 100, 300, 250, 0, 0, 1)`,
+    [productId, productId, productId, 'Operations report product']);
+  db.run(`INSERT INTO warehouse_stock (id,warehouse_id,product_id,quantity_m2,reserved_m2)
+    VALUES (?, 'wh_main', ?, 50, 0)`, [`stock_${productId}`, productId]);
+  const customer = new CustomerService().createCustomer({
+    name: 'Operations report customer',
+    phone: '0199000099',
+    customerType: 'RETAIL',
+    creditLimit: 0,
+  });
+  new SalesService().createSale({
+    customerId: customer.id,
+    warehouseId: 'wh_main',
+    items: [{ productId, soldBy: 'M2', quantityM2: 5, boxesCount: 2, piecesCount: 0, unitPrice: 300 }],
+    paidAmount: 1500,
+    paymentType: 'CASH',
+    taxAmount: 0,
+    shippingCost: 0,
+  });
+
+  for (const id of ['operations-log', 'user-activity', 'daily-movements', 'exceptions', 'approvals', 'received-reports', 'alerts']) {
+    assert.doesNotThrow(() => runReport(id, { from: '2000-01-01', to: '2099-12-31' }));
+  }
 });
 
 test('report-center cash and sales-rep reports use current tables and check permission before cache reads', async () => {

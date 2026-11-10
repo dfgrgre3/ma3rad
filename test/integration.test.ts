@@ -16,6 +16,7 @@ import { runMigrations } from '../src/database/migrations/index.ts';
 import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 import { InventoryCostingService } from '../src/services/domains/inventory/InventoryCostingService.ts';
+import { FacilityManagementService } from '../src/services/domains/operations/FacilityManagementService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -26,6 +27,16 @@ test('database initialization enables SQLite foreign key enforcement', async () 
   const db = await manager.initialize();
   assert.equal(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0], 1);
   assert.equal(q("SELECT id FROM schema_migrations WHERE id = '014_users_custom_roles'").length, 1);
+  assert.equal(q("SELECT id FROM schema_migrations WHERE id = '161_unified_facility_management'").length, 1);
+  assert.equal(q("SELECT id FROM schema_migrations WHERE id = '163_facility_maintenance_linkage_and_schedules'").length, 1);
+  for (const table of ['facility_locations', 'facility_assets', 'facility_work_orders', 'facility_contracts', 'facility_safety_records']) {
+    assert.equal(q('SELECT name FROM sqlite_master WHERE type = ? AND name = ?', ['table', table]).length, 1, `${table} is migrated`);
+  }
+  assert.equal(q('SELECT name FROM sqlite_master WHERE type = ? AND name = ?', ['table', 'facility_maintenance_schedules']).length, 1);
+  const workOrderColumns = q('PRAGMA table_info(facility_work_orders)').map((column) => column.name);
+  assert.ok(workOrderColumns.includes('expense_id'));
+  assert.ok(workOrderColumns.includes('inventory_transaction_id'));
+  assert.ok(workOrderColumns.includes('maintenance_schedule_id'));
   manager.exportDatabaseBinary();
   assert.equal(db.exec('PRAGMA foreign_keys')[0]?.values[0]?.[0], 1);
   assert.throws(() => {
@@ -34,6 +45,49 @@ test('database initialization enables SQLite foreign key enforcement', async () 
       ['missing_user', 'test.permission']
     );
   }, /FOREIGN KEY constraint failed/);
+});
+
+test('facility work orders link branch expenses and generate due preventive work once', async () => {
+  const manager = DatabaseManager.getInstance();
+  await manager.initialize();
+  const actor = AuthService.login('admin', 'admin123');
+  const service = new FacilityManagementService();
+  const branch = service.getBranches()[0];
+  assert.ok(branch);
+
+  service.createLocation({ branchId: branch.id, locationType: 'FACTORY', name: 'FM integration location' });
+  const location = service.getLocations().find((item) => item.name === 'FM integration location');
+  assert.ok(location);
+
+  const registerId = q('SELECT id FROM cash_registers WHERE is_active = 1 ORDER BY is_default DESC LIMIT 1')[0].id;
+  const expenseId = 'expense_facility_integration';
+  manager.run(`INSERT INTO expenses (id, category, amount, register_id, date, description, performed_by, branch_id)
+    VALUES (?, 'FACILITY', 125, ?, ?, 'Facility maintenance test expense', ?, ?)`,
+  [expenseId, registerId, localDateString(), actor.id, branch.id]);
+
+  service.createWorkOrder({
+    locationId: location.id, requestType: 'PREVENTIVE', title: 'FM recurring test', priority: 'NORMAL',
+    scheduledDate: localDateString(), nextMaintenanceDate: localDateString(), repeatIntervalDays: 30, expenseId,
+  });
+  const workOrder = service.getWorkOrders().find((item) => item.title === 'FM recurring test');
+  assert.equal(workOrder?.expenseId, expenseId);
+  const schedule = service.getMaintenanceSchedules().find((item) => item.title === 'FM recurring test');
+  assert.ok(schedule);
+
+  service.createDueScheduleWorkOrder(schedule.id);
+  assert.equal(q('SELECT COUNT(*) AS count FROM facility_work_orders WHERE maintenance_schedule_id = ?', [schedule.id])[0].count, 1);
+  assert.ok(service.getMaintenanceSchedules().find((item) => item.id === schedule.id)!.nextDueDate > localDateString());
+  assert.throws(() => service.createDueScheduleWorkOrder(schedule.id), /لم يحن بعد/);
+
+  const paymentDate = new Date();
+  paymentDate.setDate(paymentDate.getDate() + 5);
+  service.createContract({
+    locationId: location.id, contractType: 'UTILITY', title: 'FM reminder test', vendorName: 'Test utility',
+    nextPaymentDate: localDateString(paymentDate), paymentCycle: 'MONTHLY',
+  });
+  service.runFacilityReminders();
+  service.runFacilityReminders();
+  assert.equal(q("SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND reference_type = 'FACILITY_DUE'", [actor.id])[0].count, 1);
 });
 
 test('accounting policy migration reclassifications balance and reruns safely', async () => {

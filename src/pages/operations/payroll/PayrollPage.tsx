@@ -1,11 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Wallet, Loader2, Trash2, Users, Banknote, Calculator, CheckCircle2, FileDown, Printer, LockKeyhole } from 'lucide-react';
-import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, PayrollRun, PayrollRunItem } from '../../../services/domains/hr/EmployeeService';
+import { EmployeeService, Employee, PayrollTransaction, PayrollTxType, PayrollRun, PayrollRunItem, PayrollPayOptions, PayrollPaymentMethod, PayrollPaymentReconciliation } from '../../../services/domains/hr/EmployeeService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 import { TX_LABELS, TX_COLORS, fmt, today } from './payrollDisplay';
 import { PayrollTransactionModal } from './PayrollTransactionModal';
+import { PayrollPayoutModal } from './PayrollPayoutModal';
+import { PayrollTaxRulesModal } from './PayrollTaxRulesModal';
+
+const PAYMENT_METHOD_LABELS: Record<PayrollPaymentMethod, string> = {
+  CASH: 'نقدي',
+  BANK_TRANSFER: 'تحويل بنكي',
+  WALLET: 'محفظة',
+};
 
 const RUN_STATUS_LABELS: Record<PayrollRun['status'], string> = {
   DRAFT: 'مسودة',
@@ -34,6 +42,10 @@ export const PayrollPage: React.FC = () => {
   const [target, setTarget] = useState<Employee | null>(null);
   const [form, setForm] = useState({ type: 'SALARY_PAYOUT' as PayrollTxType, amount: '', date: today(), notes: '' });
   const [saving, setSaving] = useState(false);
+  const [payoutOpen, setPayoutOpen] = useState(false);
+  const [taxOpen, setTaxOpen] = useState(false);
+  const [payoutOptions, setPayoutOptions] = useState<{ bankAccounts: Array<{ id: string; accountName: string; bankName: string; accountNumber: string; currentBalance: number }>; registers: Array<{ id: string; name: string; currentBalance: number }> }>({ bankAccounts: [], registers: [] });
+  const [reconciliation, setReconciliation] = useState<PayrollPaymentReconciliation | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -41,7 +53,11 @@ export const PayrollPage: React.FC = () => {
       const list = EmployeeService.getAll().filter((e) => e.status !== 'SUSPENDED');
       setEmployees(list);
       setTransactions(canViewPayroll ? EmployeeService.getTransactions().slice(0, 100) : []);
-      setRun(canViewPayroll ? EmployeeService.getPayrollRun(period) : null);
+      const loadedRun = canViewPayroll ? EmployeeService.getPayrollRun(period) : null;
+      setRun(loadedRun);
+      setReconciliation(loadedRun && loadedRun.status !== 'DRAFT' && loadedRun.status !== 'APPROVED'
+        ? EmployeeService.getPayrollPaymentReconciliation(loadedRun.id)
+        : null);
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل بيانات الرواتب.'); }
     finally { setLoading(false); }
@@ -104,10 +120,24 @@ export const PayrollPage: React.FC = () => {
   };
 
   const payRun = () => {
-    if (!run || !confirm(`صرف صافي الرواتب لجميع موظفي كشف ${run.period}؟ سيتم تسجيل عمليات الصرف في خزينة الفرع.`)) return;
+    if (!run) return;
+    try {
+      setPayoutOptions(EmployeeService.getPayrollPayoutOptions());
+      setPayoutOpen(true);
+      setError(null);
+    } catch (err: any) { setError(err?.message || 'تعذر تحميل بيانات الصرف.'); }
+  };
+
+  const submitPayout = (payout: PayrollPayOptions) => {
+    if (!run) return;
     setSaving(true);
-    try { setRun(EmployeeService.payPayrollRun(run.id)); setError(null); }
-    catch (err: any) { setError(err?.message || 'تعذر صرف دورة الرواتب.'); }
+    try {
+      const paid = EmployeeService.payPayrollRun(run.id, payout);
+      setRun(paid);
+      setReconciliation(EmployeeService.getPayrollPaymentReconciliation(paid.id));
+      setPayoutOpen(false);
+      setError(null);
+    } catch (err: any) { setError(err?.message || 'تعذر صرف دورة الرواتب.'); }
     finally { setSaving(false); }
   };
 
@@ -196,6 +226,9 @@ export const PayrollPage: React.FC = () => {
                   {run && <button onClick={exportRun} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
                     <FileDown className="h-3.5 w-3.5" /> تصدير CSV
                   </button>}
+                  {canManagePayroll && <button onClick={() => setTaxOpen(true)} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700">
+                    قواعد الضريبة
+                  </button>}
                   {run?.status === 'DRAFT' && canApprovePayroll && <button onClick={approveRun} disabled={saving || run.items.some((item) => item.netAmount < 0)} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
                     <CheckCircle2 className="h-3.5 w-3.5" /> اعتماد الكشف
                   </button>}
@@ -219,10 +252,30 @@ export const PayrollPage: React.FC = () => {
                   <div className="rounded-xl bg-rose-50 px-4 py-3"><div className="text-[10px] font-bold text-rose-700">إجمالي الخصومات</div><div className="mt-1 font-black text-rose-700">{fmt(totals.deductions)}</div></div>
                   <div className="rounded-xl bg-sky-50 px-4 py-3"><div className="text-[10px] font-bold text-sky-700">صافي مستحق الفترة</div><div className="mt-1 font-black text-sky-700">{fmt(totals.net)}</div></div>
                 </div>
+                {reconciliation && (
+                  <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      <span className="font-black text-slate-700">مطابقة الصرف:</span>
+                      <span>المستحق <b className="font-mono">{fmt(reconciliation.expectedTotal)}</b></span>
+                      <span>المصروف <b className="font-mono">{fmt(reconciliation.paidTotal)}</b></span>
+                      <span className={reconciliation.isBalanced ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                        {reconciliation.isBalanced ? 'مطابق' : `فرق ${fmt(reconciliation.difference)}`}
+                      </span>
+                      {reconciliation.byMethod.map((row) => (
+                        <span key={row.method} className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-slate-600">
+                          {PAYMENT_METHOD_LABELS[row.method]}: {row.count} / {fmt(row.amount)}
+                        </span>
+                      ))}
+                    </div>
+                    {reconciliation.items.flatMap((item) => item.issues.map((issue) => (
+                      <div key={`${item.itemId}-${issue}`} className="mt-1 text-[10px] text-amber-700">{item.employeeName}: {issue}</div>
+                    )))}
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1100px] text-right text-xs">
                     <thead className="border-b border-slate-200 bg-white">
-                      <tr>{['الموظف', 'الأساسي', 'الإضافي', 'مكافأة وعمولة', 'غياب / إجازة', 'تأخير', 'سلف وخصومات', 'ضريبة', 'الصافي', 'القسيمة / التحذيرات'].map((heading) => <th key={heading} className="px-3 py-3 font-bold text-slate-500">{heading}</th>)}</tr>
+                      <tr>{['الموظف', 'الأساسي', 'الإضافي', 'مكافأة وعمولة', 'غياب / إجازة', 'تأخير', 'سلف وخصومات', 'ضريبة', 'الصافي', 'الصرف', 'القسيمة / التحذيرات'].map((heading) => <th key={heading} className="px-3 py-3 font-bold text-slate-500">{heading}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {run.items.map((item) => (
@@ -237,6 +290,11 @@ export const PayrollPage: React.FC = () => {
                           <td className="px-3 py-3 font-mono">{fmt(item.taxAmount)}</td>
                           <td className={`px-3 py-3 font-mono font-black ${item.netAmount < 0 ? 'text-rose-700' : 'text-sky-700'}`}>{fmt(item.netAmount)}</td>
                           <td className="px-3 py-3">
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">{PAYMENT_METHOD_LABELS[item.paymentMethod] || item.paymentMethod}</span>
+                            {item.payoutStatus === 'PAID' && <div className="mt-1 text-[10px] font-bold text-emerald-700">مصروف</div>}
+                            {item.paymentReference && <div className="mt-1 max-w-[130px] truncate font-mono text-[10px] text-slate-400" title={item.paymentReference}>{item.paymentReference}</div>}
+                          </td>
+                          <td className="px-3 py-3">
                             <button onClick={() => printPayslip(item)} className="mb-1 flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 font-bold text-slate-600">
                               <Printer className="h-3 w-3" /> قسيمة
                             </button>
@@ -244,7 +302,7 @@ export const PayrollPage: React.FC = () => {
                           </td>
                         </tr>
                       ))}
-                      {!run.items.length && <tr><td colSpan={10} className="py-10 text-center text-slate-400">لا يوجد موظفون مستحقون في هذه الفترة.</td></tr>}
+                      {!run.items.length && <tr><td colSpan={11} className="py-10 text-center text-slate-400">لا يوجد موظفون مستحقون في هذه الفترة.</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -302,6 +360,16 @@ export const PayrollPage: React.FC = () => {
       </div>
 
       {target && <PayrollTransactionModal target={target} form={form} setForm={setForm} saving={saving} onClose={() => setTarget(null)} onSubmit={submit} />}
+      {payoutOpen && run && (
+        <PayrollPayoutModal
+          run={run}
+          options={payoutOptions}
+          saving={saving}
+          onClose={() => setPayoutOpen(false)}
+          onSubmit={submitPayout}
+        />
+      )}
+      {taxOpen && <PayrollTaxRulesModal open={taxOpen} onClose={() => { setTaxOpen(false); load(); }} />}
     </div>
   );
 };

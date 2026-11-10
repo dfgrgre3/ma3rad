@@ -1,8 +1,8 @@
 import {
   Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Building2, CalendarDays, Car,
   CheckSquare, Clock3, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
-  HardHat, RefreshCw, Settings, ShieldCheck, ShoppingCart, SlidersHorizontal,
-  Sparkles, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
+  Gift, GraduationCap, HardHat, Network, RefreshCw, Settings, ShieldAlert, ShieldCheck,
+  ShoppingCart, SlidersHorizontal, Sparkles, Star, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
 } from 'lucide-react';
 import type { NavGroupDef } from '../types/config/navigation';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from './routePermissions';
@@ -18,6 +18,7 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'لوحة الأسطول والتوصيل', to: '/fleet/dashboard', icon: Truck, perm: 'deliveries.view' },
       { label: 'لوحة الموارد البشرية', to: '/hr/dashboard', icon: HardHat, perm: 'employees.view' },
       { label: 'الفروع', to: '/branches', icon: Building2, perm: 'branches.view' },
+      { label: 'إدارة المنشأة والصيانة', to: '/facility-management', icon: Building2, perm: 'operations.view' },
       { label: 'المخازن', to: '/warehouses', icon: Warehouse, perm: 'warehouses.view' },
       { label: 'الموظفون', to: '/employees', icon: HardHat, perm: 'employees.view' },
       { label: 'الحضور والانصراف', to: '/employees/attendance', icon: CheckSquare, perm: 'employees.view' },
@@ -25,6 +26,11 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'الرواتب والمسحوبات', to: '/employees/payroll', icon: Wallet, perm: 'employees.payroll.view' },
       { label: 'عمولات المبيعات', to: '/employees/commissions', icon: BadgeDollarSign, perm: 'employees.payroll.view' },
       { label: 'الإجازات', to: '/employees/leave', icon: CalendarDays, perm: 'hr.leave.view' },
+      { label: 'هيكل الموظفين', to: '/hr/organization', icon: Network, perm: 'employees.view' },
+      { label: 'الأداء والتقييم', to: '/hr/performance', icon: Star, perm: 'employees.payroll.view' },
+      { label: 'التدريب والتطوير', to: '/hr/training', icon: GraduationCap, perm: 'employees.payroll.view' },
+      { label: 'الجزاءات والمخالفات', to: '/hr/discipline', icon: ShieldAlert, perm: 'employees.payroll.view' },
+      { label: 'المزايا والبدلات', to: '/hr/benefits', icon: Gift, perm: 'employees.payroll.view' },
       { label: 'عقود الموظفين', to: '/employees/contracts', icon: FileSignature, perm: 'hr.contracts.view' },
       { label: 'مستندات الموظفين', to: '/employees/documents', icon: FileText, perm: 'hr.documents.view' },
       { label: 'التوظيف والمرشحون', to: '/employees/recruitment', icon: UserPlus, perm: 'hr.recruitment.view' },

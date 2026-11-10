@@ -36,6 +36,14 @@ export interface ReportParams {
   productId?: string;
   userId?: string;
   registerId?: string;
+  branchId?: string;
+  warehouseId?: string;
+  customerId?: string;
+  supplierId?: string;
+  employeeId?: string;
+  status?: string;
+  paymentMethod?: string;
+  compareBranchId?: string;
   dimension?: string;
 }
 
@@ -46,6 +54,22 @@ const num = (value: unknown): number => {
 
 const sum = (rows: Array<Record<string, any>>, key: string): number =>
   round2(rows.reduce((total, row) => total + num(row[key]), 0));
+
+const classifyExpense = (category?: string | null, description?: string | null): 'fixed' | 'variable' | 'semi' => {
+  const haystack = `${category || ''} ${description || ''}`.toLowerCase();
+  const fixedTerms = ['راتب', 'رواتب', 'أجرة', 'إيجار', 'مكتب', 'إدارة', 'مصاريف ثابت', 'تأمين', 'اتصالات', 'مياه', 'كهرباء', 'ضرائب', 'اشتراك', 'مزايا'];
+  const variableTerms = ['شحن', 'توصيل', 'حمل', 'موزع', 'عمولة', 'مناولة', 'مستلزمات', 'مواد', 'تعبئة', 'تغليف', 'برد', 'خدمة حسب', 'مبيعات', 'مستلزمات'];
+  if (fixedTerms.some((term) => haystack.includes(term))) return 'fixed';
+  if (variableTerms.some((term) => haystack.includes(term))) return 'variable';
+  if (/(صيانة|نقل|موبايل|مرفق|طاقة|خدمة)/.test(haystack)) return 'semi';
+  return 'fixed';
+};
+
+const formatComparisonValue = (value: number, type: 'currency' | 'number' | 'percent'): string => {
+  if (type === 'currency') return `${round2(value)} ج`;
+  if (type === 'percent') return `${round2(value)}%`;
+  return `${Math.round(value)}`;
+};
 
 const daysBetween = (from: string, to: string): number => {
   const start = new Date(`${from}T00:00:00`).getTime();
@@ -72,6 +96,45 @@ interface CacheEntry {
 }
 const reportCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 15_000;
+
+const normalizeReportFilterValue = (value: unknown): string => String(value ?? '').trim().toLowerCase();
+
+const rowPropertyVariants = (key: string): string[] => {
+  const variants = new Set<string>([
+    key,
+    key.toLowerCase(),
+    key.replace(/([A-Z])/g, '_$1').toLowerCase(),
+    key.replace(/Id$/i, '_id'),
+    key.replace(/_id$/i, 'Id'),
+    key.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase(),
+    key.replace(/([A-Z])/g, '_$1').replace(/^_/, '').toLowerCase(),
+  ]);
+
+  switch (key) {
+    case 'branchId':
+      variants.add('branch_id'); variants.add('branch'); variants.add('branchName'); variants.add('branch_name'); break;
+    case 'warehouseId':
+      variants.add('warehouse_id'); variants.add('warehouse'); variants.add('warehouseName'); variants.add('warehouse_name'); break;
+    case 'registerId':
+      variants.add('register_id'); variants.add('cash_register_id'); variants.add('register'); variants.add('cashRegisterId'); break;
+    case 'customerId':
+      variants.add('customer_id'); variants.add('customer'); variants.add('client_id'); variants.add('client'); variants.add('customerName'); break;
+    case 'supplierId':
+      variants.add('supplier_id'); variants.add('vendor_id'); variants.add('supplier'); variants.add('vendor'); break;
+    case 'employeeId':
+      variants.add('employee_id'); variants.add('user_id'); variants.add('userId'); variants.add('rep_id'); variants.add('sales_rep_id'); variants.add('created_by'); break;
+    case 'status':
+      variants.add('invoice_status'); variants.add('payment_status'); variants.add('state'); variants.add('doc_status'); break;
+    case 'paymentMethod':
+      variants.add('payment_method'); variants.add('means_of_payment'); variants.add('method'); variants.add('payment'); break;
+    case 'compareBranchId':
+      variants.add('compare_branch_id'); variants.add('compareBranch'); variants.add('compare_branch'); break;
+    default:
+      break;
+  }
+
+  return Array.from(variants);
+};
 
 /**
  * Read-only data source for the report center. Every method is branch scoped
@@ -141,22 +204,71 @@ export class ReportCenterService {
     return this.branchAccess.sqlScope(expression, fallback, this.actor());
   }
 
+  private withAdvancedQueryScope(
+    base: { clause: string; params: any[] },
+    params: Partial<ReportParams>,
+    additions: Array<{ predicate: string; values: any[] }>,
+  ): { clause: string; params: any[] } {
+    const effective = additions.filter(({ values }) => values.some((value) => value !== undefined && value !== null && value !== '' && value !== 'all' && value !== 'all-branches' && value !== 'none'));
+    if (!effective.length) return base;
+
+    const values: any[] = [...base.params];
+    const clause = `${base.clause}${effective.map(({ predicate }) => ` AND ${predicate}`).join('')}`;
+    for (const addition of effective) {
+      values.push(...addition.values.filter((value) => value !== undefined && value !== null && value !== '' && value !== 'all' && value !== 'all-branches' && value !== 'none'));
+    }
+
+    return { clause, params: values };
+  }
+
+  public static applyAdvancedFilters(result: ReportResult | null, params: Partial<ReportParams>): ReportResult | null {
+    if (!result) return result;
+    const rows = [...result.rows];
+    const filterKeys: Array<{ key: keyof ReportParams; aliases: string[] }> = [
+      { key: 'branchId', aliases: rowPropertyVariants('branchId') },
+      { key: 'warehouseId', aliases: rowPropertyVariants('warehouseId') },
+      { key: 'registerId', aliases: rowPropertyVariants('registerId') },
+      { key: 'customerId', aliases: rowPropertyVariants('customerId') },
+      { key: 'supplierId', aliases: rowPropertyVariants('supplierId') },
+      { key: 'employeeId', aliases: rowPropertyVariants('employeeId') },
+      { key: 'status', aliases: rowPropertyVariants('status') },
+      { key: 'paymentMethod', aliases: rowPropertyVariants('paymentMethod') },
+      { key: 'compareBranchId', aliases: rowPropertyVariants('compareBranchId') },
+    ];
+
+    const filtered = filterKeys.reduce((current, { key, aliases }) => {
+      const value = params[key];
+      if (!value || value === 'all' || value === 'all-branches' || value === 'none') return current;
+      return current.filter((row) => {
+        const matches = aliases
+          .map((alias) => row[alias])
+          .filter((candidate) => candidate !== undefined && candidate !== null && candidate !== '');
+        return matches.some((candidate) => normalizeReportFilterValue(candidate) === normalizeReportFilterValue(value));
+      });
+    }, rows);
+
+    return { ...result, rows: filtered };
+  }
+
   // ── Operations & audit ────────────────────────────────────────────────────
 
   public operationsLog({ from, to }: ReportParams): ReportResult {
     const sales = this.salesScope();
     const purchases = this.purchaseScope();
-    const cash = this.tableScope(
-      'cp.branch_id',
+    const cash = this.branchAccess.sqlScope(
       '(SELECT br.branch_id FROM cash_registers br WHERE br.id = cp.register_id)',
+      undefined,
+      this.actor(),
     );
-    const supply = this.tableScope(
-      'sp.branch_id',
+    const supply = this.branchAccess.sqlScope(
       '(SELECT br.branch_id FROM cash_registers br WHERE br.id = sp.register_id)',
+      undefined,
+      this.actor(),
     );
-    const expense = this.tableScope(
-      'ex.branch_id',
+    const expense = this.branchAccess.sqlScope(
       '(SELECT br.branch_id FROM cash_registers br WHERE br.id = ex.register_id)',
+      undefined,
+      this.actor(),
     );
 
     const rows = this.db.query<any>(`
@@ -622,12 +734,14 @@ export class ReportCenterService {
     const rows = metrics.map(([label, key, type]) => {
       const currentValue = num(current[key]);
       const previousValue = num(previous[key]);
+      const currentDisplay = type === 'currency' ? round2(currentValue) : Math.round(currentValue);
+      const previousDisplay = type === 'currency' ? round2(previousValue) : Math.round(previousValue);
       return {
         metric: label,
         type,
-        current: round2(currentValue),
-        previous: round2(previousValue),
-        change: round2(currentValue - previousValue),
+        current: currentDisplay,
+        previous: previousDisplay,
+        change: type === 'currency' ? round2(currentValue - previousValue) : Math.round(currentValue - previousValue),
         changePercent: previousValue ? round2(((currentValue - previousValue) / Math.abs(previousValue)) * 100) : 0,
       };
     });
@@ -640,9 +754,9 @@ export class ReportCenterService {
       ],
       columns: [
         { key: 'metric', label: 'المؤشر' },
-        { key: 'current', label: 'الفترة الحالية', type: 'currency' },
-        { key: 'previous', label: 'الفترة السابقة', type: 'currency' },
-        { key: 'change', label: 'الفرق', type: 'currency' },
+        { key: 'current', label: 'الفترة الحالية', type: 'text' },
+        { key: 'previous', label: 'الفترة السابقة', type: 'text' },
+        { key: 'change', label: 'الفرق', type: 'text' },
         { key: 'changePercent', label: 'نسبة التغير', type: 'percent' },
       ],
       rows,
@@ -1626,38 +1740,50 @@ export class ReportCenterService {
   }
 
   public cashMovement({ from, to, registerId }: ReportParams): ReportResult {
-    const registerParams = registerId ? [registerId] : [];
-    const registerClause = registerId ? 'AND register_id = ?' : '';
+    const sales = this.salesScope();
+    const purchases = this.purchaseScope();
+    const registerScope = registerId
+      ? { clause: 'cp.register_id = ?', params: [registerId] }
+      : this.allBranchesTableScope('cr.branch_id', '(SELECT br.branch_id FROM cash_registers br WHERE br.id = cp.register_id)');
+    const registerListScope = registerId
+      ? { clause: 'id = ?', params: [registerId] }
+      : this.allBranchesTableScope('branch_id');
     const paymentRows = this.db.query<any>(`
       SELECT date, cp.created_at AS createdAt, 'وارد' AS direction, 'سند قبض' AS source, receipt_number AS document,
-        c.name AS party, amount, register_id AS registerId
-      FROM customer_payments cp LEFT JOIN customers c ON c.id = cp.customer_id
-      WHERE date >= ? AND date <= ? ${registerClause}
+        c.name AS party, amount, cp.register_id AS registerId
+      FROM customer_payments cp
+      LEFT JOIN customers c ON c.id = cp.customer_id
+      LEFT JOIN cash_registers cr ON cr.id = cp.register_id
+      WHERE date >= ? AND date <= ? AND ${registerScope.clause}
 
       UNION ALL
-      SELECT date, sp.created_at, 'منصرف', 'سند صرف', receipt_number, s.name, amount, register_id
-      FROM supplier_payments sp LEFT JOIN suppliers s ON s.id = sp.supplier_id
-      WHERE date >= ? AND date <= ? ${registerClause}
+      SELECT date, sp.created_at, 'منصرف', 'سند صرف', receipt_number, s.name, amount, sp.register_id
+      FROM supplier_payments sp
+      LEFT JOIN suppliers s ON s.id = sp.supplier_id
+      LEFT JOIN cash_registers cr ON cr.id = sp.register_id
+      WHERE date >= ? AND date <= ? AND ${registerScope.clause}
 
       UNION ALL
-      SELECT date, ex.created_at, 'منصرف', 'مصروف', COALESCE(recipient, description), description, amount, register_id
-      FROM expenses ex WHERE date >= ? AND date <= ? ${registerClause}
+      SELECT date, ex.created_at, 'منصرف', 'مصروف', COALESCE(recipient, description), description, amount, ex.register_id
+      FROM expenses ex
+      LEFT JOIN cash_registers cr ON cr.id = ex.register_id
+      WHERE date >= ? AND date <= ? AND ${registerScope.clause}
     `, [
-      from, to, ...registerParams,
-      from, to, ...registerParams,
-      from, to, ...registerParams,
+      from, to, ...registerScope.params,
+      from, to, ...registerScope.params,
+      from, to, ...registerScope.params,
     ]);
     const invoiceRows = this.db.query<any>(`
       SELECT date, si.created_at AS createdAt, 'وارد' AS direction, 'تحصيل فاتورة' AS source,
         invoice_number AS document, c.name AS party, paid_amount AS amount, NULL AS registerId
       FROM sales_invoices si LEFT JOIN customers c ON c.id = si.customer_id
-      WHERE date >= ? AND date <= ? AND paid_amount > 0 AND invoice_status != 'VOID'
+      WHERE date >= ? AND date <= ? AND paid_amount > 0 AND invoice_status != 'VOID' AND ${sales.clause}
 
       UNION ALL
       SELECT date, pi.created_at, 'منصرف', 'سداد فاتورة شراء', invoice_number, s.name, paid_amount, NULL
       FROM purchase_invoices pi LEFT JOIN suppliers s ON s.id = pi.supplier_id
-      WHERE date >= ? AND date <= ? AND paid_amount > 0
-    `, [from, to, from, to]);
+      WHERE date >= ? AND date <= ? AND paid_amount > 0 AND ${purchases.clause}
+    `, [from, to, ...sales.params, from, to, ...purchases.params]);
     const rows = [...paymentRows, ...(registerId ? [] : invoiceRows)]
       .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
     let running = 0;
@@ -1668,13 +1794,13 @@ export class ReportCenterService {
     });
     const inflow = round2(result.filter((row) => row.direction === 'وارد').reduce((total, row) => total + row.amount, 0));
     const outflow = round2(result.filter((row) => row.direction === 'منصرف').reduce((total, row) => total + row.amount, 0));
-    const registers = this.db.query<any>('SELECT id, name, current_balance AS balance FROM cash_registers ORDER BY name');
+    const registerList = this.db.query<any>(`SELECT id, name, current_balance AS balance FROM cash_registers WHERE ${registerListScope.clause} ORDER BY name`, registerListScope.params);
     return {
       kpis: [
         { label: 'إجمالي الوارد', value: inflow, tone: 'success' },
         { label: 'إجمالي المنصرف', value: outflow, tone: 'danger' },
         { label: 'صافي الحركة', value: round2(inflow - outflow), tone: inflow >= outflow ? 'success' : 'danger' },
-        { label: 'الرصيد الحالي للخزائن', value: round2(registers.reduce((total, row) => total + num(row.balance), 0)), tone: 'info' },
+        { label: 'الرصيد الحالي للخزائن', value: round2(registerList.reduce((total, row) => total + num(row.balance), 0)), tone: 'info' },
       ],
       columns: [
         { key: 'date', label: 'التاريخ', type: 'date' },
@@ -1686,7 +1812,7 @@ export class ReportCenterService {
         { key: 'balance', label: 'الرصيد الجاري', type: 'currency' },
       ],
       rows: result,
-      notes: registers.length ? undefined : ['لا توجد خزائن مسجلة.'],
+      notes: registerList.length ? undefined : ['لا توجد خزائن مسجلة في النطاق الحالي.'],
     };
   }
 
@@ -1697,6 +1823,21 @@ export class ReportCenterService {
     const expenseScope = this.tableScope('e.branch_id');
     const payrollScope = this.tableScope('e.branch_id');
     const installmentScope = this.tableScope('ip.branch_id');
+    const cashScope = this.allBranchesTableScope('cr.branch_id');
+    const openingBalance = this.db.query<any>(`
+      SELECT COALESCE(SUM(cr.current_balance), 0) AS total FROM cash_registers cr
+      WHERE ${cashScope.clause}
+    `, cashScope.params)[0]?.total || 0;
+    const weeklyPayroll = this.db.query<any>(`
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN e.salary_type = 'MONTHLY' THEN e.base_salary / 4.0
+          WHEN e.salary_type = 'DAILY' THEN (e.base_salary * 26) / 4.0
+          ELSE e.base_salary / 4.0
+        END), 0) AS total
+      FROM employees e
+      WHERE e.is_active = 1 AND e.status = 'ACTIVE' AND ${payrollScope.clause}
+    `, payrollScope.params)[0]?.total || 0;
     const weeks: Array<Record<string, any>> = [];
     for (let week = 0; week < 8; week += 1) {
       const weekStart = shiftDate(start, week * 7);
@@ -1722,79 +1863,77 @@ export class ReportCenterService {
         JOIN installment_plans ip ON ip.id = i.plan_id
         WHERE i.remaining_amount > 0.01 AND i.due_date >= ? AND i.due_date <= ? AND ${installmentScope.clause}
       `, [weekStart, weekEnd, ...installmentScope.params])[0]?.total || 0;
-      const payroll = this.db.query<any>(`
-        SELECT COALESCE(SUM(e.base_salary), 0) AS total FROM employees e
-        WHERE e.is_active = 1 AND ${payrollScope.clause}
-      `, payrollScope.params)[0]?.total || 0;
       const expenses = this.db.query<any>(`
         SELECT COALESCE(SUM(e.amount), 0) / 30.0 * 7 AS total FROM expenses e
         WHERE e.date >= ? AND e.date <= ? AND ${expenseScope.clause}
       `, [shiftDate(to, -30), to, ...expenseScope.params])[0]?.total || 0;
       const inflow = round2(num(invoices) + num(chequesIn) + num(installments));
-      const outflow = round2(num(purchases) + num(chequesOut) + num(payroll) + num(expenses));
+      const outflow = round2(num(purchases) + num(chequesOut) + num(weeklyPayroll) + num(expenses));
       weeks.push({
         week: `أسبوع ${week + 1}`,
         from: weekStart,
         to: weekEnd,
+        openingBalance: round2(num(openingBalance)),
         invoices: round2(num(invoices)),
         installments: round2(num(installments)),
         chequesIn: round2(num(chequesIn)),
         inflow,
         purchases: round2(num(purchases)),
         chequesOut: round2(num(chequesOut)),
-        payroll: round2(num(payroll)),
+        payroll: round2(num(weeklyPayroll)),
         expenses: round2(num(expenses)),
         outflow,
         net: round2(inflow - outflow),
       });
     }
-    let running = 0;
+    let running = round2(num(openingBalance));
     const result: Array<Record<string, any>> = weeks.map((row) => {
-      running = round2(running + row.net);
-      return { ...row, cumulative: running };
+      const projectedBalance = round2(running + row.net);
+      running = projectedBalance;
+      return { ...row, projectedBalance, cumulative: running };
     });
     const lowest = result.reduce<Record<string, any>>((min, row) => (row.cumulative < min.cumulative ? row : min), result[0]);
     return {
       kpis: [
+        { label: 'الرصيد النقدي الحالي', value: round2(num(openingBalance)), tone: 'info' },
         { label: 'إجمالي الوارد المتوقع', value: round2(result.reduce((total, row) => total + row.inflow, 0)), tone: 'success' },
-        { label: 'إجمالي المنصرف المتوقع', value: round2(result.reduce((total, row) => total + row.outflow, 0)), tone: 'danger' },
-        { label: 'صافي التدفق', value: round2(result.reduce((total, row) => total + row.net, 0)), tone: 'info' },
-        { label: 'أقل رصيد متوقع', value: lowest?.cumulative || 0, hint: lowest?.week, tone: (lowest?.cumulative || 0) < 0 ? 'danger' : 'success' },
+        { label: 'إجمالي المدفوعات المستحقة', value: round2(result.reduce((total, row) => total + row.outflow, 0)), tone: 'danger' },
+        { label: 'الرصيد المتوقع في آخر أسبوع', value: lowest?.cumulative || 0, hint: lowest?.week, tone: (lowest?.cumulative || 0) < 0 ? 'danger' : 'success' },
       ],
       columns: [
         { key: 'week', label: 'الأسبوع' },
         { key: 'from', label: 'من', type: 'date' },
         { key: 'to', label: 'إلى', type: 'date' },
-        { key: 'invoices', label: 'تحصيل فواتير', type: 'currency' },
-        { key: 'installments', label: 'أقساط', type: 'currency' },
-        { key: 'chequesIn', label: 'شيكات قبض', type: 'currency' },
-        { key: 'inflow', label: 'إجمالي الوارد', type: 'currency' },
-        { key: 'purchases', label: 'سداد موردين', type: 'currency' },
-        { key: 'chequesOut', label: 'شيكات دفع', type: 'currency' },
-        { key: 'payroll', label: 'رواتب', type: 'currency' },
-        { key: 'expenses', label: 'مصروفات دورية', type: 'currency' },
-        { key: 'outflow', label: 'إجمالي المنصرف', type: 'currency' },
-        { key: 'net', label: 'الصافي', type: 'currency' },
-        { key: 'cumulative', label: 'الرصيد التراكمي', type: 'currency' },
+        { key: 'openingBalance', label: 'الرصيد الفعلي', type: 'currency' },
+        { key: 'inflow', label: 'التحصيلات المتوقعة', type: 'currency' },
+        { key: 'outflow', label: 'المدفوعات المستحقة', type: 'currency' },
+        { key: 'net', label: 'صافي الأسبوع', type: 'currency' },
+        { key: 'projectedBalance', label: 'الرصيد المتوقع', type: 'currency' },
       ],
       rows: result,
-      notes: ['التوقعات مبنية على تواريخ استحقاق الفواتير والأقساط والشيكات، ومتوسط المصروفات والرواتب.'],
+      notes: ['يبدأ التقرير من الرصيد النقدي الحالي الفعلي، ثم يضيف التحصيلات المتوقعة وخصم الالتزامات المستحقة حسب تواريخ الاستحقاق.'],
     };
   }
 
   public breakEven({ from, to }: ReportParams): ReportResult {
     const metrics = this.periodMetrics(from, to);
     const scope = this.tableScope('branch_id');
-    const expenses = this.db.query<any>(`
-      SELECT COALESCE(SUM(amount), 0) AS total FROM expenses
+    const expenseRows = this.db.query<any>(`
+      SELECT amount, category, description FROM expenses
       WHERE date >= ? AND date <= ? AND ${scope.clause}
-    `, [from, to, ...scope.params])[0]?.total || 0;
+    `, [from, to, ...scope.params]);
+    const totals = { fixed: 0, variable: 0, semi: 0 };
+    for (const row of expenseRows) {
+      const amount = num(row.amount);
+      const bucket = classifyExpense(row.category, row.description);
+      totals[bucket] += amount;
+    }
     const revenue = round2(num(metrics.sales));
     const profit = round2(num(metrics.profit));
-    const variableCost = round2(revenue - profit);
+    const variableCost = Math.max(0, round2(revenue - profit));
     const contribution = round2(revenue - variableCost);
     const contributionMargin = revenue ? round2((contribution / revenue) * 100) : 0;
-    const fixed = round2(num(expenses));
+    const fixed = round2(totals.fixed + totals.semi * 0.5);
     const breakEvenRevenue = contributionMargin > 0 ? round2(fixed / (contributionMargin / 100)) : 0;
     const marginOfSafety = revenue ? round2(((revenue - breakEvenRevenue) / revenue) * 100) : 0;
     const rows = [
@@ -1803,13 +1942,14 @@ export class ReportCenterService {
       { metric: 'هامش المساهمة', value: contribution, type: 'currency' },
       { metric: 'نسبة هامش المساهمة', value: contributionMargin, type: 'percent' },
       { metric: 'المصروفات الثابتة', value: fixed, type: 'currency' },
+      { metric: 'المصروفات شبه المتغيرة', value: round2(totals.semi), type: 'currency' },
       { metric: 'مبيعات نقطة التعادل', value: breakEvenRevenue, type: 'currency' },
       { metric: 'هامش الأمان', value: marginOfSafety, type: 'percent' },
       { metric: 'صافي الربح', value: profit, type: 'currency' },
     ];
     return {
       kpis: [
-        { label: 'نقطة التعادل', value: breakEvenRevenue, hint: 'مبيعات مطلوبة لتغطية المصروفات', tone: 'warning' },
+        { label: 'نقطة التعادل', value: breakEvenRevenue, hint: 'مبيعات مطلوبة لتغطية المصروفات الثابتة', tone: 'warning' },
         { label: 'هامش المساهمة', value: contributionMargin, tone: 'info' },
         { label: 'المصروفات الثابتة', value: fixed, tone: 'danger' },
         { label: 'هامش الأمان', value: marginOfSafety, tone: marginOfSafety >= 0 ? 'success' : 'danger' },
@@ -1819,7 +1959,7 @@ export class ReportCenterService {
         { key: 'value', label: 'القيمة', type: 'currency' },
       ],
       rows,
-      notes: ['يُحسب هامش المساهمة من صافي المبيعات والتكلفة، وتُعامَل المصروفات المسجلة كمصروفات ثابتة للفترة.'],
+      notes: ['يُصنَّف كل مصروف إلى ثابت أو متغير أو شبه متغير، فلا تُعامل جميع المصروفات كتكاليف ثابتة.'],
     };
   }
 
@@ -2118,24 +2258,25 @@ export class ReportCenterService {
     const actor = this.actor();
     const key = `${this.cachePartition(actor)}:salesRepPerformance:${params.from}:${params.to}`;
     return this.withCache(key, () => {
-    const scope = this.salesScope();
-    const rows = this.db.query<any>(
-      `SELECT
-         COALESCE(u.full_name, 'غير محدد') AS repName,
-         COUNT(si.id) AS invoiceCount,
-         COALESCE(SUM(si.total_amount), 0) AS totalSales,
-         COALESCE(SUM(si.paid_amount), 0) AS totalCollected,
-         COALESCE(SUM(si.remaining_amount), 0) AS totalPending,
-         COALESCE(SUM(si.gross_profit), 0) AS estimatedProfit
-       FROM sales_invoices si
-       LEFT JOIN users u ON u.id = si.created_by
-       WHERE si.date BETWEEN ? AND ?
-         AND si.invoice_status != 'VOID'
-         AND ${scope.clause}
-       GROUP BY u.id, u.full_name
-       ORDER BY totalSales DESC`,
-      [params.from, params.to, ...scope.params]
-    );
+      const scope = this.salesScope();
+      const rows = this.db.query<any>(`
+        SELECT
+          COALESCE(e.full_name, u.full_name, 'غير محدد') AS repName,
+          COUNT(si.id) AS invoiceCount,
+          COALESCE(SUM(si.total_amount), 0) AS totalSales,
+          COALESCE(SUM(si.paid_amount), 0) AS totalCollected,
+          COALESCE(SUM(si.remaining_amount), 0) AS totalPending,
+          COALESCE(SUM(si.gross_profit), 0) AS estimatedProfit
+        FROM sales_invoices si
+        LEFT JOIN orders o ON o.invoice_id = si.id
+        LEFT JOIN employees e ON e.id = o.sales_rep_id
+        LEFT JOIN users u ON u.id = si.created_by
+        WHERE si.date BETWEEN ? AND ?
+          AND si.invoice_status != 'VOID'
+          AND ${scope.clause}
+        GROUP BY COALESCE(e.full_name, u.full_name, 'غير محدد')
+        ORDER BY totalSales DESC
+      `, [params.from, params.to, ...scope.params]);
 
       const totalSalesAll = sum(rows, 'totalSales');
       const totalCollectedAll = sum(rows, 'totalCollected');
@@ -2166,10 +2307,10 @@ export class ReportCenterService {
           { label: 'إجمالي مبيعات الفريق', value: round2(totalSalesAll), tone: 'info' },
           { label: 'إجمالي التحصيلات', value: round2(totalCollectedAll), tone: 'success' },
           { label: 'إجمالي الأرباح المقدرة', value: round2(totalProfitAll), tone: 'success' },
-          { label: 'مندوب الصدارة', value: mapped[0]?.totalSales || 0, hint: mapped[0]?.repName || '—', tone: 'neutral' },
+          { label: 'مندوب المبيعات', value: mapped[0]?.totalSales || 0, hint: mapped[0]?.repName || '—', tone: 'neutral' },
         ],
         columns: [
-          { key: 'repName', label: 'منشئ الفاتورة' },
+          { key: 'repName', label: 'مندوب المبيعات' },
           { key: 'invoiceCount', label: 'عدد الفواتير', type: 'number' },
           { key: 'totalSales', label: 'إجمالي المبيعات', type: 'currency' },
           { key: 'totalCollected', label: 'المحصل', type: 'currency' },
@@ -2180,8 +2321,8 @@ export class ReportCenterService {
           { key: 'performanceBadge', label: 'التقييم', type: 'badge' },
         ],
         rows: mapped,
-        notes: ['التجميع حسب منشئ الفاتورة (created_by)، وليس مندوب البيع؛ لا يسجل مخطط الفاتورة الحالي مندوبًا منفصلًا.'],
-    };
+        notes: ['يُجمّع التقرير حسب مندوب المبيعات عند توفره، مع احتياطية إلى منشئ الفاتورة عند غياب المندوب الفعلي.'],
+      };
     });
   }
 
@@ -2247,6 +2388,861 @@ export class ReportCenterService {
       notes: ['التوقع = متوسط المبيعات الشهرية للسنة الماضية مع موسمية آخر 3 أشهر. الكمية المقترحة تغطي 1.5 شهر بعد الرصيد الحالي.'],
     };
   }
+
+  public hrPayrollSummary({ from, to }: ReportParams): ReportResult {
+    const scope = this.tableScope('pr.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT pr.period, COALESCE(e.name, '—') AS employeeName,
+        COALESCE(prt.base_amount, 0) AS baseAmount,
+        COALESCE(prt.overtime_amount, 0) AS overtimeAmount,
+        COALESCE(prt.bonus_amount, 0) AS bonusAmount,
+        COALESCE(prt.commission_amount, 0) AS commissionAmount,
+        COALESCE(prt.attendance_deduction_amount, 0) AS attendanceDeduction,
+        COALESCE(prt.manual_deduction_amount, 0) AS manualDeduction,
+        COALESCE(prt.advance_amount, 0) AS advanceAmount,
+        COALESCE(prt.tax_amount, 0) AS taxAmount,
+        COALESCE(prt.net_amount, 0) AS netAmount,
+        COALESCE(prt.payment_method, 'CASH') AS paymentMethod,
+        COALESCE(prt.payout_status, 'PENDING') AS payoutStatus
+      FROM payroll_runs pr
+      JOIN payroll_run_items prt ON prt.payroll_run_id = pr.id
+      LEFT JOIN employees e ON e.id = prt.employee_id
+      WHERE pr.period >= ? AND pr.period <= ? AND ${scope.clause}
+      ORDER BY pr.period, e.name
+    `, [from.slice(0, 7), to.slice(0, 7), ...scope.params]);
+    const result = rows.map((row) => ({
+      ...row,
+      baseAmount: round2(num(row.baseAmount)),
+      overtimeAmount: round2(num(row.overtimeAmount)),
+      bonusAmount: round2(num(row.bonusAmount)),
+      commissionAmount: round2(num(row.commissionAmount)),
+      attendanceDeduction: round2(num(row.attendanceDeduction)),
+      manualDeduction: round2(num(row.manualDeduction)),
+      advanceAmount: round2(num(row.advanceAmount)),
+      taxAmount: round2(num(row.taxAmount)),
+      netAmount: round2(num(row.netAmount)),
+    }));
+    return {
+      kpis: [
+        { label: 'دورات/موظفين', value: result.length, tone: 'info' },
+        { label: 'إجمالي الاستحقاقات', value: round2(result.reduce((t, r) => t + r.baseAmount + r.overtimeAmount + r.bonusAmount + r.commissionAmount, 0)), tone: 'success' },
+        { label: 'إجمالي الخصومات والضرائب', value: round2(result.reduce((t, r) => t + r.attendanceDeduction + r.manualDeduction + r.advanceAmount + r.taxAmount, 0)), tone: 'danger' },
+        { label: 'صافي الرواتب', value: round2(result.reduce((t, r) => t + r.netAmount, 0)), tone: 'success' },
+      ],
+      columns: [
+        { key: 'period', label: 'الفترة' },
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'baseAmount', label: 'الأساسي', type: 'currency' },
+        { key: 'overtimeAmount', label: 'إضافي', type: 'currency' },
+        { key: 'bonusAmount', label: 'مكافأة', type: 'currency' },
+        { key: 'commissionAmount', label: 'عمولة', type: 'currency' },
+        { key: 'attendanceDeduction', label: 'غياب/تأخير', type: 'currency' },
+        { key: 'manualDeduction', label: 'خصومات', type: 'currency' },
+        { key: 'advanceAmount', label: 'سلف', type: 'currency' },
+        { key: 'taxAmount', label: 'ضريبة', type: 'currency' },
+        { key: 'netAmount', label: 'الصافي', type: 'currency' },
+        { key: 'paymentMethod', label: 'طريقة الصرف', type: 'badge' },
+        { key: 'payoutStatus', label: 'حالة الصرف', type: 'badge' },
+      ],
+      rows: result,
+      notes: ['يستخدم دورات الرواتب (مسودة/معتمدة/مصروفة).'],
+    };
+  }
+
+  public hrPayrollPayouts({ from, to }: ReportParams): ReportResult {
+    const scope = this.tableScope('pt.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT pt.date, COALESCE(e.name, '—') AS employeeName, pt.type, pt.amount,
+        COALESCE(pt.payment_method, 'CASH') AS paymentMethod,
+        pt.bank_account_id AS bankAccountId, pt.reference_number AS referenceNumber,
+        pt.proof_reference AS proofReference, pt.payment_status AS paymentStatus
+      FROM payroll_transactions pt
+      LEFT JOIN employees e ON e.id = pt.employee_id
+      WHERE pt.type = 'SALARY_PAYOUT' AND substr(pt.date, 1, 10) >= ? AND substr(pt.date, 1, 10) <= ?
+        AND ${scope.clause}
+      ORDER BY pt.date DESC, e.name
+    `, [from, to, ...scope.params]);
+    const result = rows.map((row) => ({
+      ...row,
+      amount: round2(num(row.amount)),
+    }));
+    const byMethod = (method: string) => result.filter((row) => row.paymentMethod === method);
+    return {
+      kpis: [
+        { label: 'عدد عمليات الصرف', value: result.length, tone: 'info' },
+        { label: 'نقدي', value: round2(byMethod('CASH').reduce((t, r) => t + r.amount, 0)), tone: 'success' },
+        { label: 'تحويل بنكي', value: round2(byMethod('BANK_TRANSFER').reduce((t, r) => t + r.amount, 0)), tone: 'info' },
+        { label: 'محفظة', value: round2(byMethod('WALLET').reduce((t, r) => t + r.amount, 0)), tone: 'warning' },
+      ],
+      columns: [
+        { key: 'date', label: 'التاريخ', type: 'date' },
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'amount', label: 'المبلغ', type: 'currency' },
+        { key: 'paymentMethod', label: 'الطريقة', type: 'badge' },
+        { key: 'bankAccountId', label: 'الحساب البنكي' },
+        { key: 'referenceNumber', label: 'المرجع' },
+        { key: 'proofReference', label: 'الإثبات' },
+        { key: 'paymentStatus', label: 'الحالة', type: 'badge' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrAttendanceSummary({ from, to }: ReportParams): ReportResult {
+    const scope = this.tableScope('e.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT e.id AS employeeId, COALESCE(e.name, '—') AS employeeName,
+        COUNT(a.id) AS days, COALESCE(SUM(a.worked_minutes), 0) AS workedMinutes,
+        COALESCE(SUM(a.late_minutes), 0) AS lateMinutes,
+        COALESCE(SUM(a.overtime_minutes), 0) AS overtimeMinutes,
+        COALESCE(SUM(CASE WHEN a.overtime_approved = 1 THEN a.overtime_minutes ELSE 0 END), 0) AS approvedOvertime
+      FROM employees e
+      LEFT JOIN attendance a ON a.employee_id = e.id AND a.date >= ? AND a.date <= ?
+      WHERE e.is_active = 1 AND ${scope.clause}
+      GROUP BY e.id, e.name
+      ORDER BY e.name
+    `, [from, to, ...scope.params]);
+    const result = rows.map((row) => ({
+      ...row,
+      days: num(row.days),
+      workedMinutes: num(row.workedMinutes),
+      lateMinutes: num(row.lateMinutes),
+      overtimeMinutes: num(row.overtimeMinutes),
+      approvedOvertime: num(row.approvedOvertime),
+    }));
+    return {
+      kpis: [
+        { label: 'موظفون', value: result.length, tone: 'info' },
+        { label: 'أيام حضور', value: result.reduce((t, r) => t + r.days, 0), tone: 'info' },
+        { label: 'دقائق تأخير', value: result.reduce((t, r) => t + r.lateMinutes, 0), tone: 'warning' },
+        { label: 'عمل إضافي (دقائق)', value: result.reduce((t, r) => t + r.overtimeMinutes, 0), tone: 'success' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'days', label: 'أيام', type: 'qty' },
+        { key: 'workedMinutes', label: 'عمل (دقائق)', type: 'qty' },
+        { key: 'lateMinutes', label: 'تأخير (دقائق)', type: 'qty' },
+        { key: 'overtimeMinutes', label: 'إضافي (دقائق)', type: 'qty' },
+        { key: 'approvedOvertime', label: 'إضافي معتمد (دقائق)', type: 'qty' },
+      ],
+      rows: result,
+      notes: ['يعتمد على جدول الحضور (attendance) المُحدّث من periods/shifts.'],
+    };
+  }
+
+  public hrLeaveSummary({ from, to }: ReportParams): ReportResult {
+    const scope = this.tableScope('lr.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, lr.leave_type AS leaveType,
+        lr.start_date AS startDate, lr.end_date AS endDate, lr.days, lr.status,
+        lr.reason, lr.decision_note AS decisionNote
+      FROM employee_leave_requests lr
+      LEFT JOIN employees e ON e.id = lr.employee_id
+      WHERE lr.start_date <= ? AND lr.end_date >= ? AND ${scope.clause}
+      ORDER BY lr.start_date DESC, e.name
+    `, [to, from, ...scope.params]);
+    const result = rows.map((row) => ({ ...row, days: num(row.days) }));
+    return {
+      kpis: [
+        { label: 'طلبات', value: result.length, tone: 'info' },
+        { label: 'معتمدة', value: result.filter((r) => r.status === 'APPROVED').length, tone: 'success' },
+        { label: 'معلقة', value: result.filter((r) => r.status === 'PENDING').length, tone: 'warning' },
+        { label: 'أيام إجازة', value: result.reduce((t, r) => t + (r.status === 'APPROVED' ? r.days : 0), 0), tone: 'info' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'leaveType', label: 'النوع', type: 'badge' },
+        { key: 'startDate', label: 'من', type: 'date' },
+        { key: 'endDate', label: 'إلى', type: 'date' },
+        { key: 'days', label: 'أيام', type: 'qty' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'reason', label: 'السبب' },
+        { key: 'decisionNote', label: 'ملاحظة القرار' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrTaxSummary({ from, to }: ReportParams): ReportResult {
+    const scope = this.tableScope('pr.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT pr.period, COALESCE(e.name, '—') AS employeeName,
+        COALESCE(prt.tax_amount, 0) AS taxAmount,
+        COALESCE(json_extract(prt.detail_json, '$.taxRuleName'), '—') AS taxRuleName,
+        COALESCE(json_extract(prt.detail_json, '$.taxSource'), '—') AS taxSource,
+        COALESCE(json_extract(prt.detail_json, '$.taxableAmount'), 0) AS taxableAmount,
+        COALESCE(json_extract(prt.detail_json, '$.taxExemptionAmount'), 0) AS exemptionAmount
+      FROM payroll_runs pr
+      JOIN payroll_run_items prt ON prt.payroll_run_id = pr.id
+      LEFT JOIN employees e ON e.id = prt.employee_id
+      WHERE pr.period >= ? AND pr.period <= ? AND ${scope.clause}
+      ORDER BY pr.period, e.name
+    `, [from.slice(0, 7), to.slice(0, 7), ...scope.params]);
+    const result = rows.map((row) => ({
+      ...row,
+      taxAmount: round2(num(row.taxAmount)),
+      taxableAmount: round2(num(row.taxableAmount)),
+      exemptionAmount: round2(num(row.exemptionAmount)),
+    }));
+    return {
+      kpis: [
+        { label: 'موظفون', value: result.length, tone: 'info' },
+        { label: 'إجمالي الضريبة', value: round2(result.reduce((t, r) => t + r.taxAmount, 0)), tone: 'danger' },
+        { label: 'إجمالي الخاضع', value: round2(result.reduce((t, r) => t + r.taxableAmount, 0)), tone: 'info' },
+        { label: 'إجمالي الإعفاءات', value: round2(result.reduce((t, r) => t + r.exemptionAmount, 0)), tone: 'success' },
+      ],
+      columns: [
+        { key: 'period', label: 'الفترة' },
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'taxRuleName', label: 'قاعدة الضريبة' },
+        { key: 'taxSource', label: 'المصدر', type: 'badge' },
+        { key: 'taxableAmount', label: 'الخاضع', type: 'currency' },
+        { key: 'exemptionAmount', label: 'الإعفاء', type: 'currency' },
+        { key: 'taxAmount', label: 'الضريبة', type: 'currency' },
+      ],
+      rows: result,
+    };
+  }
+
+
+  public hrVacancies({ from: _from, to: _to }: ReportParams): ReportResult {
+    const scope = this.tableScope('d.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT d.id AS departmentId, d.name AS departmentName,
+        COALESCE(d.required_headcount, 0) AS requiredHeadcount,
+        (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id AND e.is_active = 1) AS actualHeadcount
+      FROM departments d
+      WHERE d.is_active = 1 AND ${scope.clause}
+      ORDER BY d.name
+    `, scope.params);
+    const result = rows.map((row) => ({
+      ...row,
+      requiredHeadcount: num(row.requiredHeadcount),
+      actualHeadcount: num(row.actualHeadcount),
+      vacant: Math.max(0, num(row.requiredHeadcount) - num(row.actualHeadcount)),
+    }));
+    return {
+      kpis: [
+        { label: 'أقسام', value: result.length, tone: 'info' },
+        { label: 'مطلوب', value: result.reduce((t, r) => t + r.requiredHeadcount, 0), tone: 'info' },
+        { label: 'فعلي', value: result.reduce((t, r) => t + r.actualHeadcount, 0), tone: 'success' },
+        { label: 'شاغر', value: result.reduce((t, r) => t + r.vacant, 0), tone: 'danger' },
+      ],
+      columns: [
+        { key: 'departmentName', label: 'القسم' },
+        { key: 'requiredHeadcount', label: 'المطلوب', type: 'qty' },
+        { key: 'actualHeadcount', label: 'الفعلي', type: 'qty' },
+        { key: 'vacant', label: 'الشاغر', type: 'qty' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrOnboarding({ from: _from, to: _to }: ReportParams): ReportResult {
+    const scope = this.tableScope('e.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT e.id AS employeeId, COALESCE(e.name, '—') AS employeeName,
+        COUNT(t.id) AS total,
+        SUM(CASE WHEN t.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN t.status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
+        SUM(CASE WHEN t.status = 'PENDING' AND (t.due_date IS NULL OR t.due_date <= ?) THEN 1 ELSE 0 END) AS overdue
+      FROM employees e
+      LEFT JOIN employee_onboarding_tasks t ON t.employee_id = e.id
+      WHERE ${scope.clause}
+      GROUP BY e.id, e.name
+      HAVING COUNT(t.id) > 0
+      ORDER BY e.name
+    `, [_to, ...scope.params]);
+    const result = rows.map((row) => ({
+      ...row,
+      total: num(row.total),
+      completed: num(row.completed),
+      pending: num(row.pending),
+      overdue: num(row.overdue),
+    }));
+    return {
+      kpis: [
+        { label: 'موظفون', value: result.length, tone: 'info' },
+        { label: 'مهام', value: result.reduce((t, r) => t + r.total, 0), tone: 'info' },
+        { label: 'مكتملة', value: result.reduce((t, r) => t + r.completed, 0), tone: 'success' },
+        { label: 'متأخرة', value: result.reduce((t, r) => t + r.overdue, 0), tone: 'danger' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'total', label: 'المهام', type: 'qty' },
+        { key: 'completed', label: 'مكتملة', type: 'qty' },
+        { key: 'pending', label: 'معلقة', type: 'qty' },
+        { key: 'overdue', label: 'متأخرة', type: 'qty' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrProbation({ from, to }: ReportParams): ReportResult {
+    const scope = this.tableScope('e.branch_id');
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, r.review_date AS reviewDate,
+        r.score, r.rating, r.recommendation, r.status
+      FROM employee_probation_reviews r
+      LEFT JOIN employees e ON e.id = r.employee_id
+      WHERE r.review_date >= ? AND r.review_date <= ? AND ${scope.clause}
+      ORDER BY r.review_date DESC
+    `, [from, to, ...scope.params]);
+    const result = rows.map((row) => ({ ...row, score: num(row.score) }));
+    return {
+      kpis: [
+        { label: 'تقييمات', value: result.length, tone: 'info' },
+        { label: 'معتمدة', value: result.filter((r) => r.status === 'APPROVED').length, tone: 'success' },
+        { label: 'معلقة', value: result.filter((r) => r.status !== 'APPROVED').length, tone: 'warning' },
+        { label: 'متوسط الدرجة', value: result.length ? round2(result.reduce((t, r) => t + r.score, 0) / result.length) : 0, tone: 'info' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'reviewDate', label: 'التاريخ', type: 'date' },
+        { key: 'score', label: 'الدرجة', type: 'number' },
+        { key: 'rating', label: 'التقييم', type: 'badge' },
+        { key: 'recommendation', label: 'التوصية', type: 'badge' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+      ],
+      rows: result,
+    };
+  }
+
+
+  public hrViolations({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, v.violation_type AS violationType,
+        v.severity, v.status, v.occurred_at AS occurredAt, v.description
+      FROM hr_violations v
+      LEFT JOIN employees e ON e.id = v.employee_id
+      WHERE v.occurred_at >= ? AND v.occurred_at <= ? AND (e.branch_id IS NULL OR e.branch_id IN (
+        SELECT id FROM branches WHERE id = e.branch_id
+      ))
+      ORDER BY v.occurred_at DESC
+    `, [from, to]);
+    const result = rows.map((row) => ({ ...row }));
+    return {
+      kpis: [
+        { label: 'مخالفات', value: result.length, tone: 'info' },
+        { label: 'حرجة', value: result.filter((r) => r.severity === 'CRITICAL').length, tone: 'danger' },
+        { label: 'كبيرة', value: result.filter((r) => r.severity === 'MAJOR').length, tone: 'warning' },
+        { label: 'مغلقة', value: result.filter((r) => r.status === 'CLOSED').length, tone: 'success' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'violationType', label: 'النوع' },
+        { key: 'severity', label: 'الخطورة', type: 'badge' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'occurredAt', label: 'التاريخ', type: 'date' },
+        { key: 'description', label: 'الوصف' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrComplaints({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, c.subject, c.status, c.submitted_at AS submittedAt,
+        c.resolved_at AS resolvedAt, c.resolution
+      FROM hr_complaints c
+      LEFT JOIN employees e ON e.id = c.employee_id
+      WHERE c.submitted_at >= ? AND c.submitted_at <= ?
+      ORDER BY c.submitted_at DESC
+    `, [from, to]);
+    const result = rows.map((row) => ({ ...row }));
+    return {
+      kpis: [
+        { label: 'شكاوى', value: result.length, tone: 'info' },
+        { label: 'مفتوحة', value: result.filter((r) => r.status === 'OPEN' || r.status === 'UNDER_REVIEW').length, tone: 'warning' },
+        { label: 'محلولة', value: result.filter((r) => r.status === 'RESOLVED').length, tone: 'success' },
+        { label: 'مرفوضة', value: result.filter((r) => r.status === 'REJECTED').length, tone: 'danger' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'subject', label: 'الموضوع' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'submittedAt', label: 'تاريخ التقديم', type: 'date' },
+        { key: 'resolvedAt', label: 'تاريخ الحل', type: 'date' },
+        { key: 'resolution', label: 'القرار' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrPenaltiesReport({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, p.penalty_type AS penaltyType, p.amount, p.status,
+        p.approved_at AS approvedAt, p.notes
+      FROM hr_penalties p
+      LEFT JOIN employees e ON e.id = p.employee_id
+      WHERE p.created_at >= ? AND p.created_at <= ?
+      ORDER BY p.created_at DESC
+    `, [from + 'T00:00:00', to + 'T23:59:59']);
+    const result = rows.map((row) => ({ ...row, amount: Number(row.amount) || 0 }));
+    return {
+      kpis: [
+        { label: 'جزاءات', value: result.length, tone: 'info' },
+        { label: 'معتمدة/مرحّلة', value: result.filter((r) => r.status === 'POSTED' || r.status === 'APPROVED').length, tone: 'success' },
+        { label: 'مسودات', value: result.filter((r) => r.status === 'DRAFT').length, tone: 'warning' },
+        { label: 'إجمالي', value: result.reduce((t, r) => t + r.amount, 0), tone: 'danger' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'penaltyType', label: 'النوع' },
+        { key: 'amount', label: 'المبلغ', type: 'currency' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'approvedAt', label: 'تاريخ الاعتماد', type: 'date' },
+        { key: 'notes', label: 'ملاحظات' },
+      ],
+      rows: result,
+    };
+  }
+
+
+  public hrWarnings({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, w.warning_type AS warningType, w.status,
+        w.issued_at AS issuedAt, w.notes
+      FROM hr_warnings w
+      LEFT JOIN employees e ON e.id = w.employee_id
+      WHERE w.issued_at >= ? AND w.issued_at <= ?
+      ORDER BY w.issued_at DESC
+    `, [from, to]);
+    const result = rows.map((row) => ({ ...row }));
+    return {
+      kpis: [
+        { label: 'إنذارات', value: result.length, tone: 'info' },
+        { label: 'صادرة', value: result.filter((r) => r.status === 'ISSUED').length, tone: 'warning' },
+        { label: 'ملغاة', value: result.filter((r) => r.status === 'CANCELLED').length, tone: 'danger' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'warningType', label: 'النوع' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'issuedAt', label: 'تاريخ الإصدار', type: 'date' },
+        { key: 'notes', label: 'ملاحظات' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrAppeals({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, a.reference_type AS referenceType, a.reference_id AS referenceId,
+        a.status, a.created_at AS createdAt, a.decided_at AS decidedAt, a.decision
+      FROM hr_appeals a
+      LEFT JOIN employees e ON e.id = a.employee_id
+      WHERE a.created_at >= ? AND a.created_at <= ?
+      ORDER BY a.created_at DESC
+    `, [from + 'T00:00:00', to + 'T23:59:59']);
+    const result = rows.map((row) => ({ ...row }));
+    return {
+      kpis: [
+        { label: 'تظلمات', value: result.length, tone: 'info' },
+        { label: 'مفتوحة', value: result.filter((r) => r.status === 'OPEN').length, tone: 'warning' },
+        { label: 'مقبولة', value: result.filter((r) => r.status === 'APPROVED').length, tone: 'success' },
+        { label: 'مرفوضة', value: result.filter((r) => r.status === 'REJECTED').length, tone: 'danger' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'referenceType', label: 'نوع المرجع' },
+        { key: 'referenceId', label: 'معرف المرجع' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'createdAt', label: 'تاريخ التقديم', type: 'date' },
+        { key: 'decidedAt', label: 'تاريخ القرار', type: 'date' },
+        { key: 'decision', label: 'القرار' },
+      ],
+      rows: result,
+    };
+  }
+
+
+  public hrAttachments({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT a.reference_type AS referenceType, a.reference_id AS referenceId,
+        a.file_name AS fileName, COALESCE(u.full_name, '—') AS uploadedBy, a.created_at AS createdAt
+      FROM hr_case_attachments a
+      LEFT JOIN users u ON u.id = a.uploaded_by
+      WHERE a.created_at >= ? AND a.created_at <= ?
+      ORDER BY a.created_at DESC
+    `, [from + 'T00:00:00', to + 'T23:59:59']);
+    const result = rows.map((row) => ({ ...row }));
+    return {
+      kpis: [
+        { label: 'مرفقات', value: result.length, tone: 'info' },
+        { label: 'مخالفات', value: result.filter((r) => r.referenceType === 'HR_VIOLATION').length, tone: 'warning' },
+        { label: 'شكاوى', value: result.filter((r) => r.referenceType === 'HR_COMPLAINT').length, tone: 'info' },
+        { label: 'جزاءات', value: result.filter((r) => r.referenceType === 'HR_PENALTY').length, tone: 'danger' },
+      ],
+      columns: [
+        { key: 'referenceType', label: 'نوع المرجع', type: 'badge' },
+        { key: 'referenceId', label: 'معرف المرجع' },
+        { key: 'fileName', label: 'اسم الملف' },
+        { key: 'uploadedBy', label: 'رفع بواسطة' },
+        { key: 'createdAt', label: 'تاريخ الرفع', type: 'date' },
+      ],
+      rows: result,
+    };
+  }
+
+
+  public hrAllowances({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, a.allowance_type AS allowanceType,
+        a.amount, a.frequency, a.effective_from AS effectiveFrom,
+        COALESCE(a.effective_to, '—') AS effectiveTo,
+        CASE WHEN a.is_active = 1 THEN 'نشط' ELSE 'موقوف' END AS activeLabel
+      FROM hr_allowances a
+      LEFT JOIN employees e ON e.id = a.employee_id
+      WHERE a.effective_from <= ? AND (a.effective_to IS NULL OR a.effective_to >= ?)
+      ORDER BY e.name, a.effective_from DESC
+    `, [to, from]);
+    const result = rows.map((row) => ({ ...row, amount: Number(row.amount) || 0 }));
+    return {
+      kpis: [
+        { label: 'بدلات', value: result.length, tone: 'info' },
+        { label: 'نشطة', value: result.filter((r) => r.activeLabel === 'نشط').length, tone: 'success' },
+        { label: 'شهرية', value: result.filter((r) => r.frequency === 'MONTHLY' && r.activeLabel === 'نشط').length, tone: 'info' },        { label: 'إجمالي الشهرية النشطة', value: fmtMoney(result.filter((r) => r.frequency === 'MONTHLY' && r.activeLabel === 'نشط').reduce((t, r) => t + r.amount, 0)), tone: 'success' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'allowanceType', label: 'النوع' },
+        { key: 'amount', label: 'المبلغ', type: 'currency' },
+        { key: 'frequency', label: 'التكرار' },
+        { key: 'effectiveFrom', label: 'من', type: 'date' },
+        { key: 'effectiveTo', label: 'إلى', type: 'date' },
+        { key: 'activeLabel', label: 'الحالة', type: 'badge' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrBenefits({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, b.benefit_type AS benefitType,
+        COALESCE(b.provider, '—') AS provider, COALESCE(b.policy_number, '—') AS policyNumber,
+        b.start_date AS startDate, COALESCE(b.end_date, '—') AS endDate, b.amount, b.status
+      FROM hr_benefits b
+      LEFT JOIN employees e ON e.id = b.employee_id
+      WHERE b.start_date <= ? AND (b.end_date IS NULL OR b.end_date >= ?)
+      ORDER BY e.name, b.start_date DESC
+    `, [to, from]);
+    const result = rows.map((row) => ({ ...row, amount: Number(row.amount) || 0 }));
+    return {
+      kpis: [
+        { label: 'مزايا/تأمينات', value: result.length, tone: 'info' },
+        { label: 'سارية', value: result.filter((r) => r.status === 'ACTIVE').length, tone: 'success' },
+        { label: 'منتهية', value: result.filter((r) => r.status === 'EXPIRED').length, tone: 'warning' },
+        { label: 'ملغاة', value: result.filter((r) => r.status === 'CANCELLED').length, tone: 'danger' },
+        { label: 'إجمالي التكلفة', value: fmtMoney(result.reduce((t, r) => t + r.amount, 0)), tone: 'info' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'benefitType', label: 'النوع' },
+        { key: 'provider', label: 'جهة التوفير' },
+        { key: 'policyNumber', label: 'رقم البوليصة' },
+        { key: 'startDate', label: 'من', type: 'date' },
+        { key: 'endDate', label: 'إلى', type: 'date' },
+        { key: 'amount', label: 'التكلفة', type: 'currency' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrLoans({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, '—') AS employeeName, l.id AS loanId, l.principal,
+        l.installment_amount AS installmentAmount, l.remaining_balance AS remainingBalance,
+        l.start_date AS startDate, l.status,
+        COALESCE((SELECT COUNT(*) FROM hr_loan_installments i
+          WHERE i.loan_id = l.id AND i.status = 'PAID'), 0) AS paidInstallments,
+        COALESCE((SELECT COUNT(*) FROM hr_loan_installments i
+          WHERE i.loan_id = l.id AND i.status = 'PENDING'), 0) AS pendingInstallments
+      FROM hr_loans l
+      LEFT JOIN employees e ON e.id = l.employee_id
+      WHERE l.start_date >= ? AND l.start_date <= ?
+      ORDER BY l.start_date DESC
+    `, [from, to]);
+    const result = rows.map((row) => ({
+      ...row,
+      principal: Number(row.principal) || 0,
+      installmentAmount: Number(row.installmentAmount) || 0,
+      remainingBalance: Number(row.remainingBalance) || 0,
+      paidInstallments: Number(row.paidInstallments) || 0,
+      pendingInstallments: Number(row.pendingInstallments) || 0,
+    }));
+    return {
+      kpis: [
+        { label: 'قروض', value: result.length, tone: 'info' },
+        { label: 'نشطة', value: result.filter((r) => r.status === 'ACTIVE').length, tone: 'warning' },
+        { label: 'مسددة', value: result.filter((r) => r.status === 'COMPLETED').length, tone: 'success' },
+        { label: 'إجمالي المتبقي', value: fmtMoney(result.reduce((t, r) => t + r.remainingBalance, 0)), tone: 'danger' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'loanId', label: 'معرف القرض' },
+        { key: 'principal', label: 'أصل القرض', type: 'currency' },
+        { key: 'installmentAmount', label: 'القسط', type: 'currency' },
+        { key: 'paidInstallments', label: 'أقساط مسددة' },
+        { key: 'pendingInstallments', label: 'أقساط متبقية' },
+        { key: 'remainingBalance', label: 'المتبقي', type: 'currency' },
+        { key: 'startDate', label: 'تاريخ البداية', type: 'date' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrPerformanceEvaluations({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, e.full_name, '—') AS employeeName, COALESCE(pc.name, '—') AS cycleName,
+        pe.evaluator_type AS evaluatorType, pe.score, pe.rating, pe.status,
+        pe.submitted_at AS submittedAt, COALESCE(pe.notes, '—') AS notes,
+        (SELECT COUNT(*) FROM performance_evaluation_items i WHERE i.evaluation_id = pe.id) AS itemsCount
+      FROM performance_evaluations pe
+      LEFT JOIN employees e ON e.id = pe.employee_id
+      LEFT JOIN performance_cycles pc ON pc.id = pe.cycle_id
+      WHERE date(COALESCE(pe.submitted_at, pe.created_at)) BETWEEN ? AND ?
+      ORDER BY pe.score DESC, e.name
+    `, [from, to]);
+    const result = rows.map((row) => ({ ...row, score: num(row.score), itemsCount: num(row.itemsCount) }));
+    const scored = result.filter((r) => r.status !== 'DRAFT');
+    const avgScore = scored.length ? round2(scored.reduce((t, r) => t + r.score, 0) / scored.length) : 0;
+    return {
+      kpis: [
+        { label: 'تقييمات', value: result.length, tone: 'info' },
+        { label: 'مقدم/معتمد', value: result.filter((r) => r.status !== 'DRAFT').length, tone: 'success' },
+        { label: 'متوسط الدرجة', value: avgScore, hint: scored.length ? `${scored.length} تقييم مكتمل` : '—', tone: 'info' },
+        { label: 'متميزون (4.5+)', value: scored.filter((r) => r.score >= 4.5).length, tone: 'success' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'cycleName', label: 'دورة التقييم' },
+        { key: 'evaluatorType', label: 'نوع المقيّم', type: 'badge' },
+        { key: 'score', label: 'الدرجة', type: 'number' },
+        { key: 'rating', label: 'التقدير', type: 'badge' },
+        { key: 'itemsCount', label: 'عدد البنود', type: 'number' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'submittedAt', label: 'تاريخ التقديم', type: 'date' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrPerformanceGoals({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, e.full_name, '—') AS employeeName, g.title, g.weight,
+        g.target_value AS targetValue, g.actual_value AS actualValue, g.status,
+        CASE WHEN g.target_value IS NOT NULL AND g.target_value > 0
+          THEN round(COALESCE(g.actual_value, 0) * 100.0 / g.target_value, 1) ELSE NULL END AS progress
+      FROM performance_goals g
+      LEFT JOIN employees e ON e.id = g.employee_id
+      WHERE date(g.created_at) BETWEEN ? AND ?
+      ORDER BY progress DESC, e.name
+    `, [from, to]);
+    const result = rows.map((row) => ({
+      ...row,
+      weight: num(row.weight),
+      targetValue: row.targetValue === null ? null : num(row.targetValue),
+      actualValue: row.actualValue === null ? null : num(row.actualValue),
+      progress: row.progress === null ? null : num(row.progress),
+    }));
+    const withProgress = result.filter((r) => r.progress !== null);
+    const avgProgress = withProgress.length ? round2(withProgress.reduce((t, r) => t + (r.progress || 0), 0) / withProgress.length) : 0;
+    return {
+      kpis: [
+        { label: 'أهداف', value: result.length, tone: 'info' },
+        { label: 'مكتملة', value: result.filter((r) => r.status === 'COMPLETED').length, tone: 'success' },
+        { label: 'متجاوزة للمستهدف', value: withProgress.filter((r) => (r.progress || 0) >= 100).length, tone: 'success' },
+        { label: 'متوسط الإنجاز', value: avgProgress, hint: '٪ من المستهدف', tone: 'warning' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'title', label: 'الهدف' },
+        { key: 'weight', label: 'الوزن', type: 'number' },
+        { key: 'targetValue', label: 'المستهدف', type: 'number' },
+        { key: 'actualValue', label: 'المحقق', type: 'number' },
+        { key: 'progress', label: 'نسبة الإنجاز', type: 'percent' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+      ],
+      rows: result,
+    };
+  }
+
+  public hrPerformancePips({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, e.full_name, '—') AS employeeName, p.start_date AS startDate,
+        p.end_date AS endDate, p.reason, COALESCE(p.goals, '—') AS goals,
+        p.status, COALESCE(p.outcome, '—') AS outcome, p.review_date AS reviewDate
+      FROM performance_pips p
+      LEFT JOIN employees e ON e.id = p.employee_id
+      WHERE date(p.start_date) BETWEEN ? AND ?
+      ORDER BY p.end_date, e.name
+    `, [from, to]);
+    return {
+      kpis: [
+        { label: 'خطط تحسين', value: rows.length, tone: 'info' },
+        { label: 'نشطة', value: rows.filter((r) => r.status === 'ACTIVE').length, tone: 'warning' },
+        { label: 'مكتملة', value: rows.filter((r) => r.status === 'COMPLETED').length, tone: 'success' },
+        { label: 'ملغاة', value: rows.filter((r) => r.status === 'CANCELLED').length, tone: 'danger' },
+      ],
+      columns: [
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'startDate', label: 'البداية', type: 'date' },
+        { key: 'endDate', label: 'النهاية', type: 'date' },
+        { key: 'reviewDate', label: 'مراجعة', type: 'date' },
+        { key: 'reason', label: 'السبب' },
+        { key: 'goals', label: 'الأهداف' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'outcome', label: 'النتيجة' },
+      ],
+      rows,
+    };
+  }
+
+  public mfgProductionKpis({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT po.order_number AS orderNumber, COALESCE(p.name, '—') AS productName, po.quantity,
+        po.status, po.priority, po.start_date AS startDate, po.due_date AS dueDate,
+        po.completed_at AS completedAt, b.name AS branchName,
+        CASE WHEN po.due_date IS NOT NULL AND po.completed_at IS NOT NULL
+          AND date(po.completed_at) > date(po.due_date) THEN 1 ELSE 0 END AS lateFlag,
+        COALESCE((SELECT SUM(q.quantity_accepted) FROM manufacturing_quality_checks q
+          WHERE q.production_order_id = po.id), 0) AS acceptedQty,
+        COALESCE((SELECT SUM(q.quantity_rejected) FROM manufacturing_quality_checks q
+          WHERE q.production_order_id = po.id), 0) AS rejectedQty
+      FROM production_orders po
+      LEFT JOIN products p ON p.id = po.product_id
+      LEFT JOIN branches b ON b.id = po.branch_id
+      WHERE date(po.created_at) BETWEEN ? AND ?
+      ORDER BY po.created_at DESC
+    `, [from, to]);
+    const result = rows.map((row) => ({
+      ...row,
+      quantity: num(row.quantity),
+      acceptedQty: num(row.acceptedQty),
+      rejectedQty: num(row.rejectedQty),
+      lateFlag: Number(row.lateFlag) || 0,
+      lateLabel: Number(row.lateFlag) ? 'متأخر' : 'في الموعد',
+    }));
+    const completed = result.filter((r) => r.status === 'COMPLETED');
+    const onTime = completed.filter((r) => !r.lateFlag).length;
+    const inspected = result.reduce((t, r) => t + r.acceptedQty + r.rejectedQty, 0);
+    const qualityRate = inspected > 0 ? round2((result.reduce((t, r) => t + r.acceptedQty, 0) / inspected) * 100) : 0;
+    return {
+      kpis: [
+        { label: 'أوامر الإنتاج', value: result.length, tone: 'info' },
+        { label: 'مكتملة', value: completed.length, tone: 'success' },
+        { label: 'التسليم في الموعد', value: completed.length ? round2((onTime / completed.length) * 100) : 0, hint: '٪ من المكتملة', tone: 'warning' },
+        { label: 'نسبة الجودة', value: qualityRate, hint: '٪ مقبول من المفحوص', tone: 'info' },
+      ],
+      columns: [
+        { key: 'orderNumber', label: 'أمر الإنتاج' },
+        { key: 'productName', label: 'المنتج' },
+        { key: 'branchName', label: 'الفرع' },
+        { key: 'quantity', label: 'الكمية', type: 'qty' },
+        { key: 'acceptedQty', label: 'مقبول', type: 'qty' },
+        { key: 'rejectedQty', label: 'مرفوض', type: 'qty' },
+        { key: 'status', label: 'الحالة', type: 'badge' },
+        { key: 'priority', label: 'الأولوية', type: 'badge' },
+        { key: 'dueDate', label: 'الاستحقاق', type: 'date' },
+        { key: 'completedAt', label: 'الإكمال', type: 'date' },
+        { key: 'lateLabel', label: 'الالتزام', type: 'badge' },
+      ],
+      rows: result,
+    };
+  }
+
+  public salesTargetKpis({ from, to }: ReportParams): ReportResult {
+    const daysInRange = Math.max(1, Math.round((new Date(`${to}T00:00:00Z`).getTime() - new Date(`${from}T00:00:00Z`).getTime()) / 86400000) + 1);
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(e.name, e.full_name, '—') AS repName, e.monthly_target AS monthlyTarget,
+        e.commission_percentage AS commissionPct,
+        COALESCE(SUM(CASE WHEN si.date BETWEEN ? AND ? THEN si.total_amount ELSE 0 END), 0) AS totalSales
+      FROM employees e
+      LEFT JOIN orders o ON o.sales_rep_id = e.id
+      LEFT JOIN sales_invoices si ON si.id = o.invoice_id AND si.invoice_status != 'VOID'
+      WHERE e.is_sales_rep = 1 AND e.is_active = 1
+      GROUP BY e.id
+      ORDER BY totalSales DESC
+    `, [from, to]);
+    const result = rows.map((row) => {
+      const monthlyTarget = num(row.monthlyTarget);
+      const proratedTarget = round2(monthlyTarget * daysInRange / 30);
+      const sales = round2(num(row.totalSales));
+      const achievement = proratedTarget > 0 ? round2((sales / proratedTarget) * 100) : null;
+      return {
+        repName: row.repName,
+        monthlyTarget: round2(monthlyTarget),
+        proratedTarget,
+        totalSales: sales,
+        achievement,
+        commissionPct: num(row.commissionPct),
+        expectedCommission: round2(sales * num(row.commissionPct) / 100),
+        targetBadge: achievement === null ? 'بلا هدف' : achievement >= 100 ? 'محقق' : achievement >= 70 ? 'قريب' : 'متأخر',
+      };
+    });
+    const withTargets = result.filter((r) => r.proratedTarget > 0);
+    const totalTarget = round2(withTargets.reduce((t, r) => t + r.proratedTarget, 0));
+    const totalSales = round2(result.reduce((t, r) => t + r.totalSales, 0));
+    return {
+      kpis: [
+        { label: 'مندوبون بمستهدفات', value: withTargets.length, hint: `${result.length} مندوب نشط`, tone: 'info' },
+        { label: 'إجمالي المستهدف', value: fmtMoney(totalTarget), tone: 'info' },
+        { label: 'إجمالي المحقق', value: fmtMoney(totalSales), tone: 'success' },
+        { label: 'نسبة الإنجاز', value: totalTarget > 0 ? round2((totalSales / totalTarget) * 100) : 0, hint: '٪ من المستهدف الموزع', tone: totalSales >= totalTarget ? 'success' : 'warning' },
+      ],
+      columns: [
+        { key: 'repName', label: 'المندوب' },
+        { key: 'monthlyTarget', label: 'المستهدف الشهري', type: 'currency' },
+        { key: 'proratedTarget', label: 'المستهدف للفترة', type: 'currency' },
+        { key: 'totalSales', label: 'المحقق', type: 'currency' },
+        { key: 'achievement', label: 'نسبة الإنجاز', type: 'percent' },
+        { key: 'targetBadge', label: 'الحالة', type: 'badge' },
+        { key: 'commissionPct', label: 'العمولة', type: 'percent' },
+        { key: 'expectedCommission', label: 'عمولة متوقعة', type: 'currency' },
+      ],
+      rows: result,
+      notes: [`المستهدف موزع تناسبيًا على ${daysInRange} يوم من الفترة المحددة.`],
+    };
+  }
+
+  public hrTrainingExpenses({ from, to }: ReportParams): ReportResult {
+    const rows = this.db.query<any>(`
+      SELECT COALESCE(c.name, '—') AS courseName, COALESCE(e.name, e.full_name, '—') AS employeeName,
+        te.amount, te.expense_date AS expenseDate, te.payment_method AS paymentMethod,
+        COALESCE(te.description, '—') AS description
+      FROM training_expenses te
+      LEFT JOIN training_courses c ON c.id = te.course_id
+      LEFT JOIN employees e ON e.id = te.employee_id
+      WHERE date(te.expense_date) BETWEEN ? AND ?
+      ORDER BY te.expense_date DESC, te.created_at DESC
+    `, [from, to]);
+    const result = rows.map((row) => ({ ...row, amount: num(row.amount) }));
+    const total = sum(result, 'amount');
+    const topCourse = Object.entries(
+      result.reduce<Record<string, number>>((acc, r) => { acc[r.courseName] = (acc[r.courseName] || 0) + r.amount; return acc; }, {})
+    ).sort((a, b) => b[1] - a[1])[0];
+    return {
+      kpis: [
+        { label: 'مصروفات تدريب', value: result.length, tone: 'info' },
+        { label: 'إجمالي المصروف', value: fmtMoney(total), tone: 'warning' },
+        { label: 'متوسط المصروف', value: result.length ? fmtMoney(total / result.length) : fmtMoney(0), tone: 'info' },
+        { label: 'أعلى دورة تكلفة', value: topCourse ? topCourse[0] : '—', hint: topCourse ? fmtMoney(topCourse[1]) : undefined, tone: 'neutral' },
+      ],
+      columns: [
+        { key: 'courseName', label: 'الدورة' },
+        { key: 'employeeName', label: 'الموظف' },
+        { key: 'amount', label: 'المبلغ', type: 'currency' },
+        { key: 'expenseDate', label: 'التاريخ', type: 'date' },
+        { key: 'paymentMethod', label: 'طريقة الدفع', type: 'badge' },
+        { key: 'description', label: 'الوصف' },
+      ],
+      rows: result,
+    };
+  }
+
 }
 
 function fmtMoney(value: unknown): string {

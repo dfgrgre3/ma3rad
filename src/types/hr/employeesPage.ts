@@ -17,6 +17,8 @@ export interface Employee {
   emergencyContactPhone?: string | null;
   departmentId?: string | null;
   departmentName?: string | null;
+  jobGradeId?: string | null;
+  costCenterId?: string | null;
   managerEmployeeId?: string | null;
   managerName?: string | null;
   probationStartDate?: string | null;
@@ -28,8 +30,13 @@ export interface Employee {
   salaryPaymentMethod?: 'CASH' | 'BANK_TRANSFER' | 'WALLET';
   bankName?: string | null;
   bankAccountNumber?: string | null;
+  walletProvider?: string | null;
+  walletNumber?: string | null;
   socialInsuranceNumber?: string | null;
   taxFileNumber?: string | null;
+  taxExempt?: boolean;
+  taxExemptionAmount?: number;
+  taxDependents?: number;
   education?: string | null;
   previousExperience?: string | null;
   status: 'PROBATION' | 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'RESIGNED' | 'TERMINATED';
@@ -82,8 +89,13 @@ export interface EmployeeFormState {
   salaryPaymentMethod: NonNullable<Employee['salaryPaymentMethod']>;
   bankName: string;
   bankAccountNumber: string;
+  walletProvider: string;
+  walletNumber: string;
   socialInsuranceNumber: string;
   taxFileNumber: string;
+  taxExempt: boolean;
+  taxExemptionAmount: number;
+  taxDependents: number;
   education: string;
   previousExperience: string;
   status: Employee['status'];

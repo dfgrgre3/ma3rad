@@ -10,7 +10,11 @@ export function shouldShowFirstRunSetup(evidence: FirstRunSetupEvidence): boolea
     && !evidence.hasLegacyConfiguration;
 }
 
-export const BYPASS_FIRST_RUN_ACTIVATION = true;
+// يُحقن من بنية النكهة المحلية (vite.config: serve → 'local'). تحت node --test
+// لا يوجد define، لذا القيمة الافتراضية false (التقييد الطبيعي).
+declare const __BYPASS_FIRST_RUN_ACTIVATION__: boolean | undefined;
+export const BYPASS_FIRST_RUN_ACTIVATION =
+  typeof __BYPASS_FIRST_RUN_ACTIVATION__ === 'boolean' ? __BYPASS_FIRST_RUN_ACTIVATION__ : false;
 
 /**
  * وضع التشغيل المحلي الشامل، عند الحاجة:

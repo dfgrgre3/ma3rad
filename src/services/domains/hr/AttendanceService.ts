@@ -7,6 +7,7 @@ import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAcces
 import { PermissionService } from '../auth/PermissionService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { AttendanceStatus } from './EmployeeService';
+import { AttendanceTimeService } from './AttendanceTimeService';
 
 export interface AttendanceEntry {
   id: string;
@@ -794,6 +795,14 @@ export class AttendanceService {
          overtime_approved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [actor.id, attendanceId]
       );
+      db.run(
+        `UPDATE employee_attendance_periods SET overtime_approved = 1,
+           overtime_approved_by = ?, overtime_approved_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+         WHERE employee_id = ? AND attendance_date = ? AND check_out_at IS NOT NULL
+           AND overtime_minutes > 0 AND overtime_approved = 0`,
+        [actor.id, row.employeeId, row.date]
+      );
       const after = this.getAttendanceRow(row.employeeId, row.date, db)!;
       this.recordAudit(db, attendanceId, row.employeeId, row.date, 'OVERTIME_APPROVED', row, after, actor.id);
     });
@@ -1094,6 +1103,7 @@ export class AttendanceService {
     const actor = this.requireManage();
     const branchId = this.requireEmployeeBranch(employeeId, actor);
     const now = options.at || `${localDateString()}T${new Date().toTimeString().slice(0, 8)}`;
+    this.assertPeriodEditable(branchId, now.slice(0, 10));
     const date = now.slice(0, 10);
     if (!isValidDate(date) || !/^\d{2}:\d{2}/.test(now.slice(11))) {
       throw new Error('وقت تسجيل الحضور غير صالح.');
@@ -1125,6 +1135,7 @@ export class AttendanceService {
           Math.max(0, options.lateMinutes || 0), options.source || 'MANUAL',
           options.notes?.trim() || null, actor.id]
       );
+      AttendanceTimeService.syncDailySummary(employeeId, date, actor.id);
       return this.getAttendancePeriods({ employeeId }).find((row) => row.id === id)!;
     }
 
@@ -1138,6 +1149,7 @@ export class AttendanceService {
       [now, workedMinutes, Math.max(0, options.overtimeMinutes || 0),
         options.notes?.trim() || null, open.id]
     );
+    AttendanceTimeService.syncDailySummary(employeeId, date, actor.id);
     return this.getAttendancePeriods({ employeeId }).find((row) => row.id === open.id)!;
   }
 }

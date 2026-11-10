@@ -21,6 +21,8 @@ export const WarehousesPage = lazy(() => import('../pages/operations/warehouses/
 
 export const FleetDashboardPage = lazy(() => import('../pages/operations/fleet-dashboard/FleetDashboardPage').then(m => ({ default: m.FleetDashboardPage })));
 
+export const FacilityManagementPage = lazy(() => import('../pages/operations/facility-management/FacilityManagementPage').then(m => ({ default: m.FacilityManagementPage })));
+
 export const DeliveriesPage = lazy(() => import('../pages/operations/deliveries/DeliveriesPage').then(m => ({ default: m.DeliveriesPage })));
 
 export const DriversPage = lazy(() => import('../pages/operations/drivers/DriversPage').then(m => ({ default: m.DriversPage })));
@@ -46,6 +48,17 @@ export const RecruitmentPage = lazy(() => import('../pages/hr/recruitment/Recrui
 export const ManufacturingPage = lazy(() => import('../pages/manufacturing/manufacturing/ManufacturingPage').then(m => ({ default: m.ManufacturingPage })));
 
 export const HrDashboardPage = lazy(() => import('../pages/hr/hr-dashboard/HrDashboardPage').then(m => ({ default: m.HrDashboardPage })));
+
+export const HrOrganizationPage = lazy(() => import('../pages/hr/organization/HrOrganizationPage').then(m => ({ default: m.HrOrganizationPage })));
+
+export const PerformancePage = lazy(() => import('../pages/hr/performance/PerformancePage').then(m => ({ default: m.PerformancePage })));
+
+export const TrainingPage = lazy(() => import('../pages/hr/training/TrainingPage').then(m => ({ default: m.TrainingPage })));
+
+export const HrDisciplinePage = lazy(() => import('../pages/hr/discipline/HrDisciplinePage').then(m => ({ default: m.HrDisciplinePage })));
+
+export const HrBenefitsPage = lazy(() => import('../pages/hr/benefits/HrBenefitsPage').then(m => ({ default: m.HrBenefitsPage })));
+export const HrSelfServicePage = lazy(() => import('../pages/hr/self-service/HrSelfServicePage').then(m => ({ default: m.HrSelfServicePage })));
 
 // CRM & Customers
 export const CustomersView = lazy(() => import('../components/customers/CustomersView').then(m => ({ default: m.CustomersView })));

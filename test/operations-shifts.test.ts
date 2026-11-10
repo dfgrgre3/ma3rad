@@ -8,6 +8,8 @@ import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegi
 import { OperationsShiftService } from '../src/services/domains/operations/OperationsShiftService.ts';
 import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 import { AttendanceService } from '../src/services/domains/hr/AttendanceService.ts';
+import { AttendanceTimeService } from '../src/services/domains/hr/AttendanceTimeService.ts';
+import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
@@ -69,6 +71,7 @@ async function boot(): Promise<DatabaseManager> {
   db.run('DELETE FROM operation_shift_production');
   db.run('DELETE FROM operation_shift_handovers');
   db.run('DELETE FROM operation_shift_incidents');
+  db.run('DELETE FROM operation_shift_swap_requests');
   db.run('DELETE FROM employee_attendance_periods');
   db.run('DELETE FROM operation_shift_staff');
   db.run('DELETE FROM operation_shift_assignments');
@@ -213,4 +216,148 @@ test('24/7 operations shift lifecycle, multi-drawer cash, handover, attendance a
   assert.equal(replacement.operationShiftId, generated!.id);
   assert.equal(replacement.userId, cashierTwo.id);
   assert.equal(cashier.getCashShiftsForOperationShift(generated!.id).length, 2);
+});
+
+test('workforce schedule balances staffing, records absences, approves overtime and reports shift cost', async () => {
+  const db = await boot();
+  const service = new OperationsShiftService();
+  const previousMonth = new Date();
+  previousMonth.setDate(1);
+  previousMonth.setMonth(previousMonth.getMonth() - 1);
+  const date = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}-10`;
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  db.run(
+    `UPDATE employees SET base_salary = 2400, salary_type = 'MONTHLY' WHERE id IN (?, ?, ?)`,
+    [employeeOne, employeeTwo, employeeThree]
+  );
+  const definition = service.saveShiftDefinition({
+    name: 'Workforce Test',
+    startTime: '08:00',
+    endTime: '16:00',
+    workdays: [weekday],
+    minimumStaffCount: 2,
+    requiredRestMinutes: 480,
+  });
+  service.assignEmployee({
+    definitionId: definition.id,
+    employeeId: employeeOne,
+    effectiveFrom: date,
+    effectiveTo: date,
+  });
+  const generated = service.generateWorkforceSchedule(date, date);
+  assert.equal(generated.shortages.length, 0);
+  assert.equal(generated.staffAssigned, 1);
+  const shift = service.getShiftBoard({ from: date, to: date })
+    .find((row) => row.definitionId === definition.id)!;
+  assert.equal(shift.staffCount, 2);
+  assert.equal(shift.minimumStaffCount, 2);
+
+  const conflicting = service.saveShiftDefinition({
+    name: 'Workforce Conflict',
+    startTime: '12:00',
+    endTime: '20:00',
+    workdays: [weekday],
+  });
+  assert.throws(() => service.assignEmployee({
+    definitionId: conflicting.id,
+    employeeId: employeeOne,
+    effectiveFrom: date,
+    effectiveTo: date,
+  }), /تعارض وردية/);
+
+  const replacementEmployeeId = [employeeTwo, employeeThree]
+    .find((employeeId) => !service.getShiftDetail(shift.id).staff.some((staff) => staff.employeeId === employeeId))!;
+  service.replaceAbsentStaff(shift.id, employeeOne, replacementEmployeeId, 'غياب مجدول');
+  const absent = db.query<{ status: string }>(
+    'SELECT status FROM attendance WHERE employee_id = ? AND date = ?',
+    [employeeOne, date]
+  )[0];
+  assert.equal(absent.status, 'ABSENT');
+  const opened = service.openShift(shift.id);
+  assert.equal(opened.staff.filter((staff) => staff.status !== 'ABSENT').length, 2);
+  assert.equal(opened.attendancePeriods.length, 2);
+
+  db.run(
+    `UPDATE employee_attendance_periods SET check_out_at = ?, worked_minutes = 540,
+       overtime_minutes = 60, status = 'CLOSED' WHERE id = ?`,
+    [`${date}T17:00:00`, opened.attendancePeriods[0].id]
+  );
+  service.approveShiftOvertime(opened.attendancePeriods[0].id);
+  const unified = AttendanceTimeService.getUnifiedRows('br_main', date, date)
+    .find((row) => row.employeeId === opened.attendancePeriods[0].employeeId)!;
+  assert.equal(unified.approvedOvertimeMinutes, 60);
+  db.run(
+    'UPDATE employees SET joined_date = ?, hired_at = ? WHERE id IN (?, ?, ?)',
+    [`${date.slice(0, 7)}-01`, `${date.slice(0, 7)}-01`, employeeOne, employeeTwo, employeeThree]
+  );
+  const payroll = EmployeeService.calculatePayrollRun(date.slice(0, 7));
+  assert.equal(payroll.items.find((item) => item.employeeId === unified.employeeId)?.overtimeMinutes, 60);
+
+  service.recordProduction(shift.id, { targetQty: 100, producedQty: 100, goodQty: 95, scrapQty: 5 });
+  const report = service.getShiftReport(date, date).find((row) => row.shiftId === shift.id)!;
+  assert.ok(report.laborCost > 0);
+  assert.equal(report.approvedOvertimeMinutes, 60);
+  assert.ok(report.productivityPerLaborHour > 0);
+});
+
+test('shift swaps move both scheduled employees only after manager approval', async () => {
+  const db = await boot();
+  const service = new OperationsShiftService();
+  const firstDate = '2031-03-11';
+  const secondDate = '2031-03-13';
+  const firstWeekday = new Date(`${firstDate}T00:00:00Z`).getUTCDay();
+  const secondWeekday = new Date(`${secondDate}T00:00:00Z`).getUTCDay();
+  const first = service.saveShiftDefinition({
+    name: 'Swap First Test',
+    startTime: '08:00',
+    endTime: '16:00',
+    workdays: [firstWeekday],
+    minimumStaffCount: 1,
+  });
+  const second = service.saveShiftDefinition({
+    name: 'Swap Second Test',
+    startTime: '08:00',
+    endTime: '16:00',
+    workdays: [secondWeekday],
+    minimumStaffCount: 1,
+  });
+  service.assignEmployee({
+    definitionId: first.id,
+    employeeId: employeeOne,
+    effectiveFrom: firstDate,
+    effectiveTo: firstDate,
+  });
+  service.assignEmployee({
+    definitionId: second.id,
+    employeeId: employeeTwo,
+    effectiveFrom: secondDate,
+    effectiveTo: secondDate,
+  });
+  service.generateWorkforceSchedule(firstDate, secondDate);
+  const firstShift = db.query<{ id: string }>(
+    'SELECT id FROM operation_shifts WHERE definition_id = ? AND business_date = ?',
+    [first.id, firstDate]
+  )[0];
+  const secondShift = db.query<{ id: string }>(
+    'SELECT id FROM operation_shifts WHERE definition_id = ? AND business_date = ?',
+    [second.id, secondDate]
+  )[0];
+  assert.ok(firstShift);
+  assert.ok(secondShift);
+  const request = service.requestShiftSwap({
+    requesterEmployeeId: employeeOne,
+    targetEmployeeId: employeeTwo,
+    requesterShiftId: firstShift.id,
+    targetShiftId: secondShift.id,
+  });
+  assert.equal(request.status, 'PENDING');
+  service.decideShiftSwap(request.id, true, 'معتمد');
+  assert.equal(db.query<{ employeeId: string }>(
+    'SELECT employee_id AS employeeId FROM operation_shift_staff WHERE operation_shift_id = ?',
+    [firstShift.id]
+  )[0].employeeId, employeeTwo);
+  assert.equal(db.query<{ employeeId: string }>(
+    'SELECT employee_id AS employeeId FROM operation_shift_staff WHERE operation_shift_id = ?',
+    [secondShift.id]
+  )[0].employeeId, employeeOne);
 });

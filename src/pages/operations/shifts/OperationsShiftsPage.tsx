@@ -12,13 +12,14 @@ import {
   type OperationShiftStaff,
   type OperationShiftAssignmentRow,
   type OperationEmployee,
+  type OperationShiftSwapRequest,
   type OperationsWorkMode,
 } from '../../../services/domains/operations/OperationsShiftService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 
-type Tab = 'board' | 'settings' | 'reports';
+type Tab = 'board' | 'schedule' | 'settings' | 'reports';
 
 const service = new OperationsShiftService();
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -50,6 +51,19 @@ const offsetDate = (days: number) => {
   date.setDate(date.getDate() + days);
   return localDateString(date);
 };
+const schedulePeriod = (mode: 'week' | 'month', anchor: string) => {
+  const date = new Date(`${anchor}T00:00:00Z`);
+  if (mode === 'week') {
+    const start = new Date(date);
+    start.setUTCDate(start.getUTCDate() - start.getUTCDay());
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 6);
+    return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+  }
+  const from = `${anchor.slice(0, 7)}-01`;
+  const end = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+  return { from, to: end.toISOString().slice(0, 10) };
+};
 const emptyDefinition = () => ({
   id: '',
   name: '',
@@ -62,6 +76,8 @@ const emptyDefinition = () => ({
   breakMinutes: 0,
   graceMinutes: 0,
   overtimeAfterMinutes: 0,
+  minimumStaffCount: 0,
+  requiredRestMinutes: 480,
   workdays: [0, 1, 2, 3, 4, 5, 6] as number[],
   shiftOrder: 0,
 });
@@ -75,6 +91,15 @@ export const OperationsShiftsPage: React.FC = () => {
     || PermissionService.can(currentUser, 'ui.employees.employees.manage');
 
   const [tab, setTab] = useState<Tab>('board');
+  const [scheduleMode, setScheduleMode] = useState<'week' | 'month'>('week');
+  const [scheduleAnchor, setScheduleAnchor] = useState(localDateString());
+  const [scheduleShifts, setScheduleShifts] = useState<OperationShiftInstance[]>([]);
+  const [swapRequests, setSwapRequests] = useState<OperationShiftSwapRequest[]>([]);
+  const [scheduleResult, setScheduleResult] = useState<{
+    shiftsCreated: number;
+    staffAssigned: number;
+    shortages: Array<{ shiftId: string; name: string; date: string; shortageCount: number }>;
+  } | null>(null);
   const [from, setFrom] = useState(offsetDate(-1));
   const [to, setTo] = useState(offsetDate(7));
   const [shifts, setShifts] = useState<OperationShiftInstance[]>([]);
@@ -95,6 +120,12 @@ export const OperationsShiftsPage: React.FC = () => {
   const [assignmentForm, setAssignmentForm] = useState({
     definitionId: '', employeeId: '', role: 'STAFF' as 'STAFF' | 'SUPERVISOR',
     effectiveFrom: localDateString(), effectiveTo: '',
+  });
+  const [replacementForm, setReplacementForm] = useState({
+    absentEmployeeId: '', replacementEmployeeId: '', notes: '',
+  });
+  const [swapForm, setSwapForm] = useState({
+    requesterEmployeeId: '', targetEmployeeId: '', requesterShiftId: '', targetShiftId: '',
   });
   const [openForm, setOpenForm] = useState({ supervisorId: '', notes: '' });
   const [staffToAdd, setStaffToAdd] = useState('');
@@ -142,6 +173,19 @@ export const OperationsShiftsPage: React.FC = () => {
     setWorkMode(service.getWorkMode());
   }, []);
 
+  const currentScheduleRange = useMemo(
+    () => schedulePeriod(scheduleMode, scheduleAnchor),
+    [scheduleAnchor, scheduleMode]
+  );
+  const loadSchedule = useCallback(() => {
+    const rows = service.getShiftBoard({
+      from: currentScheduleRange.from,
+      to: currentScheduleRange.to,
+    });
+    setScheduleShifts(rows);
+    setSwapRequests(service.getShiftSwapRequests(currentScheduleRange.from, currentScheduleRange.to));
+  }, [currentScheduleRange]);
+
   const loadAll = useCallback(() => {
     try {
       setLoading(true);
@@ -158,6 +202,11 @@ export const OperationsShiftsPage: React.FC = () => {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+  useEffect(() => {
+    if (tab !== 'schedule') return;
+    try { loadSchedule(); }
+    catch (reason) { notify(reason instanceof Error ? reason.message : 'تعذر تحميل الجدول.', true); }
+  }, [loadSchedule, notify, tab]);
 
   const run = useCallback(async (key: string, action: () => void, success: string) => {
     try {
@@ -166,13 +215,14 @@ export const OperationsShiftsPage: React.FC = () => {
       notify(success);
       loadBoard();
       loadSettings();
+      if (tab === 'schedule') loadSchedule();
       if (detail) setDetail(service.getShiftDetail(detail.shift.id));
     } catch (e: any) {
       notify(e.message || 'تعذر تنفيذ العملية.', true);
     } finally {
       setBusy(null);
     }
-  }, [detail, loadBoard, loadSettings, notify]);
+  }, [detail, loadBoard, loadSchedule, loadSettings, notify, tab]);
 
   const openDetail = useCallback((id: string) => {
     try {
@@ -229,6 +279,8 @@ export const OperationsShiftsPage: React.FC = () => {
         breakMinutes: Number(definitionForm.breakMinutes) || 0,
         graceMinutes: Number(definitionForm.graceMinutes) || 0,
         overtimeAfterMinutes: Number(definitionForm.overtimeAfterMinutes) || 0,
+        minimumStaffCount: Number(definitionForm.minimumStaffCount) || 0,
+        requiredRestMinutes: Number(definitionForm.requiredRestMinutes) || 0,
         workdays: definitionForm.workdays,
         shiftOrder: Number(definitionForm.shiftOrder) || 0,
       });
@@ -248,6 +300,31 @@ export const OperationsShiftsPage: React.FC = () => {
       setAssignmentForm((current) => ({ ...current, employeeId: '', effectiveTo: '' }));
     }, 'تم تعيين الموظف على الوردية.');
   };
+
+  const generateSchedule = () => run('schedule', () => {
+    setScheduleResult(service.generateWorkforceSchedule(
+      currentScheduleRange.from,
+      currentScheduleRange.to
+    ));
+  }, 'تم إنشاء الجدول. راجع تنبيهات نقص العمالة قبل بداية الورديات.');
+
+  const replaceAbsentStaff = () => {
+    if (!detail || !replacementForm.absentEmployeeId || !replacementForm.replacementEmployeeId) return;
+    run('replacement', () => {
+      service.replaceAbsentStaff(
+        detail.shift.id,
+        replacementForm.absentEmployeeId,
+        replacementForm.replacementEmployeeId,
+        replacementForm.notes
+      );
+      setReplacementForm({ absentEmployeeId: '', replacementEmployeeId: '', notes: '' });
+    }, 'تم تعيين البديل وربط حضوره بالوردية.');
+  };
+
+  const submitSwapRequest = () => run('swap-request', () => {
+    service.requestShiftSwap(swapForm);
+    setSwapForm({ requesterEmployeeId: '', targetEmployeeId: '', requesterShiftId: '', targetShiftId: '' });
+  }, 'تم إرسال طلب التبديل للموافقة.');
 
   const renderShiftCard = (shift: OperationShiftInstance) => (
     <button
@@ -275,6 +352,9 @@ export const OperationsShiftsPage: React.FC = () => {
         <div className="text-left text-xs text-slate-500">
           <div className="flex items-center gap-1 justify-end"><Users className="w-3.5 h-3.5" /> {shift.presentCount}/{shift.staffCount}</div>
           <div className="flex items-center gap-1 justify-end mt-1"><Wallet className="w-3.5 h-3.5" /> {money(shift.expectedCash)}</div>
+          {shift.shortageCount > 0 && (
+            <div className="text-rose-700 font-bold mt-1">نقص {shift.shortageCount}</div>
+          )}
         </div>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
@@ -321,6 +401,7 @@ export const OperationsShiftsPage: React.FC = () => {
       <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit">
         {([
           ['board', 'لوحة الورديات', CalendarClock],
+          ['schedule', 'الجدولة والموارد', Users],
           ['settings', 'إعدادات الورديات', Settings2],
           ['reports', 'تقارير الورديات', Factory],
         ] as Array<[Tab, string, React.ComponentType<{ className?: string }>]>).map(([id, label, Icon]) => (
@@ -330,6 +411,7 @@ export const OperationsShiftsPage: React.FC = () => {
             onClick={() => {
               setTab(id);
               if (id === 'settings') loadSettings();
+              if (id === 'schedule') loadSchedule();
               if (id === 'reports') setReport(service.getShiftReport(reportFrom, reportTo));
             }}
             className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ${
@@ -497,6 +579,28 @@ export const OperationsShiftsPage: React.FC = () => {
                       </div>
                     ))}
                   </div>
+
+                  {detail.attendancePeriods.some((period) => period.overtimeMinutes > 0) && (
+                    <div className="rounded-xl border border-slate-200 p-3 space-y-2">
+                      <h4 className="text-xs font-bold text-slate-700">اعتماد الإضافي وربطه بالرواتب</h4>
+                      {detail.attendancePeriods.filter((period) => period.overtimeMinutes > 0).map((period) => (
+                        <div key={period.id} className="flex items-center justify-between gap-2 text-xs">
+                          <span>{period.employeeName} · {period.overtimeMinutes} دقيقة</span>
+                          {period.overtimeApproved ? (
+                            <span className="text-emerald-700 font-bold">معتمد</span>
+                          ) : canManage && period.status === 'CLOSED' ? (
+                            <button type="button" disabled={busy === `overtime-${period.id}`}
+                              onClick={() => run(`overtime-${period.id}`,
+                                () => service.approveShiftOvertime(period.id),
+                                'تم اعتماد الإضافي وسيظهر في دورة الرواتب.')}
+                              className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 font-bold">اعتماد</button>
+                          ) : (
+                            <span className="text-amber-700">بانتظار إغلاق الفترة</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <h3 className="font-bold text-slate-700 text-sm flex items-center gap-2 pt-2"><Wallet className="w-4 h-4" /> ورديات الكاشير المرتبطة</h3>
                   <div className="rounded-xl border border-slate-200 overflow-hidden text-xs">
@@ -686,6 +790,181 @@ export const OperationsShiftsPage: React.FC = () => {
         </>
       )}
 
+      {tab === 'schedule' && (
+        <div className="space-y-4">
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+            <div className="flex items-end gap-3 flex-wrap">
+              <label className="text-xs font-bold text-slate-600">نوع الجدول
+                <select value={scheduleMode} onChange={(e) => setScheduleMode(e.target.value as 'week' | 'month')}
+                  className="block mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <option value="week">أسبوعي</option>
+                  <option value="month">شهري</option>
+                </select>
+              </label>
+              <label className="text-xs font-bold text-slate-600">
+                {scheduleMode === 'week' ? 'اختر يوماً من الأسبوع' : 'الشهر'}
+                <input type={scheduleMode === 'week' ? 'date' : 'month'}
+                  value={scheduleMode === 'week' ? scheduleAnchor : scheduleAnchor.slice(0, 7)}
+                  onChange={(e) => setScheduleAnchor(scheduleMode === 'week' ? e.target.value : `${e.target.value}-01`)}
+                  className="block mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              </label>
+              <div className="text-xs text-slate-500 pb-2">
+                الفترة: {currentScheduleRange.from} — {currentScheduleRange.to}
+              </div>
+              <button type="button" disabled={!canManage || busy === 'schedule'} onClick={generateSchedule}
+                className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-bold">
+                إنشاء / توزيع الجدول تلقائياً
+              </button>
+              <button type="button" onClick={loadSchedule}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-bold">تحديث</button>
+            </div>
+            {scheduleResult && (
+              <div className="rounded-xl bg-teal-50 p-3 text-xs text-teal-800">
+                أُنشئت {scheduleResult.shiftsCreated} وردية وأضيف {scheduleResult.staffAssigned} تعيين تلقائي.
+                {scheduleResult.shortages.length > 0
+                  ? ` يوجد نقص في ${scheduleResult.shortages.length} وردية؛ راجع القائمة قبل بدايتها.`
+                  : ' تمت تغطية الحد الأدنى للعمالة في جميع الورديات.'}
+              </div>
+            )}
+            {scheduleShifts.some((shift) => shift.shortageCount > 0) && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                <div className="font-bold flex items-center gap-2"><AlertTriangle className="h-4 w-4" /> نقص عمالة قبل بداية الوردية</div>
+                <div className="mt-1 space-y-1">
+                  {scheduleShifts.filter((shift) => shift.shortageCount > 0).map((shift) => (
+                    <div key={shift.id}>{shift.businessDate} · {shift.definitionName}: ينقص {shift.shortageCount} موظف</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {scheduleShifts.map((shift) => (
+                <button key={shift.id} type="button" onClick={() => openDetail(shift.id)}
+                  className={`rounded-xl border p-3 text-right ${
+                    detail?.shift.id === shift.id ? 'border-teal-500 ring-2 ring-teal-100' : 'border-slate-200'
+                  }`}>
+                  <div className="flex justify-between gap-2">
+                    <span className="font-bold text-slate-800">{shift.definitionName}</span>
+                    <span className="text-xs text-slate-500">{shift.businessDate}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {timeOf(shift.scheduledStart)}–{timeOf(shift.scheduledEnd)} · {shift.staffCount}/{shift.minimumStaffCount} موظف
+                  </div>
+                  {shift.shortageCount > 0 && (
+                    <div className="mt-2 text-xs font-bold text-rose-700">ينقص {shift.shortageCount} قبل البداية</div>
+                  )}
+                </button>
+              ))}
+              {scheduleShifts.length === 0 && (
+                <div className="col-span-full rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
+                  لا توجد ورديات معرفة في الفترة المحددة.
+                </div>
+              )}
+            </div>
+          </section>
+
+          {detail && scheduleShifts.some((shift) => shift.id === detail.shift.id) && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+              <h2 className="font-black text-slate-800">{detail.shift.definitionName} · طاقم {detail.shift.businessDate}</h2>
+              <div className="grid md:grid-cols-2 gap-2">
+                {detail.staff.map((member) => (
+                  <div key={member.id} className="rounded-lg border border-slate-100 p-2 text-sm flex justify-between">
+                    <span>{member.employeeName}</span>
+                    <span className={member.status === 'ABSENT' ? 'text-rose-700' : 'text-slate-500'}>
+                      {member.status === 'ABSENT' ? 'غائب' : member.status === 'LEAVE' ? 'إجازة' : member.checkInAt ? 'حاضر' : 'مجدول'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {canManage && ['PLANNED', 'MISSED'].includes(detail.shift.status) && (
+                <div className="grid md:grid-cols-4 gap-2 rounded-xl bg-slate-50 p-3">
+                  <select value={replacementForm.absentEmployeeId}
+                    onChange={(e) => setReplacementForm({ ...replacementForm, absentEmployeeId: e.target.value })}
+                    className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
+                    <option value="">الموظف الغائب</option>
+                    {detail.staff.filter((member) => !member.checkInAt && member.status !== 'ABSENT')
+                      .map((member) => <option key={member.employeeId} value={member.employeeId}>{member.employeeName}</option>)}
+                  </select>
+                  <select value={replacementForm.replacementEmployeeId}
+                    onChange={(e) => setReplacementForm({ ...replacementForm, replacementEmployeeId: e.target.value })}
+                    className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
+                    <option value="">الموظف البديل</option>
+                    {employees.filter((employee) => !detail.staff.some((member) => member.employeeId === employee.id))
+                      .map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
+                  </select>
+                  <input value={replacementForm.notes}
+                    onChange={(e) => setReplacementForm({ ...replacementForm, notes: e.target.value })}
+                    placeholder="سبب الغياب أو ملاحظة" className="rounded-lg border border-slate-200 px-2 py-2 text-xs" />
+                  <button type="button" disabled={!replacementForm.absentEmployeeId || !replacementForm.replacementEmployeeId}
+                    onClick={replaceAbsentStaff}
+                    className="rounded-lg bg-amber-600 text-white text-xs font-bold">تعيين بديل</button>
+                </div>
+              )}
+            </section>
+          )}
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+            <h2 className="font-black text-slate-800 flex items-center gap-2"><ArrowRightLeft className="h-4 w-4" /> طلب تبديل وردية بموافقة المدير</h2>
+            {canManage && (
+              <div className="grid md:grid-cols-5 gap-2">
+                <select value={swapForm.requesterEmployeeId}
+                  onChange={(e) => setSwapForm({ ...swapForm, requesterEmployeeId: e.target.value })}
+                  className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
+                  <option value="">الموظف الطالب</option>
+                  {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
+                </select>
+                <select value={swapForm.requesterShiftId}
+                  onChange={(e) => setSwapForm({ ...swapForm, requesterShiftId: e.target.value })}
+                  className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
+                  <option value="">وردية الموظف</option>
+                  {scheduleShifts.filter((shift) => shift.status === 'PLANNED').map((shift) => (
+                    <option key={shift.id} value={shift.id}>{shift.businessDate} · {shift.definitionName}</option>
+                  ))}
+                </select>
+                <select value={swapForm.targetEmployeeId}
+                  onChange={(e) => setSwapForm({ ...swapForm, targetEmployeeId: e.target.value })}
+                  className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
+                  <option value="">الموظف البديل</option>
+                  {employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}
+                </select>
+                <select value={swapForm.targetShiftId}
+                  onChange={(e) => setSwapForm({ ...swapForm, targetShiftId: e.target.value })}
+                  className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
+                  <option value="">وردية الموظف البديل</option>
+                  {scheduleShifts.filter((shift) => shift.status === 'PLANNED').map((shift) => (
+                    <option key={shift.id} value={shift.id}>{shift.businessDate} · {shift.definitionName}</option>
+                  ))}
+                </select>
+                <button type="button" disabled={busy === 'swap-request' || !swapForm.requesterEmployeeId
+                  || !swapForm.targetEmployeeId || !swapForm.requesterShiftId || !swapForm.targetShiftId}
+                  onClick={submitSwapRequest}
+                  className="rounded-lg bg-slate-800 text-white text-xs font-bold">إرسال للموافقة</button>
+              </div>
+            )}
+            <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+              {swapRequests.length === 0 && <div className="p-4 text-xs text-slate-400 text-center">لا توجد طلبات تبديل.</div>}
+              {swapRequests.map((request) => (
+                <div key={request.id} className="p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span>{request.requesterEmployeeName} ({request.requesterShiftDate} · {request.requesterShiftName})
+                    {' ↔ '}{request.targetEmployeeName} ({request.targetShiftDate} · {request.targetShiftName})</span>
+                  <span className="font-bold">{request.status === 'PENDING' ? 'بانتظار المدير'
+                    : request.status === 'APPROVED' ? 'معتمد' : 'مرفوض'}</span>
+                  {canManage && request.status === 'PENDING' && (
+                    <span className="flex gap-2">
+                      <button type="button" onClick={() => run(`swap-${request.id}`,
+                        () => service.decideShiftSwap(request.id, true), 'تم اعتماد التبديل.')}
+                        className="rounded bg-emerald-50 px-2 py-1 text-emerald-700 font-bold">اعتماد</button>
+                      <button type="button" onClick={() => run(`swap-${request.id}`,
+                        () => service.decideShiftSwap(request.id, false), 'تم رفض الطلب.')}
+                        className="rounded bg-rose-50 px-2 py-1 text-rose-700 font-bold">رفض</button>
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
       {tab === 'settings' && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
@@ -719,6 +998,8 @@ export const OperationsShiftsPage: React.FC = () => {
                       color: definition.color || '#0f766e', startTime: definition.startTime.slice(0, 5),
                       endTime: definition.endTime.slice(0, 5), breakMinutes: definition.breakMinutes,
                       graceMinutes: definition.graceMinutes, overtimeAfterMinutes: definition.overtimeAfterMinutes,
+                      minimumStaffCount: definition.minimumStaffCount,
+                      requiredRestMinutes: definition.requiredRestMinutes,
                       workdays: definition.workdays, shiftOrder: definition.shiftOrder,
                     })}
                     className="w-full text-right rounded-xl border border-slate-200 p-3 hover:bg-slate-50">
@@ -728,6 +1009,7 @@ export const OperationsShiftsPage: React.FC = () => {
                     </div>
                     <div className="text-[11px] text-slate-500 mt-1">
                       {definition.department || 'بدون قسم'} · {definition.assignedCount} موظف
+                      · الحد الأدنى {definition.minimumStaffCount}
                       {definition.crossesMidnight ? ' · تمتد بعد منتصف الليل' : ''}
                     </div>
                   </button>
@@ -759,7 +1041,8 @@ export const OperationsShiftsPage: React.FC = () => {
                 </label>
                 {([
                   ['breakMinutes', 'استراحة (د)'], ['graceMinutes', 'سماحية تأخير (د)'],
-                  ['overtimeAfterMinutes', 'إضافي بعد (د)'], ['shiftOrder', 'الترتيب'],
+                  ['overtimeAfterMinutes', 'إضافي بعد (د)'], ['minimumStaffCount', 'الحد الأدنى للعاملين'],
+                  ['requiredRestMinutes', 'الراحة بين الورديات (د)'], ['shiftOrder', 'الترتيب'],
                 ] as Array<[keyof typeof definitionForm, string]>).map(([key, label]) => (
                   <label key={key} className="text-[11px] font-bold text-slate-500">{label}
                     <input type="number" min={0} value={Number(definitionForm[key] || 0)}
@@ -871,13 +1154,13 @@ export const OperationsShiftsPage: React.FC = () => {
             <table className="w-full text-xs text-right">
               <thead className="bg-slate-50 text-slate-500">
                 <tr>
-                  {['الوردية', 'التاريخ', 'الحالة', 'المشرف', 'الموظفون', 'المتوقع', 'الفعلي', 'الفرق', 'المسلّم', 'إنتاج', 'هالك', 'توقف', 'ملاحظات'].map((head) => (
+                  {['الوردية', 'التاريخ', 'الحالة', 'المشرف', 'الموظفون', 'المتوقع', 'الفعلي', 'الفرق', 'المسلّم', 'إنتاج جيد', 'هالك', 'توقف', 'ملاحظات', 'تكلفة العمالة', 'إضافي معتمد (د)', 'إنتاج/ساعة عمل', 'تكلفة/وحدة'].map((head) => (
                     <th key={head} className="p-2 font-bold whitespace-nowrap">{head}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {report.length === 0 && <tr><td colSpan={13} className="p-6 text-center text-slate-400">لا توجد بيانات.</td></tr>}
+                {report.length === 0 && <tr><td colSpan={17} className="p-6 text-center text-slate-400">لا توجد بيانات.</td></tr>}
                 {report.map((row) => (
                   <tr key={row.shiftId} className="border-t border-slate-100">
                     <td className="p-2 font-bold text-slate-700 whitespace-nowrap">{row.definitionName}</td>
@@ -893,6 +1176,10 @@ export const OperationsShiftsPage: React.FC = () => {
                     <td className="p-2">{row.scrapQty}</td>
                     <td className="p-2">{row.downtimeMinutes}</td>
                     <td className="p-2">{row.incidents}</td>
+                    <td className="p-2">{money(row.laborCost)}</td>
+                    <td className="p-2">{row.approvedOvertimeMinutes}</td>
+                    <td className="p-2">{row.productivityPerLaborHour.toFixed(2)}</td>
+                    <td className="p-2">{money(row.costPerGoodUnit)}</td>
                   </tr>
                 ))}
               </tbody>

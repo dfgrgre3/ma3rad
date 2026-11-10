@@ -313,6 +313,8 @@ export class CentralLicenseService {
     issueType: string;
     severity: string;
   }): Promise<void> {
+    if (typeof window === 'undefined' || !window.ceramisys?.central?.getStatus) return;
+
     try {
       const status = await this.getStatus();
       if (!status.configured) return;

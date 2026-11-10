@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Archive,
   Award,
+  Banknote,
   BarChart3,
   Boxes,
   CalendarClock,
@@ -13,17 +14,25 @@ import {
   DollarSign,
   FileCheck2,
   FileSpreadsheet,
+  FileText,
+  Factory,
   Gauge,
+  GraduationCap,
   GitCompare,
   Landmark,
   LineChart,
+  MessageSquare,
   Package,
+  HeartPulse,
+  Gift,
+  Paperclip,
   PackageSearch,
   Receipt,
   Scale,
   ShieldAlert,
   ShoppingCart,
   Sparkles,
+  Star,
   Target,
   TrendingDown,
   TrendingUp,
@@ -42,7 +51,8 @@ export type ReportCategoryId =
   | 'credit'
   | 'inventory'
   | 'finance'
-  | 'forecast';
+  | 'forecast'
+  | 'hr';
 
 export interface ReportCategory {
   id: ReportCategoryId;
@@ -59,6 +69,14 @@ export interface ReportControl {
   options?: Array<{ value: string; label: string }>;
 }
 
+export type ReportChartType = 'bar' | 'line' | 'area' | 'pie';
+
+export interface ReportDrilldown {
+  label: string;
+  route: string;
+  note?: string;
+}
+
 export interface ReportDefinition {
   id: string;
   title: string;
@@ -69,6 +87,8 @@ export interface ReportDefinition {
   controls?: ReportControl[];
   legacyTab?: 'sales' | 'purchases' | 'pos' | 'finance' | 'profitLoss' | 'tax';
   accent?: string;
+  chart?: ReportChartType;
+  drilldown?: ReportDrilldown;
 }
 
 export const REPORT_CATEGORIES: ReportCategory[] = [
@@ -120,6 +140,13 @@ export const REPORT_CATEGORIES: ReportCategory[] = [
     description: 'توقع الطلب والنفاد، العملاء المعرضون للفقد، وتحليل السلة.',
     icon: Sparkles,
     color: 'indigo',
+  },
+  {
+    id: 'hr',
+    label: 'الموارد البشرية',
+    description: 'الرواتب، الصرف، الحضور، الإجازات والضرائب.',
+    icon: Users,
+    color: 'teal',
   },
 ];
 
@@ -208,6 +235,219 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     legacyTab: 'tax',
     accent: 'rose',
   },
+  // HR
+  {
+    id: 'hr-payroll-summary',
+    title: 'كشف الرواتب',
+    description: 'مستحقات الموظفين حسب الفترة: أساسي، إضافي، مكافآت، خصومات، ضرائب وصافي.',
+    category: 'hr',
+    icon: Wallet,
+    dateMode: 'range',
+    accent: 'teal',
+  },
+  {
+    id: 'hr-payroll-payouts',
+    title: 'صرف الرواتب',
+    description: 'عمليات صرف الرواتب حسب الطريقة (نقدي/بنكي/محفظة) مع المراجع والإثباتات.',
+    category: 'hr',
+    icon: Banknote,
+    dateMode: 'range',
+    accent: 'sky',
+  },
+  {
+    id: 'hr-attendance-summary',
+    title: 'ملخص الحضور',
+    description: 'أيام الحضور، التأخير، العمل الإضافي (معتمد) لكل موظف.',
+    category: 'hr',
+    icon: ClipboardList,
+    dateMode: 'range',
+    accent: 'emerald',
+  },
+  {
+    id: 'hr-leave-summary',
+    title: 'الإجازات',
+    description: 'طلبات الإجازات (معتمدة/معلقة) وأيام الإجازة.',
+    category: 'hr',
+    icon: CalendarClock,
+    dateMode: 'range',
+    accent: 'amber',
+  },
+  {
+    id: 'hr-tax-summary',
+    title: 'ضرائب الرواتب',
+    description: 'الضريبة حسب قاعدة الضريبة (شرائح) مع الخاضع والإعفاءات.',
+    category: 'hr',
+    icon: Receipt,
+    dateMode: 'range',
+    accent: 'rose',
+  },
+  {
+    id: 'hr-vacancies',
+    title: 'الشواغر الوظيفية',
+    description: 'المطلوب مقابل الفعلي والشواغر حسب القسم.',
+    category: 'hr',
+    icon: Users,
+    dateMode: 'range',
+    accent: 'rose',
+  },
+  {
+    id: 'hr-onboarding',
+    title: 'تأهيل الموظفين',
+    description: 'مهام التأهيل: مكتملة، معلقة، متأخرة.',
+    category: 'hr',
+    icon: ClipboardList,
+    dateMode: 'range',
+    accent: 'teal',
+  },
+  {
+    id: 'hr-probation',
+    title: 'تقييمات فترة الاختبار',
+    description: 'تقييمات فترة الاختبار والتوصيات.',
+    category: 'hr',
+    icon: Award,
+    dateMode: 'range',
+    accent: 'amber',
+  },
+  {
+    id: 'hr-violations',
+    title: 'المخالفات',
+    description: 'سجل المخالفات حسب الموظف والخطورة.',
+    category: 'hr',
+    icon: ShieldAlert,
+    dateMode: 'range',
+    accent: 'rose',
+  },
+  {
+    id: 'hr-complaints',
+    title: 'الشكاوى',
+    description: 'شكاوى الموظفين وحالاتها.',
+    category: 'hr',
+    icon: MessageSquare,
+    dateMode: 'range',
+    accent: 'amber',
+  },
+  {
+    id: 'hr-penalties-report',
+    title: 'الجزاءات',
+    description: 'جزاءات الموظفين (مسودة/معتمدة/مرحّلة).',
+    category: 'hr',
+    icon: Scale,
+    dateMode: 'range',
+    accent: 'rose',
+  },
+  {
+    id: 'hr-warnings',
+    title: 'الإنذارات',
+    description: 'إنذارات الموظفين (صادرة/ملغاة).',
+    category: 'hr',
+    icon: AlertTriangle,
+    dateMode: 'range',
+    accent: 'amber',
+  },
+  {
+    id: 'hr-appeals',
+    title: 'التظلمات',
+    description: 'تظلمات الموظفين وقراراتها.',
+    category: 'hr',
+    icon: FileText,
+    dateMode: 'range',
+    accent: 'rose',
+  },
+  {
+    id: 'hr-attachments',
+    title: 'مرفقات قضايا HR',
+    description: 'مرفقات المخالفات/الشكاوى/الجزاءات.',
+    category: 'hr',
+    icon: Paperclip,
+    dateMode: 'range',
+    accent: 'teal',
+  },
+  {
+    id: 'hr-allowances',
+    title: 'البدلات',
+    description: 'بدلات الموظفين الشهرية ومرة واحدة.',
+    category: 'hr',
+    icon: Gift,
+    dateMode: 'range',
+    accent: 'emerald',
+  },
+  {
+    id: 'hr-benefits',
+    title: 'المزايا والتأمينات',
+    description: 'مزايا وتأمينات الموظفين وتكلفتها.',
+    category: 'hr',
+    icon: HeartPulse,
+    dateMode: 'range',
+    accent: 'emerald',
+  },
+  {
+    id: 'hr-loans',
+    title: 'قروض الموظفين',
+    description: 'القروض والأقساط والمتبقي.',
+    category: 'hr',
+    icon: Landmark,
+    dateMode: 'range',
+    accent: 'emerald',
+  },
+  {
+    id: 'hr-performance-evaluations',
+    title: 'تقييمات الأداء',
+    description: 'تقييمات الموظفين حسب الدورة والدرجة والتقدير.',
+    category: 'hr',
+    icon: Star,
+    dateMode: 'range',
+    accent: 'teal',
+  },
+  {
+    id: 'hr-performance-goals',
+    title: 'أهداف الأداء',
+    description: 'أهداف الموظفين: المستهدف والمحقق ونسبة الإنجاز.',
+    category: 'hr',
+    icon: Target,
+    dateMode: 'range',
+    accent: 'teal',
+  },
+  {
+    id: 'hr-performance-pips',
+    title: 'خطط تحسين الأداء',
+    description: 'خطط تحسين الأداء وحالتها ونتائجها.',
+    category: 'hr',
+    icon: TrendingUp,
+    dateMode: 'range',
+    accent: 'teal',
+  },
+  {
+    id: 'mfg-production-kpis',
+    title: 'مؤشرات الإنتاج',
+    description: 'أوامر الإنتاج: الكميات، الجودة، الالتزام بالمواعيد.',
+    category: 'operations',
+    icon: Factory,
+    dateMode: 'range',
+    accent: 'sky',
+  },
+  {
+    id: 'sales-target-kpis',
+    title: 'أهداف المبيعات',
+    description: 'مستهدفات المندوبين مقابل المحقق ونسب الإنجاز والعمولات.',
+    category: 'sales',
+    icon: Target,
+    dateMode: 'range',
+    accent: 'emerald',
+  },
+  {
+    id: 'hr-training-expenses',
+    title: 'مصروفات التدريب',
+    description: 'مصروفات الدورات التدريبية حسب الدورة والموظف وطريقة الدفع.',
+    category: 'hr',
+    icon: GraduationCap,
+    dateMode: 'range',
+    accent: 'emerald',
+  },
+
+
+
+
+
 
   // Operations
   {
@@ -276,6 +516,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     icon: BarChart3,
     dateMode: 'range',
     controls: [DIMENSION_SALES],
+    chart: 'line',
+    drilldown: { label: 'فتح تفاصيل المبيعات', route: '/sales/invoices', note: 'عرض الفواتير المكوّنة للمبلغ.' },
   },
   {
     id: 'product-sales',
@@ -429,6 +671,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     icon: Wallet,
     dateMode: 'range',
     controls: [{ key: 'registerId', label: 'الخزينة', kind: 'register' }],
+    chart: 'area',
+    drilldown: { label: 'فتح سندات الخزينة', route: '/finance/cash-registers', note: 'عرض الحركات والسندات المرتبطة بالخزينة.' },
   },
   {
     id: 'shift-closing',
@@ -445,6 +689,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'finance',
     icon: LineChart,
     dateMode: 'asOf',
+    chart: 'area',
+    drilldown: { label: 'فتح تفاصيل التدفق النقدي', route: '/finance/cash-flow', note: 'عرض كل التحصيلات والمدفوعات المتوقعة.' },
   },
   {
     id: 'break-even',
@@ -453,6 +699,8 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
     category: 'finance',
     icon: Target,
     dateMode: 'range',
+    chart: 'pie',
+    drilldown: { label: 'فتح تفاصيل المصروفات', route: '/finance/expenses', note: 'عرض المصروفات المصنفة إلى ثابتة ومتغيرة وشبه متغيرة.' },
   },
   {
     id: 'branch-performance',
@@ -511,80 +759,188 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
 const service = new ReportCenterService();
 
 export function runReport(id: string, params: ReportParams): ReportResult {
+  let result: ReportResult;
+
   switch (id) {
     case 'operations-log':
-      return service.operationsLog(params);
+      result = service.operationsLog(params);
+      break;
     case 'user-activity':
-      return service.userActivity(params);
+      result = service.userActivity(params);
+      break;
     case 'daily-movements':
-      return service.dailyMovements(params);
+      result = service.dailyMovements(params);
+      break;
     case 'exceptions':
-      return service.exceptionsLog(params);
+      result = service.exceptionsLog(params);
+      break;
     case 'approvals':
-      return service.approvalsLog(params);
+      result = service.approvalsLog(params);
+      break;
     case 'received-reports':
-      return service.receivedReports(params);
+      result = service.receivedReports(params);
+      break;
     case 'alerts':
-      return service.alertsSummary(params);
+      result = service.alertsSummary(params);
+      break;
     case 'sales-analysis':
-      return service.salesAnalysis(params);
+      result = service.salesAnalysis(params);
+      break;
     case 'product-sales':
-      return service.productSales(params);
+      result = service.productSales(params);
+      break;
     case 'product-detail':
-      return service.productDetail(params);
+      result = service.productDetail(params);
+      break;
     case 'product-profitability':
-      return service.productProfitability(params);
+      result = service.productProfitability(params);
+      break;
     case 'customer-profitability':
-      return service.customerProfitability(params);
+      result = service.customerProfitability(params);
+      break;
     case 'period-comparison':
-      return service.periodComparison(params);
+      result = service.periodComparison(params);
+      break;
     case 'ar-aging':
-      return service.arAging(params);
+      result = service.arAging(params);
+      break;
     case 'credit-exposure':
-      return service.creditExposure(params);
+      result = service.creditExposure(params);
+      break;
     case 'payment-behavior':
-      return service.paymentBehavior(params);
+      result = service.paymentBehavior(params);
+      break;
     case 'cheque-maturity':
-      return service.chequeMaturity(params);
+      result = service.chequeMaturity(params);
+      break;
     case 'bounced-cheques':
-      return service.bouncedCheques(params);
+      result = service.bouncedCheques(params);
+      break;
     case 'installment-aging':
-      return service.installmentAging(params);
+      result = service.installmentAging(params);
+      break;
     case 'inventory-balances':
-      return service.inventoryBalances();
+      result = service.inventoryBalances();
+      break;
     case 'slow-moving':
-      return service.slowMoving(params);
+      result = service.slowMoving(params);
+      break;
     case 'purchase-analysis':
-      return service.purchaseAnalysis(params);
+      result = service.purchaseAnalysis(params);
+      break;
     case 'supplier-prices':
-      return service.supplierPrices(params);
+      result = service.supplierPrices(params);
+      break;
     case 'count-variance':
-      return service.countVariance(params);
+      result = service.countVariance(params);
+      break;
     case 'financial-position':
-      return service.financialPosition(params);
+      result = service.financialPosition(params);
+      break;
     case 'cash-movement':
-      return service.cashMovement(params);
+      result = service.cashMovement(params);
+      break;
     case 'shift-closing':
-      return service.shiftClosing(params);
+      result = service.shiftClosing(params);
+      break;
     case 'cash-flow-forecast':
-      return service.cashFlowForecast(params);
+      result = service.cashFlowForecast(params);
+      break;
     case 'break-even':
-      return service.breakEven(params);
+      result = service.breakEven(params);
+      break;
     case 'branch-performance':
-      return service.branchPerformance(params);
+      result = service.branchPerformance(params);
+      break;
     case 'demand-forecast':
-      return service.demandForecast(params);
+      result = service.demandForecast(params);
+      break;
     case 'customer-churn':
-      return service.customerChurn(params);
+      result = service.customerChurn(params);
+      break;
     case 'basket':
-      return service.basketAnalysis(params);
+      result = service.basketAnalysis(params);
+      break;
     case 'sales-rep-performance':
-      return service.salesRepPerformance(params);
+      result = service.salesRepPerformance(params);
+      break;
     case 'cash-flow-detailed':
-      return service.cashFlowDetailed(params);
+      result = service.cashFlowDetailed(params);
+      break;
+    case 'hr-payroll-summary':
+      result = service.hrPayrollSummary(params);
+      break;
+    case 'hr-payroll-payouts':
+      result = service.hrPayrollPayouts(params);
+      break;
+    case 'hr-attendance-summary':
+      result = service.hrAttendanceSummary(params);
+      break;
+    case 'hr-leave-summary':
+      result = service.hrLeaveSummary(params);
+      break;
+    case 'hr-tax-summary':
+      result = service.hrTaxSummary(params);
+      break;
+    case 'hr-vacancies':
+      result = service.hrVacancies(params);
+      break;
+    case 'hr-onboarding':
+      result = service.hrOnboarding(params);
+      break;
+    case 'hr-probation':
+      result = service.hrProbation(params);
+      break;
+    case 'hr-violations':
+      result = service.hrViolations(params);
+      break;
+    case 'hr-complaints':
+      result = service.hrComplaints(params);
+      break;
+    case 'hr-penalties-report':
+      result = service.hrPenaltiesReport(params);
+      break;
+    case 'hr-warnings':
+      result = service.hrWarnings(params);
+      break;
+    case 'hr-appeals':
+      result = service.hrAppeals(params);
+      break;
+    case 'hr-attachments':
+      result = service.hrAttachments(params);
+      break;
+    case 'hr-allowances':
+      result = service.hrAllowances(params);
+      break;
+    case 'hr-benefits':
+      result = service.hrBenefits(params);
+      break;
+    case 'hr-loans':
+      result = service.hrLoans(params);
+      break;
+    case 'hr-performance-evaluations':
+      result = service.hrPerformanceEvaluations(params);
+      break;
+    case 'hr-performance-goals':
+      result = service.hrPerformanceGoals(params);
+      break;
+    case 'hr-performance-pips':
+      result = service.hrPerformancePips(params);
+      break;
+    case 'mfg-production-kpis':
+      result = service.mfgProductionKpis(params);
+      break;
+    case 'sales-target-kpis':
+      result = service.salesTargetKpis(params);
+      break;
+    case 'hr-training-expenses':
+      result = service.hrTrainingExpenses(params);
+      break;
     default:
       throw new Error('تقرير غير معروف.');
   }
+
+  return ReportCenterService.applyAdvancedFilters(result, params) ?? result;
 }
 
 export const findReport = (id: string | null): ReportDefinition | undefined =>

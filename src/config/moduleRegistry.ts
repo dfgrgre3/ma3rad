@@ -119,7 +119,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الفروع والمخازن والموظفون والحضور والرواتب والتوصيل.',
     dependencies: [],
     permissions: ['branches.view'],
-    paths: ['/fleet/dashboard', '/branches', '/warehouses', '/deliveries', '/drivers', '/vehicles', '/operations/shifts'],
+    paths: ['/fleet/dashboard', '/facility-management', '/branches', '/warehouses', '/deliveries', '/drivers', '/vehicles', '/operations/shifts'],
     businessEvents: ['payroll.posted', 'attendance.recorded', 'delivery.completed'],
     settings: [
       { key: 'payrollCurrency', label: 'عملة الرواتب', type: 'string', defaultValue: '' },
@@ -179,7 +179,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الموظفون والحضور والرواتب والإجازات والعقود والمستندات والتوظيف.',
     dependencies: ['finance'],
     permissions: ['employees.view'],
-    paths: ['/employees', '/employees/attendance', '/employees/payroll', '/employees/commissions', '/employees/leave', '/employees/contracts', '/employees/documents', '/employees/recruitment', '/hr/dashboard'],
+    paths: ['/employees', '/employees/attendance', '/employees/payroll', '/employees/commissions', '/employees/leave', '/employees/contracts', '/employees/documents', '/employees/recruitment', '/hr/dashboard', '/hr/organization', '/hr/performance', '/hr/training', '/hr/discipline', '/hr/benefits', '/hr/self-service'],
     businessEvents: ['employee.created', 'attendance.recorded', 'payroll.posted', 'recruitment.job.opened', 'recruitment.candidate.updated'],
     settings: [],
     activation: {},

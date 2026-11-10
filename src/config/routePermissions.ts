@@ -127,6 +127,7 @@ export const ROUTE_PERMISSIONS: RoutePermissionRule[] = [
   // المشاريع والعمليات
   { path: '/projects', all: ['projects.view'] },
   { path: '/fleet/dashboard', any: ['operations.fleet.view', 'deliveries.view'] },
+  { path: '/facility-management', any: ['operations.view'] },
   { path: '/deliveries', all: ['deliveries.view'] },
   { path: '/drivers', all: ['drivers.view'] },
   { path: '/vehicles', all: ['vehicles.view'] },

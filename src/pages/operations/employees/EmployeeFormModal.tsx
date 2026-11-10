@@ -359,6 +359,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                 <input type="text" maxLength={34} autoComplete="off" value={form.bankAccountNumber}
                   onChange={(e) => onFormChange((prev) => ({ ...prev, bankAccountNumber: e.target.value }))}
                   className={fieldClass} /></label>
+              <label><span className={labelClass}>مزود المحفظة الإلكترونية</span>
+                <input type="text" maxLength={100} value={form.walletProvider}
+                  onChange={(e) => onFormChange((prev) => ({ ...prev, walletProvider: e.target.value }))}
+                  placeholder="مثال: فودافون كاش" className={fieldClass} /></label>
+              <label><span className={labelClass}>رقم المحفظة الإلكترونية</span>
+                <input type="text" maxLength={40} autoComplete="off" value={form.walletNumber}
+                  onChange={(e) => onFormChange((prev) => ({ ...prev, walletNumber: e.target.value }))}
+                  className={fieldClass} /></label>
               <label><span className={labelClass}>رقم التأمينات الاجتماعية</span>
                 <input type="text" maxLength={40} value={form.socialInsuranceNumber}
                   onChange={(e) => onFormChange((prev) => ({ ...prev, socialInsuranceNumber: e.target.value }))}
@@ -366,6 +374,20 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               <label><span className={labelClass}>رقم الملف الضريبي</span>
                 <input type="text" maxLength={40} value={form.taxFileNumber}
                   onChange={(e) => onFormChange((prev) => ({ ...prev, taxFileNumber: e.target.value }))}
+                  className={fieldClass} /></label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={form.taxExempt}
+                  onChange={(e) => onFormChange((prev) => ({ ...prev, taxExempt: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 text-sky-600" />
+                <span className={labelClass}>معفى من الضريبة</span>
+              </label>
+              <label><span className={labelClass}>إعفاء شهري إضافي</span>
+                <input type="number" min={0} step="0.01" value={form.taxExemptionAmount}
+                  onChange={(e) => onFormChange((prev) => ({ ...prev, taxExemptionAmount: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                  className={fieldClass} /></label>
+              <label><span className={labelClass}>عدد المعالين</span>
+                <input type="number" min={0} step={1} value={form.taxDependents}
+                  onChange={(e) => onFormChange((prev) => ({ ...prev, taxDependents: e.target.value === '' ? 0 : Number(e.target.value) }))}
                   className={fieldClass} /></label>
             </div>
           </section>

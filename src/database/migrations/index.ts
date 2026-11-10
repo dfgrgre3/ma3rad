@@ -37,6 +37,21 @@ import { MIGRATION_PART_33 } from './part33';
 import { MIGRATION_PART_34 } from './part34';
 import { MIGRATION_PART_35 } from './part35';
 import { MIGRATION_PART_36 } from './part36';
+import { MIGRATION_PART_37 } from './part37';
+import { MIGRATION_PART_38 } from './part38';
+import { MIGRATION_PART_39 } from './part39';
+import { MIGRATION_PART_40 } from './part40';
+import { MIGRATION_PART_41 } from './part41';
+import { MIGRATION_PART_42 } from './part42';
+import { MIGRATION_PART_43 } from './part43';
+import { MIGRATION_PART_44 } from './part44';
+import { MIGRATION_PART_45 } from './part45';
+import { MIGRATION_PART_46 } from './part46';
+import { MIGRATION_PART_47 } from './part47';
+import { MIGRATION_PART_48 } from './part48';
+import { MIGRATION_PART_49 } from './part49';
+import { MIGRATION_PART_50 } from './part50';
+import { MIGRATION_PART_51 } from './part51';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
 
@@ -2531,7 +2546,27 @@ export const MIGRATIONS: Migration[] = [
   ...MIGRATION_PART_34,
   ...MIGRATION_PART_36,
   ...MIGRATION_PART_35,
-].flat();
+  ...MIGRATION_PART_37,
+  ...MIGRATION_PART_38,
+  ...MIGRATION_PART_39,
+  ...MIGRATION_PART_40,
+  ...MIGRATION_PART_41,
+  ...MIGRATION_PART_42,
+  ...MIGRATION_PART_43,
+  ...MIGRATION_PART_44,
+  ...MIGRATION_PART_45,
+  ...MIGRATION_PART_46,
+  ...MIGRATION_PART_47,
+  ...MIGRATION_PART_48,
+  ...MIGRATION_PART_49,
+  ...MIGRATION_PART_50,
+  ...MIGRATION_PART_51,
+].flat().sort((left, right) => {
+  const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
+  const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
+  if (leftNumber !== rightNumber) return leftNumber - rightNumber;
+  return String(left.id || '').localeCompare(String(right.id || ''));
+});
 
 /** Validate the append-only migration catalog before touching a database. */
 export function validateMigrationCatalog(migrations: Migration[] = MIGRATIONS): void {

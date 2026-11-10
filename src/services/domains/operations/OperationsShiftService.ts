@@ -4,6 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { localDateString } from '../../../utils/shared/date';
+import { AttendanceTimeService } from '../hr/AttendanceTimeService';
 
 export type OperationsWorkMode = 'NORMAL' | 'TWO_SHIFTS' | 'THREE_SHIFTS' | 'CONTINUOUS';
 export type OperationShiftStatus = 'PLANNED' | 'OPEN' | 'HANDOVER_PENDING' | 'CLOSED' | 'MISSED' | 'CANCELLED';
@@ -24,6 +25,8 @@ export interface OperationShiftDefinition {
   breakMinutes: number;
   graceMinutes: number;
   overtimeAfterMinutes: number;
+  minimumStaffCount: number;
+  requiredRestMinutes: number;
   workdays: number[];
   shiftOrder: number;
   isActive: boolean;
@@ -50,6 +53,8 @@ export interface OperationShiftInstance {
   closedAt: string | null;
   staffCount: number;
   presentCount: number;
+  minimumStaffCount: number;
+  shortageCount: number;
   handoverStatus: string | null;
   expectedCash: number;
   actualCash: number;
@@ -165,6 +170,9 @@ export interface EmployeeAttendancePeriod {
   workedMinutes: number;
   lateMinutes: number;
   overtimeMinutes: number;
+  overtimeApproved?: boolean;
+  overtimeApprovedBy?: string | null;
+  overtimeApprovedAt?: string | null;
   status: 'OPEN' | 'CLOSED';
   source: string;
   notes: string | null;
@@ -190,6 +198,11 @@ export interface OperationShiftReportRow {
   scrapQty: number;
   downtimeMinutes: number;
   incidents: number;
+  workedMinutes: number;
+  approvedOvertimeMinutes: number;
+  laborCost: number;
+  productivityPerLaborHour: number;
+  costPerGoodUnit: number;
 }
 
 export interface OperationEmployee {
@@ -211,6 +224,26 @@ export interface OperationShiftAssignmentRow {
   role: OperationStaffRole;
   effectiveFrom: string;
   effectiveTo: string | null;
+}
+
+export interface OperationShiftSwapRequest {
+  id: string;
+  requesterEmployeeId: string;
+  requesterEmployeeName: string;
+  targetEmployeeId: string;
+  targetEmployeeName: string;
+  requesterShiftId: string;
+  requesterShiftName: string;
+  requesterShiftDate: string;
+  targetShiftId: string;
+  targetShiftName: string;
+  targetShiftDate: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  requestedByName: string;
+  requestedAt: string;
+  decidedByName: string | null;
+  decidedAt: string | null;
+  decisionNotes: string | null;
 }
 
 const WORK_MODES: OperationsWorkMode[] = ['NORMAL', 'TWO_SHIFTS', 'THREE_SHIFTS', 'CONTINUOUS'];
@@ -305,6 +338,8 @@ export class OperationsShiftService {
              s.shift_code AS shiftCode, s.color, s.start_time AS startTime,
              s.end_time AS endTime, s.break_minutes AS breakMinutes,
              s.grace_minutes AS graceMinutes, s.overtime_after_minutes AS overtimeAfterMinutes,
+             s.minimum_staff_count AS minimumStaffCount,
+             s.required_rest_minutes AS requiredRestMinutes,
              s.workdays_json AS workdaysJson, s.shift_order AS shiftOrder, s.is_active AS isActive,
              (SELECT COUNT(DISTINCT a.employee_id) FROM operation_shift_assignments a
               WHERE a.definition_id = s.id AND a.effective_from <= date('now')
@@ -327,6 +362,8 @@ export class OperationsShiftService {
       breakMinutes: Number(row.breakMinutes) || 0,
       graceMinutes: Number(row.graceMinutes) || 0,
       overtimeAfterMinutes: Number(row.overtimeAfterMinutes) || 0,
+      minimumStaffCount: Number(row.minimumStaffCount) || 0,
+      requiredRestMinutes: Number(row.requiredRestMinutes) || 0,
       workdays: JSON.parse(row.workdaysJson || '[0,1,2,3,4]') as number[],
       shiftOrder: Number(row.shiftOrder) || 0,
       isActive: bool(row.isActive),
@@ -365,6 +402,8 @@ export class OperationsShiftService {
     breakMinutes?: number;
     graceMinutes?: number;
     overtimeAfterMinutes?: number;
+    minimumStaffCount?: number;
+    requiredRestMinutes?: number;
     workdays?: number[];
     shiftOrder?: number;
     isActive?: boolean;
@@ -380,6 +419,8 @@ export class OperationsShiftService {
       ['مدة الاستراحة', input.breakMinutes ?? 0],
       ['مهلة التأخير', input.graceMinutes ?? 0],
       ['مهلة العمل الإضافي', input.overtimeAfterMinutes ?? 0],
+      ['الحد الأدنى للعاملين', input.minimumStaffCount ?? 0],
+      ['الراحة بين الورديات', input.requiredRestMinutes ?? 480],
     ] as const) {
       if (!Number.isInteger(value) || value < 0 || value > 1440) throw new Error(`${label} غير صحيحة.`);
     }
@@ -399,8 +440,9 @@ export class OperationsShiftService {
       `INSERT INTO attendance_shifts
          (id, branch_id, name, start_time, end_time, break_minutes, grace_minutes,
           overtime_after_minutes, workdays_json, is_active, department, location,
-          shift_code, color, shift_order, is_operations, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          shift_code, color, shift_order, is_operations, created_by,
+          minimum_staff_count, required_rest_minutes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          name = excluded.name,
          start_time = excluded.start_time,
@@ -415,6 +457,8 @@ export class OperationsShiftService {
          shift_code = excluded.shift_code,
          color = excluded.color,
          shift_order = excluded.shift_order,
+         minimum_staff_count = excluded.minimum_staff_count,
+         required_rest_minutes = excluded.required_rest_minutes,
          is_operations = 1,
          updated_at = CURRENT_TIMESTAMP
        WHERE attendance_shifts.branch_id = excluded.branch_id`,
@@ -423,7 +467,7 @@ export class OperationsShiftService {
         JSON.stringify(workdays), input.isActive === false ? 0 : 1,
         input.department?.trim() || null, input.location?.trim() || null,
         input.shiftCode?.trim() || null, input.color?.trim() || null,
-        input.shiftOrder ?? 0, actor.id]
+        input.shiftOrder ?? 0, actor.id, input.minimumStaffCount ?? 0, input.requiredRestMinutes ?? 480]
     );
     const saved = this.getShiftDefinitions(branchId).find((row) => row.id === id);
     if (!saved) throw new Error('تعذر حفظ وردية التشغيل.');
@@ -482,6 +526,69 @@ export class OperationsShiftService {
     return this.db.query<OperationShiftAssignmentRow>(sql, params);
   }
 
+  private assertRecurringAssignmentCompatible(
+    employeeId: string,
+    definitionId: string,
+    effectiveFrom: string,
+    effectiveTo: string | null
+  ): void {
+    const candidate = this.db.query<any>(
+      `SELECT name, start_time AS startTime, end_time AS endTime,
+              workdays_json AS workdaysJson, required_rest_minutes AS requiredRestMinutes
+       FROM attendance_shifts WHERE id = ?`,
+      [definitionId]
+    )[0];
+    const existing = this.db.query<any>(
+      `SELECT a.definition_id AS definitionId, a.effective_from AS effectiveFrom,
+              a.effective_to AS effectiveTo, s.name, s.start_time AS startTime,
+              s.end_time AS endTime, s.workdays_json AS workdaysJson,
+              s.required_rest_minutes AS requiredRestMinutes
+       FROM operation_shift_assignments a
+       JOIN attendance_shifts s ON s.id = a.definition_id AND s.is_active = 1
+       WHERE a.employee_id = ? AND a.definition_id != ?
+         AND a.effective_from <= COALESCE(?, '9999-12-31')
+         AND COALESCE(a.effective_to, '9999-12-31') >= ?`,
+      [employeeId, definitionId, effectiveTo, effectiveFrom]
+    );
+    if (!candidate) throw new Error('تعريف الوردية غير موجود.');
+    const candidateDays = JSON.parse(candidate.workdaysJson || '[]') as number[];
+    for (const assignment of existing) {
+      const start = effectiveFrom > assignment.effectiveFrom ? effectiveFrom : assignment.effectiveFrom;
+      const ends = [effectiveTo, assignment.effectiveTo].filter((value): value is string => Boolean(value));
+      const end = ends.length ? ends.sort()[0] : dateOffset(start, 13);
+      const checkedThrough = end < dateOffset(start, 13) ? end : dateOffset(start, 13);
+      const existingDays = JSON.parse(assignment.workdaysJson || '[]') as number[];
+      for (let date = start; date <= checkedThrough; date = dateOffset(date, 1)) {
+        const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+        if (!candidateDays.includes(weekday)) continue;
+        const candidateWindow = scheduledWindow(date, candidate.startTime, candidate.endTime);
+        const candidateStart = Date.parse(candidateWindow.start);
+        const candidateEnd = Date.parse(candidateWindow.end);
+        const restMinutes = Math.max(
+          Number(candidate.requiredRestMinutes) || 0,
+          Number(assignment.requiredRestMinutes) || 0
+        );
+        for (const existingDate of [dateOffset(date, -1), date, dateOffset(date, 1)]) {
+          if (existingDate < assignment.effectiveFrom
+            || (assignment.effectiveTo && existingDate > assignment.effectiveTo)
+            || !existingDays.includes(new Date(`${existingDate}T00:00:00Z`).getUTCDay())) continue;
+          const existingWindow = scheduledWindow(existingDate, assignment.startTime, assignment.endTime);
+          const existingStart = Date.parse(existingWindow.start);
+          const existingEnd = Date.parse(existingWindow.end);
+          const overlap = candidateStart < existingEnd && existingStart < candidateEnd;
+          const restGap = candidateStart >= existingEnd
+            ? candidateStart - existingEnd
+            : existingStart >= candidateEnd
+              ? existingStart - candidateEnd
+              : -1;
+          if (overlap || restGap < restMinutes * 60_000) {
+            throw new Error(`تعارض وردية أو راحة غير كافية مع «${assignment.name}» للموظف.`);
+          }
+        }
+      }
+    }
+  }
+
   public assignEmployee(input: {
     definitionId: string;
     employeeId: string;
@@ -506,6 +613,9 @@ export class OperationsShiftService {
     )[0];
     if (!employee) throw new Error('الموظف غير موجود.');
     if (employee.branchId !== definition.branchId) throw new Error('الموظف لا يتبع فرع وردية التشغيل.');
+    this.assertRecurringAssignmentCompatible(
+      input.employeeId, input.definitionId, input.effectiveFrom, input.effectiveTo || null
+    );
     const id = `opsassign_${uuidv4().replace(/-/g, '').slice(0, 14)}`;
     this.db.run(
       `INSERT INTO operation_shift_assignments
@@ -586,6 +696,7 @@ export class OperationsShiftService {
         }
       }
     });
+    this.seedAssignedStaff(from, to, targetBranch);
     this.refreshMissedShifts(targetBranch);
     return created;
   }
@@ -593,6 +704,311 @@ export class OperationsShiftService {
   /** Auto-generate the current week and the next seven days. */
   public syncShiftLifecycle(today = localDateString()): number {
     return this.ensureShiftInstances(dateOffset(today, -1), dateOffset(today, 7));
+  }
+
+  private isOnApprovedLeave(employeeId: string, date: string): boolean {
+    return this.db.query(
+      `SELECT id FROM employee_leave_requests
+       WHERE employee_id = ? AND status = 'APPROVED'
+         AND start_date <= ? AND end_date >= ? LIMIT 1`,
+      [employeeId, date, date]
+    ).length > 0;
+  }
+
+  private scheduleConflict(
+    employeeId: string,
+    shift: Pick<OperationShiftInstance, 'id' | 'branchId' | 'scheduledStart' | 'scheduledEnd'>,
+    excludedShiftIds: string[] = []
+  ): string | null {
+    const rows = this.db.query<any>(
+      `SELECT os.id, os.scheduled_start AS scheduledStart, os.scheduled_end AS scheduledEnd,
+              d.name AS definitionName, d.required_rest_minutes AS requiredRestMinutes
+       FROM operation_shift_staff st
+       JOIN operation_shifts os ON os.id = st.operation_shift_id
+       JOIN attendance_shifts d ON d.id = os.definition_id
+       WHERE st.employee_id = ? AND os.branch_id = ?
+         AND os.status != 'CANCELLED'
+         AND os.business_date BETWEEN ? AND ?
+         AND st.status NOT IN ('ABSENT', 'LEAVE')`,
+      [employeeId, shift.branchId,
+        dateOffset(shift.scheduledStart.slice(0, 10), -2),
+        dateOffset(shift.scheduledStart.slice(0, 10), 2)]
+    );
+    const targetStart = Date.parse(shift.scheduledStart);
+    const targetEnd = Date.parse(shift.scheduledEnd);
+    for (const row of rows) {
+      if (row.id === shift.id || excludedShiftIds.includes(row.id)) continue;
+      const currentStart = Date.parse(row.scheduledStart);
+      const currentEnd = Date.parse(row.scheduledEnd);
+      const overlap = targetStart < currentEnd && currentStart < targetEnd;
+      const restGap = targetStart >= currentEnd
+        ? targetStart - currentEnd
+        : currentStart >= targetEnd
+          ? currentStart - targetEnd
+          : -1;
+      const candidateRest = this.db.query<{ requiredRestMinutes: number }>(
+        `SELECT required_rest_minutes AS requiredRestMinutes FROM attendance_shifts
+         WHERE id = (SELECT definition_id FROM operation_shifts WHERE id = ?)`,
+        [shift.id]
+      )[0]?.requiredRestMinutes || 0;
+      const requiredRest = Math.max(Number(row.requiredRestMinutes) || 0, Number(candidateRest) || 0);
+      if (overlap) return `تعارض مع وردية «${row.definitionName}».`;
+      if (restGap < requiredRest * 60_000) {
+        return `فترة الراحة بين الورديات أقل من ${requiredRest} دقيقة.`;
+      }
+    }
+    return null;
+  }
+
+  private assertEmployeeAvailable(
+    employeeId: string,
+    shift: Pick<OperationShiftInstance, 'id' | 'branchId' | 'scheduledStart' | 'scheduledEnd' | 'businessDate'>,
+    excludedShiftIds: string[] = []
+  ): void {
+    if (this.isOnApprovedLeave(employeeId, shift.businessDate)) {
+      throw new Error('الموظف في إجازة معتمدة خلال تاريخ الوردية.');
+    }
+    const conflict = this.scheduleConflict(employeeId, shift, excludedShiftIds);
+    if (conflict) throw new Error(conflict);
+  }
+
+  private seedAssignedStaff(from: string, to: string, branchId: string): void {
+    const rows = this.db.query<{ id: string; definitionId: string; businessDate: string; branchId: string;
+      scheduledStart: string; scheduledEnd: string }>(
+      `SELECT id, definition_id AS definitionId, business_date AS businessDate,
+              branch_id AS branchId, scheduled_start AS scheduledStart, scheduled_end AS scheduledEnd
+       FROM operation_shifts WHERE branch_id = ? AND business_date BETWEEN ? AND ?
+         AND status IN ('PLANNED', 'MISSED') ORDER BY scheduled_start`,
+      [branchId, from, to]
+    );
+    for (const shift of rows) {
+      for (const assignment of this.currentAssignments(shift.definitionId, shift.businessDate)) {
+        if (this.db.query(
+          'SELECT id FROM operation_shift_staff WHERE operation_shift_id = ? AND employee_id = ?',
+          [shift.id, assignment.employeeId]
+        ).length || this.isOnApprovedLeave(assignment.employeeId, shift.businessDate)) continue;
+        if (this.scheduleConflict(assignment.employeeId, shift)) continue;
+        this.db.run(
+          `INSERT OR IGNORE INTO operation_shift_staff
+             (id, operation_shift_id, employee_id, role, status)
+           VALUES (?, ?, ?, ?, 'PRESENT')`,
+          [`opstaff_${uuidv4().replace(/-/g, '').slice(0, 14)}`, shift.id,
+            assignment.employeeId, assignment.role]
+        );
+      }
+    }
+  }
+
+  public generateWorkforceSchedule(from: string, to: string, branchId?: string): {
+    shiftsCreated: number;
+    staffAssigned: number;
+    shortages: Array<{ shiftId: string; name: string; date: string; shortageCount: number }>;
+  } {
+    const actor = this.requireManage();
+    if (!isValidDate(from) || !isValidDate(to) || to < from) {
+      throw new Error('فترة إنشاء جدول الورديات غير صالحة.');
+    }
+    const targetBranch = branchId || this.branchAccess.getCurrentBranchId(actor);
+    this.branchAccess.requireBranchAccess(targetBranch, actor);
+    const shiftsCreated = this.ensureShiftInstances(from, to, targetBranch);
+    const shifts = this.db.query<any>(
+      `SELECT os.id, os.definition_id AS definitionId, os.branch_id AS branchId,
+              os.business_date AS businessDate, os.scheduled_start AS scheduledStart,
+              os.scheduled_end AS scheduledEnd, d.name, d.minimum_staff_count AS minimumStaffCount
+       FROM operation_shifts os JOIN attendance_shifts d ON d.id = os.definition_id
+       WHERE os.branch_id = ? AND os.business_date BETWEEN ? AND ?
+         AND os.status IN ('PLANNED', 'MISSED') ORDER BY os.scheduled_start`,
+      [targetBranch, from, to]
+    );
+    const employees = this.db.query<OperationEmployee>(
+      `SELECT id, branch_id AS branchId, code, name, role, status FROM employees
+       WHERE branch_id = ? AND status IN ('ACTIVE', 'PROBATION') ORDER BY name`,
+      [targetBranch]
+    );
+    let staffAssigned = 0;
+    for (const row of shifts) {
+      const existing = this.db.query<{ employeeId: string; role: OperationStaffRole; status: string }>(
+        `SELECT employee_id AS employeeId, role, status FROM operation_shift_staff
+         WHERE operation_shift_id = ?`,
+        [row.id]
+      );
+      let eligibleCount = existing.filter((staff) => !['ABSENT', 'LEAVE'].includes(staff.status)).length;
+      const required = Math.max(0, Number(row.minimumStaffCount) || 0);
+      if (eligibleCount >= required) continue;
+      const assigned = this.currentAssignments(row.definitionId, row.businessDate);
+      const assignedIds = new Set(assigned.map((assignment) => assignment.employeeId));
+      const scheduledCounts = new Map(this.db.query<{ employeeId: string; count: number }>(
+        `SELECT st.employee_id AS employeeId, COUNT(*) AS count
+         FROM operation_shift_staff st JOIN operation_shifts os ON os.id = st.operation_shift_id
+         WHERE os.branch_id = ? AND os.business_date BETWEEN ? AND ?
+           AND st.status NOT IN ('ABSENT', 'LEAVE')
+         GROUP BY st.employee_id`,
+        [targetBranch, from, to]
+      ).map((entry) => [entry.employeeId, Number(entry.count) || 0]));
+      const candidates = [
+        ...assigned.map((assignment) => employees.find((employee) => employee.id === assignment.employeeId))
+          .filter((employee): employee is OperationEmployee => Boolean(employee)),
+        ...employees.filter((employee) => !assignedIds.has(employee.id)),
+      ].sort((left, right) => (scheduledCounts.get(left.id) || 0) - (scheduledCounts.get(right.id) || 0)
+        || left.name.localeCompare(right.name));
+      for (const employee of candidates) {
+        if (eligibleCount >= required) break;
+        if (existing.some((staff) => staff.employeeId === employee.id)
+          || this.isOnApprovedLeave(employee.id, row.businessDate)) continue;
+        const conflict = this.scheduleConflict(employee.id, row);
+        if (conflict) continue;
+        const role = assigned.find((assignment) => assignment.employeeId === employee.id)?.role || 'STAFF';
+        this.db.run(
+          `INSERT OR IGNORE INTO operation_shift_staff
+             (id, operation_shift_id, employee_id, role, status)
+           VALUES (?, ?, ?, ?, 'PRESENT')`,
+          [`opstaff_${uuidv4().replace(/-/g, '').slice(0, 14)}`, row.id, employee.id, role]
+        );
+        existing.push({ employeeId: employee.id, role, status: 'PRESENT' });
+        eligibleCount += 1;
+        staffAssigned += 1;
+      }
+    }
+    const roster = this.getShiftBoard({ from, to, branchId: targetBranch });
+    const shortages = roster.filter((shift) => shift.shortageCount > 0).map((shift) => ({
+      shiftId: shift.id,
+      name: shift.definitionName,
+      date: shift.businessDate,
+      shortageCount: shift.shortageCount,
+    }));
+    return { shiftsCreated, staffAssigned, shortages };
+  }
+
+  public getShiftSwapRequests(from?: string, to?: string): OperationShiftSwapRequest[] {
+    const actor = this.requireView();
+    const scope = this.branchAccess.sqlScope('rs.branch_id', undefined, actor);
+    const conditions = [scope.clause];
+    const params: Array<string> = [...scope.params];
+    if (from) {
+      if (!isValidDate(from)) throw new Error('تاريخ بداية طلبات التبديل غير صالح.');
+      conditions.push('rs.business_date >= ?');
+      params.push(from);
+    }
+    if (to) {
+      if (!isValidDate(to)) throw new Error('تاريخ نهاية طلبات التبديل غير صالح.');
+      conditions.push('rs.business_date <= ?');
+      params.push(to);
+    }
+    return this.db.query<OperationShiftSwapRequest>(
+      `SELECT r.id, r.requester_employee_id AS requesterEmployeeId,
+              requester.name AS requesterEmployeeName,
+              r.target_employee_id AS targetEmployeeId, target.name AS targetEmployeeName,
+              r.requester_shift_id AS requesterShiftId, rd.name AS requesterShiftName,
+              rs.business_date AS requesterShiftDate,
+              r.target_shift_id AS targetShiftId, td.name AS targetShiftName,
+              ts.business_date AS targetShiftDate, r.status,
+              requested.full_name AS requestedByName, r.requested_at AS requestedAt,
+              decided.full_name AS decidedByName, r.decided_at AS decidedAt,
+              r.decision_notes AS decisionNotes
+       FROM operation_shift_swap_requests r
+       JOIN operation_shifts rs ON rs.id = r.requester_shift_id
+       JOIN operation_shifts ts ON ts.id = r.target_shift_id
+       JOIN attendance_shifts rd ON rd.id = rs.definition_id
+       JOIN attendance_shifts td ON td.id = ts.definition_id
+       JOIN employees requester ON requester.id = r.requester_employee_id
+       JOIN employees target ON target.id = r.target_employee_id
+       JOIN users requested ON requested.id = r.requested_by
+       LEFT JOIN users decided ON decided.id = r.decided_by
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY CASE r.status WHEN 'PENDING' THEN 0 ELSE 1 END, r.requested_at DESC LIMIT 200`,
+      params
+    );
+  }
+
+  public requestShiftSwap(input: {
+    requesterEmployeeId: string;
+    targetEmployeeId: string;
+    requesterShiftId: string;
+    targetShiftId: string;
+  }): OperationShiftSwapRequest {
+    const actor = this.requireManage();
+    if (input.requesterEmployeeId === input.targetEmployeeId || input.requesterShiftId === input.targetShiftId) {
+      throw new Error('اختر موظفين وورديتين مختلفتين لطلب التبديل.');
+    }
+    const requesterShift = this.getInstance(input.requesterShiftId);
+    const targetShift = this.getInstance(input.targetShiftId);
+    if (requesterShift.branchId !== targetShift.branchId) throw new Error('يجب أن تكون الوردية في الفرع نفسه.');
+    if (![requesterShift.status, targetShift.status].every((status) => status === 'PLANNED')) {
+      throw new Error('يمكن طلب التبديل بين ورديات لم تبدأ فقط.');
+    }
+    for (const [shiftId, employeeId] of [
+      [input.requesterShiftId, input.requesterEmployeeId],
+      [input.targetShiftId, input.targetEmployeeId],
+    ]) {
+      if (!this.db.query(
+        `SELECT id FROM operation_shift_staff
+         WHERE operation_shift_id = ? AND employee_id = ? AND status NOT IN ('ABSENT', 'LEAVE')`,
+        [shiftId, employeeId]
+      ).length) throw new Error('يجب أن يكون كل موظف مسجلاً في ورديته قبل طلب التبديل.');
+    }
+    const id = `opsswap_${uuidv4().replace(/-/g, '').slice(0, 14)}`;
+    this.db.run(
+      `INSERT INTO operation_shift_swap_requests
+         (id, requester_employee_id, target_employee_id, requester_shift_id, target_shift_id, requested_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, input.requesterEmployeeId, input.targetEmployeeId,
+        input.requesterShiftId, input.targetShiftId, actor.id]
+    );
+    this.audit('طلب تبديل وردية', id, input);
+    return this.getShiftSwapRequests().find((request) => request.id === id)!;
+  }
+
+  public decideShiftSwap(requestId: string, approve: boolean, notes = ''): void {
+    const actor = this.requireManage();
+    const request = this.db.query<any>(
+      `SELECT r.*, rs.branch_id AS requesterBranchId, ts.branch_id AS targetBranchId,
+              rs.scheduled_start AS requesterStart, rs.scheduled_end AS requesterEnd,
+              ts.scheduled_start AS targetStart, ts.scheduled_end AS targetEnd,
+              rs.business_date AS requesterDate, ts.business_date AS targetDate
+       FROM operation_shift_swap_requests r
+       JOIN operation_shifts rs ON rs.id = r.requester_shift_id
+       JOIN operation_shifts ts ON ts.id = r.target_shift_id WHERE r.id = ?`,
+      [requestId]
+    )[0];
+    if (!request) throw new Error('طلب تبديل الوردية غير موجود.');
+    this.branchAccess.requireBranchAccess(request.requesterBranchId, actor);
+    if (request.requesterBranchId !== request.targetBranchId) throw new Error('الوردية المستهدفة خارج الفرع.');
+    if (request.status !== 'PENDING') throw new Error('تم البت في طلب التبديل سابقاً.');
+    if (approve) {
+      const requesterTarget = this.getInstance(request.targetShiftId);
+      const targetTarget = this.getInstance(request.requesterShiftId);
+      if (requesterTarget.status !== 'PLANNED' || targetTarget.status !== 'PLANNED') {
+        throw new Error('لا يمكن اعتماد التبديل بعد بدء إحدى الورديتين.');
+      }
+      this.assertEmployeeAvailable(request.requesterEmployeeId, requesterTarget,
+        [request.requesterShiftId, request.targetShiftId]);
+      this.assertEmployeeAvailable(request.targetEmployeeId, targetTarget,
+        [request.requesterShiftId, request.targetShiftId]);
+      this.db.executeTransaction((db) => {
+        db.run(
+          `UPDATE operation_shift_staff SET employee_id = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE operation_shift_id = ? AND employee_id = ?`,
+          [request.targetEmployeeId, request.requesterShiftId, request.requesterEmployeeId]
+        );
+        db.run(
+          `UPDATE operation_shift_staff SET employee_id = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE operation_shift_id = ? AND employee_id = ?`,
+          [request.requesterEmployeeId, request.targetShiftId, request.targetEmployeeId]
+        );
+        db.run(
+          `UPDATE operation_shift_swap_requests SET status = 'APPROVED', decided_by = ?,
+             decided_at = CURRENT_TIMESTAMP, decision_notes = ? WHERE id = ? AND status = 'PENDING'`,
+          [actor.id, notes.trim() || null, requestId]
+        );
+      });
+    } else {
+      this.db.run(
+        `UPDATE operation_shift_swap_requests SET status = 'REJECTED', decided_by = ?,
+           decided_at = CURRENT_TIMESTAMP, decision_notes = ? WHERE id = ? AND status = 'PENDING'`,
+        [actor.id, notes.trim() || null, requestId]
+      );
+    }
+    this.audit(approve ? 'اعتماد تبديل وردية' : 'رفض تبديل وردية', requestId, { notes });
   }
 
   private refreshMissedShifts(branchId: string): void {
@@ -614,10 +1030,12 @@ export class OperationsShiftService {
     this.ensureShiftInstances(from, to, branchId);
     const rows = this.db.query<any>(
       `SELECT os.*, d.name AS definitionName, d.department, d.location,
+              d.minimum_staff_count AS minimumStaffCount,
               sup.name AS supervisorName, opener.full_name AS openedByName,
               h.status AS handoverStatus, h.expected_cash AS handoverExpected,
               h.actual_cash AS handoverActual, h.cash_difference AS handoverDifference,
-              (SELECT COUNT(*) FROM operation_shift_staff st WHERE st.operation_shift_id = os.id) AS staffCount,
+              (SELECT COUNT(*) FROM operation_shift_staff st
+               WHERE st.operation_shift_id = os.id AND st.status NOT IN ('ABSENT', 'LEAVE')) AS staffCount,
               (SELECT COUNT(*) FROM operation_shift_staff st
                WHERE st.operation_shift_id = os.id AND st.check_in_at IS NOT NULL) AS presentCount,
               (SELECT COALESCE(SUM(p.produced_qty), 0) FROM operation_shift_production p
@@ -660,6 +1078,9 @@ export class OperationsShiftService {
       closedAt: row.closed_at ?? row.closedAt ?? null,
       staffCount: Number(row.staffCount) || 0,
       presentCount: Number(row.presentCount) || 0,
+      minimumStaffCount: Number(row.minimumStaffCount) || 0,
+      shortageCount: Math.max(0,
+        (Number(row.minimumStaffCount) || 0) - (Number(row.staffCount) || 0)),
       expectedCash: Number(row.handoverExpected ?? cash.expected) || 0,
       actualCash: Number(row.handoverActual ?? cash.actual) || 0,
       cashDifference: Number(row.handoverDifference ?? cash.difference) || 0,
@@ -678,10 +1099,12 @@ export class OperationsShiftService {
     this.branchAccess.requireBranchAccess(target, actor);
     const row = this.db.query<any>(
       `SELECT os.*, d.name AS definitionName, d.department, d.location,
+              d.minimum_staff_count AS minimumStaffCount,
               sup.name AS supervisorName, opener.full_name AS openedByName,
               h.status AS handoverStatus, h.expected_cash AS handoverExpected,
               h.actual_cash AS handoverActual, h.cash_difference AS handoverDifference,
-              (SELECT COUNT(*) FROM operation_shift_staff st WHERE st.operation_shift_id = os.id) AS staffCount,
+              (SELECT COUNT(*) FROM operation_shift_staff st
+               WHERE st.operation_shift_id = os.id AND st.status NOT IN ('ABSENT', 'LEAVE')) AS staffCount,
               (SELECT COUNT(*) FROM operation_shift_staff st
                WHERE st.operation_shift_id = os.id AND st.check_in_at IS NOT NULL) AS presentCount,
               (SELECT COALESCE(SUM(p.produced_qty), 0) FROM operation_shift_production p
@@ -706,10 +1129,12 @@ export class OperationsShiftService {
     const actor = this.requireView();
     const row = this.db.query<any>(
       `SELECT os.*, d.name AS definitionName, d.department, d.location,
+              d.minimum_staff_count AS minimumStaffCount,
               sup.name AS supervisorName, opener.full_name AS openedByName,
               h.status AS handoverStatus, h.expected_cash AS handoverExpected,
               h.actual_cash AS handoverActual, h.cash_difference AS handoverDifference,
-              (SELECT COUNT(*) FROM operation_shift_staff st WHERE st.operation_shift_id = os.id) AS staffCount,
+              (SELECT COUNT(*) FROM operation_shift_staff st
+               WHERE st.operation_shift_id = os.id AND st.status NOT IN ('ABSENT', 'LEAVE')) AS staffCount,
               (SELECT COUNT(*) FROM operation_shift_staff st
                WHERE st.operation_shift_id = os.id AND st.check_in_at IS NOT NULL) AS presentCount,
               (SELECT COALESCE(SUM(p.produced_qty), 0) FROM operation_shift_production p
@@ -925,12 +1350,29 @@ export class OperationsShiftService {
       - timeMinutes(definition.startTime) - Number(definition.graceMinutes || 0));
 
     const chosen = new Map<string, OperationStaffRole>();
+    for (const staff of this.db.query<{ employeeId: string; role: OperationStaffRole }>(
+      `SELECT employee_id AS employeeId, role FROM operation_shift_staff
+       WHERE operation_shift_id = ? AND status NOT IN ('ABSENT', 'LEAVE')`,
+      [id]
+    )) chosen.set(staff.employeeId, staff.role);
     for (const assignment of this.currentAssignments(shift.definitionId, shift.businessDate)) {
-      chosen.set(assignment.employeeId, assignment.role);
+      if (!chosen.has(assignment.employeeId)) chosen.set(assignment.employeeId, assignment.role);
     }
     for (const employeeId of input.employeeIds || []) chosen.set(employeeId, chosen.get(employeeId) || 'STAFF');
     if (supervisorId) chosen.set(supervisorId, 'SUPERVISOR');
-    for (const employeeId of chosen.keys()) this.assertEmployeeInBranch(employeeId, shift.branchId);
+    for (const employeeId of [...chosen.keys()]) {
+      this.assertEmployeeInBranch(employeeId, shift.branchId);
+      const rosterRow = this.db.query<{ status: OperationStaffStatus; checkInAt: string | null }>(
+        `SELECT status, check_in_at AS checkInAt FROM operation_shift_staff
+         WHERE operation_shift_id = ? AND employee_id = ?`,
+        [id, employeeId]
+      )[0];
+      if (rosterRow && ['ABSENT', 'LEAVE'].includes(rosterRow.status)) {
+        chosen.delete(employeeId);
+        continue;
+      }
+      this.assertEmployeeAvailable(employeeId, shift);
+    }
 
     this.db.executeTransaction((db) => {
       db.run(
@@ -939,8 +1381,9 @@ export class OperationsShiftService {
         [supervisorId, actor.id, now, input.notes?.trim() || null, id]
       );
       for (const [employeeId, role] of chosen) {
-        const existing = db.query<{ id: string }>(
-          'SELECT id FROM operation_shift_staff WHERE operation_shift_id = ? AND employee_id = ?',
+        const existing = db.query<{ id: string; checkInAt: string | null }>(
+          `SELECT id, check_in_at AS checkInAt FROM operation_shift_staff
+           WHERE operation_shift_id = ? AND employee_id = ?`,
           [id, employeeId]
         )[0];
         if (!existing) {
@@ -951,10 +1394,26 @@ export class OperationsShiftService {
             [`opstaff_${uuidv4().replace(/-/g, '').slice(0, 14)}`, id, employeeId, role,
               lateMinutes > 0 ? 'LATE' : 'PRESENT', now, lateMinutes]
           );
+        } else if (!existing.checkInAt) {
+          db.run(
+            `UPDATE operation_shift_staff SET role = ?, status = ?, check_in_at = ?,
+               late_minutes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [role, lateMinutes > 0 ? 'LATE' : 'PRESENT', now, lateMinutes, existing.id]
+          );
+        }
+        if (!existing || !existing.checkInAt) {
+          const openPeriod = db.query<{ id: string }>(
+            'SELECT id FROM employee_attendance_periods WHERE employee_id = ? AND check_out_at IS NULL',
+            [employeeId]
+          )[0];
+          if (openPeriod) throw new Error('يوجد سجل حضور مفتوح لهذا الموظف؛ سجّل الانصراف أولاً.');
           this.insertPeriod(employeeId, id, shift.businessDate, now, actor.id);
         }
       }
     });
+    for (const employeeId of chosen.keys()) {
+      AttendanceTimeService.syncDailySummary(employeeId, shift.businessDate, actor.id);
+    }
     this.audit('فتح وردية تشغيل', id, { supervisorId, staff: chosen.size, notes: input.notes || null });
     return this.getShiftDetail(id);
   }
@@ -977,6 +1436,114 @@ export class OperationsShiftService {
       [`opstaff_${uuidv4().replace(/-/g, '').slice(0, 14)}`, operationShiftId, employeeId, role]
     );
     this.audit('إضافة موظف إلى وردية تشغيل', operationShiftId, { employeeId, role });
+  }
+
+  public replaceAbsentStaff(
+    operationShiftId: string,
+    absentEmployeeId: string,
+    replacementEmployeeId: string,
+    notes = ''
+  ): void {
+    const actor = this.requireManage();
+    const shift = this.getInstance(operationShiftId);
+    if (!['PLANNED', 'MISSED'].includes(shift.status)) {
+      throw new Error('يمكن تعيين البديل قبل فتح الوردية فقط.');
+    }
+    if (absentEmployeeId === replacementEmployeeId) throw new Error('اختر موظفاً بديلاً مختلفاً.');
+    const absent = this.db.query<{ id: string; checkInAt: string | null }>(
+      `SELECT id, check_in_at AS checkInAt FROM operation_shift_staff
+       WHERE operation_shift_id = ? AND employee_id = ?`,
+      [operationShiftId, absentEmployeeId]
+    )[0];
+    if (!absent) throw new Error('الموظف الغائب غير مجدول في هذه الوردية.');
+    if (absent.checkInAt) throw new Error('لا يمكن استبدال موظف بدأ العمل بالفعل.');
+    this.assertEmployeeInBranch(replacementEmployeeId, shift.branchId);
+    if (this.db.query(
+      'SELECT id FROM operation_shift_staff WHERE operation_shift_id = ? AND employee_id = ?',
+      [operationShiftId, replacementEmployeeId]
+    ).length) throw new Error('الموظف البديل مسجل بالفعل في الوردية.');
+    this.assertEmployeeAvailable(replacementEmployeeId, shift);
+    const attendance = this.db.query<{ id: string; status: string; checkInAt: string | null }>(
+      `SELECT id, status, check_in_at AS checkInAt FROM attendance
+       WHERE employee_id = ? AND date = ?`,
+      [absentEmployeeId, shift.businessDate]
+    )[0];
+    if (attendance?.checkInAt || ['PRESENT', 'LATE'].includes(attendance?.status || '')) {
+      throw new Error('يوجد حضور فعلي لهذا اليوم؛ لا يمكن تسجيل الموظف غائباً.');
+    }
+    if (attendance?.status === 'LEAVE') throw new Error('الموظف مسجل بإجازة في هذا اليوم.');
+    const payroll = this.db.query<{ status: string }>(
+      'SELECT status FROM payroll_runs WHERE branch_id = ? AND period = ?',
+      [shift.branchId, shift.businessDate.slice(0, 7)]
+    )[0];
+    if (payroll && payroll.status !== 'DRAFT') {
+      throw new Error('الفترة مرتبطة بدورة رواتب معتمدة؛ لا يمكن تسجيل الغياب.');
+    }
+    this.db.executeTransaction((db) => {
+      db.run(
+        `UPDATE operation_shift_staff SET status = 'ABSENT', notes = ?,
+           updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [notes.trim() || 'غياب - تم تعيين بديل', absent.id]
+      );
+      if (attendance) {
+        db.run(
+          `UPDATE attendance SET status = 'ABSENT', notes = ?, source = 'OPERATIONS_SHIFT',
+             recorded_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          [notes.trim() || 'غياب - تم تعيين بديل', actor.id, attendance.id]
+        );
+      } else {
+        db.run(
+          `INSERT INTO attendance (id, employee_id, date, status, notes, source, recorded_by)
+           VALUES (?, ?, ?, 'ABSENT', ?, 'OPERATIONS_SHIFT', ?)`,
+          [`att_${uuidv4().replace(/-/g, '').slice(0, 16)}`, absentEmployeeId,
+            shift.businessDate, notes.trim() || 'غياب - تم تعيين بديل', actor.id]
+        );
+      }
+      db.run(
+        `INSERT INTO operation_shift_staff (id, operation_shift_id, employee_id, role, status, notes)
+         VALUES (?, ?, ?, 'STAFF', 'PRESENT', ?)`,
+        [`opstaff_${uuidv4().replace(/-/g, '').slice(0, 14)}`, operationShiftId,
+          replacementEmployeeId, notes.trim() || 'بديل عن موظف غائب']
+      );
+    });
+    this.audit('تعيين بديل لموظف غائب', operationShiftId, {
+      absentEmployeeId, replacementEmployeeId, notes,
+    });
+  }
+
+  public approveShiftOvertime(attendancePeriodId: string): void {
+    const actor = this.requireManage();
+    const row = this.db.query<any>(
+      `SELECT p.id, p.employee_id AS employeeId, p.attendance_date AS attendanceDate,
+              p.check_out_at AS checkOutAt, p.overtime_minutes AS overtimeMinutes,
+              p.overtime_approved AS overtimeApproved, e.branch_id AS branchId
+       FROM employee_attendance_periods p JOIN employees e ON e.id = p.employee_id
+       WHERE p.id = ?`,
+      [attendancePeriodId]
+    )[0];
+    if (!row) throw new Error('سجل فترة الحضور غير موجود.');
+    this.branchAccess.requireBranchAccess(row.branchId, actor);
+    if (!row.checkOutAt || Number(row.overtimeMinutes) <= 0) {
+      throw new Error('لا توجد ساعات إضافية مكتملة لاعتمادها.');
+    }
+    if (Number(row.overtimeApproved)) throw new Error('تم اعتماد الإضافي لهذه الفترة بالفعل.');
+    const payroll = this.db.query<{ status: string }>(
+      'SELECT status FROM payroll_runs WHERE branch_id = ? AND period = ?',
+      [row.branchId, String(row.attendanceDate).slice(0, 7)]
+    )[0];
+    if (payroll && payroll.status !== 'DRAFT') {
+      throw new Error('الفترة مرتبطة بدورة رواتب معتمدة؛ لا يمكن تعديل الإضافي.');
+    }
+    this.db.run(
+      `UPDATE employee_attendance_periods SET overtime_approved = 1,
+         overtime_approved_by = ?, overtime_approved_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP WHERE id = ? AND overtime_approved = 0`,
+      [actor.id, attendancePeriodId]
+    );
+    AttendanceTimeService.syncDailySummary(row.employeeId, row.attendanceDate, actor.id);
+    this.audit('اعتماد إضافي فترة حضور وردية', attendancePeriodId, {
+      employeeId: row.employeeId, overtimeMinutes: row.overtimeMinutes,
+    });
   }
 
   public recordStaffPresence(operationShiftId: string, employeeId: string, direction: 'IN' | 'OUT'): OperationShiftStaff {
@@ -1038,6 +1605,7 @@ export class OperationsShiftService {
         }
       });
     }
+    AttendanceTimeService.syncDailySummary(employeeId, shift.businessDate, actor.id);
     this.audit(direction === 'IN' ? 'تسجيل حضور في وردية تشغيل' : 'تسجيل انصراف من وردية تشغيل',
       operationShiftId, { employeeId });
     return this.getShiftDetail(operationShiftId).staff
@@ -1134,6 +1702,9 @@ export class OperationsShiftService {
       );
       this.assignNextShiftStaff(db, shift, handover.nextStaffIds, now);
     });
+    for (const staff of this.getShiftDetail(operationShiftId).staff) {
+      AttendanceTimeService.syncDailySummary(staff.employeeId, shift.businessDate, actor.id);
+    }
     this.audit('استلام وردية تشغيل', operationShiftId, { receivedBy: actor.id });
     return this.getShiftDetail(operationShiftId);
   }
@@ -1192,6 +1763,9 @@ export class OperationsShiftService {
         [now, Math.max(0, durationMinutes(shift.openedAt || shift.scheduledStart, now)), operationShiftId]
       );
     });
+    for (const staff of this.getShiftDetail(operationShiftId).staff) {
+      AttendanceTimeService.syncDailySummary(staff.employeeId, shift.businessDate, actor.id);
+    }
     this.audit('إغلاق وردية تشغيل', operationShiftId, { notes });
     return this.getShiftDetail(operationShiftId);
   }
@@ -1275,7 +1849,7 @@ export class OperationsShiftService {
       }
     }
     let productId = input.productId || null;
-    let workCenterId = input.workCenterId || null;
+    const workCenterId = input.workCenterId || null;
     if (input.productionOrderId) {
       const order = this.db.query<{
         productId: string; branchId: string; status: string;
@@ -1383,6 +1957,9 @@ export class OperationsShiftService {
               p.attendance_date AS attendanceDate, p.check_in_at AS checkInAt,
               p.check_out_at AS checkOutAt, p.worked_minutes AS workedMinutes,
               p.late_minutes AS lateMinutes, p.overtime_minutes AS overtimeMinutes,
+              p.overtime_approved AS overtimeApproved,
+              p.overtime_approved_by AS overtimeApprovedBy,
+              p.overtime_approved_at AS overtimeApprovedAt,
               p.status, p.source, p.notes
        FROM employee_attendance_periods p
        JOIN employees e ON e.id = p.employee_id
@@ -1395,6 +1972,7 @@ export class OperationsShiftService {
       workedMinutes: Number(row.workedMinutes) || 0,
       lateMinutes: Number(row.lateMinutes) || 0,
       overtimeMinutes: Number(row.overtimeMinutes) || 0,
+      overtimeApproved: bool(row.overtimeApproved),
     }));
   }
 
@@ -1411,6 +1989,24 @@ export class OperationsShiftService {
               d.department, os.business_date AS businessDate, os.scheduled_start AS scheduledStart,
               os.scheduled_end AS scheduledEnd, os.status, sup.name AS supervisorName,
               (SELECT COUNT(*) FROM operation_shift_staff st WHERE st.operation_shift_id = os.id) AS staffCount,
+              (SELECT COALESCE(SUM(p.worked_minutes), 0) FROM employee_attendance_periods p
+               WHERE p.operation_shift_id = os.id) AS workedMinutes,
+              (SELECT COALESCE(SUM(CASE WHEN p.overtime_approved = 1 THEN p.overtime_minutes ELSE 0 END), 0)
+               FROM employee_attendance_periods p WHERE p.operation_shift_id = os.id) AS approvedOvertimeMinutes,
+              (SELECT COALESCE(SUM(
+                 (e.base_salary / CASE WHEN e.salary_type = 'DAILY' THEN 8.0
+                   ELSE COALESCE(c.working_days_per_month, 26) * 8.0 END) * p.worked_minutes / 60.0
+                 + CASE WHEN p.overtime_approved = 1 THEN
+                   (e.base_salary / CASE WHEN e.salary_type = 'DAILY' THEN 8.0
+                     ELSE COALESCE(c.working_days_per_month, 26) * 8.0 END)
+                     * p.overtime_minutes / 60.0 * (COALESCE(c.overtime_multiplier, 1.5) - 1)
+                   ELSE 0 END
+               ), 0)
+               FROM employee_attendance_periods p
+               JOIN employees e ON e.id = p.employee_id
+               LEFT JOIN branches b ON b.id = e.branch_id
+               LEFT JOIN companies c ON c.id = b.company_id
+               WHERE p.operation_shift_id = os.id) AS laborCost,
               (SELECT COALESCE(SUM(p.produced_qty), 0) FROM operation_shift_production p
                WHERE p.operation_shift_id = os.id) AS producedQty,
               (SELECT COALESCE(SUM(p.good_qty), 0) FROM operation_shift_production p
@@ -1445,6 +2041,15 @@ export class OperationsShiftService {
         scrapQty: Number(row.scrapQty) || 0,
         downtimeMinutes: Number(row.downtimeMinutes) || 0,
         incidents: Number(row.incidents) || 0,
+        workedMinutes: Number(row.workedMinutes) || 0,
+        approvedOvertimeMinutes: Number(row.approvedOvertimeMinutes) || 0,
+        laborCost: Number(row.laborCost) || 0,
+        productivityPerLaborHour: Number(row.workedMinutes) > 0
+          ? Number(row.goodQty || 0) / (Number(row.workedMinutes) / 60)
+          : 0,
+        costPerGoodUnit: Number(row.goodQty) > 0
+          ? Number(row.laborCost || 0) / Number(row.goodQty)
+          : 0,
       } as OperationShiftReportRow;
     });
   }

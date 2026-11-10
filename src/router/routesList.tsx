@@ -115,6 +115,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'projects', element: <P.ProjectsPage /> },
   { path: 'projects/:id', element: <P.ProjectDetailPage /> },
   { path: 'fleet/dashboard', element: <P.FleetDashboardPage /> },
+  { path: 'facility-management', element: <P.FacilityManagementPage /> },
   { path: 'deliveries', element: <P.DeliveriesPage /> },
   { path: 'drivers', element: <P.DriversPage /> },
   { path: 'vehicles', element: <P.VehiclesPage /> },
@@ -129,6 +130,12 @@ export const appRoutes: RouteDef[] = [
   { path: 'manufacturing', element: <P.ManufacturingPage /> },
   { path: 'operations/shifts', element: <P.OperationsShiftsPage /> },
   { path: 'hr/dashboard', element: <P.HrDashboardPage /> },
+  { path: 'hr/organization', element: <P.HrOrganizationPage /> },
+  { path: 'hr/performance', element: <P.PerformancePage /> },
+  { path: 'hr/training', element: <P.TrainingPage /> },
+  { path: 'hr/discipline', element: <P.HrDisciplinePage /> },
+  { path: 'hr/benefits', element: <P.HrBenefitsPage /> },
+  { path: 'hr/self-service', element: <P.HrSelfServicePage /> },
 
   // Reports
   { path: 'reports', element: <P.ReportsHubPage /> },

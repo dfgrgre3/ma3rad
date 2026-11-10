@@ -47,18 +47,18 @@ export function PosReportsPage() {
            SELECT sip.method, sip.amount
            FROM sales_invoice_payments sip
            JOIN sales_invoices si ON si.id = sip.invoice_id
-           WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND sip.amount > 0 ${scope.clause}
+           WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND sip.amount > 0 AND ${scope.clause}
            UNION ALL
            SELECT si.payment_type AS method, si.paid_amount AS amount
            FROM sales_invoices si
            WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND si.paid_amount > 0
              AND NOT EXISTS (SELECT 1 FROM sales_invoice_payments sip WHERE sip.invoice_id = si.id)
-             ${scope.clause}
+             AND ${scope.clause}
            UNION ALL
            SELECT cp.payment_type AS method, cp.amount
            FROM customer_payments cp
            JOIN sales_invoices si ON si.id = cp.invoice_id
-           WHERE cp.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND cp.amount > 0 ${scope.clause}
+           WHERE cp.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND cp.amount > 0 AND ${scope.clause}
          ) payments
          GROUP BY method ORDER BY amount DESC`,
         [from, to, ...sp, from, to, ...sp, from, to, ...sp]
@@ -68,7 +68,7 @@ export function PosReportsPage() {
       // Hourly distribution
       const hr = db.query<any>(
         `SELECT substr(si.created_at,12,2) AS hour, COUNT(*) AS count, COALESCE(SUM(total_amount),0) AS amount
-         FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' ${scope.clause}
+         FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
          GROUP BY hour ORDER BY hour`,
         [from, to, ...sp]
       );
@@ -78,7 +78,7 @@ export function PosReportsPage() {
       const ti = db.query<any>(
         `SELECT sii.product_name AS name, COALESCE(SUM(sii.quantity_m2),0) AS qty, COALESCE(SUM(sii.total_price),0) AS amount
          FROM sales_invoice_items sii JOIN sales_invoices si ON si.id = sii.invoice_id
-         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' ${scope.clause.replace('si.branch_id', 'si.branch_id')}
+         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
          GROUP BY sii.product_name ORDER BY amount DESC LIMIT 15`,
         [from, to, ...sp]
       );
@@ -98,7 +98,7 @@ export function PosReportsPage() {
              SUM(CASE WHEN method = 'CASH' THEN amount ELSE 0 END) AS cash
            FROM sales_invoice_payments GROUP BY invoice_id
          ) pay ON pay.invoiceId = si.id
-         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' ${scope.clause}
+         WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
          GROUP BY u.full_name ORDER BY amount DESC`,
         [from, to, ...sp]
       );
@@ -108,18 +108,18 @@ export function PosReportsPage() {
       const t = db.query<any>(
         `SELECT COUNT(*) AS invoices, COALESCE(SUM(total_amount),0) AS amount,
                 COALESCE(SUM(discount_amount),0) AS discounts
-         FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' ${scope.clause}`,
+         FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}`,
         [from, to, ...sp]
       )[0];
       const v = db.query<any>(
         `SELECT COUNT(*) AS c, COALESCE(SUM(total_amount),0) AS amount FROM sales_invoices si
-         WHERE si.date BETWEEN ? AND ? AND si.invoice_status = 'VOID' ${scope.clause}`,
+         WHERE si.date BETWEEN ? AND ? AND si.invoice_status = 'VOID' AND ${scope.clause}`,
         [from, to, ...sp]
       )[0];
       const refunds = db.query<any>(
         `SELECT COALESCE(SUM(sr.refunded_amount),0) AS amount FROM sales_returns sr
          JOIN sales_invoices si ON si.id = sr.original_invoice_id
-         WHERE sr.date BETWEEN ? AND ? ${scope.clause}`,
+         WHERE sr.date BETWEEN ? AND ? AND ${scope.clause}`,
         [from, to, ...sp]
       )[0]?.amount || 0;
       const collected = pm.reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);

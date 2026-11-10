@@ -33,6 +33,22 @@ export type PermissionEffect = 'GRANT' | 'DENY';
 /** Alphabetical comparator backed by String.localeCompare for deterministic text sorts. */
 const compareAlphabetically = (a: string, b: string) => a.localeCompare(b, 'ar');
 
+const EMPLOYEE_PERMISSION_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  'employees.view': Object.freeze(['employees.manage']),
+  'employees.create': Object.freeze(['employees.manage']),
+  'employees.update': Object.freeze(['employees.manage']),
+  'employees.terminate': Object.freeze(['employees.manage']),
+  'employees.export': Object.freeze(['employees.manage']),
+  'employees.profile.view': Object.freeze(['employees.manage']),
+  'employees.financials.view': Object.freeze(['employees.manage', 'employees.payroll.manage', 'employees.payroll.approve']),
+  'employees.payroll.view': Object.freeze(['employees.manage', 'employees.payroll.manage', 'employees.payroll.approve']),
+  'employees.payroll.manage': Object.freeze(['employees.manage', 'employees.payroll.approve']),
+  'employees.payroll.approve': Object.freeze(['employees.manage', 'employees.payroll.manage']),
+  'employees.commissions.view': Object.freeze(['employees.manage', 'employees.payroll.view', 'employees.payroll.manage', 'employees.payroll.approve']),
+  'ui.employees.employees.view': Object.freeze(['employees.manage', 'employees.view']),
+  'ui.employees.employees.manage': Object.freeze(['employees.manage']),
+});
+
 // ─── Permission catalog ───────────────────────────────────────────────────────
 // Every actionable capability in the app lives here. UI guards, route guards
 // and service-layer enforcement all resolve against these codes.
@@ -325,6 +341,10 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'hr.contracts.export', name: 'تصدير عقود الموظفين', module: 'HR' },
   { code: 'hr.documents.export', name: 'تصدير مستندات الموظفين', module: 'HR' },
   { code: 'hr.dashboard.view', name: 'عرض لوحة الموارد البشرية', module: 'HR' },
+
+  // HR employee self-service
+  { code: 'hr.selfservice.view', name: 'بوابة الموظف الذاتية', module: 'HR' },
+  { code: 'hr.selfservice.request', name: 'تقديم طلبات من بوابة الموظف', module: 'HR' },
 
   // ── صلاحيات دقيقة للصفحات والأقسام والأزرار ──────────────────────────────
   // Dashboard
@@ -646,6 +666,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'analytics.view', 'modules.view',
     'documents.view', 'documents.export', 'contracts.view', 'contracts.export',
     'hr.leave.view', 'hr.contracts.view', 'hr.documents.view',
+    'hr.selfservice.view', 'hr.selfservice.request',
   ],
   SALES: [
     'dashboard.view',
@@ -663,6 +684,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'operations.view', 'loyalty.view',
     'documents.view', 'contracts.view',
     'hr.leave.view', 'hr.leave.request',
+    'hr.selfservice.view', 'hr.selfservice.request',
   ],
   CASHIER: [
     'dashboard.view', 'products.view', 'categories.view', 'brands.view',
@@ -672,6 +694,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'cashier.view', 'cashier.expense', 'cashier.shift', 'cashier.shift.open', 'cashier.shift.close',
     'approvals.create', 'crm.view', 'notifications.view',
     'documents.view', 'hr.leave.view', 'loyalty.view',
+    'hr.selfservice.view', 'hr.selfservice.request',
   ],
   WAREHOUSE: [
     'dashboard.view', 'products.view', 'categories.view', 'brands.view',
@@ -681,6 +704,7 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'deliveries.view', 'deliveries.manage', 'drivers.view', 'vehicles.view',
     'employees.view', 'approvals.view', 'approvals.create', 'notifications.view',
     'documents.view', 'hr.leave.view', 'hr.leave.request',
+    'hr.selfservice.view', 'hr.selfservice.request',
   ],
 };
 
@@ -1570,6 +1594,7 @@ export class PermissionService {
     const legacyDenyCodes = [
       ...(GRANULAR_LEGACY_MAP[required] ? [GRANULAR_LEGACY_MAP[required]] : []),
       ...(GRANULAR_LEGACY_ALIASES[required] ?? []),
+      ...(EMPLOYEE_PERMISSION_ALIASES[required] ?? []),
     ];
     if (
       denies.has(required)
@@ -1584,6 +1609,7 @@ export class PermissionService {
     const legacyCodes = [
       ...(GRANULAR_LEGACY_MAP[required] ? [GRANULAR_LEGACY_MAP[required]] : []),
       ...(GRANULAR_LEGACY_ALIASES[required] ?? []),
+      ...(EMPLOYEE_PERMISSION_ALIASES[required] ?? []),
     ];
     for (const legacy of legacyCodes) {
       if (grants.has(legacy)) return true;

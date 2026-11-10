@@ -64,6 +64,7 @@ export const DataImportPage: React.FC = () => {
   const [encryptedBackupFile, setEncryptedBackupFile] = useState<File | null>(null);
   const [backupPassword, setBackupPassword] = useState('');
   const [showBackupPassword, setShowBackupPassword] = useState(false);
+  const [messageTone, setMessageTone] = useState<'success' | 'error' | 'info'>('info');
   const currentUser = AuthService.getCurrentUser();
   const canOpen = service.canOpen(currentUser);
 
@@ -110,7 +111,7 @@ export const DataImportPage: React.FC = () => {
 
   const handleFile = async (file?: File) => {
     if (!file) return;
-    setBusy(true); setMessage(''); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]); setExtractedText('');
+    setBusy(true); setMessage(''); setMessageTone('info'); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]); setExtractedText('');
     setDynamicPreview(null); setDynamicResult(null); setBackupImport(null); setEncryptedBackupFile(null); setBackupPassword(''); setShowBackupPassword(false); setFileName(file.name);
     try {
       const lowerName = file.name.toLocaleLowerCase();
@@ -155,7 +156,7 @@ export const DataImportPage: React.FC = () => {
       validateSpreadsheetFileHeader(extension, header);
       const parsedFile = await parseSpreadsheetInWorker(await file.arrayBuffer(), file.name);
       prepareSheetImport(parsedFile.sheets, parsedFile.buffer, file.name);
-    } catch (e: any) { setData(null); setMessage(e?.message || 'تعذرت قراءة الملف.'); }
+    } catch (e: any) { setData(null); setMessageTone('error'); setMessage(e?.message || 'تعذرت قراءة الملف.'); }
     finally { setBusy(false); }
   };
 
@@ -165,28 +166,31 @@ export const DataImportPage: React.FC = () => {
       setMessage('أدخل كلمة مرور النسخة الاحتياطية لفتح الملف.');
       return;
     }
-    setBusy(true); setMessage('');
+    setBusy(true); setMessage(''); setMessageTone('info');
     try {
       const sheets = await backupService.readBackupDataForImport(encryptedBackupFile, backupPassword);
       const preview = adminDataService.previewDataImport(sheets);
       setBackupImport({ sheets, preview });
       setEncryptedBackupFile(null);
       setBackupPassword('');
+      setMessageTone('success');
       setMessage('تمت قراءة النسخة المشفرة. راجع ملخص السجلات قبل دمجها مع البيانات الحالية.');
     } catch (e: any) {
       const errorMessage = e?.message?.replace(/^Error invoking remote method '[^']+': Error:\s*/, '');
+      setMessageTone('error');
       setMessage(errorMessage || 'تعذر فتح النسخة المشفرة. تحقق من كلمة المرور وحاول مجددًا.');
     } finally { setBusy(false); }
   };
 
   const runBackupImport = async () => {
     if (!backupImport) return;
-    setBusy(true); setMessage('');
+    setBusy(true); setMessage(''); setMessageTone('info');
     try {
       const outcome = await adminDataService.importData(backupImport.sheets);
       setBackupImport(null);
+      setMessageTone('success');
       setMessage(`تم استيراد النسخة: أُضيف ${outcome.insertedRows} سجل، واستُبدل ${outcome.updatedRows} سجل، وتم تخطي ${outcome.skippedRows} سجل.`);
-    } catch (e: any) { setMessage(e?.message || 'تعذر استيراد النسخة المشفرة.'); }
+    } catch (e: any) { setMessageTone('error'); setMessage(e?.message || 'تعذر استيراد النسخة المشفرة.'); }
     finally { setBusy(false); }
   };
 
@@ -233,6 +237,7 @@ export const DataImportPage: React.FC = () => {
       setSpreadsheetSheets([]);
       setDynamicPreview(null);
       setIssues([]);
+      setMessageTone('error');
       setMessage(error?.message || 'تعذر تحويل النص المستخرج إلى صفوف بيانات.');
     }
   };
@@ -253,21 +258,27 @@ export const DataImportPage: React.FC = () => {
 
   const runImport = () => {
     if (!data) return;
-    setBusy(true); setMessage('');
+    setBusy(true); setMessage(''); setMessageTone('info');
     try {
       if (data.entity === 'dynamic') {
         if (!fileBuffer) throw new Error('أعد اختيار الملف قبل الاستيراد.');
         const outcome = dynamicService.importSheets(fileBuffer, fileName, spreadsheetSheets, dynamicName);
         setDynamicResult(outcome);
+        setMessageTone('success');
         setMessage(`تم استيراد ${outcome.imported} سجل إلى ${outcome.entities?.length||1} نوع بيانات. البيانات الأصلية محفوظة كاملة.`);
         setBusy(false);
         return;
       }
-      const outcome = service.import(data, issues, { allowInitialBalances: allowBalances, allowProductStock: allowStock });
+      const outcome = service.import(data, { allowInitialBalances: allowBalances, allowProductStock: allowStock });
       setResult(outcome);
-      if (outcome.created) setMessage(`تمت إضافة ${outcome.created} سجل بنجاح.`);
-      else setMessage('لم تتم إضافة سجلات. راجع الأخطاء أدناه.');
-    } catch (e: any) { setMessage(e?.message || 'تعذر إتمام الاستيراد.'); }
+      if (outcome.created) {
+        setMessageTone('success');
+        setMessage(`تمت إضافة ${outcome.created} سجل بنجاح${outcome.skipped ? `، وتم تخطي ${outcome.skipped} سجل` : ''}.`);
+      } else {
+        setMessageTone('error');
+        setMessage('لم تتم إضافة سجلات. راجع الأخطاء أدناه.');
+      }
+    } catch (e: any) { setMessageTone('error'); setMessage(e?.message || 'تعذر إتمام الاستيراد.'); }
     finally { setBusy(false); }
   };
 
@@ -305,7 +316,7 @@ export const DataImportPage: React.FC = () => {
           <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملفًا للاستيراد'}<input type="file" accept=".xlsx,.xls,.csv,.pdf,.docx,.json,.xml,.txt,.png,.jpg,.jpeg,.webp,.gif,.ceramisys-backup,image/png,image/jpeg,image/webp,image/gif,application/pdf,application/json,text/plain,application/xml,application/octet-stream" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
         </div>
         <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV وPDF وDOCX وJSON وXML وTXT وصور PNG وJPG وWEBP وGIF، إضافة إلى النسخ المشفرة. الحد الأقصى لملفات DOCX وJSON وXML وTXT {MAX_DATA_FILE_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللصورة {MAX_IMAGE_IMPORT_BYTES / 1024 / 1024} ميجابايت، ولـPDF {MAX_PDF_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. تُستخرج نصوص PDF والصور محليًا عبر OCR، وتُراجع كل البيانات قبل حفظها. النسخة المشفرة تُدمج بعد المراجعة ولا تستبدل قاعدة البيانات كاملة.</p>
-        {message && <div className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${result?.created ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{message}</span></div>}
+        {message && <div role="status" aria-live="polite" className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${messageTone === 'success' ? 'bg-emerald-50 text-emerald-800' : messageTone === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-800'}`}>{messageTone === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0"/> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/>}<span>{message}</span></div>}
         {encryptedBackupFile && <div className="flex flex-wrap items-end gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
           <label className="min-w-60 flex-1 text-xs font-black text-amber-950">كلمة مرور النسخة الاحتياطية
             <span className="mt-1.5 flex overflow-hidden rounded-lg border border-amber-300 bg-white focus-within:ring-2 focus-within:ring-amber-400">

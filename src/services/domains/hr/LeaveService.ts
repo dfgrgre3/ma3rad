@@ -1152,7 +1152,6 @@ export class LeaveService {
     const leaveType = input.leaveType || 'ANNUAL';
     if (!LEAVE_TYPES.includes(leaveType)) throw new Error('نوع الإجازة غير صالح.');
 
-    this.assertEmploymentPeriod(input.employeeId, input.startDate, input.endDate);
     const employee = this.db.query<{ branchId: string | null; isActive: number | null }>(
       `SELECT branch_id AS branchId, is_active AS isActive FROM employees WHERE id = ?`,
       [input.employeeId]
@@ -1162,6 +1161,7 @@ export class LeaveService {
     if (!employee.branchId) throw new Error('الموظف غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
     this.departmentAccess.requireEmployeeAccess(input.employeeId, actor);
+    this.assertEmploymentPeriod(input.employeeId, input.startDate, input.endDate);
 
     const days = this.getChargeableDays(input.employeeId, employee.branchId, input.startDate, input.endDate);
     if (!days) throw new Error('الفترة المحددة لا تتضمن أيام دوام بعد استثناء العطلات وأيام الراحة المجدولة.');
