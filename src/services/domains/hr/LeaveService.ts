@@ -763,13 +763,23 @@ export class LeaveService {
       startDate: input.effectiveDate,
       endDate: input.effectiveDate,
     });
-    const balance = Number(this.db.query<{ days: number }>(
+    const balanceAtEffectiveDate = Number(this.db.query<{ days: number }>(
+      `SELECT COALESCE(SUM(days_delta), 0) AS days
+       FROM employee_leave_balance_transactions
+       WHERE employee_id = ? AND leave_year = ? AND effective_date <= ?`,
+      [input.employeeId, input.year, input.effectiveDate]
+    )[0]?.days ?? 0);
+    const committedAtDate = this.getYearlyRequestDays(
+      input.employeeId, 'ANNUAL', input.year, undefined, 'ALL', input.effectiveDate
+    );
+    const yearEndBalance = Number(this.db.query<{ days: number }>(
       `SELECT COALESCE(SUM(days_delta), 0) AS days
        FROM employee_leave_balance_transactions WHERE employee_id = ? AND leave_year = ?`,
       [input.employeeId, input.year]
     )[0]?.days ?? 0);
-    const committed = this.getYearlyRequestDays(input.employeeId, 'ANNUAL', input.year);
-    if (balance + input.daysDelta < committed - 1e-8) {
+    const committedForYear = this.getYearlyRequestDays(input.employeeId, 'ANNUAL', input.year);
+    if (balanceAtEffectiveDate + input.daysDelta < committedAtDate - 1e-8
+      || yearEndBalance + input.daysDelta < committedForYear - 1e-8) {
       throw new Error('لا يمكن خفض الرصيد عن الأيام السنوية المعتمدة أو قيد الانتظار.');
     }
 

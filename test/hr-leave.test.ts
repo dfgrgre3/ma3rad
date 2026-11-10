@@ -341,6 +341,7 @@ test('annual leave accrues monthly, prorates on service, and caps year-end carry
   const carryoverEmployeeId = createEmployee();
 
   assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-03-31').grantedDays, 6);
+  assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-03-31').grantedDays, 6);
   const request = service.requestLeave({
     employeeId,
     leaveType: 'ANNUAL',
@@ -350,8 +351,33 @@ test('annual leave accrues monthly, prorates on service, and caps year-end carry
   service.decide(request.id, 'APPROVED');
 
   assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-12-31').grantedDays, 24);
+  assert.equal(
+    db.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM employee_leave_balance_transactions
+       WHERE employee_id = ? AND source_key LIKE 'ACCRUAL:2026-%'`,
+      [employeeId]
+    )[0].count,
+    12
+  );
+  assert.throws(
+    () => service.saveAnnualAccrualPolicy({
+      effectiveFrom: '2026-01-01',
+      annualEntitlementDays: 30,
+      carryoverLimitDays: 5,
+      prorateOnService: true,
+    }),
+    /بأثر رجعي/
+  );
   assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2026, '2026-12-31').grantedDays, 24);
   assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2027, '2027-01-31').grantedDays, 7);
+  assert.equal(
+    db.query<{ days: number }>(
+      `SELECT days_delta AS days FROM employee_leave_balance_transactions
+       WHERE employee_id = ? AND source_key = 'CARRYOVER:2027'`,
+      [carryoverEmployeeId]
+    )[0].days,
+    5
+  );
   service.saveAnnualAccrualPolicy({
     employeeId,
     effectiveFrom: '2027-01-01',
@@ -387,4 +413,18 @@ test('annual leave accrues monthly, prorates on service, and caps year-end carry
     )[0].count,
     1
   );
+
+  const terminatedEmployeeId = createEmployee();
+  db.run(
+    "UPDATE employees SET joined_date = '2026-01-01', terminated_at = '2026-01-16' WHERE id = ?",
+    [terminatedEmployeeId]
+  );
+  service.saveAnnualAccrualPolicy({
+    employeeId: terminatedEmployeeId,
+    effectiveFrom: '2026-01-01',
+    annualEntitlementDays: 31,
+    carryoverLimitDays: 0,
+    prorateOnService: true,
+  });
+  assert.equal(service.getAnnualBalanceAsOf(terminatedEmployeeId, '2026-01-16'), 1.3333);
 });
