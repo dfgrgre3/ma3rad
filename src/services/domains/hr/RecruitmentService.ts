@@ -495,7 +495,7 @@ export class RecruitmentService {
   public hireCandidate(id: string, input: HireRecruitmentCandidateDTO): RecruitmentCandidate {
     this.guardWrites();
     const actor = this.require('hr.recruitment.manage');
-    PermissionService.require(actor, 'employees.manage');
+    PermissionService.require(actor, 'employees.create');
     const candidate = this.requireCandidate(actor, id);
     if (candidate.status !== 'OFFER' || this.getOffer(id)?.status !== 'ACCEPTED') {
       throw new Error('لا يمكن تعيين المرشح قبل قبول العرض الوظيفي.');

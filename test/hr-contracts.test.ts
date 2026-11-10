@@ -7,6 +7,7 @@ import { PermissionService } from '../src/services/domains/auth/PermissionServic
 import { BranchService } from '../src/services/domains/organization/BranchService.ts';
 import { BranchAccessService } from '../src/services/domains/auth/BranchAccessService.ts';
 import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
+import { AttendanceService } from '../src/services/domains/hr/AttendanceService.ts';
 import { ContractService } from '../src/services/domains/hr/ContractService.ts';
 import { EmployeeOrganizationService } from '../src/services/domains/hr/EmployeeOrganizationService.ts';
 import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
@@ -428,12 +429,29 @@ test('contracts are restricted to explicitly assigned HR departments', async () 
     'INSERT INTO users_departments (user_id, department_id, assigned_by) VALUES (?, ?, ?)',
     [manager.id, salesDepartment.id, admin.id]
   );
+  db.run(
+    `INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect)
+     VALUES (?, 'employees.attendance.view', 'GRANT')`,
+    [manager.id]
+  );
   asManager();
 
   assert.ok(service.getContracts().some((contract) => contract.id === salesContract.id));
   assert.ok(!service.getContracts().some((contract) => contract.id === operationsContract.id));
   assert.throws(() => service.getContract(operationsContract.id), /غير موجود/);
+  const visibleAttendanceEmployees = AttendanceService.getEmployees();
+  assert.ok(visibleAttendanceEmployees.some((employee) => employee.id === salesEmployee));
+  assert.ok(!visibleAttendanceEmployees.some((employee) => employee.id === operationsEmployee));
   asAdmin();
+});
+
+test('employee deletion is disabled and preserves the employee history', async () => {
+  const db = await boot();
+  const employeeId = createEmployee();
+
+  assert.throws(() => EmployeeService.delete(employeeId), /الحذف النهائي للموظفين معطل/);
+  assert.equal(db.query('SELECT id FROM employees WHERE id = ?', [employeeId]).length, 1);
+  assert.ok(db.query('SELECT id FROM employee_status_history WHERE employee_id = ?', [employeeId]).length > 0);
 });
 
 test('contract summary reports expiring and expired terms and hr deactivation blocks writes', async () => {

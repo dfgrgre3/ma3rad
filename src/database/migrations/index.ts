@@ -2529,8 +2529,8 @@ export const MIGRATIONS: Migration[] = [
   ...MIGRATION_PART_32,
   ...MIGRATION_PART_33,
   ...MIGRATION_PART_34,
-  ...MIGRATION_PART_35,
   ...MIGRATION_PART_36,
+  ...MIGRATION_PART_35,
 ].flat();
 
 /** Validate the append-only migration catalog before touching a database. */

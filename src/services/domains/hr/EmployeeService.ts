@@ -1662,8 +1662,8 @@ export class EmployeeService {
 
   static getPayrollPayables(): EmployeePayrollPayable[] {
     const actor = this.requireFinancialView();
+    this.departmentAccess.requireAllDepartmentAccess(actor);
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
-    const departmentScope = this.departmentAccess.sqlScope('emp.department_id', actor);
     return this.db.query<EmployeePayrollPayable>(`
       WITH payroll_lines AS (
         SELECT
@@ -1694,9 +1694,8 @@ export class EmployeeService {
       LEFT JOIN employees emp ON emp.id = p.employee_id
       GROUP BY p.employee_id, emp.name
       HAVING ABS(SUM(p.balance)) > 0.009
-        AND (emp.id IS NULL OR ${departmentScope.clause})
       ORDER BY employeeName
-    `, [...scope.params, ...departmentScope.params]);
+    `, scope.params);
   }
 
   static deleteTransaction(id: string): void {

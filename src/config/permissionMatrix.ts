@@ -507,6 +507,8 @@ const PAGES: PageSpec[] = [
     actions: [...WRITE, 'manage', 'assign', 'maintenance', 'print'] },
   { key: 'fleet', label: 'لوحة الأسطول', module: 'OPERATIONS', route: '/fleet/dashboard', legacyView: 'operations.fleet.view',
     actions: [...ANALYTICS, 'kpi', 'alerts'] },
+  { key: 'operations_shifts', label: 'ورديات التشغيل', module: 'OPERATIONS', route: '/operations/shifts', legacyView: 'operations.view',
+    actions: [...WRITE, 'assign', 'approve', 'close', 'handover', 'timeline'] },
 
   // التصنيع
   { key: 'overview', label: 'التصنيع', module: 'MANUFACTURING', route: '/manufacturing', legacyView: 'manufacturing.view',

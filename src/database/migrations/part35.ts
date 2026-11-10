@@ -13,7 +13,7 @@ import { addColumn } from './support';
  */
 export const MIGRATION_PART_35: Migration[] = [
   {
-    id: '147_operations_shift_management',
+    id: '148_operations_shift_management',
     description: 'Add 24/7 operations shift instances, handovers, presence periods, incidents, and per-shift production.',
     disableForeignKeys: true,
     up: (db) => {

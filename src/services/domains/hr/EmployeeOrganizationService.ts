@@ -109,7 +109,7 @@ export class EmployeeOrganizationService {
 
   public updateDepartment(id: string, patch: { name: string; description?: string }): EmployeeDepartment {
     const actor = this.requireManage();
-    const existing = this.requireDepartment(id, actor);
+    this.requireDepartment(id, actor);
     const name = patch.name?.trim();
     if (!name) throw new Error('اسم القسم مطلوب.');
     if (name.length > 100) throw new Error('اسم القسم لا يتجاوز 100 حرف.');

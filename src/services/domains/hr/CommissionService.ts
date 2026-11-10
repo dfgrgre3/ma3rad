@@ -152,11 +152,11 @@ export class CommissionService {
     const row = this.db.query<{
       status: CommissionRow['status'];
       amount: number;
-      employee_id: string;
+      employeeId: string;
       periodMonth: string;
       branchId: string | null;
     }>(`
-      SELECT c.status, c.commission_amount AS amount, c.employee_id, c.period_month AS periodMonth,
+      SELECT c.status, c.commission_amount AS amount, c.employee_id AS employeeId, c.period_month AS periodMonth,
              COALESCE(c.branch_id, e.branch_id) AS branchId
       FROM commissions c JOIN employees e ON e.id = c.employee_id WHERE c.id = ?
     `, [id])[0];
@@ -164,7 +164,7 @@ export class CommissionService {
     if (!row.branchId) throw new Error('العمولة غير مرتبطة بفرع.');
     const branchId = row.branchId;
     this.branchAccess.requireBranchAccess(branchId, actor);
-    this.departmentAccess.requireEmployeeAccess(row.employee_id, actor);
+    this.departmentAccess.requireEmployeeAccess(row.employeeId, actor);
     if (this.db.query(
       `SELECT id FROM payroll_runs WHERE branch_id = ? AND period = ? AND status != 'DRAFT'`,
       [branchId, row.periodMonth]
@@ -197,7 +197,7 @@ export class CommissionService {
 
       if (status === 'APPROVED') {
         postLedgerEntry(db.getDatabase(), {
-          date: today, description: `Accrue commission for employee ${row.employee_id}`,
+          date: today, description: `Accrue commission for employee ${row.employeeId}`,
           referenceType: 'COMMISSION_APPROVAL', referenceId: id, createdBy: actor.id, branchId,
           lines: [{ accountCode: '5202', debit: amount, credit: 0 }, { accountCode: '2103', debit: 0, credit: amount }],
         });
