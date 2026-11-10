@@ -105,7 +105,7 @@ export const LeavePage: React.FC = () => {
         item.leaveType,
         item.maxDaysPerYear == null ? '' : String(item.maxDaysPerYear),
       ])) as Record<LeaveType, string>);
-      setAnnualPolicyState(service.getAnnualAccrualPolicyState());
+      setAnnualPolicyState(service.getAnnualAccrualPolicyState(annualPolicyDraft.employeeId || undefined));
       if ((canRequest || canApprove) && can('employees.view')) {
         setEmployees(EmployeeService.getAll().map((employee) => ({ id: employee.id, name: employee.name })));
       }
@@ -227,9 +227,9 @@ export const LeavePage: React.FC = () => {
     }
   };
 
-  const selectAnnualPolicyTarget = (employeeId: string) => {
+  const selectAnnualPolicyTarget = (employeeId: string, asOfDate?: string) => {
     try {
-      const state = service.getAnnualAccrualPolicyState(employeeId || undefined);
+      const state = service.getAnnualAccrualPolicyState(employeeId || undefined, asOfDate);
       const selectedPolicy = employeeId
         ? state.employeePolicy ?? state.branchPolicy
         : state.branchPolicy;
@@ -263,7 +263,10 @@ export const LeavePage: React.FC = () => {
         inheritBranchPolicy: annualPolicyDraft.inheritBranchPolicy,
       });
       toast.success('تم حفظ سياسة الاستحقاق السنوي.');
-      selectAnnualPolicyTarget(annualPolicyDraft.employeeId);
+      selectAnnualPolicyTarget(
+        annualPolicyDraft.employeeId,
+        `${annualPolicyDraft.effectiveFrom}-01`
+      );
     } catch (error: any) {
       toast.error(error?.message || 'تعذر حفظ سياسة الاستحقاق السنوي.');
     }

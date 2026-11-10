@@ -249,12 +249,15 @@ export class LeaveService {
       }
 
       for (let month = 1; month <= 12; month += 1) {
-        const effectiveDate = monthEnd(year, month);
+        const periodEnd = monthEnd(year, month);
+        const effectiveDate = employee.terminatedAt && employee.terminatedAt < periodEnd
+          ? employee.terminatedAt
+          : periodEnd;
         if (effectiveDate > asOfDate) break;
         if (effectiveDate < employee.joinedDate) continue;
-        const serviceEnd = employee.terminatedAt && employee.terminatedAt < effectiveDate
+        const serviceEnd = employee.terminatedAt && employee.terminatedAt < periodEnd
           ? employee.terminatedAt
-          : effectiveDate;
+          : periodEnd;
         const periodStart = `${year}-${String(month).padStart(2, '0')}-01`;
         if (serviceEnd < periodStart) continue;
 
@@ -679,27 +682,25 @@ export class LeaveService {
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
     this.ensureAnnualLeaveAccrual(employeeId, employee.branchId, asOfDate, actor.id);
     let balance = 0;
-    let carriedOut = 0;
-    for (let year = Number(employee.joinedDate.slice(0, 4)); year <= Number(asOfDate.slice(0, 4)); year += 1) {
+    const targetYear = Number(asOfDate.slice(0, 4));
+    for (let year = Number(employee.joinedDate.slice(0, 4)); year <= targetYear; year += 1) {
       const end = asOfDate < yearEnd(year) ? asOfDate : yearEnd(year);
-      balance += Number(this.db.query<{ days: number }>(
+      const yearBalance = Number(this.db.query<{ days: number }>(
         `SELECT COALESCE(SUM(days_delta), 0) AS days
          FROM employee_leave_balance_transactions
          WHERE employee_id = ? AND leave_year = ? AND effective_date <= ?`,
         [employeeId, year, end]
       )[0]?.days ?? 0);
-      balance -= this.getYearlyRequestDays(employeeId, 'ANNUAL', year, undefined, 'APPROVED', end);
-      if (year < Number(asOfDate.slice(0, 4))) {
-        carriedOut += Number(this.db.query<{ days: number }>(
-          `SELECT COALESCE(SUM(days_delta), 0) AS days
-           FROM employee_leave_balance_transactions
-           WHERE employee_id = ? AND leave_year = ? AND transaction_type = 'CARRYOVER'
-             AND effective_date <= ?`,
-          [employeeId, year + 1, asOfDate]
-        )[0]?.days ?? 0);
-      }
+      const remaining = yearBalance
+        - this.getYearlyRequestDays(employeeId, 'ANNUAL', year, undefined, 'APPROVED', end);
+      const policy = this.effectiveAnnualLeavePolicy(
+        employeeId, employee.branchId, yearStart(year)
+      );
+      balance = year === Number(employee.joinedDate.slice(0, 4)) || policy
+        ? remaining
+        : balance + remaining;
     }
-    return Math.max(0, balance - carriedOut);
+    return Math.max(0, balance);
   }
 
   public getBalanceTransactions(employeeId: string, year: number): LeaveBalanceTransaction[] {
@@ -795,12 +796,15 @@ export class LeaveService {
     return this.getBalanceTransactions(input.employeeId, input.year).find((row) => row.id === id)!;
   }
 
-  public getAnnualAccrualPolicyState(employeeId?: string): AnnualLeaveAccrualPolicyState {
+  public getAnnualAccrualPolicyState(
+    employeeId?: string,
+    asOfDate = new Date().toISOString().slice(0, 10)
+  ): AnnualLeaveAccrualPolicyState {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, ['hr.leave.view', 'hr.leave.approve']);
+    assertDate(asOfDate, 'تاريخ السياسة');
     const branchId = this.branchAccess.getCurrentBranchId(actor);
-    const today = new Date().toISOString().slice(0, 10);
-    const effectiveDate = monthStart(today);
+    const effectiveDate = monthStart(asOfDate);
     const branchRow = this.queryAnnualLeavePolicy(branchId, null, effectiveDate);
     let employeeRow: AnnualLeavePolicyRow | null = null;
     if (employeeId) {

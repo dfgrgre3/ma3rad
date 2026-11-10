@@ -327,3 +327,64 @@ test('approved unpaid leave updates attendance and is deducted from the period p
     2
   );
 });
+
+test('annual leave accrues monthly, prorates on service, and caps year-end carryover', async () => {
+  const db = await boot();
+  const service = new LeaveService();
+  const employeeId = createEmployee();
+  service.saveAnnualAccrualPolicy({
+    effectiveFrom: '2026-01-01',
+    annualEntitlementDays: 24,
+    carryoverLimitDays: 5,
+    prorateOnService: true,
+  });
+  const carryoverEmployeeId = createEmployee();
+
+  assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-03-31').grantedDays, 6);
+  const request = service.requestLeave({
+    employeeId,
+    leaveType: 'ANNUAL',
+    startDate: '2026-04-15',
+    endDate: '2026-04-16',
+  });
+  service.decide(request.id, 'APPROVED');
+
+  assert.equal(service.getBalanceSummary(employeeId, 2026, '2026-12-31').grantedDays, 24);
+  assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2026, '2026-12-31').grantedDays, 24);
+  assert.equal(service.getBalanceSummary(carryoverEmployeeId, 2027, '2027-01-31').grantedDays, 7);
+  service.saveAnnualAccrualPolicy({
+    employeeId,
+    effectiveFrom: '2027-01-01',
+    annualEntitlementDays: 36,
+    carryoverLimitDays: 0,
+    prorateOnService: false,
+  });
+  const nextYearBalance = service.getBalanceSummary(employeeId, 2027, '2027-01-31');
+  assert.equal(nextYearBalance.grantedDays, 3);
+  assert.equal(
+    service.getAnnualAccrualPolicyState(employeeId, '2027-01-01').effectivePolicy?.annualEntitlementDays,
+    36
+  );
+
+  const employeeProrateId = createEmployee();
+  db.run("UPDATE employees SET joined_date = '2026-01-16' WHERE id = ?", [employeeProrateId]);
+  service.saveAnnualAccrualPolicy({
+    employeeId: employeeProrateId,
+    effectiveFrom: '2026-01-01',
+    annualEntitlementDays: 31,
+    carryoverLimitDays: 0,
+    prorateOnService: true,
+  });
+  assert.equal(
+    service.getBalanceSummary(employeeProrateId, 2026, '2026-01-31').grantedDays,
+    1.3333
+  );
+  assert.equal(
+    db.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM employee_leave_balance_transactions
+       WHERE employee_id = ? AND source_key = 'ACCRUAL:2026-01'`,
+      [employeeProrateId]
+    )[0].count,
+    1
+  );
+});
