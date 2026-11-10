@@ -285,13 +285,13 @@ export class RecruitmentService {
     const actor = this.require('hr.recruitment.manage');
     if (!CANDIDATE_STATUSES.includes(status)) throw new Error('مرحلة المرشح غير صالحة.');
     const candidate = this.requireCandidate(actor, id);
-    if (candidate.status === status) return candidate;
     if (status === 'HIRED' || status === 'INTERVIEW' || status === 'OFFER' || candidate.status === 'HIRED') {
       throw new Error('تُدار المقابلات والعروض والتعيين من إجراءاتها المخصصة لضمان حفظ تفاصيلها.');
     }
     if (candidate.status === 'OFFER') {
       throw new Error('تُدار حالة المرشح في مرحلة العرض من سجل العرض الوظيفي.');
     }
+    if (candidate.status === status) return candidate;
     if (!CANDIDATE_TRANSITIONS[candidate.status].includes(status)) {
       throw new Error(`لا يمكن نقل المرشح من «${candidate.status}» إلى «${status}».`);
     }

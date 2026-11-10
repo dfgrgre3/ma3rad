@@ -758,9 +758,7 @@ export class EmployeeService {
   }
 
   static delete(id: string): void {
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'employees.delete');
-    this.requireEmployeeBranch(id, actor);
+    AuthService.requireAuth();
     throw new Error('الحذف النهائي للموظفين معطل للحفاظ على السجلات المالية والتاريخية. استخدم إنهاء الخدمة أو الأرشفة.');
   }
 

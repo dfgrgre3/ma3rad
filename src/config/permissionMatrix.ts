@@ -44,6 +44,7 @@ interface PageSpec {
   module: string;
   route?: string;
   legacyView: string;
+  legacyAliases?: string[];
   actions: string[];
   sections?: SectionSpec[];
 }
@@ -285,6 +286,8 @@ const PAGES: PageSpec[] = [
   { key: 'quotations', label: 'عروض الأسعار', module: 'QUOTATIONS', route: '/quotations', legacyView: 'quotations.view',
     actions: [...APPROVE, 'print', 'share', 'email', 'whatsapp', 'convert', 'timeline'],
     sections: [section('list', 'قائمة العروض'), section('items', 'البنود', ['view', 'manage']), section('totals', 'الإجماليات'), section('terms', 'الشروط'), section('approvals', 'الموافقات')] },
+  { key: 'construction_estimate', label: 'حاسبة المقايسة الهندسية', module: 'QUOTATIONS', route: '/construction-estimate',
+    legacyView: 'quotations.view', legacyAliases: ['quotations.create', 'projects.view'], actions: ['create', 'export', 'print'] },
   { key: 'orders', label: 'طلبات البيع', module: 'ORDERS', route: '/orders', legacyView: 'orders.view',
     actions: [...APPROVE, 'convert', 'assign', 'deliver', 'print', 'share', 'timeline', 'attach'],
     sections: [section('list', 'قائمة الطلبات'), section('items', 'البنود', ['view', 'manage']), section('timeline', 'السجل الزمني'), section('deliveries', 'التسليم'), section('payments', 'المدفوعات')] },
@@ -671,9 +674,10 @@ function buildPermissions(): GranularPermissionDef[] {
 
     // صلاحية الدخول إلى الصفحة
     const viewHead = page.legacyView.split('.')[0];
-    const viewAliases = viewHead && `${viewHead}.view` !== page.legacyView
-      ? [`${viewHead}.view`]
-      : undefined;
+    const viewAliases = [
+      ...(viewHead && `${viewHead}.view` !== page.legacyView ? [`${viewHead}.view`] : []),
+      ...(page.legacyAliases ?? []),
+    ];
     push({
       code: `${base}.view`,
       name: `عرض صفحة ${page.label}`,
@@ -681,7 +685,7 @@ function buildPermissions(): GranularPermissionDef[] {
       group: page.label,
       kind: 'page',
       legacy: page.legacyView,
-      legacyAliases: viewAliases,
+      legacyAliases: viewAliases.length ? viewAliases : undefined,
       route: page.route,
       granular: true,
     });
