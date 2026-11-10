@@ -1230,6 +1230,80 @@ export class OperationsShiftService {
     return this.getShiftDetail(incident.operationShiftId).incidents.find((row) => row.id === incidentId)!;
   }
 
+  public recordProduction(operationShiftId: string, input: {
+    productionOrderId?: string | null;
+    productId?: string | null;
+    workCenterId?: string | null;
+    targetQty?: number;
+    producedQty?: number;
+    goodQty?: number;
+    scrapQty?: number;
+    downtimeMinutes?: number;
+    downtimeReason?: string | null;
+    notes?: string | null;
+  }): OperationShiftProductionRow {
+    const actor = this.requireManage();
+    const shift = this.getInstance(operationShiftId);
+    if (!['OPEN', 'HANDOVER_PENDING', 'CLOSED'].includes(shift.status)) {
+      throw new Error('لا يمكن تسجيل إنتاج على وردية ملغاة.');
+    }
+    const numeric: Array<[string, number | undefined]> = [
+      ['الكمية المستهدفة', input.targetQty],
+      ['الكمية المنتجة', input.producedQty],
+      ['الكمية السليمة', input.goodQty],
+      ['الهالك', input.scrapQty],
+      ['دقائق التوقف', input.downtimeMinutes],
+    ];
+    for (const [label, value] of numeric) {
+      if (value != null && (!Number.isFinite(value) || value < 0)) {
+        throw new Error(`${label} يجب أن تكون رقماً غير سالب.`);
+      }
+    }
+    let productId = input.productId || null;
+    let workCenterId = input.workCenterId || null;
+    if (input.productionOrderId) {
+      const order = this.db.query<{
+        productId: string; branchId: string; status: string;
+      }>(
+        `SELECT product_id AS productId, branch_id AS branchId, status
+         FROM production_orders WHERE id = ?`,
+        [input.productionOrderId]
+      )[0];
+      if (!order) throw new Error('أمر الإنتاج غير موجود.');
+      if (order.branchId !== shift.branchId) throw new Error('أمر الإنتاج لا يتبع فرع وردية التشغيل.');
+      productId = productId || order.productId;
+    }
+    if (productId && !this.db.query('SELECT id FROM products WHERE id = ?', [productId]).length) {
+      throw new Error('المنتج غير موجود.');
+    }
+    if (workCenterId && !this.db.query('SELECT id FROM work_centers WHERE id = ?', [workCenterId]).length) {
+      throw new Error('مركز العمل غير موجود.');
+    }
+    const id = `opsprod_${uuidv4().replace(/-/g, '').slice(0, 14)}`;
+    this.db.run(
+      `INSERT INTO operation_shift_production
+         (id, operation_shift_id, production_order_id, product_id, work_center_id,
+          target_qty, produced_qty, good_qty, scrap_qty, downtime_minutes, downtime_reason,
+          notes, recorded_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, operationShiftId, input.productionOrderId || null, productId, workCenterId,
+        input.targetQty ?? 0, input.producedQty ?? 0, input.goodQty ?? 0, input.scrapQty ?? 0,
+        input.downtimeMinutes ?? 0, input.downtimeReason?.trim() || null,
+        input.notes?.trim() || null, actor.id]
+    );
+    if (input.productionOrderId) {
+      this.db.run(
+        'UPDATE production_orders SET operation_shift_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [operationShiftId, input.productionOrderId]
+      );
+    }
+    this.audit('تسجيل إنتاج وردية تشغيل', id, {
+      operationShiftId, productionOrderId: input.productionOrderId || null,
+      producedQty: input.producedQty || 0, scrapQty: input.scrapQty || 0,
+    });
+    return this.getProduction(operationShiftId).find((row) => row.id === id)!;
+  }
+
   public getProduction(operationShiftId: string): OperationShiftProductionRow[] {
     return this.db.query<OperationShiftProductionRow>(
       `SELECT p.id, p.operation_shift_id AS operationShiftId,
