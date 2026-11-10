@@ -757,7 +757,7 @@ export class EmployeeService {
       .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0));
   }
 
-  static delete(id: string): void {
+  static delete(_id: string): void {
     AuthService.requireAuth();
     throw new Error('الحذف النهائي للموظفين معطل للحفاظ على السجلات المالية والتاريخية. استخدم إنهاء الخدمة أو الأرشفة.');
   }

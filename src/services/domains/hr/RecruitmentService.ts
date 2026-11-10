@@ -242,7 +242,8 @@ export class RecruitmentService {
     const phone = input.phone?.trim() || null;
     if (!email && !phone) throw new Error('أدخل رقم هاتف المرشح أو بريده الإلكتروني.');
     const job = this.requireJob(actor, input.jobId);
-    if (job.status !== 'OPEN' || !job.isPublished || job.approvalStatus !== 'APPROVED') {
+    if (job.status !== 'OPEN') throw new Error('الوظيفة غير مفتوحة لاستقبال المرشحين.');
+    if (!job.isPublished || job.approvalStatus !== 'APPROVED') {
       throw new Error('لا يمكن استقبال طلبات لوظيفة غير معتمدة ومنشورة.');
     }
     if (email && this.db.query(

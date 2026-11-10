@@ -294,6 +294,36 @@ test('leave dates are strict and annual balances reserve, approve and restore at
   ));
 });
 
+test('leave requests and approvals stay within the employee employment dates', async () => {
+  const db = await boot();
+  const service = new LeaveService();
+  const employeeId = createEmployee();
+
+  assert.throws(
+    () => service.requestLeave({
+      employeeId, leaveType: 'SICK', startDate: '2025-12-30', endDate: '2025-12-31',
+    }),
+    /قبل تاريخ تعيين الموظف/
+  );
+
+  const request = service.requestLeave({
+    employeeId, leaveType: 'UNPAID', startDate: '2026-03-10', endDate: '2026-03-11',
+  });
+  db.run(
+    "UPDATE employees SET terminated_at = '2026-03-09' WHERE id = ?",
+    [employeeId]
+  );
+  assert.throws(() => service.decide(request.id, 'APPROVED'), /بعد تاريخ انتهاء خدمة الموظف/);
+  assert.equal(service.getRequest(request.id).status, 'PENDING');
+  assert.equal(
+    db.query<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM attendance WHERE employee_id = ? AND date BETWEEN '2026-03-10' AND '2026-03-11'",
+      [employeeId]
+    )[0].count,
+    0
+  );
+});
+
 test('approved unpaid leave updates attendance and is deducted from the period payroll', async () => {
   const db = await boot();
   const service = new LeaveService();

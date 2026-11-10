@@ -391,6 +391,21 @@ export class LeaveService {
     }
   }
 
+  private assertEmploymentPeriod(employeeId: string, startDate: string, endDate: string): void {
+    const employee = this.db.query<{ joinedDate: string; terminatedAt: string | null }>(
+      `SELECT joined_date AS joinedDate, terminated_at AS terminatedAt
+       FROM employees WHERE id = ?`,
+      [employeeId]
+    )[0];
+    if (!employee) throw new Error('الموظف المحدد غير موجود.');
+    if (startDate < employee.joinedDate) {
+      throw new Error('لا يمكن تسجيل إجازة قبل تاريخ تعيين الموظف.');
+    }
+    if (employee.terminatedAt && endDate > employee.terminatedAt) {
+      throw new Error('لا يمكن تسجيل إجازة بعد تاريخ انتهاء خدمة الموظف.');
+    }
+  }
+
   private getChargeableDates(employeeId: string, branchId: string, startDate: string, endDate: string): string[] {
     const shifts = this.db.query<LeaveScheduleRow>(
       `SELECT a.effective_from AS effectiveFrom, a.effective_to AS effectiveTo,
@@ -1137,6 +1152,7 @@ export class LeaveService {
     const leaveType = input.leaveType || 'ANNUAL';
     if (!LEAVE_TYPES.includes(leaveType)) throw new Error('نوع الإجازة غير صالح.');
 
+    this.assertEmploymentPeriod(input.employeeId, input.startDate, input.endDate);
     const employee = this.db.query<{ branchId: string | null; isActive: number | null }>(
       `SELECT branch_id AS branchId, is_active AS isActive FROM employees WHERE id = ?`,
       [input.employeeId]
@@ -1187,6 +1203,7 @@ export class LeaveService {
     if (request.status !== 'PENDING') throw new Error('لا يمكن البت في طلب ليس قيد الانتظار.');
     this.assertPayrollPeriodsEditable(request);
     if (decision === 'APPROVED') {
+      this.assertEmploymentPeriod(request.employeeId, request.startDate, request.endDate);
       this.assertNoOverlap(request.employeeId, request.startDate, request.endDate, request.id);
       this.assertTypeLimits(
         request.employeeId, request.branchId, request.leaveType, request.startDate, request.endDate, request.id
