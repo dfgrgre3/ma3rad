@@ -3,7 +3,7 @@ import { addColumn } from './support';
 
 export const MIGRATION_PART_34: Migration[] = [
   {
-    id: '122_hr_recruitment_lifecycle',
+    id: '146_hr_recruitment_lifecycle',
     description: 'Add recruitment approval, publication, resume, interview, and offer workflows',
     up: (db) => {
       addColumn(db, 'hr_job_postings', 'approval_status', "TEXT NOT NULL DEFAULT 'APPROVED' CHECK(approval_status IN ('PENDING', 'APPROVED', 'REJECTED'))");

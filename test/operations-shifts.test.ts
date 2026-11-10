@@ -36,8 +36,9 @@ const employeeTwo = 'emp_ops_two';
 const employeeThree = 'emp_ops_three';
 const businessDate = '2031-03-10';
 
-function boot(): DatabaseManager {
+async function boot(): Promise<DatabaseManager> {
   const db = DatabaseManager.getInstance();
+  await db.initialize();
   PermissionService.seed();
   db.run(
     `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active, branch_scope)
@@ -88,8 +89,8 @@ function asAdmin(): void {
   AuthService.setCurrentUser(admin);
 }
 
-test('24/7 operations shift lifecycle, multi-drawer cash, handover, attendance and production', () => {
-  const db = boot();
+test('24/7 operations shift lifecycle, multi-drawer cash, handover, attendance and production', async () => {
+  const db = await boot();
   const service = new OperationsShiftService();
   const cashier = new CashierService();
 

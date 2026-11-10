@@ -1267,10 +1267,11 @@ export class LeaveService {
       id: string; employeeId: string; branchId: string; status: LeaveStatus; leaveType: LeaveType;
       startDate: string; endDate: string; days: number;
     }>(
-      `SELECT id, employee_id AS employeeId, branch_id AS branchId,
-              status, leave_type AS leaveType, start_date AS startDate,
-              end_date AS endDate, days
+      `SELECT l.id, l.employee_id AS employeeId, l.branch_id AS branchId,
+              l.status, l.leave_type AS leaveType, l.start_date AS startDate,
+              l.end_date AS endDate, l.days
        FROM employee_leave_requests l
+       JOIN employees e ON e.id = l.employee_id
        WHERE ${scope.clause} AND l.start_date <= ? AND l.end_date >= ?`,
       [...scope.params, yearEnd(targetYear), yearStart(targetYear)]
     );

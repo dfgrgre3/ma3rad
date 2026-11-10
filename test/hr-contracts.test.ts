@@ -410,6 +410,32 @@ test('contracts are branch scoped for reads and lifecycle actions', async () => 
   asAdmin();
 });
 
+test('contracts are restricted to explicitly assigned HR departments', async () => {
+  const db = await boot();
+  const organization = new EmployeeOrganizationService();
+  const salesDepartment = organization.createDepartment({ name: 'Contracts Sales Scope' });
+  const operationsDepartment = organization.createDepartment({ name: 'Contracts Operations Scope' });
+  const salesEmployee = createEmployee();
+  const operationsEmployee = createEmployee();
+  EmployeeService.update(salesEmployee, { departmentId: salesDepartment.id });
+  EmployeeService.update(operationsEmployee, { departmentId: operationsDepartment.id });
+  const service = new ContractService();
+  const salesContract = draft(service, salesEmployee);
+  const operationsContract = draft(service, operationsEmployee);
+
+  db.run("UPDATE users SET department_scope = 'ASSIGNED' WHERE id = ?", [manager.id]);
+  db.run(
+    'INSERT INTO users_departments (user_id, department_id, assigned_by) VALUES (?, ?, ?)',
+    [manager.id, salesDepartment.id, admin.id]
+  );
+  asManager();
+
+  assert.ok(service.getContracts().some((contract) => contract.id === salesContract.id));
+  assert.ok(!service.getContracts().some((contract) => contract.id === operationsContract.id));
+  assert.throws(() => service.getContract(operationsContract.id), /غير موجود/);
+  asAdmin();
+});
+
 test('contract summary reports expiring and expired terms and hr deactivation blocks writes', async () => {
   await boot();
   const service = new ContractService();
