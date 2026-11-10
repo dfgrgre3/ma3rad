@@ -147,7 +147,12 @@ export class CashierService {
       ));
   }
 
-  public openShift(registerId: string, userId: string, openingBalance: number): CashShift {
+  public openShift(
+    registerId: string,
+    userId: string,
+    openingBalance: number,
+    operationShiftId?: string | null
+  ): CashShift {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.cashier.cashier.open_shift');
     const branchId = this.branchAccess.requireRegisterAccess(registerId, actor);
@@ -175,6 +180,9 @@ export class CashierService {
     if (existing) {
       throw new Error(`توجد وردية مفتوحة بالفعل للكاشير (${existing.shiftNumber}). يجب إغلاقها أولاً.`);
     }
+    const linkedOperationShiftId = operationShiftId
+      ? this.validateOperationShiftLink(operationShiftId, branchId)
+      : null;
 
     const shiftId = `shf_${uuidv4().substring(0, 8)}`;
     const shiftNumber = `SHF-${Date.now().toString().slice(-6)}`;
@@ -182,9 +190,11 @@ export class CashierService {
     return this.db.executeTransaction((sqliteDb) => {
       sqliteDb.run(`
         INSERT INTO cash_shifts (
-          id, shift_number, register_id, user_id, branch_id, opening_balance, expected_ending_cash, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN')
-      `, [shiftId, shiftNumber, registerId, userId, branchId, openingBalance, openingBalance]);
+          id, shift_number, register_id, user_id, branch_id, opening_balance,
+          expected_ending_cash, operation_shift_id, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+      `, [shiftId, shiftNumber, registerId, userId, branchId, openingBalance, openingBalance,
+        linkedOperationShiftId]);
 
       sqliteDb.run(`
         INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id)
@@ -193,6 +203,122 @@ export class CashierService {
 
       return this.getActiveShift(userId)!;
     });
+  }
+
+  private validateOperationShiftLink(operationShiftId: string, branchId: string): string {
+    const operationShift = this.db.query<{ branchId: string; status: string }>(
+      `SELECT branch_id AS branchId, status FROM operation_shifts WHERE id = ?`,
+      [operationShiftId]
+    )[0];
+    if (!operationShift) throw new Error('وردية التشغيل المحددة غير موجودة.');
+    if (operationShift.branchId !== branchId) {
+      throw new Error('وردية التشغيل لا تتبع نفس فرع الخزينة.');
+    }
+    if (operationShift.status !== 'OPEN') {
+      throw new Error('لا يمكن ربط وردية الكاشير إلا بوردية تشغيل مفتوحة.');
+    }
+    return operationShiftId;
+  }
+
+  public getCashShiftsForOperationShift(operationShiftId: string): CashShift[] {
+    const actor = AuthService.requireAuth();
+    const scope = this.branchAccess.sqlScope('cs.branch_id', undefined, actor);
+    return this.db.query<CashShift>(`
+      SELECT cs.*, cs.branch_id AS branchId, cr.name AS registerName, u.full_name AS userName
+      FROM cash_shifts cs
+      JOIN cash_registers cr ON cr.id = cs.register_id
+      JOIN users u ON u.id = cs.user_id
+      WHERE cs.operation_shift_id = ? AND ${scope.clause}
+      ORDER BY cs.opened_at
+    `, [operationShiftId, ...scope.params]);
+  }
+
+  public getCashShiftSummaryForOperationShift(operationShiftId: string): {
+    expected: number;
+    actual: number;
+    difference: number;
+    openShifts: number;
+    closedShifts: number;
+  } {
+    const shifts = this.getCashShiftsForOperationShift(operationShiftId);
+    let expected = 0;
+    let actual = 0;
+    let difference = 0;
+    let openShifts = 0;
+    let closedShifts = 0;
+    for (const shift of shifts) {
+      if (shift.status === 'CLOSED') {
+        expected += Number(shift.expectedEndingCash) || 0;
+        actual += Number(shift.actualEndingCash) || 0;
+        difference += Number(shift.cashDifference) || 0;
+        closedShifts += 1;
+      } else {
+        expected += this.calculateExpectedEndingCash(shift);
+        openShifts += 1;
+      }
+    }
+    const round = (value: number) => Number(value.toFixed(2));
+    return {
+      expected: round(expected), actual: round(actual), difference: round(difference),
+      openShifts, closedShifts,
+    };
+  }
+
+  /**
+   * Cashier change during a shift: close the previous drawer and open a fresh
+   * drawer for the replacement cashier, keeping the same register and the same
+   * operations shift link.
+   */
+  public openReplacementShift(
+    previousShiftId: string,
+    nextUserId: string,
+    openingBalance: number,
+    closingNotes = 'تسليم وردية الكاشير إلى كاشير آخر'
+  ): CashShift {
+    const actor = AuthService.requireAuth();
+    const previous = this.db.query<{
+      userId: string; registerId: string; branchId: string; operationShiftId: string | null;
+    }>(
+      `SELECT user_id AS userId, register_id AS registerId, branch_id AS branchId,
+              operation_shift_id AS operationShiftId
+       FROM cash_shifts WHERE id = ? AND status = 'OPEN'`,
+      [previousShiftId]
+    )[0];
+    if (!previous) throw new Error('وردية الكاشير السابقة غير موجودة أو مغلقة.');
+    this.branchAccess.requireRegisterAccess(previous.registerId, actor);
+    if (actor.id !== previous.userId && actor.id !== nextUserId && actor.role !== 'ADMIN') {
+      PermissionService.require(actor, 'ui.cashier.cashier.manage');
+    }
+    if (previous.userId === nextUserId) {
+      throw new Error('الكاشير البديل يجب أن يكون مستخدمًا مختلفًا.');
+    }
+    const next = this.db.query<{ branchScope: string; isActive: number }>(
+      'SELECT branch_scope AS branchScope, is_active AS isActive FROM users WHERE id = ?',
+      [nextUserId]
+    )[0];
+    if (!next || !next.isActive) throw new Error('المستخدم البديل غير موجود أو غير نشط.');
+    const canWorkBranch = next.branchScope === 'ALL' || Boolean(this.db.query(
+      'SELECT 1 FROM users_branches WHERE user_id = ? AND branch_id = ?',
+      [nextUserId, previous.branchId]
+    ).length);
+    if (!canWorkBranch) throw new Error('المستخدم البديل غير مخول للعمل على فرع الخزينة.');
+    if (this.getActiveShift(nextUserId)) {
+      throw new Error('المستخدم البديل لديه وردية كاشير مفتوحة بالفعل.');
+    }
+    if (!Number.isFinite(openingBalance) || openingBalance < 0) {
+      throw new Error('الرصيد الافتتاحي يجب أن يكون رقمًا صحيحًا غير سالب.');
+    }
+    if (previous.operationShiftId) {
+      this.validateOperationShiftLink(previous.operationShiftId, previous.branchId);
+    }
+
+    this.closeShift(previousShiftId, openingBalance, closingNotes, actor.id);
+    return this.openShift(
+      previous.registerId,
+      nextUserId,
+      openingBalance,
+      previous.operationShiftId
+    );
   }
 
   public closeShift(shiftId: string, actualEndingCash: number, closingNotes = '', performedBy = 'usr_admin'): CashShift {

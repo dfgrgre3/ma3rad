@@ -19,6 +19,7 @@ export interface CashShift {
   registerName?: string;
   userId: string;
   userName: string;
+  operationShiftId?: string | null;
   openedAt: string;
   closedAt?: string;
   openingBalance: number;
