@@ -276,12 +276,10 @@ export class CashierService {
     closingNotes = 'تسليم وردية الكاشير إلى كاشير آخر'
   ): CashShift {
     const actor = AuthService.requireAuth();
-    const previous = this.db.query<{
+    const previous = this.db.query<CashShift & {
       userId: string; registerId: string; branchId: string; operationShiftId: string | null;
     }>(
-      `SELECT user_id AS userId, register_id AS registerId, branch_id AS branchId,
-              operation_shift_id AS operationShiftId
-       FROM cash_shifts WHERE id = ? AND status = 'OPEN'`,
+      `SELECT * FROM cash_shifts WHERE id = ? AND status = 'OPEN'`,
       [previousShiftId]
     )[0];
     if (!previous) throw new Error('وردية الكاشير السابقة غير موجودة أو مغلقة.');
@@ -312,7 +310,7 @@ export class CashierService {
       this.validateOperationShiftLink(previous.operationShiftId, previous.branchId);
     }
 
-    this.closeShift(previousShiftId, openingBalance, closingNotes, actor.id);
+    this.closeShift(previousShiftId, this.calculateExpectedEndingCash(previous), closingNotes, actor.id);
     return this.openShift(
       previous.registerId,
       nextUserId,
