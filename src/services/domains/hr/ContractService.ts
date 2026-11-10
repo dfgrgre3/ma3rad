@@ -3,6 +3,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { LeaveService } from './LeaveService';
 import { localDateString } from '../../../utils/shared/date';
@@ -62,6 +63,7 @@ function daysBetweenInclusive(startDate: string, endDate: string): number {
 export class ContractService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+  private departmentAccess = new EmployeeDepartmentAccessService();
 
   private require(permission: string): User {
     const actor = AuthService.requireAuth();
@@ -91,13 +93,14 @@ export class ContractService {
 
   private queryContract(actor: User, id: string): EmployeeContract | null {
     const scope = this.branchAccess.sqlScope('c.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     const row = this.db.query<EmployeeContract>(
       `SELECT c.*, e.name AS employee_name, b.name AS branch_name
        FROM employee_contracts c
        JOIN employees e ON e.id = c.employee_id
        LEFT JOIN branches b ON b.id = c.branch_id
-       WHERE c.id = ? AND ${scope.clause}`,
-      [id, ...scope.params]
+       WHERE c.id = ? AND ${scope.clause} AND ${departmentScope.clause}`,
+      [id, ...scope.params, ...departmentScope.params]
     )[0];
     return row ? this.decorate(row) : null;
   }
@@ -119,6 +122,7 @@ export class ContractService {
       throw new Error('لا يمكن إنشاء عقد جديد لموظف انتهت خدمته.');
     }
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     return { branchId: employee.branchId, name: employee.name };
   }
 
@@ -146,8 +150,9 @@ export class ContractService {
   public getContracts(filters: ContractFilters = {}): EmployeeContract[] {
     const actor = this.require('hr.contracts.view');
     const scope = this.branchAccess.sqlScope('c.branch_id', undefined, actor);
-    const conditions = [scope.clause];
-    const params: Array<string | number> = [...scope.params];
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    const conditions = [scope.clause, departmentScope.clause];
+    const params: Array<string | number> = [...scope.params, ...departmentScope.params];
 
     if (filters.employeeId) {
       conditions.push('c.employee_id = ?');
@@ -608,8 +613,9 @@ export class ContractService {
   public getFinalSettlements(employeeId?: string): EmployeeFinalSettlement[] {
     const actor = this.require('hr.contracts.view');
     const scope = this.branchAccess.sqlScope('s.branch_id', undefined, actor);
-    const conditions = [scope.clause];
-    const params: Array<string> = [...scope.params];
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
+    const conditions = [scope.clause, departmentScope.clause];
+    const params: Array<string> = [...scope.params, ...departmentScope.params];
     if (employeeId) {
       conditions.push('s.employee_id = ?');
       params.push(employeeId);
@@ -633,6 +639,7 @@ export class ContractService {
     )[0];
     if (!employee?.branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     const salaryChanges = this.db.query<EmployeeLifecycleHistory['salaryChanges'][number]>(
       `SELECT h.id, h.previous_salary AS previousSalary, h.next_salary AS nextSalary,
               h.salary_type AS salaryType, h.effective_date AS effectiveDate,

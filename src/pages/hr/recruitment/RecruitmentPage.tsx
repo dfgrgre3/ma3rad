@@ -944,7 +944,7 @@ export const RecruitmentPage: React.FC = () => {
                       ) : null}
                       {candidate.employeeContractId && (
                           <Link
-                            to={`/employees/contracts?employeeId=${encodeURIComponent(candidate.employeeId)}`}
+                            to={`/employees/contracts?employeeId=${encodeURIComponent(candidate.employeeId || '')}`}
                             className="text-xs font-semibold text-violet-700 hover:text-violet-900"
                           >
                             عرض العقد

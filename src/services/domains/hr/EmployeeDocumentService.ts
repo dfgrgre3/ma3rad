@@ -3,6 +3,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { localDateString } from '../../../utils/shared/date';
 import type { User } from '../../../types/auth/identity';
@@ -44,6 +45,7 @@ function addDays(date: string, days: number): string {
 export class EmployeeDocumentService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+  private departmentAccess = new EmployeeDepartmentAccessService();
 
   private require(permission: string): User {
     const actor = AuthService.requireAuth();
@@ -124,10 +126,11 @@ export class EmployeeDocumentService {
 
   private queryDocument(actor: User, id: string): EmployeeDocument | null {
     const scope = this.branchAccess.sqlScope('d.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     const row = this.db.query<EmployeeDocument>(
       `${this.documentSelect()}
-       WHERE d.id = ? AND ${scope.clause}`,
-      [id, ...scope.params]
+       WHERE d.id = ? AND ${scope.clause} AND ${departmentScope.clause}`,
+      [id, ...scope.params, ...departmentScope.params]
     )[0];
     return row && this.canSeeConfidentiality(actor, row.confidentiality)
       ? this.decorate(row)
@@ -148,6 +151,7 @@ export class EmployeeDocumentService {
     if (!employee) throw new Error('الموظف المحدد غير موجود.');
     if (!employee.branchId) throw new Error('الموظف غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     return { branchId: employee.branchId, name: employee.name };
   }
 
@@ -186,9 +190,10 @@ export class EmployeeDocumentService {
     const actor = AuthService.requireAuth();
     PermissionService.requireAny(actor, ['hr.documents.view', 'hr.documents.manage']);
     const scope = this.branchAccess.sqlScope('d.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     const confidentiality = this.confidentialityCondition(actor);
-    const conditions = [scope.clause, confidentiality.clause];
-    const params: Array<string | number> = [...scope.params, ...confidentiality.params];
+    const conditions = [scope.clause, departmentScope.clause, confidentiality.clause];
+    const params: Array<string | number> = [...scope.params, ...departmentScope.params, ...confidentiality.params];
 
     if (filters.employeeId) {
       conditions.push('d.employee_id = ?');
@@ -433,11 +438,13 @@ export class EmployeeDocumentService {
   public isVersionStorageAttached(storageName: string): boolean {
     const actor = this.require('hr.documents.manage');
     const scope = this.branchAccess.sqlScope('d.branch_id', undefined, actor);
+    const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
     return this.db.query<{ id: string }>(
       `SELECT v.id FROM employee_document_versions v
        JOIN employee_documents d ON d.id = v.document_id
-       WHERE v.storage_name = ? AND ${scope.clause} LIMIT 1`,
-      [storageName, ...scope.params]
+       JOIN employees e ON e.id = d.employee_id
+       WHERE v.storage_name = ? AND ${scope.clause} AND ${departmentScope.clause} LIMIT 1`,
+      [storageName, ...scope.params, ...departmentScope.params]
     ).length > 0;
   }
 

@@ -3,6 +3,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { User } from '../../../types/auth/identity';
 import type {
@@ -150,6 +151,16 @@ interface AttendanceSnapshot {
 export class LeaveService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
+  private departmentAccess = new EmployeeDepartmentAccessService();
+
+  private employeeDataScope(actor: User) {
+    const branch = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const department = this.departmentAccess.sqlScope('e.department_id', actor);
+    return {
+      clause: `(${branch.clause}) AND (${department.clause})`,
+      params: [...branch.params, ...department.params],
+    };
+  }
 
   private require(permission: string): User {
     const actor = AuthService.requireAuth();
@@ -327,7 +338,7 @@ export class LeaveService {
   }
 
   private queryRequest(actor: User, id: string): EmployeeLeaveRequest | null {
-    const scope = this.branchAccess.sqlScope('l.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<EmployeeLeaveRequest>(
       `SELECT l.*, e.name AS employee_name, b.name AS branch_name,
               ru.full_name AS requester_name, du.full_name AS decider_name
@@ -655,6 +666,7 @@ export class LeaveService {
     )[0];
     if (!employee) throw new Error('الموظف المحدد غير موجود.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     this.ensureAnnualLeaveAccrual(employeeId, employee.branchId, balanceDate, actor.id);
     const grantedDays = Number(this.db.query<{ days: number }>(
       `SELECT COALESCE(SUM(days_delta), 0) AS days
@@ -684,6 +696,7 @@ export class LeaveService {
     )[0];
     if (!employee?.branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     this.ensureAnnualLeaveAccrual(employeeId, employee.branchId, asOfDate, actor.id);
     let balance = 0;
     const targetYear = Number(asOfDate.slice(0, 4));
@@ -717,11 +730,12 @@ export class LeaveService {
     )[0];
     if (!employee?.branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     const today = new Date().toISOString().slice(0, 10);
     this.ensureAnnualLeaveAccrual(
       employeeId, employee.branchId, yearEnd(year) < today ? yearEnd(year) : today, actor.id
     );
-    const scope = this.branchAccess.sqlScope('t.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     return this.db.query<LeaveBalanceTransaction>(
       `SELECT t.id, t.employee_id AS employeeId, e.name AS employeeName,
               t.leave_year AS year, t.days_delta AS daysDelta,
@@ -761,6 +775,7 @@ export class LeaveService {
     )[0];
     if (!employee) throw new Error('الموظف المحدد غير موجود.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(input.employeeId, actor);
     this.ensureAnnualLeaveAccrual(input.employeeId, employee.branchId, input.effectiveDate, actor.id);
     this.assertPayrollPeriodsEditable({
       branchId: employee.branchId,
@@ -843,6 +858,7 @@ export class LeaveService {
       )[0];
       if (!employee?.branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
       this.branchAccess.requireBranchAccess(employee.branchId, actor);
+      this.departmentAccess.requireEmployeeAccess(employeeId, actor);
       if (employee.branchId !== branchId) throw new Error('اختر موظفًا من الفرع الحالي.');
       employeeRow = this.queryAnnualLeavePolicy(branchId, employeeId, effectiveDate);
     }
@@ -905,6 +921,7 @@ export class LeaveService {
       )[0];
       if (!employee?.branchId) throw new Error('الموظف غير موجود أو غير مرتبط بفرع.');
       this.branchAccess.requireBranchAccess(employee.branchId, actor);
+      this.departmentAccess.requireEmployeeAccess(input.employeeId, actor);
       branchId = employee.branchId;
     } else {
       branchId = this.branchAccess.getCurrentBranchId(actor);
@@ -1025,7 +1042,7 @@ export class LeaveService {
     const month = Number(period.slice(5, 7));
     const year = Number(period.slice(0, 4));
     const end = `${period}-${String(new Date(Date.UTC(year, month, 0)).getUTCDate()).padStart(2, '0')}`;
-    const scope = this.branchAccess.sqlScope('l.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     const requests = this.db.query<{
       employeeId: string; employeeName: string; branchId: string; leaveType: LeaveType;
       status: 'PENDING' | 'APPROVED'; startDate: string; endDate: string;
@@ -1050,7 +1067,7 @@ export class LeaveService {
         status: request.status,
       }));
     });
-    const absenceScope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const absenceScope = this.employeeDataScope(actor);
     const absences = this.db.query<{ date: string; employeeId: string; employeeName: string }>(
       `SELECT a.date, a.employee_id AS employeeId, e.name AS employeeName
        FROM attendance a JOIN employees e ON e.id = a.employee_id
@@ -1063,7 +1080,7 @@ export class LeaveService {
 
   public getRequests(filters: LeaveFilters = {}): EmployeeLeaveRequest[] {
     const actor = this.require('hr.leave.view');
-    const scope = this.branchAccess.sqlScope('l.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     const conditions = [scope.clause];
     const params: Array<string | number> = [...scope.params];
 
@@ -1128,6 +1145,7 @@ export class LeaveService {
     if (employee.isActive === 0) throw new Error('لا يمكن تسجيل إجازة لموظف غير نشط.');
     if (!employee.branchId) throw new Error('الموظف غير مرتبط بفرع.');
     this.branchAccess.requireBranchAccess(employee.branchId, actor);
+    this.departmentAccess.requireEmployeeAccess(input.employeeId, actor);
 
     const days = this.getChargeableDays(input.employeeId, employee.branchId, input.startDate, input.endDate);
     if (!days) throw new Error('الفترة المحددة لا تتضمن أيام دوام بعد استثناء العطلات وأيام الراحة المجدولة.');
@@ -1244,7 +1262,7 @@ export class LeaveService {
     if (!Number.isInteger(targetYear) || targetYear < 2000 || targetYear > 2100) {
       throw new Error('السنة غير صالحة.');
     }
-    const scope = this.branchAccess.sqlScope('l.branch_id', undefined, actor);
+    const scope = this.employeeDataScope(actor);
     const rows = this.db.query<{
       id: string; employeeId: string; branchId: string; status: LeaveStatus; leaveType: LeaveType;
       startDate: string; endDate: string; days: number;

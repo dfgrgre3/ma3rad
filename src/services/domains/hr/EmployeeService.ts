@@ -407,6 +407,10 @@ export class EmployeeService {
 
   static getById(id: string): Employee | null {
     const actor = this.requireView();
+    return this.getScopedById(id, actor);
+  }
+
+  private static getScopedById(id: string, actor: ReturnType<typeof AuthService.requireAuth>): Employee | null {
     const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
@@ -461,7 +465,7 @@ export class EmployeeService {
     }
     const branchId = data.branchId || this.branchAccess.getCurrentBranchId(actor);
     this.branchAccess.requireBranchAccess(branchId, actor);
-    this.validateEmployeeOrganization(data, branchId);
+    this.validateEmployeeOrganization(data, branchId, undefined, actor);
     const id = `emp_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('EMP');
@@ -508,13 +512,13 @@ export class EmployeeService {
         [`aud_${uuidv4().replace(/-/g, '').slice(0, 12)}`, actor.id, actor.fullName, id,
           JSON.stringify({ branchId, departmentId: data.departmentId || null, status: data.status })]
       );
-      return this.getById(id)!;
+      return this.getScopedById(id, actor)!;
     });
   }
 
   static update(id: string, data: Partial<Omit<Employee, 'id' | 'code' | 'createdAt'>>): Employee {
     const actor = this.requireUpdate();
-    const existing = this.getById(id);
+    const existing = this.getScopedById(id, actor);
     if (!existing) throw new Error('الموظف غير موجود.');
     if (data.branchId) this.branchAccess.requireBranchAccess(data.branchId, actor);
     this.validateEmployeeFields(data);
@@ -525,7 +529,7 @@ export class EmployeeService {
       'SELECT status, base_salary AS baseSalary, salary_type AS salaryType FROM employees WHERE id = ?',
       [id]
     )[0];
-    this.validateEmployeeOrganization(data, data.branchId || existing.branchId || '', id);
+    this.validateEmployeeOrganization(data, data.branchId || existing.branchId || '', id, actor);
     const nextStatus = data.status ?? existing.status;
     this.db.executeTransaction((db) => {
     db.run(
@@ -689,7 +693,8 @@ export class EmployeeService {
   private static validateEmployeeOrganization(
     data: Partial<Employee>,
     branchId: string,
-    employeeId?: string
+    employeeId?: string,
+    actor = AuthService.requireAuth()
   ): void {
     if (data.departmentId) {
       const department = this.db.query<{ branchId: string | null; isActive: number }>(
@@ -709,7 +714,13 @@ export class EmployeeService {
         || (department.branchId && department.branchId !== branchId)) {
         throw new Error('القسم غير نشط أو لا يتبع فرع الموظف.');
       }
+      const departmentScope = this.departmentAccess.sqlScope('d.id', actor);
+      if (!this.db.query(
+        `SELECT 1 FROM departments d WHERE d.id = ? AND ${departmentScope.clause}`,
+        [data.departmentId, ...departmentScope.params]
+      ).length) throw new Error('القسم خارج نطاق الأقسام المصرح بها.');
     }
+    if (employeeId) this.departmentAccess.requireEmployeeAccess(employeeId, actor);
     if (data.nationalId?.trim()) {
       const duplicate = this.db.query<{ id: string }>(
         `SELECT id FROM employees WHERE national_id = ? ${employeeId ? 'AND id != ?' : ''} LIMIT 1`,

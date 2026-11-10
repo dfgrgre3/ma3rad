@@ -102,7 +102,12 @@ export const OperationsShiftsPage: React.FC = () => {
     expectedCash: 0, actualCash: 0, cashDelivered: 0, pendingOrders: '',
     inventoryStatus: '', equipmentStatus: '', notes: '', nextStaffIds: [] as string[],
   });
-  const [incidentForm, setIncidentForm] = useState({
+  const [incidentForm, setIncidentForm] = useState<{
+    type: 'NOTE' | 'BREAKDOWN' | 'SAFETY' | 'QUALITY' | 'OTHER';
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    title: string;
+    description: string;
+  }>({
     type: 'NOTE', severity: 'MEDIUM', title: '', description: '',
   });
   const [productionForm, setProductionForm] = useState({
@@ -511,12 +516,14 @@ export const OperationsShiftsPage: React.FC = () => {
                   <h3 className="font-bold text-slate-700 text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> الأعطال والملاحظات</h3>
                   {canManage && (
                     <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 p-3">
-                      <select value={incidentForm.type} onChange={(e) => setIncidentForm({ ...incidentForm, type: e.target.value })}
+                      <select value={incidentForm.type}
+                        onChange={(e) => setIncidentForm({ ...incidentForm, type: e.target.value as typeof incidentForm.type })}
                         className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
                         <option value="NOTE">ملاحظة</option><option value="BREAKDOWN">عطل</option>
                         <option value="SAFETY">سلامة</option><option value="QUALITY">جودة</option><option value="OTHER">أخرى</option>
                       </select>
-                      <select value={incidentForm.severity} onChange={(e) => setIncidentForm({ ...incidentForm, severity: e.target.value })}
+                      <select value={incidentForm.severity}
+                        onChange={(e) => setIncidentForm({ ...incidentForm, severity: e.target.value as typeof incidentForm.severity })}
                         className="rounded-lg border border-slate-200 px-2 py-2 text-xs">
                         <option value="LOW">منخفضة</option><option value="MEDIUM">متوسطة</option>
                         <option value="HIGH">عالية</option><option value="CRITICAL">حرجة</option>

@@ -22,15 +22,6 @@ export class EmployeeDepartmentAccessService {
       throw new Error('عمود نطاق القسم غير صالح.');
     }
 
-    public requireEmployeeAccess(employeeId: string, actor = AuthService.requireAuth()): void {
-      const scope = this.sqlScope('e.department_id', actor);
-      if (!this.db.query(
-        `SELECT 1 FROM employees e WHERE e.id = ? AND ${scope.clause}`,
-        [employeeId, ...scope.params]
-      ).length) {
-        throw new Error('الموظف خارج نطاق الأقسام المصرح بها.');
-      }
-    }
     if (actor.role === 'ADMIN') return { clause: '1 = 1', params: [] };
     const scope = this.db.query<{ departmentScope: DepartmentScope }>(
       'SELECT department_scope AS departmentScope FROM users WHERE id = ? AND is_active = 1',
@@ -45,6 +36,16 @@ export class EmployeeDepartmentAccessService {
       )`,
       params: [actor.id],
     };
+  }
+
+  public requireEmployeeAccess(employeeId: string, actor = AuthService.requireAuth()): void {
+    const scope = this.sqlScope('e.department_id', actor);
+    if (!this.db.query(
+      `SELECT 1 FROM employees e WHERE e.id = ? AND ${scope.clause}`,
+      [employeeId, ...scope.params]
+    ).length) {
+      throw new Error('الموظف خارج نطاق الأقسام المصرح بها.');
+    }
   }
 
   public getScope(userId: string): DepartmentScope {
