@@ -76,6 +76,12 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function isValidDate(value: string | null | undefined): boolean {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 /**
  * بوابة الموظف الذاتية (Self-Service):
  * كل القراءات مقيدة بملف الموظف المرتبط بحساب المستخدم (employees.user_id)،
@@ -438,5 +444,139 @@ export class EmployeeSelfServiceService {
     this.audit('طلب من بوابة الموظف', ctx.actor, id, input);
     this.notify('طلب جديد من بوابة الموظف', `تقديم ${ctx.actor.fullName} طلبًا: ${subject}`, 'HR_SELF_SERVICE_REQUEST', id);
     return { id, requestType, subject, details: input.details?.trim() || null, status: 'PENDING', resolution: null, createdAt: nowIso() };
+  }
+
+  /** طلب تحديث البيانات الشخصية مع اعتماد */
+  static requestPersonalDataUpdate(input: {
+    fieldName: string;
+    currentValue: string | null;
+    newValue: string;
+    reason?: string | null;
+  }): MySelfServiceRequest {
+    const ctx = this.requirePortalSubmit();
+    const fieldName = input.fieldName?.trim();
+    const newValue = input.newValue?.trim();
+    if (!fieldName) throw new Error('اسم الحقل المطلوب تحديثه مطلوب.');
+    if (!newValue) throw new Error('القيمة الجديدة مطلوبة.');
+    const subject = `تحديث البيانات الشخصية: ${fieldName}`;
+    const details = `الحقل: ${fieldName}\nالقيمة الحالية: ${input.currentValue ?? 'غير محدد'}\nالقيمة الجديدة: ${newValue}\nالسبب: ${input.reason ?? 'غير محدد'}`;
+    const id = `ssr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+    this.db.run(
+      `INSERT INTO hr_self_service_requests (id, employee_id, request_type, subject, details, status, submitted_by)
+       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+      [id, ctx.employeeId, 'PERSONAL_DATA_UPDATE', subject, details, ctx.actor.id]
+    );
+    this.audit('طلب تحديث بيانات شخصية من البوابة', ctx.actor, id, input);
+    this.notify('طلب تحديث بيانات شخصية', `تقديم ${ctx.actor.fullName} طلب تحديث: ${fieldName}`, 'HR_SELF_SERVICE_REQUEST', id);
+    return { id, requestType: 'PERSONAL_DATA_UPDATE', subject, details, status: 'PENDING', resolution: null, createdAt: nowIso() };
+  }
+
+  /** طلب خطاب تعريف بالراتب */
+  static requestSalaryCertificate(input: {
+    purpose?: string | null;
+    recipient?: string | null;
+  }): MySelfServiceRequest {
+    const ctx = this.requirePortalSubmit();
+    const subject = 'طلب خطاب تعريف بالراتب';
+    const details = `الغرض: ${input.purpose ?? 'غير محدد'}\nالمستلم: ${input.recipient ?? 'غير محدد'}`;
+    const id = `ssr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+    this.db.run(
+      `INSERT INTO hr_self_service_requests (id, employee_id, request_type, subject, details, status, submitted_by)
+       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+      [id, ctx.employeeId, 'SALARY_CERTIFICATE', subject, details, ctx.actor.id]
+    );
+    this.audit('طلب خطاب تعريف بالراتب من البوابة', ctx.actor, id, input);
+    this.notify('طلب خطاب تعريف بالراتب', `تقديم ${ctx.actor.fullName} طلب خطاب تعريف بالراتب`, 'HR_SELF_SERVICE_REQUEST', id);
+    return { id, requestType: 'SALARY_CERTIFICATE', subject, details, status: 'PENDING', resolution: null, createdAt: nowIso() };
+  }
+
+  /** طلب شهادة خبرة */
+  static requestExperienceCertificate(input: {
+    purpose?: string | null;
+    recipient?: string | null;
+  }): MySelfServiceRequest {
+    const ctx = this.requirePortalSubmit();
+    const subject = 'طلب شهادة خبرة';
+    const details = `الغرض: ${input.purpose ?? 'غير محدد'}\nالمستلم: ${input.recipient ?? 'غير محدد'}`;
+    const id = `ssr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+    this.db.run(
+      `INSERT INTO hr_self_service_requests (id, employee_id, request_type, subject, details, status, submitted_by)
+       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+      [id, ctx.employeeId, 'EMPLOYMENT_CERTIFICATE', subject, details, ctx.actor.id]
+    );
+    this.audit('طلب شهادة خبرة من البوابة', ctx.actor, id, input);
+    this.notify('طلب شهادة خبرة', `تقديم ${ctx.actor.fullName} طلب شهادة خبرة`, 'HR_SELF_SERVICE_REQUEST', id);
+    return { id, requestType: 'EMPLOYMENT_CERTIFICATE', subject, details, status: 'PENDING', resolution: null, createdAt: nowIso() };
+  }
+
+  /** طلب سلفة */
+  static requestAdvance(input: {
+    amount: number;
+    reason?: string | null;
+  }): MySelfServiceRequest {
+    const ctx = this.requirePortalSubmit();
+    const amount = Number(input.amount);
+    if (!amount || amount <= 0) throw new Error('مبلغ السلفة يجب أن يكون أكبر من صفر.');
+    const subject = 'طلب سلفة مالية';
+    const details = `المبلغ: ${amount} ج\nالسبب: ${input.reason ?? 'غير محدد'}`;
+    const id = `ssr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+    this.db.run(
+      `INSERT INTO hr_self_service_requests (id, employee_id, request_type, subject, details, status, submitted_by)
+       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+      [id, ctx.employeeId, 'ADVANCE_REQUEST', subject, details, ctx.actor.id]
+    );
+    this.audit('طلب سلفة من البوابة', ctx.actor, id, input);
+    this.notify('طلب سلفة مالية', `تقديم ${ctx.actor.fullName} طلب سلفة بمبلغ ${amount} ج`, 'HR_SELF_SERVICE_REQUEST', id);
+    return { id, requestType: 'ADVANCE_REQUEST', subject, details, status: 'PENDING', resolution: null, createdAt: nowIso() };
+  }
+
+  /** تقديم اعتراض على الحضور */
+  static submitAttendanceObjection(input: {
+    attendanceDate: string;
+    objectionType: string;
+    description: string;
+    evidence?: string | null;
+  }): MySelfServiceRequest {
+    const ctx = this.requirePortalSubmit();
+    const objectionType = input.objectionType?.trim();
+    const description = input.description?.trim();
+    if (!objectionType) throw new Error('نوع الاعتراض مطلوب.');
+    if (!description) throw new Error('وصف الاعتراض مطلوب.');
+    if (!isValidDate(input.attendanceDate)) throw new Error('تاريخ الحضور غير صالح.');
+    const subject = `اعتراض على الحضور: ${objectionType}`;
+    const details = `التاريخ: ${input.attendanceDate}\nالنوع: ${objectionType}\nالوصف: ${description}\nالأدلة: ${input.evidence ?? 'غير محدد'}`;
+    const id = `ssr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+    this.db.run(
+      `INSERT INTO hr_self_service_requests (id, employee_id, request_type, subject, details, status, submitted_by)
+       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+      [id, ctx.employeeId, 'ATTENDANCE_OBJECTION', subject, details, ctx.actor.id]
+    );
+    this.audit('تقديم اعتراض على الحضور من البوابة', ctx.actor, id, input);
+    this.notify('اعتراض على الحضور', `تقديم ${ctx.actor.fullName} اعتراض على الحضور لليوم ${input.attendanceDate}`, 'HR_SELF_SERVICE_REQUEST', id);
+    return { id, requestType: 'ATTENDANCE_OBJECTION', subject, details, status: 'PENDING', resolution: null, createdAt: nowIso() };
+  }
+
+  /** طلب مستند معتمد للتحميل */
+  static requestApprovedDocument(input: {
+    documentType: string;
+    documentTitle: string;
+    reason?: string | null;
+  }): MySelfServiceRequest {
+    const ctx = this.requirePortalSubmit();
+    const documentType = input.documentType?.trim();
+    const documentTitle = input.documentTitle?.trim();
+    if (!documentType) throw new Error('نوع المستند مطلوب.');
+    if (!documentTitle) throw new Error('عنوان المستند مطلوب.');
+    const subject = `طلب مستند معتمد: ${documentTitle}`;
+    const details = `النوع: ${documentType}\nالعنوان: ${documentTitle}\nالسبب: ${input.reason ?? 'غير محدد'}`;
+    const id = `ssr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
+    this.db.run(
+      `INSERT INTO hr_self_service_requests (id, employee_id, request_type, subject, details, status, submitted_by)
+       VALUES (?, ?, ?, ?, ?, 'PENDING', ?)`,
+      [id, ctx.employeeId, 'DOCUMENT_COPY', subject, details, ctx.actor.id]
+    );
+    this.audit('طلب مستند معتمد من البوابة', ctx.actor, id, input);
+    this.notify('طلب مستند معتمد', `تقديم ${ctx.actor.fullName} طلب مستند: ${documentTitle}`, 'HR_SELF_SERVICE_REQUEST', id);
+    return { id, requestType: 'DOCUMENT_COPY', subject, details, status: 'PENDING', resolution: null, createdAt: nowIso() };
   }
 }

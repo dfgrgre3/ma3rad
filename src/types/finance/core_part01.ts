@@ -1,5 +1,7 @@
 export type FiscalPeriodStatus = 'OPEN' | 'CLOSED' | 'LOCKED';
 
+export type FiscalWorkflowState = 'OPEN' | 'IN_REVIEW' | 'PENDING_APPROVAL' | 'CLOSED' | 'LOCKED';
+
 export interface FiscalYear {
   id: string;
   yearCode: string;
@@ -7,6 +9,17 @@ export interface FiscalYear {
   startDate: string;
   endDate: string;
   status: FiscalPeriodStatus;
+  workflowState?: FiscalWorkflowState;
+  companyId?: string;
+  companyName?: string;
+  branchScope?: string;
+  currency?: string;
+  yearType?: string;
+  periodCount?: number;
+  previousYearId?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  lockedAt?: string | null;
   closedAt?: string | null;
   closedBy?: string | null;
   closingEntryId?: string | null;
@@ -22,6 +35,15 @@ export interface FiscalPeriod {
   startDate: string;
   endDate: string;
   status: FiscalPeriodStatus;
+  workflowState?: FiscalWorkflowState;
+  periodType?: string;
+  companyId?: string;
+  branchId?: string | null;
+  reviewStartedAt?: string | null;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  lockedAt?: string | null;
+  closeRunId?: string | null;
   closedAt?: string | null;
   closedBy?: string | null;
   closingNotes?: string | null;

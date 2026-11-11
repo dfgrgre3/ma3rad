@@ -12,6 +12,8 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { NotificationService } from '../notifications/NotificationService';
 import { DATA_IMPORT_ACCESS_PERMISSIONS } from '../../../config/routePermissions';
 import { OperationalFieldService } from '../products/OperationalFieldService';
+import { v4 as uuidv4 } from 'uuid';
+import type { ParsedSpreadsheetSheet } from '../../infrastructure/data/SpreadsheetImportService';
 
 export type ImportEntity = 'customers' | 'suppliers' | 'categories' | 'brands' | 'products' | 'employees' | 'warehouses' | 'dynamic';
 type ExistingImportEntity = Exclude<ImportEntity, 'dynamic'>;
@@ -60,7 +62,12 @@ const number = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : NaN;
 };
 type ImportValue = (key: string) => string;
-type ImportOptions = { allowInitialBalances: boolean; allowProductStock: boolean };
+type ImportOptions = {
+  allowInitialBalances: boolean;
+  allowProductStock: boolean;
+  openingStockWarehouseId?: string;
+  sourceName?: string;
+};
 type ImportRowValues = {
   val: ImportValue;
   opt: (key: string) => string | undefined;
@@ -208,6 +215,11 @@ const validateEntitySpecificFields = (
 };
 
 export class DataImportService {
+  parseSheets(sheets: ParsedSpreadsheetSheet[]): Array<{ sheet: ParsedSpreadsheetSheet; data: ParsedImport }> {
+    if (!sheets.length) throw new Error('الملف لا يحتوي على أوراق بيانات.');
+    return sheets.map(sheet => ({ sheet, data: this.parseRows(sheet.headers, sheet.rows) }));
+  }
+
   parseRows(headers: string[], rows: Record<string, unknown>[], preferred?: ImportEntity): ParsedImport {
     if (!rows.length) throw new Error('الملف لا يحتوي على صفوف بيانات.');
     const scores = (Object.keys(ENTITY_META) as ExistingImportEntity[]).map(entity => ({ entity, score: ENTITY_META[entity].fields.reduce((n,f)=>n+(headers.some(h=>f.aliases.some(a=>cleanHeader(a)===cleanHeader(h)))?1:0),0) }));
@@ -225,6 +237,12 @@ export class DataImportService {
 
   canOpen(user: ReturnType<typeof AuthService.getCurrentUser>): boolean {
     return PermissionService.canAny(user, DATA_IMPORT_ACCESS_PERMISSIONS);
+  }
+
+  getOpeningStockWarehouses() {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'operations.view');
+    return new OperationsService().getWarehouses().filter(warehouse => warehouse.isActive);
   }
 
   validate(data: ParsedImport): ImportIssue[] {
@@ -246,7 +264,7 @@ export class DataImportService {
     });
   }
 
-  import(data: ParsedImport, options: ImportOptions): { created: number; skipped: number; errors: ImportIssue[] } {
+  import(data: ParsedImport, options: ImportOptions): { created: number; skipped: number; errors: ImportIssue[]; batchId?: string } {
     if (data.entity === 'dynamic') throw new Error('استخدم مسار استيراد البيانات المرنة لهذا الملف.');
     const entity = data.entity;
     const actor = AuthService.requireAuth();
@@ -255,6 +273,14 @@ export class DataImportService {
     const issueMap = new Map(this.validate(data).map(issue => [issue.row, issue.messages]));
     const result = { created: 0, skipped: 0, errors: [] as ImportIssue[] };
     const db = DatabaseManager.getInstance();
+    const isTrackedEntity = entity === 'customers' || entity === 'products';
+    const batchId = isTrackedEntity ? `dib_${uuidv4().replace(/-/g, '').slice(0, 12)}` : undefined;
+    if (batchId) {
+      db.run(
+        'INSERT INTO data_import_batches (id,entity_type,source_name,status,imported_count,created_by) VALUES (?,?,?,?,?,?)',
+        [batchId, entity, options.sourceName || 'استيراد بيانات', 'COMPLETED', 0, actor.id],
+      );
+    }
     const categories = new CategoryService();
     const brands = new BrandService();
     const context = {
@@ -280,7 +306,14 @@ export class DataImportService {
       }
 
       try {
-        this.importRow(entity, this.createRowValues(row, data.mapping), context);
+        const createdId = this.importRow(entity, this.createRowValues(row, data.mapping), context);
+        if (batchId && createdId) {
+          db.run('INSERT INTO data_import_batch_records (id,batch_id,entity_id) VALUES (?,?,?)', [
+            `dibr_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
+            batchId,
+            createdId,
+          ]);
+        }
         result.created++;
       } catch (error) {
         result.skipped++;
@@ -288,7 +321,94 @@ export class DataImportService {
       }
     });
 
-    return result;
+    if (batchId) {
+      db.run('UPDATE data_import_batches SET imported_count=?,status=? WHERE id=?', [
+        result.created,
+        result.skipped ? 'PARTIAL' : 'COMPLETED',
+        batchId,
+      ]);
+    }
+    return { ...result, batchId };
+  }
+
+  getImportBatches(entity: 'customers' | 'products'): Array<{
+    id: string;
+    entityType: 'customers' | 'products';
+    sourceName: string;
+    status: string;
+    importedCount: number;
+    createdAt: string;
+  }> {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, ENTITY_META[entity].permission);
+    return DatabaseManager.getInstance().query(
+      'SELECT id,entity_type,source_name,status,imported_count,created_at FROM data_import_batches WHERE entity_type=? ORDER BY created_at DESC, rowid DESC LIMIT 50',
+      [entity],
+    );
+  }
+
+  rollbackImportBatch(batchId: string): number {
+    const actor = AuthService.requireAuth();
+    const db = DatabaseManager.getInstance();
+    const batch = db.query<{ id: string; entityType: 'customers' | 'products'; status: string }>(
+      'SELECT id,entity_type,status FROM data_import_batches WHERE id=?',
+      [batchId],
+    )[0];
+    if (!batch) throw new Error('دفعة الاستيراد غير موجودة.');
+    if (batch.status === 'ROLLED_BACK') return 0;
+    PermissionService.require(
+      actor,
+      batch.entityType === 'customers' ? 'ui.customers.list.delete' : 'ui.products.catalog.delete',
+    );
+    if (batch.entityType === 'customers') PermissionService.require(actor, 'ui.customers.list.view');
+
+    const records = db.query<{ entityId: string }>(
+      'SELECT entity_id FROM data_import_batch_records WHERE batch_id=? ORDER BY rowid DESC',
+      [batchId],
+    );
+    for (const { entityId } of records) {
+      if (batch.entityType === 'customers') {
+        const customer = db.query<{ currentBalance: number }>(
+          'SELECT current_balance FROM customers WHERE id=?',
+          [entityId],
+        )[0];
+        if (customer && Math.abs(Number(customer.currentBalance || 0)) > 1e-6) {
+          throw new Error('لا يمكن التراجع عن الدفعة لوجود رصيد حالي على أحد العملاء المستوردين.');
+        }
+      }
+      const references = this.getRecordReferences(batch.entityType, entityId);
+      if (references.length) {
+        throw new Error(`لا يمكن التراجع عن الدفعة لوجود سجلات مرتبطة في «${references[0]}».`);
+      }
+    }
+
+    for (const { entityId } of records) {
+      if (batch.entityType === 'customers') new CustomerService().deleteCustomer(entityId);
+      else new ProductService().deleteProduct(entityId);
+    }
+    db.run("UPDATE data_import_batches SET status='ROLLED_BACK',imported_count=0 WHERE id=?", [batchId]);
+    return records.length;
+  }
+
+  private getRecordReferences(entityType: 'customers' | 'products', entityId: string): string[] {
+    const db = DatabaseManager.getInstance();
+    const tables = db.query<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+    );
+    const references: string[] = [];
+    for (const { name } of tables) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) continue;
+      const foreignKeys = db.query<{ table: string; from: string; to: string }>(`PRAGMA foreign_key_list("${name}")`);
+      for (const key of foreignKeys) {
+        if (key.table !== entityType || key.to !== 'id' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key.from)) continue;
+        const count = db.query<{ count: number }>(
+          `SELECT COUNT(*) AS count FROM "${name}" WHERE "${key.from}"=?`,
+          [entityId],
+        )[0]?.count || 0;
+        if (count > 0) references.push(name);
+      }
+    }
+    return references;
   }
 
   private createRowValues(row: Record<string, unknown>, mapping: Record<string, string>): ImportRowValues {
@@ -321,28 +441,27 @@ export class DataImportService {
       brandSet: Set<string>;
       options: ImportOptions;
     },
-  ): void {
+  ): string | undefined {
     switch (entity) {
       case 'customers':
-        this.importCustomer(values, context.db, context.customers, context.options);
-        return;
+        return this.importCustomer(values, context.db, context.customers, context.options);
       case 'suppliers':
         this.importSupplier(values, context.db, context.suppliers, context.options);
-        return;
+        return undefined;
       case 'categories':
         this.importCategory(values, context.categories, context.categorySet);
-        return;
+        return undefined;
       case 'brands':
         this.importBrand(values, context.brands, context.brandSet);
-        return;
+        return undefined;
       case 'warehouses':
         this.importWarehouse(values, context.operations);
-        return;
+        return undefined;
       case 'employees':
         this.importEmployee(values, context.db);
-        return;
+        return undefined;
       case 'products':
-        this.importProduct(values, context);
+        return this.importProduct(values, context);
     }
   }
 
@@ -351,7 +470,7 @@ export class DataImportService {
     db: ReturnType<typeof DatabaseManager.getInstance>,
     customers: CustomerService,
     options: ImportOptions,
-  ): void {
+  ): string {
     const code = values.opt('code');
     const phone = values.val('phone');
     if ((code && db.query('SELECT id FROM customers WHERE code=?', [code]).length)
@@ -373,6 +492,7 @@ export class DataImportService {
       notes: values.opt('notes'),
     });
     this.notifyIncompleteCustomer(customer, values);
+    return customer.id;
   }
 
   private getCustomerType(value: string): string {
@@ -479,7 +599,7 @@ export class DataImportService {
       brandSet: Set<string>;
       options: ImportOptions;
     },
-  ): void {
+  ): string {
     const categoryName = values.val('category');
     const brandName = values.val('brand');
     const normalizedCategory = categoryName.toLowerCase();
@@ -497,10 +617,10 @@ export class DataImportService {
     const costPrice = values.num('costPrice');
     const openingQuantity = context.options.allowProductStock ? values.num('initialStockM2') : 0;
     const warehouse = openingQuantity > 0
-      ? context.operations.getWarehouses().find(item => item.isActive)
+      ? context.operations.getWarehouses().find(item => item.id === context.options.openingStockWarehouseId && item.isActive)
       : undefined;
     if (openingQuantity > 0 && !warehouse) {
-      throw new Error('لا يوجد مخزن نشط لتسجيل الرصيد الافتتاحي');
+      throw new Error('اختر مخزنًا نشطًا يدويًا لتسجيل الرصيد الافتتاحي.');
     }
 
     const grade = values.val('grade').toUpperCase();
@@ -508,7 +628,7 @@ export class DataImportService {
     const configuredGrade = gradeOptions.find((option) =>
       option.value.toUpperCase() === grade || option.label.trim().toUpperCase() === grade,
     )?.value;
-    context.products.createProduct({
+    const created = context.products.createProduct({
       sku,
       barcode: values.val('barcode') || sku,
       name: values.val('name'),
@@ -530,6 +650,7 @@ export class DataImportService {
     } as any, openingQuantity > 0 && warehouse
       ? { warehouseId: warehouse.id, quantityM2: openingQuantity, unitCost: costPrice }
       : undefined);
+    return created.id;
   }
 
   private getErrorMessage(error: unknown): string {

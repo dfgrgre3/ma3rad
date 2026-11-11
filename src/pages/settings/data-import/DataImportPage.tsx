@@ -44,11 +44,16 @@ export const DataImportPage: React.FC = () => {
   const backupService = useMemo(() => new BackupService(), []);
   const adminDataService = useMemo(() => new DataAdminService(), []);
   const dynamicService = useMemo(() => new DynamicDataService(), []);
+  const [sheetImports, setSheetImports] = useState<Array<{ sheet: ParsedSpreadsheetSheet; data: ParsedImport }>>([]);
+  const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const [data, setData] = useState<ParsedImport | null>(null);
   const [fileName, setFileName] = useState('');
   const [issues, setIssues] = useState<ImportIssue[]>([]);
   const [allowBalances, setAllowBalances] = useState(false);
   const [allowStock, setAllowStock] = useState(false);
+  const [openingStockWarehouseId, setOpeningStockWarehouseId] = useState('');
+  const [openingStockWarehouses, setOpeningStockWarehouses] = useState<Array<{ id: string; name: string }>>([]);
+  const [importBatches, setImportBatches] = useState<Array<{ id: string; entityType: 'customers' | 'products'; sourceName: string; status: string; importedCount: number; createdAt: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number; errors: ImportIssue[] } | null>(null);
   const [message, setMessage] = useState('');
@@ -68,27 +73,35 @@ export const DataImportPage: React.FC = () => {
   const currentUser = AuthService.getCurrentUser();
   const canOpen = service.canOpen(currentUser);
 
+  React.useEffect(() => {
+    if (!canOpen) return;
+    try {
+      const trackedEntities = (['customers', 'products'] as const)
+        .filter(entity => PermissionService.can(currentUser, ENTITY_META[entity].permission));
+      setImportBatches(trackedEntities.flatMap(entity => service.getImportBatches(entity)));
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'تعذر تحميل سجل دفعات الاستيراد.');
+    }
+  }, [canOpen, currentUser, service]);
+
   const prepareSheetImport = (
     sheets: ParsedSpreadsheetSheet[],
     buffer: ArrayBuffer,
     importFileName: string,
   ) => {
-    const firstSheet = sheets[0];
-    if (!firstSheet) throw new Error('الملف لا يحتوي على صفوف بيانات.');
-    const parsedBase = service.parseRows(
-      firstSheet.headers,
-      firstSheet.rows,
-      manualOverride && manualEntity ? manualEntity : undefined,
-    );
-    const parsed = !manualOverride && sheets.length > 1 ? { ...parsedBase, entity: 'dynamic' as const } : parsedBase;
-    if (parsed.entity === 'dynamic' && !PermissionService.can(currentUser, 'admin.data')) {
-      throw new Error('الملف لا يطابق كيانًا معروفًا. صلاحية إنشاء أنواع البيانات المرنة غير متاحة لحسابك.');
-    }
+    if (!sheets.length) throw new Error('الملف لا يحتوي على صفوف بيانات.');
+    const prepared = service.parseSheets(sheets);
+    const firstSheet = prepared[0].sheet;
+    const parsed = prepared[0].data;
 
     setFileBuffer(buffer);
     setSpreadsheetSheets(sheets);
+    setSheetImports(prepared);
+    setActiveSheetIndex(0);
     setData(parsed);
     setManualEntity(parsed.entity);
+    setManualOverride(false);
     if (parsed.entity === 'dynamic') {
       setDynamicPreview({ headers: firstSheet.headers, rows: firstSheet.rows });
       setDynamicName(firstSheet.name || importFileName.replace(/\.[^.]+$/, ''));
@@ -100,6 +113,8 @@ export const DataImportPage: React.FC = () => {
     if (parsed.confidence < 0.35 && parsed.entity !== 'dynamic') {
       setMessage('التعرف التلقائي غير واثق. اختر نوع البيانات الصحيح وراجع مطابقة الأعمدة.');
     }
+    setOpeningStockWarehouses([]);
+    setOpeningStockWarehouseId('');
   };
 
   const prepareExtractedTextImport = (text: string, buffer: ArrayBuffer, importFileName: string) => {
@@ -111,7 +126,7 @@ export const DataImportPage: React.FC = () => {
 
   const handleFile = async (file?: File) => {
     if (!file) return;
-    setBusy(true); setMessage(''); setMessageTone('info'); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]); setExtractedText('');
+    setBusy(true); setMessage(''); setMessageTone('info'); setResult(null); setIssues([]); setData(null); setFileBuffer(null); setSpreadsheetSheets([]); setSheetImports([]); setActiveSheetIndex(0); setImportBatches([]); setManualOverride(false); setManualEntity(''); setAllowBalances(false); setAllowStock(false); setOpeningStockWarehouseId(''); setOpeningStockWarehouses([]); setExtractedText('');
     setDynamicPreview(null); setDynamicResult(null); setBackupImport(null); setEncryptedBackupFile(null); setBackupPassword(''); setShowBackupPassword(false); setFileName(file.name);
     try {
       const lowerName = file.name.toLocaleLowerCase();
@@ -194,17 +209,69 @@ export const DataImportPage: React.FC = () => {
     finally { setBusy(false); }
   };
 
+  const rollbackImportBatch = (batch: typeof importBatches[number]) => {
+    if (!PermissionService.can(currentUser, batch.entityType === 'customers' ? 'ui.customers.list.delete' : 'ui.products.catalog.delete')) {
+      setMessageTone('error');
+      setMessage('لا تملك صلاحية حذف سجلات هذا النوع للتراجع عن الدفعة.');
+      return;
+    }
+    if (!window.confirm('سيتم حذف سجلات الدفعة فقط. إذا ارتبط أي سجل بمعاملة لاحقة فسيُمنع التراجع. متابعة؟')) return;
+    try {
+      const removed = service.rollbackImportBatch(batch.id);
+      setImportBatches(current => current.map(item => item.id === batch.id
+        ? { ...item, importedCount: 0, status: 'ROLLED_BACK' }
+        : item));
+      setMessageTone('success');
+      setMessage(`تم التراجع عن الدفعة وحذف ${removed} سجل.`);
+    } catch (error) {
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'تعذر التراجع عن الدفعة.');
+    }
+  };
+
   const changeEntity = (entity: ImportEntity | '') => {
     setManualEntity(entity);
     setManualOverride(Boolean(entity));
     if (!data) return;
     if (!spreadsheetSheets.length) return;
-    const firstSheet = spreadsheetSheets[0];
-    const next = service.parseRows(firstSheet.headers, firstSheet.rows, entity || undefined);
+    const activeSheet = spreadsheetSheets[activeSheetIndex];
+    if (!activeSheet) return;
+    const next = service.parseRows(activeSheet.headers, activeSheet.rows, entity || undefined);
+    setSheetImports(current => current.map((item, index) => index === activeSheetIndex ? { sheet: activeSheet, data: next } : item));
     setData(next); setIssues(next.entity === 'dynamic' ? [] : service.validate(next)); setResult(null); setDynamicResult(null);
     if (next.entity === 'dynamic') {
-      setDynamicPreview({ headers: firstSheet.headers, rows: firstSheet.rows }); setDynamicName(firstSheet.name || fileName.replace(/\.[^.]+$/, ''));
+      setDynamicPreview({ headers: activeSheet.headers, rows: activeSheet.rows }); setDynamicName(activeSheet.name || fileName.replace(/\.[^.]+$/, ''));
     } else setDynamicPreview(null);
+  };
+
+  const toggleProductStock = (enabled: boolean) => {
+    setAllowStock(enabled);
+    if (!enabled) {
+      setOpeningStockWarehouseId('');
+      return;
+    }
+    try {
+      setOpeningStockWarehouses(service.getOpeningStockWarehouses().map(({ id, name }) => ({ id, name })));
+    } catch (error) {
+      setOpeningStockWarehouses([]);
+      setMessageTone('error');
+      setMessage(error instanceof Error ? error.message : 'تعذر تحميل قائمة المخازن.');
+    }
+  };
+
+  const selectSheet = (index: number) => {
+    const selected = sheetImports[index];
+    if (!selected) return;
+    setActiveSheetIndex(index);
+    setData(selected.data);
+    setManualEntity(selected.data.entity);
+    setIssues(selected.data.entity === 'dynamic' ? [] : service.validate(selected.data));
+    setDynamicPreview(selected.data.entity === 'dynamic'
+      ? { headers: selected.sheet.headers, rows: selected.sheet.rows }
+      : null);
+    setDynamicName(selected.sheet.name || fileName.replace(/\.[^.]+$/, ''));
+    setResult(null);
+    setDynamicResult(null);
   };
 
   const changeExtractedText = (text: string) => {
@@ -222,6 +289,8 @@ export const DataImportPage: React.FC = () => {
         throw new Error('لم يتم التعرف على نوع بيانات معروف. يلزم منح صلاحية إدارة البيانات لإنشاء نوع مرن.');
       }
       setSpreadsheetSheets([sheet]);
+      setSheetImports([{ sheet, data: next }]);
+      setActiveSheetIndex(0);
       setData(next);
       setManualEntity(next.entity);
       if (next.entity === 'dynamic') {
@@ -235,6 +304,7 @@ export const DataImportPage: React.FC = () => {
     } catch (error: any) {
       setData(null);
       setSpreadsheetSheets([]);
+      setSheetImports([]);
       setDynamicPreview(null);
       setIssues([]);
       setMessageTone('error');
@@ -245,6 +315,9 @@ export const DataImportPage: React.FC = () => {
   const changeMapping = (key: string, header: string) => {
     if (!data) return;
     const next = { ...data, mapping: { ...data.mapping, [key]: header } };
+    setSheetImports(current => current.map((item, index) => index === activeSheetIndex
+      ? { ...item, data: next }
+      : item));
     setData(next); setIssues(service.validate(next)); setResult(null);
   };
 
@@ -260,20 +333,74 @@ export const DataImportPage: React.FC = () => {
     if (!data) return;
     setBusy(true); setMessage(''); setMessageTone('info');
     try {
-      if (data.entity === 'dynamic') {
-        if (!fileBuffer) throw new Error('أعد اختيار الملف قبل الاستيراد.');
-        const outcome = dynamicService.importSheets(fileBuffer, fileName, spreadsheetSheets, dynamicName);
-        setDynamicResult(outcome);
-        setMessageTone('success');
-        setMessage(`تم استيراد ${outcome.imported} سجل إلى ${outcome.entities?.length||1} نوع بيانات. البيانات الأصلية محفوظة كاملة.`);
-        setBusy(false);
-        return;
+      if (!sheetImports.length) throw new Error('أعد اختيار الملف قبل الاستيراد.');
+      const dynamicSheets = sheetImports.filter(item => item.data.entity === 'dynamic');
+      const erpSheets = sheetImports.filter(item => item.data.entity !== 'dynamic');
+      if (dynamicSheets.length && !PermissionService.can(currentUser, 'admin.data')) {
+        throw new Error('لا تملك صلاحية إنشاء أنواع البيانات المرنة لهذه الأوراق.');
       }
-      const outcome = service.import(data, { allowInitialBalances: allowBalances, allowProductStock: allowStock });
-      setResult(outcome);
-      if (outcome.created) {
+      for (const item of erpSheets) {
+        if (!PermissionService.can(currentUser, ENTITY_META[item.data.entity as Exclude<ImportEntity, 'dynamic'>].permission)) {
+          throw new Error(`لا تملك صلاحية استيراد ورقة «${item.sheet.name}» إلى هذا الكيان.`);
+        }
+      }
+      if (allowStock && erpSheets.some(item => item.data.entity === 'products')
+        && !openingStockWarehouseId
+        && erpSheets.some(item => item.data.entity === 'products' && item.data.rows.some(row => {
+          const value = Number(String(row[item.data.mapping.initialStockM2] || '').replace(/[٬,]/g, '').replace(/[٫]/g, '.'));
+          return Number.isFinite(value) && value > 0;
+        }))) {
+        throw new Error('اختر مخزنًا نشطًا لتسجيل الأرصدة الافتتاحية للمنتجات.');
+      }
+
+      let dynamicOutcome: DynamicImportResult | null = null;
+      if (dynamicSheets.length) {
+        if (!fileBuffer) throw new Error('أعد اختيار الملف قبل الاستيراد.');
+        dynamicOutcome = dynamicService.importSheets(
+          fileBuffer,
+          fileName,
+          dynamicSheets.map(item => item.sheet),
+          sheetImports.length === 1 ? dynamicName : undefined,
+        );
+        setDynamicResult(dynamicOutcome);
+      }
+
+      const combined = { created: 0, skipped: 0, errors: [] as ImportIssue[] };
+      const importPriority: Record<Exclude<ImportEntity, 'dynamic'>, number> = {
+        categories: 0,
+        brands: 1,
+        warehouses: 2,
+        customers: 3,
+        suppliers: 3,
+        employees: 3,
+        products: 4,
+      };
+      const orderedErpSheets = [...erpSheets].sort((left, right) =>
+        importPriority[left.data.entity as Exclude<ImportEntity, 'dynamic'>]
+        - importPriority[right.data.entity as Exclude<ImportEntity, 'dynamic'>]);
+      for (const item of orderedErpSheets) {
+        const outcome = service.import(item.data, {
+          allowInitialBalances: allowBalances,
+          allowProductStock: allowStock,
+          openingStockWarehouseId,
+          sourceName: `${fileName} · ${item.sheet.name}`,
+        });
+        combined.created += outcome.created;
+        combined.skipped += outcome.skipped;
+        combined.errors.push(...outcome.errors.map(issue => ({
+          ...issue,
+          messages: [`ورقة «${item.sheet.name}»: ${issue.messages.join('، ')}`],
+        })));
+      }
+      setResult(combined);
+      const importedEntities = [...new Set(erpSheets.map(item => item.data.entity)
+        .filter((entity): entity is 'customers' | 'products' => entity === 'customers' || entity === 'products'))];
+      setImportBatches(importedEntities.flatMap(entity => service.getImportBatches(entity)));
+      const totalImported = combined.created + (dynamicOutcome?.imported || 0);
+      const totalSkipped = combined.skipped + (dynamicOutcome?.skipped || 0);
+      if (totalImported) {
         setMessageTone('success');
-        setMessage(`تمت إضافة ${outcome.created} سجل بنجاح${outcome.skipped ? `، وتم تخطي ${outcome.skipped} سجل` : ''}.`);
+        setMessage(`تم استيراد ${totalImported} سجل من ${sheetImports.length} ورقة${totalSkipped ? `، وتم تخطي ${totalSkipped} سجل` : ''}. راجع نتائج كل ورقة أدناه.`);
       } else {
         setMessageTone('error');
         setMessage('لم تتم إضافة سجلات. راجع الأخطاء أدناه.');
@@ -283,8 +410,9 @@ export const DataImportPage: React.FC = () => {
   };
 
   const fields = data && data.entity !== 'dynamic' ? ENTITY_META[data.entity].fields : [];
-  const invalidRows = new Set(issues.map(x => x.row));
-  const validCount = data ? data.rows.length - invalidRows.size : 0;
+  const totalValidCount = sheetImports.reduce((total, item) => total + (item.data.entity === 'dynamic'
+    ? 0
+    : item.data.rows.length - service.validate(item.data).length), 0);
 
   if (!canOpen) return <div className="m-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900" dir="rtl">لا تملك صلاحية استيراد البيانات. يرجى التواصل مع مسؤول النظام لمنحك الصلاحية اللازمة.</div>;
   return <div className="w-full p-4 md:p-8 space-y-6" dir="rtl">
@@ -316,6 +444,18 @@ export const DataImportPage: React.FC = () => {
           <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-black text-white hover:bg-sky-700">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}{fileName || 'اختر ملفًا للاستيراد'}<input type="file" accept=".xlsx,.xls,.csv,.pdf,.docx,.json,.xml,.txt,.png,.jpg,.jpeg,.webp,.gif,.ceramisys-backup,image/png,image/jpeg,image/webp,image/gif,application/pdf,application/json,text/plain,application/xml,application/octet-stream" className="hidden" onChange={e=>{void handleFile(e.target.files?.[0]);e.currentTarget.value='';}}/></label>
         </div>
         <p className="text-xs text-slate-500">الصيغ المدعومة: XLSX وXLS وCSV وPDF وDOCX وJSON وXML وTXT وصور PNG وJPG وWEBP وGIF، إضافة إلى النسخ المشفرة. الحد الأقصى لملفات DOCX وJSON وXML وTXT {MAX_DATA_FILE_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللصورة {MAX_IMAGE_IMPORT_BYTES / 1024 / 1024} ميجابايت، ولـPDF {MAX_PDF_IMPORT_BYTES / 1024 / 1024} ميجابايت، وللجداول {MAX_SPREADSHEET_FILE_SIZE / 1024 / 1024} ميجابايت و{MAX_SPREADSHEET_ROWS.toLocaleString('ar-EG')} صف و{MAX_SPREADSHEET_COLUMNS} عمود. تُستخرج نصوص PDF والصور محليًا عبر OCR، وتُراجع كل البيانات قبل حفظها. النسخة المشفرة تُدمج بعد المراجعة ولا تستبدل قاعدة البيانات كاملة.</p>
+        {sheetImports.length > 1 && <div className="flex flex-wrap gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3" aria-label="أوراق المصنف">
+          {sheetImports.map((item, index) => <button
+            type="button"
+            key={`${item.sheet.name}-${index}`}
+            onClick={() => selectSheet(index)}
+            aria-pressed={activeSheetIndex === index}
+            className={`rounded-lg px-3 py-2 text-xs font-black ${activeSheetIndex === index ? 'bg-sky-700 text-white' : 'bg-white text-sky-900'}`}
+          >
+            {item.sheet.name} · {item.data.entity === 'dynamic' ? 'نوع مرن' : ENTITY_META[item.data.entity].label}
+          </button>)}
+          <span className="self-center text-xs text-slate-600">راجع مطابقة كل ورقة على حدة قبل الاستيراد.</span>
+        </div>}
         {message && <div role="status" aria-live="polite" className={`flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-bold ${messageTone === 'success' ? 'bg-emerald-50 text-emerald-800' : messageTone === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-800'}`}>{messageTone === 'success' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0"/> : <AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/>}<span>{message}</span></div>}
         {encryptedBackupFile && <div className="flex flex-wrap items-end gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
           <label className="min-w-60 flex-1 text-xs font-black text-amber-950">كلمة مرور النسخة الاحتياطية
@@ -419,13 +559,26 @@ export const DataImportPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3"><div className="flex items-center gap-2"><WandSparkles className="h-4 w-4 text-violet-600"/><span className="text-sm font-black">نوع البيانات: {ENTITY_META[data.entity].label}</span><span className="text-xs text-slate-500">({data.rows.length} صف)</span></div><span className="text-xs font-bold text-slate-500">تم ربط {Object.keys(data.mapping).length} من {fields.length} عمود</span></div>
           <div><h2 className="mb-3 text-sm font-black text-slate-800">مطابقة الأعمدة</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{fields.map(field=><label key={field.key} className="text-xs font-bold text-slate-600">{field.label}{field.required&&<span className="text-rose-600"> *</span>}<select value={data.mapping[field.key]||''} onChange={e=>changeMapping(field.key,e.target.value)} className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"><option value="">— غير مرتبط —</option>{data.headers.map(h=><option key={h} value={h}>{h}</option>)}</select></label>)}</div></div>
           {(data.entity==='customers'||data.entity==='suppliers')&&<label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900"><input type="checkbox" checked={allowBalances} onChange={e=>setAllowBalances(e.target.checked)} className="mt-0.5"/>تطبيق عمود الرصيد الافتتاحي على حسابات {ENTITY_META[data.entity].label}. يؤثر هذا على الأرصدة المالية.</label>}
-          {data.entity==='products'&&<label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-900"><input type="checkbox" checked={allowStock} onChange={e=>setAllowStock(e.target.checked)} className="mt-0.5"/>إضافة الكميات من عمود الرصيد الافتتاحي إلى المخزن الافتراضي، مع تسجيل حركة مخزنية.</label>}
+          {data.entity==='products'&&<div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3"><label className="flex items-start gap-2 text-xs font-bold text-amber-900"><input type="checkbox" checked={allowStock} onChange={e=>toggleProductStock(e.target.checked)} className="mt-0.5"/>إضافة الكميات من عمود الرصيد الافتتاحي إلى مخزن تختاره يدويًا، مع تسجيل حركة مخزنية.</label>{allowStock&&<label className="block text-xs font-black text-amber-950">مخزن الرصيد الافتتاحي<select value={openingStockWarehouseId} onChange={e=>setOpeningStockWarehouseId(e.target.value)} className="mt-1.5 w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm"><option value="">اختر مخزنًا نشطًا</option>{openingStockWarehouses.map(warehouse=><option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>{!openingStockWarehouses.length&&<span className="mt-1 block font-normal text-rose-700">لا توجد مخازن متاحة أو لا تملك صلاحية عرضها.</span>}</label>}</div>}
           <div className="overflow-x-auto rounded-xl border border-slate-200"><table className="w-full min-w-[700px] text-right text-xs"><thead className="bg-slate-50 text-slate-600"><tr><th className="p-3">صف الملف</th>{fields.filter(f=>data.mapping[f.key]).slice(0,7).map(f=><th key={f.key} className="p-3">{f.label}</th>)}<th className="p-3">التحقق</th></tr></thead><tbody>{data.rows.slice(0,100).map((row,i)=>{const rowNo=i+2;const rowIssues=issues.find(x=>x.row===rowNo);return <tr key={rowNo} className="border-t border-slate-100"><td className="p-3 font-bold">{rowNo}</td>{fields.filter(f=>data.mapping[f.key]).slice(0,7).map(f=><td key={f.key} className="max-w-48 truncate p-3">{String(row[data.mapping[f.key]]??'')}</td>)}<td className="p-3">{rowIssues?<span className="text-rose-700">{rowIssues.messages.join('، ')}</span>:<span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5"/>صالح</span>}</td></tr>})}</tbody></table>{data.rows.length>100&&<p className="bg-slate-50 p-2 text-center text-xs text-slate-500">معاينة أول 100 صف؛ سيتم فحص كل الصفوف عند الاستيراد.</p>}</div>
           {result?.errors?.length ? <div className="max-h-36 overflow-auto rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">{result.errors.map(e=><p key={e.row}>صف {e.row}: {e.messages.join('، ')}</p>)}</div>:null}
         </>}
       </section>
 
-      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="mb-3 font-black text-slate-900">أنواع البيانات المدعومة</h2><ul className="space-y-2">{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><li key={key} className={`rounded-lg px-3 py-2 text-xs font-bold ${data?.entity===key?'bg-sky-50 text-sky-800':'bg-slate-50 text-slate-600'}`}>{meta.label}</li>)}</ul>{PermissionService.can(currentUser,'admin.data')&&<Link to="/data-import/types" className="mt-4 block rounded-xl bg-violet-50 hover:bg-violet-100 p-3 text-xs font-black text-violet-900 border border-violet-200 transition">إدارة الأنواع المرنة والسجلات والعلاقات ←</Link>}<div className="mt-4 rounded-xl bg-violet-50 p-3 text-xs leading-6 text-violet-900"><b>حقول إضافية:</b> الأصناف تشمل أكواد وباركود وأسعار ومقاسات وفرز ومتر الكرتونة وقطعها. يمكن تصدير القوالب من هنا وتعبئتها قبل الاستيراد.</div>{data&&data.entity!=='dynamic'&&<><button onClick={runImport} disabled={!PermissionService.can(currentUser,ENTITY_META[data.entity].permission)||validCount===0||busy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}استيراد {validCount>0?`${validCount} سجل صالح`:''}</button><p className="mt-2 text-center text-[11px] text-slate-500">الصفوف غير الصالحة أو المكررة تُتخطى ويُذكر سببها.</p></>}</aside>
+      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-3 font-black text-slate-900">أنواع البيانات المدعومة</h2>
+        <ul className="space-y-2">{Object.entries(ENTITY_META).filter(([,meta])=>PermissionService.can(currentUser,meta.permission)).map(([key,meta])=><li key={key} className={`rounded-lg px-3 py-2 text-xs font-bold ${data?.entity===key?'bg-sky-50 text-sky-800':'bg-slate-50 text-slate-600'}`}>{meta.label}</li>)}</ul>
+        {(PermissionService.can(currentUser,'admin.data')||PermissionService.can(currentUser,'settings.dynamic_data.view'))&&<Link to="/data-import/types" className="mt-4 block rounded-xl bg-violet-50 hover:bg-violet-100 p-3 text-xs font-black text-violet-900 border border-violet-200 transition">إدارة الأنواع المرنة والسجلات والعلاقات ←</Link>}
+        <div className="mt-4 rounded-xl bg-violet-50 p-3 text-xs leading-6 text-violet-900"><b>حقول إضافية:</b> الأصناف تشمل أكواد وباركود وأسعار ومقاسات وفرز ومتر الكرتونة وقطعها. يمكن تصدير القوالب من هنا وتعبئتها قبل الاستيراد.</div>
+        {data&&data.entity!=='dynamic'&&<><button onClick={runImport} disabled={totalValidCount===0||busy} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">{busy?<Loader2 className="h-4 w-4 animate-spin"/>:<Upload className="h-4 w-4"/>}استيراد {totalValidCount>0?`${totalValidCount} سجل صالح`:''}</button><p className="mt-2 text-center text-[11px] text-slate-500">ستُستورد كل ورقة إلى الكيان المعروض عليها بعد مراجعتها؛ وتُتخطى الصفوف غير الصالحة مع توضيح السبب.</p></>}
+      </aside>
     </div>
+    {importBatches.length > 0 && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-3 text-lg font-black text-slate-900">دفعات استيراد العملاء والمنتجات</h2>
+      <div className="space-y-2">{importBatches.map(batch => <div key={batch.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-xs">
+        <span className="font-bold">{batch.entityType === 'customers' ? 'العملاء' : 'المنتجات'} · {batch.sourceName} · {batch.importedCount} سجل · {batch.status} · {new Date(batch.createdAt).toLocaleString()}</span>
+        {batch.status !== 'ROLLED_BACK' && <button type="button" onClick={() => rollbackImportBatch(batch)} disabled={!PermissionService.can(currentUser, batch.entityType === 'customers' ? 'ui.customers.list.delete' : 'ui.products.catalog.delete')} className="rounded-lg border border-rose-200 px-3 py-2 font-black text-rose-700 disabled:opacity-40">التراجع عن الدفعة</button>}
+      </div>)}</div>
+    </section>}
   </div>;
 };

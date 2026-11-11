@@ -1,7 +1,7 @@
 import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  Activity, ArrowLeftRight, Barcode, BookmarkPlus, Building2, ClipboardList, Layers,
+  Activity, AlertTriangle, ArrowLeftRight, Barcode, BookmarkPlus, Building2, ClipboardList, Layers,
   PackageSearch, Scale, ShieldAlert, Warehouse, Wrench,
 } from 'lucide-react';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
@@ -20,11 +20,13 @@ const ReorderPlanningPage = lazy(() => import('../reorder-planning/ReorderPlanni
 const WarehouseLocationsPage = lazy(() => import('../warehouse-locations/WarehouseLocationsPage').then((module) => ({ default: module.WarehouseLocationsPage })));
 const DamageQuarantinePage = lazy(() => import('../damage-quarantine/DamageQuarantinePage').then((module) => ({ default: module.DamageQuarantinePage })));
 const InventoryReconciliationPage = lazy(() => import('../inventory-reconciliation/InventoryReconciliationPage').then((module) => ({ default: module.InventoryReconciliationPage })));
+const InventoryAlertsPage = lazy(() => import('../inventory-alerts/InventoryAlertsPage').then((module) => ({ default: module.InventoryAlertsPage })));
 
 const TABS: WorkspaceHubTab[] = [
   { id: 'overview', label: 'نظرة عامة', path: '/inventory', icon: Layers },
   { id: 'warehouse-stock', label: 'أرصدة المخازن', path: '/inventory/warehouse-stock', icon: Warehouse },
   { id: 'showroom-stock', label: 'أرصدة المعارض', path: '/inventory/showroom-stock', icon: Building2 },
+  { id: 'alerts', label: 'تنبيهات المخزون', path: '/inventory/alerts', icon: AlertTriangle },
   { id: 'ledger', label: 'سجل الحركة', path: '/inventory/ledger', icon: Activity },
   { id: 'transfers', label: 'التحويلات', path: '/inventory/transfers', icon: ArrowLeftRight },
   { id: 'counts', label: 'الجرد', path: '/inventory/counts', icon: ClipboardList },
@@ -41,6 +43,7 @@ const REQUIRED_PERMISSION: Record<string, string> = {
   overview: 'inventory.view',
   'warehouse-stock': 'inventory.view',
   'showroom-stock': 'inventory.view',
+  alerts: 'inventory.view',
   ledger: 'inventory.view',
   transfers: 'inventory.transfer',
   counts: 'inventory.count',
@@ -57,6 +60,7 @@ const PAGE_BY_TAB = {
   overview: InventoryView,
   'warehouse-stock': () => <LocationStockPage mode="warehouse" />,
   'showroom-stock': () => <LocationStockPage mode="showroom" />,
+  alerts: InventoryAlertsPage,
   ledger: StockLedgerPage,
   transfers: StockTransfersView,
   counts: InventoryCountPage,

@@ -65,17 +65,29 @@ function normalizeGroupsOrder(saved: string[]): string[] {
     saved.length === LEGACY_DEFAULT_GROUP_ORDER.length
     && saved.every((groupId, index) => groupId === LEGACY_DEFAULT_GROUP_ORDER[index])
   ) return [];
-  return [...new Set(saved.map((groupId) => LEGACY_GROUP_IDS[groupId] ?? groupId))];
+  const order = [...new Set(saved.map((groupId) => LEGACY_GROUP_IDS[groupId] ?? groupId))];
+  if (order.length > 0 && !order.includes('hr')) {
+    const operationsIndex = order.indexOf('operations');
+    order.splice(operationsIndex >= 0 ? operationsIndex + 1 : order.length, 0, 'hr');
+  }
+  return order;
 }
 
 function normalizeItemsOrder(saved: Record<string, string[]>): Record<string, string[]> {
-  return Object.entries(saved).reduce<Record<string, string[]>>((orders, [savedGroupId, paths]) => {
+  const orders = Object.entries(saved).reduce<Record<string, string[]>>((result, [savedGroupId, paths]) => {
     const groupId = LEGACY_GROUP_IDS[savedGroupId] ?? savedGroupId;
-    if (!Array.isArray(paths)) return orders;
+    if (!Array.isArray(paths)) return result;
     const normalizedPaths = paths.map((path) => LEGACY_PATHS[path] ?? path);
-    orders[groupId] = [...new Set([...(orders[groupId] ?? []), ...normalizedPaths])];
-    return orders;
+    result[groupId] = [...new Set([...(result[groupId] ?? []), ...normalizedPaths])];
+    return result;
   }, {});
+  const hrOrder = orders.hr ?? [];
+  if (hrOrder.length === 0) {
+    const hrPaths = new Set(NAV_GROUPS.find((group) => group.id === 'hr')?.items.map((item) => item.to) ?? []);
+    const migratedHrOrder = (orders.operations ?? []).filter((path) => hrPaths.has(path));
+    if (migratedHrOrder.length > 0) orders.hr = migratedHrOrder;
+  }
+  return orders;
 }
 
 function normalizeLabels(saved: Record<string, string>): Record<string, string> {

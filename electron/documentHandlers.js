@@ -209,12 +209,18 @@ function registerDocumentHandlers({
             fsSync.copyFileSync(sourcePath, targetPath);
           }
         }
-        const { createWorker, OEM } = require('tesseract.js');
-        return createWorker('ara+eng', OEM.LSTM_ONLY, {
+        const { createWorker, OEM, PSM } = require('tesseract.js');
+        const worker = await createWorker('ara+eng', OEM.LSTM_ONLY, {
           langPath: languageDirectory,
           cacheMethod: 'none',
           gzip: true,
         });
+        await worker.setParameters({
+          preserve_interword_spaces: '1',
+          tessedit_pageseg_mode: PSM.AUTO,
+          user_defined_dpi: '300',
+        });
+        return worker;
       })().catch((error) => {
         ocrWorkerPromise = null;
         throw error;

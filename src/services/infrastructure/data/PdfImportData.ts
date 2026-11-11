@@ -14,9 +14,17 @@ const uniqueHeaders = (values: string[]): string[] => {
 };
 
 const splitTableLine = (line: string): string[] => {
-  if (line.includes('|')) return line.split('|').map(value => value.trim()).filter(Boolean);
-  if (line.includes('\t')) return line.split(/\t+/).map(value => value.trim()).filter(Boolean);
-  return line.split(/\s{2,}/).map(value => value.trim()).filter(Boolean);
+  if (line.includes('|')) {
+    const normalized = line.trim();
+    const cells = normalized.split('|').map(value => value.trim());
+    if (normalized.startsWith('|') && normalized.endsWith('|')) {
+      cells.pop();
+      cells.shift();
+    }
+    return cells;
+  }
+  if (line.includes('\t')) return line.split('\t').map(value => value.trim());
+  return line.split(/\s{2,}/).map(value => value.trim());
 };
 
 export const parsePdfExtractedText = (text: string, sheetName: string): ParsedSpreadsheetSheet => {
@@ -35,7 +43,8 @@ export const parsePdfExtractedText = (text: string, sheetName: string): ParsedSp
 
     const matchingRows = lines.slice(headerIndex + 1)
       .map(splitTableLine)
-      .filter(row => row.length === header.length);
+      .filter(row => row.length === header.length)
+      .filter(row => !row.every(value => /^:?-{3,}:?$/.test(value)));
     if (!matchingRows.length) continue;
 
     table = [header, ...matchingRows];

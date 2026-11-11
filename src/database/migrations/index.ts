@@ -53,6 +53,18 @@ import { MIGRATION_PART_49 } from './part49';
 import { MIGRATION_PART_50 } from './part50';
 import { MIGRATION_PART_51 } from './part51';
 import { MIGRATION_PART_52 } from './part52';
+import { MIGRATION_PART_53 } from './part53';
+import { MIGRATION_PART_54 } from './part54';
+import { MIGRATION_PART_55 } from './part55';
+import { MIGRATION_PART_56 } from './part56';
+import { MIGRATION_PART_57 } from './part57';
+import { MIGRATION_PART_58 } from './part58';
+import { MIGRATION_PART_59 } from './part59';
+import { MIGRATION_PART_60 } from './part60';
+import { MIGRATION_PART_61 } from './part61';
+import { MIGRATION_PART_62 } from './part62';
+import { MIGRATION_PART_63 } from './part63';
+import { MIGRATION_PART_64 } from './part64';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
 
@@ -74,6 +86,17 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_12,
   MIGRATION_PART_13,
   MIGRATION_ENTERPRISE,
+  MIGRATION_PART_54,
+  MIGRATION_PART_55,
+  MIGRATION_PART_56,
+  MIGRATION_PART_57,
+  MIGRATION_PART_58,
+  MIGRATION_PART_59,
+  MIGRATION_PART_60,
+  MIGRATION_PART_61,
+  MIGRATION_PART_62,
+  MIGRATION_PART_63,
+  MIGRATION_PART_64,
   {
     id: '050_cash_shift_auto_close',
     description: 'Track automatically closed cashier shifts',
@@ -2265,6 +2288,30 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
+    id: '103_legacy_fixed_asset_count_snapshot_columns',
+    description: 'Backfill required status/location columns on older fixed asset count snapshot tables.',
+    up: (db: Database) => {
+      if (!tableExists(db, 'fixed_asset_count_snapshots')) return;
+
+      addColumn(db, 'fixed_asset_count_snapshots', 'registered_status', "TEXT NOT NULL DEFAULT 'UNKNOWN'");
+      addColumn(db, 'fixed_asset_count_snapshots', 'registered_location', 'TEXT');
+
+      db.exec(`
+        UPDATE fixed_asset_count_snapshots
+        SET registered_status = (
+          SELECT fa.status FROM fixed_assets fa WHERE fa.id = fixed_asset_count_snapshots.asset_id
+        )
+        WHERE registered_status IS NULL OR registered_status = '';
+
+        UPDATE fixed_asset_count_snapshots
+        SET registered_location = (
+          SELECT fa.location FROM fixed_assets fa WHERE fa.id = fixed_asset_count_snapshots.asset_id
+        )
+        WHERE registered_location IS NULL;
+      `);
+    },
+  },
+  {
     id: '104_journal_entries_reference_unique',
     description: 'Enforce one journal entry per (reference_type, reference_id) when existing data allows it',
     up: (db: Database) => {
@@ -2563,6 +2610,260 @@ export const MIGRATIONS: Migration[] = [
   ...MIGRATION_PART_50,
   ...MIGRATION_PART_51,
   ...MIGRATION_PART_52,
+  MIGRATION_PART_53,
+  {
+    id: '170_fiscal_close_database_guards',
+    description: 'Enforce posted-entry and closed-period prerequisites at the database layer.',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_fiscal_period_close_requires_posted_entries
+        BEFORE UPDATE OF status ON fiscal_periods
+        WHEN NEW.status = 'CLOSED' AND OLD.status = 'OPEN'
+        BEGIN
+          SELECT RAISE(ABORT, 'لا يمكن إقفال فترة تحتوي على قيود يومية غير مرحلة.')
+          WHERE EXISTS (
+            SELECT 1 FROM journal_entries e
+            WHERE e.date >= OLD.start_date AND e.date <= OLD.end_date AND e.is_posted = 0
+          );
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_fiscal_year_close_requires_closed_periods
+        BEFORE UPDATE OF status ON fiscal_years
+        WHEN NEW.status = 'CLOSED' AND OLD.status = 'OPEN'
+        BEGIN
+          SELECT RAISE(ABORT, 'لا يمكن إقفال السنة قبل إقفال جميع فتراتها.')
+          WHERE NOT EXISTS (
+            SELECT 1 FROM fiscal_periods fp WHERE fp.fiscal_year_id = OLD.id
+          ) OR EXISTS (
+            SELECT 1 FROM fiscal_periods fp
+            WHERE fp.fiscal_year_id = OLD.id AND fp.status = 'OPEN'
+          );
+
+          SELECT RAISE(ABORT, 'لا يمكن إقفال السنة لوجود قيود يومية غير مرحلة.')
+          WHERE EXISTS (
+            SELECT 1 FROM journal_entries e
+            WHERE e.date >= OLD.start_date AND e.date <= OLD.end_date AND e.is_posted = 0
+          );
+        END;
+      `);
+    },
+  },
+  {
+    id: '171_fiscal_party_subledger_history',
+    description: 'Establish a party-level ledger baseline and preserve dated receivable/payable movements.',
+    up: (db: Database) => {
+      const currentDate = new Date().toISOString().slice(0, 10);
+      const latestLedgerDate = db.exec(`
+        SELECT MAX(date) FROM journal_entries WHERE is_posted = 1
+      `)[0]?.values[0]?.[0];
+      const coverageStartDate = typeof latestLedgerDate === 'string' && latestLedgerDate > currentDate
+        ? latestLedgerDate
+        : currentDate;
+      const capturedAt = new Date().toISOString();
+      const cutoffEntryRowId = Number(db.exec('SELECT COALESCE(MAX(rowid), 0) FROM journal_entries')[0]?.values[0]?.[0] || 0);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS finance_subledger_coverage (
+          id INTEGER PRIMARY KEY CHECK(id = 1),
+          coverage_start_date TEXT NOT NULL,
+          captured_at TEXT NOT NULL,
+          cutoff_entry_rowid INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS finance_subledger_party_baselines (
+          company_id TEXT NOT NULL,
+          party_type TEXT NOT NULL CHECK(party_type IN ('CUSTOMER', 'SUPPLIER')),
+          party_id TEXT NOT NULL,
+          balance REAL NOT NULL,
+          captured_at TEXT NOT NULL,
+          PRIMARY KEY(company_id, party_type, party_id)
+        );
+        CREATE TABLE IF NOT EXISTS finance_subledger_control_baselines (
+          company_id TEXT NOT NULL,
+          account_code TEXT NOT NULL CHECK(account_code IN ('1103', '2101')),
+          balance REAL NOT NULL,
+          captured_at TEXT NOT NULL,
+          PRIMARY KEY(company_id, account_code)
+        );
+        CREATE TABLE IF NOT EXISTS finance_subledger_events (
+          id TEXT PRIMARY KEY,
+          journal_entry_id TEXT NOT NULL,
+          company_id TEXT NOT NULL,
+          party_type TEXT NOT NULL CHECK(party_type IN ('CUSTOMER', 'SUPPLIER')),
+          party_id TEXT NOT NULL,
+          account_code TEXT NOT NULL CHECK(account_code IN ('1103', '2101')),
+          amount REAL NOT NULL,
+          effective_date TEXT NOT NULL,
+          reference_type TEXT NOT NULL,
+          reference_id TEXT NOT NULL,
+          UNIQUE(journal_entry_id, party_type, party_id, account_code),
+          FOREIGN KEY(journal_entry_id) REFERENCES journal_entries(id) ON DELETE RESTRICT
+        );
+        CREATE INDEX IF NOT EXISTS idx_finance_subledger_events_party_date
+          ON finance_subledger_events(party_type, party_id, effective_date);
+        CREATE TABLE IF NOT EXISTS fiscal_period_subledger_snapshots (
+          id TEXT PRIMARY KEY,
+          snapshot_batch_id TEXT NOT NULL,
+          period_id TEXT NOT NULL,
+          company_id TEXT NOT NULL,
+          party_type TEXT NOT NULL CHECK(party_type IN ('CUSTOMER', 'SUPPLIER')),
+          party_id TEXT NOT NULL,
+          control_account_code TEXT NOT NULL CHECK(control_account_code IN ('1103', '2101')),
+          balance REAL NOT NULL,
+          effective_date TEXT NOT NULL,
+          captured_at TEXT NOT NULL,
+          FOREIGN KEY(period_id) REFERENCES fiscal_periods(id) ON DELETE RESTRICT
+        );
+        CREATE INDEX IF NOT EXISTS idx_fiscal_period_subledger_snapshot
+          ON fiscal_period_subledger_snapshots(period_id, snapshot_batch_id, party_type);
+      `);
+      db.run(
+        `INSERT OR IGNORE INTO finance_subledger_coverage
+          (id, coverage_start_date, captured_at, cutoff_entry_rowid) VALUES (1, ?, ?, ?)`,
+        [coverageStartDate, capturedAt, cutoffEntryRowId],
+      );
+      db.run(`
+        INSERT OR IGNORE INTO finance_subledger_party_baselines
+          (company_id, party_type, party_id, balance, captured_at)
+        SELECT COALESCE(company_id, 'cmp_main'), 'CUSTOMER', id, current_balance, ? FROM customers
+      `, [capturedAt]);
+      db.run(`
+        INSERT OR IGNORE INTO finance_subledger_party_baselines
+          (company_id, party_type, party_id, balance, captured_at)
+        SELECT COALESCE(company_id, 'cmp_main'), 'SUPPLIER', id, current_balance, ? FROM suppliers
+      `, [capturedAt]);
+      db.run(`
+        INSERT OR IGNORE INTO finance_subledger_control_baselines
+          (company_id, account_code, balance, captured_at)
+        SELECT c.id, a.code, COALESCE(SUM(
+          CASE WHEN e.id IS NULL THEN 0
+               WHEN a.code = '1103' THEN l.debit - l.credit
+               ELSE l.credit - l.debit END
+        ), 0), ?
+        FROM companies c
+        CROSS JOIN chart_of_accounts a
+        LEFT JOIN journal_entry_lines l ON l.account_id = a.id
+        LEFT JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1
+          AND e.date <= ? AND COALESCE(e.company_id, 'cmp_main') = c.id
+        WHERE a.code IN ('1103', '2101')
+        GROUP BY c.id, a.code
+      `, [capturedAt, coverageStartDate]);
+    },
+  },
+  {
+    id: '172_fiscal_party_subledger_reconciliation',
+    description: 'Support company-scoped legacy matching and preserve manual reconciliation evidence.',
+    up: (db: Database) => {
+      const hasColumn = (table: string, column: string): boolean =>
+        db.exec(`PRAGMA table_info(${table})`)[0]?.values.some((row) => row[1] === column) || false;
+
+      if (!hasColumn('finance_subledger_party_baselines', 'company_id')) {
+        db.exec(`
+          CREATE TABLE finance_subledger_party_baselines_company (
+            company_id TEXT NOT NULL,
+            party_type TEXT NOT NULL CHECK(party_type IN ('CUSTOMER', 'SUPPLIER')),
+            party_id TEXT NOT NULL,
+            balance REAL NOT NULL,
+            captured_at TEXT NOT NULL,
+            PRIMARY KEY(company_id, party_type, party_id)
+          );
+          INSERT OR IGNORE INTO finance_subledger_party_baselines_company
+            (company_id, party_type, party_id, balance, captured_at)
+          SELECT COALESCE(c.company_id, 'cmp_main'), b.party_type, b.party_id, b.balance, b.captured_at
+          FROM finance_subledger_party_baselines b
+          LEFT JOIN customers c ON b.party_type = 'CUSTOMER' AND c.id = b.party_id
+          WHERE b.party_type = 'CUSTOMER'
+          UNION ALL
+          SELECT COALESCE(s.company_id, 'cmp_main'), b.party_type, b.party_id, b.balance, b.captured_at
+          FROM finance_subledger_party_baselines b
+          LEFT JOIN suppliers s ON b.party_type = 'SUPPLIER' AND s.id = b.party_id
+          WHERE b.party_type = 'SUPPLIER';
+          DROP TABLE finance_subledger_party_baselines;
+          ALTER TABLE finance_subledger_party_baselines_company RENAME TO finance_subledger_party_baselines;
+        `);
+      }
+
+      if (!hasColumn('finance_subledger_control_baselines', 'company_id')) {
+        const coverage = db.exec(`
+          SELECT coverage_start_date, cutoff_entry_rowid, captured_at
+          FROM finance_subledger_coverage WHERE id = 1
+        `)[0]?.values[0] || [];
+        const coverageStartDate = coverage[0] || new Date().toISOString().slice(0, 10);
+        const cutoffEntryRowId = Number(coverage[1] || 0);
+        const baselineCapturedAt = coverage[2] || new Date().toISOString();
+        db.exec(`
+          CREATE TABLE finance_subledger_control_baselines_company (
+            company_id TEXT NOT NULL,
+            account_code TEXT NOT NULL CHECK(account_code IN ('1103', '2101')),
+            balance REAL NOT NULL,
+            captured_at TEXT NOT NULL,
+            PRIMARY KEY(company_id, account_code)
+          );
+        `);
+        db.run(`
+          INSERT OR IGNORE INTO finance_subledger_control_baselines_company
+            (company_id, account_code, balance, captured_at)
+          SELECT c.id, a.code, COALESCE(SUM(
+            CASE WHEN a.code = '1103' THEN l.debit - l.credit ELSE l.credit - l.debit END
+          ), 0), ?
+          FROM companies c
+          CROSS JOIN chart_of_accounts a
+          LEFT JOIN journal_entry_lines l ON l.account_id = a.id
+          LEFT JOIN journal_entries e ON e.id = l.entry_id AND e.is_posted = 1
+            AND e.date <= ? AND e.rowid <= ? AND COALESCE(e.company_id, 'cmp_main') = c.id
+          WHERE a.code IN ('1103', '2101')
+          GROUP BY c.id, a.code
+        `, [baselineCapturedAt, coverageStartDate, cutoffEntryRowId]);
+        db.exec(`
+          DROP TABLE finance_subledger_control_baselines;
+          ALTER TABLE finance_subledger_control_baselines_company RENAME TO finance_subledger_control_baselines;
+        `);
+      }
+
+      if (!hasColumn('finance_subledger_events', 'company_id')) {
+        db.exec(`
+          ALTER TABLE finance_subledger_events
+          ADD COLUMN company_id TEXT NOT NULL DEFAULT 'cmp_main';
+          UPDATE finance_subledger_events
+          SET company_id = COALESCE((
+            SELECT company_id FROM journal_entries WHERE id = journal_entry_id
+          ), 'cmp_main');
+        `);
+      }
+      if (!hasColumn('fiscal_period_subledger_snapshots', 'company_id')) {
+        db.exec(`
+          ALTER TABLE fiscal_period_subledger_snapshots
+          ADD COLUMN company_id TEXT NOT NULL DEFAULT 'cmp_main';
+          UPDATE fiscal_period_subledger_snapshots
+          SET company_id = COALESCE((
+            SELECT fy.company_id FROM fiscal_periods fp
+            JOIN fiscal_years fy ON fy.id = fp.fiscal_year_id
+            WHERE fp.id = period_id
+          ), 'cmp_main');
+        `);
+      }
+
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_finance_subledger_events_company_date
+          ON finance_subledger_events(company_id, effective_date, account_code);
+        CREATE TABLE IF NOT EXISTS finance_subledger_manual_reconciliations (
+          id TEXT PRIMARY KEY,
+          period_id TEXT NOT NULL,
+          company_id TEXT NOT NULL,
+          party_type TEXT NOT NULL CHECK(party_type IN ('CUSTOMER', 'SUPPLIER')),
+          verified_subledger_balance REAL NOT NULL,
+          control_balance REAL NOT NULL,
+          evidence_reference TEXT NOT NULL,
+          notes TEXT,
+          created_by TEXT NOT NULL,
+          created_by_name TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY(period_id) REFERENCES fiscal_periods(id) ON DELETE RESTRICT
+        );
+        CREATE INDEX IF NOT EXISTS idx_finance_subledger_manual_reconciliation
+          ON finance_subledger_manual_reconciliations(period_id, party_type, created_at DESC);
+      `);
+    },
+  },
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);

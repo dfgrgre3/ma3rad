@@ -45,6 +45,7 @@ export const APP_ROUTE_PATHS = [
   "inventory/locations",
   "inventory/damage-quarantine",
   "inventory/reconciliation",
+  "inventory/alerts",
   "branches",
   "warehouses",
   "crm/hub",

@@ -60,6 +60,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'inventory/locations', element: <P.WarehouseLocationsPage /> },
   { path: 'inventory/damage-quarantine', element: <P.DamageQuarantinePage /> },
   { path: 'inventory/reconciliation', element: <P.InventoryReconciliationPage /> },
+  { path: 'inventory/alerts', element: <P.InventoryAlertsPage /> },
 
   // Branches & Warehouses
   { path: 'branches', element: <P.BranchesPage /> },

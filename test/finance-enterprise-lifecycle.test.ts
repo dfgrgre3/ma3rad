@@ -82,26 +82,59 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   assert.equal(periods.length, 12, 'Must have 12 monthly periods');
 
   const shiftedYearId = financeService.createFiscalYear({
-    yearCode: 'FY2025JUL',
+    yearCode: 'FY2023JUL',
     name: 'سنة مالية تبدأ في يوليو',
-    startDate: '2025-07-01',
-    endDate: '2026-06-30',
+    startDate: '2023-07-01',
+    endDate: '2024-06-30',
   });
   const shiftedPeriods = financeService.getFiscalPeriods(shiftedYearId);
   assert.equal(shiftedPeriods.length, 12, 'A non-calendar fiscal year must still have 12 monthly periods');
-  assert.equal(shiftedPeriods[0]?.startDate, '2025-07-01');
-  assert.equal(shiftedPeriods[0]?.endDate, '2025-07-31');
-  assert.equal(shiftedPeriods[11]?.startDate, '2026-06-01');
-  assert.equal(shiftedPeriods[11]?.endDate, '2026-06-30');
+  assert.equal(shiftedPeriods[0]?.startDate, '2023-07-01');
+  assert.equal(shiftedPeriods[0]?.endDate, '2023-07-31');
+  assert.equal(shiftedPeriods[11]?.startDate, '2024-06-01');
+  assert.equal(shiftedPeriods[11]?.endDate, '2024-06-30');
 
   // Close January 2025
   const janPeriod = periods.find(p => p.periodNumber === 1);
   assert.ok(janPeriod, 'January period must exist');
   assert.equal(financeService.getUnpostedJournalEntryCount(janPeriod!.startDate, janPeriod!.endDate), 0);
+  const legacyPartyBalances = (periodId: string, endDate: string) => {
+    const companyId = queryOne<{ companyId: string }>(
+      'SELECT company_id AS companyId FROM fiscal_periods WHERE id = ?',
+      [periodId],
+    )?.companyId || 'cmp_main';
+    for (const partyType of ['CUSTOMER', 'SUPPLIER'] as const) {
+      const accountCode = partyType === 'CUSTOMER' ? '1103' : '2101';
+      const rawBalance = Number(queryOne<{ balance: number }>(`
+        SELECT COALESCE(SUM(l.debit - l.credit), 0) AS balance
+        FROM journal_entry_lines l
+        JOIN journal_entries e ON e.id = l.entry_id
+        JOIN chart_of_accounts a ON a.id = l.account_id
+        WHERE a.code = ? AND e.is_posted = 1 AND e.date <= ?
+          AND COALESCE(e.company_id, 'cmp_main') = ?
+      `, [accountCode, endDate, companyId])?.balance || 0);
+      financeService.recordLegacySubledgerReconciliation(
+        periodId,
+        partyType,
+        partyType === 'CUSTOMER' ? rawBalance : -rawBalance,
+        `TEST-MANUAL-${periodId}-${partyType}`,
+      );
+    }
+  };
+  assert.equal(
+    financeService.getPeriodCloseChecklist(janPeriod!.id).find((check) => check.id === 'customer_subledger')?.status,
+    'FAIL',
+    'A period before subledger coverage must require documented manual matching',
+  );
+  legacyPartyBalances(janPeriod!.id, janPeriod!.endDate);
+  assert.ok(financeService.getPeriodCloseChecklist(janPeriod!.id).every((check) => check.passed));
 
   financeService.closePeriod(janPeriod!.id, 'محضر إقفال شهر يناير 2025');
   const updatedJan = queryOne<{ status: string }>(`SELECT status FROM fiscal_periods WHERE id = ?`, [janPeriod!.id]);
   assert.equal(updatedJan?.status, 'CLOSED', 'January period must be CLOSED');
+  const januaryReport = financeService.getPeriodCloseReport(janPeriod!.id);
+  assert.equal(januaryReport?.payload.legacyManualSubledgerMatches?.length, 2);
+  assert.equal(januaryReport?.payload.partySubledgerBalances?.length, 0);
 
   // Attempting to post another transaction dated in closed January should be rejected
   assert.throws(() => {
@@ -122,14 +155,57 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
   financeService.reopenPeriod(janPeriod!.id, 'تسوية محاسبية استثنائية بإذن الإدارة');
   const reopenedJan = queryOne<{ status: string }>(`SELECT status FROM fiscal_periods WHERE id = ?`, [janPeriod!.id]);
   assert.equal(reopenedJan?.status, 'OPEN', 'January period should be OPEN again');
+  db.run(`
+    INSERT INTO journal_entries (id, entry_number, date, description, total_debit, total_credit, is_posted, created_by)
+    VALUES ('jv_test_unposted_close', 'JV-TEST-UNPOSTED-CLOSE', '2025-01-25', 'قيد مراجعة غير مرحل', 0, 0, 0, ?)
+  `, [adminId]);
+  const unpostedCheck = financeService.getPeriodCloseChecklist(janPeriod!.id).find((check) => check.id === 'unposted');
+  assert.equal(unpostedCheck?.passed, false, 'The close checklist must report unposted entries');
+  assert.throws(() => financeService.closePeriod(janPeriod!.id), /غير مرح/);
+  assert.throws(() => db.run("UPDATE fiscal_periods SET status = 'CLOSED' WHERE id = ?", [janPeriod!.id]), /غير مرحلة/);
+  db.run("DELETE FROM journal_entries WHERE id = 'jv_test_unposted_close'");
 
-  // Year-end closing simulation
-  // Post sample revenue and expense in 2025
+  // Closing a later month must not lock an earlier open month.
+  const marchPeriod = periods.find((period) => period.periodNumber === 3);
+  assert.ok(marchPeriod, 'March period must exist');
+  legacyPartyBalances(marchPeriod!.id, marchPeriod!.endDate);
+  financeService.closePeriod(marchPeriod!.id, 'إقفال اختبار مارس قبل فبراير');
   postLedgerEntry(db.getDatabase(), {
-    date: '2025-06-15',
-    description: 'مبيعات منتصف السنة 2025',
-    referenceType: 'TEST_REV_2025',
-    referenceId: 'test_rev_2025',
+    date: '2025-02-20',
+    description: 'ترحيل في فبراير المفتوح بعد إقفال مارس',
+    referenceType: 'TEST_OPEN_PERIOD',
+    referenceId: 'test_open_feb_01',
+    createdBy: adminId,
+    lines: [
+      { accountCode: '1101', debit: 10, credit: 0 },
+      { accountCode: '3101', debit: 0, credit: 10 },
+    ],
+  });
+  financeService.reopenPeriod(marchPeriod!.id, 'استكمال اختبار الفترات غير المتتابعة');
+  postLedgerEntry(db.getDatabase(), {
+    date: '2025-03-20',
+    description: 'ترحيل بعد إعادة فتح مارس',
+    referenceType: 'TEST_REOPENED_PERIOD',
+    referenceId: 'test_reopened_mar_01',
+    createdBy: adminId,
+    lines: [
+      { accountCode: '1101', debit: 10, credit: 0 },
+      { accountCode: '3101', debit: 0, credit: 10 },
+    ],
+  });
+
+  // Annual close must reject an open year and then post a balanced profit close.
+  const closeYearId = financeService.createFiscalYear({
+    yearCode: 'FY2045CLOSE',
+    name: 'سنة اختبار الإقفال 2045',
+    startDate: '2045-01-01',
+    endDate: '2045-12-31',
+  });
+  postLedgerEntry(db.getDatabase(), {
+    date: '2045-06-15',
+    description: 'إيرادات اختبار الإقفال السنوي',
+    referenceType: 'TEST_REV_2045',
+    referenceId: 'test_rev_2045',
     createdBy: adminId,
     lines: [
       { accountCode: '1101', debit: 12000, credit: 0 },
@@ -137,24 +213,150 @@ test('5.5: Finance & Accounting Enterprise Lifecycle', async () => {
     ],
   });
   postLedgerEntry(db.getDatabase(), {
-    date: '2025-07-20',
-    description: 'مصروفات تشغيلية 2025',
-    referenceType: 'TEST_EXP_2025',
-    referenceId: 'test_exp_2025',
+    date: '2045-07-20',
+    description: 'مصروفات اختبار الإقفال السنوي',
+    referenceType: 'TEST_EXP_2045',
+    referenceId: 'test_exp_2045',
     createdBy: adminId,
     lines: [
       { accountCode: '5201', debit: 4000, credit: 0 },
       { accountCode: '1101', debit: 0, credit: 4000 },
     ],
   });
+  assert.throws(() => financeService.closeFiscalYear(closeYearId, '3102'), /إقفال كل فترة على حدة/);
+  assert.throws(() => db.run("UPDATE fiscal_years SET status = 'CLOSED' WHERE id = ?", [closeYearId]), /جميع فتراتها/);
 
-  // Close fiscal year
-  const closingEntryId = financeService.closeFiscalYear(fyId!, '3102');
+  const closeYearPeriods = financeService.getFiscalPeriods(closeYearId);
+  const march2045 = closeYearPeriods.find((period) => period.periodNumber === 3);
+  assert.ok(march2045);
+  db.run(`
+    INSERT OR REPLACE INTO finance_subledger_party_baselines
+      (company_id, party_type, party_id, balance, captured_at)
+    VALUES ('cmp_main', 'CUSTOMER', 'test_subledger_snapshot_customer', 0, '2045-01-01T00:00:00.000Z')
+  `);
+  financeService.closePeriod(march2045!.id);
+  const futureReport = financeService.getPeriodCloseReport(march2045!.id);
+  assert.equal(
+    futureReport?.payload.partySubledgerBalances?.some((balance) => balance.partyId === 'test_subledger_snapshot_customer'),
+    true,
+    'The approved close report must retain the party-level subledger snapshot',
+  );
+  assert.equal(Number(queryOne<{ count: number }>(`
+    SELECT COUNT(*) AS count FROM fiscal_period_subledger_snapshots
+    WHERE period_id = ? AND party_id = 'test_subledger_snapshot_customer'
+  `, [march2045!.id])?.count || 0), 1);
+  const february2045 = closeYearPeriods.find((period) => period.periodNumber === 2);
+  assert.ok(february2045);
+  postLedgerEntry(db.getDatabase(), {
+    date: '2045-02-20',
+    description: 'فبراير يظل متاحًا بعد إقفال مارس',
+    referenceType: 'TEST_OPEN_FEB_2045',
+    referenceId: 'test_open_feb_2045',
+    createdBy: adminId,
+    lines: [
+      { accountCode: '1101', debit: 1, credit: 0 },
+      { accountCode: '3101', debit: 0, credit: 1 },
+    ],
+  });
+  for (const period of closeYearPeriods) {
+    if (period.status === 'OPEN' && period.id !== march2045!.id) financeService.closePeriod(period.id);
+  }
+
+  const closingEntryId = financeService.closeFiscalYear(closeYearId, '3101');
   assert.ok(closingEntryId, 'Closing entry must be generated');
 
-  const closedFy = queryOne<{ status: string; closingEntryId: string }>(`SELECT status, closing_entry_id AS closingEntryId FROM fiscal_years WHERE id = ?`, [fyId!]);
+  const closedFy = queryOne<{ status: string; closingEntryId: string }>(`SELECT status, closing_entry_id AS closingEntryId FROM fiscal_years WHERE id = ?`, [closeYearId]);
   assert.equal(closedFy?.status, 'CLOSED', 'Fiscal year must be CLOSED');
   assert.equal(closedFy?.closingEntryId, closingEntryId);
+  const closingTotals = queryOne<{ debit: number; credit: number }>(
+    'SELECT SUM(debit) AS debit, SUM(credit) AS credit FROM journal_entry_lines WHERE entry_id = ?',
+    [closingEntryId]
+  );
+  assert.equal(closingTotals?.debit, closingTotals?.credit, 'Annual closing journal entry must balance');
+  const retainedEarningsLine = queryOne<{ debit: number; credit: number }>(`
+    SELECT l.debit, l.credit FROM journal_entry_lines l
+    JOIN chart_of_accounts a ON a.id = l.account_id
+    WHERE l.entry_id = ? AND a.code = '3101'
+  `, [closingEntryId]);
+  assert.equal(retainedEarningsLine?.debit, 0, 'Profit must not debit retained earnings');
+  assert.equal(retainedEarningsLine?.credit, 8000, 'Profit must credit retained earnings by net income');
+  assert.throws(() => postLedgerEntry(db.getDatabase(), {
+    date: '2045-12-30',
+    description: 'رفض ترحيل تشغيلي في سنة مقفلة',
+    referenceType: 'TEST_CLOSED_YEAR',
+    referenceId: 'test_closed_2045',
+    createdBy: adminId,
+    lines: [
+      { accountCode: '1101', debit: 1, credit: 0 },
+      { accountCode: '2101', debit: 0, credit: 1 },
+    ],
+  }), /فترة محاسبية مقفلة/);
+
+  const lossYearId = financeService.createFiscalYear({
+    yearCode: 'FY2046LOSS',
+    name: 'سنة اختبار الخسارة 2046',
+    startDate: '2046-01-01',
+    endDate: '2046-12-31',
+  });
+  postLedgerEntry(db.getDatabase(), {
+    date: '2046-04-15',
+    description: 'إيرادات سنة الخسارة',
+    referenceType: 'TEST_REV_2046',
+    referenceId: 'test_rev_2046',
+    createdBy: adminId,
+    lines: [
+      { accountCode: '1101', debit: 200, credit: 0 },
+      { accountCode: '4101', debit: 0, credit: 200 },
+    ],
+  });
+  postLedgerEntry(db.getDatabase(), {
+    date: '2046-05-15',
+    description: 'مصروفات سنة الخسارة',
+    referenceType: 'TEST_EXP_2046',
+    referenceId: 'test_exp_2046',
+    createdBy: adminId,
+    lines: [
+      { accountCode: '5201', debit: 600, credit: 0 },
+      { accountCode: '1101', debit: 0, credit: 600 },
+    ],
+  });
+  for (const period of financeService.getFiscalPeriods(lossYearId)) financeService.closePeriod(period.id);
+  const lossClosingEntryId = financeService.closeFiscalYear(lossYearId, '3101');
+  const retainedLossLine = queryOne<{ debit: number; credit: number }>(`
+    SELECT l.debit, l.credit FROM journal_entry_lines l
+    JOIN chart_of_accounts a ON a.id = l.account_id
+    WHERE l.entry_id = ? AND a.code = '3101'
+  `, [lossClosingEntryId]);
+  assert.equal(retainedLossLine?.debit, 400, 'Loss must debit retained earnings by net loss');
+  assert.equal(retainedLossLine?.credit, 0, 'Loss must not credit retained earnings');
+
+  const unassignedYearId = financeService.createFiscalYear({
+    yearCode: 'FY2047UNASSIGNED',
+    name: 'سنة اختبار الحركات غير المسندة',
+    startDate: '2047-01-01',
+    endDate: '2047-12-31',
+  });
+  const unassignedPeriod = financeService.getFiscalPeriods(unassignedYearId)[0];
+  assert.ok(unassignedPeriod);
+  assert.throws(() => db.executeTransaction((tx) => {
+    postLedgerEntry(tx.getDatabase(), {
+      date: '2047-01-15',
+      description: 'حركة مدينين غير مسندة لاختبار رقابة الإقفال',
+      referenceType: 'TEST_UNASSIGNED_RECEIVABLE',
+      referenceId: 'test_unassigned_receivable_2047',
+      createdBy: adminId,
+      lines: [
+        { accountCode: '1103', debit: 100, credit: 0 },
+        { accountCode: '4101', debit: 0, credit: 100 },
+      ],
+    });
+    const check = financeService.getPeriodCloseChecklist(unassignedPeriod!.id)
+      .find((item) => item.id === 'customer_subledger');
+    assert.equal(check?.status, 'FAIL');
+    assert.ok(check?.issues.some((issue) => issue.includes('غير مسندة')));
+    throw new Error('Rollback unassigned receivable test entry');
+  }), /Rollback unassigned receivable test entry/);
+  db.run('DELETE FROM fiscal_years WHERE id = ?', [unassignedYearId]);
 
   // ──────────────────────────────────────────────────────────
   // 3. Bank Accounts & Bank Reconciliation
@@ -534,17 +736,25 @@ test('fixed-asset transfer, depreciation, maintenance, disposal, and physical co
     'SELECT purchase_cost AS purchaseCost FROM fixed_assets WHERE id = ?', [asset.id]
   )?.purchaseCost, 1300);
 
+  const postingPeriod = queryOne<{ id: string; status: string }>(
+    'SELECT id, status FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date LIMIT 1',
+    [today, today]
+  );
+  if (postingPeriod) db.run("UPDATE fiscal_periods SET status = 'CLOSED' WHERE id = ?", [postingPeriod.id]);
   const priorClosedUntil = queryOne<{ value: string }>(
     "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
   )?.value;
-  db.run(
-    `INSERT INTO system_settings (key, value) VALUES ('accounting_closed_until_date', ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    [today]
-  );
+  if (!postingPeriod) {
+    db.run(
+      `INSERT INTO system_settings (key, value) VALUES ('accounting_closed_until_date', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [today]
+    );
+  }
   assert.throws(() => service.recordFixedAssetMaintenance({
     assetId: asset.id, date: today, type: 'صيانة', description: 'فترة مقفلة', cost: 10, treatment: 'OPERATIONAL',
-  }), /فترة محاسبية مغلقة/);
+  }), /فترة محاسبية/);
+  if (postingPeriod) db.run('UPDATE fiscal_periods SET status = ? WHERE id = ?', [postingPeriod.status, postingPeriod.id]);
   if (priorClosedUntil === undefined) db.run("DELETE FROM system_settings WHERE key = 'accounting_closed_until_date'");
   else db.run("UPDATE system_settings SET value = ? WHERE key = 'accounting_closed_until_date'", [priorClosedUntil]);
 

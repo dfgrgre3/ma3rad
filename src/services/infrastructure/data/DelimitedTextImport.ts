@@ -47,17 +47,26 @@ export const decodeDelimitedText = (bytes: Uint8Array): string => {
 };
 
 export const parseDelimitedText = (text: string, name: string): ParsedSpreadsheetSheet => {
-  const firstLine = text.split(/\r?\n/).find(line => line.trim());
+  const sampleLines = text.split(/\r?\n/).filter(line => line.trim()).slice(0, 20);
+  const firstLine = sampleLines[0];
   if (!firstLine) throw new Error('الملف لا يحتوي على صفوف بيانات.');
   const detectedDelimiter = DELIMITERS
-    .map(candidate => ({ candidate, count: countSeparators(firstLine, candidate) }))
-    .sort((left, right) => right.count - left.count)[0];
-  const delimiter = detectedDelimiter?.count ? detectedDelimiter.candidate : '\0';
+    .map(candidate => {
+      const counts = sampleLines.map(line => countSeparators(line, candidate)).filter(count => count > 0);
+      const frequencies = new Map<number, number>();
+      counts.forEach(count => frequencies.set(count, (frequencies.get(count) || 0) + 1));
+      const consistentRows = Math.max(0, ...frequencies.values());
+      const consistentColumns = Math.max(0, ...frequencies.keys());
+      return { candidate, score: consistentRows * 100 + consistentColumns };
+    })
+    .sort((left, right) => right.score - left.score)[0];
+  const delimiter = detectedDelimiter?.score ? detectedDelimiter.candidate : '\0';
 
   const matrix: string[][] = [];
   let row: string[] = [];
   let cell = '';
   let quoted = false;
+  let quotedFieldClosed = false;
   for (let index = 0; index < text.length; index++) {
     const character = text[index];
     if (quoted) {
@@ -66,20 +75,27 @@ export const parseDelimitedText = (text: string, name: string): ParsedSpreadshee
         index++;
       } else if (character === '"') {
         quoted = false;
+        quotedFieldClosed = true;
       } else {
         cell += character;
       }
-    } else if (character === '"' && cell.length === 0) {
+    } else if (character === '"' && !cell.trim()) {
+      cell = '';
       quoted = true;
+      quotedFieldClosed = false;
     } else if (character === delimiter) {
       row.push(cell);
       cell = '';
+      quotedFieldClosed = false;
     } else if (character === '\r' || character === '\n') {
       if (character === '\r' && text[index + 1] === '\n') index++;
       row.push(cell);
       if (row.some(value => value.trim())) matrix.push(row);
       row = [];
       cell = '';
+      quotedFieldClosed = false;
+    } else if (quotedFieldClosed) {
+      if (!/\s/.test(character)) throw new Error('توجد بيانات إضافية بعد إغلاق قيمة مقتبسة.');
     } else {
       cell += character;
     }
@@ -90,7 +106,8 @@ export const parseDelimitedText = (text: string, name: string): ParsedSpreadshee
   if (matrix.length < 2) throw new Error('الملف لا يحتوي على صفوف بيانات بعد العناوين.');
 
   const headers = matrix[0].map((header, index) => header.trim() || `حقل ${index + 1}`);
-  if (headers.length > MAX_SPREADSHEET_COLUMNS || new Set(headers).size !== headers.length) {
+  const normalizedHeaders = headers.map(header => header.toLocaleLowerCase());
+  if (headers.length > MAX_SPREADSHEET_COLUMNS || new Set(normalizedHeaders).size !== normalizedHeaders.length) {
     throw new Error(`عناوين الأعمدة غير صالحة أو تتجاوز الحد الأقصى (${MAX_SPREADSHEET_COLUMNS}).`);
   }
   const rows = matrix.slice(1);

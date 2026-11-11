@@ -11,6 +11,9 @@ import { BackupService } from '../src/services/infrastructure/backup/BackupServi
 import { encryptExternalBackup } from '../src/services/infrastructure/backup/backupEncryption.ts';
 import { parseAdminDataWorkbook } from '../src/pages/admin/admin/adminDataUtils.ts';
 import type { User } from '../src/types/auth/identity.ts';
+import { DataImportService } from '../src/services/domains/admin/DataImportService.ts';
+import { CategoryService } from '../src/services/domains/products/CategoryService.ts';
+import { BrandService } from '../src/services/domains/products/BrandService.ts';
 
 test('previews conflicts and merges XLSX and encrypted backup records', async () => {
   const db = DatabaseManager.getInstance();
@@ -132,4 +135,68 @@ test('previews conflicts and merges XLSX and encrypted backup records', async ()
     db.query<{ accountName: string }>(`SELECT account_name FROM data_import_test WHERE id = 'existing'`)[0].accountName,
     'بعد'
   );
+
+  const importer = new DataImportService();
+  const importedCustomer = importer.import(
+    importer.parseRows(['اسم العميل', 'الهاتف'], [{
+      'اسم العميل': `عميل دفعة ${Date.now()}`,
+      الهاتف: `09${Date.now().toString().slice(-8)}`,
+    }], 'customers'),
+    { allowInitialBalances: false, allowProductStock: false, sourceName: 'batch-rollback-test.xlsx' },
+  );
+  assert.equal(importedCustomer.created, 1);
+  assert.ok(importedCustomer.batchId);
+  const customerId = db.query<{ id: string }>(
+    'SELECT entity_id AS id FROM data_import_batch_records WHERE batch_id=?',
+    [importedCustomer.batchId],
+  )[0].id;
+  assert.equal(importer.getImportBatches('customers')[0].importedCount, 1);
+  db.run('UPDATE customers SET current_balance=10 WHERE id=?', [customerId]);
+  assert.throws(() => importer.rollbackImportBatch(importedCustomer.batchId!), /وجود رصيد حالي/);
+  db.run('UPDATE customers SET current_balance=0 WHERE id=?', [customerId]);
+  assert.equal(importer.rollbackImportBatch(importedCustomer.batchId!), 1);
+  assert.equal(db.query('SELECT id FROM customers WHERE id=?', [customerId]).length, 0);
+  assert.equal(importer.getImportBatches('customers')[0].status, 'ROLLED_BACK');
+
+  const suffix = Date.now().toString();
+  const category = new CategoryService().createCategory(`Import category ${suffix}`);
+  const brand = new BrandService().createBrand(`Import brand ${suffix}`);
+  const productImportData = importer.parseRows([
+    'الكود', 'اسم الصنف', 'التصنيف', 'الماركة', 'المقاس',
+    'قطع بالكرتونة', 'متر/كرتونة', 'سعر التكلفة', 'سعر البيع',
+    'رصيد افتتاحي بالمتر',
+  ], [{
+    الكود: `SKU-${suffix}`,
+    'اسم الصنف': `منتج دفعة ${suffix}`,
+    التصنيف: category.name,
+    الماركة: brand.name,
+    المقاس: '60x60',
+    'قطع بالكرتونة': 4,
+    'متر/كرتونة': 1.44,
+    'سعر التكلفة': 100,
+    'سعر البيع': 150,
+    'رصيد افتتاحي بالمتر': 5,
+  }], 'products');
+  const missingWarehouse = importer.import(productImportData, {
+    allowInitialBalances: false,
+    allowProductStock: true,
+    sourceName: 'product-stock-without-warehouse.xlsx',
+  });
+  assert.equal(missingWarehouse.created, 0);
+  assert.match(missingWarehouse.errors[0].messages[0], /اختر مخزنًا نشطًا يدويًا/);
+
+  const importedProduct = importer.import(productImportData, {
+    allowInitialBalances: false,
+    allowProductStock: false,
+    sourceName: 'product-batch-test.xlsx',
+  });
+  assert.equal(importedProduct.created, 1);
+  assert.ok(importedProduct.batchId);
+  const productId = db.query<{ id: string }>(
+    'SELECT entity_id AS id FROM data_import_batch_records WHERE batch_id=?',
+    [importedProduct.batchId],
+  )[0].id;
+  assert.equal(importer.getImportBatches('products')[0].importedCount, 1);
+  assert.equal(importer.rollbackImportBatch(importedProduct.batchId!), 1);
+  assert.equal(db.query('SELECT id FROM products WHERE id=?', [productId]).length, 0);
 });

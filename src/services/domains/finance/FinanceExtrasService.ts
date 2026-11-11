@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
-import { paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../../../database/repositories/ledger';
+import { assertLedgerDateOpenForPosting, paymentAccountCode, postLedgerEntry, reverseLedgerEntry } from '../../../database/repositories/ledger';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { inclusiveReturnTaxSql, returnTaxSql } from './financials';
 
@@ -180,15 +180,7 @@ export class FinanceExtrasService {
     if (!validDate(date) || (date > localDateString() && !(allowCurrentMonthEnd && date.slice(0, 7) === currentPeriod))) {
       throw new Error('تاريخ الترحيل غير صالح أو يقع في المستقبل.');
     }
-    const closedDate = this.db.query<{ value: string }>(
-      "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
-    )[0]?.value;
-    if (closedDate && date <= closedDate) throw new Error('لا يمكن الترحيل في فترة محاسبية مغلقة.');
-    const period = this.db.query<{ name: string; status: string }>(
-      "SELECT name, status FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date AND status IN ('CLOSED', 'LOCKED') LIMIT 1",
-      [date, date]
-    )[0];
-    if (period) throw new Error(`لا يمكن الترحيل في فترة محاسبية مقفلة: ${period.name} (${period.status}).`);
+    assertLedgerDateOpenForPosting(this.db.getDatabase(), date);
   }
 
   // ─── Chart of accounts ──────────────────────────────────────────────────────
@@ -1367,16 +1359,66 @@ export class FinanceExtrasService {
     );
   }
 
+  private ensureFixedAssetCountSnapshotColumns(): void {
+    const columns = this.db.query<{ name: string }>('PRAGMA table_info(fixed_asset_count_snapshots)');
+    const names = new Set(columns.map((column) => String(column.name ?? '')));
+
+    if (!names.has('registered_status')) {
+      this.db.executeTransaction((db) => {
+        db.run("ALTER TABLE fixed_asset_count_snapshots ADD COLUMN registered_status TEXT NOT NULL DEFAULT 'UNKNOWN'");
+      });
+    }
+    if (!names.has('registered_location')) {
+      this.db.executeTransaction((db) => {
+        db.run('ALTER TABLE fixed_asset_count_snapshots ADD COLUMN registered_location TEXT');
+      });
+    }
+
+    this.db.executeTransaction((db) => {
+      db.run(
+        `UPDATE fixed_asset_count_snapshots
+         SET registered_status = (
+           SELECT fa.status FROM fixed_assets fa WHERE fa.id = fixed_asset_count_snapshots.asset_id
+         )
+         WHERE registered_status IS NULL OR registered_status = ''`,
+      );
+      db.run(
+        `UPDATE fixed_asset_count_snapshots
+         SET registered_location = (
+           SELECT fa.location FROM fixed_assets fa WHERE fa.id = fixed_asset_count_snapshots.asset_id
+         )
+         WHERE registered_location IS NULL`,
+      );
+    });
+  }
+
   getFixedAssetCountSnapshots(campaignId: string): FixedAssetCountSnapshot[] {
     const actor = this.requireView();
     const campaign = this.db.query<FixedAssetCountCampaign>('SELECT * FROM fixed_asset_count_campaigns WHERE id = ?', [campaignId])[0];
     if (!campaign) throw new Error('حملة الجرد غير موجودة.');
     const allowed = this.branchAccess.getAccessibleBranchIds(actor);
     if (allowed !== null && !allowed.includes(campaign.branchId)) throw new Error('ليس لديك صلاحية الوصول إلى حملة الجرد.');
+
+    const getSnapshotColumns = () => {
+      const snapshotColumns = this.db.query<{ name: string }>('PRAGMA table_info(fixed_asset_count_snapshots)');
+      return {
+        hasRegisteredStatus: snapshotColumns.some((column) => String(column.name) === 'registered_status'),
+        hasRegisteredLocation: snapshotColumns.some((column) => String(column.name) === 'registered_location'),
+      };
+    };
+
+    let snapshotColumns = getSnapshotColumns();
+    if (!snapshotColumns.hasRegisteredStatus || !snapshotColumns.hasRegisteredLocation) {
+      this.ensureFixedAssetCountSnapshotColumns();
+      snapshotColumns = getSnapshotColumns();
+    }
+
+    const { hasRegisteredStatus, hasRegisteredLocation } = snapshotColumns;
+
     return this.db.query<FixedAssetCountSnapshot>(
       `SELECT s.asset_id AS assetId, s.asset_code AS assetCode, s.asset_name AS assetName,
-              s.registered_status AS registeredStatus,
-              s.registered_location AS registeredLocation,
+              ${hasRegisteredStatus ? 's.registered_status' : '(SELECT fa.status FROM fixed_assets fa WHERE fa.id = s.asset_id)'} AS registeredStatus,
+              ${hasRegisteredLocation ? 's.registered_location' : '(SELECT fa.location FROM fixed_assets fa WHERE fa.id = s.asset_id)'} AS registeredLocation,
               EXISTS (SELECT 1 FROM fixed_asset_count_observations o
                 WHERE o.campaign_id = s.campaign_id AND o.asset_id = s.asset_id AND o.count_status = 'FOUND') AS observed
        FROM fixed_asset_count_snapshots s WHERE s.campaign_id = ? ORDER BY s.asset_code`,
@@ -1404,6 +1446,8 @@ export class FinanceExtrasService {
     if (!this.db.query('SELECT id FROM branches WHERE id = ? AND is_active = 1', [input.branchId]).length ||
         (allowed !== null && !allowed.includes(input.branchId))) throw new Error('الفرع غير متاح أو خارج نطاق صلاحيتك.');
     if (!validDate(input.date)) throw new Error('تاريخ الجرد غير صحيح.');
+    this.ensureFixedAssetCountSnapshotColumns();
+
     const campaignId = `fac_${uuidv4().substring(0, 8)}`;
     const location = input.location?.trim() || null;
     this.db.executeTransaction((db) => {

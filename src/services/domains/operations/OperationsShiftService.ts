@@ -214,6 +214,16 @@ export interface OperationEmployee {
   status: string;
 }
 
+export type ShiftPayrollRow = {
+  employeeId: string; employeeName: string; employeeCode: string; branchId: string;
+  date: string; shiftId: string; shiftNumber: string; shiftName: string;
+  scheduledStart: string; scheduledEnd: string;
+  checkInAt: string | null; checkOutAt: string | null;
+  status: 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE';
+  lateMinutes: number; overtimeMinutes: number; workedMinutes: number;
+  isApprovedOvertime: boolean;
+};
+
 export interface OperationShiftAssignmentRow {
   id: string;
   definitionId: string;
@@ -2057,5 +2067,119 @@ export class OperationsShiftService {
   /** Cashier page helper: link a cash drawer shift to the branch's current operations shift. */
   public getLinkableOpenShift(branchId: string): OperationShiftInstance | null {
     return this.getOpenShiftForBranch(branchId);
+  }
+
+  /* ========== ربط الورديات بالحضور والرواتب (Payroll Integration) ========== */
+
+  public getShiftAttendanceForPayroll(options: {
+    from: string; to: string; branchId?: string;
+  }): ShiftPayrollRow[] {
+    const actor = this.requireView();
+    const targetBranch = options.branchId || this.branchAccess.getCurrentBranchId(actor);
+    this.branchAccess.requireBranchAccess(targetBranch, actor);
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(options.from) || !/^\d{4}-\d{2}-\d{2}$/.test(options.to)) {
+      throw new Error('نطاق التواريخ غير صالح.');
+    }
+    if (options.to < options.from) {
+      throw new Error('تاريخ النهاية يجب أن يكون بعد تاريخ البداية.');
+    }
+
+    const rows = this.db.query<any>(`
+      SELECT st.employee_id AS employeeId, e.name AS employeeName, e.code AS employeeCode,
+             e.branch_id AS branchId, os.business_date AS date, os.id AS shiftId,
+             os.shift_number AS shiftNumber, d.name AS shiftName,
+             os.scheduled_start AS scheduledStart, os.scheduled_end AS scheduledEnd,
+             st.check_in_at AS checkInAt, st.check_out_at AS checkOutAt,
+             st.status, st.late_minutes AS lateMinutes, st.overtime_minutes AS overtimeMinutes,
+             COALESCE(st.worked_minutes, 0) AS workedMinutes,
+             COALESCE(st.overtime_approved, 0) AS isApprovedOvertime
+      FROM operation_shift_staff st
+      JOIN operation_shifts os ON os.id = st.operation_shift_id
+      JOIN employees e ON e.id = st.employee_id
+      JOIN attendance_shifts d ON d.id = os.definition_id
+      WHERE os.branch_id = ? AND os.business_date BETWEEN ? AND ?
+      ORDER BY e.name, os.business_date, os.scheduled_start
+    `, [targetBranch, options.from, options.to]);
+
+    return rows.map((row) => ({
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      employeeCode: row.employeeCode,
+      branchId: row.branchId,
+      date: row.date,
+      shiftId: row.shiftId,
+      shiftNumber: row.shiftNumber,
+      shiftName: row.shiftName,
+      scheduledStart: row.scheduledStart,
+      scheduledEnd: row.scheduledEnd,
+      checkInAt: row.checkInAt,
+      checkOutAt: row.checkOutAt,
+      status: row.status,
+      lateMinutes: Number(row.lateMinutes) || 0,
+      overtimeMinutes: Number(row.overtimeMinutes) || 0,
+      workedMinutes: Number(row.workedMinutes) || 0,
+      isApprovedOvertime: Boolean(row.isApprovedOvertime),
+    }));
+  }
+
+  public getEmployeeShiftSummary(employeeId: string, options: {
+    from: string; to: string; branchId?: string;
+  }): {
+    employeeId: string; employeeName: string; branchId: string;
+    totalShifts: number; presentShifts: number; lateShifts: number; absentShifts: number;
+    totalWorkedMinutes: number; totalLateMinutes: number; totalOvertimeMinutes: number;
+    approvedOvertimeMinutes: number;
+  } {
+    const actor = this.requireView();
+    const targetBranch = options.branchId || this.branchAccess.getCurrentBranchId(actor);
+    this.branchAccess.requireBranchAccess(targetBranch, actor);
+
+    const employee = this.db.query<{ id: string; name: string; branch_id: string }>(
+      'SELECT id, name, branch_id AS branchId FROM employees WHERE id = ? AND status != ?',
+      [employeeId, 'SUSPENDED']
+    )[0];
+    if (!employee) throw new Error('الموظف غير موجود.');
+    if (employee.branch_id !== targetBranch) throw new Error('الموظف لا يتبع الفرع المحدد.');
+
+    const rows = this.db.query<any>(`
+      SELECT st.status, COALESCE(st.worked_minutes, 0) AS workedMinutes,
+             COALESCE(st.late_minutes, 0) AS lateMinutes,
+             COALESCE(st.overtime_minutes, 0) AS overtimeMinutes,
+             COALESCE(st.overtime_approved, 0) AS approvedOvertime
+      FROM operation_shift_staff st
+      JOIN operation_shifts os ON os.id = st.operation_shift_id
+      WHERE st.employee_id = ? AND os.branch_id = ?
+        AND os.business_date BETWEEN ? AND ?
+    `, [employeeId, targetBranch, options.from, options.to]);
+
+    let totalShifts = 0;
+    let presentShifts = 0;
+    let lateShifts = 0;
+    let absentShifts = 0;
+    let totalWorkedMinutes = 0;
+    let totalLateMinutes = 0;
+    let totalOvertimeMinutes = 0;
+    let approvedOvertimeMinutes = 0;
+
+    for (const row of rows) {
+      totalShifts += 1;
+      switch (row.status) {
+        case 'PRESENT': presentShifts += 1; break;
+        case 'LATE': lateShifts += 1; break;
+        case 'ABSENT': absentShifts += 1; break;
+        case 'LEAVE': absentShifts += 1; break;
+      }
+      totalWorkedMinutes += Number(row.workedMinutes) || 0;
+      totalLateMinutes += Number(row.lateMinutes) || 0;
+      totalOvertimeMinutes += Number(row.overtimeMinutes) || 0;
+      approvedOvertimeMinutes += Number(row.approvedOvertime) || 0;
+    }
+
+    return {
+      employeeId, employeeName: employee.name, branchId: employee.branch_id,
+      totalShifts, presentShifts, lateShifts, absentShifts,
+      totalWorkedMinutes, totalLateMinutes, totalOvertimeMinutes, approvedOvertimeMinutes,
+    };
   }
 }

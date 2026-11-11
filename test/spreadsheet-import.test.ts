@@ -34,6 +34,25 @@ test('spreadsheet import validates extension, file size, and file signature befo
   assert.equal(parsed.sheets[0].rows.length, 1);
 });
 
+test('CSV import detects semicolon delimiters and preserves quoted multiline and empty values', () => {
+  const csv = [
+    'Name;Address;Notes',
+    ' "Tile" ;"Road; 12";"line one',
+    'line two"',
+    'Stone;;',
+  ].join('\r\n');
+  const parsed = parseSpreadsheetBuffer(toArrayBuffer(new TextEncoder().encode(csv)), 'catalog.csv');
+  assert.deepEqual(parsed.sheets[0].headers, ['Name', 'Address', 'Notes']);
+  assert.deepEqual(parsed.sheets[0].rows, [
+    { Name: 'Tile', Address: 'Road; 12', Notes: 'line one\r\nline two' },
+    { Name: 'Stone', Address: '', Notes: '' },
+  ]);
+  assert.throws(
+    () => parseSpreadsheetBuffer(toArrayBuffer(new TextEncoder().encode('Name,name\nA,B')), 'duplicate.csv'),
+    /عناوين الأعمدة غير صالحة/,
+  );
+});
+
 test('PDF text parsing creates reviewable tabular, labeled, and generic rows', () => {
   const table = parsePdfExtractedText('الكود\tاسم الصنف\tالسعر\nA1\tبلاط\t250\nB2\tرخام\t500', 'قائمة');
   assert.deepEqual(table.headers, ['الكود', 'اسم الصنف', 'السعر']);
@@ -49,6 +68,18 @@ test('PDF text parsing creates reviewable tabular, labeled, and generic rows', (
   const generic = parsePdfExtractedText('ملاحظة أولى\nملاحظة ثانية', 'ملاحظات');
   assert.deepEqual(generic.headers, ['النص المستخرج']);
   assert.equal(generic.rows.length, 2);
+});
+
+test('PDF table parsing retains empty cells and skips Markdown separators', () => {
+  const table = parsePdfExtractedText(
+    '| SKU | Name | Price |\n| --- | --- | --- |\n| A1 |  | 250 |\n| B2 | Tile |  |',
+    'قائمة',
+  );
+  assert.deepEqual(table.headers, ['SKU', 'Name', 'Price']);
+  assert.deepEqual(table.rows, [
+    { SKU: 'A1', Name: '', Price: '250' },
+    { SKU: 'B2', Name: 'Tile', Price: '' },
+  ]);
 });
 
 test('spreadsheet import rejects worksheet row and column ranges beyond configured limits', () => {
@@ -84,6 +115,24 @@ test('data import validation reports duplicate customer codes and invalid openin
     { row: 2, messages: ['الرصيد الافتتاحي غير صالح'] },
     { row: 3, messages: ['سجل مكرر داخل الملف'] },
   ]);
+});
+
+test('multi-sheet workbooks are mapped to ERP entities independently', () => {
+  const service = new DataImportService();
+  const sheets = service.parseSheets([
+    {
+      name: 'العملاء',
+      headers: ['اسم العميل', 'الهاتف', 'الرقم القومي', 'حد الائتمان'],
+      rows: [{ 'اسم العميل': 'عميل', الهاتف: '0100', 'الرقم القومي': '123', 'حد الائتمان': 500 }],
+    },
+    {
+      name: 'التصنيفات',
+      headers: ['اسم التصنيف'],
+      rows: [{ 'اسم التصنيف': 'سيراميك' }],
+    },
+  ]);
+  assert.deepEqual(sheets.map(item => item.data.entity), ['customers', 'categories']);
+  assert.deepEqual(sheets.map(item => item.sheet.name), ['العملاء', 'التصنيفات']);
 });
 
 test('data import validation checks positive product measurements and duplicate SKUs', () => {

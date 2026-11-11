@@ -149,6 +149,93 @@ export function paymentAccountCode(paymentType: string): string {
   }
 }
 
+export function assertLedgerDateOpenForPosting(db: Database, date: string): void {
+  const closedFiscalPeriod = queryLedgerRows<{ name: string; status: string }>(
+    db,
+    "SELECT name, status FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date AND status IN ('CLOSED', 'LOCKED') LIMIT 1",
+    [date, date]
+  )[0];
+  if (closedFiscalPeriod) {
+    throw new Error(`لا يمكن الترحيل في فترة محاسبية مقفلة: ${closedFiscalPeriod.name} (${closedFiscalPeriod.status}).`);
+  }
+
+  const definedPeriod = queryLedgerRows<{ id: string }>(
+    db,
+    'SELECT id FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date LIMIT 1',
+    [date, date]
+  )[0];
+  if (!definedPeriod) {
+    const closedPeriodRow = queryLedgerRows<{ value: string }>(
+      db,
+      "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
+    )[0];
+    if (closedPeriodRow?.value && date <= closedPeriodRow.value) {
+      throw new Error(`لا يمكن الترحيل في فترة محاسبية مغلقة (الفترة مغلقة حتى تاريخ: ${closedPeriodRow.value}).`);
+    }
+  }
+}
+
+function resolvePostingParty(
+  db: Database,
+  referenceType: string,
+  referenceId: string,
+): { partyType: 'CUSTOMER' | 'SUPPLIER'; partyId: string } | null {
+  const sourceId = referenceId.split(':', 1)[0];
+  let matches: Array<{ partyType: 'CUSTOMER' | 'SUPPLIER'; partyId: string }> = [];
+  switch (referenceType) {
+    case 'SALES_INVOICE':
+    case 'SALES_VOID':
+      matches = queryLedgerRows<{ partyId: string }>(db,
+        'SELECT customer_id AS partyId FROM sales_invoices WHERE id = ?', [sourceId])
+        .map((row) => ({ partyType: 'CUSTOMER', partyId: row.partyId }));
+      break;
+    case 'SALES_RETURN':
+      matches = queryLedgerRows<{ partyId: string }>(db,
+        'SELECT customer_id AS partyId FROM sales_returns WHERE id = ?', [sourceId])
+        .map((row) => ({ partyType: 'CUSTOMER', partyId: row.partyId }));
+      break;
+    case 'CUSTOMER_PAYMENT':
+    case 'CUSTOMER_PAYMENT_VOID':
+    case 'CUSTOMER_PAYMENT_GROUP':
+    case 'CUSTOMER_PAYMENT_GROUP_VOID':
+      matches = queryLedgerRows<{ partyId: string }>(db, `
+        SELECT DISTINCT customer_id AS partyId FROM customer_payments
+        WHERE id = ? OR payment_group_id = ?
+      `, [sourceId, sourceId]).map((row) => ({ partyType: 'CUSTOMER', partyId: row.partyId }));
+      break;
+    case 'PURCHASE_INVOICE':
+    case 'PURCHASE_VOID':
+      matches = queryLedgerRows<{ partyId: string }>(db,
+        'SELECT supplier_id AS partyId FROM purchase_invoices WHERE id = ?', [sourceId])
+        .map((row) => ({ partyType: 'SUPPLIER', partyId: row.partyId }));
+      break;
+    case 'PURCHASE_RETURN':
+      matches = queryLedgerRows<{ partyId: string }>(db,
+        'SELECT supplier_id AS partyId FROM purchase_returns WHERE id = ?', [sourceId])
+        .map((row) => ({ partyType: 'SUPPLIER', partyId: row.partyId }));
+      break;
+    case 'SUPPLIER_PAYMENT':
+    case 'SUPPLIER_PAYMENT_VOID':
+      matches = queryLedgerRows<{ partyId: string }>(db,
+        'SELECT supplier_id AS partyId FROM supplier_payments WHERE id = ?', [sourceId])
+        .map((row) => ({ partyType: 'SUPPLIER', partyId: row.partyId }));
+      break;
+    case 'CHEQUE_CLEARANCE':
+    case 'CHEQUE_PAYABLE_CLEARANCE':
+    case 'CHEQUE_BOUNCE':
+      matches = queryLedgerRows<{ partyType: 'CUSTOMER' | 'SUPPLIER'; partyId: string }>(db, `
+        SELECT party_type AS partyType, party_id AS partyId
+        FROM cheques
+        WHERE id = ? AND party_type IN ('CUSTOMER', 'SUPPLIER') AND party_id IS NOT NULL
+      `, [sourceId]);
+      break;
+    default:
+      break;
+  }
+  const unique = [...new Map(matches.map((match) => [`${match.partyType}:${match.partyId}`, match])).values()];
+  return unique.length === 1 ? unique[0] : null;
+}
+
 export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
   const prior = queryLedgerRows<{ id: string }>(
     db,
@@ -165,24 +252,39 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
     throw new Error('Ledger posting metadata is incomplete.');
   }
 
-  // Enforce fiscal period closing: prevent postings to locked/closed financial periods
-  const closedPeriodRow = queryLedgerRows<{ value: string }>(
-    db,
-    "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
-  )[0];
-  if (closedPeriodRow?.value && posting.date <= closedPeriodRow.value) {
-    throw new Error(`لا يمكن الترحيل في فترة محاسبية مغلقة (الفترة مغلقة حتى تاريخ: ${closedPeriodRow.value}).`);
-  }
-
-  // Enforce period lock from fiscal_periods table if present
   const closedFiscalPeriod = queryLedgerRows<{ name: string; status: string }>(
     db,
-    "SELECT name, status FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date AND status IN ('CLOSED', 'LOCKED') LIMIT 1",
+    `SELECT name, status FROM fiscal_periods
+     WHERE ? >= start_date AND ? <= end_date
+       AND (status IN ('CLOSED', 'LOCKED') OR workflow_state IN ('CLOSED', 'LOCKED'))
+     LIMIT 1`,
     [posting.date, posting.date]
   )[0];
-  if (closedFiscalPeriod) {
+  if (closedFiscalPeriod && posting.referenceType === 'YEAR_END_CLOSE') {
+    const authorizedYearEndClose = queryLedgerRows<{ id: string }>(db, `
+      SELECT fy.id
+      FROM fiscal_years fy
+      WHERE fy.id = ? AND fy.status = 'OPEN' AND fy.end_date = ?
+        AND EXISTS (
+          SELECT 1 FROM fiscal_periods fp
+          WHERE fp.fiscal_year_id = fy.id AND ? BETWEEN fp.start_date AND fp.end_date
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM fiscal_periods fp
+          WHERE fp.fiscal_year_id = fy.id AND fp.status = 'OPEN'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM journal_entries e
+          WHERE e.date >= fy.start_date AND e.date <= fy.end_date AND e.is_posted = 0
+        )
+    `, [posting.referenceId, posting.date, posting.date])[0];
+    if (!authorizedYearEndClose) {
+      throw new Error('لا يمكن ترحيل قيد إقفال سنوي إلا في نهاية سنة مفتوحة بعد إقفال جميع فتراتها.');
+    }
+  } else if (closedFiscalPeriod) {
     throw new Error(`لا يمكن الترحيل في فترة محاسبية مقفلة: ${closedFiscalPeriod.name} (${closedFiscalPeriod.status}).`);
   }
+  if (!closedFiscalPeriod) assertLedgerDateOpenForPosting(db, posting.date);
 
   const lines = posting.lines.map((line) => {
     const debit = Number(line.debit);
@@ -243,6 +345,40 @@ export function postLedgerEntry(db: Database, posting: LedgerPosting): string {
       round2(line.debit - line.credit),
       line.accountId,
     ]);
+  }
+
+  const subledgerInitialized = queryLedgerRows<{ name: string }>(db, `
+    SELECT name FROM sqlite_master
+    WHERE type = 'table' AND name = 'finance_subledger_coverage'
+  `).length > 0;
+  const coverage = subledgerInitialized
+    ? queryLedgerRows<{ coverageStartDate: string; cutoffEntryRowid: number }>(db, `
+        SELECT coverage_start_date AS coverageStartDate, cutoff_entry_rowid AS cutoffEntryRowid
+        FROM finance_subledger_coverage WHERE id = 1
+      `)[0]
+    : undefined;
+  const party = resolvePostingParty(db, posting.referenceType, posting.referenceId);
+  if (coverage && party) {
+    const accountCode = party.partyType === 'CUSTOMER' ? '1103' : '2101';
+    const movement = lines
+      .filter((line) => line.accountCode === accountCode)
+      .reduce((sum, line) => sum + (accountCode === '1103'
+        ? line.debit - line.credit
+        : line.credit - line.debit), 0);
+    if (cents(movement) !== 0) {
+      db.run(`
+        INSERT OR IGNORE INTO finance_subledger_events (
+          id, journal_entry_id, company_id, party_type, party_id, account_code, amount,
+          effective_date, reference_type, reference_id
+        )
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        WHERE ? >= ?
+      `, [
+        `sble_${uuidv4().slice(0, 12)}`, entryId, companyId, party.partyType, party.partyId, accountCode,
+        round2(movement), posting.date, posting.referenceType, posting.referenceId,
+        posting.date, coverage.coverageStartDate,
+      ]);
+    }
   }
 
   return entryId;

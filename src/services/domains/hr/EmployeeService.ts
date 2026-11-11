@@ -11,6 +11,7 @@ import { AttendanceService } from './AttendanceService';
 import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { AttendanceTimeService } from './AttendanceTimeService';
 import { PayrollTaxService } from './PayrollTaxService';
+import { PayrollSocialInsuranceService } from './PayrollSocialInsuranceService';
 import type { PayrollTaxBasis, PayrollTaxBreakdownLine, PayrollTaxSource } from './PayrollTaxService';
 
 export type EmployeeStatus = 'PROBATION' | 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'RESIGNED' | 'TERMINATED';
@@ -186,6 +187,10 @@ export interface PayrollRunItem {
   manualDeductionAmount: number;
   attendanceDeductionAmount: number;
   taxAmount: number;
+  socialInsuranceBase: number;
+  socialInsuranceEmployeeShare: number;
+  socialInsuranceEmployerShare: number;
+  socialInsuranceTotal: number;
   grossAmount: number;
   netAmount: number;
   warnings: string[];
@@ -218,6 +223,12 @@ export interface PayrollRunItem {
     taxDependentAllowance?: number;
     taxDependents?: number;
     taxBreakdown?: PayrollTaxBreakdownLine[];
+    socialInsuranceRuleId?: string | null;
+    socialInsuranceRuleName?: string | null;
+    socialInsuranceCeilingApplied?: boolean;
+    endOfServiceBenefit?: number;
+    endOfServiceRuleId?: string | null;
+    endOfServiceRuleName?: string | null;
   };
   payoutTransactionId: string | null;
 }
@@ -1348,6 +1359,10 @@ export class EmployeeService {
               allowance_amount AS allowanceAmount, loan_deduction_amount AS loanDeductionAmount,
               advance_amount AS advanceAmount, manual_deduction_amount AS manualDeductionAmount,
               attendance_deduction_amount AS attendanceDeductionAmount, tax_amount AS taxAmount,
+              social_insurance_base AS socialInsuranceBase,
+              social_insurance_employee_share AS socialInsuranceEmployeeShare,
+              social_insurance_employer_share AS socialInsuranceEmployerShare,
+              social_insurance_total AS socialInsuranceTotal,
               gross_amount AS grossAmount, net_amount AS netAmount, warning_json AS warningJson,
               detail_json AS detailJson, payout_transaction_id AS payoutTransactionId,
               payment_method AS paymentMethod, payment_reference AS paymentReference,
@@ -1613,8 +1628,20 @@ export class EmployeeService {
         legacyRate: Number(taxRate) || 0,
       });
       const taxAmount = tax.taxAmount;
+
+      // Social insurance calculation (Egyptian tamkeen)
+      const socialInsurance = PayrollSocialInsuranceService.calculateSocialInsurance(
+        employee.companyId || 'cmp_main',
+        periodEnd,
+        grossAmount
+      );
+      const socialInsuranceBase = socialInsurance.contributionBase;
+      const socialInsuranceEmployeeShare = socialInsurance.employeeShareAmount;
+      const socialInsuranceEmployerShare = socialInsurance.employerShareAmount;
+      const socialInsuranceTotal = socialInsurance.totalAmount;
+
       const netAmount = roundMoney(
-        grossAmount - attendanceDeductionAmount - manualDeductionAmount - advanceAmount - previousPayoutAmount - taxAmount - loanDeductionAmount
+        grossAmount - attendanceDeductionAmount - manualDeductionAmount - advanceAmount - previousPayoutAmount - taxAmount - loanDeductionAmount - socialInsuranceEmployeeShare
       );
 
       if (!employee.contractSalary && !employee.hasContractHistory && salaryType !== 'DAILY') warnings.push('لا يوجد عقد نشط يغطي الفترة؛ استُخدم الراتب الأساسي المسجل.');
@@ -1653,6 +1680,10 @@ export class EmployeeService {
           manualDeductionAmount,
           attendanceDeductionAmount,
           taxAmount,
+          socialInsuranceBase,
+          socialInsuranceEmployeeShare,
+          socialInsuranceEmployerShare,
+          socialInsuranceTotal,
           grossAmount,
           netAmount,
           warnings,
@@ -1687,6 +1718,9 @@ export class EmployeeService {
             taxDependentAllowance: tax.dependentAllowanceAmount,
             taxDependents: tax.dependents,
             taxBreakdown: tax.lines,
+            socialInsuranceRuleId: socialInsurance.ruleId,
+            socialInsuranceRuleName: socialInsurance.ruleName,
+            socialInsuranceCeilingApplied: socialInsurance.ceilingApplied,
           },
           payoutTransactionId: null,
         },
@@ -1714,15 +1748,17 @@ export class EmployeeService {
              expected_workdays, absent_days, unpaid_leave_days, late_minutes, overtime_minutes,
              base_amount, overtime_amount, bonus_amount, commission_amount, allowance_amount,
              loan_deduction_amount, advance_amount,
-             manual_deduction_amount, attendance_deduction_amount, tax_amount, gross_amount,
-             net_amount, warning_json, detail_json, payment_method, payout_status
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             manual_deduction_amount, attendance_deduction_amount, tax_amount,
+             social_insurance_base, social_insurance_employee_share, social_insurance_employer_share, social_insurance_total,
+             gross_amount, net_amount, warning_json, detail_json, payment_method, payout_status
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             item.id, existingRunId, item.employeeId, item.branchId, item.employeeName, item.salaryType,
             item.baseSalary, item.expectedWorkdays, item.absentDays, item.unpaidLeaveDays, item.lateMinutes,
             item.overtimeMinutes, item.baseAmount, item.overtimeAmount, item.bonusAmount, item.commissionAmount,
             item.allowanceAmount, item.loanDeductionAmount, item.advanceAmount,
             item.manualDeductionAmount, item.attendanceDeductionAmount, item.taxAmount,
+            item.socialInsuranceBase, item.socialInsuranceEmployeeShare, item.socialInsuranceEmployerShare, item.socialInsuranceTotal,
             item.grossAmount, item.netAmount, JSON.stringify(item.warnings), JSON.stringify(item.details),
             item.paymentMethod, item.payoutStatus,
           ]
@@ -1820,6 +1856,21 @@ export class EmployeeService {
             lines: [
               { accountCode: '2104', debit: item.taxAmount, credit: 0 },
               { accountCode: '2106', debit: 0, credit: item.taxAmount },
+            ],
+          });
+        }
+        if (item.socialInsuranceTotal > 0) {
+          postLedgerEntry(db.getDatabase(), {
+            date: `${run.period}-01`,
+            description: `Social insurance contributions for ${item.employeeName} (${run.period})`,
+            referenceType: 'PAYROLL_RUN_SOCIAL_INSURANCE',
+            referenceId,
+            createdBy: actor.id,
+            branchId: item.branchId,
+            lines: [
+              { accountCode: '2104', debit: item.socialInsuranceEmployeeShare, credit: 0 },
+              { accountCode: '5203', debit: item.socialInsuranceEmployerShare, credit: 0 },
+              { accountCode: '2107', debit: 0, credit: item.socialInsuranceTotal },
             ],
           });
         }

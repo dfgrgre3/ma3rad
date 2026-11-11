@@ -1,5 +1,5 @@
 import {
-  Banknote, BarChart3, BookmarkPlus, BookOpen, Boxes, Building2, CalendarDays,
+  AlertTriangle, Banknote, BarChart3, BookmarkPlus, BookOpen, Boxes, Building2, CalendarDays,
   Calculator, ClipboardList, CreditCard, FileText, FolderTree, Layers, LayoutDashboard, Lock,
   MessageCircle, Package, Package2, PackageCheck, Percent, PieChart, Receipt,
   RotateCcw, Scale, ShoppingBag, ShoppingCart, ShieldCheck, Star, Tags, Target,
@@ -15,7 +15,6 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
     color: 'text-sky-600',
     items: [
       { label: 'لوحة المعلومات والتحليلات الشاملة', to: '/dashboard', icon: LayoutDashboard, perm: 'dashboard.view' },
-      { label: 'بوابة الموظف الذاتية', to: '/hr/self-service', icon: UserRound, perm: 'hr.selfservice.view' },
     ],
   },
   {
@@ -71,6 +70,7 @@ export const NAV_GROUPS_01: NavGroupDef[] = [
       { label: 'مواقع الرفوف', to: '/inventory/locations', icon: Building2, perm: 'inventory.view' },
       { label: 'التالف والحجر', to: '/inventory/damage-quarantine', icon: Lock, perm: 'inventory.adjust' },
       { label: 'مطابقة المخزون', to: '/inventory/reconciliation', icon: ClipboardList, perm: 'inventory.view' },
+      { label: 'تنبيهات المخزون', to: '/inventory/alerts', icon: AlertTriangle, perm: 'inventory.view' },
       { label: 'المنتجات', to: '/products', icon: Package, perm: 'products.view' },
       { label: 'التصنيفات', to: '/categories', icon: FolderTree, perm: 'categories.view' },
       { label: 'الماركات', to: '/brands', icon: Tags, perm: 'brands.view' },

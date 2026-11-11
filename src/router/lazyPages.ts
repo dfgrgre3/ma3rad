@@ -43,6 +43,7 @@ export { ReorderPlanningPage } from './lazyPages_part02';
 export { WarehouseLocationsPage } from './lazyPages_part02';
 export { DamageQuarantinePage } from './lazyPages_part02';
 export { InventoryReconciliationPage } from './lazyPages_part02';
+export { InventoryAlertsPage } from '../pages/inventory/inventory-alerts/InventoryAlertsPage';
 export { BranchesPage } from './lazyPages_part02';
 export { WarehousesPage } from './lazyPages_part02';
 export { FleetDashboardPage } from './lazyPages_part02';

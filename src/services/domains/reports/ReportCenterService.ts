@@ -3243,6 +3243,95 @@ export class ReportCenterService {
     };
   }
 
+  public workforceAnalytics({ from, to }: ReportParams): ReportResult {
+    const actor = this.actor();
+    const branchScope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
+    const companyScope = this.branchAccess.companyScope('e.company_id', actor);
+
+    const headcountByBranch = this.db.query<any>(`
+      SELECT b.id AS branchId, b.name AS branchName,
+             COUNT(e.id) AS headcount,
+             COALESCE(SUM(e.base_salary), 0) AS totalSalaryCost
+      FROM employees e
+      JOIN branches b ON b.id = e.branch_id
+      WHERE e.is_active = 1 AND ${branchScope.clause} AND ${companyScope.clause}
+      GROUP BY b.id, b.name
+      ORDER BY headcount DESC
+    `, [...branchScope.params, ...companyScope.params]);
+
+    const totalHeadcount = headcountByBranch.reduce((sum, r) => sum + Number(r.headcount), 0);
+    const totalSalaryCost = headcountByBranch.reduce((sum, r) => sum + Number(r.totalSalaryCost), 0);
+
+    return {
+      kpis: [
+        { label: 'إجمالي القوى العاملة', value: totalHeadcount, tone: 'info' },
+        { label: 'إجمالي تكلفة الرواتب', value: fmtMoney(totalSalaryCost), tone: 'warning' },
+      ],
+      columns: [
+        { key: 'branchName', label: 'الفرع' },
+        { key: 'headcount', label: 'عدد القوى العاملة', type: 'number' },
+        { key: 'totalSalaryCost', label: 'تكلفة الرواتب', type: 'currency' },
+      ],
+      rows: headcountByBranch,
+    };
+  }
+
+  public assetAnalytics({ from, to }: ReportParams): ReportResult {
+    const actor = this.actor();
+    const branchScope = this.branchAccess.sqlScope('fa.branch_id', undefined, actor);
+
+    const assetsByStatus = this.db.query<any>(`
+      SELECT fa.status, COUNT(*) AS count
+      FROM facility_assets fa
+      WHERE ${branchScope.clause}
+      GROUP BY fa.status
+    `, [...branchScope.params]);
+
+    const totalAssets = assetsByStatus.reduce((sum, r) => sum + Number(r.count), 0);
+
+    return {
+      kpis: [
+        { label: 'إجمالي الأصول', value: totalAssets, tone: 'info' },
+        { label: 'الأصول النشطة', value: Number(assetsByStatus.find((r: any) => r.status === 'ACTIVE')?.count || 0), tone: 'success' },
+      ],
+      columns: [
+        { key: 'status', label: 'حالة الأصل' },
+        { key: 'count', label: 'العدد', type: 'number' },
+      ],
+      rows: assetsByStatus,
+    };
+  }
+
+  public facilityAnalytics({ from, to }: ReportParams): ReportResult {
+    const actor = this.actor();
+    const companyId = this.branchAccess.companyScope('company_id', actor).params[0] || 'cmp_main';
+
+    const utilityConsumption = this.db.query<any>(`
+      SELECT um.utility_type AS type,
+             SUM(ur.consumption) AS totalConsumption,
+             SUM(ur.cost) AS totalCost
+      FROM facility_utility_readings ur
+      JOIN facility_utility_meters um ON um.id = ur.meter_id
+      WHERE um.company_id = ? AND ur.reading_date >= ? AND ur.reading_date <= ?
+      GROUP BY um.utility_type
+      ORDER BY totalCost DESC
+    `, [companyId, from, to]);
+
+    const totalUtilityCost = utilityConsumption.reduce((sum, r) => sum + Number(r.totalCost), 0);
+
+    return {
+      kpis: [
+        { label: 'إجمالي تكلفة المرافق', value: fmtMoney(totalUtilityCost), tone: 'warning' },
+      ],
+      columns: [
+        { key: 'type', label: 'نوع المرفق' },
+        { key: 'totalConsumption', label: 'الاستهلاك', type: 'number' },
+        { key: 'totalCost', label: 'التكلفة', type: 'currency' },
+      ],
+      rows: utilityConsumption,
+    };
+  }
+
 }
 
 function fmtMoney(value: unknown): string {

@@ -39,6 +39,8 @@ export const App: React.FC = () => {
   );
   const [licenseBlocked, setLicenseBlocked] = useState(false);
   const centralActive = activationComplete && !BYPASS_FIRST_RUN_ACTIVATION;
+  // تم تعطيل فحص الترخيص ليظهر التطبيق دائماً بدون ع interruption (ملفات الكود محفوظة)
+  const SKIP_LICENSE_CHECK = true;
   const [licenseRetrying, setLicenseRetrying] = useState(false);
 
   useEffect(() => {
@@ -54,22 +56,16 @@ export const App: React.FC = () => {
   }, []);
 
   const checkLicense = useCallback(async () => {
-    if (!centralActive) return;
-    setLicenseRetrying(true);
-    try {
-      const valid = await CentralLicenseService.validate();
-      setLicenseBlocked(!valid);
-    } finally {
-      setLicenseRetrying(false);
-    }
-  }, [centralActive]);
+    // تم تعطيل الفحص بالكامل - الترخيص مدعوم Always
+    setLicenseBlocked(false);
+    return;
+  }, []);
 
   useEffect(() => {
     if (!centralActive) return;
-    void checkLicense();
-    const timer = setInterval(() => void checkLicense(), 6 * 60 * 60 * 1000);
-    return () => clearInterval(timer);
-  }, [centralActive, checkLicense]);
+    // تم تعطيل فحص الترخيص الدوري
+    return;
+  }, [centralActive]);
 
   const [centralConfigTick, setCentralConfigTick] = useState(CentralLicenseService.getConfigRevision());
 
