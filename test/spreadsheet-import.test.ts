@@ -180,3 +180,17 @@ test('data import prevents duplicate field mappings and invalid optional product
     ],
   }]);
 });
+
+test('data import keeps fallback values when numeric cells are blank', () => {
+  const service = new DataImportService();
+  const data = service.parseRows(
+    ['اسم المورد', 'الهاتف', 'مدة السداد', 'الرصيد الافتتاحي'],
+    [{ 'اسم المورد': 'مورد', الهاتف: '0100', 'مدة السداد': '', 'الرصيد الافتتاحي': '' }],
+    'suppliers',
+  );
+
+  const rowValues = service['createRowValues'](data.rows[0], data.mapping);
+  assert.equal(rowValues.num('paymentTermsDays', 30), 30);
+  assert.equal(rowValues.num('initialBalance', 0), 0);
+  assert.deepEqual(service.validate(data), []);
+});

@@ -52,6 +52,7 @@ import { MIGRATION_PART_48 } from './part48';
 import { MIGRATION_PART_49 } from './part49';
 import { MIGRATION_PART_50 } from './part50';
 import { MIGRATION_PART_51 } from './part51';
+import { MIGRATION_PART_52 } from './part52';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
 
@@ -2561,6 +2562,7 @@ export const MIGRATIONS: Migration[] = [
   ...MIGRATION_PART_49,
   ...MIGRATION_PART_50,
   ...MIGRATION_PART_51,
+  ...MIGRATION_PART_52,
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);

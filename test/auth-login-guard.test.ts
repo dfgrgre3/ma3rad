@@ -2,7 +2,38 @@ import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
+import { MIGRATION_PART_52 } from '../src/database/migrations/part52.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
+import { SecurityService } from '../src/services/domains/security/SecurityService.ts';
+
+test('security migration: existing login history receives request metadata columns', async () => {
+  const initializeSqlJs = (globalThis as typeof globalThis & {
+    initSqlJs: () => Promise<import('sql.js').SqlJsStatic>;
+  }).initSqlJs;
+  const SQL = await initializeSqlJs();
+  const legacyDb = new SQL.Database();
+  try {
+    legacyDb.run(`
+      CREATE TABLE login_history (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        username_attempted TEXT NOT NULL,
+        succeeded INTEGER NOT NULL DEFAULT 0,
+        failure_reason TEXT,
+        device_label TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    MIGRATION_PART_52[0].up(legacyDb);
+    const columnNames = (legacyDb.exec('PRAGMA table_info(login_history)')[0]?.values ?? [])
+      .map((column) => String(column[1]));
+    assert.ok(columnNames.includes('ip_address'));
+    assert.ok(columnNames.includes('user_agent'));
+  } finally {
+    legacyDb.close();
+  }
+});
 
 test('auth guard: remaining attempts are reported before lockout and the lock lifts after the window', async () => {
   const db = DatabaseManager.getInstance();
@@ -61,6 +92,19 @@ test('auth guard: disabled lockout returns a neutral state', async () => {
     assert.equal(status.lockedUntil, null);
   } finally {
     db.run(`UPDATE system_settings SET value = '5' WHERE key = 'maxFailedLoginAttempts'`);
+  }
+});
+
+test('security center: login history can be read with request metadata fields', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+
+  const user = AuthService.login('admin', 'admin123');
+  try {
+    const history = SecurityService.getInstance().getLoginHistory({ limit: 10 });
+    assert.ok(history.some((record) => record.username === user.username && record.succeeded));
+  } finally {
+    AuthService.logout();
   }
 });
 

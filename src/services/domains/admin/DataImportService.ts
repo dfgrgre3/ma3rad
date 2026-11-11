@@ -49,9 +49,11 @@ export const ENTITY_META: Record<Exclude<ImportEntity, 'dynamic'>, { label: stri
 const cleanHeader = (value: string) => value.trim().toLocaleLowerCase().replace(/[\s_-]+/g, ' ');
 const text = (value: unknown) => String(value ?? '').trim();
 const number = (value: unknown) => {
-  const normalized = String(value ?? '')
+  const raw = String(value ?? '').trim();
+  if (!raw) return NaN;
+  const normalized = raw
     .replace(/[٠-٩]/g, digit => String(digit.charCodeAt(0) - 0x0660))
-    .replace(/[۰-۹]/g, digit => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/[۰-۹]/g, digit => String(digit.charCodeAt(0) - 0x06F0))
     .replace(/[٬,]/g, '')
     .replace(/[٫]/g, '.');
   const parsed = Number(normalized);
@@ -295,7 +297,10 @@ export class DataImportService {
       val,
       opt: key => val(key) || undefined,
       num: (key, fallback = 0) => {
-        const parsed = number(row[mapping[key]]);
+        const raw = row[mapping[key]];
+        const valueText = text(raw);
+        if (!valueText) return fallback;
+        const parsed = number(raw);
         return Number.isFinite(parsed) ? parsed : fallback;
       },
     };
