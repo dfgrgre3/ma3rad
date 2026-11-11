@@ -49,6 +49,7 @@ test('bulk product insert and lookup stays within a reasonable time', async () =
   const lookupElapsed = Date.now() - lookupStart;
   assert.ok(products.length >= 500);
   assert.ok(lookupElapsed < 5000, `lookup took ${lookupElapsed}ms, expected < 5000ms`);
+  console.info(`[benchmark] 500 product inserts ${elapsed}ms; lookup ${lookupElapsed}ms (${products.length} rows)`);
 });
 
 test('realistic catalogue and invoice volume stays responsive', async () => {
@@ -62,7 +63,7 @@ test('realistic catalogue and invoice volume stays responsive', async () => {
   AuthService.setCurrentUser(admin);
   PermissionService.invalidate(admin);
 
-  const PRODUCTS = 3000;
+  const PRODUCTS = 10000;
   const CUSTOMERS = 1200;
   const INVOICES = 5000;
 
@@ -74,6 +75,11 @@ test('realistic catalogue and invoice volume stays responsive', async () => {
            base_unit, sell_unit, cost_price, selling_price_m2, is_active)
          VALUES (?, ?, ?, ?, 'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 100, 150, 1)`,
         [`perf_p_${i}`, `PERF-P-${i}`, `PERF-PB-${i}`, `Bulk Product ${i}`]
+      );
+      tx.run(
+        `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2)
+         VALUES (?, 'wh_main', ?, 10)`,
+        [`perf_ws_${i}`, `perf_p_${i}`]
       );
     }
     for (let i = 0; i < CUSTOMERS; i++) {
@@ -101,11 +107,18 @@ test('realistic catalogue and invoice volume stays responsive', async () => {
   assert.ok(seedElapsed < 120000, `seeding ${PRODUCTS} products / ${INVOICES} invoices took ${seedElapsed}ms`);
 
   const listStart = Date.now();
-  const products = new ProductService().getAllProducts();
+  const productService = new ProductService();
+  const products = productService.getAllProducts();
   const listElapsed = Date.now() - listStart;
   assert.ok(products.length >= PRODUCTS);
   assert.ok(listElapsed < 5000, `product list of ${products.length} rows took ${listElapsed}ms`);
 
+  const searchStart = Date.now();
+  const productPage = productService.getProductsPage('Bulk Product 99', undefined, undefined, 1, 25);
+  const searchElapsed = Date.now() - searchStart;
+  assert.equal(productPage.items.length, 25);
+  assert.ok(productPage.totalItems > 0);
+  assert.ok(searchElapsed < 5000, `10,000-product search page took ${searchElapsed}ms`);
   const reportStart = Date.now();
   const totals = db.query<{ total: number; count: number }>(
     `SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
@@ -130,4 +143,9 @@ test('realistic catalogue and invoice volume stays responsive', async () => {
   const invoiceListElapsed = Date.now() - invoiceListStart;
   assert.ok(invoices.length >= INVOICES);
   assert.ok(invoiceListElapsed < 10000, `invoice list of ${invoices.length} rows took ${invoiceListElapsed}ms`);
+  console.info(
+    `[benchmark] ${PRODUCTS} products/${INVOICES} invoices: seed ${seedElapsed}ms; list ${listElapsed}ms; ` +
+    `search ${searchElapsed}ms (${productPage.totalItems} matches); annual report ${reportElapsed}ms; ` +
+    `aging ${agingElapsed}ms; invoice list ${invoiceListElapsed}ms`
+  );
 });

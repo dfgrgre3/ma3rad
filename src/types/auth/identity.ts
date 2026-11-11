@@ -22,6 +22,7 @@ export interface User {
   phone?: string;
   isActive: boolean;
   mustChangePassword?: boolean;
+  securityKeySetupRequired?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { activate, launchSeededApp, login } from './support/app.fixture';
+import { launchSeededApp, login, waitForLogin } from './support/app.fixture';
 
 /**
  * Responsive layout regression sweep.
@@ -26,7 +26,7 @@ const VIEWPORTS = [360, 390, 768, 1024, 1366, 1440, 1920];
 test('pages fit phone, tablet, laptop and desktop viewports without horizontal overflow', async () => {
   test.setTimeout(300_000);
   const { app, page, closeMockServer } = await launchSeededApp();
-  await activate(page);
+  await waitForLogin(page);
   await login(page);
 
   try {

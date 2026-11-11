@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Truck } from 'lucide-react';
 import type { DailyPurchaseResult } from '../../services/domains/operations/DailyOperationsService';
 import { CeramicMath } from '../../utils/products/ceramicMath';
@@ -28,6 +29,9 @@ const purchasePaymentColors: Record<string, string> = {
 interface TodayPurchasesPanelProps {
   canViewPurchases: boolean;
   todayPurchases: DailyPurchaseResult | null;
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
   purchaseHourly: PurchaseHourlyBucket[];
   purchasePeakHour: number;
   purchasePaymentMix: PurchasePaymentMixItem[];
@@ -39,6 +43,9 @@ interface TodayPurchasesPanelProps {
 export const TodayPurchasesPanel: React.FC<TodayPurchasesPanelProps> = ({
   canViewPurchases,
   todayPurchases,
+  isLoading,
+  error,
+  onRetry,
   purchaseHourly,
   purchasePeakHour,
   purchasePaymentMix,
@@ -46,13 +53,52 @@ export const TodayPurchasesPanel: React.FC<TodayPurchasesPanelProps> = ({
   purchaseTopItems,
   purchaseQuantitiesByUnit,
 }) => {
-  if (!canViewPurchases || !todayPurchases || todayPurchases.rows.length === 0) return null;
+  if (!canViewPurchases) return null;
+
+  if (isLoading && !todayPurchases) {
+    return (
+      <section className="rounded-[2px] border border-[#d9d9d9] bg-white p-3.5 text-[11px] font-semibold text-[#4d4d4d] dark:border-[#3d3d3d] dark:bg-[#2b2b2b] dark:text-[#c8c8c8]" role="status" aria-live="polite">
+        <span className="flex items-center gap-2"><Truck className="h-4 w-4 text-[#0078d4]" aria-hidden="true" /> جارٍ تحميل مشتريات اليوم...</span>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="rounded-[2px] border border-rose-200 bg-rose-50 p-3.5 dark:border-rose-900 dark:bg-rose-950/30" role="alert">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[11px] font-extrabold text-rose-800 dark:text-rose-200">تعذر تحميل مشتريات اليوم</h3>
+            <p className="mt-1 break-words text-[10px] text-rose-700 dark:text-rose-300">{error}</p>
+          </div>
+          <button type="button" onClick={onRetry} className="shrink-0 rounded-[2px] border border-rose-300 px-3 py-1.5 text-[10px] font-bold text-rose-800 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 dark:border-rose-800 dark:text-rose-200 dark:hover:bg-rose-950">
+            إعادة المحاولة
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!todayPurchases || todayPurchases.rows.length === 0) {
+    return (
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] border border-[#d9d9d9] bg-white p-3.5 dark:border-[#3d3d3d] dark:bg-[#2b2b2b]">
+        <div className="flex items-center gap-2">
+          <Truck className="h-4 w-4 text-[#767676]" aria-hidden="true" />
+          <div>
+            <h3 className="text-[11px] font-bold text-[#1b1b1b] dark:text-[#f0f0f0]">مشتريات اليوم</h3>
+            <p className="text-[10px] text-[#767676] dark:text-[#a6a6a6]">لا توجد فواتير توريد مسجلة اليوم</p>
+          </div>
+        </div>
+        <Link to="/purchases" className="text-[10px] font-bold text-[#0067b8] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0078d4] dark:text-[#76c7ff]">فتح المشتريات</Link>
+      </section>
+    );
+  }
 
   return (
     <details className="group rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-3.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-        <span className="flex items-center gap-2"><Truck className="h-4 w-4 text-amber-700 dark:text-amber-300" /> <span>?????? ??????? ?????</span></span>
-        <span className="text-[10px] font-semibold text-slate-400">{todayPurchases.summary.count} ?????? ????? ? ??? ????????</span>
+        <span className="flex items-center gap-2"><Truck className="h-4 w-4 text-amber-700 dark:text-amber-300" /> <span>مشتريات وتوريدات اليوم</span></span>
+        <span className="text-[10px] font-semibold text-slate-400">{isLoading ? 'جارٍ التحديث...' : `${todayPurchases.summary.count.toLocaleString('ar-EG')} فاتورة • ${todayPurchases.summary.suppliersCount.toLocaleString('ar-EG')} مورد`}</span>
       </summary>
       <div className="border-t border-slate-100 p-3.5 dark:border-slate-800">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
@@ -69,6 +115,7 @@ export const TodayPurchasesPanel: React.FC<TodayPurchasesPanelProps> = ({
           <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
             {new Date(`${todayPurchases.date}T12:00:00`).toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric', month: 'short' })}
           </span>
+          <Link to="/purchases" className="text-[10px] font-bold text-sky-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 dark:text-sky-300">عرض الفواتير</Link>
         </div>
       </div>
 

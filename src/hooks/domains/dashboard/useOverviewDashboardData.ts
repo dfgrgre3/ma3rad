@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AccountingService, DashboardMetrics } from '../../../services/domains/finance/AccountingService';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { AccountingService, type DashboardMetrics, type MonthlyComparison } from '../../../services/domains/finance/AccountingService';
 import { DailyOperationsService, type DailyPurchaseResult } from '../../../services/domains/operations/DailyOperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import type {
-  PurchaseHourlyBucket, PurchasePaymentMixItem, PurchaseTopItem, PurchaseTopSupplier,
-  SalesTrendPoint, TopSellingProduct,
+  CategoryDistributionItem, PaymentDistributionItem, PurchaseHourlyBucket,
+  PurchasePaymentMixItem, PurchaseTopItem, PurchaseTopSupplier, RecentActivityItem, SalesTrendPoint,
+  TopCustomerItem, TopSellingProduct,
 } from '../../../types/dashboard/components';
 
 export interface OverviewDashboardData {
@@ -16,12 +18,12 @@ export interface OverviewDashboardData {
   loading: boolean;
   refreshing: boolean;
   dashboardError: string | null;
-  monthlyComparison: any;
-  topCustomers: any[];
-  categorySales: any[];
-  gradeSales: any[];
-  paymentDistribution: any[];
-  recentActivities: any[];
+  monthlyComparison: MonthlyComparison | null;
+  topCustomers: TopCustomerItem[];
+  categorySales: CategoryDistributionItem[];
+  gradeSales: { grade: string; quantityM2: number; totalRevenue: number }[];
+  paymentDistribution: PaymentDistributionItem[];
+  recentActivities: RecentActivityItem[];
   todayPurchases: DailyPurchaseResult | null;
   purchasesLoading: boolean;
   purchasesError: string | null;
@@ -42,21 +44,25 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
-  const [monthlyComparison, setMonthlyComparison] = useState<any>(null);
-  const [topCustomers, setTopCustomers] = useState<any[]>([]);
-  const [categorySales, setCategorySales] = useState<any[]>([]);
-  const [gradeSales, setGradeSales] = useState<any[]>([]);
-  const [paymentDistribution, setPaymentDistribution] = useState<any[]>([]);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [monthlyComparison, setMonthlyComparison] = useState<MonthlyComparison | null>(null);
+  const [topCustomers, setTopCustomers] = useState<TopCustomerItem[]>([]);
+  const [categorySales, setCategorySales] = useState<CategoryDistributionItem[]>([]);
+  const [gradeSales, setGradeSales] = useState<{ grade: string; quantityM2: number; totalRevenue: number }[]>([]);
+  const [paymentDistribution, setPaymentDistribution] = useState<PaymentDistributionItem[]>([]);
+  const [recentActivities, setRecentActivities] = useState<RecentActivityItem[]>([]);
   const [todayPurchases, setTodayPurchases] = useState<DailyPurchaseResult | null>(null);
   const [purchasesLoading, setPurchasesLoading] = useState(true);
   const [purchasesError, setPurchasesError] = useState<string | null>(null);
 
   const accountingService = useMemo(() => new AccountingService(), []);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
+    const dashboardStartedAt = performance.now();
     setRefreshing(true);
     setPurchasesLoading(true);
+    const databaseManager = DatabaseManager.getInstance();
+    const accountingStartedAt = performance.now();
+    const accountingQueryCountBefore = databaseManager.getQueryStats().totalQueries;
     try {
       const actor = AuthService.requireAuth();
       PermissionService.require(actor, 'sales.view', '/sales');
@@ -68,10 +74,22 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
       const trend = accountingService.getSalesTrendLast7Days();
       const top = accountingService.getTopSellingProducts(5);
       const monthlyComp = accountingService.getMonthlyComparison();
-      const topCust = accountingService.getTopCustomers(5);
-      const catSales = accountingService.getCategorySalesReport();
+      const topCust = accountingService.getTopCustomers(5).map((customer) => ({
+        name: customer.name,
+        totalAmount: customer.totalPurchases,
+        invoiceCount: customer.purchaseCount,
+      }));
+      const categories = new Map<string, number>();
+      accountingService.getCategorySalesReport().forEach((category) => {
+        categories.set(category.categoryName, (categories.get(category.categoryName) || 0) + category.totalRevenue);
+      });
+      const catSales = [...categories.entries()].map(([name, value]) => ({ name, value }));
       const gradeDist = accountingService.getSalesByGrade();
-      const payDist = accountingService.getPaymentMethodDistribution();
+      const payDist = accountingService.getPaymentMethodDistribution().map((payment) => ({
+        method: payment.method,
+        amount: payment.totalAmount,
+        count: payment.count,
+      }));
       const activities = accountingService.getRecentActivities(6);
 
       setMetrics(data);
@@ -87,8 +105,15 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
     } catch (e) {
       console.error(e);
       setDashboardError((e as Error)?.message || 'تعذر تحميل بيانات لوحة المعلومات');
+    } finally {
+      console.info('[performance] Dashboard accounting data loaded', JSON.stringify({
+        durationMs: Math.round((performance.now() - accountingStartedAt) * 100) / 100,
+        queryCount: databaseManager.getQueryStats().totalQueries - accountingQueryCountBefore,
+      }));
     }
 
+    const purchasesStartedAt = performance.now();
+    const purchasesQueryCountBefore = databaseManager.getQueryStats().totalQueries;
     try {
       if (PermissionService.can(AuthService.getCurrentUser(), 'purchases.view')) {
         setTodayPurchases(new DailyOperationsService().getPurchases());
@@ -101,15 +126,22 @@ export const useOverviewDashboardData = (): OverviewDashboardData => {
       setTodayPurchases(null);
       setPurchasesError(error?.message || 'تعذر تحميل مؤشرات مشتريات اليوم');
     } finally {
+      console.info('[performance] Dashboard purchase data loaded', JSON.stringify({
+        durationMs: Math.round((performance.now() - purchasesStartedAt) * 100) / 100,
+        queryCount: databaseManager.getQueryStats().totalQueries - purchasesQueryCountBefore,
+      }));
+      console.info('[performance] Dashboard data ready', JSON.stringify({
+        durationMs: Math.round((performance.now() - dashboardStartedAt) * 100) / 100,
+      }));
       setLoading(false);
       setPurchasesLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [accountingService]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const purchaseHourly = useMemo(() => {
     const buckets = Array.from({ length: 24 }, () => ({ total: 0, count: 0 }));

@@ -15,6 +15,7 @@ export interface PerformanceMetrics {
   activeConnections: number;
   queriesPerSecond: number | null;
   errorRate: number | null;
+  slowQueryCount: number;
 }
 
 interface PerformanceThresholds {
@@ -37,13 +38,15 @@ class PerformanceMonitorService {
   private static instance: PerformanceMonitorService;
   private metricsBuffer: PerformanceMetrics[] = [];
   private alerts: Alert[] = [];
-  private readonly maxBuffer = 1000;
+  private readonly maxBuffer = (typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined' && __CERAMISYS_LEGACY_BUILD__)
+    ? 200
+    : 1000;
   private monitoringTimer: ReturnType<typeof setInterval> | null = null;
   private lastQuerySample: { timestamp: number; totalQueries: number; failedQueries: number } | null = null;
   private thresholds: PerformanceThresholds = {
     maxDbAccessTimeMs: 500,
     maxDbSizeMB: 500,
-    maxMemoryMB: 2048,
+    maxMemoryMB: (typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined' && __CERAMISYS_LEGACY_BUILD__) ? 256 : 2048,
     maxErrorRate: 5 // percentage
   };
 
@@ -96,10 +99,12 @@ class PerformanceMonitorService {
     const runtimeInfo = typeof window !== 'undefined'
       ? await window.ceramisys?.app?.info?.()
       : undefined;
-    const processMemoryBytes = runtimeInfo?.system?.processMemoryBytes;
+    const processMemoryBytes = runtimeInfo?.system?.electronProcessMemoryBytes
+      ?? runtimeInfo?.system?.processMemoryBytes;
     const memoryUsageMB = typeof processMemoryBytes === 'number' && Number.isFinite(processMemoryBytes)
       ? processMemoryBytes / (1024 * 1024)
       : null;
+    const cpuUsage = runtimeInfo?.system?.electronProcessCpuPercent;
     const queryStats = databaseManager.getQueryStats();
     const now = Date.now();
     const previousSample = this.lastQuerySample;
@@ -127,10 +132,11 @@ class PerformanceMonitorService {
       dbSizeMB: (pageCount * pageSize) / (1024 * 1024),
       cacheSizeMB: databaseManager.getQueryCacheStats().sizeBytes / (1024 * 1024),
       memoryUsageMB,
-      cpuUsage: null,
+      cpuUsage: typeof cpuUsage === 'number' && Number.isFinite(cpuUsage) ? cpuUsage : null,
       activeConnections: 1,
       queriesPerSecond,
-      errorRate
+      errorRate,
+      slowQueryCount: queryStats.slowQueryCount
     };
   }
 
@@ -225,6 +231,8 @@ class PerformanceMonitorService {
   getStats(): {
     avgDbAccessTime: number | null;
     totalQueries: number;
+    slowQueryCount: number;
+    slowestQueryMs: number;
     peakMemory: number | null;
     alertCount: number;
   } {
@@ -238,6 +246,8 @@ class PerformanceMonitorService {
     return {
       avgDbAccessTime: avgTime === null ? null : Math.floor(avgTime),
       totalQueries: DatabaseManager.getInstance().getQueryStats().totalQueries,
+      slowQueryCount: DatabaseManager.getInstance().getQueryStats().slowQueryCount,
+      slowestQueryMs: DatabaseManager.getInstance().getQueryStats().slowestQueryMs,
       peakMemory: peakMemory,
       alertCount: this.alerts.length
     };

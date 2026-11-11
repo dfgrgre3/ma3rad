@@ -1,9 +1,10 @@
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CeramicMath } from '../../utils/products/ceramicMath';
+import type { PaymentDistributionItem } from '../../types/dashboard/components';
 
 interface PaymentMethodsCardProps {
-  paymentDistribution: any[];
+  paymentDistribution: PaymentDistributionItem[];
 }
 
 export const PaymentMethodsCard: React.FC<PaymentMethodsCardProps> = ({ paymentDistribution }) => {

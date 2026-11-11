@@ -160,17 +160,8 @@ export async function launchSeededApp(): Promise<{
   return { app, page, dataDir, closeMockServer };
 }
 
-export async function activate(page: Page): Promise<void> {
-  const loginOrActivationAccount = page.locator('#username').or(page.getByLabel('اسم الحساب'));
-  await expect(loginOrActivationAccount).toBeVisible({ timeout: 90_000 });
-  if (await page.locator('#username').isVisible().catch(() => false)) return;
-
-  await page.getByLabel('اسم الحساب').fill('admin');
-  await page.getByLabel('كلمة المرور').fill('admin123');
-  await page.getByLabel('رقم الهاتف').fill('01000000000');
-  await page.getByLabel('مفتاح الترخيص').fill('VALID-CODE');
-  await page.getByRole('button', { name: 'تحقق وانتقل لتسجيل الدخول' }).click();
-  await expect(page.locator('#username')).toBeVisible();
+export async function waitForLogin(page: Page): Promise<void> {
+  await expect(page.locator('#username')).toBeVisible({ timeout: 90_000 });
 }
 
 const DEFAULT_E2E_ADMIN_PASSWORD = 'admin123';

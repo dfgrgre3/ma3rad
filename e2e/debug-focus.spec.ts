@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { activate, launchSeededApp, login } from './support/app.fixture';
+import { launchSeededApp, login, waitForLogin } from './support/app.fixture';
 
 test('debug focus', async () => {
   test.setTimeout(120_000);
   const { app, page, closeMockServer } = await launchSeededApp();
   try {
-    await activate(page);
+    await waitForLogin(page);
     await login(page);
     await page.setViewportSize({ width: 768, height: 900 });
     await page.keyboard.press('Control+k');

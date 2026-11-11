@@ -1,4 +1,5 @@
 import type { Migration } from './support';
+import { addColumn } from './support_part01';
 
 export const MIGRATION_PART_56: Migration[] = [
   {
@@ -100,33 +101,15 @@ export const MIGRATION_PART_56: Migration[] = [
       `);
 
       // --- Extend payroll run items with social insurance fields ---
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='social_insurance_base'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN social_insurance_base REAL NOT NULL DEFAULT 0`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='social_insurance_employee_share'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN social_insurance_employee_share REAL NOT NULL DEFAULT 0`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='social_insurance_employer_share'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN social_insurance_employer_share REAL NOT NULL DEFAULT 0`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='social_insurance_total'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN social_insurance_total REAL NOT NULL DEFAULT 0`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='social_insurance_rule_id'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN social_insurance_rule_id TEXT`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='social_insurance_rule_name'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN social_insurance_rule_name TEXT`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='end_of_service_benefit'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN end_of_service_benefit REAL NOT NULL DEFAULT 0`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='end_of_service_rule_id'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN end_of_service_rule_id TEXT`);
-      }
-      if (db.exec(`SELECT 1 FROM pragma_table_info('payroll_run_items') WHERE name='end_of_service_rule_name'`)[0]?.values?.length === 0) {
-        db.run(`ALTER TABLE payroll_run_items ADD COLUMN end_of_service_rule_name TEXT`);
-      }
+      addColumn(db, 'payroll_run_items', 'social_insurance_base', 'REAL NOT NULL DEFAULT 0');
+      addColumn(db, 'payroll_run_items', 'social_insurance_employee_share', 'REAL NOT NULL DEFAULT 0');
+      addColumn(db, 'payroll_run_items', 'social_insurance_employer_share', 'REAL NOT NULL DEFAULT 0');
+      addColumn(db, 'payroll_run_items', 'social_insurance_total', 'REAL NOT NULL DEFAULT 0');
+      addColumn(db, 'payroll_run_items', 'social_insurance_rule_id', 'TEXT');
+      addColumn(db, 'payroll_run_items', 'social_insurance_rule_name', 'TEXT');
+      addColumn(db, 'payroll_run_items', 'end_of_service_benefit', 'REAL NOT NULL DEFAULT 0');
+      addColumn(db, 'payroll_run_items', 'end_of_service_rule_id', 'TEXT');
+      addColumn(db, 'payroll_run_items', 'end_of_service_rule_name', 'TEXT');
     },
   },
 ];

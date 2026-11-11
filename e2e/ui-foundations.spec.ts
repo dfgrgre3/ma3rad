@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { activate, launchSeededApp, login } from './support/app.fixture';
+import { launchSeededApp, login, waitForLogin } from './support/app.fixture';
 
 test('global search is keyboard accessible and fits small, tablet, and desktop viewports', async () => {
   const { app, page, closeMockServer } = await launchSeededApp();
-  await activate(page);
+  await waitForLogin(page);
   await login(page);
 
   try {

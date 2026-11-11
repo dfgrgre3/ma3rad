@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { activate, launchSeededApp, login } from './support/app.fixture';
+import { launchSeededApp, login, waitForLogin } from './support/app.fixture';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -63,7 +63,7 @@ const EXPECTED_HEADINGS: Record<(typeof HIGH_RISK_ROUTES)[number], string> = {
 
 test('high-risk routes render without uncaught page errors (single app session)', async () => {
   const { app, page, closeMockServer } = await launchSeededApp();
-  await activate(page);
+  await waitForLogin(page);
   await login(page);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));

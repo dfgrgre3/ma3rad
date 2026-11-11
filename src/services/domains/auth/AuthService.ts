@@ -28,6 +28,7 @@ const SESSION_ID_KEY = 'ceramisys_session_id';
 
 /** Window during which failed attempts are counted before the account is temporarily locked. */
 export const LOGIN_LOCKOUT_WINDOW_MINUTES = 15;
+export const SECURITY_KEY_LOGIN_GUARD_KEY = '__SECURITY_KEY_LOGIN__';
 
 export interface LoginGuardStatus {
   /** Configured maximum failed attempts. 0 means lockout is disabled. */
@@ -161,7 +162,8 @@ export class AuthService {
 
     const row = DatabaseManager.getInstance().query<any>(
       `SELECT id, username, password_hash AS passwordHash, full_name AS fullName,
-              role, phone, is_active AS isActive, created_at AS createdAt, updated_at AS updatedAt
+              role, phone, is_active AS isActive, created_at AS createdAt, updated_at AS updatedAt,
+              security_key_hash AS securityKeyHash
        FROM users WHERE id = ? AND is_active = 1`,
       [userId]
     )[0];
@@ -178,6 +180,7 @@ export class AuthService {
       phone: row.phone,
       isActive: Boolean(row.isActive),
       mustChangePassword: row.username === 'admin' && bcrypt.compareSync('admin123', row.passwordHash),
+      securityKeySetupRequired: row.id === 'usr_admin' && !row.securityKeyHash,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -396,6 +399,7 @@ export class AuthService {
       phone: userRecord.phone,
       isActive: Boolean(userRecord.isActive),
       mustChangePassword: isDefaultAdmin,
+      securityKeySetupRequired: userRecord.id === 'usr_admin' && !userRecord.securityKeyHash,
       createdAt: userRecord.createdAt,
       updatedAt: userRecord.updatedAt
     };
@@ -447,7 +451,8 @@ export class AuthService {
     if (!userId) return null;
 
     const rows = DatabaseManager.getInstance().query<any>(
-      `SELECT id, username, password_hash, full_name, role, phone, is_active, created_at, updated_at
+      `SELECT id, username, password_hash, full_name, role, phone, is_active, created_at, updated_at,
+              security_key_hash
        FROM users WHERE id = ? AND is_active = 1`,
       [userId]
     );
@@ -465,6 +470,7 @@ export class AuthService {
       phone: u.phone,
       isActive: Boolean(u.isActive),
       mustChangePassword: isDefaultAdmin,
+      securityKeySetupRequired: u.id === 'usr_admin' && !u.securityKeyHash,
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
     };
@@ -535,11 +541,86 @@ export class AuthService {
       phone: matched.phone,
       isActive: Boolean(matched.isActive),
       mustChangePassword: matched.username === 'admin' && bcrypt.compareSync('admin123', matched.passwordHash),
+      securityKeySetupRequired: matched.id === 'usr_admin' && !matched.securityKeyHash,
       createdAt: matched.createdAt,
       updatedAt: matched.updatedAt
     };
     AuthService.setCurrentUser(user);
     AuthService.recordLogin(user.id, AuthService.pinLoginLabel(matched.username), true);
+    AuthService.startSession(user.id);
+    try { localStorage.setItem(SESSION_KEY, user.id); } catch { /* ignore */ }
+    return user;
+  }
+
+  public static loginBySecurityKey(securityKey: string): User {
+    const db = DatabaseManager.getInstance();
+    const guard = AuthService.getLoginGuardStatus(SECURITY_KEY_LOGIN_GUARD_KEY);
+    if (guard.isLocked) {
+      AuthService.recordLogin(null, SECURITY_KEY_LOGIN_GUARD_KEY, false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(guard.lockedUntil));
+    }
+
+    const records = db.query<any>(
+      `SELECT id, username, password_hash AS passwordHash, full_name AS fullName,
+              role, phone, is_active AS isActive, created_at AS createdAt,
+              updated_at AS updatedAt, security_key_hash AS securityKeyHash
+       FROM users
+       WHERE is_active = 1 AND security_key_hash IS NOT NULL`
+    );
+    const matches: any[] = [];
+    for (const record of records) {
+      try {
+        if (bcrypt.compareSync(securityKey, record.securityKeyHash)) matches.push(record);
+      } catch {
+        // Ignore malformed stored hashes and keep the result indistinguishable from a bad key.
+      }
+    }
+
+    if (matches.length !== 1) {
+      AuthService.recordLogin(
+        null,
+        SECURITY_KEY_LOGIN_GUARD_KEY,
+        false,
+        matches.length > 1 ? 'AMBIGUOUS_SECURITY_KEY' : 'WRONG_SECURITY_KEY'
+      );
+      const updated = AuthService.getLoginGuardStatus(SECURITY_KEY_LOGIN_GUARD_KEY);
+      if (updated.isLocked) throw new Error(AuthService.lockoutMessage(updated.lockedUntil));
+      if (updated.remainingAttempts != null) {
+        throw new Error(`مفتاح الأمان غير صحيح. المحاولات المتبقية قبل الإيقاف المؤقت: ${updated.remainingAttempts}.`);
+      }
+      throw new Error('مفتاح الأمان غير صحيح.');
+    }
+
+    const matched = matches[0];
+    const accountGuard = AuthService.getLoginGuardStatus(matched.username);
+    if (accountGuard.isLocked) {
+      AuthService.recordLogin(matched.id, matched.username, false, 'LOCKED_OUT');
+      throw new Error(AuthService.lockoutMessage(accountGuard.lockedUntil));
+    }
+    if (twoFactorAuth.isEnabled(matched.id)) {
+      AuthService.recordLogin(matched.id, SECURITY_KEY_LOGIN_GUARD_KEY, false, 'TWO_FACTOR_REQUIRED');
+      AuthService.recordLogin(matched.id, matched.username, false, 'TWO_FACTOR_REQUIRED');
+      throw new Error('هذا الحساب محمي بالتحقق الثنائي. سجّل الدخول بكلمة المرور ورمز التحقق.');
+    }
+    if (matched.username === 'admin' && bcrypt.compareSync('admin123', matched.passwordHash)) {
+      AuthService.recordLogin(matched.id, SECURITY_KEY_LOGIN_GUARD_KEY, false, 'PASSWORD_CHANGE_REQUIRED');
+      throw new Error('يجب تغيير كلمة المرور الافتراضية قبل استخدام مفتاح الأمان.');
+    }
+
+    const user: User = {
+      id: matched.id,
+      username: matched.username,
+      fullName: matched.fullName,
+      role: matched.role,
+      phone: matched.phone,
+      isActive: Boolean(matched.isActive),
+      mustChangePassword: false,
+      securityKeySetupRequired: false,
+      createdAt: matched.createdAt,
+      updatedAt: matched.updatedAt,
+    };
+    AuthService.setCurrentUser(user);
+    AuthService.recordLogin(user.id, matched.username, true);
     AuthService.startSession(user.id);
     try { localStorage.setItem(SESSION_KEY, user.id); } catch { /* ignore */ }
     return user;
@@ -991,10 +1072,20 @@ export class AuthService {
     currentUser.mustChangePassword = false;
   }
 
-  public async changeOwnPasswordAsync(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+  public async changeOwnPasswordAsync(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    fullName?: string,
+    deferForcedSetupCompletion = false
+  ): Promise<void> {
     const currentUser = AuthService.requireAuth();
     if (currentUser.id !== userId) {
       throw new Error('يمكنك تغيير كلمة مرور حسابك الحالي فقط.');
+    }
+    const updatedFullName = fullName?.trim();
+    if (updatedFullName !== undefined && (updatedFullName.length < 2 || updatedFullName.length > 100)) {
+      throw new Error('يجب أن يتكون الاسم المعروض من حرفين إلى 100 حرف.');
     }
     const row = this.db.query<any>('SELECT password_hash FROM users WHERE id = ?', [currentUser.id])[0];
     if (!row) throw new Error('المستخدم غير موجود.');
@@ -1006,8 +1097,9 @@ export class AuthService {
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(newPassword, salt);
     this.db.executeTransaction(() => {
-      this.db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
+      this.db.run('UPDATE users SET password_hash = ?, full_name = ?, updated_at = ? WHERE id = ?', [
         hash,
+        updatedFullName ?? currentUser.fullName,
         new Date().toISOString(),
         currentUser.id,
       ]);
@@ -1019,7 +1111,54 @@ export class AuthService {
         [new Date().toISOString(), currentUser.id, currentSes]
       );
     });
-    currentUser.mustChangePassword = false;
+    if (updatedFullName !== undefined) currentUser.fullName = updatedFullName;
+    if (deferForcedSetupCompletion) {
+      currentUser.securityKeySetupRequired = true;
+    } else {
+      currentUser.mustChangePassword = false;
+    }
+  }
+
+  public async setOwnSecurityKeyAsync(userId: string, securityKey: string): Promise<void> {
+    const currentUser = AuthService.requireAuth();
+    if (currentUser.id !== userId) {
+      throw new Error('يمكنك إنشاء مفتاح الأمان لحسابك الحالي فقط.');
+    }
+    const normalizedKey = securityKey.trim();
+    if (normalizedKey.length < 8 || normalizedKey.length > 12) {
+      throw new Error('يجب أن يتكون مفتاح الأمان من 8 إلى 12 حرفًا.');
+    }
+
+    const user = this.db.query<{ username: string; isActive: number; passwordHash: string }>(
+      `SELECT username, is_active AS isActive, password_hash AS passwordHash
+       FROM users WHERE id = ?`,
+      [currentUser.id]
+    )[0];
+    if (!user || !user.isActive) throw new Error('حساب المستخدم غير موجود أو غير نشط.');
+    if (user.username === 'admin' && await bcrypt.compare('admin123', user.passwordHash)) {
+      throw new Error('يجب تغيير كلمة المرور الافتراضية قبل إنشاء مفتاح الأمان.');
+    }
+
+    const securityKeyHash = await bcrypt.hash(normalizedKey, await bcrypt.genSalt(10));
+    this.db.executeTransaction(() => {
+      const activeKeys = this.db.query<{ userId: string; securityKeyHash: string }>(
+        `SELECT id AS userId, security_key_hash AS securityKeyHash
+         FROM users
+         WHERE is_active = 1 AND security_key_hash IS NOT NULL AND id <> ?`,
+        [currentUser.id]
+      );
+      if (activeKeys.some(({ securityKeyHash: existingHash }) => {
+        try { return bcrypt.compareSync(normalizedKey, existingHash); } catch { return false; }
+      })) {
+        throw new Error('مفتاح الأمان مستخدم بالفعل من حساب نشط آخر.');
+      }
+      this.db.run(
+        'UPDATE users SET security_key_hash = ?, updated_at = ? WHERE id = ? AND is_active = 1',
+        [securityKeyHash, new Date().toISOString(), currentUser.id]
+      );
+    });
+    this.audit(currentUser, 'إنشاء مفتاح الأمان', 'USERS', currentUser.id, null, { configured: true });
+    currentUser.securityKeySetupRequired = false;
   }
 
   public completeFirstRunAdminSetup(
@@ -1087,6 +1226,7 @@ export class AuthService {
       fullName,
       phone: phone || undefined,
       mustChangePassword: false,
+      securityKeySetupRequired: true,
       updatedAt,
     };
   }

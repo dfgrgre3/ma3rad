@@ -158,6 +158,19 @@ export class ProductService {
       LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN ${stock.sql} st ON st.product_id = p.id
       WHERE ${where}`;
+    const countNeedsStock = ['in', 'low', 'out'].includes(options.stockStatus || '');
+    const countJoins = [
+      ...(search.trim() ? [
+        'LEFT JOIN categories c ON p.category_id = c.id',
+        'LEFT JOIN brands b ON p.brand_id = b.id',
+      ] : []),
+      ...(countNeedsStock ? [`LEFT JOIN ${stock.sql} st ON st.product_id = p.id`] : []),
+    ];
+    const countFromSql = `FROM products p ${countJoins.join(' ')} WHERE ${where}`;
+    const countParams = [
+      ...(countNeedsStock ? stock.params : []),
+      ...params.slice(stock.params.length),
+    ];
 
     return this.db.queryPage<Product>(
       `SELECT ${this.productColumns('p')}, c.name as categoryName, b.name as brandName,
@@ -166,8 +179,8 @@ export class ProductService {
               CASE WHEN p.meters_per_box > 0 AND p.pieces_per_box > 0
                    THEN (COALESCE(st.qty, 0) / p.meters_per_box) * p.pieces_per_box ELSE 0 END as totalStockPieces
        ${fromSql} ORDER BY ${orderBy}`,
-      `SELECT COUNT(*) as total_items ${fromSql}`,
-      params, page, pageSize,
+      `SELECT COUNT(*) as total_items ${countFromSql}`,
+      params, page, pageSize, countParams,
     );
   }
 

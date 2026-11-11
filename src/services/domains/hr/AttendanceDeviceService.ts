@@ -479,8 +479,6 @@ export class AttendanceDeviceService {
 
       recordsFound = input.records.length;
       recordsProcessed = recordsNew;
-      recordsSkipped = recordsSkipped;
-      recordsError = recordsError;
       const status = recordsError > 0 && recordsNew === 0 ? 'ERROR' : 'COMPLETED';
       db.run(
         `UPDATE hr_attendance_import_logs
@@ -739,6 +737,34 @@ export class AttendanceDeviceService {
       [sessionId, companyId, ...scope.params]
     )[0];
     return row ? { ...row } : null;
+  }
+
+  static getMobileAttendanceSessions(status?: 'PENDING' | 'VERIFIED' | 'REJECTED'): MobileAttendanceSession[] {
+    const actor = this.requireView();
+    const companyId = this.currentCompanyId(actor);
+    const scope = this.branchAccess.sqlScope('s.branch_id', undefined, actor);
+    const conditions: string[] = ['s.company_id = ?', scope.clause];
+    const params: (string | number)[] = [companyId, ...scope.params];
+    if (status) {
+      conditions.push('s.status = ?');
+      params.push(status);
+    }
+    return this.db.query<any>(
+      `SELECT s.id, s.employee_id AS employeeId, e.name AS employeeName,
+              s.branch_id AS branchId, s.session_type AS sessionType,
+              s.recorded_at AS recordedAt, s.latitude, s.longitude,
+              s.accuracy_meters AS accuracyMeters, s.device_info AS deviceInfo,
+              s.ip_address AS ipAddress, s.status,
+              s.verified_by AS verifiedBy, u.full_name AS verifiedByName,
+              s.verified_at AS verifiedAt, s.rejection_reason AS rejectionReason,
+              s.created_at AS createdAt
+       FROM hr_mobile_attendance_sessions s
+       JOIN employees e ON e.id = s.employee_id
+       LEFT JOIN users u ON u.id = s.verified_by
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY s.status = 'PENDING' DESC, s.recorded_at DESC`,
+      params
+    );
   }
 
   static verifyMobileSession(sessionId: string, approve: boolean, rejectionReason?: string | null): MobileAttendanceSession {

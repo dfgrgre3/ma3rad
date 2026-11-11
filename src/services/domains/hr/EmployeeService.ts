@@ -1751,7 +1751,7 @@ export class EmployeeService {
              manual_deduction_amount, attendance_deduction_amount, tax_amount,
              social_insurance_base, social_insurance_employee_share, social_insurance_employer_share, social_insurance_total,
              gross_amount, net_amount, warning_json, detail_json, payment_method, payout_status
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             item.id, existingRunId, item.employeeId, item.branchId, item.employeeName, item.salaryType,
             item.baseSalary, item.expectedWorkdays, item.absentDays, item.unpaidLeaveDays, item.lateMinutes,

@@ -1,8 +1,9 @@
 import React from 'react';
 import { CeramicMath } from '../../utils/products/ceramicMath';
+import type { TopCustomerItem } from '../../types/dashboard/components';
 
 interface TopCustomersCardProps {
-  topCustomers: any[];
+  topCustomers: TopCustomerItem[];
 }
 
 export const TopCustomersCard: React.FC<TopCustomersCardProps> = ({ topCustomers }) => {
@@ -22,7 +23,7 @@ export const TopCustomersCard: React.FC<TopCustomersCardProps> = ({ topCustomers
                 </span>
                 <div className="min-w-0">
                   <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{c.name}</div>
-                  <div className="text-[10px] text-slate-400">{c.invoiceCount || 0} فاتورة</div>
+                  <div className="text-[10px] text-slate-400">{c.invoiceCount} فاتورة</div>
                 </div>
               </div>
               <span className="font-bold tabular-nums text-emerald-600 dark:text-emerald-400 text-xs shrink-0 mr-2">

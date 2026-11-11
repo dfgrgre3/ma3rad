@@ -137,6 +137,10 @@ export const appRoutes: RouteDef[] = [
   { path: 'hr/discipline', element: <P.HrDisciplinePage /> },
   { path: 'hr/benefits', element: <P.HrBenefitsPage /> },
   { path: 'hr/self-service', element: <P.HrSelfServicePage /> },
+  { path: 'hr/workforce-planning', element: <P.WorkforcePlanningPage /> },
+  { path: 'hr/clearance', element: <P.EmployeeClearancePage /> },
+  { path: 'hr/social-insurance', element: <P.PayrollSocialInsurancePage /> },
+  { path: 'hr/attendance-devices', element: <P.AttendanceDevicesPage /> },
 
   // Reports
   { path: 'reports', element: <P.ReportsHubPage /> },

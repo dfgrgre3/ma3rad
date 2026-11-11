@@ -43,14 +43,14 @@ public reopenPeriod(periodId: string, reason: string): void {
         WHERE id = ?
       `, [` [أعيد فتحها بواسطة ${actor.fullName} لسبب: ${reason}]`, periodId]);
 
-      if (period.close_run_id) {
+      if (period.closeRunId) {
         tx.run(`
           UPDATE period_close_runs SET status = 'REOPENED' WHERE id = ?
-        `, [period.close_run_id]);
+        `, [period.closeRunId]);
       }
 
       this.fiscalAudit(tx, actor, 'PERIOD', periodId, 'REOPEN_FISCAL_PERIOD',
-        period.workflow_state || period.status, 'OPEN', reason);
+        period.workflowState || period.status, 'OPEN', reason);
       tx.run(`
         INSERT INTO fiscal_close_approvals (id, entity_type, entity_id, stage, decision, actor_id, actor_name, notes, created_at)
         VALUES (?, 'PERIOD', ?, 'REOPEN', 'REOPENED', ?, ?, ?, ?)

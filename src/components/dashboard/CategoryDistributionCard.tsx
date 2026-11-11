@@ -1,10 +1,10 @@
 import React from 'react';
 import { Cell, Pie, PieChart as PieChartRecharts, ResponsiveContainer, Tooltip } from 'recharts';
 import { CeramicMath } from '../../utils/products/ceramicMath';
-import { CHART_COLORS } from '../../types/dashboard/components';
+import { CHART_COLORS, type CategoryDistributionItem } from '../../types/dashboard/components';
 
 interface CategoryDistributionCardProps {
-  categorySales: any[];
+  categorySales: CategoryDistributionItem[];
 }
 
 export const CategoryDistributionCard: React.FC<CategoryDistributionCardProps> = ({ categorySales }) => {

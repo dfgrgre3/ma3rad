@@ -18,7 +18,7 @@ export const ExecutiveBottomGrid: React.FC<Props> = ({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       {/* Top Products Bar Chart */}
       <div className="min-w-0 lg:col-span-1 bg-white rounded-xl border border-slate-200 p-3 sm:p-4">
-        <h3 className="text-sm font-bold text-slate-900 mb-4">أكثر المنتجات مبيعاً</h3>
+        <h3 className="text-sm font-bold text-slate-900 mb-4">أعلى المنتجات إيراداً</h3>
         {topProducts.length === 0 ? (
           <div className="text-center text-slate-500 text-sm py-8">لا توجد بيانات</div>
         ) : (

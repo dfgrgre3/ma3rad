@@ -33,6 +33,45 @@ test('base32 round-trips arbitrary bytes', () => {
   assert.deepEqual(Array.from(base32Decode(base32Encode(bytes))), Array.from(bytes));
 });
 
+test('security keys are stored as hashes and support standalone login', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  const previousFailedAttempts = db.query<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = 'maxFailedLoginAttempts'`
+  )[0]?.value || '5';
+  db.run(`UPDATE system_settings SET value = '0' WHERE key = 'maxFailedLoginAttempts'`);
+  const admin = AuthService.login('admin', 'admin123');
+  const auth = new AuthService();
+  const user = auth.createUser({
+    username: 'security_key_login_test',
+    password: 'SecurityTest2026!',
+    fullName: 'Security Key Test',
+    role: 'CASHIER',
+  }, 'usr_admin', admin);
+
+  try {
+    AuthService.setCurrentUser(user);
+    await assert.rejects(auth.setOwnSecurityKeyAsync(user.id, 'short'), /8 إلى 12/);
+    await auth.setOwnSecurityKeyAsync(user.id, 'KeyOnly2026');
+
+    const stored = db.query<{ securityKeyHash: string }>(
+      `SELECT security_key_hash AS securityKeyHash FROM users WHERE id = ?`,
+      [user.id]
+    )[0]?.securityKeyHash;
+    assert.ok(stored);
+    assert.notEqual(stored, 'KeyOnly2026');
+    assert.equal(bcrypt.compareSync('KeyOnly2026', stored), true);
+
+    AuthService.logout();
+    assert.equal(AuthService.loginBySecurityKey('KeyOnly2026').id, user.id);
+  } finally {
+    AuthService.logout();
+    db.run(`DELETE FROM users WHERE id = ?`, [user.id]);
+    db.run(`DELETE FROM login_history WHERE username_attempted = '__SECURITY_KEY_LOGIN__'`);
+    db.run(`UPDATE system_settings SET value = ? WHERE key = 'maxFailedLoginAttempts'`, [previousFailedAttempts]);
+  }
+});
+
 async function adminId(db: DatabaseManager): Promise<string> {
   const row = db.query<{ id: string }>(`SELECT id FROM users WHERE username = 'admin'`)[0];
   assert.ok(row, 'admin fixture exists');
@@ -128,14 +167,18 @@ test('login requires a valid second factor once 2FA is enabled', async () => {
   }
 });
 
-test('PIN login never bypasses an enabled second factor', async () => {
+test('PIN and security-key login never bypass an enabled second factor', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();
   const userId = await adminId(db);
   const secret = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
   const pinHash = bcrypt.hashSync('1234', 10);
+  const keyHash = bcrypt.hashSync('KeyForTwoFA1', 10);
+  const previousKeyHash = db.query<{ securityKeyHash: string | null }>(
+    `SELECT security_key_hash AS securityKeyHash FROM users WHERE id = ?`, [userId]
+  )[0]?.securityKeyHash ?? null;
 
-  db.run(`UPDATE users SET pin_code = ? WHERE id = ?`, [pinHash, userId]);
+  db.run(`UPDATE users SET pin_code = ?, security_key_hash = ? WHERE id = ?`, [pinHash, keyHash, userId]);
   db.run(
     `INSERT INTO user_2fa
        (user_id, secret, algorithm, period, counter, enabled, recovery_codes, setup_date, last_used_counter, created_at, updated_at)
@@ -146,9 +189,14 @@ test('PIN login never bypasses an enabled second factor', async () => {
 
   try {
     assert.throws(() => AuthService.loginByPin('1234'), /محمي بالتحقق الثنائي/);
+    assert.throws(
+      () => AuthService.loginBySecurityKey('KeyForTwoFA1'),
+      /محمي بالتحقق الثنائي/
+    );
   } finally {
     db.run(`DELETE FROM user_2fa WHERE user_id = ?`, [userId]);
-    db.run(`UPDATE users SET pin_code = NULL WHERE id = ?`, [userId]);
+    db.run(`UPDATE users SET pin_code = NULL, security_key_hash = ? WHERE id = ?`, [previousKeyHash, userId]);
+    db.run(`DELETE FROM login_history WHERE username_attempted = '__SECURITY_KEY_LOGIN__'`);
   }
 });
 

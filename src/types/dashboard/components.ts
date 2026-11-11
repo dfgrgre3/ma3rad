@@ -14,7 +14,7 @@ export interface DashboardSectionConfig {
 
 export const SECTIONS_CONFIG: DashboardSectionConfig[] = [
   { id: 'all', label: 'نظرة شاملة', icon: Layers },
-  { id: 'pulse', label: 'ملخص اليوم', icon: LayoutDashboard, badge: 'مباشر' },
+  { id: 'pulse', label: 'ملخص اليوم', icon: LayoutDashboard },
   { id: 'executive', label: 'الأداء التنفيذي', icon: TrendingUp },
   { id: 'sales', label: 'المبيعات', icon: ShoppingCart },
   { id: 'purchases', label: 'المشتريات والمخزون', icon: ShoppingBag },
@@ -39,6 +39,30 @@ export interface TopSellingProduct {
   productType: 'CERAMIC' | 'GENERAL';
   baseUnit: string;
   customUnit?: string;
+}
+
+export interface CategoryDistributionItem {
+  name: string;
+  value: number;
+}
+
+export interface PaymentDistributionItem {
+  method: string;
+  amount: number;
+  count: number;
+}
+
+export interface TopCustomerItem {
+  name: string;
+  totalAmount: number;
+  invoiceCount: number;
+}
+
+export interface RecentActivityItem {
+  type: 'sale' | 'purchase' | 'inventory';
+  description: string;
+  amount?: number;
+  timestamp: string;
 }
 
 export interface PurchaseHourlyBucket {

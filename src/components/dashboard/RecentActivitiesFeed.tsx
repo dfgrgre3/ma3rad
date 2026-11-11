@@ -1,18 +1,18 @@
 import React from 'react';
-import { Activity, CheckCircle, Package, PackagePlus, XCircle } from 'lucide-react';
+import { Activity, CheckCircle, Package, PackagePlus } from 'lucide-react';
+import type { RecentActivityItem } from '../../types/dashboard/components';
 
 const getActivityIcon = (type: string) => {
   switch (type) {
     case 'sale': return <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />;
     case 'purchase': return <PackagePlus className="w-3.5 h-3.5 text-sky-600" />;
-    case 'return': return <XCircle className="w-3.5 h-3.5 text-rose-600" />;
     case 'inventory': return <Package className="w-3.5 h-3.5 text-amber-600" />;
     default: return <Activity className="w-3.5 h-3.5 text-slate-500" />;
   }
 };
 
 interface RecentActivitiesFeedProps {
-  recentActivities: any[];
+  recentActivities: RecentActivityItem[];
 }
 
 export const RecentActivitiesFeed: React.FC<RecentActivitiesFeedProps> = ({ recentActivities }) => {

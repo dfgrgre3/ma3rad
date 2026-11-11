@@ -352,6 +352,41 @@ test('customer supply demand accumulates quantity and total value across added q
   AuthService.login('admin', 'admin123');
 });
 
+test('customer codes skip existing values when generated during creation', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const nextNumber = (db.query<{ value: number }>(
+    'SELECT value FROM sequence_counters WHERE name = ?',
+    ['CUST'],
+  )[0]?.value ?? 0) + 1;
+  const occupiedCode = `CUST-${new Date().getFullYear()}-${String(nextNumber).padStart(6, '0')}`;
+  const service = new CustomerService();
+  const occupied = service.createCustomer({
+    code: occupiedCode,
+    name: 'Customer occupied code test',
+    phone: '0199000043',
+    customerType: 'RETAIL',
+    creditLimit: 0,
+  });
+
+  try {
+    const generated = service.createCustomer({
+      name: 'Customer generated code test',
+      phone: '0199000044',
+      customerType: 'RETAIL',
+      creditLimit: 0,
+    });
+    assert.notEqual(generated.code, occupied.code);
+    assert.match(generated.code, /^CUST-\d{4}-\d{6}$/);
+    db.run('DELETE FROM customers WHERE id = ?', [generated.id]);
+  } finally {
+    db.run('DELETE FROM customers WHERE id = ?', [occupied.id]);
+  }
+});
+
 test('profit and loss reconciles merchandise gross profit with invoices and separates shipping revenue', async () => {
   const manager = DatabaseManager.getInstance();
   await manager.initialize();

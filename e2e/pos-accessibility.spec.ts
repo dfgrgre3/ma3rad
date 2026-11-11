@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { activate, launchSeededApp, login } from './support/app.fixture';
+import { launchSeededApp, login, waitForLogin } from './support/app.fixture';
 
 test('POS supports keyboard product addition and responsive checkout', async () => {
   test.setTimeout(300_000);
   const { app, page, closeMockServer } = await launchSeededApp();
 
   try {
-    await activate(page);
+    await waitForLogin(page);
     await login(page);
     await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];

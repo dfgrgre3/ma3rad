@@ -185,11 +185,11 @@ private async readBackupBytes(
 
 private async importBackupWithRollback(bytes: Uint8Array, currentSnapshot: Uint8Array, snapshotPath?: string): Promise<void> {
     try {
-      this.db.importDatabaseBinary(bytes);
+        await this.db.importDatabaseBinary(bytes);
       await this.db.flush();
     } catch (restoreError) {
       try {
-        this.db.importDatabaseBinary(currentSnapshot);
+          await this.db.importDatabaseBinary(currentSnapshot);
         await this.db.flush();
       } catch (rollbackError) {
         throw new Error(`Restore failed (${restoreError instanceof Error ? restoreError.message : String(restoreError)}); rollback also failed (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}). The pre-restore snapshot remains at ${snapshotPath || 'the configured backup location'}.`);
@@ -201,7 +201,7 @@ private async importBackupWithRollback(bytes: Uint8Array, currentSnapshot: Uint8
 private async verifyRestoredDatabase(currentSnapshot: Uint8Array): Promise<void> {
     const restored = this.verifyBackupFile(this.db.exportDatabaseBinary());
     if (!restored.valid) {
-      this.db.importDatabaseBinary(currentSnapshot);
+      await this.db.importDatabaseBinary(currentSnapshot);
       await this.db.flush();
       throw new Error(`فشل التحقق بعد الاستعادة، وتمت إعادة قاعدة البيانات السابقة: ${restored.error || restored.integrity}`);
     }

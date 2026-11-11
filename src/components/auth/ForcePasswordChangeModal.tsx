@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Lock, ShieldAlert, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, ShieldAlert, CheckCircle2, AlertCircle, Eye, EyeOff, KeyRound, ShieldCheck } from 'lucide-react';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { useToast } from '../ui/Toast';
 import type { User } from '../../types';
@@ -12,10 +12,17 @@ interface ForcePasswordChangeModalProps {
 export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> = ({ user, onSuccess }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const currentPasswordRef = useRef<HTMLInputElement>(null);
+  const securityKeyRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+  const [step, setStep] = useState<'password' | 'security-key'>(
+    user.mustChangePassword ? 'password' : 'security-key'
+  );
   const [currentPassword, setCurrentPassword] = useState('');
+  const [fullName, setFullName] = useState(user.fullName);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [securityKey, setSecurityKey] = useState('');
+  const [confirmSecurityKey, setConfirmSecurityKey] = useState('');
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,16 +56,60 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
     };
   }, []);
 
+  useEffect(() => {
+    if (step === 'security-key') securityKeyRef.current?.focus();
+  }, [step]);
+
   const hasMinLength = newPassword.length >= 8;
   const hasLetters = /[a-zA-Z\u0600-\u06FF]/.test(newPassword);
   const hasNumbers = /[0-9]/.test(newPassword);
   const isNotDefault = newPassword !== 'admin123';
   const passwordsMatch = newPassword === confirmPassword && newPassword.length > 0;
-  const isValid = hasMinLength && hasLetters && hasNumbers && isNotDefault && passwordsMatch;
+  const isFullNameValid = fullName.trim().length >= 2 && fullName.trim().length <= 100;
+  const isValid = isFullNameValid && hasMinLength && hasLetters && hasNumbers && isNotDefault && passwordsMatch;
+  const normalizedSecurityKey = securityKey.trim();
+  const securityKeyLengthValid = normalizedSecurityKey.length >= 8 && normalizedSecurityKey.length <= 12;
+  const securityKeysMatch = normalizedSecurityKey === confirmSecurityKey.trim() && normalizedSecurityKey.length > 0;
+  const isSecurityKeyValid = securityKeyLengthValid && securityKeysMatch;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (step === 'security-key') {
+      if (!securityKeyLengthValid) {
+        setError('يجب أن يتكون مفتاح الأمان من 8 إلى 12 حرفًا.');
+        return;
+      }
+      if (!securityKeysMatch) {
+        setError('تأكيد مفتاح الأمان غير مطابق.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await new AuthService().setOwnSecurityKeyAsync(user.id, normalizedSecurityKey);
+        const securedUser: User = {
+          ...user,
+          fullName: fullName.trim(),
+          mustChangePassword: false,
+          securityKeySetupRequired: false,
+        };
+        AuthService.setCurrentUser(securedUser);
+        toast.success('تم إنشاء مفتاح الأمان وحفظه بصورة آمنة.');
+        onSuccess(securedUser);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'فشل إنشاء مفتاح الأمان');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (!isFullNameValid) {
+      setError('يجب أن يتكون الاسم المعروض من حرفين إلى 100 حرف.');
+      return;
+    }
 
     if (!isValid) {
       setError('يرجى استيفاء جميع شروط كلمة المرور وتطابق التأكيد.');
@@ -68,11 +119,17 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
     setLoading(true);
     try {
       const authService = new AuthService();
-      await authService.changeOwnPasswordAsync(user.id, currentPassword, newPassword);
-      toast.success('تم تغيير كلمة المرور بنجاح وتم تأمين حساب المدير.');
-      const updatedUser: User = { ...user, mustChangePassword: false };
+      const savedFullName = fullName.trim();
+      await authService.changeOwnPasswordAsync(user.id, currentPassword, newPassword, savedFullName, true);
+      toast.success('تم تغيير كلمة المرور. أكمل الآن إنشاء مفتاح الأمان.');
+      const updatedUser: User = {
+        ...user,
+        fullName: savedFullName,
+        mustChangePassword: true,
+        securityKeySetupRequired: true,
+      };
       AuthService.setCurrentUser(updatedUser);
-      onSuccess(updatedUser);
+      setStep('security-key');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'فشل تغيير كلمة المرور');
     } finally {
@@ -88,14 +145,37 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
             <ShieldAlert className="w-6 h-6" />
           </div>
           <div>
-            <h2 id="force-password-title" className="text-lg font-bold">تغيير كلمة المرور الافتراضية</h2>
-            <p id="force-password-description" className="text-xs text-amber-100">إجراء أمني إلزامي لتأمين النظام وقاعدة البيانات</p>
+            <h2 id="force-password-title" className="text-lg font-bold">
+              {step === 'password' ? 'تغيير كلمة المرور الافتراضية' : 'إنشاء مفتاح الأمان'}
+            </h2>
+            <p id="force-password-description" className="text-xs text-amber-100">
+              {step === 'password' ? 'الخطوة 1 من 2 · تأمين حساب المدير' : 'الخطوة 2 من 2 · أضف طريقة دخول آمنة بديلة'}
+            </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4" aria-busy={loading}>
+          {step === 'password' ? (
+            <>
           <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-xl text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
             تم رصد استخدام كلمة المرور الافتراضية (<strong>admin123</strong>) لحساب المدير. يرجى تعيين كلمة مرور قوية لمتابعة العمل على البرنامج.
+          </div>
+
+          <div>
+            <label htmlFor="display-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+              الاسم المعروض
+            </label>
+            <input
+              id="display-name"
+              type="text"
+              required
+              minLength={2}
+              maxLength={100}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="أدخل الاسم المعروض"
+              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
           </div>
 
           {error && (
@@ -202,6 +282,66 @@ export const ForcePasswordChangeModal: React.FC<ForcePasswordChangeModalProps> =
               <span aria-live="polite">{loading ? 'جاري الحفظ...' : 'حفظ كلمة المرور وتأمين النظام'}</span>
             </button>
           </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">
+                <KeyRound className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <p>أنشئ مفتاحًا سريًا من 8 إلى 12 حرفًا. سيُحفظ كتجزئة مشفّرة، ويمكن استخدامه لاحقًا بدل اسم المستخدم وكلمة المرور.</p>
+              </div>
+
+              <div>
+                <label htmlFor="security-key" className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  مفتاح الأمان
+                </label>
+                <input
+                  ref={securityKeyRef}
+                  id="security-key"
+                  type="password"
+                  autoComplete="new-password"
+                  maxLength={12}
+                  required
+                  value={securityKey}
+                  onChange={(event) => setSecurityKey(event.target.value)}
+                  placeholder="أدخل مفتاحًا من 8 إلى 12 حرفًا"
+                  aria-describedby="security-key-guidance"
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-slate-700 dark:bg-slate-800"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="confirm-security-key" className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  تأكيد مفتاح الأمان
+                </label>
+                <input
+                  id="confirm-security-key"
+                  type="password"
+                  autoComplete="new-password"
+                  maxLength={12}
+                  required
+                  value={confirmSecurityKey}
+                  onChange={(event) => setConfirmSecurityKey(event.target.value)}
+                  placeholder="أعد إدخال مفتاح الأمان"
+                  className="w-full rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-slate-700 dark:bg-slate-800"
+                />
+              </div>
+              <p id="security-key-guidance" className={`text-xs ${securityKeyLengthValid ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
+                من 8 إلى 12 حرفًا
+              </p>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={!isSecurityKeyValid || loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3 text-sm font-bold text-white shadow-md transition hover:bg-amber-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                >
+                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                  <span aria-live="polite">{loading ? 'جاري الحفظ...' : 'حفظ مفتاح الأمان ومتابعة العمل'}</span>
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </div>
     </div>

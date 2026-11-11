@@ -61,6 +61,19 @@ function registerAppHandlers({
   ipcMain.handle('app:info', async (event) => {
     validateIpcSender(event);
     const memory = process.memoryUsage();
+    const processMetrics = typeof app.getAppMetrics === 'function' ? app.getAppMetrics() : [];
+    const electronProcessMemoryBytes = processMetrics.length > 0
+      ? processMetrics.reduce((total, metric) => {
+        const workingSetKB = Number(metric.memory?.workingSetSize);
+        return total + (Number.isFinite(workingSetKB) && workingSetKB > 0 ? workingSetKB * 1024 : 0);
+      }, 0)
+      : memory.rss;
+    const electronProcessCpuPercent = processMetrics.length > 0
+      ? processMetrics.reduce((total, metric) => {
+        const percent = Number(metric.cpu?.percentCPUUsage);
+        return total + (Number.isFinite(percent) && percent > 0 ? percent : 0);
+      }, 0) / Math.max(1, os.cpus().length)
+      : null;
     /** @type {{ available: true; freeBytes: number; totalBytes: number } | { available: false; error: string }} */
     let disk = { available: false, error: 'قياس مساحة القرص غير مدعوم على هذا النظام.' };
     if (typeof fs.statfs === 'function') {
@@ -90,6 +103,8 @@ function registerAppHandlers({
         processUptimeSeconds: process.uptime(),
         processMemoryBytes: memory.rss,
         processHeapUsedBytes: memory.heapUsed,
+        electronProcessMemoryBytes,
+        electronProcessCpuPercent,
         disk,
       },
     };

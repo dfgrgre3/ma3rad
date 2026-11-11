@@ -6,8 +6,8 @@ import type { User } from '../../../types';
 export class DashboardQueryScopeService {
   private static branches = new BranchAccessService();
 
-  static branch(alias: string, user: User): BranchSqlScope {
-    return this.branches.sqlScope(`${alias}.branch_id`, undefined, user);
+  static branch(alias: string, user: User, includeAllAuthorizedBranches = false): BranchSqlScope {
+    return this.branches.sqlScope(`${alias}.branch_id`, undefined, user, includeAllAuthorizedBranches);
   }
 
   static expenseBranch(alias: string, user: User): BranchSqlScope {

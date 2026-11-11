@@ -1399,8 +1399,8 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       description: patch.description?.trim() ?? task.description,
       department: patch.department?.trim() ?? task.department,
       category: patch.category ?? task.category,
-      assignee_user_id: patch.assigneeUserId ?? task.assignee_user_id,
-      due_date: patch.dueDate ?? task.due_date,
+      assignee_user_id: patch.assigneeUserId ?? task.assigneeUserId ?? null,
+      due_date: patch.dueDate ?? task.dueDate ?? null,
       priority: patch.priority ?? task.priority,
       status: status ?? task.status,
       notes: patch.notes ?? task.notes,
@@ -1505,7 +1505,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     const actor = this.requireManage();
     const adjustment = this.requireAdjustment(adjustmentId);
     if (adjustment.status !== 'PENDING_APPROVAL') throw new Error('لا يمكن اعتماد تسوية قبل إرسالها للاعتماد.');
-    if (adjustment.created_by === actor.id) {
+    if (adjustment.createdBy === actor.id) {
       throw new Error('يجب أن يعتمد التسوية مستخدم آخر غير مُنشئها (فصل المهام).');
     }
     this.db.executeTransaction((tx) => {
@@ -1542,7 +1542,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     const actor = this.requireCloseControl();
     const adjustment = this.requireAdjustment(adjustmentId);
     if (adjustment.status !== 'APPROVED') throw new Error('لا يمكن ترحيل تسوية قبل اعتمادها.');
-    const period = this.getPeriodRow(adjustment.fiscal_period_id);
+    const period = this.getPeriodRow(adjustment.fiscalPeriodId);
     if (period.status === 'CLOSED' || period.status === 'LOCKED') {
       throw new Error('لا يمكن ترحيل تسوية داخل فترة مقفلة؛ أعد فتح الفترة أولًا.');
     }
@@ -1550,13 +1550,13 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
     this.db.executeTransaction((tx) => {
       entryId = postLedgerEntry(tx.getDatabase(), {
         date: period.endDate,
-        description: `تسوية شهرية (${adjustment.adjustment_type}): ${adjustment.description}`,
+        description: `تسوية شهرية (${adjustment.adjustmentType}): ${adjustment.description}`,
         referenceType: 'PERIOD_ADJUSTMENT',
         referenceId: adjustmentId,
         createdBy: actor.id,
         lines: [
-          { accountCode: adjustment.debit_account_code, debit: Number(adjustment.amount), credit: 0, description: adjustment.description },
-          { accountCode: adjustment.credit_account_code, debit: 0, credit: Number(adjustment.amount), description: adjustment.description },
+          { accountCode: adjustment.debitAccountCode, debit: Number(adjustment.amount), credit: 0, description: adjustment.description },
+          { accountCode: adjustment.creditAccountCode, debit: 0, credit: Number(adjustment.amount), description: adjustment.description },
         ],
       });
       tx.run(`
@@ -1679,7 +1679,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
       startDate: fy.startDate,
       endDate: fy.endDate,
       fiscalYearId: fy.id,
-      companyId: fy.company_id || fy.companyId,
+      companyId: fy.companyId,
     }, query, 'year_'));
 
     return checks;
@@ -1917,7 +1917,7 @@ export abstract class FinancePeriodCloseService extends FinanceEnterpriseContrac
            account_type, debit, credit, balance, created_by, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        `fyo_${uuidv4().slice(0, 8)}`, next.id, fy.id, next.company_id || fy.companyId || 'cmp_main',
+        `fyo_${uuidv4().slice(0, 8)}`, next.id, fy.id, next.companyId || fy.companyId || 'cmp_main',
         row.accountCode, row.accountName, row.accountType,
         Number(row.debit || 0), Number(row.credit || 0), Number(row.balance || 0),
         actorId, now,

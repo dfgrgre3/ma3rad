@@ -179,7 +179,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الموظفون والحضور والرواتب والإجازات والعقود والمستندات والتوظيف.',
     dependencies: ['finance'],
     permissions: ['employees.view'],
-    paths: ['/employees', '/employees/attendance', '/employees/payroll', '/employees/commissions', '/employees/leave', '/employees/contracts', '/employees/documents', '/employees/recruitment', '/hr/dashboard', '/hr/organization', '/hr/performance', '/hr/training', '/hr/discipline', '/hr/benefits', '/hr/self-service'],
+    paths: ['/employees', '/employees/attendance', '/employees/payroll', '/employees/commissions', '/employees/leave', '/employees/contracts', '/employees/documents', '/employees/recruitment', '/hr/dashboard', '/hr/organization', '/hr/performance', '/hr/training', '/hr/discipline', '/hr/benefits', '/hr/self-service', '/hr/workforce-planning', '/hr/clearance', '/hr/social-insurance', '/hr/attendance-devices'],
     businessEvents: ['employee.created', 'attendance.recorded', 'payroll.posted', 'recruitment.job.opened', 'recruitment.candidate.updated'],
     settings: [],
     activation: {},

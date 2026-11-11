@@ -8,8 +8,14 @@ import {
   Loader2,
   ShieldCheck,
   User as UserIcon,
+  KeyRound,
 } from 'lucide-react';
-import { AuthService, TwoFactorRequiredError, type LoginGuardStatus } from '../../../services/domains/auth/AuthService';
+import {
+  AuthService,
+  SECURITY_KEY_LOGIN_GUARD_KEY,
+  TwoFactorRequiredError,
+  type LoginGuardStatus,
+} from '../../../services/domains/auth/AuthService';
 import type { User } from '../../../types';
 import { LoginBrandPanel } from './LoginBrandPanel';
 
@@ -17,7 +23,7 @@ interface LoginPageProps {
   onSuccess: (user: User) => void;
 }
 
-type FieldErrors = { username?: string; password?: string; pinCode?: string };
+type FieldErrors = { username?: string; password?: string; pinCode?: string; securityKey?: string };
 
 const EMPTY_GUARD: LoginGuardStatus = {
   maxAttempts: 0,
@@ -39,12 +45,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const pinRef = useRef<HTMLInputElement>(null);
+  const securityKeyRef = useRef<HTMLInputElement>(null);
   const twoFactorRef = useRef<HTMLInputElement>(null);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [pinCode, setPinCode] = useState('');
-  const [loginMethod, setLoginMethod] = useState<'password' | 'pin'>('password');
+  const [securityKey, setSecurityKey] = useState('');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'pin' | 'security-key'>('password');
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [rememberOnDevice, setRememberOnDevice] = useState(false);
@@ -106,7 +114,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   useEffect(() => {
     if (guard.isLocked && lockedRemainingMs === 0) {
       // The window elapsed — re-read the guard so the form unlocks.
-      setGuard(AuthService.getLoginGuardStatus(loginMethod === 'pin' ? '__PIN_LOGIN__' : username.trim()));
+      setGuard(AuthService.getLoginGuardStatus(
+        loginMethod === 'pin' ? '__PIN_LOGIN__'
+          : loginMethod === 'security-key' ? SECURITY_KEY_LOGIN_GUARD_KEY : username.trim()
+      ));
       setError(null);
     }
   }, [guard.isLocked, lockedRemainingMs, username, loginMethod]);
@@ -130,6 +141,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     const next: FieldErrors = {};
     if (loginMethod === 'pin') {
       if (!pinCode.trim()) next.pinCode = 'أدخل رمز الدخول.';
+    } else if (loginMethod === 'security-key') {
+      if (!securityKey.trim()) next.securityKey = 'أدخل مفتاح الأمان.';
     } else {
       if (!username.trim()) next.username = 'أدخل اسم المستخدم.';
       if (!password) next.password = 'أدخل كلمة المرور.';
@@ -138,6 +151,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
     if (next.pinCode) {
       pinRef.current?.focus();
+      return false;
+    }
+    if (next.securityKey) {
+      securityKeyRef.current?.focus();
       return false;
     }
     if (next.username) {
@@ -149,7 +166,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       return false;
     }
     return true;
-  }, [loginMethod, username, password, pinCode]);
+  }, [loginMethod, username, password, pinCode, securityKey]);
 
   const updateCapsLock = (event: React.KeyboardEvent<HTMLInputElement>) => {
     try {
@@ -179,7 +196,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     try {
       const user = loginMethod === 'pin'
         ? AuthService.loginByPin(pinCode.trim())
-        : await AuthService.loginAsync(
+        : loginMethod === 'security-key'
+          ? AuthService.loginBySecurityKey(securityKey.trim())
+          : await AuthService.loginAsync(
           normalizedUsername,
           password,
           twoFactorRequired ? twoFactorCode : undefined
@@ -214,17 +233,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       setError(message);
 
       // Refresh the lockout state so the UI can show remaining attempts or a countdown.
-      const nextGuard = AuthService.getLoginGuardStatus(loginMethod === 'pin' ? '__PIN_LOGIN__' : normalizedUsername);
+      const guardKey = loginMethod === 'pin' ? '__PIN_LOGIN__'
+        : loginMethod === 'security-key' ? SECURITY_KEY_LOGIN_GUARD_KEY : normalizedUsername;
+      const nextGuard = AuthService.getLoginGuardStatus(guardKey);
       setGuard(nextGuard);
       setNow(Date.now());
       if (nextGuard.isLocked) {
         setPassword('');
         setPinCode('');
+        setSecurityKey('');
       }
 
       if (loginMethod === 'pin') {
         pinRef.current?.focus();
         pinRef.current?.select();
+      } else if (loginMethod === 'security-key') {
+        securityKeyRef.current?.focus();
+        securityKeyRef.current?.select();
       } else {
         passwordRef.current?.focus();
         passwordRef.current?.select();
@@ -276,7 +301,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4 px-6 py-5" aria-busy={loading}>
               {!twoFactorRequired && (
-                <div className="grid grid-cols-2 gap-1 rounded-[2px] border border-[#d9d9d9] bg-[#f5f5f5] p-1 dark:border-[#4a4a4a] dark:bg-[#252525]">
+                <div className="grid grid-cols-3 gap-1 rounded-[2px] border border-[#d9d9d9] bg-[#f5f5f5] p-1 dark:border-[#4a4a4a] dark:bg-[#252525]">
                   <button
                     type="button"
                     onClick={() => {
@@ -286,7 +311,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                       setFieldErrors({});
                     }}
                     aria-pressed={loginMethod === 'password'}
-                    className={`rounded-[2px] px-2 py-1.5 text-xs font-semibold ${loginMethod === 'password' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'password' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
                   >
                     اسم المستخدم وكلمة المرور
                   </button>
@@ -299,9 +324,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                       setFieldErrors({});
                     }}
                     aria-pressed={loginMethod === 'pin'}
-                    className={`rounded-[2px] px-2 py-1.5 text-xs font-semibold ${loginMethod === 'pin' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'pin' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
                   >
                     رمز الدخول
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginMethod('security-key');
+                      setGuard(AuthService.getLoginGuardStatus(SECURITY_KEY_LOGIN_GUARD_KEY));
+                      setError(null);
+                      setFieldErrors({});
+                    }}
+                    aria-pressed={loginMethod === 'security-key'}
+                    className={`rounded-[2px] px-1.5 py-1.5 text-[11px] font-semibold ${loginMethod === 'security-key' ? 'bg-white text-[#0078d4] shadow-sm dark:bg-[#3a3a3a]' : 'text-[var(--win-text-muted)]'}`}
+                  >
+                    مفتاح الأمان
                   </button>
                 </div>
               )}
@@ -416,6 +454,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
                   )}
                   <p className="mt-1 text-[10px] text-[var(--win-text-muted)]">
                     أدخل رمز الدخول الذي عيّنه المدير أو وافق عليه.
+                  </p>
+                </div>
+              )}
+
+              {loginMethod === 'security-key' && !twoFactorRequired && (
+                <div>
+                  <label htmlFor="login-security-key" className="mb-1 block text-[11.5px] font-semibold text-[#1b1b1b] dark:text-[#f0f0f0]">
+                    مفتاح الأمان
+                  </label>
+                  <div className="relative">
+                    <KeyRound
+                      className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--win-text-muted)]"
+                      aria-hidden="true"
+                    />
+                    <input
+                      ref={securityKeyRef}
+                      id="login-security-key"
+                      type="password"
+                      dir="ltr"
+                      autoComplete="off"
+                      maxLength={12}
+                      disabled={loading}
+                      value={securityKey}
+                      onChange={(event) => {
+                        setSecurityKey(event.target.value);
+                        clearFieldError('securityKey');
+                      }}
+                      placeholder="••••••••"
+                      aria-invalid={Boolean(fieldErrors.securityKey)}
+                      aria-describedby={fieldErrors.securityKey ? 'login-security-key-error' : undefined}
+                      className={`win-input w-full pl-2 pr-8 text-left disabled:opacity-60 ${
+                        fieldErrors.securityKey ? 'border-[#a8413e] dark:border-[#e3a09b]' : ''
+                      }`}
+                    />
+                  </div>
+                  {fieldErrors.securityKey && (
+                    <p id="login-security-key-error" role="alert" className="mt-1 text-xs text-[#a8413e] dark:text-[#e3a09b]">
+                      {fieldErrors.securityKey}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[10px] text-[var(--win-text-muted)]">
+                    أدخل مفتاح الأمان الذي أنشأته عند إعداد الحساب.
                   </p>
                 </div>
               )}

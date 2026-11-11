@@ -103,7 +103,7 @@ export class SecurityService {
       keyStorage: 'local',
       backupEncryption: true,
       auditLogging: true,
-      performanceMonitoring: true,
+      performanceMonitoring: !(typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined' && __CERAMISYS_LEGACY_BUILD__),
       accessControl: 'strict',
       passwordPolicy: { ...DEFAULT_PASSWORD_POLICY },
     };

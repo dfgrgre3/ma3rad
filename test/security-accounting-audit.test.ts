@@ -17,6 +17,7 @@ test('3.4: enforce default password change, password policy, and session invalid
   // 1. Logging in with default admin password forces password change
   const admin = AuthService.login('admin', 'admin123');
   assert.equal(admin.mustChangePassword, true, 'Default admin password must be flagged for mandatory change');
+  const originalFullName = admin.fullName;
 
   // 2. Password policy rejects weak or default passwords
   assert.throws(
@@ -37,17 +38,23 @@ test('3.4: enforce default password change, password policy, and session invalid
 
   // 3. Changing password to a strong password secures the account and invalidates other sessions
   const auth = new AuthService();
-  auth.changeOwnPassword(admin.id, 'admin123', 'NewAdminPass2026!');
+  await auth.changeOwnPasswordAsync(admin.id, 'admin123', 'NewAdminPass2026!', 'مدير الحساب');
   const current = AuthService.getCurrentUser();
   assert.equal(current?.mustChangePassword, false, 'mustChangePassword should be cleared after change');
+  assert.equal(current?.fullName, 'مدير الحساب', 'Display name should be updated with the password');
+  assert.equal(db.query<{ fullName: string }>(
+    'SELECT full_name AS fullName FROM users WHERE id = ?',
+    [admin.id]
+  )[0]?.fullName, 'مدير الحساب');
 
   // 4. Logging in again with the new password works and does not require password change
   const loggedAgain = AuthService.login('admin', 'NewAdminPass2026!');
   assert.equal(loggedAgain.mustChangePassword, false);
 
   // Restore admin password for other tests
-  db.run('UPDATE users SET password_hash = ? WHERE username = ?', [
+  db.run('UPDATE users SET password_hash = ?, full_name = ? WHERE username = ?', [
     (await import('bcryptjs')).default.hashSync('admin123', 10),
+    originalFullName,
     'admin',
   ]);
 });
@@ -89,6 +96,7 @@ test('first-run setup securely customizes the built-in administrator account', a
   assert.equal(loggedIn.username, 'owner');
   assert.equal(loggedIn.fullName, 'مدير جديد');
   assert.equal(loggedIn.mustChangePassword, false);
+  assert.equal(loggedIn.securityKeySetupRequired, true, 'Renamed built-in admin must still be prompted to create a security key');
 
   AuthService.logout();
   AuthService.login('owner', 'NewOwnerPass2026!');

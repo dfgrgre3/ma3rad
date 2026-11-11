@@ -100,6 +100,9 @@ export default defineConfig(({ command }) => {
       outDir: 'dist',
       emptyOutDir: true,
       sourcemap: false,
+      minify: 'esbuild',
+      cssMinify: true,
+      reportCompressedSize: false,
       target: process.env.CERAMISYS_LEGACY_BUILD === '1' ? 'chrome108' : 'modules',
       chunkSizeWarningLimit: 2000,
       // Keep stable third-party code cacheable and out of the application entry chunk.
@@ -110,7 +113,9 @@ export default defineConfig(({ command }) => {
             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
             if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts';
             if (id.includes('xlsx')) return 'vendor-xlsx';
-            if (id.includes('jspdf')) return 'vendor-pdf';
+            if (id.includes('jspdf') || id.includes('pdfjs')) return 'vendor-pdf';
+            if (id.includes('tesseract')) return 'vendor-ocr';
+            if (id.includes('lucide-react')) return 'vendor-icons';
             if (id.includes('sql.js')) return 'vendor-sqlite';
             return undefined;
           },

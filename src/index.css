@@ -311,10 +311,9 @@ pre, code { overflow-wrap: anywhere; }
 @media (max-width: 640px) {
   .app-header { min-height: 3.5rem; }
   .app-header > nav { display: none; }
-  /* Dialogs and controls stay within the available viewport on touch screens. */
-  .app-main [role='dialog'] { max-width: calc(100vw - 1rem); max-height: calc(100dvh - 1rem); overflow: auto; }
+  /* Keep dialogs within the available height without replacing their own widths. */
+  .app-main [role='dialog'] { max-height: calc(100dvh - 1rem); overflow: auto; }
   .app-main input, .app-main select, .app-main textarea { max-width: 100%; }
-  .app-main .fixed.inset-0 > * { max-width: calc(100vw - 1rem); }
 }
 
 @media (max-width: 380px) {
@@ -446,7 +445,6 @@ pre, code { overflow-wrap: anywhere; }
 
 @media (max-width: 640px) {
   .appearance-color-modal {
-    max-width: calc(100vw - 1rem) !important;
     padding: 1rem !important;
   }
   .appearance-color-item {
@@ -1441,7 +1439,6 @@ pre, code { overflow-wrap: anywhere; }
 
 /* ── Dialogs ─────────────────────────────────────────────────────────────── */
 .win-app [role='dialog'] {
-  max-width: calc(100vw - 16px);
   max-height: calc(100dvh - 16px);
   border-radius: var(--erp-radius, var(--win-radius)) !important;
 }
@@ -1463,7 +1460,7 @@ pre, code { overflow-wrap: anywhere; }
   .win-app .app-main :is(h1, h2).text-3xl { font-size: 1.2rem !important; }
   .win-app .app-main :is(h1, h2).text-2xl { font-size: 1.125rem !important; }
   .win-app .app-main :is(h1, h2).text-xl { font-size: 1.05rem !important; }
-  .win-app .app-main [role='dialog'] { max-width: calc(100vw - 8px); max-height: calc(100dvh - 8px); }
+  .win-app .app-main [role='dialog'] { max-height: calc(100dvh - 8px); }
   /* Action groups wrap instead of pushing the page wider than the screen. */
   .win-app .app-main :is(header, form) > .flex:last-child { flex-wrap: wrap; }
 }

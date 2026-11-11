@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Activity, AlertTriangle } from 'lucide-react';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
@@ -12,9 +12,14 @@ import { TodayPurchasesPanel } from './TodayPurchasesPanel';
 import { TopCustomersCard } from './TopCustomersCard';
 import { TopProductsCard } from './TopProductsCard';
 import { ProfileKpiPanel } from './ProfileKpiPanel';
+import { QuickActions } from './QuickActions';
 import { useOverviewDashboardData } from '../../hooks/domains/dashboard/useOverviewDashboardData';
 
-export const OverviewSection: React.FC = () => {
+interface OverviewSectionProps {
+  onDataLoaded?: () => void;
+}
+
+export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }) => {
   const {
     metrics,
     chartData,
@@ -27,6 +32,8 @@ export const OverviewSection: React.FC = () => {
     paymentDistribution,
     recentActivities,
     todayPurchases,
+    purchasesLoading,
+    purchasesError,
     loadData,
     purchaseHourly,
     purchasePeakHour,
@@ -35,6 +42,10 @@ export const OverviewSection: React.FC = () => {
     purchaseTopItems,
     purchaseQuantitiesByUnit,
   } = useOverviewDashboardData();
+
+  useEffect(() => {
+    if (!loading && !refreshing) onDataLoaded?.();
+  }, [loading, onDataLoaded, refreshing]);
 
   if (!metrics && loading) {
     return (
@@ -68,7 +79,6 @@ export const OverviewSection: React.FC = () => {
 
   return (
     <div className="min-w-0 space-y-3 sm:space-y-4">
-      <ProfileKpiPanel />
       {dashboardError && (
         <div role="alert" className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
           <span className="flex min-w-0 items-center gap-1.5">
@@ -79,7 +89,10 @@ export const OverviewSection: React.FC = () => {
         </div>
       )}
 
-      {/* ── Unified Metric Cards Grid (8 Compact KPI Cards) ── */}
+      <AttentionRequiredSection metrics={metrics} />
+      <QuickActions />
+      <ProfileKpiPanel />
+
       <OverviewKpiGrid
         metrics={metrics}
         monthlyComparison={monthlyComparison}
@@ -87,12 +100,12 @@ export const OverviewSection: React.FC = () => {
         averageTicket={averageTicket}
       />
 
-      <AttentionRequiredSection metrics={metrics} />
-
-      {/* ── Today's Purchases Compact Panel ── */}
       <TodayPurchasesPanel
         canViewPurchases={PermissionService.can(AuthService.getCurrentUser(), 'ui.purchases.invoices.view')}
         todayPurchases={todayPurchases}
+        isLoading={purchasesLoading}
+        error={purchasesError}
+        onRetry={loadData}
         purchaseHourly={purchaseHourly}
         purchasePeakHour={purchasePeakHour}
         purchasePaymentMix={purchasePaymentMix}
@@ -101,28 +114,17 @@ export const OverviewSection: React.FC = () => {
         purchaseQuantitiesByUnit={purchaseQuantitiesByUnit}
       />
 
-      {/* ── Main Charts Row (Sales Trend & Top Selling Products) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        {/* Sales Trend Chart (2 cols) */}
         <SalesTrendCard chartData={chartData} />
-
-        {/* Top Ceramic Products (1 col) */}
         <TopProductsCard topProducts={topProducts} />
       </div>
 
-      {/* ── Secondary Analytics (Categories, Payment Methods, Top Customers) ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Category Distribution */}
         <CategoryDistributionCard categorySales={categorySales} />
-
-        {/* Payment Methods */}
         <PaymentMethodsCard paymentDistribution={paymentDistribution} />
-
-        {/* Top Customers */}
         <TopCustomersCard topCustomers={topCustomers} />
       </div>
 
-      {/* ── Recent Activities Compact Feed ── */}
       <RecentActivitiesFeed recentActivities={recentActivities} />
     </div>
   );

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { activate, launchSeededApp, login } from './support/app.fixture';
+import { launchSeededApp, login, waitForLogin } from './support/app.fixture';
 
 /**
  * Visual audit screenshots for design-system review.
@@ -16,7 +16,7 @@ test('capture representative pages for visual review', async () => {
   test.setTimeout(300_000);
   const { app, page, closeMockServer } = await launchSeededApp();
   try {
-    await activate(page);
+    await waitForLogin(page);
     await login(page);
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 900 });

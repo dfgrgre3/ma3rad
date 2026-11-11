@@ -59,6 +59,10 @@ export const HrDisciplinePage = lazy(() => import('../pages/hr/discipline/HrDisc
 
 export const HrBenefitsPage = lazy(() => import('../pages/hr/benefits/HrBenefitsPage').then(m => ({ default: m.HrBenefitsPage })));
 export const HrSelfServicePage = lazy(() => import('../pages/hr/self-service/HrSelfServicePage').then(m => ({ default: m.HrSelfServicePage })));
+export const WorkforcePlanningPage = lazy(() => import('../pages/hr/workforce-planning/WorkforcePlanningPage').then(m => ({ default: m.WorkforcePlanningPage })));
+export const EmployeeClearancePage = lazy(() => import('../pages/hr/clearance/EmployeeClearancePage').then(m => ({ default: m.EmployeeClearancePage })));
+export const PayrollSocialInsurancePage = lazy(() => import('../pages/hr/social-insurance/PayrollSocialInsurancePage').then(m => ({ default: m.PayrollSocialInsurancePage })));
+export const AttendanceDevicesPage = lazy(() => import('../pages/hr/attendance-devices/AttendanceDevicesPage').then(m => ({ default: m.AttendanceDevicesPage })));
 
 // CRM & Customers
 export const CustomersView = lazy(() => import('../components/customers/CustomersView').then(m => ({ default: m.CustomersView })));

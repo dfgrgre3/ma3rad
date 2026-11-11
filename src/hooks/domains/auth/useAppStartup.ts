@@ -25,6 +25,7 @@ function markRuntimeSession(): void {
 
 export function useAppStartup() {
   const backupTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startupMaintenanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncWorker = useRef<SyncWorker | null>(null);
   const startupCompleted = useRef(false);
   const [dbReady, setDbReady] = useState(false);
@@ -48,8 +49,15 @@ export function useAppStartup() {
         PermissionService.seed();
         setCurrentUser(restoreCurrentRuntimeSession ? AuthService.restoreSession() : null);
         setDbReady(true);
-        scheduleAutomaticBackupChecks(backupTimer);
-        try { new NotificationService().runScheduledChecks(); } catch { /* ignore */ }
+        startupMaintenanceTimer.current = setTimeout(() => {
+          startupMaintenanceTimer.current = null;
+          scheduleAutomaticBackupChecks(backupTimer);
+          try {
+            new NotificationService().runScheduledChecks();
+          } catch (error) {
+            console.error('Scheduled notifications could not be refreshed:', error);
+          }
+        }, 1000);
       })
       .catch((err) => {
         const failure = toAppError(err, 'DATABASE_INITIALIZATION_FAILED', 'حدث خطأ أثناء تحميل قاعدة البيانات.');
@@ -76,6 +84,7 @@ export function useAppStartup() {
     void CentralLicenseService.initHardwareBinding();
     initDb();
     return () => {
+      if (startupMaintenanceTimer.current) clearTimeout(startupMaintenanceTimer.current);
       if (backupTimer.current) clearInterval(backupTimer.current);
       void syncWorker.current?.stopAndWait();
       syncWorker.current = null;

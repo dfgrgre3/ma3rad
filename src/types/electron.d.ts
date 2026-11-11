@@ -170,6 +170,8 @@ declare global {
             processUptimeSeconds: number;
             processMemoryBytes: number;
             processHeapUsedBytes: number;
+            electronProcessMemoryBytes?: number;
+            electronProcessCpuPercent?: number | null;
             disk: { available: true; freeBytes: number; totalBytes: number } | { available: false; error: string };
           };
         }>;

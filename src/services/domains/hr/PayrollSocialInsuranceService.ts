@@ -125,6 +125,12 @@ export class PayrollSocialInsuranceService {
     return row.companyId;
   }
 
+  /** Company id of the current branch, for calculators that operate outside a rule row. */
+  static getCurrentCompanyId(): string {
+    this.requireView();
+    return this.currentCompanyId();
+  }
+
   /* ========== Social Insurance Rules ========== */
 
   static getSocialInsuranceRules(): SocialInsuranceRule[] {

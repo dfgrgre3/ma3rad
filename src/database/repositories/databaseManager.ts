@@ -1,12 +1,14 @@
 import type { Database } from 'sql.js';
-import { runMigrations, DEFAULT_BRANCH_ID } from '../migrations';
-import bcrypt from 'bcryptjs';
+import type { MigrationReport } from '../migrations';
+import { DEFAULT_BRANCH_ID } from '../migrations/settings';
 import { AppError, toAppError } from '../../errors/appError';
 
 const DB_STORAGE_KEY = 'ceramics_erp_sqlite_db';
 const DB_IDB_NAME = 'ceramisys_database';
 const DB_IDB_STORE = 'snapshots';
 const DB_IDB_KEY = 'main';
+const SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS = 50;
+const SLOW_SNAPSHOT_PERSIST_THRESHOLD_MS = 500;
 const LEGACY_X86_BUILD = typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined'
   && __CERAMISYS_LEGACY_BUILD__;
 type DatabaseFileApi = NonNullable<NonNullable<Window['ceramisys']>['db']>;
@@ -151,7 +153,11 @@ export class DatabaseManager {
   private queryCacheMisses = 0;
   private totalQueries = 0;
   private failedQueries = 0;
-  private readonly queryCacheTtlMs = 2000;
+  private slowQueryCount = 0;
+  private slowestQueryMs = 0;
+  private readonly slowQueryThresholdMs = 250;
+  private recentSlowQueries: Array<{ timestamp: string; durationMs: number; statement: string }> = [];
+  private readonly queryCacheTtlMs = 5000;
   private readonly queryCacheMaxEntries = LEGACY_X86_BUILD ? 150 : 300;
   private readonly queryCacheMaxEntryBytes = LEGACY_X86_BUILD ? 256 * 1024 : 512 * 1024;
   private readonly queryCacheMaxSizeBytes = LEGACY_X86_BUILD ? 4 * 1024 * 1024 : 16 * 1024 * 1024;
@@ -204,6 +210,7 @@ export class DatabaseManager {
   }
 
   private async initializeDatabase(): Promise<Database> {
+    const initializationStartedAt = performance.now();
     this.clearQueryCache();
     if (this.db) {
       this.db?.close();
@@ -211,13 +218,31 @@ export class DatabaseManager {
     }
 
     const fileApi = typeof window !== 'undefined' ? window.ceramisys?.db : undefined;
+    const sqlEngineStartedAt = performance.now();
+    const snapshotLoadStartedAt = performance.now();
     const [, loadedDatabase] = await Promise.all([
-      this.initializeSqlEngine(),
-      this.loadSavedBytes(fileApi),
+      this.initializeSqlEngine().then(() => {
+        console.info('[performance] SQL.js engine initialized', JSON.stringify({
+          durationMs: Math.round((performance.now() - sqlEngineStartedAt) * 100) / 100,
+        }));
+      }),
+      this.loadSavedBytes(fileApi).then((result) => {
+        console.info('[performance] Database snapshot loaded', JSON.stringify({
+          durationMs: Math.round((performance.now() - snapshotLoadStartedAt) * 100) / 100,
+          bytes: result.savedBytes?.byteLength ?? 0,
+          loadedFromFile: result.loadedFromFile,
+        }));
+        return result;
+      }),
     ]);
     let savedBytes = loadedDatabase.savedBytes;
     const { loadedFromFile } = loadedDatabase;
+    const databaseOpenStartedAt = performance.now();
     const isFreshDatabase = await this.openDatabase(savedBytes);
+    console.info('[performance] SQLite database opened', JSON.stringify({
+      durationMs: Math.round((performance.now() - databaseOpenStartedAt) * 100) / 100,
+      isFreshDatabase,
+    }));
     this.selectStorageBackend(fileApi);
     await this.backupBeforeGrossProfitMigration(savedBytes, loadedFromFile, isFreshDatabase, fileApi);
     // sql.js has copied the database into WASM memory; don't retain the raw
@@ -226,16 +251,32 @@ export class DatabaseManager {
 
     const schemaBeforeMigrations = this.getSchemaSignature();
     const legacyDataChanged = this.ensureLegacySalesInvoiceStatusColumns();
+    const migrationStartedAt = performance.now();
+    const { runMigrations } = await import('../migrations');
     const report = runMigrations(this.getDatabase());
+    console.info('[performance] Database migrations completed', JSON.stringify({
+      durationMs: Math.round((performance.now() - migrationStartedAt) * 100) / 100,
+      applied: report.applied.length,
+      failed: report.failed.length,
+    }));
     await this.handleMigrationFailures(report, isFreshDatabase, fileApi);
 
     const databaseChanged = isFreshDatabase
       || legacyDataChanged
       || report.applied.length > 0
       || schemaBeforeMigrations !== this.getSchemaSignature();
+    const persistenceStartedAt = performance.now();
     await this.persistInitializedDatabase(isFreshDatabase, databaseChanged);
+    console.info('[performance] Initial database persistence completed', JSON.stringify({
+      durationMs: Math.round((performance.now() - persistenceStartedAt) * 100) / 100,
+      databaseChanged,
+    }));
     this.forceFreshAfterRecovery = false;
     this.initializedSuccessfully = true;
+    console.info('[performance] Database initialization completed', JSON.stringify({
+      durationMs: Math.round((performance.now() - initializationStartedAt) * 100) / 100,
+      databaseChanged,
+    }));
     return this.getDatabase();
   }
 
@@ -443,7 +484,7 @@ export class DatabaseManager {
   }
 
   private async handleMigrationFailures(
-    report: ReturnType<typeof runMigrations>,
+    report: MigrationReport,
     isFreshDatabase: boolean,
     fileApi: DatabaseFileApi | undefined
   ): Promise<void> {
@@ -680,6 +721,7 @@ export class DatabaseManager {
     }
     this.cancelIdleSave();
     let snapshot: Uint8Array;
+    const exportStartedAt = performance.now();
     try {
       snapshot = this.exportSnapshot();
     } catch (e) {
@@ -688,6 +730,13 @@ export class DatabaseManager {
       this.lastPersistErrorCode = failure.code;
       console.error('Failed to export SQLite database snapshot', e);
       return;
+    }
+    const exportDurationMs = Math.max(0, performance.now() - exportStartedAt);
+    if (exportDurationMs >= SLOW_SNAPSHOT_EXPORT_THRESHOLD_MS) {
+      console.warn('[performance] Slow database snapshot export', JSON.stringify({
+        durationMs: Math.round(exportDurationMs * 100) / 100,
+        bytes: snapshot.byteLength,
+      }));
     }
     this.persist(snapshot);
   }
@@ -715,6 +764,7 @@ export class DatabaseManager {
   }
 
   private async persistSnapshot(snapshot: Uint8Array): Promise<void> {
+    const persistStartedAt = performance.now();
     try {
       if (await this.persistToFile(snapshot)) return;
       if (typeof indexedDB !== 'undefined' || typeof localStorage !== 'undefined') {
@@ -734,6 +784,15 @@ export class DatabaseManager {
       this.lastPersistError = persistenceErrorMessage(error, failure.code);
       this.lastPersistErrorCode = failure.code;
       console.error('Failed to persist SQLite database', error);
+    } finally {
+      const durationMs = Math.max(0, performance.now() - persistStartedAt);
+      if (durationMs >= SLOW_SNAPSHOT_PERSIST_THRESHOLD_MS) {
+        console.warn('[performance] Slow database snapshot persistence', JSON.stringify({
+          durationMs: Math.round(durationMs * 100) / 100,
+          bytes: snapshot.byteLength,
+          backend: this.storageBackend,
+        }));
+      }
     }
   }
 
@@ -810,23 +869,25 @@ export class DatabaseManager {
         get: (target, property) => {
           const value = Reflect.get(target, property, target);
           if (property === 'run' || property === 'exec') {
-            return (...args: unknown[]) => this.trackQuery(() => {
+            return (...args: unknown[]) => {
               const sql = args[0];
-              if (typeof sql !== 'string' || this.isMutatingSql(sql)) this.clearQueryCache();
-              if (property === 'exec' && typeof sql === 'string') {
-                const params = Array.isArray(args[1]) ? args[1] : [];
-                const cacheKey = this.createQueryCacheKey(sql, params);
-                if (cacheKey) {
-                  const key = `exec:${cacheKey}`;
-                  const cached = this.getCachedQuery<unknown>(key);
-                  if (cached !== undefined) return cached;
-                  const result = Reflect.apply(value, target, args);
-                  this.setCachedQuery(key, result);
-                  return result;
+              return this.trackQuery(typeof sql === 'string' ? sql : '', () => {
+                if (typeof sql !== 'string' || this.isMutatingSql(sql)) this.clearQueryCache();
+                if (property === 'exec' && typeof sql === 'string') {
+                  const params = Array.isArray(args[1]) ? args[1] : [];
+                  const cacheKey = this.createQueryCacheKey(sql, params);
+                  if (cacheKey) {
+                    const key = `exec:${cacheKey}`;
+                    const cached = this.getCachedQuery<unknown>(key);
+                    if (cached !== undefined) return cached;
+                    const result = Reflect.apply(value, target, args);
+                    this.setCachedQuery(key, result);
+                    return result;
+                  }
                 }
-              }
-              return Reflect.apply(value, target, args);
-            });
+                return Reflect.apply(value, target, args);
+              });
+            };
           }
           return typeof value === 'function' ? value.bind(target) : value;
         },
@@ -909,7 +970,7 @@ export class DatabaseManager {
   }
 
   public query<T = any>(sql: string, params: any[] = []): T[] {
-    return this.trackQuery(() => {
+    return this.trackQuery(sql, () => {
       const cacheKey = this.createQueryCacheKey(sql, params);
       if (cacheKey) {
         const cached = this.getCachedQuery<T[]>(`query:${cacheKey}`);
@@ -933,9 +994,12 @@ export class DatabaseManager {
   }
 
   public run(sql: string, params: any[] = []): void {
-    this.trackQuery(() => {
+    this.trackQuery(sql, () => {
       this.clearQueryCache();
-      const db = this.getDatabase();
+      const db = this.db;
+      if (!db) {
+        throw new Error('Database not initialized! Call DatabaseManager.getInstance().initialize() first.');
+      }
       db.run(sql, params);
       // Debounce writes outside transactions so sequential queries don't export full snapshots repeatedly
       if (this.transactionDepth === 0) {
@@ -944,18 +1008,62 @@ export class DatabaseManager {
     });
   }
 
-  private trackQuery<T>(operation: () => T): T {
+  private trackQuery<T>(sql: string, operation: () => T): T {
+    const startedAt = performance.now();
     this.totalQueries++;
     try {
       return operation();
     } catch (error) {
       this.failedQueries++;
       throw error;
+    } finally {
+      const durationMs = Math.max(0, performance.now() - startedAt);
+      if (durationMs >= this.slowQueryThresholdMs) {
+        this.slowQueryCount++;
+        this.slowestQueryMs = Math.max(this.slowestQueryMs, durationMs);
+        const statement = sql
+          .replace(/'(?:''|[^'])*'/g, '?')
+          .replace(/\b\d+\b/g, '?')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 160);
+        this.recentSlowQueries.push({
+          timestamp: new Date().toISOString(),
+          durationMs: Math.round(durationMs * 100) / 100,
+          statement,
+        });
+        const slowQueryHistoryLimit = LEGACY_X86_BUILD ? 10 : 50;
+        if (this.recentSlowQueries.length > slowQueryHistoryLimit) this.recentSlowQueries.shift();
+      }
     }
   }
 
-  public getQueryStats(): { totalQueries: number; failedQueries: number } {
-    return { totalQueries: this.totalQueries, failedQueries: this.failedQueries };
+  public getQueryStats(): {
+    totalQueries: number;
+    failedQueries: number;
+    slowQueryCount: number;
+    slowestQueryMs: number;
+  } {
+    return {
+      totalQueries: this.totalQueries,
+      failedQueries: this.failedQueries,
+      slowQueryCount: this.slowQueryCount,
+      slowestQueryMs: this.slowestQueryMs,
+    };
+  }
+
+  public getSlowQueryStats(): {
+    thresholdMs: number;
+    count: number;
+    slowestQueryMs: number;
+    recent: Array<{ timestamp: string; durationMs: number; statement: string }>;
+  } {
+    return {
+      thresholdMs: this.slowQueryThresholdMs,
+      count: this.slowQueryCount,
+      slowestQueryMs: this.slowestQueryMs,
+      recent: this.recentSlowQueries.map((query) => ({ ...query })),
+    };
   }
 
   /** Execute a bounded list query and its count query without loading all rows. */
@@ -965,9 +1073,10 @@ export class DatabaseManager {
     params: any[] = [],
     page = 1,
     pageSize = 25,
+    countParams: any[] = params,
   ): { items: T[]; page: number; pageSize: number; totalItems: number; totalPages: number } {
     const safePageSize = Math.min(Math.max(Math.floor(pageSize) || 25, 1), 100);
-    const totalItems = Number(this.query<any>(countSql, params)[0]?.totalItems ?? 0);
+    const totalItems = Number(this.query<any>(countSql, countParams)[0]?.totalItems ?? 0);
     const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize));
     const safePage = Math.min(Math.max(Math.floor(page) || 1, 1), totalPages);
     const items = this.query<T>(`${dataSql} LIMIT ? OFFSET ?`, [...params, safePageSize, (safePage - 1) * safePageSize]);
@@ -1177,8 +1286,9 @@ export class DatabaseManager {
     return snapshot;
   }
 
-  public importDatabaseBinary(bytes: Uint8Array): void {
+  public async importDatabaseBinary(bytes: Uint8Array): Promise<void> {
     if (!this.SQL) throw new Error('SQL engine not loaded');
+    const { runMigrations } = await import('../migrations');
     this.clearQueryCache();
     let imported: Database | undefined;
     try {

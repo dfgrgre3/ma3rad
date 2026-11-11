@@ -54,7 +54,7 @@ test('database recovery preserves unreadable data and requires an explicit fresh
   manager.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('restore_failure_sentinel', 'keep-current')`);
   await manager.flush();
   const currentDb = manager.getDatabase();
-  assert.throws(() => manager.importDatabaseBinary(new Uint8Array([1, 2, 3])));
+  await assert.rejects(() => manager.importDatabaseBinary(new Uint8Array([1, 2, 3])));
   assert.equal(manager.getDatabase(), currentDb, 'a rejected restore never swaps the live database handle');
   assert.equal(manager.query<{ value: string }>(`SELECT value FROM system_settings WHERE key='restore_failure_sentinel'`)[0]?.value,
     'keep-current', 'the active database contents remain available after restore validation fails');

@@ -16,7 +16,6 @@ import { APP_VERSION } from '../config/appVersion';
 import { DatabasePersistenceStatus } from '../components/shared/DatabasePersistenceStatus';
 import { AppRouter } from '../router';
 import { LoginPage } from '../pages/auth/login/LoginPage';
-import { FirstRunActivationPage } from '../pages/auth/first-run-activation/FirstRunActivationPage';
 import { SetupWizard } from '../components/setup/SetupWizard';
 import { ForcePasswordChangeModal } from '../components/auth/ForcePasswordChangeModal';
 import { ThemeProvider } from '../contexts/ThemeProvider';
@@ -240,20 +239,6 @@ export const App: React.FC = () => {
     }
   }, [currentUser?.id]);
 
-  if (!activationComplete) {
-    return (
-      <>
-        <FirstRunActivationPage
-          onSuccess={() => {
-            setLicenseBlocked(false);
-            setActivationComplete(true);
-          }}
-        />
-        <UpdateNotification />
-      </>
-    );
-  }
-
   if (licenseBlocked) {
     return (
       <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-950 px-4 py-10">
@@ -261,8 +246,7 @@ export const App: React.FC = () => {
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-2xl font-black text-rose-700">!</div>
           <h1 className="text-xl font-black text-slate-900">تعذر التحقق من الترخيص</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            انتهت فترة العمل دون اتصال أو رفض الخادم صلاحية هذا الجهاز. تحقق من الاتصال ثم أعد المحاولة،
-            أو أعد تفعيل الجهاز برمز جديد.
+            انتهت فترة العمل دون اتصال أو رفض الخادم صلاحية هذا الجهاز. تحقق من الاتصال أو تواصل مع مسؤول النظام.
           </p>
           <div className="mt-6 flex flex-col gap-3">
             <button
@@ -271,19 +255,6 @@ export const App: React.FC = () => {
               className="rounded-xl bg-sky-700 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:bg-sky-800 disabled:opacity-60"
             >
               {licenseRetrying ? 'جارٍ التحقق...' : 'إعادة المحاولة'}
-            </button>
-            <button
-              onClick={() => {
-                void CentralLicenseService.clearActivation().catch((error: unknown) => {
-                  console.error('Could not clear the central activation credential:', error);
-                });
-                setLicenseBlocked(false);
-                setActivationComplete(false);
-              }}
-              disabled={licenseRetrying}
-              className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-            >
-              إعادة التفعيل برمز جديد
             </button>
           </div>
         </div>
@@ -362,7 +333,7 @@ export const App: React.FC = () => {
     <ThemeProvider ready={dbReady}>
       <ToastProvider>
         <ErrorBoundary>
-          {!BYPASS_FIRST_RUN_SETUP && !showSetup && currentUser?.mustChangePassword && (
+          {!BYPASS_FIRST_RUN_SETUP && !showSetup && (currentUser?.mustChangePassword || currentUser?.securityKeySetupRequired) && (
             <ForcePasswordChangeModal user={currentUser} onSuccess={(u) => setCurrentUser(u)} />
           )}
           <UpdateNotification />

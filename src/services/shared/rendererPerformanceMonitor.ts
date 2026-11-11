@@ -4,7 +4,10 @@ const LONG_TASK_THRESHOLD_MS = 300;
 const SLOW_RENDER_THRESHOLD_MS = 250;
 
 export function startRendererPerformanceMonitoring(): () => void {
-  if (!import.meta.env.DEV || typeof PerformanceObserver === 'undefined') {
+  if (
+    typeof PerformanceObserver === 'undefined'
+    || !PerformanceObserver.supportedEntryTypes?.includes('longtask')
+  ) {
     return () => {};
   }
 
@@ -18,11 +21,6 @@ export function startRendererPerformanceMonitoring(): () => void {
       }
     }
   });
-
-  if (!PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
-    observer.disconnect();
-    return () => {};
-  }
 
   observer.observe({ entryTypes: ['longtask'] });
   return () => observer.disconnect();

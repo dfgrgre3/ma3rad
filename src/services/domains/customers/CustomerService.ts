@@ -152,9 +152,16 @@ export class CustomerService {
     const existing = this.db.query('SELECT id FROM customers WHERE name = ?', [cleanName]);
     if (existing.length > 0) throw new Error('اسم العميل مسجل مسبقاً.');
     const id = `cust_${uuidv4().substring(0, 8)}`;
-    const code = customer.code || `CUST-${Date.now().toString().slice(-5)}`;
+    const requestedCode = customer.code?.trim();
 
     return this.db.executeTransaction((sqliteDb) => {
+      let code = requestedCode;
+      if (!code) {
+        do {
+          code = sqliteDb.nextNumber('CUST');
+        } while (sqliteDb.query('SELECT id FROM customers WHERE code = ?', [code]).length > 0);
+      }
+
       sqliteDb.run(`
         INSERT INTO customers (
           id, code, name, phone, phone2, national_id, address, city,

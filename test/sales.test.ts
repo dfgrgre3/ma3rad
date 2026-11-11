@@ -110,7 +110,7 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   // Simulate closing and reopening the SQLite file saved by Electron.
   await db.flush();
   const persistedBytes = db.exportDatabaseBinary();
-  db.importDatabaseBinary(persistedBytes);
+  await db.importDatabaseBinary(persistedBytes);
   const restoredDb = db.getDatabase();
   assert.equal(restoredDb.exec('PRAGMA integrity_check')[0]?.values[0]?.[0], 'ok');
   assert.equal(restoredDb.exec('PRAGMA foreign_key_check')[0]?.values.length ?? 0, 0);

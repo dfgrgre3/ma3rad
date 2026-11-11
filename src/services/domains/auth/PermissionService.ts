@@ -346,6 +346,25 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'hr.selfservice.view', name: 'بوابة الموظف الذاتية', module: 'HR' },
   { code: 'hr.selfservice.request', name: 'تقديم طلبات من بوابة الموظف', module: 'HR' },
 
+  // HR core domain permissions (spec 2.2)
+  { code: 'hr.employees.view', name: 'عرض بيانات الموظفين', module: 'HR' },
+  { code: 'hr.employees.manage', name: 'إضافة وتعديل بيانات الموظفين', module: 'HR' },
+  { code: 'hr.organization.view', name: 'عرض الهيكل التنظيمي', module: 'HR' },
+  { code: 'hr.attendance.manage', name: 'إدارة الحضور', module: 'HR' },
+  { code: 'hr.attendance.approve', name: 'اعتماد تعديلات الحضور', module: 'HR' },
+  { code: 'hr.payroll.view', name: 'عرض الرواتب', module: 'HR' },
+  { code: 'hr.payroll.calculate', name: 'احتساب الرواتب', module: 'HR' },
+  { code: 'hr.payroll.approve', name: 'اعتماد الرواتب', module: 'HR' },
+  { code: 'hr.payroll.pay', name: 'تنفيذ الصرف', module: 'HR' },
+  { code: 'hr.documents.confidential', name: 'الوصول للمستندات السرية', module: 'HR' },
+  { code: 'hr.performance.manage', name: 'إدارة تقييم الأداء', module: 'HR' },
+  { code: 'hr.training.manage', name: 'إدارة التدريب', module: 'HR' },
+  { code: 'hr.discipline.manage', name: 'إدارة الجزاءات والشكاوى', module: 'HR' },
+  { code: 'hr.benefits.manage', name: 'إدارة المزايا والبدلات', module: 'HR' },
+  { code: 'hr.clearance.manage', name: 'إدارة إخلاء الطرف', module: 'HR' },
+  { code: 'hr.workforce.manage', name: 'إدارة تخطيط القوى العاملة', module: 'HR' },
+  { code: 'hr.insurance.manage', name: 'إدارة التأمينات الاجتماعية', module: 'HR' },
+
   // ── صلاحيات دقيقة للصفحات والأقسام والأزرار ──────────────────────────────
   // Dashboard
   { code: 'dashboard.export', name: 'تصدير بيانات لوحة المعلومات', module: 'DASHBOARD' },

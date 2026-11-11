@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { DEFAULT_SETTINGS } from '../../../database/migrations';
+import { DEFAULT_SETTINGS } from '../../../database/migrations/settings';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { AuditService } from '../security/AuditService';

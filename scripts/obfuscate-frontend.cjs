@@ -28,7 +28,7 @@ for (const entry of files) {
   const obfuscationResult = JavaScriptObfuscator.obfuscate(code, {
     compact: true,
     controlFlowFlattening: true,
-    controlFlowFlatteningThreshold: 0.75,
+    controlFlowFlatteningThreshold: 0.15,
     deadCodeInjection: false, // keep performance snappy
     debugProtection: false, // handled by Electron
     disableConsoleOutput: false,

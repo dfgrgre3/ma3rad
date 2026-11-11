@@ -7,7 +7,6 @@ import {
   tempDataDir,
   launchApp,
   launchAuthenticatedApp,
-  activate,
   login,
 } from './support/app.fixture';
 
@@ -17,33 +16,11 @@ import {
  * never reads or writes a real installation's database.
  */
 
-test('a fresh installation renders its activation or login entry point', async () => {
+test('a fresh installation renders the login entry point', async () => {
   const dataDir = tempDataDir();
   const { app, page, closeMockServer } = await launchApp(dataDir);
   try {
     await expect(page).toHaveTitle(/سيراميسيس/);
-    await expect(page.locator('#username').or(page.getByLabel('اسم الحساب')))
-      .toBeVisible({ timeout: 90_000 });
-    const activationCode = page.getByLabel('مفتاح الترخيص');
-    if (await activationCode.isVisible().catch(() => false)) {
-      await page.getByLabel('اسم الحساب').fill('admin');
-      await page.getByLabel('كلمة المرور').fill('admin123');
-      await page.getByLabel('رقم الهاتف').fill('01000000000');
-      await activationCode.fill('INVALID-CODE');
-      await page.getByRole('button', { name: 'تحقق وانتقل لتسجيل الدخول' }).click();
-      await expect(page.getByRole('alert')).toContainText('رمز التفعيل غير صحيح.');
-      await expect(page.locator('#username')).toHaveCount(0);
-
-      await activationCode.fill('VALID-CODE');
-      await page.getByRole('button', { name: 'تحقق وانتقل لتسجيل الدخول' }).click();
-      await expect(page.locator('#username')).toBeVisible();
-      await page.reload();
-      await expect(page.locator('#username')).toBeVisible({ timeout: 90_000 });
-      await login(page);
-      await expect(page.locator('#root')).not.toBeEmpty();
-      return;
-    }
-
     await expect(page.locator('#username')).toBeVisible({ timeout: 90_000 });
     const rootHtml = await page.locator('#root').innerHTML();
     expect(rootHtml.length).toBeGreaterThan(500);

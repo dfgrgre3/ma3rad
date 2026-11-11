@@ -1,7 +1,7 @@
 import {
-  Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Building2, CalendarDays, Car,
+  Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Briefcase, Building2, CalendarDays, Car,
   CheckSquare, Clock3, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
-  Gift, GraduationCap, HardHat, Network, RefreshCw, Settings, ShieldAlert, ShieldCheck,
+  Gift, GraduationCap, HardHat, Landmark, Network, RefreshCw, Settings, ShieldAlert, ShieldCheck,
   ShoppingCart, SlidersHorizontal, Sparkles, Star, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
 } from 'lucide-react';
 import type { NavGroupDef } from '../types/config/navigation';
@@ -43,6 +43,10 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
       { label: 'التدريب والتطوير', to: '/hr/training', icon: GraduationCap, perm: 'employees.payroll.view' },
       { label: 'الجزاءات والمخالفات', to: '/hr/discipline', icon: ShieldAlert, perm: 'employees.payroll.view' },
       { label: 'المزايا والبدلات', to: '/hr/benefits', icon: Gift, perm: 'employees.payroll.view' },
+      { label: 'تخطيط القوى العاملة', to: '/hr/workforce-planning', icon: Briefcase, perm: 'employees.payroll.view' },
+      { label: 'إخلاء الطرف', to: '/hr/clearance', icon: ShieldCheck, perm: 'employees.payroll.view' },
+      { label: 'التأمينات الاجتماعية', to: '/hr/social-insurance', icon: Landmark, perm: 'employees.payroll.view' },
+      { label: 'أجهزة الحضور والانصراف', to: '/hr/attendance-devices', icon: Cpu, perm: 'employees.payroll.view' },
       { label: 'عقود الموظفين', to: '/employees/contracts', icon: FileSignature, perm: 'hr.contracts.view' },
       { label: 'مستندات الموظفين', to: '/employees/documents', icon: FileText, perm: 'hr.documents.view' },
       { label: 'التوظيف والمرشحون', to: '/employees/recruitment', icon: UserPlus, perm: 'hr.recruitment.view' },

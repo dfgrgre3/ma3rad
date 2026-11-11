@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { activate, launchSeededApp, login } from './support/app.fixture';
+import { launchSeededApp, login, waitForLogin } from './support/app.fixture';
 
 test('POS customer dialog searches, filters, paginates, and updates the invoice customer', async () => {
   test.setTimeout(300_000);
   const { app, page, closeMockServer } = await launchSeededApp();
 
   try {
-    await activate(page);
+    await waitForLogin(page);
     await login(page);
     await page.evaluate(() => { window.location.hash = '#/pos'; });
     await expect(page.getByRole('heading', { name: 'نقطة البيع السريعة' })).toBeVisible();

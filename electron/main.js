@@ -121,10 +121,8 @@ if (app.isPackaged && dangerousSwitches.some(sw => process.argv.some(arg => arg.
   app.quit();
 }
 
-app.disableHardwareAcceleration();
-
-// تحسينات استهلاك الموارد للأجهزة الضعيفة والقديمة (Low-spec optimizations)
-app.commandLine.appendSwitch('disable-gpu');
+// Keep Chromium's default GPU selection enabled so rendering is not forced onto
+// the CPU; retain the memory cap for low-spec devices.
 app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${getMaxV8HeapSize(process.arch)}`);
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,Translate,InterestFeedContentSuggestions');
 
@@ -168,6 +166,7 @@ let activeSyncClientConfig = null;
 let syncClientConfigSource = 'none';
 let syncRelay = null;
 let syncStartupError = null;
+let syncInitialization = Promise.resolve();
 let restartAfterGracefulClose = false;
 let shutdownAfterGracefulClose = false;
 let pendingUpdateInstall = false;
@@ -569,6 +568,7 @@ async function initializeSync() {
 
 ipcMain.handle('sync:status', async (event) => {
   validateIpcSender(event);
+  await syncInitialization;
   return {
     clientConfigured: Boolean(syncClient),
     clientIdentity: syncClient ? {
@@ -842,16 +842,6 @@ app.whenReady().then(async () => {
   } else {
     console.warn('[central] CENTRAL_API_URL is unset or invalid; central API requests are disabled.');
   }
-  try {
-    await initializeSync();
-    if (syncRelay) {
-      const address = await syncRelay.start();
-      console.info(`Local sync relay listening on ${address.address}:${address.port}`);
-    }
-  } catch (error) {
-    syncStartupError = error instanceof Error ? error.message : String(error);
-    console.error('Branch synchronization could not start; the local ERP remains available:', syncStartupError);
-  }
   createWindow();
   updateController = configureAutoUpdater({
     app,
@@ -866,6 +856,18 @@ app.whenReady().then(async () => {
       win.close();
     },
   });
+  syncInitialization = (async () => {
+    try {
+      await initializeSync();
+      if (syncRelay) {
+        const address = await syncRelay.start();
+        console.info(`Local sync relay listening on ${address.address}:${address.port}`);
+      }
+    } catch (error) {
+      syncStartupError = error instanceof Error ? error.message : String(error);
+      console.error('Branch synchronization could not start; the local ERP remains available:', syncStartupError);
+    }
+  })();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -33,6 +33,33 @@ export interface DashboardMetrics {
   urgentDebtsCount: number;
 }
 
+export interface MonthlyComparison {
+  currentMonth: { sales: number; profit: number; invoices: number };
+  previousMonth: { sales: number; profit: number; invoices: number };
+  salesGrowth: number | null;
+  invoiceGrowth: number | null;
+  currentMonthInvoices: number;
+}
+
+export interface RecentDashboardActivity {
+  type: 'sale' | 'purchase' | 'inventory';
+  description: string;
+  amount?: number;
+  timestamp: string;
+}
+
+export interface DashboardProfitData {
+  netProfit: number;
+  dailyNetProfit: { date: string; profit: number }[];
+}
+
+interface DashboardActivityRow {
+  type: 'SALE' | 'PURCHASE' | 'STOCK';
+  description: string;
+  amount: number | null;
+  date: string;
+}
+
 export class AccountingService {
   private db = DatabaseManager.getInstance();
   private branchAccess = new BranchAccessService();
@@ -92,8 +119,10 @@ export class AccountingService {
         SUM(CASE WHEN si.date >= ? AND si.date <= ? THEN si.gross_profit ELSE 0 END) as monthGrossProfit,
         COUNT(CASE WHEN si.date = ? THEN 1 END) as todaySalesCount
       FROM sales_invoices si
-      WHERE si.invoice_status != 'VOID' AND ${salesScope.clause}
-    `, [today, monthStart, today, monthStart, today, today, ...salesScope.params])[0] || {};
+      WHERE si.invoice_status != 'VOID'
+        AND si.date BETWEEN ? AND ?
+        AND ${salesScope.clause}
+    `, [today, monthStart, today, monthStart, today, today, monthStart, today, ...salesScope.params])[0] || {};
 
     const returnStats = this.db.query<any>(`
       SELECT
@@ -105,8 +134,10 @@ export class AccountingService {
           ELSE 0 END) AS monthReturnedCost
       FROM sales_returns sr
       JOIN sales_invoices si ON si.id = sr.original_invoice_id
-      WHERE si.invoice_status != 'VOID' AND ${salesScope.clause}
-    `, [today, monthStart, today, monthStart, today, ...salesScope.params])[0] || {};
+      WHERE si.invoice_status != 'VOID'
+        AND sr.date BETWEEN ? AND ?
+        AND ${salesScope.clause}
+    `, [today, monthStart, today, monthStart, today, monthStart, today, ...salesScope.params])[0] || {};
 
     const prevMonthSales = Number(this.db.query<any>(`
       SELECT
@@ -121,8 +152,8 @@ export class AccountingService {
     const purchaseStats = this.db.query<any>(`
       SELECT SUM(CASE WHEN pi.date = ? THEN pi.total_amount ELSE 0 END) as todayPurchases
       FROM purchase_invoices pi
-      WHERE ${purchaseScope.clause}
-    `, [today, ...purchaseScope.params])[0] || {};
+      WHERE pi.date = ? AND ${purchaseScope.clause}
+    `, [today, today, ...purchaseScope.params])[0] || {};
 
     // 3. Expenses metrics (bounded up to today)
     const expenseStats = this.db.query<any>(`
@@ -130,8 +161,8 @@ export class AccountingService {
         SUM(CASE WHEN e.date = ? THEN e.amount ELSE 0 END) as todayExpenses,
         SUM(CASE WHEN e.date >= ? AND e.date <= ? THEN e.amount ELSE 0 END) as monthExpenses
       FROM expenses e
-      WHERE ${expenseScope.clause}
-    `, [today, monthStart, today, ...expenseScope.params])[0] || {};
+      WHERE e.date BETWEEN ? AND ? AND ${expenseScope.clause}
+    `, [today, monthStart, today, monthStart, today, ...expenseScope.params])[0] || {};
 
     // 4. Receivables (Customer debts)
     const customerDebts = this.db.query<any>(`
@@ -191,8 +222,8 @@ export class AccountingService {
             WHERE icl.product_id = ws.product_id AND icl.warehouse_id = ws.warehouse_id), 0)) * p.cost_price
           ELSE ws.quantity_m2 * p.cost_price END) as valuationCost,
         SUM(ws.quantity_m2 * p.selling_price_m2) as valuationSale,
-        COUNT(CASE WHEN ws.quantity_m2 <= p.min_stock_level AND ws.quantity_m2 > 0 THEN 1 END) as lowStock,
-        COUNT(CASE WHEN ws.quantity_m2 <= 0 THEN 1 END) as outOfStock
+        COUNT(DISTINCT CASE WHEN ws.quantity_m2 <= p.min_stock_level AND ws.quantity_m2 > 0 THEN p.id END) as lowStock,
+        COUNT(DISTINCT CASE WHEN ws.quantity_m2 <= 0 THEN p.id END) as outOfStock
       FROM warehouse_stock ws
       JOIN warehouses w ON w.id = ws.warehouse_id
       JOIN products p ON ws.product_id = p.id
@@ -229,8 +260,8 @@ export class AccountingService {
       : 0;
 
     // Calculate average order value
-    const averageOrderValue = salesStats.todaySalesCount > 0
-      ? Number((salesStats.todaySales / salesStats.todaySalesCount).toFixed(2))
+    const averageOrderValue = salesStats.todaySalesCount > 0 && todaySales > 0
+      ? Number((todaySales / salesStats.todaySalesCount).toFixed(2))
       : 0;
 
     return {
@@ -322,7 +353,7 @@ export class AccountingService {
       JOIN sales_invoices si ON sii.invoice_id = si.id
       WHERE si.invoice_status != 'VOID' AND ${scope.clause}
       GROUP BY p.id
-      ORDER BY totalRevenue DESC
+      ORDER BY quantityM2 DESC, totalRevenue DESC
       LIMIT ?
     `, [...scope.params, limit]);
   }
@@ -486,6 +517,72 @@ export class AccountingService {
     };
   }
 
+  public getDashboardProfitData(dateFrom: string, dateTo: string): DashboardProfitData {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'finance.view', '/finance');
+    if (!isValidDate(dateFrom) || !isValidDate(dateTo) || dateFrom > dateTo) {
+      throw new Error('Invalid profit and loss date range.');
+    }
+
+    const scope = this.ledgerScope();
+    const balances = this.db.query<{ date: string; code: string; type: 'REVENUE' | 'EXPENSE'; amount: number }>(`
+      SELECT e.date,
+             a.code,
+             a.type,
+             SUM(CASE WHEN a.type = 'REVENUE' THEN l.credit - l.debit ELSE l.debit - l.credit END) AS amount
+      FROM journal_entries e
+      JOIN journal_entry_lines l ON l.entry_id = e.id
+      JOIN chart_of_accounts a ON a.id = l.account_id
+      WHERE e.is_posted = 1
+        AND a.type IN ('REVENUE', 'EXPENSE')
+        AND e.date BETWEEN ? AND ?
+        AND ${scope.clause}
+      GROUP BY e.date, a.code, a.type
+      ORDER BY e.date, a.code
+    `, [dateFrom, dateTo, ...scope.params]);
+
+    const accountBalances = new Map<string, { type: 'REVENUE' | 'EXPENSE'; amount: number }>();
+    const dailyAccountBalances = new Map<string, { date: string; type: 'REVENUE' | 'EXPENSE'; amount: number }>();
+    for (const balance of balances) {
+      const amount = Number(balance.amount);
+      const accountKey = `${balance.code}:${balance.type}`;
+      const accountBalance = accountBalances.get(accountKey) || { type: balance.type, amount: 0 };
+      accountBalance.amount += amount;
+      accountBalances.set(accountKey, accountBalance);
+
+      const dailyAccountKey = `${balance.date}:${accountKey}`;
+      const dailyAccountBalance = dailyAccountBalances.get(dailyAccountKey) || {
+        date: balance.date,
+        type: balance.type,
+        amount: 0,
+      };
+      dailyAccountBalance.amount += amount;
+      dailyAccountBalances.set(dailyAccountKey, dailyAccountBalance);
+    }
+
+    const dailyProfits = new Map<string, number>();
+    for (const balance of dailyAccountBalances.values()) {
+      const roundedAmount = Number(balance.amount.toFixed(2));
+      const signedAmount = balance.type === 'REVENUE' ? roundedAmount : -roundedAmount;
+      dailyProfits.set(balance.date, (dailyProfits.get(balance.date) || 0) + signedAmount);
+    }
+
+    const dailyNetProfit = [...dailyProfits.entries()].map(([date, profit]) => ({
+      date,
+      profit: Number(profit.toFixed(2)),
+    }));
+
+    return {
+      netProfit: Number([...accountBalances.values()].reduce(
+        (sum, account) => sum + (account.type === 'REVENUE'
+          ? Number(account.amount.toFixed(2))
+          : -Number(account.amount.toFixed(2))),
+        0
+      ).toFixed(2)),
+      dailyNetProfit,
+    };
+  }
+
   public getCategorySalesReport(dateFrom?: string, dateTo?: string): { categoryName: string; quantityM2: number; totalRevenue: number; profit: number; productType: string; baseUnit: string; customUnit?: string }[] {
     this.requireView('ui.sales.invoices.view');
     let whereClause = 'WHERE si.invoice_status != \'VOID\'';
@@ -622,10 +719,7 @@ export class AccountingService {
   }
 
   // New methods for enhanced dashboard analytics
-  public getMonthlyComparison(): {
-    currentMonth: { sales: number; profit: number; invoices: number };
-    previousMonth: { sales: number; profit: number; invoices: number };
-  } {
+  public getMonthlyComparison(): MonthlyComparison {
     this.requireView('dashboard.view');
     PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
     const now = new Date();
@@ -703,17 +797,27 @@ export class AccountingService {
       invoices: Number(summaries.previousInvoices || 0),
     };
 
+    const currentMonth = {
+      sales: Number((current.sales || 0).toFixed(2)),
+      profit: Number((current.profit || 0).toFixed(2)),
+      invoices: current.invoices || 0,
+    };
+    const previousMonth = {
+      sales: Number((previous.sales || 0).toFixed(2)),
+      profit: Number((previous.profit || 0).toFixed(2)),
+      invoices: previous.invoices || 0,
+    };
+
     return {
-      currentMonth: {
-        sales: Number((current.sales || 0).toFixed(2)),
-        profit: Number((current.profit || 0).toFixed(2)),
-        invoices: current.invoices || 0
-      },
-      previousMonth: {
-        sales: Number((previous.sales || 0).toFixed(2)),
-        profit: Number((previous.profit || 0).toFixed(2)),
-        invoices: previous.invoices || 0
-      }
+      currentMonth,
+      previousMonth,
+      salesGrowth: previousMonth.sales > 0
+        ? Number(((currentMonth.sales - previousMonth.sales) / previousMonth.sales * 100).toFixed(1))
+        : null,
+      invoiceGrowth: previousMonth.invoices > 0
+        ? Number(((currentMonth.invoices - previousMonth.invoices) / previousMonth.invoices * 100).toFixed(1))
+        : null,
+      currentMonthInvoices: currentMonth.invoices,
     };
   }
 
@@ -768,12 +872,7 @@ export class AccountingService {
     `, scope.params);
   }
 
-  public getRecentActivities(limit = 10): {
-    type: 'SALE' | 'PURCHASE' | 'STOCK' | 'PAYMENT';
-    description: string;
-    amount?: number;
-    date: string;
-  }[] {
+  public getRecentActivities(limit = 10): RecentDashboardActivity[] {
     this.requireView('dashboard.view');
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.sales.invoices.view', '/sales');
@@ -785,10 +884,10 @@ export class AccountingService {
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)'
     );
-    const activities: any[] = [];
+    const activities: DashboardActivityRow[] = [];
 
     // Recent sales
-    const sales = this.db.query<any>(`
+    const sales = this.db.query<DashboardActivityRow>(`
       SELECT 'SALE' as type, 
         'فاتورة مبيعات #' || si.invoice_number as description,
         si.total_amount as amount,
@@ -800,7 +899,7 @@ export class AccountingService {
     `, salesScope.params);
 
     // Recent purchases
-    const purchases = this.db.query<any>(`
+    const purchases = this.db.query<DashboardActivityRow>(`
       SELECT 'PURCHASE' as type,
         'فاتورة توريد #' || pi.invoice_number as description,
         pi.total_amount as amount,
@@ -812,7 +911,7 @@ export class AccountingService {
     `, purchaseScope.params);
 
     // Recent stock movements
-    const stocks = this.db.query<any>(`
+    const stocks = this.db.query<DashboardActivityRow>(`
       SELECT 'STOCK' as type,
         'حركة مخزون #' || t.transaction_number as description,
         NULL as amount,
@@ -827,11 +926,17 @@ export class AccountingService {
     activities.push(...sales, ...purchases, ...stocks);
     activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+    const activityTypes: Record<string, RecentDashboardActivity['type']> = {
+      SALE: 'sale',
+      PURCHASE: 'purchase',
+      STOCK: 'inventory',
+    };
+
     return activities.slice(0, limit).map(a => ({
-      type: a.type,
+      type: activityTypes[a.type],
       description: a.description,
-      amount: a.amount ? Number(a.amount.toFixed(2)) : undefined,
-      date: a.date
+      amount: a.amount == null ? undefined : Number(Number(a.amount).toFixed(2)),
+      timestamp: a.date,
     }));
   }
 }

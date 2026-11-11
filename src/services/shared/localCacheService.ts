@@ -22,9 +22,13 @@ type CacheKey = string | number | boolean;
 class LocalCacheService {
   private static instance: LocalCacheService;
   private cache = new Map<string, CacheItem<unknown>>();
-  private maxEntries = 100;
+  private maxEntries = (typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined' && __CERAMISYS_LEGACY_BUILD__)
+    ? 50
+    : 100;
   private maxLifetimeMs = 5 * 60 * 1000;
-  private maxSizeBytes = 50 * 1024 * 1024;
+  private maxSizeBytes = (typeof __CERAMISYS_LEGACY_BUILD__ !== 'undefined' && __CERAMISYS_LEGACY_BUILD__)
+    ? 16 * 1024 * 1024
+    : 50 * 1024 * 1024;
   private epsilon = 0.01;
   private hits = 0;
   private misses = 0;

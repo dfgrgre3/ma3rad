@@ -44,7 +44,14 @@ async function createHandlers(
       throw error;
     }
   };
-  const app = { getVersion: () => 'test', isPackaged: false };
+  const app = {
+    getVersion: () => 'test',
+    isPackaged: false,
+    getAppMetrics: () => [{
+      memory: { workingSetSize: 10 },
+      cpu: { percentCPUUsage: 50 },
+    }],
+  };
   const safeStorage = safeStorageOverride || {
     isEncryptionAvailable: () => true,
     encryptString: (value) => Buffer.from(value),
@@ -410,6 +417,8 @@ test('registered app and printing handlers receive their directory and size depe
     assert.ok(appInfo.system.totalMemoryBytes > 0);
     assert.ok(appInfo.system.freeMemoryBytes > 0);
     assert.ok(appInfo.system.processMemoryBytes > 0);
+    assert.equal(appInfo.system.electronProcessMemoryBytes, 10 * 1024);
+    assert.equal(appInfo.system.electronProcessCpuPercent, 50 / appInfo.system.cpuCount);
     assert.equal(typeof appInfo.system.disk.available, 'boolean');
     assert.deepEqual(await handlers.get('app:openFolder')(event, 'data'), {
       ok: true,

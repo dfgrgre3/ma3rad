@@ -131,7 +131,6 @@ export const CustomersView: React.FC = () => {
     try {
       operationalFieldService.validateRecordValues('customers', operationalFieldValues, 'create');
       const customer = customerService.createCustomer({
-        code: `CUST-${Date.now().toString().slice(-4)}`,
         name: formData.name,
         phone: formData.phone,
         phone2: formData.phone2,
