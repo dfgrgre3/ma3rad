@@ -7,6 +7,7 @@ import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { exportToExcel } from '../../../utils/export/export';
 import { STOCK_LEDGER_BALANCE_AMOUNT } from './stockLedgerBalance';
+import { StockLedgerMovementPolicy } from '../../../services/domains/inventory/StockLedgerMovementPolicy';
 
 interface LedgerEntry {
   id: string;
@@ -101,14 +102,9 @@ export const StockLedgerPage: React.FC = () => {
         SELECT it.id, it.created_at as date, p.name as product,
                p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
                w.name as warehouse, it.type,
-               CASE WHEN it.quantity_m2 > 0 THEN it.quantity_m2 ELSE 0 END as qtyIn,
-               CASE WHEN it.quantity_m2 < 0
-                         AND it.type != 'DAMAGE'
-                         AND COALESCE(it.reference_type, '') != 'TRANSFER_LOSS'
-                    THEN ABS(it.quantity_m2) ELSE 0 END as qtyOut,
-               CASE WHEN it.quantity_m2 < 0
-                         AND (it.type = 'DAMAGE' OR COALESCE(it.reference_type, '') = 'TRANSFER_LOSS')
-                    THEN ABS(it.quantity_m2) ELSE 0 END as qtyLoss,
+               ${StockLedgerMovementPolicy.qtyInSql} as qtyIn,
+               ${StockLedgerMovementPolicy.qtyOutSql} as qtyOut,
+               ${StockLedgerMovementPolicy.qtyLossSql} as qtyLoss,
                b.previous_balance AS previousBalance,
                b.balance AS balance,
                COALESCE(si.invoice_number, pi.invoice_number,

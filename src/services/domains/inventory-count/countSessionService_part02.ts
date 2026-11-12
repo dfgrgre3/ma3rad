@@ -89,9 +89,13 @@ export function validateCountItemMembership(item: CountItem, sessionItemIds: Set
   }
 }
 
-export function validateCountedQuantity(item: CountItem, reservedM2: number): void {
-  if (item.countedQuantityM2 !== null && item.countedQuantityM2 < reservedM2) {
+export function validateCountedQuantity(item: CountItem, reservedM2: number, resultingQuantityM2?: number): void {
+  const targetQuantity = resultingQuantityM2 !== undefined ? resultingQuantityM2 : item.countedQuantityM2;
+  if (targetQuantity !== null && targetQuantity !== undefined && targetQuantity < reservedM2) {
     const unit = getStockQuantityLabel(item);
-    throw new Error(`الكمية المعدودة للصنف "${item.productName}" (${item.countedQuantityM2} ${unit}) أقل من الكمية المحجوزة (${reservedM2} ${unit}). يجب فك الحجز أو تصحيح الكمية قبل الترحيل.`);
+    if (item.locationId) {
+      throw new Error(`الرصيد الإجمالي الناتج في المستودع للصنف "${item.productName}" (${targetQuantity} ${unit}) بعد تسوية الرف سيكون أقل من الكمية المحجوزة بالمستودع (${reservedM2} ${unit}). يجب فك الحجز أو تصحيح الكمية قبل الترحيل.`);
+    }
+    throw new Error(`الكمية المعدودة للصنف "${item.productName}" (${targetQuantity} ${unit}) أقل من الكمية المحجوزة (${reservedM2} ${unit}). يجب فك الحجز أو تصحيح الكمية قبل الترحيل.`);
   }
 }

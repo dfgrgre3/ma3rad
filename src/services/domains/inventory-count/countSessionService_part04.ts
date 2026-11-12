@@ -26,7 +26,7 @@ export function postCountVariance(
   const value = Math.round(Math.abs(diffM2 * unitCost) * 100) / 100;
 
   if (item.locationId) {
-    const delta = Number((Number(item.countedQuantityM2 || 0) - Number(item.systemQuantityM2)).toFixed(3));
+    const delta = diffM2;
     const stockExists = txDb.query<{ id: string; quantityM2: number }>(
       'SELECT id, quantity_m2 AS quantityM2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
       [warehouseId, item.productId]
@@ -47,7 +47,7 @@ export function postCountVariance(
       reason: 'تسوية جرد الخانة',
     });
   } else {
-    updateWarehouseStock(txDb, item, warehouseId, actorId);
+    updateWarehouseStock(txDb, item, warehouseId, actorId, diffM2);
   }
 
   const txId = `tx_${uuidv4().substring(0, 8)}`;

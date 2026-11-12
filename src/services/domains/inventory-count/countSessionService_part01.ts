@@ -5,6 +5,7 @@ import { localDateString } from '../../../utils/shared/date';
 import { PermissionService } from '../auth/PermissionService';
 import { branchAccess } from './branchAccess';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { StockTrackedProductPolicy } from '../inventory/StockTrackedProductPolicy';
 import type { CountType } from '../../../types/inventory/countSessions';
 
 export interface StartCountSessionInput {
@@ -37,6 +38,11 @@ export function startCountSession(input: StartCountSessionInput): void {
       }
     }
 
+    // Validate explicitly selected products are stock-tracked products
+    if (selectedProductIds.length > 0) {
+      StockTrackedProductPolicy.assertStockTrackedBatch(txDb, selectedProductIds, 'جلسة الجرد');
+    }
+
     const productsSql = locationId
       ? `SELECT p.id as productId, p.name as productName,
                COALESCE(pls.quantity_m2, 0) as systemQuantityM2,
@@ -44,7 +50,9 @@ export function startCountSession(input: StartCountSessionInput): void {
                p.base_unit as baseUnit, p.custom_unit as customUnit
          FROM product_location_stock pls
          JOIN products p ON p.id = pls.product_id
-         WHERE pls.location_id = ? AND pls.quantity_m2 > 0`
+         WHERE pls.location_id = ? AND pls.quantity_m2 > 0
+           AND COALESCE(p.product_type, '') != 'SERVICE'
+           AND COALESCE(p.base_unit, '') != 'SERVICE'`
       : `SELECT 
          p.id as productId,
          p.name as productName,
@@ -53,7 +61,9 @@ export function startCountSession(input: StartCountSessionInput): void {
          p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit
        FROM products p
        LEFT JOIN warehouse_stock ws ON p.id = ws.product_id AND ws.warehouse_id = ?
-       WHERE p.is_active = 1`;
+       WHERE p.is_active = 1
+         AND COALESCE(p.product_type, '') != 'SERVICE'
+         AND COALESCE(p.base_unit, '') != 'SERVICE'`;
     const selectedIds = countType === 'FULL' ? [] : [...new Set(selectedProductIds)];
     const products = txDb.query<any>(locationId
       ? productsSql

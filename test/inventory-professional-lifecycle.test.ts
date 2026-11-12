@@ -809,3 +809,129 @@ test('batch receipt posts stock movement and FIFO layer atomically', async () =>
   assert.throws(() => batchService.updateBatch(batch.id, { costPrice: 20 }), /بيانات الاستلام أو تكلفته/);
   assert.throws(() => batchService.deleteBatch(batch.id), /لها حركة مخزنية أو طبقة تكلفة/);
 });
+
+test('inventory count posts real-time variance, rejects service products, and enforces warehouse reservations on bin counts', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const suffix = randomUUID().replace(/-/g, '').slice(0, 8);
+  const warehouseId = `wh_count_rt_${suffix}`;
+  const prodTrackedId = `prod_count_rt_${suffix}`;
+  const prodServiceId = `prod_count_srv_${suffix}`;
+  const categoryId = `cat_count_rt_${suffix}`;
+  const brandId = `brand_count_rt_${suffix}`;
+  const locationId = `loc_count_rt_${suffix}`;
+
+  db.run(`INSERT INTO warehouses (id, code, name, branch_id, is_active) VALUES (?, ?, ?, 'br_main', 1)`,
+    [warehouseId, `WH-RT-${suffix}`, 'Count real-time test warehouse']);
+  db.run('INSERT INTO categories (id, name) VALUES (?, ?)', [categoryId, `Count RT ${suffix}`]);
+  db.run('INSERT INTO brands (id, name) VALUES (?, ?)', [brandId, `Count RT ${suffix}`]);
+  db.run(`INSERT INTO warehouse_locations (id, warehouse_id, zone, aisle, shelf, bin, barcode, is_active) VALUES (?, ?, 'Z1', 'A1', 'S1', 'B1', ?, 1)`,
+    [locationId, warehouseId, `BAR-${suffix}`]);
+
+  db.run(`INSERT INTO products (
+    id, sku, barcode, name, category_id, brand_id, product_type, base_unit, size,
+    cost_price, selling_price_m2, is_active
+  ) VALUES (?, ?, ?, 'صنف مادي للاختبار', ?, ?, 'GENERAL', 'PIECE', 'standard', 10, 20, 1)`,
+    [prodTrackedId, `SKU-TRK-${suffix}`, `BAR-TRK-${suffix}`, categoryId, brandId]);
+
+  db.run(`INSERT INTO products (
+    id, sku, barcode, name, category_id, brand_id, product_type, base_unit, size,
+    cost_price, selling_price_m2, is_active
+  ) VALUES (?, ?, ?, 'خدمة نقل وتركيب', ?, ?, 'SERVICE', 'SERVICE', '', 0, 50, 1)`,
+    [prodServiceId, `SKU-SRV-${suffix}`, `BAR-SRV-${suffix}`, categoryId, brandId]);
+
+  // Initial stock: 100 on warehouse
+  db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+    VALUES (?, ?, ?, 100, 0)`, [`stk_cnt_${suffix}`, warehouseId, prodTrackedId]);
+
+  // 1. Service product rejection at session start
+  assert.throws(() => {
+    startCountSession({
+      warehouseId,
+      countType: 'PARTIAL',
+      selectedProductIds: [prodServiceId],
+      isBlindCount: false,
+      notes: 'test service count',
+    });
+  }, /خدمة/);
+
+  // 2. Real-time variance calculation:
+  // Start session when system quantity is 100
+  startCountSession({
+    warehouseId,
+    countType: 'PARTIAL',
+    selectedProductIds: [prodTrackedId],
+    isBlindCount: false,
+    notes: 'realtime test session',
+  });
+
+  const session = loadBranchCountSessions().find(s => s.warehouseId === warehouseId && s.status === 'COUNTING');
+  assert.ok(session);
+  const items = loadCountSessionItems(session!);
+  assert.equal(items[0].systemQuantityM2, 100);
+
+  // User records physical count = 90
+  items[0].countedQuantityM2 = 90;
+  items[0].discrepancyReason = 'فقد طبيعي';
+
+  // Simulate an intermediate stock movement during count (sale of 10) -> current stock becomes 90
+  db.run('UPDATE warehouse_stock SET quantity_m2 = 90 WHERE warehouse_id = ? AND product_id = ?',
+    [warehouseId, prodTrackedId]);
+
+  // Submit session
+  submitCountSession(session!, items);
+
+  // Create another user to approve (segregation of duties)
+  new AuthService().createUser({ username: `rev_${suffix}`, password: 'Rev-pass-123!', fullName: 'مراجع الجرد', role: 'MANAGER' });
+  AuthService.login(`rev_${suffix}`, 'Rev-pass-123!');
+
+  // Approve count session
+  approveCountSession(session!);
+
+  // Check result: since counted was 90 and current stock was 90, difference is 0! No phantom negative adjustment.
+  const finalStock = queryOne<{ quantityM2: number }>(
+    'SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [warehouseId, prodTrackedId]
+  )?.quantityM2;
+  assert.equal(finalStock, 90, 'Warehouse stock should remain 90');
+
+  // No adjustment transaction should have been recorded because difference against current was 0
+  const countTx = queryOne<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM inventory_transactions WHERE warehouse_id = ? AND reference_type = 'STOCK_COUNT'",
+    [warehouseId]
+  )?.count;
+  assert.equal(countTx, 0, 'No variance transaction when physical count matches current stock');
+
+  // 3. Shelf/bin count reservation check:
+  // Put 50 on shelf BIN-01, warehouse reserved is 45, counted is 30 -> resulting warehouse = 90 - 20 = 70 >= 45 (allowed)
+  // But if warehouse reserved is 80, resulting warehouse = 90 - 20 = 70 < 80 -> MUST throw error!
+  AuthService.login('admin', 'admin123');
+  db.run(`INSERT INTO product_location_stock (id, location_id, product_id, quantity_m2)
+    VALUES (?, ?, ?, 50)`, [`pls_cnt_${suffix}`, locationId, prodTrackedId]);
+  db.run('UPDATE warehouse_stock SET reserved_m2 = 80 WHERE warehouse_id = ? AND product_id = ?',
+    [warehouseId, prodTrackedId]);
+
+  startCountSession({
+    warehouseId,
+    locationId,
+    countType: 'PARTIAL',
+    selectedProductIds: [],
+    isBlindCount: false,
+    notes: 'bin test session',
+  });
+
+  const binSession = loadBranchCountSessions().find(s => s.warehouseId === warehouseId && s.status === 'COUNTING');
+  assert.ok(binSession);
+  const binItems = loadCountSessionItems(binSession!);
+  binItems[0].countedQuantityM2 = 30; // 50 -> 30 (loss of 20)
+  binItems[0].discrepancyReason = 'فروقات خانة';
+  submitCountSession(binSession!, binItems);
+
+  AuthService.login(`rev_${suffix}`, 'Rev-pass-123!');
+  assert.throws(() => {
+    approveCountSession(binSession!);
+  }, /أقل من الكمية المحجوزة/);
+});

@@ -135,6 +135,7 @@ export const MIGRATION_PART_14: Migration[] = [
           approved_by TEXT,
           approved_at TEXT,
           rejection_reason TEXT,
+          location_id TEXT,
           FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
           FOREIGN KEY (posted_by) REFERENCES users(id),
           FOREIGN KEY (created_by) REFERENCES users(id)
@@ -144,13 +145,14 @@ export const MIGRATION_PART_14: Migration[] = [
           id, count_number, warehouse_id, date, count_type, status, total_items,
           items_with_variance, total_variance_value, posted_at, posted_by, notes,
           created_by, created_at, is_blind, approval_status, approved_by, approved_at,
-          rejection_reason
+          rejection_reason, location_id
         )
         SELECT
           id, count_number, warehouse_id, date, count_type, status, total_items,
           items_with_variance, total_variance_value, posted_at, posted_by, notes,
           created_by, created_at, is_blind, approval_status, approved_by, approved_at,
-          rejection_reason
+          rejection_reason,
+          CASE WHEN notes LIKE '[BIN:%' THEN SUBSTR(notes, 6, INSTR(notes, ']') - 6) ELSE NULL END
         FROM stock_counts;
 
         DROP TABLE stock_counts;

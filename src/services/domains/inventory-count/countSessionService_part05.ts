@@ -8,6 +8,7 @@ import type { CountVarianceTotals } from './countSessionService_part02';
 import { updateCountItem } from './countSessionService_part03';
 import { postCountVariance } from './countSessionService_part04';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { StockTrackedProductPolicy } from '../inventory/StockTrackedProductPolicy';
 
 export function postCountItems(
   txDb: DatabaseManager,
@@ -35,8 +36,34 @@ export function postCountItems(
     if (item.countedQuantityM2 === null) continue;
 
     validateCountItemMembership(item, sessionItemIds);
+    StockTrackedProductPolicy.assertStockTracked(txDb, item.productId, 'ترحيل الجرد');
     if (!Number.isFinite(item.countedQuantityM2) || item.countedQuantityM2 < 0) throw new Error(`Invalid counted quantity for ${item.productName}.`);
-    item.varianceM2 = Number((item.countedQuantityM2 - item.systemQuantityM2).toFixed(3));
+
+    // Fetch current real-time stock to calculate variance against current balance
+    const currentStock = txDb.query<{ quantityM2: number; reservedM2: number }>(
+      'SELECT COALESCE(quantity_m2, 0) AS quantityM2, COALESCE(reserved_m2, 0) AS reservedM2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+      [warehouseId, item.productId]
+    )[0];
+    const currentWarehouseQty = currentStock ? Number(currentStock.quantityM2) : 0;
+    const reservedM2 = currentStock ? Number(currentStock.reservedM2) : 0;
+
+    if (item.locationId) {
+      // Shelf/Bin count: variance is counted vs current shelf stock
+      const currentBin = txDb.query<{ quantityM2: number }>(
+        'SELECT COALESCE(quantity_m2, 0) AS quantityM2 FROM product_location_stock WHERE location_id = ? AND product_id = ?',
+        [item.locationId, item.productId]
+      )[0];
+      const currentBinQty = currentBin ? Number(currentBin.quantityM2) : 0;
+      item.varianceM2 = Number((item.countedQuantityM2 - currentBinQty).toFixed(3));
+      // Resulting warehouse stock after applying bin delta
+      const resultingWarehouseQty = Number((currentWarehouseQty + item.varianceM2).toFixed(3));
+      validateCountedQuantity(item, reservedM2, resultingWarehouseQty);
+    } else {
+      // General warehouse count: variance is counted vs current warehouse stock
+      item.varianceM2 = Number((item.countedQuantityM2 - currentWarehouseQty).toFixed(3));
+      validateCountedQuantity(item, reservedM2, item.countedQuantityM2);
+    }
+
     item.varianceValue = Number((item.varianceM2 * item.unitCost).toFixed(2));
     if (submittedItem) {
       item.discrepancyReason = submittedItem.discrepancyReason;
@@ -46,7 +73,6 @@ export function postCountItems(
       throw new Error(`Choose a discrepancy reason for ${item.productName} before posting.`);
     }
     const stockInfo = getCountStockInfo(txDb, item, warehouseId);
-    if (!item.locationId) validateCountedQuantity(item, stockInfo.reservedM2);
     updateCountItem(txDb, item, actorId, activeSession.id);
 
     if (item.varianceM2 === 0) continue;

@@ -19,25 +19,24 @@ export function updateWarehouseStock(
   txDb: DatabaseManager,
   item: CountItem,
   warehouseId: string,
-  actorId: string
+  actorId: string,
+  delta: number
 ): void {
   const stockExists = txDb.query<{ id: string; quantityM2: number }>(
     'SELECT id, quantity_m2 AS quantityM2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
     [warehouseId, item.productId]
   )[0];
-  const previousQuantity = Number(stockExists?.quantityM2 || 0);
   if (stockExists) {
     txDb.run(
-      'UPDATE warehouse_stock SET quantity_m2 = ?, last_updated = CURRENT_TIMESTAMP WHERE warehouse_id = ? AND product_id = ?',
-      [item.countedQuantityM2, warehouseId, item.productId]
+      'UPDATE warehouse_stock SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP WHERE warehouse_id = ? AND product_id = ?',
+      [delta, warehouseId, item.productId]
     );
   } else {
     txDb.run(
       'INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES (?, ?, ?, ?, 0)',
-      [`stk_${uuidv4().substring(0, 8)}`, warehouseId, item.productId, item.countedQuantityM2]
+      [`stk_${uuidv4().substring(0, 8)}`, warehouseId, item.productId, Math.max(0, delta)]
     );
   }
-  const delta = Number((Number(item.countedQuantityM2) - previousQuantity).toFixed(3));
   InventoryLocationStockService.applyDelta(txDb, {
     warehouseId,
     productId: item.productId,
