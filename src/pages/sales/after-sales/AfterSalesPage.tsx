@@ -1,36 +1,35 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  RotateCcw, ShieldCheck, AlertTriangle, Search, Calendar, Eye,
-  Printer, Loader2, X, RefreshCw, CheckCircle2, TrendingDown,
-  DollarSign, FileText, ArrowRightLeft, Sparkles, Building2, User,
-  PieChart as PieIcon, Award, MessageSquare, Wrench
+  RotateCcw, ShieldCheck, Search, Eye,
+  Printer, Loader2, X, RefreshCw,
+  DollarSign, ArrowRightLeft,
+  PieChart as PieIcon, Award
 } from 'lucide-react';
-import { SalesService, ReturnStats, ReturnableItem } from '../../../services/domains/sales/SalesService';
+import { SalesService, ReturnStats } from '../../../services/domains/sales/SalesService';
 import { PrintService } from '../../../services/shared/PrintService';
-import { AuthService } from '../../../services/domains/auth/AuthService';
-import { PermissionService } from '../../../services/domains/auth/PermissionService';
-import { SalesInvoice, SalesReturn, SalesReturnItem } from '../../../types';
+
+import { SalesInvoice, SalesReturnItem } from '../../../types';
 import { useToast } from '../../../components/ui/Toast';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { WarrantyClaimsPanel } from './WarrantyClaimsPanel';
 
 const fmtCurrency = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج';
 
-const REFUND_LABELS: Record<string, string> = {
+const _REFUND_LABELS: Record<string, string> = {
   CASH: 'استرداد نقدي من الخزينة',
   CARD: 'استرداد على البطاقة',
   BANK_TRANSFER: 'تحويل بنكي',
   BALANCE: 'إضافة رصيد دائن للعميل (Credit Note)',
 };
 
-const REFUND_BADGES: Record<string, string> = {
+const _REFUND_BADGES: Record<string, string> = {
   CASH: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   CARD: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   BANK_TRANSFER: 'bg-sky-50 text-sky-700 border-sky-200',
   BALANCE: 'bg-purple-50 text-purple-700 border-purple-200',
 };
 
-const COMMON_REASONS = [
+const _COMMON_REASONS = [
   'كسر أثناء النقل أو التعتيق',
   'عيب صناعة أو اختلاف لون/فرز',
   'مقاس غير متطابق مع التصميم',
@@ -62,8 +61,8 @@ export const AfterSalesPage: React.FC = () => {
 
   // Search & Filters
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, _setDateFrom] = useState('');
+  const [dateTo, _setDateTo] = useState('');
 
   // Selected Return Detail Modal
   const [selectedReturn, setSelectedReturn] = useState<any | null>(null);
@@ -97,7 +96,7 @@ export const AfterSalesPage: React.FC = () => {
     try {
       const items = salesService.getReturnItems(ret.id);
       setReturnItems(items);
-    } catch (e: any) {
+    } catch {
       toast.error('تعذر تحميل بنود المرتجع.');
     } finally {
       setLoadingReturnDetails(false);

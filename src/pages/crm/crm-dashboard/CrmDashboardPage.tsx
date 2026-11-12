@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
-  Users, TrendingUp, Target, Phone, Activity, Calendar, Award, AlertCircle,
-  ArrowUpRight, Clock, MessageSquare, Loader2, RefreshCw, Filter, BarChart3,
-  UserCheck, UserX, Star, Wallet, CheckCircle2, XCircle, Building2,
+  Users, TrendingUp, Target, Activity, Calendar, Award, AlertCircle,
+  ArrowUpRight, MessageSquare, Loader2, RefreshCw, BarChart3,
+  UserCheck, Star, Wallet, Clock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CrmService, Lead, LeadStage } from '../../../services/domains/crm/CrmService';
@@ -327,7 +327,7 @@ export const CrmDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       PermissionService.require(AuthService.requireAuth(), 'crm.view', '/crm/dashboard');
@@ -338,15 +338,15 @@ export const CrmDashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, setLoading, setStats, setError]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (!refreshCtx) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx?.refreshToken, load]);
+  }, [refreshCtx, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

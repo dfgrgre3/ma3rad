@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { memo, useState, useEffect, useCallback } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { DatabaseManager } from '../database/repositories/databaseManager';
 import { AuthService } from '../services/domains/auth/AuthService';
@@ -39,8 +39,8 @@ export const App: React.FC = () => {
   const [licenseBlocked, setLicenseBlocked] = useState(false);
   const centralActive = activationComplete && !BYPASS_FIRST_RUN_ACTIVATION;
   // تم تعطيل فحص الترخيص ليظهر التطبيق دائماً بدون ع interruption (ملفات الكود محفوظة)
-  const SKIP_LICENSE_CHECK = true;
-  const [licenseRetrying, setLicenseRetrying] = useState(false);
+  const _SKIP_LICENSE_CHECK = true;
+  const [licenseRetrying, _setLicenseRetrying] = useState(false);
 
   useEffect(() => {
     if (BYPASS_FIRST_RUN_ACTIVATION) return;
@@ -182,7 +182,16 @@ export const App: React.FC = () => {
     };
   }, [dbReady]);
 
-  useAppSession(dbReady, currentUser, () => setCurrentUser(null));
+  const handleSessionExpired = useCallback(() => setCurrentUser(null), [setCurrentUser]);
+  const handleLogout = useCallback(() => {
+    AuthService.logout();
+    setCurrentUser(null);
+  }, [setCurrentUser]);
+  const handleSwitchUser = useCallback((userId: string) => {
+    setCurrentUser(AuthService.switchToUser(userId));
+  }, [setCurrentUser]);
+
+  useAppSession(dbReady, currentUser, handleSessionExpired);
 
   // Numbering templates are resolved by the configuration engine; installing
   // the formatter keeps every existing nextNumber() caller compatible.
@@ -237,7 +246,7 @@ export const App: React.FC = () => {
       // cannot be determined safely.
       setShowSetup(false);
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser]);
 
   if (licenseBlocked) {
     return (
@@ -349,8 +358,8 @@ export const App: React.FC = () => {
               <AppRouter
                 key={centralConfigTick}
                 currentUser={currentUser}
-                onLogout={() => { AuthService.logout(); setCurrentUser(null); }}
-                onSwitchUser={(userId) => setCurrentUser(AuthService.switchToUser(userId))}
+                onLogout={handleLogout}
+                onSwitchUser={handleSwitchUser}
               />
             </HashRouter>
           )}
@@ -361,4 +370,4 @@ export const App: React.FC = () => {
   );
 };
 
-export default App;
+export default memo(App);

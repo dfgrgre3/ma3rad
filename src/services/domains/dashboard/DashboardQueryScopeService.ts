@@ -1,5 +1,3 @@
-import { BranchAccessService, type BranchSqlScope } from '../auth/BranchAccessService';
-import type { User } from '../../../types';
 import './DashboardQueryScopeService_part01';
 import './DashboardQueryScopeService_part02';
 export { DashboardQueryScopeService } from './DashboardQueryScopeService_part01';

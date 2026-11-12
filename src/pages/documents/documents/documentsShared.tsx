@@ -1,11 +1,3 @@
-import React from 'react';
-import { X } from 'lucide-react';
-import type {
-  ContractEffectiveStatus,
-  ContractPartyType,
-  DocumentConfidentiality,
-  DocumentStatus,
-} from '../../../types';
 import './documentsShared_part01';
 import './documentsShared_part02';
 export { inputCls } from './documentsShared_part01';

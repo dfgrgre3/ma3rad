@@ -1,15 +1,8 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Building2,
-  CheckCircle2,
-  AlertCircle,
   Plus,
   RefreshCw,
   Loader2,
-  ArrowDownLeft,
-  ArrowUpRight,
-  FileSpreadsheet,
-  Check,
   Scale,
 } from 'lucide-react';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
@@ -51,7 +44,7 @@ export const BankReconciliationPage: React.FC = () => {
     glAccountId: 'acc_1102',
   });
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const banks = service.getBankAccounts();
@@ -69,11 +62,11 @@ export const BankReconciliationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, toast, selectedBankId, statementDate, setLoading, setBankAccounts, setSelectedBankId, setUnreconciledItems, setHistoryReconciliations]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     if (selectedBankId) {
@@ -86,7 +79,7 @@ export const BankReconciliationPage: React.FC = () => {
         toast.error(err?.message || 'تعذر تحميل حركات الحساب.');
       }
     }
-  }, [selectedBankId, statementDate]);
+  }, [selectedBankId, statementDate, service, toast]);
 
   const activeBank = bankAccounts.find((b) => b.id === selectedBankId);
 

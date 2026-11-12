@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { EmployeeService } from '../../../services/domains/hr/EmployeeService';
 import { EmployeeOrganizationService } from '../../../services/domains/hr/EmployeeOrganizationService';
@@ -20,8 +20,7 @@ import { EmployeesHeader } from './EmployeesHeader';
 import { calculateTotalWagesBill, filterEmployees, getEmployeeFinancials } from './helpers';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
-import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
-import { OperationalFieldsRecordEditor } from '../../../components/products/OperationalFieldsRecordEditor';
+
 import {
   type AttendanceRecord,
   type Employee,
@@ -56,7 +55,7 @@ export const EmployeesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
 
-  const loadAll = () => {
+  const loadAll = useCallback(() => {
     setLoading(true);
     try {
       const branchAccess = new BranchAccessService();
@@ -85,9 +84,9 @@ export const EmployeesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canManageEmployees]);
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { setSearchQuery(searchParams.get('search') || ''); }, [searchParams]);
   const handleExportEmployees = () => {
     const fieldService = new OperationalFieldService();

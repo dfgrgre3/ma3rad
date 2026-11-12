@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import type { Product, WarehouseStock, InventoryTransaction } from '../../../types';
+import type { Product, WarehouseStock } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { BranchAccessService } from '../auth/BranchAccessService';

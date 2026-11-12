@@ -267,7 +267,7 @@ export const BranchesPage: React.FC = () => {
       if (canViewWarehouses) {
         const mappings = branchService.getBranchWarehouses(branch.id);
         const directWarehouses = warehouses.filter((warehouse) => warehouse.branchId === branch.id);
-        const mappedIds = new Set(mappings.map((warehouse) => warehouse.warehouseId));
+        const _mappedIds = new Set(mappings.map((warehouse) => warehouse.warehouseId));
         setBranchWarehouses([
           ...directWarehouses.map((warehouse) => ({
             id: `direct-${warehouse.id}`,

@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
-  Users, TrendingUp, Wallet, Clock, Calendar, Award, AlertCircle, Loader2, BriefcaseBusiness,
-  RefreshCw, UserCheck, UserX, BarChart3, Activity, ArrowUpRight, HardHat,
-  DollarSign, CheckCircle2, Percent, Building2,
+  Users, Wallet, Calendar, Award, AlertCircle, Loader2, BriefcaseBusiness,
+  RefreshCw, UserCheck, BarChart3, HardHat, Clock, UserX, CheckCircle2,
+  DollarSign, Building2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { EmployeeService, Employee, AttendanceStatus } from '../../../services/domains/hr/EmployeeService';
@@ -240,13 +240,13 @@ export const HrDashboardPage: React.FC = () => {
   const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
-  const canManage = PermissionService.can(user, 'ui.employees.employees.manage');
+  const _canManage = PermissionService.can(user, 'ui.employees.employees.manage');
   const canViewRecruitment = PermissionService.can(user, 'ui.hr.recruitment.view');
   const [stats, setStats] = useState<HrStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setStats(buildHrStats());
@@ -256,15 +256,15 @@ export const HrDashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setLoading, setStats, setError]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (!refreshCtx) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx?.refreshToken, load]);
+  }, [refreshCtx, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

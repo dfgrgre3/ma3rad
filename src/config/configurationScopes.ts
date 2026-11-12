@@ -1,19 +1,20 @@
-import { isSecuritySensitiveConfigKey, type AppConfigDomain } from './appConfiguration';
-import './configurationScopes_part01';
-import './configurationScopes_part02';
-import './configurationScopes_part03';
-export type { ConfigurationScopeType } from './configurationScopes_part01';
-export { CONFIGURATION_SCOPE_PRECEDENCE } from './configurationScopes_part01';
-export { CONFIGURATION_SCOPE_TYPES } from './configurationScopes_part01';
-export { CONFIGURATION_SCOPE_LABELS } from './configurationScopes_part01';
-export type { ConfigurationScopeContext } from './configurationScopes_part01';
-export type { ConfigurationScopeRef } from './configurationScopes_part01';
-export { isConfigurationScopeType } from './configurationScopes_part01';
-export { configurationScopeRef } from './configurationScopes_part01';
-export { resolveConfigurationScopeChain } from './configurationScopes_part02';
-export { normalizeScopeContext } from './configurationScopes_part02';
-export { serializeScopeContext } from './configurationScopes_part02';
-export { describeScope } from './configurationScopes_part02';
+export {
+  CONFIGURATION_SCOPE_LABELS,
+  CONFIGURATION_SCOPE_PRECEDENCE,
+  CONFIGURATION_SCOPE_TYPES,
+  configurationScopeRef,
+  isConfigurationScopeType,
+} from './configurationScopes_part01';
+export {
+  describeScope,
+  normalizeScopeContext,
+  resolveConfigurationScopeChain,
+  serializeScopeContext,
+} from './configurationScopes_part02';
+export { canOverrideAtScope, scopeAuthority } from './configurationScopes_part03';
+export type {
+  ConfigurationScopeContext,
+  ConfigurationScopeRef,
+} from './configurationScopes_part01';
 export type { ScopeOverrideDecision } from './configurationScopes_part02';
-export { canOverrideAtScope } from './configurationScopes_part03';
-export { scopeAuthority } from './configurationScopes_part03';
+export type { ConfigurationScopeType } from './configurationScopes_part01';

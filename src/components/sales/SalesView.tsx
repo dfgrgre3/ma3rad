@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Receipt, Search, Printer, RotateCcw, FileText, Plus, X, Eye, Ban,
-  FileSpreadsheet, FileDown, ChevronRight, ChevronLeft, User, CreditCard,
-  Loader2, RefreshCw, Wallet, TrendingUp, Banknote, CheckCircle2, AlertTriangle,
-  ShoppingCart, CalendarDays, Percent, Users, Warehouse, FileBarChart, XCircle, Info,
+  Receipt, Search, Printer, RotateCcw, Plus, Eye,
+  FileSpreadsheet, FileDown, ChevronRight, ChevronLeft, Loader2,
+  RefreshCw, Wallet, TrendingUp, Banknote, CalendarDays, Percent, XCircle, Info,
 } from 'lucide-react';
 import { SalesService, InvoiceFilters, InvoiceStats } from '../../services/domains/sales/SalesService';
 import { CustomerService } from '../../services/domains/customers/CustomerService';
@@ -14,11 +13,10 @@ import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { SalesInvoice, SalesInvoiceItem, CustomerPayment, PaymentType, Customer, Warehouse as WarehouseType } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
-import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
+import { formatProductQuantity } from '../../utils/products/productUnits';
 import { exportToExcel, buildExportHtml } from '../../utils/export/export';
-import { DocumentPreviewModal } from '../documents/DocumentPreviewModal';
 import { SalesModals } from './SalesModals';
-import { StatCard, IconButton, Modal, InfoBox, SummaryRow } from './SalesUi';
+import { StatCard, IconButton } from './SalesUi';
 import { localDateString } from '../../utils/shared/date';
 import { openWhatsAppChat } from '../../utils/shared/externalLinks';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
@@ -36,7 +34,7 @@ const paymentStatusLabel: Record<string, string> = {
   UNPAID: 'آجل / غير مسدد',
 };
 
-const paymentTypeLabel: Record<string, string> = {
+const _paymentTypeLabel: Record<string, string> = {
   CASH: 'نقدي',
   CARD: 'بطاقة',
   BANK_TRANSFER: 'تحويل بنكي',

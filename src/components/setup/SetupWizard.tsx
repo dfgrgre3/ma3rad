@@ -1,14 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Store, Percent, CheckCircle2, ArrowLeft, ArrowRight, Loader2,
-  ShieldCheck, Boxes, Layers, Shirt, Zap, Sofa, Car, Apple,
-  Sparkles, Wrench, Package, ShoppingBag, Gem, Tv, Coffee,
-  Building2, Palette, BookOpen, Settings2,
-  Users, BarChart3, Shield, Check, X, Phone, MapPin,
-  FileText, DollarSign, Lock, Eye, EyeOff, Star, Rocket,
-  Warehouse, ClipboardList, Activity,
-  Hash, Tag, Ruler,
-  RefreshCw,
+  ShieldCheck, Boxes, Settings2,
+  Check, Eye, EyeOff, Warehouse, RefreshCw, Rocket,
 } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { DatabaseManager } from '../../database/repositories/databaseManager';

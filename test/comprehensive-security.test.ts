@@ -14,7 +14,6 @@ import {
   decryptAes256Gcm,
   verifyEd25519Signature,
   signEd25519,
-  canonicalStringify,
   sha256Hex,
   timingSafeEqual,
 } from '../electron/security/crypto.js';

@@ -319,7 +319,7 @@ export class CashierService {
     );
   }
 
-  public closeShift(shiftId: string, actualEndingCash: number, closingNotes = '', performedBy = 'usr_admin'): CashShift {
+  public closeShift(shiftId: string, actualEndingCash: number, closingNotes = '', _performedBy = 'usr_admin'): CashShift {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.cashier.cashier.close_shift');
     if (!Number.isFinite(actualEndingCash) || actualEndingCash < 0) {

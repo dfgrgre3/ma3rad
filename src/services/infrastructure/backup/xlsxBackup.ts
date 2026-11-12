@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import './xlsxBackup_part01';
 import './xlsxBackup_part02';
 import './xlsxBackup_part03';

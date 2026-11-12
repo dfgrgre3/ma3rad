@@ -36,7 +36,7 @@ test('performance service manages cycles, kpis, goals, evaluations, pips and rew
   await bootstrap();
   const cycle = PerformanceService.createCycle({ name: 'دورة 2020', periodType: 'MONTHLY', startDate: '2020-08-01', endDate: '2020-08-31' });
   const kpi = PerformanceService.createKpi({ name: 'KPI اختبار', defaultWeight: 2 });
-  const goal = PerformanceService.createGoal({ employeeId: 'emp_x', cycleId: cycle.id, title: 'هدف اختبار', weight: 1, targetValue: 100 });
+  const _goal = PerformanceService.createGoal({ employeeId: 'emp_x', cycleId: cycle.id, title: 'هدف اختبار', weight: 1, targetValue: 100 });
   const evaluation = PerformanceService.createEvaluation({ employeeId: 'emp_x', cycleId: cycle.id, evaluatorType: 'MANAGER' });
   PerformanceService.addEvaluationItem({ evaluationId: evaluation.id, kpiId: kpi.id, score: 80, weight: 2 });
   const updated = PerformanceService.getEvaluations('emp_x', cycle.id)[0];

@@ -294,7 +294,7 @@ export const ReturnsPage: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  const doExport = (kind: 'excel' | 'pdf') => {
+  const doExport = (_kind: 'excel' | 'pdf') => {
     const options = {
       title: 'سجل مرتجعات المبيعات',
       subtitle: `عدد المرتجعات: ${returns.length} • صافي المرتجعات: ${fmt(stats?.totalAmount ?? 0)} • الضريبة المسجلة: ${fmt(stats?.taxAmount ?? 0)} • الإجمالي المحسوب من الضريبة المسجلة: ${fmt(stats?.grossAmount ?? 0)} • ضريبة غير مسجلة في ${stats?.returnsWithoutRecordedTax ?? 0} مرتجع`,

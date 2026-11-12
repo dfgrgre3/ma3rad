@@ -42,7 +42,6 @@ export function fetchInvoiceById(
   id: string
 ): (SalesInvoice & { items: SalesInvoiceItem[] }) | null {
   AuthService.requireAuth();
-  const actor = AuthService.getCurrentUser();
   const scope = ctx.branchAccess.sqlScope('si.branch_id', 'w.branch_id');
   const companyScope = ctx.branchAccess.companyScope('si.company_id');
   const invoices = ctx.db.query<SalesInvoice>(`

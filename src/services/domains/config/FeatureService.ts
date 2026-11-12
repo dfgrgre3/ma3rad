@@ -55,7 +55,7 @@ export class FeatureService {
     FeatureService.writeEntitlements(current, actor);
   }
 
-  public static resolve(id: string, user?: User | null, context?: { branchId?: string } | null): FeatureResolution {
+  public static resolve(id: string, user?: User | null, _context?: { branchId?: string } | null): FeatureResolution {
     const definition = FeatureService.getDefinition(id);
     const subject = user ?? AuthService.getCurrentUser();
     if (!definition) {

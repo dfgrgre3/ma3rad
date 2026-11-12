@@ -1,28 +1,9 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../auth/AuthService';
-import { PermissionService } from '../auth/PermissionService';
 import { round2 } from './financials';
-import { localDateString } from '../../../utils/shared/date';
-import { postLedgerEntry } from '../../../database/repositories/ledger';
 import type {
-  FiscalYear,
-  FiscalPeriod,
-  BankAccount,
-  BankReconciliation,
-  BankReconciliationLine,
-  ExtendedChequeStatus,
-  ChequeStatusHistory,
   CostCenter,
   Budget,
-  BudgetItem,
-  CashForecastItem,
-  CashForecastDaySummary,
-  PaymentGateway,
-  PaymentGatewaySettlement,
-  MultiDimensionalReportFilters,
 } from '../../../types/finance';
-import type { Cheque } from './FinanceExtrasService';
 import { FinanceEnterprisePart05 } from './FinanceEnterprisePart05';
 
 export abstract class FinanceEnterprisePart06 extends FinanceEnterprisePart05 {
@@ -49,7 +30,7 @@ public getCostCenters(): CostCenter[] {
   }
 
 public saveCostCenter(input: Partial<CostCenter> & { code: string; name: string }): string {
-    const actor = this.requireManage();
+    const _actor = this.requireManage();
     if (!input.code.trim()) throw new Error('كود مركز التكلفة مطلوب.');
     if (!input.name.trim()) throw new Error('اسم مركز التكلفة مطلوب.');
 

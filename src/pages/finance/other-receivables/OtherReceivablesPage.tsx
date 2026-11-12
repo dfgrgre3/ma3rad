@@ -53,7 +53,7 @@ const blank = {
 export const OtherReceivablesPage: React.FC = () => {
   const db = DatabaseManager.getInstance();
   const toast = useToast();
-  const branches = new BranchAccessService();
+  const branches = useMemo(() => new BranchAccessService(), []);
   const [rows, setRows] = useState<Row[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("OPEN");
@@ -68,7 +68,7 @@ export const OtherReceivablesPage: React.FC = () => {
     {},
   );
   const [newFiles, setNewFiles] = useState<File[]>([]);
-  const load = () => {
+  const load = useCallback(() => {
     const actor = AuthService.getCurrentUser();
     if (!PermissionService.can(actor, "finance.receivables.view") && !PermissionService.can(actor, "finance.view")) {
       setRows([]);
@@ -81,10 +81,10 @@ export const OtherReceivablesPage: React.FC = () => {
         scope.params,
       ),
     );
-  };
+  }, [db, branches, setRows]);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     try {

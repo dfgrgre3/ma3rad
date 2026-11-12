@@ -4,10 +4,8 @@ import { ReservationService, StockReservation } from '../../../services/domains/
 import { OrderService, Order } from '../../../services/domains/sales/OrderService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { OperationsService } from '../../../services/domains/operations/OperationsService';
-import { CustomerService } from '../../../services/domains/customers/CustomerService';
 import { useToast } from '../../../components/ui/Toast';
-import { Product, Customer } from '../../../types';
-import { PrintService } from '../../../services/shared/PrintService';
+import { Product } from '../../../types';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { fmtCurrency } from './helpers';
 import {
@@ -41,7 +39,6 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   const canAdjustInventory = can('inventory.adjust');
   const resService = useMemo(() => new ReservationService(), []);
   const orderService = useMemo(() => new OrderService(), []);
-  const printService = useMemo(() => new PrintService(), []);
 
   const initialTab: ReservationTab = mode === 'inventory' ? 'reservations' : 'orders';
   const [activeTab, setActiveTab] = useState<ReservationTab>(initialTab);
@@ -52,7 +49,6 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
 
   // Filter states
   const [search, setSearch] = useState('');
@@ -98,7 +94,6 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
         setProducts(new ProductService().getAllProducts());
         setWarehouses(new OperationsService().getWarehouses());
       }
-      if (mode === 'sales') setCustomers(new CustomerService().getAllCustomers());
     } catch (e: any) {
       console.error(e);
     }

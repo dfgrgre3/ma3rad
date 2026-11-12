@@ -5,7 +5,6 @@ import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
-import { AuditService } from '../security/AuditService';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { BranchService } from '../organization/BranchService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';

@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  FileText, Plus, Search, Calendar, Printer, Trash2, Check, Loader2, Eye,
-  Pencil, Ban, Copy, RefreshCw, FileSpreadsheet, FileDown, ChevronLeft,
-  ChevronRight, Percent, Ban as CancelIcon, Receipt, Clock, CheckCircle2, AlertTriangle,
+  FileText, Plus, Search, Calendar, Printer, Check, Loader2, Eye,
+  Pencil, RefreshCw, FileSpreadsheet, FileDown, ChevronLeft,
+  ChevronRight, Percent, Clock, CheckCircle2, AlertTriangle,
   MessageCircle, CalendarClock, ShoppingBag, PhoneCall,
 } from 'lucide-react';
 import { QuotationService, Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
@@ -14,18 +14,16 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { Customer, Product, Warehouse, PaymentType } from '../../../types';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
-import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
+
 import { addLocalDays, localDateString } from '../../../utils/shared/date';
-import { formatProductQuantity } from '../../../utils/products/productUnits';
 import {
-  basePriceFromUnitPrice, convertQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
+  basePriceFromUnitPrice, convertQuantity, pricePerUnit,
 } from '../../../utils/products/uom';
 import { openWhatsAppChat } from '../../../utils/shared/externalLinks';
 import { QuotationModals } from './QuotationModals';
 import { emptyForm } from './QuotationModals';
 import type { FormState, Line } from './QuotationModals';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
-import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../../../components/products/OperationalFieldsFilter';
 
 
@@ -79,7 +77,7 @@ export const QuotationsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
   const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
-  const [valuesByQuotation, setValuesByQuotation] = useState<Record<string, Record<string, string>>>({});
+  const [, setValuesByQuotation] = useState<Record<string, Record<string, string>>>({});
   const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
   const [detail, setDetail] = useState<Quotation | null>(null);
@@ -99,7 +97,7 @@ export const QuotationsPage: React.FC = () => {
 
   const [followUpOnly, setFollowUpOnly] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       const rows = service.getQuotations({
@@ -122,9 +120,9 @@ export const QuotationsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, fieldService, search, statusFilter, dateFrom, dateTo, followUpOnly, fieldFilters]);
 
-  useEffect(() => { load();     }, [search, statusFilter, dateFrom, dateTo, followUpOnly, fieldFilters]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, statusFilter, dateFrom, dateTo, followUpOnly]);
 
   const totalPages = Math.max(1, Math.ceil(quotations.length / PAGE_SIZE));
@@ -388,7 +386,7 @@ export const QuotationsPage: React.FC = () => {
     }
   };
 
-  const doExport = (kind: 'excel' | 'pdf') => {
+  const doExport = (_kind: 'excel' | 'pdf') => {
     const options = {
       title: 'سجل عروض الأسعار والمقايسات',
       subtitle: `عدد العروض: ${quotations.length}`,

@@ -142,7 +142,7 @@ export class CustomerService {
     return rows.length > 0 ? rows[0] : null;
   }
 
-  public createCustomer(customer: Omit<Customer, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { code?: string; initialBalance?: number }, performedBy = 'usr_admin'): Customer {
+  public createCustomer(customer: Omit<Customer, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'totalPurchases' | 'currentBalance'> & { code?: string; initialBalance?: number }, _performedBy = 'usr_admin'): Customer {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.customers.list.create');
     const cleanName = String(customer.name || '').trim();
@@ -264,7 +264,7 @@ export class CustomerService {
     registerId?: string,
     shiftId?: string,
     notes = '',
-    performedBy = 'usr_admin',
+    _performedBy = 'usr_admin',
     paymentDate?: string,
     idempotencyKey?: string
   ): CustomerPayment {

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Activity, Layers, ShieldCheck, SlidersHorizontal, Target, Wrench, Zap,
+  Activity, Layers, ShieldCheck, Target, Zap,
 } from 'lucide-react';
 import { useAppConfig } from '../../../hooks/domains/config/useAppConfig';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
@@ -53,12 +53,12 @@ export const ConfigurationStudioPage: React.FC = () => {
 
   const selectedAction = useMemo(
     () => ActionRegistryService.resolve(selectedActionId, admin),
-    [selectedActionId, admin?.id],
+    [selectedActionId, admin],
   );
 
   const selectedFeature = useMemo(
     () => FeatureService.resolve(selectedFeatureId, admin),
-    [selectedFeatureId, admin?.id],
+    [selectedFeatureId, admin],
   );
 
   const saveAction = () => {

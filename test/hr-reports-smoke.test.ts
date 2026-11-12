@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
-import { EmployeeService } from '../src/services/domains/hr/EmployeeService.ts';
 import { ReportCenterService } from '../src/services/domains/reports/ReportCenterService.ts';
 
 async function bootstrap() {

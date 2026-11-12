@@ -1,20 +1,16 @@
 import React from 'react';
 import {
-  FileText, Plus, Trash2, Loader2, Eye,
-  Pencil, Ban, Copy, RefreshCw, FileSpreadsheet, FileDown, ChevronLeft,
-  ChevronRight, Percent, Ban as CancelIcon, Receipt, Clock, CheckCircle2, AlertTriangle,
-  MessageCircle, CalendarClock, ShoppingBag, PhoneCall, X, Printer,
+  FileText, Plus, Trash2, Loader2,
+  Pencil, Copy, RefreshCw, ChevronLeft as CancelIcon, Receipt,
+  AlertTriangle, MessageCircle, CalendarClock, ShoppingBag, X, Printer,
 } from 'lucide-react';
-import { Quotation, QuotationStats, QuotationStatus } from '../../../services/domains/sales/QuotationService';
+import { Quotation, QuotationStatus } from '../../../services/domains/sales/QuotationService';
 import { Customer, Product, Warehouse, PaymentType } from '../../../types';
-import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
-import { addLocalDays, localDateString } from '../../../utils/shared/date';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import {
-  basePriceFromUnitPrice, convertQuantity, getSellableUnits, getUomLabel, isWholeUnit, pricePerUnit,
+  getSellableUnits, getUomLabel, isWholeUnit,
 } from '../../../utils/products/uom';
-import { buildWhatsAppUrl, openExternalShare } from '../../../utils/shared/externalLinks';
 import type { OperationalFieldDefinition } from '../../../services/domains/products/OperationalFieldService';
 import { OperationalFieldsForm } from '../../../components/products/OperationalFieldsForm';
 import { OperationalFieldsSummary } from '../../../components/products/OperationalFieldsSummary';
@@ -140,7 +136,7 @@ interface QuotationModalsProps {
 export const QuotationModals: React.FC<QuotationModalsProps> = ({
   canCreate,
   canUpdate,
-  canDelete,
+  canDelete: _canDelete,
   canApprove,
   saving,
   formOpen,

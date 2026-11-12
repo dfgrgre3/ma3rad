@@ -580,7 +580,7 @@ export class PayrollSocialInsuranceService {
       const fullBenefitYears = rule.serviceYearsForFullBenefit || 0;
       const firstPeriodMonths = rule.benefitMonthsPerYearFirstPeriod || 0;
       const secondPeriodMonths = rule.benefitMonthsPerYearSecondPeriod || 0;
-      const secondPeriodThreshold = rule.secondPeriodThresholdYears || 0;
+      const _secondPeriodThreshold = rule.secondPeriodThresholdYears || 0;
 
       if (serviceYears <= fullBenefitYears) {
         benefitAmount = roundMoney(serviceYears * (firstPeriodMonths / 12) * salary);

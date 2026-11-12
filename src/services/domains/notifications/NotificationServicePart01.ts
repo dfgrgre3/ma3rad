@@ -2,7 +2,6 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { v4 as uuidv4 } from 'uuid';
-import { addLocalDays, localDateString } from '../../../utils/shared/date';
 import type { Notification, NotificationType } from '../../../types/notifications';
 
 export abstract class NotificationServicePart01 {

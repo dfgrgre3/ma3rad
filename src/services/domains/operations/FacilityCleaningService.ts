@@ -5,7 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { NotificationService } from '../notifications/NotificationService';
-import { localDateString, addLocalDays } from '../../../utils/shared/date';
+import { localDateString } from '../../../utils/shared/date';
 
 export type CleaningFrequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY' | 'OTHER';
 export type CleaningType = 'GENERAL' | 'DEEP' | 'DISINFECTION' | 'GLASS' | 'CARPET' | 'RESTROOM' | 'OTHER';
@@ -206,8 +206,6 @@ export interface CleaningStats {
   suppliesByType: Array<{ type: string; count: number }>;
 }
 
-const MAX_DATE = '9999-12-31';
-
 function roundNumber(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -286,7 +284,6 @@ export class FacilityCleaningService {
 
   static createCleaningSchedule(input: CleaningScheduleInput): CleaningSchedule {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]
@@ -332,7 +329,6 @@ export class FacilityCleaningService {
 
   static updateCleaningSchedule(id: string, input: Partial<CleaningScheduleInput>): CleaningSchedule {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
     const schedule = this.db.query<{ id: string }>(
       'SELECT id FROM facility_cleaning_schedules WHERE id = ? AND company_id = ?',
       [id, companyId]
@@ -365,7 +361,6 @@ export class FacilityCleaningService {
 
   static getCleaningChecklists(cleaningType?: CleaningType): CleaningChecklistItem[] {
     const actor = this.requireView();
-    const companyId = this.currentCompanyId(actor);
     const conditions: string[] = ['1=1'];
     const params: (string | number)[] = [];
     if (cleaningType) {
@@ -394,7 +389,6 @@ export class FacilityCleaningService {
 
   static createCleaningChecklist(input: CleaningChecklistInput): CleaningChecklistItem {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
     if (!input.itemName?.trim()) throw new Error('اسم البند مطلوب.');
     const id = `clci_${uuidv4().replace(/-/g, '').slice(0, 14)}`;
     this.db.run(
@@ -584,7 +578,6 @@ export class FacilityCleaningService {
     const companyId = this.currentCompanyId(actor);
     const scope = this.branchAccess.sqlScope('cs.branch_id', undefined, actor);
     const today = localDateString();
-    const inThirtyDays = localDateString(addLocalDays(new Date(), 30));
     const rows = this.db.query<any>(
       `SELECT cs.id, cs.supply_code AS supplyCode, cs.supply_name AS supplyName,
               cs.supply_type AS supplyType, cs.unit_of_measure AS unitOfMeasure,
@@ -618,7 +611,6 @@ export class FacilityCleaningService {
 
   static createCleaningSupply(input: CleaningSupplyInput): CleaningSupply {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]

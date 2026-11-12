@@ -463,7 +463,7 @@ export interface SafetyStats {
   trainingExpiringSoon: number;
 }
 
-const MAX_DATE = '9999-12-31';
+const _MAX_DATE = '9999-12-31';
 
 const RISK_SCORE_MAP: Record<string, Record<string, number>> = {
   RARE: { INSIGNIFICANT: 1, MINOR: 2, MODERATE: 3, MAJOR: 4, CATASTROPHIC: 5 },
@@ -490,7 +490,7 @@ function isValidDate(value: string | null | undefined): boolean {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function roundNumber(value: number): number {
+function _roundNumber(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
@@ -569,7 +569,7 @@ export class FacilitySafetyService {
 
   static createRiskRegisterItem(input: RiskRegisterInput): RiskRegisterItem {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]
@@ -713,7 +713,7 @@ export class FacilitySafetyService {
 
   static createInspectionChecklist(input: InspectionChecklistInput): InspectionChecklist {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     if (!input.checklistName?.trim()) throw new Error('اسم قائمة التفتيش مطلوب.');
     if (!input.items || !input.items.length) throw new Error('يجب إضافة بند واحد على الأقل.');
     const checklistCode = `CHK-${localDateString().slice(0, 7)}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
@@ -943,7 +943,7 @@ export class FacilitySafetyService {
 
   static createAccidentRecord(input: AccidentRecordInput): AccidentRecord {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]
@@ -1076,7 +1076,7 @@ export class FacilitySafetyService {
 
   static createCAPA(input: CAPAInput): CAPAItem {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     if (!input.title?.trim()) throw new Error('عنوان الإجراء مطلوب.');
     if (!input.description?.trim()) throw new Error('وصف الإجراء مطلوب.');
     const capaCode = `CAPA-${localDateString().slice(0, 7)}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
@@ -1188,7 +1188,7 @@ export class FacilitySafetyService {
 
   static createFireEquipment(input: FireEquipmentInput): FireEquipment {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]
@@ -1273,7 +1273,7 @@ export class FacilitySafetyService {
 
   static createEvacuationDrill(input: EvacuationDrillInput): EvacuationDrill {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]
@@ -1313,7 +1313,7 @@ export class FacilitySafetyService {
     const companyId = this.currentCompanyId(actor);
     const scope = this.branchAccess.sqlScope('ppi.branch_id', undefined, actor);
     const today = localDateString();
-    const inThirtyDays = localDateString(addLocalDays(new Date(), 30));
+    const _inThirtyDays = localDateString(addLocalDays(new Date(), 30));
     const rows = this.db.query<any>(
       `SELECT ppi.id, ppi.ppe_code AS ppeCode, ppi.ppe_name AS ppeName,
               ppi.location_id AS locationId, fl.name AS locationName,
@@ -1343,7 +1343,7 @@ export class FacilitySafetyService {
 
   static createPPEInventory(input: PPEInventoryInput): PPEInventory {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]
@@ -1488,8 +1488,8 @@ export class FacilitySafetyService {
     const actor = this.requireView();
     const companyId = this.currentCompanyId(actor);
     const scope = this.branchAccess.sqlScope('st.branch_id', undefined, actor);
-    const today = localDateString();
-    const inThirtyDays = localDateString(addLocalDays(new Date(), 30));
+    const _today = localDateString();
+    const _inThirtyDays = localDateString(addLocalDays(new Date(), 30));
     const rows = this.db.query<any>(
       `SELECT st.id, st.training_code AS trainingCode, st.training_name AS trainingName,
               st.training_type AS trainingType, st.trainer_name AS trainerName,

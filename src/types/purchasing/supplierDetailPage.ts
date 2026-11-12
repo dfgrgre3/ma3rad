@@ -1,8 +1,3 @@
-import React from 'react';
-import {
-  Building2, FileText, DollarSign, ShoppingBag, RotateCcw, Receipt, ShieldCheck, TrendingDown,
-} from 'lucide-react';
-import { PaymentType } from '..';
 import './supplierDetailPage_part01';
 import './supplierDetailPage_part02';
 export type { Tab } from './supplierDetailPage_part01';

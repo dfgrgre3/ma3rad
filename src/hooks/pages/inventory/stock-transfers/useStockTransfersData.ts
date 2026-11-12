@@ -21,8 +21,8 @@ export function useStockTransfersData() {
   const [warehouseSummary, setWarehouseSummary] = useState<any[]>([]);
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, _setDateFrom] = useState('');
+  const [dateTo, _setDateTo] = useState('');
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(() => {

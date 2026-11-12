@@ -216,7 +216,7 @@ export interface UtilityStats {
   topConsumingBranches: Array<{ branchId: string; branchName: string; totalCost: number }>;
 }
 
-const MAX_DATE = '9999-12-31';
+const _MAX_DATE = '9999-12-31';
 
 function roundNumber(value: number): number {
   return Math.round(value * 100) / 100;
@@ -303,7 +303,7 @@ export class FacilityUtilityService {
 
   static createUtilityMeter(input: UtilityMeterInput): UtilityMeter {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     const location = this.db.query<{ id: string; name: string; branch_id: string }>(
       'SELECT id, name, branch_id AS branchId FROM facility_locations WHERE id = ?',
       [input.locationId]
@@ -894,7 +894,7 @@ export class FacilityUtilityService {
       Number(periodMonth.slice(5, 7)),
       0
     ).toISOString().slice(0, 10);
-    const scope = this.branchAccess.sqlScope('b.id', undefined, actor);
+    const _scope = this.branchAccess.sqlScope('b.id', undefined, actor);
     const rows = this.db.query<any>(
       `SELECT b.id AS branchId, b.name AS branchName, um.utility_type AS utilityType,
               SUM(ur.consumption) AS totalConsumption, SUM(ur.cost) AS totalCost,
@@ -923,9 +923,9 @@ export class FacilityUtilityService {
   static getUtilityStats(): UtilityStats {
     const actor = this.requireView();
     const companyId = this.currentCompanyId(actor);
-    const scope = this.branchAccess.sqlScope('um.branch_id', undefined, actor);
+    const _scope = this.branchAccess.sqlScope('um.branch_id', undefined, actor);
     const today = localDateString();
-    const inThirtyDays = localDateString(addLocalDays(new Date(), 30));
+    const _inThirtyDays = localDateString(addLocalDays(new Date(), 30));
     const totalMeters = this.db.query<{ count: number }>(
       `SELECT COUNT(*) AS count FROM facility_utility_meters WHERE company_id = ?`,
       [companyId]

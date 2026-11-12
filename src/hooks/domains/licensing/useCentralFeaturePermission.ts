@@ -18,11 +18,14 @@ export function useCentralFeaturePermission(pathname?: string) {
     };
   }, []);
 
-  return useMemo(() => ({
-    visible: CentralFeaturePermissionService.isPageVisible(path),
-    canView: CentralFeaturePermissionService.canView(path),
-    canEdit: CentralFeaturePermissionService.canEdit(path),
-    canDelete: CentralFeaturePermissionService.canDelete(path),
-    canExportPrint: CentralFeaturePermissionService.canExportPrint(path),
-  }), [path, revision]);
+  return useMemo(() => {
+    void revision; // Re-evaluate when central configuration changes
+    return {
+      visible: CentralFeaturePermissionService.isPageVisible(path),
+      canView: CentralFeaturePermissionService.canView(path),
+      canEdit: CentralFeaturePermissionService.canEdit(path),
+      canDelete: CentralFeaturePermissionService.canDelete(path),
+      canExportPrint: CentralFeaturePermissionService.canExportPrint(path),
+    };
+  }, [path, revision]);
 }

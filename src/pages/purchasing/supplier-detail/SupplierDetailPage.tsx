@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useIdempotencyKey } from '../../../hooks/shared/useIdempotencyKey';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertTriangle, ArrowRight } from 'lucide-react';
@@ -78,8 +78,8 @@ export const SupplierDetailPage: React.FC = () => {
   });
   const [paymentError, setPaymentError] = useState('');
 
-  const supplierService = new SupplierService();
-  const operationalFieldService = new OperationalFieldService();
+  const supplierService = useMemo(() => new SupplierService(), []);
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
   const currentUser = AuthService.getCurrentUser();
   const canUpdate = PermissionService.can(currentUser, 'ui.suppliers.supplier_detail.update');
   const canPay = PermissionService.can(currentUser, 'ui.suppliers.supplier_detail.payment');
@@ -101,10 +101,12 @@ export const SupplierDetailPage: React.FC = () => {
     };
     const required = requiredPermission[tab];
     if (required && !PermissionService.can(currentUser, required)) setTab('overview');
-  }, [tab, currentUser?.id, currentUser?.role]);
+  }, [tab, currentUser]);
 
-  const loadSupplierData = () => {
+  const loadSupplierData = useCallback(() => {
     if (!id) return;
+    setLoading(true);
+    setLoading(true);
     setLoading(true);
     try {
       const db = DatabaseManager.getInstance();
@@ -225,11 +227,11 @@ export const SupplierDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setLoading, setSupplier, setOperationalFields, setOperationalFieldValues, setInvoices, setOrders, setReturns, setScorecard, setPriceHistory, setPayments, setStatement, id, statementFrom, statementTo, canViewPurchases, canViewFinancials, operationalFieldService, supplierService]);
 
   useEffect(() => {
     loadSupplierData();
-  }, [id, statementFrom, statementTo, canViewPurchases, canViewFinancials]);
+  }, [loadSupplierData, id, statementFrom, statementTo, canViewPurchases, canViewFinancials]);
 
   const handleRecordPayment = (e: React.FormEvent) => {
     e.preventDefault();

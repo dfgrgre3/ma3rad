@@ -1,4 +1,4 @@
-﻿import './integration.setup.ts';
+import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
@@ -1288,7 +1288,7 @@ test('push: failed network request remains retryable instead of stuck in flight'
 });
 
 test('sync engine: does not advance cursor while an incoming event is unapplied', async () => {
-  const manager = await boot();
+  await boot();
   const event = {
     eventId: uuidv4(),
     branchId: 'br_main',
@@ -1319,7 +1319,6 @@ test('sync engine: does not advance cursor while an incoming event is unapplied'
 });
 
 test('sync engine: enqueue and status reflect pending count', async () => {
-  const manager = await boot();
   const engine = new SyncEngine();
   const id = engine.enqueueChange({
     branchId: 'br_main', entityType: 'customer', entityId: 'c2',

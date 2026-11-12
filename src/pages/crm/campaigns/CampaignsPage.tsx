@@ -49,7 +49,7 @@ export const CampaignsPage: React.FC = () => {
     name: '', channel: 'SOCIAL' as Channel, startsAt: '', endsAt: '', budget: '0', targetAudience: '', status: 'PLANNED' as CampaignStatus, notes: '',
   });
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setRows(db.query<Campaign>(
@@ -59,8 +59,8 @@ export const CampaignsPage: React.FC = () => {
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل الحملات.'); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  }, [db, setRows, setError, setLoading]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = rows.filter((c) => {
     const q = search.trim();

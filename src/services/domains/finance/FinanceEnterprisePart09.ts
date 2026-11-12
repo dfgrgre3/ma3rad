@@ -1,28 +1,10 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../auth/AuthService';
-import { PermissionService } from '../auth/PermissionService';
 import { round2 } from './financials';
-import { localDateString } from '../../../utils/shared/date';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
 import type {
-  FiscalYear,
-  FiscalPeriod,
-  BankAccount,
-  BankReconciliation,
-  BankReconciliationLine,
-  ExtendedChequeStatus,
-  ChequeStatusHistory,
-  CostCenter,
-  Budget,
-  BudgetItem,
-  CashForecastItem,
-  CashForecastDaySummary,
   PaymentGateway,
   PaymentGatewaySettlement,
-  MultiDimensionalReportFilters,
 } from '../../../types/finance';
-import type { Cheque } from './FinanceExtrasService';
 import { FinanceEnterprisePart08 } from './FinanceEnterprisePart08';
 
 export abstract class FinanceEnterprisePart09 extends FinanceEnterprisePart08 {
@@ -49,7 +31,7 @@ public getPaymentGateways(): PaymentGateway[] {
   }
 
 public savePaymentGateway(input: Partial<PaymentGateway> & { name: string; providerCode: string; glAccountId: string }): string {
-    const actor = this.requireManage();
+    const _actor = this.requireManage();
     if (!input.name.trim()) throw new Error('اسم بوابة الدفع مطلوب.');
 
     if (input.id) {
@@ -116,7 +98,7 @@ public recordGatewaySettlement(input: {
     bankAccountId: string;
     notes?: string;
   }): string {
-    const actor = this.requireManage();
+    const _actor = this.requireManage();
     const gateway = this.db.query<any>('SELECT * FROM payment_gateways WHERE id = ?', [input.gatewayId])[0];
     if (!gateway) throw new Error('بوابة الدفع غير موجودة.');
     const bank = this.db.query<any>('SELECT * FROM bank_accounts WHERE id = ?', [input.bankAccountId])[0];

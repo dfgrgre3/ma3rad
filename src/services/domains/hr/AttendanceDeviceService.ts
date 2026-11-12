@@ -5,7 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { AttendanceTimeService } from './AttendanceTimeService';
-import { localDateString, addLocalDays } from '../../../utils/shared/date';
+import { localDateString } from '../../../utils/shared/date';
 
 export type AttendanceDeviceType = 'FINGERPRINT' | 'FACE_RECOGNITION' | 'CARD' | 'QR_CODE' | 'MOBILE_APP' | 'OTHER';
 export type DeviceEventType = 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_START' | 'BREAK_END' | 'UNKNOWN';
@@ -131,12 +131,6 @@ export interface DeviceStats {
   pendingRecords: number;
   processedToday: number;
   lastSync: string | null;
-}
-
-const MAX_DATE = '9999-12-31';
-
-function roundNumber(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 function isValidDateTime(value: string): boolean {
@@ -410,7 +404,6 @@ export class AttendanceDeviceService {
 
     const importId = `ail_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
     const importStartedAt = new Date().toISOString();
-    let recordsFound = 0;
     let recordsNew = 0;
     let recordsDuplicate = 0;
     let recordsProcessed = 0;
@@ -446,7 +439,6 @@ export class AttendanceDeviceService {
         }
         // Resolve employee by code or by device mapping
         let employeeId: string | null = null;
-        let employeeName: string | null = null;
         if (rec.employeeCode) {
           const emp = db.query<{ id: string; name: string }>(
             `SELECT e.id, e.name FROM employees e
@@ -455,7 +447,6 @@ export class AttendanceDeviceService {
           )[0];
           if (emp) {
             employeeId = emp.id;
-            employeeName = emp.name;
           } else {
             recordsSkipped += 1;
             errors.push({ recordIndex: i, employeeCode: rec.employeeCode, message: 'الموظف غير موجود أو غير نشط في هذا الفرع.' });
@@ -477,7 +468,6 @@ export class AttendanceDeviceService {
         recordsNew += 1;
       }
 
-      recordsFound = input.records.length;
       recordsProcessed = recordsNew;
       const status = recordsError > 0 && recordsNew === 0 ? 'ERROR' : 'COMPLETED';
       db.run(
@@ -582,7 +572,6 @@ export class AttendanceDeviceService {
           }
           // Create new period
           const periodId = `eap_${uuidv4().replace(/-/g, '').slice(0, 14)}`;
-          const now = new Date().toISOString();
           this.db.run(
             `INSERT INTO employee_attendance_periods
                (id, employee_id, operation_shift_id, attendance_date, check_in_at,
@@ -598,7 +587,6 @@ export class AttendanceDeviceService {
             // No open period, create a synthetic check-in then check-out
             // Use start of day as check-in if we don't know it
             const periodId = `eap_${uuidv4().replace(/-/g, '').slice(0, 14)}`;
-            const now = new Date().toISOString();
             this.db.run(
               `INSERT INTO employee_attendance_periods
                  (id, employee_id, operation_shift_id, attendance_date, check_in_at,

@@ -1,4 +1,3 @@
-import type { UnitType, CeramicGrade } from '../products';
 import './index_part01';
 import './index_part02';
 export type { PaymentType } from './index_part01';

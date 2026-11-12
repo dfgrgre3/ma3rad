@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Building2, Package, RefreshCw, Search, Warehouse as WarehouseIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { Package, RefreshCw, Search } from 'lucide-react';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -36,7 +36,7 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
   const can = usePermission();
   const canView = mode === 'showroom' ? can('inventory.showroom_stock.view') : can('inventory.warehouse_stock.view');
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const nextWarehouses = inventoryService.getAllWarehouses();
@@ -65,11 +65,11 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [inventoryService, productService, setLoading, setWarehouses, setProducts, setStock, setShowroomWarehouseId, setStoreWarehouseId, setSelectedWarehouseId, setError]);
 
   useEffect(() => {
     loadData();
-  }, [inventoryService, productService]);
+  }, [loadData]);
 
   const searchableProducts = useMemo(
     () => products.filter((product) => {

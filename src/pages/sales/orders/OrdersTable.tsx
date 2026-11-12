@@ -30,7 +30,7 @@ interface OrdersTableProps {
 }
 
 export const OrdersTable: React.FC<OrdersTableProps> = ({
-  orders, pageItems, page, totalPages, pageSize, canCreate, canUpdate, canApprove, canDelete,
+  orders, pageItems, page, totalPages, pageSize, _canCreate, canUpdate, _canApprove, canDelete,
   onViewDetails, onPrintOrder, onOpenTimeline, onShareOnWhatsApp, onEditOrder,
   onOpenDelivery, onOpenConvert, onRemoveOrder, onPrevPage, onNextPage,
 }) => (

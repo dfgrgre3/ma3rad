@@ -1,17 +1,13 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   PieChart,
   Plus,
   RefreshCw,
   Loader2,
   FolderTree,
-  DollarSign,
-  TrendingUp,
   AlertTriangle,
   CheckCircle2,
-  Building,
   Target,
-  BarChart3,
 } from 'lucide-react';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import { FinanceExtrasService } from '../../../services/domains/finance/FinanceExtrasService';
@@ -48,7 +44,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
   });
   const [chartAccounts, setChartAccounts] = useState<any[]>([]);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const ccs = service.getCostCenters();
@@ -71,11 +67,11 @@ export const BudgetsCostCentersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, extrasService, setLoading, setCostCenters, setBudgets, setFiscalYears, setChartAccounts, setSelectedBudgetId, setSelectedBudgetDetail, toast, selectedBudgetId]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
     if (selectedBudgetId) {
@@ -85,7 +81,7 @@ export const BudgetsCostCentersPage: React.FC = () => {
         toast.error(err?.message || 'تعذر تحميل تفاصيل الموازنة.');
       }
     }
-  }, [selectedBudgetId]);
+  }, [selectedBudgetId, service, toast]);
 
   const handleCreateCostCenter = (e: React.FormEvent) => {
     e.preventDefault();

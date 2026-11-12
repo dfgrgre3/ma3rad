@@ -1,4 +1,4 @@
-﻿import { OutboxRepository } from './OutboxRepository.ts';
+import { OutboxRepository } from './OutboxRepository.ts';
 import { InboxRepository } from './InboxRepository.ts';
 import { PushChangesService } from './PushChangesService.ts';
 import { PullChangesService } from './PullChangesService.ts';
@@ -8,7 +8,7 @@ import { RetryScheduler } from './RetryScheduler.ts';
 import { SyncAuditLogger } from './SyncAuditLogger.ts';
 import { EventDispatcher } from './PullChangesService.ts';
 import { EventValidator } from './EventValidator.ts';
-import type { SyncEvent, SyncTransport, SyncStatus } from '../types/sync/index.ts';
+import type { SyncTransport, SyncStatus } from '../types/sync/index.ts';
 
 export class SyncEngine {
   public outbox: OutboxRepository;

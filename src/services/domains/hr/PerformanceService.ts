@@ -4,7 +4,6 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
-import { localDateString } from '../../../utils/shared/date';
 
 export type PerformancePeriodType = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'CUSTOM';
 export type PerformanceCycleStatus = 'DRAFT' | 'OPEN' | 'CLOSED';

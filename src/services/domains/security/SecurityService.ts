@@ -19,19 +19,6 @@ import type { TwoFactorSetup } from '../auth/twoFactorAuth';
 export type { ActiveSession, LoginRecord, SecurityOverview };
 
 
-interface SecurityEvent {
-  timestamp: string;
-  type: 'login_success' | 'login_failure' | 'password_change' | 'backup_created' | 'backup_failed' | 'data_access';
-  userId: string;
-  details: {
-    sessionId: string;
-    ip?: string;
-    device?: string;
-    [key: string]: unknown;
-  };
-  riskLevel: 'low' | 'medium' | 'high';
-}
-
 interface SecurityConfig {
   encryptionAlgorithm: 'aes-256-gcm' | 'aes-256-ctr';
   keyStorage: 'local' | 'secureEnclave';
@@ -622,7 +609,7 @@ export class SecurityService {
   getActiveSessions(): ActiveSession[] {
     PermissionService.require(AuthService.requireAuth(), 'sessions.view');
     const db = DatabaseManager.getInstance();
-    const currentUser = AuthService.getCurrentUser();
+    const _currentUser = AuthService.getCurrentUser();
     const currentSessionId = AuthService.getSessionId();
 
     const sessionsRow = db.query<any>(`
@@ -736,7 +723,7 @@ export class SecurityService {
   private logAudit(module: string, userId: string, action: string, entityType: string, entityId: string, description: string, success: boolean, severity: 'low' | 'medium' | 'high' = 'medium'): void {
     try {
       auditLogger.log(module, userId, action, entityType, entityId, description, null, success, severity);
-    } catch (e) {
+    } catch {
       // ignored
     }
   }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Workflow, Phone, Clock, User, Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CrmService, Lead, LeadStage } from '../../../services/domains/crm/CrmService';
@@ -18,7 +18,7 @@ const STAGES: { id: LeadStage; label: string; color: string; bg: string; border:
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(n) + ' ج';
 
 export const PipelinePage: React.FC = () => {
-  const service = new CrmService();
+  const service = useMemo(() => new CrmService(), []);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
   const canUpdate = PermissionService.can(user, 'ui.crm.pipeline.update');
@@ -26,7 +26,7 @@ export const PipelinePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setLeads(service.getLeads());
@@ -36,9 +36,9 @@ export const PipelinePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, setLeads, setError, setLoading]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const move = (lead: Lead, direction: -1 | 1) => {
     const index = STAGES.findIndex((s) => s.id === lead.stage);

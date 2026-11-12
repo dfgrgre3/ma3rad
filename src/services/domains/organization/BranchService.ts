@@ -1,5 +1,5 @@
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import type { Branch, BranchWarehouse, UserBranch, CreateBranchDTO, User } from '../../../types';
+import type { Branch, BranchWarehouse, CreateBranchDTO, User } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';

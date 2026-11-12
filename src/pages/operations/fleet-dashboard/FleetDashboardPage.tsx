@@ -1,17 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
-  Truck, Users, Car, MapPin, Clock, CheckCircle2, AlertCircle, XCircle,
-  Loader2, RefreshCw, BarChart3, ArrowUpRight, Calendar, Package,
-  DollarSign, TrendingUp, UserRound,
+  Truck, Users, Car, Clock, CheckCircle2, AlertCircle, XCircle,
+  Loader2, RefreshCw, ArrowUpRight, Calendar, Package,
+  DollarSign, UserRound,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { OperationsService, Delivery, Driver, Vehicle } from '../../../services/domains/operations/OperationsService';
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
+import { OperationsService, Delivery } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
-const db = DatabaseManager.getInstance();
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(n || 0);
 const fmtM = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + 'ك' : fmt(n);
 
@@ -184,7 +182,7 @@ export const FleetDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setStats(buildFleetStats(service));
@@ -194,15 +192,15 @@ export const FleetDashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service]);
 
-  useEffect(() => { if (canView) load(); }, []);
+  useEffect(() => { if (canView) load(); }, [canView, load]);
 
   useEffect(() => {
     if (!refreshCtx || !canView) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx?.refreshToken, canView, load]);
+  }, [refreshCtx, canView, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

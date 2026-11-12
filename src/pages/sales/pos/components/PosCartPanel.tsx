@@ -1,10 +1,3 @@
-import React from 'react';
-import { ShoppingCart } from 'lucide-react';
-import type { Customer, Product } from '../../../../types';
-import type { CustomerService } from '../../../../services/domains/customers/CustomerService';
-import { CartLine } from './CartLine';
-import { PosCustomerPicker } from './PosCustomerPicker';
-import type { CartItem, PosUnit } from '../../../../types/pos';
 import './PosCartPanel_part01';
 import './PosCartPanel_part02';
 export type { PosCartPanelProps } from './PosCartPanel_part01';

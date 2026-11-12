@@ -5,7 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { NotificationService } from '../notifications/NotificationService';
-import { localDateString, addLocalDays } from '../../../utils/shared/date';
+import { localDateString } from '../../../utils/shared/date';
 
 export type HealthStatus = 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR' | 'CRITICAL';
 export type TriggerType = 'VIBRATION' | 'TEMPERATURE' | 'PRESSURE' | 'NOISE' | 'OIL_QUALITY' | 'LEAK' | 'HEAT' | 'HOURS' | 'CYCLES' | 'OTHER';
@@ -192,7 +192,7 @@ export interface PredictiveMaintenanceStats {
   activationsBySeverity: Array<{ severity: string; count: number }>;
 }
 
-const MAX_DATE = '9999-12-31';
+const _MAX_DATE = '9999-12-31';
 
 function roundNumber(value: number): number {
   return Math.round(value * 100) / 100;
@@ -615,7 +615,7 @@ export class FacilityPredictiveMaintenanceService {
   static getPredictiveMaintenanceStats(): PredictiveMaintenanceStats {
     const actor = this.requireView();
     const companyId = this.currentCompanyId(actor);
-    const scope = this.branchAccess.sqlScope('ah.branch_id', undefined, actor);
+    const _scope = this.branchAccess.sqlScope('ah.branch_id', undefined, actor);
     const totalAssetsMonitored = this.db.query<{ count: number }>(
       `SELECT COUNT(DISTINCT asset_id) AS count FROM facility_asset_health WHERE company_id = ?`,
       [companyId]

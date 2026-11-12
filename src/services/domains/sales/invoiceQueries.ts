@@ -1,8 +1,3 @@
-import { AuthService } from '../auth/AuthService';
-import type { BranchAccessService } from '../auth/BranchAccessService';
-import type { CustomerPayment, SalesInvoice, SalesInvoiceItem } from '../../../types';
-import type { SalesContext } from './context';
-import type { InvoiceFilters, InvoiceStats } from '../../../types/sales/serviceTypes';
 import './invoiceQueries_part01';
 import './invoiceQueries_part02';
 export { buildInvoiceWhere } from './invoiceQueries_part01';

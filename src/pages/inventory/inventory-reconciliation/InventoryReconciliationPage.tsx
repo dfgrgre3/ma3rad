@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Scale, CheckCircle2, AlertTriangle, RefreshCw, BookmarkCheck,
-  FileText, ShieldCheck, Database, Layers, ArrowLeftRight, Building2,
-  Calendar, Check, X
+  ShieldCheck, Database, Layers, Check
 } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { useToast } from '../../../components/ui/Toast';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const InventoryReconciliationPage: React.FC = () => {
-  const inventoryService = new InventoryService();
+  const inventoryService = useMemo(() => new InventoryService(), []);
   const toast = useToast();
   const canManage = usePermission()('inventory.reconciliation.manage');
 
@@ -24,7 +23,7 @@ export const InventoryReconciliationPage: React.FC = () => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveNotes, setSaveNotes] = useState('');
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const whs = inventoryService.getAllWarehouses();
@@ -40,11 +39,11 @@ export const InventoryReconciliationPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [inventoryService, setLoading, setWarehouses, setReconciliation, setHistoryLogs, toast, selectedWarehouseId]);
 
   useEffect(() => {
     loadData();
-  }, [selectedWarehouseId]);
+  }, [loadData]);
 
   const handleSaveAuditStamp = (e: React.FormEvent) => {
     e.preventDefault();

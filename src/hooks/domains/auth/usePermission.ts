@@ -30,10 +30,11 @@ export function usePermission(user?: User | null) {
   const subject = user ?? AuthService.getCurrentUser();
   const revision = useCentralRevision();
   return useCallback(
-    (code: string) => PermissionService.can(subject, code),
-    // PermissionService caches per user; role changes invalidate the cache.
-    // revision يضمن إعادة التقييم عند وصول قيود مركزية جديدة.
-    [subject?.id, subject?.role, revision]
+    (code: string) => {
+      void revision; // Re-evaluate when central config changes
+      return PermissionService.can(subject, code);
+    },
+    [subject, revision]
   );
 }
 
@@ -41,7 +42,10 @@ export function useAnyPermission(user?: User | null) {
   const subject = user ?? AuthService.getCurrentUser();
   const revision = useCentralRevision();
   return useCallback(
-    (codes: string[]) => PermissionService.canAny(subject, codes),
-    [subject?.id, subject?.role, revision]
+    (codes: string[]) => {
+      void revision; // Re-evaluate when central config changes
+      return PermissionService.canAny(subject, codes);
+    },
+    [subject, revision]
   );
 }

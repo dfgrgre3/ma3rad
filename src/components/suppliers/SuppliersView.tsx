@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useIdempotencyKey } from '../../hooks/shared/useIdempotencyKey';
 import { 
-  Users, Plus, Search, DollarSign, FileText, Download, Printer,
-  ArrowUpRight, ArrowDownRight, Phone, Building2, Pencil, Power,
+  Plus, Search, DollarSign, FileText, Download, Printer,
+  Building2, Pencil, Power,
   CalendarDays, Upload, ExternalLink
 } from 'lucide-react';
 import { SupplierService } from '../../services/domains/suppliers/SupplierService';
@@ -73,8 +73,8 @@ export const SuppliersView: React.FC = () => {
     notes: 'سداد دفعة نقدية لحساب المورد'
   });
 
-  const supplierService = new SupplierService();
-  const operationalFieldService = new OperationalFieldService();
+  const supplierService = useMemo(() => new SupplierService(), []);
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.suppliers.suppliers.create');
   const canUpdate = PermissionService.can(currentUser, 'ui.suppliers.suppliers.update');
@@ -86,7 +86,7 @@ export const SuppliersView: React.FC = () => {
   const canApproveFinancials = PermissionService.can(currentUser, 'ui.finance.receivables.approve');
   const canImport = PermissionService.can(currentUser, 'ui.settings.hub.view');
 
-  const loadSuppliers = () => {
+  const loadSuppliers = useCallback(() => {
     try {
       const data = supplierService.getAllSuppliers(search, showInactive);
       setSuppliers(data);
@@ -100,11 +100,11 @@ export const SuppliersView: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [search, showInactive, supplierService, operationalFieldService]);
 
   useEffect(() => {
     loadSuppliers();
-  }, [search, showInactive]);
+  }, [loadSuppliers]);
 
   useEffect(() => {
     if (!selectedSupplier) return;
@@ -116,7 +116,7 @@ export const SuppliersView: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  }, [selectedSupplier?.id, statementFrom, statementTo, canViewFinancials]);
+  }, [selectedSupplier, statementFrom, statementTo, canViewFinancials, supplierService]);
 
   const handleOpenStatement = (sup: Supplier) => {
     setSelectedSupplier(sup);

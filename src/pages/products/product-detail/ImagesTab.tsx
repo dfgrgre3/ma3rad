@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Star, Image as ImageIcon, Trash2, Upload } from 'lucide-react';
 import { ProductExtraService, ProductImage } from '../../../services/domains/products/ProductExtraService';
 
@@ -8,13 +8,13 @@ interface ImagesTabProps {
 }
 
 export const ImagesTab: React.FC<ImagesTabProps> = ({ productId, canEdit }) => {
-  const service = new ProductExtraService();
+  const service = useMemo(() => new ProductExtraService(), []);
   const [rows, setRows] = useState<ProductImage[]>([]);
   const [filePath, setFilePath] = useState('');
   const [caption, setCaption] = useState('');
 
-  const load = () => { try { setRows(service.getImages(productId)); } catch (e) { console.error(e); } };
-  useEffect(() => { load(); }, [productId]);
+  const load = useCallback(() => { try { setRows(service.getImages(productId)); } catch (e) { console.error(e); } }, [productId, service]);
+  useEffect(() => { load(); }, [load]);
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();

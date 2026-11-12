@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  PackageCheck, Plus, Search, Truck, Warehouse, CheckCircle2,
-  AlertTriangle, ShieldAlert, FileText, ChevronDown, Check, X,
-  Clock, Hash, Sparkles, Building2, User
+  PackageCheck, Plus, Search, CheckCircle2,
+  AlertTriangle, ShieldAlert, ChevronDown, X,
+  Clock, Sparkles
 } from 'lucide-react';
 import {
   ProcurementService, GoodsReceiptRow, GoodsReceiptItem
@@ -16,7 +16,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { useToast } from '../../../components/ui/Toast';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 import { useNavigate } from 'react-router-dom';
-import type { Supplier, Product, Warehouse as WarehouseType } from '../../../types';
+import type { Supplier, Product } from '../../../types';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
@@ -81,7 +81,7 @@ export const GoodsReceiptsPage: React.FC = () => {
     inspectionNotes: string;
   }>>([]);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const rows = service.getAllGoodsReceipts(search, statusFilter);
@@ -91,11 +91,11 @@ export const GoodsReceiptsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, statusFilter, service, toast]);
 
   useEffect(() => {
     loadData();
-  }, [statusFilter]);
+  }, [loadData]);
 
   const toggleDetails = (id: string) => {
     if (expandedId === id) {

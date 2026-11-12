@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   CreditCard,
   Plus,
@@ -10,10 +10,6 @@ import {
   ArrowUpRight,
   AlertTriangle,
   History,
-  CheckCircle2,
-  Building2,
-  Undo2,
-  Scale,
 } from 'lucide-react';
 import { FinanceExtrasService, Cheque, ChequeType } from '../../../services/domains/finance/FinanceExtrasService';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
@@ -48,7 +44,7 @@ export const ChequesPage: React.FC = () => {
   const canManageCheques = PermissionService.can(AuthService.getCurrentUser(), 'ui.finance.cheques.approve');
 
   const [rows, setRows] = useState<Cheque[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [_bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | ChequeType>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | ExtendedChequeStatus>('ALL');
@@ -80,7 +76,7 @@ export const ChequesPage: React.FC = () => {
   const [historyTarget, setHistoryTarget] = useState<Cheque | null>(null);
   const [historyLogs, setHistoryLogs] = useState<ChequeStatusHistory[]>([]);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setRows(service.getCheques());
@@ -93,11 +89,11 @@ export const ChequesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, enterpriseService, setRows, setBankAccounts, actionBankId, setActionBankId, setError, setLoading]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const filtered = rows.filter((row) => {
     const q = search.trim();

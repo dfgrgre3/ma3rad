@@ -10,7 +10,7 @@ export const DeliveriesPage: React.FC = () => {
   const service = useMemo(() => new OperationsService(), []);
   const currentUser = AuthService.getCurrentUser();
   const canCreate = PermissionService.can(currentUser, 'ui.deliveries.deliveries.create');
-  const canManage = PermissionService.can(currentUser, 'ui.deliveries.deliveries.manage');
+  const _canManage = PermissionService.can(currentUser, 'ui.deliveries.deliveries.manage');
   const canStart = PermissionService.can(currentUser, 'ui.deliveries.deliveries.start');
   const canComplete = PermissionService.can(currentUser, 'ui.deliveries.deliveries.complete');
   const canCancel = PermissionService.can(currentUser, 'ui.deliveries.deliveries.cancel');
@@ -46,7 +46,7 @@ export const DeliveriesPage: React.FC = () => {
       setVehicles(service.getVehicles().filter((v) => v.isActive && v.status !== 'OUT_OF_SERVICE'));
       setCustomers(service.getCustomersForSelect());
     } catch (e: any) { setError(e?.message || 'تعذر تحميل البيانات المرجعية.'); }
-  }, []);
+  }, [service]);
 
   const pickCustomer = (id: string) => {
     const c = customers.find((x) => x.id === id);

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Activity, ArrowDownToLine, ArrowUpFromLine, Boxes, Check, ChevronLeft, Eye, EyeOff,
+  ArrowDownToLine, ArrowUpFromLine, Boxes, Check, Eye, EyeOff,
   FileText, History, LayoutList, Redo2, RotateCcw, Save, Search, Settings2, ShieldCheck,
   SlidersHorizontal, Sparkles, Trash2, Type, Wand2, X,
 } from 'lucide-react';
@@ -14,7 +14,6 @@ import {
   type AppConfigDomain,
   type AppConfigEntry,
   type AppConfigRule,
-  type AppConfigSnapshot,
 } from '../../../config/appConfiguration';
 import { getRegisteredConfigTargets } from '../../../config/appConfigTargets';
 import { APP_ROUTE_PATHS } from '../../../router/routePaths';
@@ -114,7 +113,6 @@ export const AppConfigurationPage: React.FC = () => {
   const [rules, setRules] = useState<AppConfigRule[]>(state.rules);
   const [dirty, setDirty] = useState(false);
   const [pageSearch, setPageSearch] = useState('');
-  const [targetSearch, setTargetSearch] = useState('');
   const [versions, setVersions] = useState<AppConfigVersion[]>([]);
   const [versionsError, setVersionsError] = useState<string | null>(null);
   const [moduleState, setModuleState] = useState(() => ModuleRegistryService.getModuleState());

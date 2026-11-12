@@ -1,28 +1,10 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../auth/AuthService';
-import { PermissionService } from '../auth/PermissionService';
 import { round2 } from './financials';
 import { localDateString } from '../../../utils/shared/date';
-import { postLedgerEntry } from '../../../database/repositories/ledger';
 import type {
-  FiscalYear,
-  FiscalPeriod,
-  BankAccount,
-  BankReconciliation,
-  BankReconciliationLine,
-  ExtendedChequeStatus,
-  ChequeStatusHistory,
-  CostCenter,
-  Budget,
-  BudgetItem,
   CashForecastItem,
   CashForecastDaySummary,
-  PaymentGateway,
-  PaymentGatewaySettlement,
-  MultiDimensionalReportFilters,
 } from '../../../types/finance';
-import type { Cheque } from './FinanceExtrasService';
 import { FinanceEnterprisePart07 } from './FinanceEnterprisePart07';
 
 export abstract class FinanceEnterprisePart08 extends FinanceEnterprisePart07 {

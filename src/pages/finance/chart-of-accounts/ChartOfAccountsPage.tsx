@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   BookOpen, ChevronDown, ChevronLeft, ChevronsDownUp, ChevronsUpDown,
   Loader2, Pencil, Plus, Power, RotateCcw, Search, Trash2, X,
@@ -91,13 +91,13 @@ export const ChartOfAccountsPage: React.FC = () => {
   const [editing, setEditing] = useState<Account | null>(null);
   const [form, setForm] = useState({ code: '', name: '', type: 'ASSET' as AccountType, parentCode: '', notes: '' });
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try { setAccounts(service.getAccounts()); setError(null); }
     catch (e: any) { setError(e?.message || 'تعذر تحميل دليل الحسابات.'); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  }, [service, setLoading, setAccounts, setError]);
+  useEffect(() => { load(); }, [load]);
 
   const tree = useMemo(() => buildAccountTree(accounts), [accounts]);
   const totals = useMemo(() => {

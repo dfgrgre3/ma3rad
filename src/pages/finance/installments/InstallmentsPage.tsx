@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  CalendarDays, Plus, Search, Calendar, CheckCircle2, AlertTriangle,
-  User, CreditCard, DollarSign, Clock, Check, Printer, FileText, ArrowUpRight
+  CalendarDays, Plus, Search, Calendar, CheckCircle2,
 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { InstallmentService } from '../../../services/domains/finance/InstallmentService';
@@ -57,7 +56,7 @@ export const InstallmentsPage: React.FC = () => {
   const [openInvoices, setOpenInvoices] = useState<InstallmentInvoiceOption[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'INSTALLMENTS' | 'PLANS'>('INSTALLMENTS');
+  const _activeTab = useState<'INSTALLMENTS' | 'PLANS'>('INSTALLMENTS')[0];
 
   // Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -68,12 +67,12 @@ export const InstallmentsPage: React.FC = () => {
   const [monthsCount, setMonthsCount] = useState<number>(6);
   const [startDate, setStartDate] = useState(localDateString());
 
-  const customerService = new CustomerService();
-  const installmentService = new InstallmentService();
+  const customerService = useMemo(() => new CustomerService(), []);
+  const installmentService = useMemo(() => new InstallmentService(), []);
   const actor = AuthService.getCurrentUser();
   const canManage = PermissionService.can(actor, 'ui.finance.installments.manage');
 
-  const loadData = () => {
+  const load = useCallback(() => {
     const currentActor = AuthService.getCurrentUser();
     if (!PermissionService.can(currentActor, 'ui.finance.installments.view') && !PermissionService.can(currentActor, 'ui.finance.installments.manage')) {
       setPlans([]);
@@ -165,11 +164,11 @@ export const InstallmentsPage: React.FC = () => {
     } catch (e) {
       console.error('Error loading installments', e);
     }
-  };
+  }, [installmentService, customerService, setPlans, setInstallments, setCustomers, setOpenInvoices, setSelectedCustomerId, setSelectedInvoiceId, setTotalFinanced, setDownPayment, selectedCustomerId, selectedInvoiceId]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    load();
+  }, [load]);
 
   const handleCreatePlan = (e: React.FormEvent) => {
     e.preventDefault();

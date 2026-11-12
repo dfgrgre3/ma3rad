@@ -1,5 +1,3 @@
-import type { UnitType } from '../../types';
-import { getProductUnitLabel } from './productUnits';
 import { AREA_UNITS, LENGTH_UNITS } from './uom_part01';
 export { AREA_UNITS, LENGTH_UNITS };
 import './uom_part01';

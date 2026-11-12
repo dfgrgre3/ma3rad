@@ -1,8 +1,3 @@
-import arabicTerms from './terminology/ar.json' with { type: 'json' };
-import ceramicsTerms from './terminology/profiles/ceramics.json' with { type: 'json' };
-import servicesTerms from './terminology/profiles/services.json' with { type: 'json' };
-import professionalServicesTerms from './terminology/profiles/professional_services.json' with { type: 'json' };
-import { getBusinessProfileTemplateId } from './businessProfiles';
 import './businessTerminology_part01';
 import './businessTerminology_part02';
 import './businessTerminology_part03';

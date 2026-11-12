@@ -212,8 +212,6 @@ export interface CreateProductionOrderDTO {
 }
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const BOM_STATUSES: BomStatus[] = ['DRAFT', 'ACTIVE', 'ARCHIVED'];
-const ORDER_STATUSES: ProductionOrderStatus[] = ['PLANNED', 'RELEASED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const PRIORITIES: ProductionPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 function assertDate(value: string | undefined | null, label: string): void {
@@ -282,7 +280,7 @@ export class ManufacturingService {
   }
 
   public getWorkCenters(branchId?: string): WorkCenter[] {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     if (branchId) this.branchAccess.requireBranchAccess(branchId, actor);
     const scope = this.branchAccess.sqlScope('wc.branch_id', undefined, actor);
     const conditions = [scope.clause];
@@ -299,7 +297,7 @@ export class ManufacturingService {
 
   public createWorkCenter(input: CreateWorkCenterDTO): WorkCenter {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     if (!input.code?.trim()) throw new Error('رمز مركز العمل مطلوب.');
     if (!input.name?.trim()) throw new Error('اسم مركز العمل مطلوب.');
     const branchId = input.branchId || this.branchAccess.getDefaultAccessibleBranchId(actor);
@@ -320,7 +318,7 @@ export class ManufacturingService {
   }
 
   public getBoms(productId?: string): BillOfMaterials[] {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const conditions: string[] = [];
     const params: Array<string> = [];
     if (productId) {
@@ -350,7 +348,7 @@ export class ManufacturingService {
   }
 
   public getBom(id: string): BillOfMaterials {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const bom = this.db.query<BillOfMaterials>(
       `SELECT b.*, p.name AS product_name
        FROM bills_of_materials b
@@ -372,7 +370,7 @@ export class ManufacturingService {
 
   public createBom(input: CreateBomDTO): BillOfMaterials {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     if (!input.productId) throw new Error('يجب اختيار المنتج المصنّع.');
     const product = this.db.query<{ id: string }>(`SELECT id FROM products WHERE id = ?`, [input.productId])[0];
     if (!product) throw new Error('المنتج المحدد غير موجود.');
@@ -415,7 +413,7 @@ export class ManufacturingService {
 
   public activateBom(id: string): BillOfMaterials {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const bom = this.getBom(id);
     if (bom.status !== 'DRAFT') throw new Error('لا يمكن تفعيل BOM إلا إذا كان مسودة.');
     if (bom.items.length === 0) throw new Error('لا يمكن تفعيل BOM بدون مكوّنات.');
@@ -430,7 +428,7 @@ export class ManufacturingService {
 
   public archiveBom(id: string): BillOfMaterials {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const bom = this.getBom(id);
     this.db.run(
       `UPDATE bills_of_materials SET status = 'ARCHIVED', updated_at = ? WHERE id = ?`,
@@ -441,7 +439,7 @@ export class ManufacturingService {
   }
 
   public getProductionOrders(branchId?: string): ProductionOrder[] {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     if (branchId) this.branchAccess.requireBranchAccess(branchId, actor);
     const scope = this.branchAccess.sqlScope('po.branch_id', undefined, actor);
     const conditions = [scope.clause];
@@ -469,7 +467,7 @@ export class ManufacturingService {
   }
 
   public getProductionOrder(id: string): ProductionOrder {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const order = this.getOrderInternal(id);
     if (!order) throw new Error('أمر الإنتاج غير موجود.');
     this.branchAccess.requireBranchAccess(order.branchId, actor);
@@ -478,7 +476,7 @@ export class ManufacturingService {
 
   public createProductionOrder(input: CreateProductionOrderDTO): ProductionOrder {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     if (!input.productId) throw new Error('يجب اختيار المنتج.');
     if (!input.bomId) throw new Error('يجب اختيار BOM.');
     if (!(input.quantity > 0)) throw new Error('كمية الإنتاج يجب أن تكون أكبر من صفر.');
@@ -554,7 +552,7 @@ export class ManufacturingService {
 
   public releaseOrder(id: string): ProductionOrder {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const order = this.getProductionOrder(id);
     if (order.status !== 'PLANNED') throw new Error('لا يمكن إصدار أمر إنتاج إلا إذا كان مخططاً.');
     this.db.run(
@@ -591,7 +589,7 @@ export class ManufacturingService {
 
   public startOrder(id: string, operationShiftId?: string | null): ProductionOrder {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const order = this.getProductionOrder(id);
     if (order.status !== 'RELEASED') throw new Error('لا يمكن بدء أمر إنتاج إلا بعد إصداره.');
     if (operationShiftId != null) this.assignOrderToShift(id, operationShiftId);
@@ -610,7 +608,7 @@ export class ManufacturingService {
 
   public completeOperation(operationId: string, actualMinutes: number): ProductionOrderOperation {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const operation = this.db.query<ProductionOrderOperation>(
       `SELECT * FROM production_order_operations WHERE id = ?`,
       [operationId]
@@ -637,7 +635,7 @@ export class ManufacturingService {
 
   public consumeMaterial(materialId: string, quantity: number): ProductionOrderMaterial {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const material = this.db.query<ProductionOrderMaterial>(
       `SELECT * FROM production_order_materials WHERE id = ?`,
       [materialId]
@@ -666,7 +664,7 @@ export class ManufacturingService {
 
   public completeOrder(id: string): ProductionOrder {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const order = this.getProductionOrder(id);
     if (order.status !== 'IN_PROGRESS') throw new Error('لا يمكن إكمال أمر إنتاج إلا أثناء تنفيذه.');
     const now = new Date().toISOString();
@@ -746,7 +744,7 @@ export class ManufacturingService {
 
   public createQualityCheck(input: CreateQualityCheckDTO): QualityCheck {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     if (!input?.productionOrderId) throw new Error('أمر الإنتاج مطلوب.');
     const order = this.getOrderInternal(input.productionOrderId);
     if (!order) throw new Error('أمر الإنتاج غير موجود.');
@@ -781,7 +779,7 @@ export class ManufacturingService {
   }
 
   public getQualityCheck(id: string): QualityCheck {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const row = this.db.query<any>(
       `SELECT * FROM manufacturing_quality_checks WHERE id = ?`,
       [id]
@@ -792,7 +790,7 @@ export class ManufacturingService {
   }
 
   public getQualityChecks(productionOrderId?: string): QualityCheck[] {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const conditions: string[] = [];
     const params: Array<string> = [];
     if (productionOrderId) {
@@ -816,7 +814,7 @@ export class ManufacturingService {
 
   public updateQualityCheck(id: string, input: UpdateQualityCheckDTO): QualityCheck {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const existing = this.db.query<any>(
       `SELECT * FROM manufacturing_quality_checks WHERE id = ?`,
       [id]
@@ -884,7 +882,7 @@ export class ManufacturingService {
 
   public createMaintenance(input: CreateMaintenanceDTO): MaintenanceRecord {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     if (!input?.equipmentName?.trim()) throw new Error('اسم المعدة مطلوب.');
     let branchId = input.branchId;
     if (input.workCenterId) {
@@ -918,7 +916,7 @@ export class ManufacturingService {
   }
 
   public getMaintenance(id: string): MaintenanceRecord {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const row = this.db.query<any>(`SELECT * FROM manufacturing_maintenance WHERE id = ?`, [id])[0];
     if (!row) throw new Error('سجل الصيانة غير موجود.');
     if (row.branchId) this.branchAccess.requireBranchAccess(row.branchId, actor);
@@ -926,7 +924,7 @@ export class ManufacturingService {
   }
 
   public getMaintenanceRecords(filters?: { status?: string; workCenterId?: string }): MaintenanceRecord[] {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const conditions: string[] = [];
     const params: Array<string> = [];
     if (filters?.status) {
@@ -951,7 +949,7 @@ export class ManufacturingService {
 
   public updateMaintenance(id: string, input: UpdateMaintenanceDTO): MaintenanceRecord {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const existing = this.db.query<any>(`SELECT * FROM manufacturing_maintenance WHERE id = ?`, [id])[0];
     if (!existing) throw new Error('سجل الصيانة غير موجود.');
     if (existing.branchId) this.branchAccess.requireBranchAccess(existing.branchId, actor);
@@ -1010,7 +1008,7 @@ export class ManufacturingService {
   }
 
   public getWipValuation(): { orders: WipOrder[]; totalMaterialCost: number; totalQuantity: number } {
-    const actor = this.require('manufacturing.view');
+    this.require('manufacturing.view');
     const scope = this.branchAccess.sqlScope('o.branch_id', undefined, actor);
     const rows = this.db.query<any>(
       `SELECT o.id, o.order_number AS orderNumber, o.product_id AS productId, p.name AS productName,
@@ -1046,9 +1044,9 @@ export class ManufacturingService {
     return { orders, totalMaterialCost, totalQuantity };
   }
 
-  public recordQualityDisposition(id: string, disposition: 'ACCEPT' | 'SCRAP' | 'REWORK' | 'RETURN', quantity: number, notes?: string): QualityCheck {
+  public recordQualityDisposition(id: string, disposition: 'ACCEPT' | 'SCRAP' | 'REWORK' | 'RETURN', quantity: number, _notes?: string): QualityCheck {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const existing = this.db.query<any>(`SELECT * FROM manufacturing_quality_checks WHERE id = ?`, [id])[0];
     if (!existing) throw new Error('سجل فحص الجودة غير موجود.');
     if (existing.branchId) this.branchAccess.requireBranchAccess(existing.branchId, actor);
@@ -1100,7 +1098,7 @@ export class ManufacturingService {
 
   public cancelOrder(id: string, reason?: string): ProductionOrder {
     this.guardWrites();
-    const actor = this.require('manufacturing.manage');
+    this.require('manufacturing.manage');
     const order = this.getProductionOrder(id);
     if (order.status === 'COMPLETED' || order.status === 'CANCELLED') {
       throw new Error('لا يمكن إلغاء أمر إنتاج مكتمل أو ملغى بالفعل.');

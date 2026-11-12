@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { BarChart3, Calendar, DollarSign, Package, ShoppingCart, Truck, PieChart, FileSpreadsheet, FileDown } from 'lucide-react';
 import { SalesService } from '../../services/domains/sales/SalesService';
@@ -7,7 +7,6 @@ import { SalesInvoice } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';
 import { exportToExcel, exportToPdf, ExportOptions } from '../../utils/export/export';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 type ReportTab = 'sales' | 'purchases' | 'expenses' | 'inventory' | 'category' | 'brand';
 
@@ -22,10 +21,10 @@ export const ReportsView: React.FC = () => {
   const [categoryReport, setCategoryReport] = useState<any[]>([]);
   const [brandReport, setBrandReport] = useState<any[]>([]);
 
-  const salesService = new SalesService();
-  const accountingService = new AccountingService();
+  const salesService = useMemo(() => new SalesService(), []);
+  const accountingService = useMemo(() => new AccountingService(), []);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     try {
       setInvoices(salesService.getAllInvoices(undefined, dateFrom || undefined, dateTo || undefined));
       setPurchaseReport(accountingService.getPurchaseReport(dateFrom || undefined, dateTo || undefined));
@@ -34,9 +33,9 @@ export const ReportsView: React.FC = () => {
       setCategoryReport(accountingService.getCategorySalesReport(dateFrom || undefined, dateTo || undefined));
       setBrandReport(accountingService.getBrandSalesReport(dateFrom || undefined, dateTo || undefined));
     } catch (e) { console.error(e); }
-  };
+  }, [dateFrom, dateTo, accountingService, salesService]);
 
-  useEffect(() => { loadData(); }, [dateFrom, dateTo]);
+  useEffect(() => { loadData(); }, [dateFrom, dateTo, loadData]);
 
   const totalSales = invoices.reduce((s, i) => s + i.totalAmount, 0);
   const totalCost = invoices.reduce((s, i) => s + i.totalCost, 0);

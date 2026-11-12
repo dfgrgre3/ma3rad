@@ -1,5 +1,3 @@
-import React from 'react';
-import { AlertTriangle, CheckCircle2, Inbox, Info, Loader2, SearchX } from 'lucide-react';
 import './StateViews_part01';
 import './StateViews_part02';
 import './StateViews_part03';

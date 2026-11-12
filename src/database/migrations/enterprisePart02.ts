@@ -1,5 +1,3 @@
-import type { Database } from 'sql.js';
-import { addColumn } from './support';
 import './enterprisePart02_part01';
 import './enterprisePart02_part02';
 import './enterprisePart02_part03';

@@ -173,6 +173,7 @@ export class DatabaseManager {
   private forceFreshAfterRecovery = false;
   private debounceSaveTimer: any = null;
   private idleSaveHandle: number | null = null;
+  private idleSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   private constructor() {}
 
@@ -311,7 +312,7 @@ export class DatabaseManager {
     //    or a nested `.default` chain — walk down until we have a function.
     //  - Node (`node --test`): the test harness injects a global `initSqlJs`
     //    that points at the CommonJS build and a real wasm file path.
-    let initSqlJsFn: any;
+    let _initSqlJsFn: any;
     let wasmUrl: string | undefined;
 
     const injected = (globalThis as any)?.initSqlJs;
@@ -706,9 +707,14 @@ export class DatabaseManager {
         this.idleSaveHandle = idleHost.requestIdleCallback(() => {
           this.idleSaveHandle = null;
           this.saveToStorage();
-        }, { timeout: 2000 });
+        }, { timeout: 10000 });
       } else {
-        this.saveToStorage();
+        // sql.js exports the entire database synchronously. Avoid doing that
+        // work on the interaction frame when requestIdleCallback is absent.
+        this.idleSaveTimer = setTimeout(() => {
+          this.idleSaveTimer = null;
+          this.saveToStorage();
+        }, 1000);
       }
     }, delayMs);
   }
@@ -797,6 +803,10 @@ export class DatabaseManager {
   }
 
   private cancelIdleSave(): void {
+    if (this.idleSaveTimer) {
+      clearTimeout(this.idleSaveTimer);
+      this.idleSaveTimer = null;
+    }
     if (this.idleSaveHandle === null) return;
     const idleHost = globalThis as IdleCallbackHost;
     idleHost.cancelIdleCallback?.(this.idleSaveHandle);

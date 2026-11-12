@@ -1,10 +1,4 @@
-import type { CustomerService } from '../../services/domains/customers/CustomerService';
-import { CeramicMath } from '../products/ceramicMath';
-import { buildExportHtml, downloadPdf, type ExportOptions } from '../export/export';
-import { buildWhatsAppUrl, openExternalShare } from '../shared/externalLinks';
 import './customerStatementSharing_part01';
 import './customerStatementSharing_part02';
 import './customerStatementSharing_part03';
 export { getCustomerStatementExportOptions } from './customerStatementSharing_part01';
-export { buildCustomerStatementWhatsAppMessage } from './customerStatementSharing_part02';
-export { shareCustomerStatementOnWhatsApp } from './customerStatementSharing_part03';

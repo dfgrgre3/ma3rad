@@ -165,8 +165,8 @@ export class TrainingService {
 
     // Resolve destination before writing anything.
     let creditAccountCode = '1101';
-    let registerId: string | null = input.registerId || null;
-    let bankAccountId: string | null = input.bankAccountId || null;
+    const registerId: string | null = input.registerId || null;
+    const bankAccountId: string | null = input.bankAccountId || null;
     if (paymentMethod === 'CASH') {
       if (registerId) {
         const register = this.db.query<{ id: string; branchId: string | null }>(

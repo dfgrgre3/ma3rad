@@ -236,9 +236,9 @@ export class AttendanceTimeService {
         lateMinutes: number(daily.lateMinutes),
         earlyLeaveMinutes: number(daily.earlyLeaveMinutes),
         overtimeMinutes: number(daily.overtimeMinutes),
-        approvedOvertimeMinutes: Boolean(daily.overtimeApproved) ? number(daily.overtimeMinutes) : 0,
+        approvedOvertimeMinutes: daily.overtimeApproved ? number(daily.overtimeMinutes) : 0,
         breakMinutes: number(daily.breakMinutes),
-        overtimeApproved: Boolean(daily.overtimeApproved),
+        overtimeApproved: !!daily.overtimeApproved,
         periodCount: 0,
         sources: [daily.source || 'MANUAL'],
       };

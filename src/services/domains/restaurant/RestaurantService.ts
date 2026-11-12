@@ -486,7 +486,7 @@ export class RestaurantService {
 
   private startRecipeProduction(
     item: RestaurantOrderItem & { warehouseId: string; branchId: string },
-    actor: ReturnType<typeof AuthService.requireAuth>
+    _actor: ReturnType<typeof AuthService.requireAuth>
   ): void {
     const bom = this.db.query<{ id: string }>(
       `SELECT id FROM bills_of_materials

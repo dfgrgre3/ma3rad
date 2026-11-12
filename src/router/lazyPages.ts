@@ -1,4 +1,3 @@
-import { lazy } from 'react';
 import './lazyPages_part01';
 import './lazyPages_part02';
 import './lazyPages_part03';

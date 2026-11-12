@@ -1,13 +1,8 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import type { Warehouse, WarehouseStock, InventoryTransaction, InventoryTransactionType, UnitType } from '../../../types';
-import { v4 as uuidv4 } from 'uuid';
+import type { InventoryTransactionType } from '../../../types';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
-import { localDateString } from '../../../utils/shared/date';
-import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
 import { InventoryLocationStockService } from './InventoryLocationStockService';
-import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { InventoryServicePart05 } from './InventoryServicePart05';
 
 export class InventoryServicePart06 extends InventoryServicePart05 {

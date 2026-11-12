@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2, X, Plus } from 'lucide-react';
 import type { Employee, PayrollTxType } from '../../../services/domains/hr/EmployeeService';
-import { TX_LABELS, fmt } from './payrollDisplay';
+import { TX_LABELS } from './payrollDisplay';
 interface PayrollForm { type: PayrollTxType; amount: string; date: string; notes: string }
 interface Props { target: Employee; form: PayrollForm; setForm: React.Dispatch<React.SetStateAction<PayrollForm>>; saving: boolean; onClose: () => void; onSubmit: (event: React.FormEvent) => void }
 export const PayrollTransactionModal: React.FC<Props> = ({ target, form, setForm, saving, onClose, onSubmit }) => (

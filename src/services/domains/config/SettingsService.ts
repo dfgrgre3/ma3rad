@@ -6,8 +6,8 @@ import { AuditService } from '../security/AuditService';
 import type { InvoiceSectionId, InvoiceTableColumnId, SystemSettings, User } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export { HEX_COLOR, bool, num, type Listener, type SettingsPatch } from './settingsUtils';
-import { HEX_COLOR, bool, num, subscribeSettings, notifySettings, type Listener, type SettingsPatch } from './settingsUtils';
+export { bool, num, type Listener, type SettingsPatch } from './settingsUtils';
+import { bool, num, subscribeSettings, notifySettings, type Listener, type SettingsPatch } from './settingsUtils';
 import { validateSettings } from './settingsValidation';
 
 /**

@@ -10,7 +10,6 @@ import { InventoryCostingService } from './InventoryCostingService';
 import { InventoryLocationStockService } from './InventoryLocationStockService';
 import { InventoryServicePart13 } from './InventoryServicePart13';
 import { StockTrackedProductPolicy } from './StockTrackedProductPolicy';
-import { WarehouseTypePolicy } from '../operations/WarehouseTypePolicy';
 
 type AdjustmentType = 'ADD' | 'SUBTRACT' | 'DAMAGE' | 'OPENING_BALANCE';
 type AdjustmentSign = 1 | -1;

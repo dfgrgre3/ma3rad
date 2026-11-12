@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Users, Plus, Search, DollarSign, FileText, 
-  Printer, ArrowUpRight, ArrowDownRight, Phone, MapPin, Trash2
+  Trash2
 } from 'lucide-react';
 import { CustomerService } from '../../services/domains/customers/CustomerService';
 import { AuthService } from '../../services/domains/auth/AuthService';
@@ -73,10 +73,10 @@ export const CustomersView: React.FC = () => {
     notes: 'تحصيل دفعة نقدية'
   });
 
-  const customerService = new CustomerService();
-  const operationalFieldService = new OperationalFieldService();
+  const customerService = useMemo(() => new CustomerService(), []);
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
 
-  const loadCustomers = () => {
+  const loadCustomers = useCallback(() => {
     try {
       const result = customerService.getCustomersPage(search, page, pageSize, fieldFilters);
       setCustomers(result.items);
@@ -93,7 +93,7 @@ export const CustomersView: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [search, page, pageSize, fieldFilters, customerService, operationalFieldService]);
   const handleDeleteCustomer = (customer: any) => {
     if (!window.confirm(`حذف العميل "${customer.name}"؟`)) return;
     try { customerService.deleteCustomer(customer.id); loadCustomers(); }
@@ -114,7 +114,7 @@ export const CustomersView: React.FC = () => {
 
   useEffect(() => {
     loadCustomers();
-  }, [search, page, pageSize, fieldFilters]);
+  }, [loadCustomers, search, page, pageSize, fieldFilters]);
 
   useEffect(() => { setPage(1); }, [search, fieldFilters]);
 

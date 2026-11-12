@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   BarChart3, Download, CalendarDays, Users,
   Package, MapPin, Award, Loader2, AlertCircle, RefreshCw, Star, Scale,
@@ -362,7 +362,7 @@ export const SalesReportsPage: React.FC = () => {
 
   const currentType = REPORT_TYPES.find(t => t.id === reportType)!;
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setData(loadReport(reportType, from, to));
@@ -372,9 +372,9 @@ export const SalesReportsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportType, from, to]);
 
-  useEffect(() => { if (canView && activeSection === 'reports') load(); }, [canView, activeSection, reportType, from, to]);
+  useEffect(() => { if (canView && activeSection === 'reports') load(); }, [canView, activeSection, reportType, from, to, load]);
 
   const handleExport = () => {
     try {

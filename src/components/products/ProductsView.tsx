@@ -1,10 +1,10 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Package, Plus, Search, Edit, Trash2, Layers, AlertTriangle, X, Calculator,
-  Boxes, Ruler, Save, CheckCircle, Banknote, Loader2, Eye, Download, PackagePlus,
-  Upload, FileSpreadsheet, Copy, Power, Barcode, ImagePlus, GitBranch,
-  SlidersHorizontal, LayoutGrid, List, TrendingUp, XCircle, RefreshCw, Filter
+  Package, Plus, Search, Layers, AlertTriangle, X,
+  Boxes, Ruler, CheckCircle, Banknote, Loader2, Download, PackagePlus,
+  Upload, FileSpreadsheet, GitBranch,
+  LayoutGrid, List, XCircle, RefreshCw, Filter
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ProductService, ProductStats } from '../../services/domains/products/ProductService';
@@ -16,7 +16,7 @@ import { AttributeService, AttributeCategory } from '../../services/domains/prod
 import { OperationalFieldService, type OperationalFieldDefinition, type ProductGradeOption } from '../../services/domains/products/OperationalFieldService';
 import { ProductExtraService, ProductImage } from '../../services/domains/products/ProductExtraService';
 import { normalizeDynamicAttributeValue } from '../../services/domains/products/dynamicAttributes';
-import { Product, CeramicGrade, UnitType, Warehouse } from '../../types';
+import { Product, CeramicGrade, Warehouse } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import { exportToExcel } from '../../utils/export/export';
@@ -31,7 +31,7 @@ import { CentralLimitGuard } from '../ui/CentralLimitGuard';
 import { FilterToolbar } from '../ui/FilterToolbar';
 import { FormField } from '../ui/FormField';
 import {
-  GRADES, SURFACES, UNITS, calcMetersFromSize, emptyProductEntryForm, emptyVariant, gradeLabel,
+  GRADES, SURFACES, UNITS, calcMetersFromSize, emptyProductEntryForm, emptyVariant,
   parseGrade, pickCell, round, unitLabelFor, setConfiguredGradeLabels,
   type FormState, type OpeningStockRow, type ProductEntryFormState, type TabId, type VariantDraft,
 } from './productFormModel';
@@ -198,16 +198,16 @@ export const ProductsView: React.FC = () => {
   const canUpdatePricing = PermissionService.can(permissionUser, 'ui.pricing.pricing.update');
   const canManagePricing = editingProduct ? canUpdatePricing : canCreateProduct;
 
-  const productService = new ProductService();
-  const productFormPreferences = new ProductFormPreferencesService();
-  const inventoryService = new InventoryService();
-  const categoryService = new CategoryService();
-  const brandService = new BrandService();
-  const attributeService = new AttributeService();
-  const operationalFieldService = new OperationalFieldService();
-  const extraService = new ProductExtraService();
+  const productService = useMemo(() => new ProductService(), []);
+  const productFormPreferences = useMemo(() => new ProductFormPreferencesService(), []);
+  const inventoryService = useMemo(() => new InventoryService(), []);
+  const categoryService = useMemo(() => new CategoryService(), []);
+  const brandService = useMemo(() => new BrandService(), []);
+  const attributeService = useMemo(() => new AttributeService(), []);
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
+  const extraService = useMemo(() => new ProductExtraService(), []);
 
-  const loadLookups = () => {
+  const loadLookups = useCallback(() => {
     try {
       setCategories(categoryService.getAllCategories());
       setBrands(brandService.getAllBrands());
@@ -228,17 +228,17 @@ export const ProductsView: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [attributeService, brandService, categoryService, inventoryService, operationalFieldService]);
 
-  const loadStats = () => {
+  const loadStats = useCallback(() => {
     try {
       setStats(productService.getProductStats());
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [productService]);
 
-  const loadProducts = () => {
+  const loadProducts = useCallback(() => {
     setIsLoading(true);
     setLoadError(null);
     try {
@@ -272,16 +272,16 @@ export const ProductsView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [search, selectedCategory, selectedBrand, page, pageSize, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, operationalFieldService, productService]);
 
   useEffect(() => {
     loadLookups();
     loadStats();
-  }, []);
+  }, [loadLookups, loadStats]);
 
   useEffect(() => {
     loadProducts();
-  }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, page, pageSize]);
+  }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, page, pageSize, loadProducts]);
 
   useEffect(() => { setSelectedProductIds([]); }, [search, selectedCategory, selectedBrand, selectedGrade, selectedCustomField, selectedCustomFieldValue, stockStatus, sortBy, productStatus, page, pageSize]);
 

@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  Truck, Plus, Search, FileText, 
-  Calendar, CheckCircle, AlertCircle, Layers,
-  DollarSign, Sparkles, CheckCircle2,
-  AlertTriangle, ShieldAlert, ChevronDown, PackageCheck
+  Truck, Plus, Search, 
+  Sparkles,
+  ChevronDown
 } from 'lucide-react';
-import { PurchaseService, CreatePurchaseDTO } from '../../services/domains/purchases/PurchaseService';
+import { PurchaseService } from '../../services/domains/purchases/PurchaseService';
 import { SupplierService } from '../../services/domains/suppliers/SupplierService';
 import { ProductService } from '../../services/domains/products/ProductService';
 import { InventoryService } from '../../services/domains/inventory/InventoryService';
@@ -14,13 +13,11 @@ import { PurchaseOrderService } from '../../services/domains/purchases/PurchaseO
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { PurchaseInvoice, Supplier, Product, Warehouse } from '../../types';
-import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity } from '../../utils/products/productUnits';
 import { useBusinessProfileMeta, useBusinessTerm } from '../../hooks/domains/config/useBusinessTerm';
 import { PurchaseInvoiceModal } from './PurchaseInvoiceModal';
 import { PurchaseInvoiceDto } from '../../types/purchasing/components';
 import { OperationalFieldService, type OperationalFieldDefinition } from '../../services/domains/products/OperationalFieldService';
-import { OperationalFieldsForm } from '../products/OperationalFieldsForm';
 import { OperationalFieldsSummary } from '../products/OperationalFieldsSummary';
 import { OperationalFieldsRecordEditor } from '../products/OperationalFieldsRecordEditor';
 import { OperationalFieldsFilter, matchesOperationalFieldFilters, type OperationalFieldFilters } from '../products/OperationalFieldsFilter';
@@ -79,7 +76,7 @@ export const PurchasesView: React.FC = () => {
     paymentType: 'CREDIT',
     notes: '',
   });
-  const loadData = () => {
+  const loadData = useCallback(() => {
     try {
       const purs = purchaseService.getAllPurchases(search);
       setOperationalFields(fieldService.getDefinitions('purchase_invoices'));
@@ -109,11 +106,11 @@ export const PurchasesView: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [search, dto, fieldFilters, fieldService, inventoryService, poService, procurementService, productService, purchaseService, supplierService]);
 
   useEffect(() => {
     loadData();
-  }, [search]);
+  }, [search, loadData]);
 
   const toggleDetails = (id: string) => {
     if (expandedId === id) {

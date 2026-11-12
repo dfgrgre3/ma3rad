@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useIdempotencyKey } from '../../../hooks/shared/useIdempotencyKey';
 import {
   RotateCcw, Plus, Search, Calendar, Printer, Loader2, X, AlertTriangle, Eye,
@@ -85,7 +85,7 @@ export const PurchaseReturnsPage: React.FC = () => {
     title: string; subtitle?: string; fileName: string; html: string; excel?: () => void;
   } | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       const currentRows = service.getAllReturns(search, dateFrom || undefined, dateTo || undefined);
@@ -101,9 +101,9 @@ export const PurchaseReturnsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, fieldService, search, dateFrom, dateTo, fieldFilters, setLoading, setOperationalFields, setValuesByReturn, setRows, setStats, setTopReasons, setError]);
 
-  useEffect(() => { load();   }, [search, dateFrom, dateTo, fieldFilters]);
+  useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));

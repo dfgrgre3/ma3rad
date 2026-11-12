@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Users, ShoppingCart, FileText, Package2, ClipboardList, CreditCard,
@@ -118,7 +118,7 @@ export const CustomerDetailPage: React.FC = () => {
   const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
   const toast = useToast();
 
-  const reloadOverrides = (customerId: string) => {
+  const reloadOverrides = useCallback((customerId: string) => {
     if (!can('pricing.view')) {
       setOverrides([]);
       setPricingError(null);
@@ -132,7 +132,7 @@ export const CustomerDetailPage: React.FC = () => {
       setOverrides([]);
       setPricingError(error instanceof Error ? error.message : 'تعذر تحميل الأسعار الخاصة');
     }
-  };
+  }, [can, setOverrides, setPricingError]);
 
   useEffect(() => {
     if (!id) return;
@@ -148,7 +148,7 @@ export const CustomerDetailPage: React.FC = () => {
     } else {
       setProducts([]);
     }
-  }, [id, can]);
+  }, [id, can, reloadOverrides]);
 
   useEffect(() => {
     if (!id) {

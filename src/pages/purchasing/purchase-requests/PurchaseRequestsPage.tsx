@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   ClipboardList, Plus, Search, FileText, Loader2, X, Trash2,
-  CheckCircle2, XCircle, Truck, Sparkles, AlertTriangle, ShieldCheck,
-  ArrowRight, ArrowUpRight, Layers, FileSpreadsheet
+  XCircle, Truck, FileSpreadsheet
 } from 'lucide-react';
 import { PurchaseRequestService, PurchaseRequest, PurchaseRequestStatus, RequestPriority } from '../../../services/domains/purchases/PurchaseRequestService';
 import { ProcurementService, ReorderSuggestion } from '../../../services/domains/procurement/ProcurementService';
@@ -35,7 +34,7 @@ const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigit
 type Line = { productId: string; quantityM2: number; estimatedUnitCost: number; notes: string };
 
 export const PurchaseRequestsPage: React.FC = () => {
-  const service = new PurchaseRequestService();
+  const service = useMemo(() => new PurchaseRequestService(), []);
   const procurementService = new ProcurementService();
   const navigate = useNavigate();
 
@@ -69,7 +68,7 @@ export const PurchaseRequestsPage: React.FC = () => {
   const [suggestionsModal, setSuggestionsModal] = useState(false);
   const [suggestions, setSuggestions] = useState<ReorderSuggestion[]>([]);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setRequests(service.getRequests(search, statusFilter));
@@ -79,11 +78,11 @@ export const PurchaseRequestsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, setLoading, setRequests, setError, search, statusFilter]);
 
   useEffect(() => {
     load();
-  }, [statusFilter]);
+  }, [load]);
 
   const openDetails = async (r: PurchaseRequest) => {
     if (expanded === r.id) {

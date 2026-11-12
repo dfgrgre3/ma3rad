@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useToast } from '../../../components/ui/Toast';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
-import { Copy, Check, Info, ShieldCheck, Laptop, HelpCircle, ExternalLink, KeyRound, DownloadCloud, Sparkles } from 'lucide-react';
+import { Copy, Check, ShieldCheck, HelpCircle, ExternalLink, KeyRound, DownloadCloud } from 'lucide-react';
 import { openExternalShare } from '../../../utils/shared/externalLinks';
 
 interface SyncClientConfigForm {
@@ -26,7 +26,7 @@ const emptyConfig: SyncClientConfigForm = {
 export const SyncClientSettings: React.FC = () => {
   const toast = useToast();
   const [form, setForm] = useState(emptyConfig);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tokenConfigured, setTokenConfigured] = useState(false);
   const [configSource, setConfigSource] = useState<'secure-storage' | 'environment' | 'none'>('none');

@@ -1,12 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  FileText, Plus, Search, CheckCircle2, XCircle, ArrowRight,
-  TrendingDown, Clock, ShieldCheck, DollarSign, Building2,
-  Calendar, Layers, Check, X, Award, Eye, FileSpreadsheet
+  Plus, Search, TrendingDown, Clock, ShieldCheck, DollarSign, Building2,
+  X, Award,
 } from 'lucide-react';
 import {
   ProcurementService, SupplierRfqRow, SupplierRfqItem,
-  SupplierQuotationRow, SupplierQuotationItem
+  SupplierQuotationRow
 } from '../../../services/domains/procurement/ProcurementService';
 import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -62,7 +61,7 @@ export const SupplierQuotationsPage: React.FC = () => {
   const [quoteNotes, setQuoteNotes] = useState('');
   const [quoteItems, setQuoteItems] = useState<Array<{ rfqItemId: string; productId: string; productName: string; quantityM2: number; unitCost: number; productType?: 'CERAMIC' | 'GENERAL'; baseUnit?: string; customUnit?: string }>>([]);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const data = service.getAllRfqs(search, statusFilter);
@@ -76,11 +75,11 @@ export const SupplierQuotationsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, setLoading, setRfqs, setSelectedRfq, toast, search, statusFilter, selectedRfq]);
 
   useEffect(() => {
     loadData();
-  }, [statusFilter]);
+  }, [loadData]);
 
   const openRfqDetails = (id: string) => {
     const details = service.getRfqById(id);
@@ -186,7 +185,7 @@ export const SupplierQuotationsPage: React.FC = () => {
     try {
       const warehouses = new OperationsService().getWarehouses();
       const defaultWh = warehouses[0]?.id || 'wh_main';
-      const result = service.awardQuotation(quotation.id, true, defaultWh);
+      service.awardQuotation(quotation.id, true, defaultWh);
       toast.success('تمت ترسية العرض بنجاح وإنشاء أمر الشراء المرتبط به.');
       loadData();
       if (selectedRfq) openRfqDetails(selectedRfq.id);

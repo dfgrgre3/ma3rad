@@ -1,6 +1,6 @@
 import React from 'react';
-import { Wrench, Plus, Search, FileText, CheckCircle2, ChevronRight, X, AlertTriangle } from 'lucide-react';
-import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel } from '../../../utils/products/productUnits';
+import { Wrench, FileText, X, AlertTriangle } from 'lucide-react';
+import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { ProductPicker } from '../../../components/products/ProductPicker';
 
 interface Adjustment {
@@ -71,7 +71,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
   setShowDetailModal,
   selectedAdjustment,
   selectedItems,
-  fmt,
+  _fmt,
   showCreateModal,
   setShowCreateModal,
   errorMsg,
@@ -80,7 +80,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
   setSelectedWarehouseId,
   adjType,
   setAdjType,
-  products,
+  _products,
   selectedProductId,
   setSelectedProductId,
   selectedProduct,

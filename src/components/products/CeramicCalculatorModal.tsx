@@ -75,7 +75,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
 
   useEffect(() => {
     if (!ceramicProducts.some(p => p.id === selectedProductId)) setSelectedProductId(ceramicProducts[0]?.id || '');
-  }, [products, selectedProductId]);
+  }, [ceramicProducts, selectedProductId]);
 
   useEffect(() => {
     const size = ceramicProducts.find(p => p.id === selectedProductId)?.size || '';
@@ -84,7 +84,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
       setTileLengthCm(Number(dimensions[1]));
       setTileWidthCm(Number(dimensions[2]));
     }
-  }, [selectedProductId]);
+  }, [ceramicProducts, selectedProductId]);
 
   if (!isOpen) return null;
 
@@ -113,7 +113,7 @@ export const CeramicCalculatorModal: React.FC<CeramicCalculatorModalProps> = ({
   const metersPerBox = selectedProduct?.metersPerBox || 0;
   const boxesNeeded = metersPerBox > 0 ? Math.ceil(grossRequiredArea / metersPerBox) : 0;
   const actualCoveredArea = boxesNeeded * metersPerBox;
-  const surplusArea = actualCoveredArea - grossRequiredArea;
+  const _surplusArea = actualCoveredArea - grossRequiredArea;
 
   const unitPrice = selectedProduct?.sellingPriceM2 || 0;
   const estimatedCost = actualCoveredArea * unitPrice;

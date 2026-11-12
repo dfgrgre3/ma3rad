@@ -24,13 +24,13 @@ export const SalesAnalyticsPage: React.FC = () => {
   const canOpenPos = can('sales.pos.view');
   const db = DatabaseManager.getInstance();
   const [period, setPeriod] = useState<'today' | '7days' | '30days' | 'all'>('30days');
-  const [refresh, setRefresh] = useState(0);
+  const [, setRefresh] = useState(0);
 
   useEffect(() => {
     if (!refreshCtx) return;
     if (initialRef.current) { initialRef.current = false; return; }
     setRefresh((x) => x + 1);
-  }, [refreshCtx?.refreshToken]);
+  }, [refreshCtx]);
   const range = useMemo(() => {
     const to = new Date();
     const from = new Date(to);
@@ -39,7 +39,7 @@ export const SalesAnalyticsPage: React.FC = () => {
     if (period === '30days') from.setDate(from.getDate() - 29);
     const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     return { from: period === 'all' ? '' : iso(from), to: iso(to) };
-  }, [period, refresh]);
+  }, [period]);
   const [data] = useMemo(() => {
     const scope = branchAccess.sqlScope(
       'si.branch_id',
@@ -91,7 +91,7 @@ export const SalesAnalyticsPage: React.FC = () => {
       count: entry.count,
     }));
     return [{ summary, products, customers, daily }];
-  }, [db, range, refresh]);
+  }, [db, range]);
   const avg = data.summary.count ? data.summary.revenue / data.summary.count : 0;
   const maxDaily = Math.max(1, ...data.daily.map(x => Number(x.revenue)));
   const cards = [

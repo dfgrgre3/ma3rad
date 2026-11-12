@@ -40,7 +40,7 @@ export const ExecutiveDashboard: React.FC = () => {
       return;
     }
     refresh();
-  }, [refreshCtx?.refreshToken, refresh]);
+  }, [refreshCtx, refresh]);
 
   return (
     <div className="h-full min-w-0 overflow-y-auto bg-slate-50 text-slate-900 p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5" dir="rtl">

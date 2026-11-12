@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { FileText, Trash2, Upload } from 'lucide-react';
 import { ProductExtraService, ProductDocument } from '../../../services/domains/products/ProductExtraService';
 import { DOC_TYPES } from './constants';
@@ -10,12 +10,12 @@ interface DocumentsTabProps {
 }
 
 export const DocumentsTab: React.FC<DocumentsTabProps> = ({ productId, canCreate, canArchive }) => {
-  const service = new ProductExtraService();
+  const service = useMemo(() => new ProductExtraService(), []);
   const [rows, setRows] = useState<ProductDocument[]>([]);
   const [form, setForm] = useState({ filePath: '', fileName: '', documentType: 'OTHER' });
 
-  const load = () => { try { setRows(service.getDocuments(productId)); } catch (e) { console.error(e); } };
-  useEffect(() => { load(); }, [productId]);
+  const load = useCallback(() => { try { setRows(service.getDocuments(productId)); } catch (e) { console.error(e); } }, [productId, service]);
+  useEffect(() => { load(); }, [load]);
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();

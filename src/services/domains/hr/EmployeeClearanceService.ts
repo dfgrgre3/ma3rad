@@ -90,8 +90,6 @@ export interface ClearanceSummary {
   cancelled: number;
 }
 
-const MAX_DATE = '9999-12-31';
-
 function isValidDate(value: string | null | undefined): boolean {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
@@ -234,7 +232,6 @@ export class EmployeeClearanceService {
 
   static createEmployeeClearance(input: CreateClearanceInput): EmployeeClearance {
     const actor = this.requireManage();
-    const companyId = this.currentCompanyId(actor);
     const employee = this.db.query<{ id: string; name: string; branch_id: string; department_id: string }>(
       'SELECT id, name, branch_id AS branchId, department_id AS departmentId FROM employees WHERE id = ?',
       [input.employeeId]
@@ -242,15 +239,6 @@ export class EmployeeClearanceService {
     if (!employee) throw new Error('الموظف غير موجود.');
     if (!isValidDate(input.terminationDate)) throw new Error('تاريخ إنهاء الخدمة غير صالح.');
     if (!input.reason?.trim()) throw new Error('سبب إنهاء الخدمة مطلوب.');
-
-    const branch = this.db.query<{ id: string; name: string }>(
-      'SELECT id, name FROM branches WHERE id = ?',
-      [employee.branch_id]
-    )[0];
-    const department = this.db.query<{ id: string; name: string }>(
-      'SELECT id, name FROM departments WHERE id = ?',
-      [employee.department_id]
-    )[0];
 
     // Check for existing non-cancelled clearance
     const existing = this.db.query<{ id: string }>(
@@ -261,7 +249,6 @@ export class EmployeeClearanceService {
 
     const clearanceNumber = `CLR-${localDateString().slice(0, 7)}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
     const id = `clr_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    const now = new Date().toISOString();
 
     this.db.executeTransaction((db) => {
       db.run(

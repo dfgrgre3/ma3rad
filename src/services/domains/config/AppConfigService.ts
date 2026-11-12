@@ -417,7 +417,7 @@ export class AppConfigService {
     input: AppConfigEntry,
     reason = 'تحديث إعدادات النطاق',
     actor?: User | null,
-    context?: ConfigurationScopeContext | null,
+    _context?: ConfigurationScopeContext | null,
   ): AppConfigEntry {
     if (!isConfigurationScopeType(scopeType)) throw new Error('نطاق إعدادات غير مدعوم.');
     const normalizedScopeId = String(scopeId || '').trim();
@@ -518,7 +518,7 @@ export class AppConfigService {
     scopeId: string,
     domain: AppConfigEntry['domain'],
     key: string,
-    reason = 'حذف إعداد النطاق',
+    _reason = 'حذف إعداد النطاق',
     actor?: User | null,
   ): void {
     const user = actor ?? AuthService.requireAuth();

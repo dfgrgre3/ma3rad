@@ -1,4 +1,4 @@
-import type { PaymentType, PaymentStatus } from '../sales';
+import type { PaymentType } from '../sales';
 
 export interface CashRegister {
   id: string;

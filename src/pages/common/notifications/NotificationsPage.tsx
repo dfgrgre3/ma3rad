@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { UpdateNotificationPreferencesDTO } from '../../../types';
 import { 
@@ -8,7 +8,6 @@ import {
 import { NotificationService, Notification, NotificationType } from '../../../services/domains/notifications/NotificationService';
 import { NotificationPreferencesService } from '../../../services/domains/notifications/NotificationPreferencesService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
-import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const NotificationsPage: React.FC = () => {
@@ -20,12 +19,12 @@ export const NotificationsPage: React.FC = () => {
   const [preferences, setPreferences] = useState<UpdateNotificationPreferencesDTO>({});
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
-  const notificationService = new NotificationService();
+  const notificationService = useMemo(() => new NotificationService(), []);
   const can = usePermission();
   const canManageNotifications = can('notifications.manage');
   const canCheckStock = can('inventory.view');
   const canViewCustomers = can('customers.view');
-  const preferencesService = new NotificationPreferencesService();
+  const preferencesService = useMemo(() => new NotificationPreferencesService(), []);
   const preferenceOptions: Array<{ key: keyof UpdateNotificationPreferencesDTO; label: string }> = [
     { key: 'lowStockAlerts', label: 'تنبيهات المخزون المنخفض والنافد' },
     { key: 'paymentDueAlerts', label: 'تنبيهات الدفعات المستحقة' },
@@ -34,7 +33,7 @@ export const NotificationsPage: React.FC = () => {
     { key: 'pushEnabled', label: 'تفضيل إشعارات Push' },
   ];
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     try {
       const userId = AuthService.requireAuth().id;
       const notifs = notificationService.getNotifications(userId, filter === 'unread');
@@ -44,11 +43,11 @@ export const NotificationsPage: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [filter, notificationService]);
 
   useEffect(() => {
     loadData();
-  }, [filter]);
+  }, [loadData]);
 
   useEffect(() => {
     try {
@@ -56,7 +55,7 @@ export const NotificationsPage: React.FC = () => {
     } catch (error) {
       console.error(error);
     }
-  }, []);
+  }, [preferencesService]);
 
   const savePreferences = () => {
     try {

@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
-import { round2 } from '../finance/financials';
 
 export class ElectronicInvoiceService {
   private db = DatabaseManager.getInstance();
@@ -87,13 +86,13 @@ export class ElectronicInvoiceService {
     });
   }
 
-  public submitElectronicInvoice(id: string): ElectronicInvoice {
+  public submitElectronicInvoice(_id: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.e_invoicing.invoices.submit');
     throw new Error('لم يتم إعداد موفر فوترة إلكترونية معتمد؛ لا يمكن تسجيل الفاتورة كمرسلة ضريبيًا.');
   }
 
-  public acceptElectronicInvoice(id: string, taxAuthorityReference: string): ElectronicInvoice {
+  public acceptElectronicInvoice(_id: string, _taxAuthorityReference: string): ElectronicInvoice {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.e_invoicing.invoices.accept');
     throw new Error('لا يمكن تسجيل قبول ضريبي دون رد موثق من موفر التكامل المعتمد.');

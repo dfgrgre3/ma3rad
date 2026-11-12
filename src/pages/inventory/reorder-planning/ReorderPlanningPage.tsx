@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  TrendingDown, AlertTriangle, CheckCircle2, Package, RefreshCw, 
-  Search, SlidersHorizontal, ShoppingCart, ArrowUpDown, ChevronRight,
-  ShieldAlert, Clock, BarChart3, Building2, Edit3, X, Check
+  TrendingDown, AlertTriangle, Package, RefreshCw, 
+  Search, SlidersHorizontal, ShoppingCart, ShieldAlert, Clock, BarChart3, X
 } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { PurchaseRequestService } from '../../../services/domains/purchases/PurchaseRequestService';
@@ -11,7 +10,7 @@ import { getStockQuantityLabel } from '../../../utils/products/productUnits';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const ReorderPlanningPage: React.FC = () => {
-  const inventoryService = new InventoryService();
+  const inventoryService = useMemo(() => new InventoryService(), []);
   const toast = useToast();
   const can = usePermission();
   const canManage = can('inventory.reorder.manage');
@@ -38,7 +37,7 @@ export const ReorderPlanningPage: React.FC = () => {
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [creatingPO, setCreatingPO] = useState(false);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const whList = inventoryService.getAllWarehouses();
@@ -53,12 +52,12 @@ export const ReorderPlanningPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [inventoryService, setLoading, setWarehouses, setItems, selectedWarehouseId, search, toast]);
 
   useEffect(() => {
     setSelectedProductIds(new Set());
     loadData();
-  }, [selectedWarehouseId]);
+  }, [loadData]);
 
   const filteredItems = items.filter(item => {
     if (statusFilter === 'ALL') return true;

@@ -2,7 +2,6 @@ import React from 'react';
 import { FileText, DollarSign } from 'lucide-react';
 import { Supplier } from '../../../types';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
-import { useBusinessProfileMeta, useBusinessTerm } from '../../../hooks/domains/config/useBusinessTerm';
 import {
   Tab, SupplierInvoiceRow, SupplierOrderRow, SupplierPaymentRow, PAY_STATUS_BADGES,
 } from '../../../types/purchasing/supplierDetailPage';

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  ShieldAlert, AlertTriangle, Eye, CheckCircle2, XCircle, 
-  RefreshCw, Plus, Search, Filter, FileText, Check, DollarSign,
-  Package, Trash2, ArrowRightCircle, Sparkles, Building2
+  ShieldAlert, AlertTriangle, Eye, 
+  RefreshCw, Plus, Search, 
+  Package
 } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -12,8 +12,8 @@ import { formatProductQuantity, getProductUnitLabel, getStockQuantityLabel } fro
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const DamageQuarantinePage: React.FC = () => {
-  const inventoryService = new InventoryService();
-  const productService = new ProductService();
+  const inventoryService = useMemo(() => new InventoryService(), []);
+  const productService = useMemo(() => new ProductService(), []);
   const toast = useToast();
   const canManage = usePermission()('inventory.damage.manage');
 
@@ -46,7 +46,7 @@ export const DamageQuarantinePage: React.FC = () => {
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [discountedUnitPrice, setDiscountedUnitPrice] = useState(0);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const whs = inventoryService.getAllWarehouses();
@@ -67,11 +67,11 @@ export const DamageQuarantinePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [inventoryService, productService, selectedWarehouseId, categoryFilter, statusFilter, search, setLoading, setWarehouses, setSelectedWarehouseId, setAllProducts, setItems, toast]);
 
   useEffect(() => {
     loadData();
-  }, [selectedWarehouseId, categoryFilter, statusFilter]);
+  }, [loadData]);
 
   const handleOpenCreate = () => {
     if (!canManage) return;
@@ -151,7 +151,6 @@ export const DamageQuarantinePage: React.FC = () => {
     }
   };
 
-  const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
   const fmtCur = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(Number(n) || 0) + ' ج.م';
   const resolvingProduct = resolvingItem
     ? allProducts.find((product) => product.id === resolvingItem.productId)

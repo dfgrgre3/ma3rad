@@ -1,6 +1,5 @@
 import type { Customer, Product } from '../../../../types';
 import type { CustomerService } from '../../../../services/domains/customers/CustomerService';
-import { PosCustomerPicker } from './PosCustomerPicker';
 import type { CartItem, PosUnit } from '../../../../types/pos';
 
 export interface PosCartPanelProps {

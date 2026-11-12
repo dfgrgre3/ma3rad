@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowRight, Boxes, Building2, Calendar, CheckCircle2, DollarSign, Loader2,
-  MapPin, Package, Plus, Trash2, User, Wallet, X, Activity,
+  MapPin, Package, Plus, Trash2, User, Wallet, Activity,
 } from 'lucide-react';
 import { ProjectService, Project, ProjectUnit, ProjectProduct, ProjectStatus } from '../../../services/domains/projects/ProjectService';
 import { ProjectControlsPanel } from '../../../components/projects/ProjectControlsPanel';

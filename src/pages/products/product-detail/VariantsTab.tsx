@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { GitBranch, Plus, Trash2 } from 'lucide-react';
 import { ProductExtraService, ProductVariant } from '../../../services/domains/products/ProductExtraService';
 import { OperationalFieldService, type ProductGradeOption } from '../../../services/domains/products/OperationalFieldService';
@@ -14,13 +14,13 @@ interface VariantsTabProps {
 }
 
 export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, canViewCosts, canViewPricing, canUpdatePricing }) => {
-  const service = new ProductExtraService();
-  const fieldService = new OperationalFieldService();
+  const service = useMemo(() => new ProductExtraService(), []);
+  const fieldService = useMemo(() => new OperationalFieldService(), []);
   const [rows, setRows] = useState<ProductVariant[]>([]);
   const [gradeOptions, setGradeOptions] = useState<ProductGradeOption[]>([]);
   const [form, setForm] = useState({ variantName: '', sku: '', barcode: '', color: '', size: '', grade: 'GRADE_1', costPrice: '', sellingPriceM2: '' });
 
-  const load = () => {
+  const load = useCallback(() => {
     try {
       setRows(service.getVariants(productId));
       const options = fieldService.getProductGradeOptions(true);
@@ -30,8 +30,8 @@ export const VariantsTab: React.FC<VariantsTabProps> = ({ productId, canEdit, ca
         ? current
         : { ...current, grade: options.find((option) => option.isActive)?.value || '' });
     } catch (e) { console.error(e); }
-  };
-  useEffect(() => { load(); }, [productId]);
+  }, [productId, service, fieldService]);
+  useEffect(() => { load(); }, [load]);
 
   const add = (e: React.FormEvent) => {
     e.preventDefault();

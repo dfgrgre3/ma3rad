@@ -124,9 +124,6 @@ export interface WorkforceSummary {
   comparisons: HeadcountComparison[];
 }
 
-const MAX_DATE = '9999-12-31';
-const YEAR_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-
 function isValidPeriodMonth(value: string): boolean {
   return YEAR_MONTH_PATTERN.test(value);
 }
@@ -289,7 +286,6 @@ export class WorkforcePlanningService {
     }
 
     const planId = id || `wfp_${uuidv4().replace(/-/g, '').slice(0, 16)}`;
-    const now = new Date().toISOString();
     const approvedRecruitmentBudget = roundMoney(Math.max(0, Number(input.approvedRecruitmentBudget || 0)));
     const expectedEmployeeCost = roundMoney(Math.max(0, Number(input.expectedEmployeeCost || 0)));
 
@@ -589,7 +585,7 @@ export class WorkforcePlanningService {
 
   static generateShortageSurplusAlerts(periodMonth?: string): void {
     const actor = this.requireView();
-    const companyId = this.currentCompanyId(actor);
+    const _companyId = this.currentCompanyId(actor);
     const targetPeriod = periodMonth || localDateString().slice(0, 7);
     if (!isValidPeriodMonth(targetPeriod)) throw new Error('الفترة غير صالحة.');
 

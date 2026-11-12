@@ -62,7 +62,7 @@ export function createSaleReturn(
   invoiceId: string,
   returnItems: ReturnRequestItem[],
   refundCash = true,
-  performedBy = 'usr_admin',
+  _performedBy = 'usr_admin',
   options: ReturnOptions = {}
 ): SalesReturn {
   const actor = AuthService.requireAuth();

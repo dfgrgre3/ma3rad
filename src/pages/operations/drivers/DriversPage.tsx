@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Plus, Search, Phone, CreditCard, Loader2, X, Power, Truck } from 'lucide-react';
+import { Users, Plus, Search, Phone, Loader2, X, Power, Truck } from 'lucide-react';
 import { OperationsService, Driver } from '../../../services/domains/operations/OperationsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';

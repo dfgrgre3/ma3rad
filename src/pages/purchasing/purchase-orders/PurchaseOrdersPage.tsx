@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { ClipboardCheck, Plus, Search, X, Loader2, Trash2, Eye, RefreshCw, Truck, Send, Ban, CheckCircle2 } from 'lucide-react';
 import { PurchaseOrderService, PurchaseOrderRow, PurchaseOrderStatus } from '../../../services/domains/purchases/PurchaseOrderService';
 import { SupplierService } from '../../../services/domains/suppliers/SupplierService';
@@ -59,7 +59,7 @@ export const PurchaseOrdersPage: React.FC = () => {
   const [valuesByOrder, setValuesByOrder] = useState<Record<string, Record<string, string>>>({});
   const [fieldFilters, setFieldFilters] = useState<OperationalFieldFilters>({});
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       const currentRows = service.getAllOrders(search, statusFilter);
@@ -70,9 +70,9 @@ export const PurchaseOrdersPage: React.FC = () => {
     }
     catch (e: any) { toast.error(e?.message || 'تعذر تحميل أوامر الشراء.'); }
     finally { setLoading(false); }
-  };
+  }, [service, fieldService, search, statusFilter, setLoading, setFields, setValuesByOrder, setRows, fieldFilters, toast]);
 
-  useEffect(() => { load();   }, [statusFilter, fieldFilters]);
+  useEffect(() => { load();   }, [statusFilter, fieldFilters, load]);
 
   const openDetails = (row: PurchaseOrderRow) => {
     if (expanded === row.id) { setExpanded(null); setDetails(null); return; }

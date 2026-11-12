@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import './SpreadsheetImportService_part01';
 import './SpreadsheetImportService_part02';
 import './SpreadsheetImportService_part03';

@@ -22,6 +22,7 @@ interface OverviewSectionProps {
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }) => {
   const refreshCtx = useDashboardRefresh();
+  const refreshToken = refreshCtx?.refreshToken;
   const initialRef = useRef(true);
   const {
     metrics,
@@ -52,13 +53,13 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
   }, [loading, onDataLoaded, refreshing]);
 
   useEffect(() => {
-    if (!refreshCtx) return;
+    if (refreshToken === undefined) return;
     if (initialRef.current) {
       initialRef.current = false;
       return;
     }
     loadData();
-  }, [refreshCtx?.refreshToken, loadData]);
+  }, [refreshToken, loadData]);
 
   if (!metrics && loading) {
     return (

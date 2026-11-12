@@ -775,7 +775,6 @@ test('commissions and stock reservations lifecycle', async () => {
 });
 
 test('approved credit-limit request updates the customer automatically', async () => {
-  const db = DatabaseManager.getInstance();
   const customer = q(`SELECT id, credit_limit AS creditLimit FROM customers WHERE phone = '0111111111'`)[0];
   const service = new ApprovalService();
   const request = service.createRequest({

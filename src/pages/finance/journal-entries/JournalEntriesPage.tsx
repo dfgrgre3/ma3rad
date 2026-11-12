@@ -26,7 +26,7 @@ export const JournalEntriesPage: React.FC = () => {
   const [draft, setDraft] = useState<DraftLine[]>([emptyLine(), emptyLine()]);
   const [saving, setSaving] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setEntries(service.getJournalEntries());
@@ -35,8 +35,8 @@ export const JournalEntriesPage: React.FC = () => {
       setError(null);
     } catch (e: any) { setError(e?.message || 'تعذر تحميل القيود.'); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  }, [service, setLoading, setEntries, setAccounts, setTrial, setError]);
+  useEffect(() => { load(); }, [load]);
 
   const totals = useMemo(() => ({
     debit: draft.reduce((s, l) => s + Number(l.debit || 0), 0),

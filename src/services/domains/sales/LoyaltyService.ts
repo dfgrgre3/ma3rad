@@ -3,8 +3,6 @@ import type { CustomerLoyalty, LoyaltyTier, LoyaltyTransaction, EarnLoyaltyPoint
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
-import { localDateString } from '../../../utils/shared/date';
-import { round2 } from '../finance/financials';
 
 export class LoyaltyService {
   private db = DatabaseManager.getInstance();

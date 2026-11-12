@@ -7,7 +7,6 @@ import { PermissionService } from '../src/services/domains/auth/PermissionServic
 import { AccountingService } from '../src/services/domains/finance/AccountingService.ts';
 import { BackupService } from '../src/services/infrastructure/backup/BackupService.ts';
 import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
-import { localDateString } from '../src/utils/shared/date.ts';
 
 test('3.4: enforce default password change, password policy, and session invalidation', async () => {
   const db = DatabaseManager.getInstance();
@@ -133,7 +132,6 @@ test('3.5: dashboard metrics date upper-bounding and accurate overdue debt aging
   AuthService.login('admin', 'admin123');
 
   const accounting = new AccountingService();
-  const today = localDateString();
 
   const custId = db.query<{ id: string }>('SELECT id FROM customers LIMIT 1')[0]?.id;
   const whId = db.query<{ id: string }>('SELECT id FROM warehouses LIMIT 1')[0]?.id;

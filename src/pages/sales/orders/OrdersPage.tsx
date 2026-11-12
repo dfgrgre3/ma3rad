@@ -342,7 +342,7 @@ export const OrdersPage: React.FC = () => {
     ...(operationalFieldService.getRecordValuesForExport('orders', [orders[index].id])[orders[index].id] || {}),
   }));
 
-  const doExport = (kind: 'excel' | 'pdf') => {
+  const doExport = (_kind: 'excel' | 'pdf') => {
     const options = {
       title: 'سجل طلبات وحجوزات العملاء',
       subtitle: `عدد الطلبات: ${orders.length}`,

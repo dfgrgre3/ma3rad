@@ -83,10 +83,10 @@ export const TodayPurchasesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [date, service, setLoading, setData, setError]);
 
   useEffect(() => { load();   }, [load]);
-  const loadFor = useCallback(
+  const _loadFor = useCallback(
     (dateValue: string) => {
       setLoading(true);
       try {
@@ -106,9 +106,9 @@ export const TodayPurchasesPage: React.FC = () => {
     setExpanded(null);
   }, [search, status, supplierId, warehouse, paymentType, minAmount, maxAmount, pageSize, date]);
 
-  const rows = data?.rows || [];
-  const items = data?.items || [];
-  const payments = data?.payments || [];
+  const rows = useMemo(() => data?.rows || [], [data]);
+  const items = useMemo(() => data?.items || [], [data]);
+  const payments = useMemo(() => data?.payments || [], [data]);
 
   const suppliersOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -149,7 +149,7 @@ export const TodayPurchasesPage: React.FC = () => {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }), [rows, status, supplierId, warehouse, paymentType, minAmount, maxAmount]);
 
-  const scopeWithoutSearch = useMemo(() => filteredRowsRaw, [filteredRowsRaw]);
+  const _scopeWithoutSearch = useMemo(() => filteredRowsRaw, [filteredRowsRaw]);
   const scopedIds = useMemo(() => new Set(filteredRows.map((row) => row.id)), [filteredRows]);
   const scopedItems = useMemo(() => itemsInScope(items, scopedIds), [items, scopedIds]);
 
@@ -168,7 +168,7 @@ export const TodayPurchasesPage: React.FC = () => {
   const supplierStats = useMemo(() => buildSupplierStats(filteredRows, scopedItems), [filteredRows, scopedItems]);
 
   const previousTrend = data && data.trend.length >= 2 ? data.trend[data.trend.length - 2] : null;
-  const totalDelta = previousTrend && previousTrend.total > 0 && data
+  const _totalDelta = previousTrend && previousTrend.total > 0 && data
     ? ((data.summary.total - previousTrend.total) / previousTrend.total) * 100
     : null;
 

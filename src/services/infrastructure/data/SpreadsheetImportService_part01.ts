@@ -1,5 +1,3 @@
-import * as XLSX from 'xlsx';
-
 export const MAX_SPREADSHEET_FILE_SIZE = 10 * 1024 * 1024;
 
 export const MAX_SPREADSHEET_ROWS = 20_000;

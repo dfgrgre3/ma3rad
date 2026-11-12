@@ -1,12 +1,3 @@
-import React from 'react';
-import {
-  AlertCircle, CheckCircle2, History, Info, Keyboard, Lock, PlayCircle,
-  Printer, Receipt, Trash2, Unlock, UserPlus,
-} from 'lucide-react';
-import type { CashRegister, CashShift, Customer, ToneMixingConflict } from '../../../../types';
-import { CeramicMath } from '../../../../utils/products/ceramicMath';
-import { Field, Modal, inputCls } from './PosShared';
-import type { HeldOrder, Toast } from '../../../../types/pos';
 import './PosModals_part01';
 import './PosModals_part02';
 import './PosModals_part03';

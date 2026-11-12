@@ -1,10 +1,5 @@
 import type { PermissionDef } from './types';
-import {
-  GRANULAR_LEGACY_ALIASES,
-  GRANULAR_LEGACY_MAP,
-  GRANULAR_PERMISSIONS,
-  PAGE_VIEW_PERMISSIONS,
-} from '../../../../config/permissionMatrix';
+import { GRANULAR_PERMISSIONS } from '../../../../config/permissionMatrix';
 
 const EMPLOYEE_PERMISSION_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   'employees.view': Object.freeze(['employees.manage']),

@@ -1,13 +1,9 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   CreditCard,
   Plus,
   RefreshCw,
   Loader2,
-  CheckCircle2,
-  Building2,
-  DollarSign,
-  Percent,
   Receipt,
   ArrowRightLeft,
 } from 'lucide-react';
@@ -51,7 +47,7 @@ export const EPaymentSettlementPage: React.FC = () => {
     notes: '',
   });
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const gws = service.getPaymentGateways();
@@ -73,11 +69,11 @@ export const EPaymentSettlementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, toast, setLoading, setGateways, setSettlements, setBankAccounts, setSettleForm, settleForm.gatewayId, settleForm.bankAccountId]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleCreateGateway = (e: React.FormEvent) => {
     e.preventDefault();

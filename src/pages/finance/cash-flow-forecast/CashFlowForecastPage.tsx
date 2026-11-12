@@ -1,17 +1,8 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   TrendingUp,
   RefreshCw,
   Loader2,
-  Calendar,
-  ArrowDownLeft,
-  ArrowUpRight,
-  ShieldCheck,
-  AlertTriangle,
-  Wallet,
-  CheckCircle2,
-  Clock,
-  Layers,
 } from 'lucide-react';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
 import type { CashForecastDaySummary } from '../../../types/finance';
@@ -33,7 +24,7 @@ export const CashFlowForecastPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<CashForecastDaySummary | null>(null);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const data = service.getCashFlowForecast(daysHorizon);
@@ -46,11 +37,11 @@ export const CashFlowForecastPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, toast, daysHorizon, setLoading, setForecastData, setSelectedDay]);
 
   useEffect(() => {
     loadData();
-  }, [daysHorizon]);
+  }, [loadData, daysHorizon]);
 
   const hasNegativeDip = useMemo(() => {
     return forecastData?.days.some((d) => d.projectedClosingBalance < 0) || false;

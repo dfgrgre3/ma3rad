@@ -8,7 +8,7 @@ export const AddExpenseModal: React.FC<Props> = ({ isOpen, categories, onClose, 
   const [amount, setAmount] = useState(0);
   const [recipient, setRecipient] = useState('');
   const [description, setDescription] = useState('');
-  const [paymentType, setPaymentType] = useState<PaymentType>('CASH');
+  const [paymentType, _setPaymentType] = useState<PaymentType>('CASH');
 
   if (!isOpen) return null;
 

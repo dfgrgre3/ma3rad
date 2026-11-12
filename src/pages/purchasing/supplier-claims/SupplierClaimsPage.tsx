@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  ShieldAlert, Plus, Search, AlertTriangle, CheckCircle2,
-  DollarSign, FileText, ChevronDown, Check, X, Building2,
-  Layers, Package, Receipt, ArrowDownRight, Sparkles
+  ShieldAlert, Plus, Search, ChevronDown, X,
 } from 'lucide-react';
 import {
   ProcurementService, SupplierClaimRow, SupplierClaimItem
@@ -43,7 +41,7 @@ export const SupplierClaimsPage: React.FC = () => {
   const [claims, setClaims] = useState<SupplierClaimRow[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [supplierFilter, setSupplierFilter] = useState('');
+  const [_setSupplierFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -75,7 +73,7 @@ export const SupplierClaimsPage: React.FC = () => {
   const [settleAgreedAmount, setSettleAgreedAmount] = useState(0);
   const [settleNotes, setSettleNotes] = useState('');
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const rows = service.getAllClaims(search, statusFilter, supplierFilter);
@@ -85,11 +83,11 @@ export const SupplierClaimsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, setLoading, setClaims, toast, search, statusFilter]);
 
   useEffect(() => {
     loadData();
-  }, [statusFilter, supplierFilter]);
+  }, [loadData]);
 
   const toggleDetails = (id: string) => {
     if (expandedId === id) {

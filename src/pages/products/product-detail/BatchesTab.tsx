@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Palette, Plus, X, Trash2, Loader2 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { BatchService } from '../../../services/domains/inventory/BatchService';
@@ -14,9 +14,9 @@ interface BatchesTabProps {
 }
 
 export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canViewCosts, canUpdatePricing }) => {
-  const batchService = new BatchService();
-  const db = DatabaseManager.getInstance();
-  const branchAccess = new BranchAccessService();
+  const batchService = useMemo(() => new BatchService(), []);
+  const db = useMemo(() => DatabaseManager.getInstance(), []);
+  const branchAccess = useMemo(() => new BranchAccessService(), []);
   const [batches, setBatches] = useState<ProductBatch[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({
@@ -33,15 +33,15 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     try {
       setBatches(batchService.getBatchesForProduct(productId));
       const scope = branchAccess.warehouseBranchScope('w', undefined, AuthService.requireAuth());
       setWarehouses(db.query<{ id: string; name: string }>(`SELECT w.id, w.name FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause} ORDER BY w.name`, scope.params));
     } catch (e) { console.error(e); }
-  };
+  }, [productId, batchService, branchAccess, db]);
 
-  useEffect(() => { load(); }, [productId]);
+  useEffect(() => { load(); }, [load]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();

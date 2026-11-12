@@ -45,7 +45,7 @@ const money = (value: number) => `${Number(value || 0).toLocaleString('en-US', {
   minimumFractionDigits: 2, maximumFractionDigits: 2,
 })}`;
 const timeOf = (value: string | null | undefined) => String(value || '').slice(11, 16);
-const dateOf = (value: string | null | undefined) => String(value || '').slice(0, 10);
+const _dateOf = (value: string | null | undefined) => String(value || '').slice(0, 10);
 const offsetDate = (days: number) => {
   const date = new Date(`${localDateString()}T00:00:00`);
   date.setDate(date.getDate() + days);

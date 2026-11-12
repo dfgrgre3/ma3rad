@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Save, Palette, Table as TableIcon, Columns, Info, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Image as ImageIcon, Check, History, Download,
-  Printer, Eye, Star, CheckCircle, RefreshCw, Layers, LayoutTemplate, FileText, CheckCircle2, X, ExternalLink, SlidersHorizontal, Sparkles, Plus, ArrowUp, ArrowDown,
+  Save, Palette, Table as TableIcon, Store, ReceiptText, Boxes, ShieldCheck, Truck, Upload, RotateCcw, Check, History, Download,
+  Printer, Eye, Star, RefreshCw, Layers, LayoutTemplate, FileText, CheckCircle2, X, SlidersHorizontal, Sparkles, Plus, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { SettingsService } from '../../../services/domains/config/SettingsService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -171,7 +171,7 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
     };
   }, [previewModalOpen]);
 
-  const scanPrinters = async (notify = true) => {
+  const scanPrinters = useCallback(async (notify = true) => {
     setIsScanningPrinters(true);
     try {
       const res = await window.ceramisys?.printing?.listPrinters?.();
@@ -189,13 +189,13 @@ export const AdminSettingsTab: React.FC<AdminSettingsTabProps> = ({ initialTab, 
     } finally {
       setIsScanningPrinters(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     if (tab === 'invoice') {
       scanPrinters(false);
     }
-  }, [tab]);
+  }, [tab, scanPrinters]);
 
   useEffect(() => {
     if (initialTab && (initialTab !== 'backup' || canViewBackup)) setTab(initialTab);

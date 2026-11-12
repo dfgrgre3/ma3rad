@@ -1,14 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { AuthService } from '../auth/AuthService';
-import { postLedgerEntry } from '../../../database/repositories/ledger';
-import { localDateString } from '../../../utils/shared/date';
-import { InventoryCostingService } from '../inventory/InventoryCostingService';
-import { PermissionService } from '../auth/PermissionService';
-import { AuditService } from '../security/AuditService';
-import { getStockQuantityLabel } from '../../../utils/products/productUnits';
-import { branchAccess } from './branchAccess';
-import type { CountItem, CountSession, CountType } from '../../../types/inventory/countSessions';
 import './countSessionService_part01';
 import './countSessionService_part02';
 import './countSessionService_part03';

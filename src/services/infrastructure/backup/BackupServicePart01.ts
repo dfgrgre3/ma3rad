@@ -4,7 +4,7 @@ import { AuthService } from '../../domains/auth/AuthService';
 import { PermissionService } from '../../domains/auth/PermissionService';
 import { AuditService } from '../../domains/security/AuditService';
 import { localDateString } from '../../../utils/shared/date';
-import { decryptExternalBackup, encryptExternalBackup, isEncryptedBackup, isEncryptedLocalDatabase } from './backupEncryption';
+import { decryptExternalBackup, isEncryptedBackup, isEncryptedLocalDatabase } from './backupEncryption';
 import {
   createXlsxBackupWorkbook,
   extractDatabaseFromXlsxBackup,

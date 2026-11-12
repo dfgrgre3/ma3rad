@@ -180,7 +180,7 @@ export interface VendorStats {
   topVendors: Array<{ id: string; name: string; rating: number; totalContracts: number }>;
 }
 
-const MAX_DATE = '9999-12-31';
+const _MAX_DATE = '9999-12-31';
 
 export class FacilityContractSLAService {
   private static db = DatabaseManager.getInstance();

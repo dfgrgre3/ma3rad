@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BadgeDollarSign, Calculator, Check, Banknote, X, Loader2, FileSpreadsheet, RefreshCw } from 'lucide-react';
 import { CommissionService, CommissionRow, CommissionStats } from '../../../services/domains/hr/CommissionService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
@@ -32,7 +32,7 @@ export const CommissionsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setRows(service.getCommissions({ month, status }));
@@ -42,9 +42,9 @@ export const CommissionsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service, month, status, setLoading, setRows, setStats, toast]);
 
-  useEffect(() => { load();   }, [month, status]);
+  useEffect(() => { load();   }, [load, month, status]);
 
   const generate = () => {
     setGenerating(true);

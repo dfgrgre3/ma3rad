@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, Check, ChevronDown, ChevronUp, RefreshCw, ShieldCheck,
-  Sparkles, History, GitMerge, Wifi, WifiOff, Clock, AlertCircle, X,
-  CheckCircle2, ArrowRightLeft, Database, SlidersHorizontal
+  ChevronDown, ChevronUp, RefreshCw,
+  Sparkles, History, GitMerge, Clock, AlertCircle, X,
+  CheckCircle2, ArrowRightLeft, SlidersHorizontal
 } from 'lucide-react';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';

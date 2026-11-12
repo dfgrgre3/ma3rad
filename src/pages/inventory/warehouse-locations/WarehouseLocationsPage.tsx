@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  Building2, Barcode, Plus, Search, RefreshCw, Printer, 
-  Layers, Package, AlertCircle, Edit3, Trash2, X, Check, Eye
+  Barcode, Plus, Search, RefreshCw, Printer, 
+  Eye
 } from 'lucide-react';
 import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -11,8 +11,8 @@ import { formatProductQuantity, getProductUnitLabel } from '../../../utils/produ
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const WarehouseLocationsPage: React.FC = () => {
-  const inventoryService = new InventoryService();
-  const productService = new ProductService();
+  const inventoryService = useMemo(() => new InventoryService(), []);
+  const productService = useMemo(() => new ProductService(), []);
   const toast = useToast();
   const canManage = usePermission()('inventory.locations.manage');
 
@@ -48,7 +48,7 @@ export const WarehouseLocationsPage: React.FC = () => {
   // Print barcode label modal
   const [printLocation, setPrintLocation] = useState<any | null>(null);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     try {
       const whs = inventoryService.getAllWarehouses();
@@ -67,11 +67,11 @@ export const WarehouseLocationsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [inventoryService, productService, setLoading, setWarehouses, setSelectedWarehouseId, setLocations, setAllProducts, toast, selectedWarehouseId, search]);
 
   useEffect(() => {
     loadData();
-  }, [selectedWarehouseId]);
+  }, [loadData]);
 
   const handleOpenCreate = () => {
     if (!canManage) return;

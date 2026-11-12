@@ -1,6 +1,6 @@
 import { getCachedDisabledPermissions } from './centralConfigStore';
 import { forPath, isPageVisible, getCurrentPath } from './CentralFeaturePermissionService_part01';
-import type { CentralFeaturePermission, CentralAction } from './CentralFeaturePermissionService';
+import type { CentralAction } from './CentralFeaturePermissionService';
 
 const ACTION_BY_SUFFIX: Record<string, CentralAction> = {
   view: 'view', read: 'view', list: 'view', show: 'view', open: 'view',

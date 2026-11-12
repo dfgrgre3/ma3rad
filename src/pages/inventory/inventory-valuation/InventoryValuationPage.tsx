@@ -7,7 +7,7 @@ import { exportToExcel } from '../../../utils/export/export';
 
 export const InventoryValuationPage: React.FC = () => {
   const [data, setData] = useState<WarehouseValuation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadValuation();

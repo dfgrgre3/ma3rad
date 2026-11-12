@@ -66,12 +66,6 @@ const classifyExpense = (category?: string | null, description?: string | null):
   return 'fixed';
 };
 
-const formatComparisonValue = (value: number, type: 'currency' | 'number' | 'percent'): string => {
-  if (type === 'currency') return `${round2(value)} ج`;
-  if (type === 'percent') return `${round2(value)}%`;
-  return `${Math.round(value)}`;
-};
-
 const daysBetween = (from: string, to: string): number => {
   const start = new Date(`${from}T00:00:00`).getTime();
   const end = new Date(`${to}T00:00:00`).getTime();
@@ -3251,7 +3245,7 @@ export class ReportCenterService {
     };
   }
 
-  public workforceAnalytics({ from, to }: ReportParams): ReportResult {
+  public workforceAnalytics({ _from, _to }: ReportParams): ReportResult {
     const actor = this.actor();
     const branchScope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const companyScope = this.branchAccess.companyScope('e.company_id', actor);
@@ -3284,7 +3278,7 @@ export class ReportCenterService {
     };
   }
 
-  public assetAnalytics({ from, to }: ReportParams): ReportResult {
+  public assetAnalytics({ _from, _to }: ReportParams): ReportResult {
     const actor = this.actor();
     const branchScope = this.branchAccess.sqlScope('fa.branch_id', undefined, actor);
 

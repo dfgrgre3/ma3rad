@@ -1,9 +1,7 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
-import { CustomerService } from '../customers/CustomerService';
-import type { Lead, CrmActivity, LeadStage } from '../../../types/crm';
+import type { CrmActivity, LeadStage } from '../../../types/crm';
 
 const ACTIVITY_TYPES = ['CALL', 'VISIT', 'WHATSAPP', 'EMAIL', 'MEETING', 'QUOTATION_SENT', 'SAMPLE_GIVEN', 'NOTE', 'STAGE_CHANGE'];
 import { CrmServicePart01 } from './CrmServicePart01';

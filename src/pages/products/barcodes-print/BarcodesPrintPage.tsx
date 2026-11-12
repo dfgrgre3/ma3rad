@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
-  Barcode, Printer, Search, Check, Layers, Sliders, RefreshCw, Eye, Tag, FileText, CheckCircle2
+  Barcode, Printer, Search, Eye
 } from 'lucide-react';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { SettingsService } from '../../../services/domains/config/SettingsService';
-import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { Product } from '../../../types';
 import { gradeLabel, setConfiguredGradeLabels } from '../../../components/products/productFormModel';
 import { OperationalFieldService } from '../../../services/domains/products/OperationalFieldService';
@@ -35,7 +34,7 @@ export const BarcodesPrintPage: React.FC = () => {
     showBarcodeNumber: true,
   });
 
-  const productService = new ProductService();
+  const productService = useMemo(() => new ProductService(), []);
 
   useEffect(() => {
     try {
@@ -49,7 +48,7 @@ export const BarcodesPrintPage: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [productService]);
 
   const selectedProduct = products.find(p => p.id === selectedProductId) || products[0];
   const showroomName = SettingsService.getSettings().showroomName;

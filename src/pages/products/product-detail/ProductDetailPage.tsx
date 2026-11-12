@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
@@ -33,10 +33,10 @@ import { OperationalFieldsForm } from '../../../components/products/OperationalF
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const db = DatabaseManager.getInstance();
-  const productService = new ProductService();
+  const db = useMemo(() => DatabaseManager.getInstance(), []);
+  const productService = useMemo(() => new ProductService(), []);
   const currentUser = AuthService.getCurrentUser();
-  const branchAccess = new BranchAccessService();
+  const branchAccess = useMemo(() => new BranchAccessService(), []);
   const can = usePermission(currentUser);
   const canEdit = PermissionService.can(currentUser, 'ui.products.detail.update');
   const canViewCosts = can('finance.view');
@@ -55,9 +55,9 @@ export const ProductDetailPage: React.FC = () => {
   const [form, setForm] = useState<ProductEditForm | null>(null);
   const [operationalFields, setOperationalFields] = useState<OperationalFieldDefinition[]>([]);
   const [operationalFieldValues, setOperationalFieldValues] = useState<Record<string, string>>({});
-  const operationalFieldService = new OperationalFieldService();
+  const operationalFieldService = useMemo(() => new OperationalFieldService(), []);
 
-  const load = () => {
+  const load = useCallback(() => {
     if (!id) return;
     setLoading(true);
     try {
@@ -105,9 +105,9 @@ export const ProductDetailPage: React.FC = () => {
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
-  };
+  }, [id, can, productService, operationalFieldService, branchAccess, db]);
 
-  useEffect(() => { load(); }, [id, can]);
+  useEffect(() => { load(); }, [load]);
 
   const openEdit = () => {
     if (!product) return;

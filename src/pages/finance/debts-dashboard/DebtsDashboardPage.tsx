@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useDashboardRefresh } from "../../../contexts/DashboardRefreshContext";
 import {
   Banknote,
@@ -52,8 +52,8 @@ export const DebtsDashboardPage: React.FC = () => {
   const refreshCtx = useDashboardRefresh();
   const initialRef = useRef(true);
   const navigate = useNavigate();
-  const debtService = new DebtService();
-  const branchAccess = new BranchAccessService();
+  const debtService = useMemo(() => new DebtService(), []);
+  const branchAccess = useMemo(() => new BranchAccessService(), []);
   const [debts, setDebts] = useState<DebtRow[]>([]);
   const [totals, setTotals] = useState({ receivable: 0, payable: 0, net: 0 });
   const [search, setSearch] = useState("");
@@ -387,7 +387,7 @@ export const DebtsDashboardPage: React.FC = () => {
     }
   };
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       const db = DatabaseManager.getInstance();
@@ -444,17 +444,15 @@ export const DebtsDashboardPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [debtService, search, setLoading, setDebts, setTotals, setSummary, setError, branchAccess]);
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     if (!refreshCtx) return;
     if (initialRef.current) { initialRef.current = false; return; }
     load();
-  }, [refreshCtx?.refreshToken, load]);
+  }, [refreshCtx, load]);
 
   const openPayment = (d: DebtRow) => {
     setTarget(d);

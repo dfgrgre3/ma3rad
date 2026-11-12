@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FolderTree, Plus, Search, Edit, Trash2, Package, ChevronRight, X, Layers
@@ -18,17 +18,17 @@ export const CategoriesPage: React.FC = () => {
   const [formData, setFormData] = useState({ name: '', parentId: '', description: '' });
   const navigate = useNavigate();
 
-  const categoryService = new CategoryService();
+  const categoryService = useMemo(() => new CategoryService(), []);
 
-  const loadCategories = () => {
+  const loadCategories = useCallback(() => {
     try {
       setCategories(categoryService.getAllCategories());
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [categoryService]);
 
-  useEffect(() => { loadCategories(); }, []);
+  useEffect(() => { loadCategories(); }, [loadCategories]);
 
   const term = search.trim();
   const matches = (c: CategoryWithCount) =>

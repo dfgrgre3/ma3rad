@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
 import { FeatureService } from '../../../services/domains/config/FeatureService';
@@ -27,7 +27,7 @@ export function useConfiguration() {
 
 export function useFeature(id: string, user?: User | null) {
   const subject = user ?? AuthService.getCurrentUser();
-  return useMemo(() => FeatureService.resolve(id, subject), [id, subject?.id, subject?.role]);
+  return useMemo(() => FeatureService.resolve(id, subject), [id, subject]);
 }
 
 export function useModule(id: string) {
@@ -39,14 +39,14 @@ export function useModule(id: string) {
 
 export function useDynamicAction(id: string, user?: User | null) {
   const subject = user ?? AuthService.getCurrentUser();
-  return useMemo(() => ActionRegistryService.resolve(id, subject), [id, subject?.id, subject?.role]);
+  return useMemo(() => ActionRegistryService.resolve(id, subject), [id, subject]);
 }
 
 export function useEffectivePermissions(codes: string[], user?: User | null) {
   const subject = user ?? AuthService.getCurrentUser();
   return useMemo(
     () => codes.map((code) => ({ code, allowed: PermissionService.can(subject, code) })),
-    [codes.join('|'), subject?.id, subject?.role],
+    [codes, subject],
   );
 }
 

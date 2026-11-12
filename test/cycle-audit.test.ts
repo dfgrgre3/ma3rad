@@ -126,7 +126,7 @@ function assertDocumentNumber(prefix: string, value: string): void {
 }
 
 test('sales cycle audit: numbers, stock, ledger, receipts and returns agree', async () => {
-  const manager = await boot();
+  const _manager = await boot();
   const productId = 'prod_audit_sale';
   seedProduct({ id: productId, stock: 100 });
   const customer = new CustomerService().createCustomer({

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   BarChart2,
@@ -383,7 +383,7 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
     return 'bar';
   }, [columns, definition.chart, rows.length]);
 
-  const rowValue = (key: string) => rows[0]?.[key];
+  const rowValue = useCallback((key: string) => rows[0]?.[key], [rows]);
 
   const chartData = useMemo(() => {
     if (!rows.length || !columns.length) return [];

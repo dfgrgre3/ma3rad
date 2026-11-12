@@ -9,10 +9,10 @@ import { useTheme } from '../../../contexts/useTheme';
 export function useBusinessTerm(
   key: BusinessTermKey,
 ): string {
-  const { settings } = useTheme();
+  useTheme();
   return useMemo(
     () => TerminologyService.getTerm(key),
-    [key, settings],
+    [key],
   );
 }
 

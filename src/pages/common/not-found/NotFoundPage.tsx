@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   FileQuestion, ArrowRight, LayoutDashboard, ShoppingCart,
-  Package, Users, Handshake, Settings, Search, FileSpreadsheet
+  Package, Users, Handshake, Settings, FileSpreadsheet
 } from 'lucide-react';
 
 export const NotFoundPage: React.FC = () => {

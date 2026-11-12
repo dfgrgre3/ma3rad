@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeftRight, Warehouse, Plus, RefreshCw, 
-  History, AlertTriangle, CheckCircle2, Search, SlidersHorizontal
-} from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ArrowLeftRight, Search } from 'lucide-react';
 import { InventoryService } from '../../services/domains/inventory/InventoryService';
 import { ProductService } from '../../services/domains/products/ProductService';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
-import { WarehouseStock, InventoryTransaction, Warehouse as IWarehouse, Product } from '../../types';
+import { Product } from '../../types';
 import { CeramicMath } from '../../utils/products/ceramicMath';
 import { formatProductQuantity, getProductUnitLabel } from '../../utils/products/productUnits';
 import { gradeLabel } from '../products/productFormModel';
@@ -50,14 +47,14 @@ export const InventoryView: React.FC = () => {
   const adjustingProduct = products.find((product) => product.id === adjustData.productId);
   const transferringProduct = products.find((product) => product.id === transferData.productId);
 
-  const inventoryService = new InventoryService();
-  const productService = new ProductService();
+  const inventoryService = useMemo(() => new InventoryService(), []);
+  const productService = useMemo(() => new ProductService(), []);
   const currentUser = AuthService.getCurrentUser();
   const canTransfer = PermissionService.can(currentUser, 'inventory.transfer');
   const canAdjust = PermissionService.can(currentUser, 'inventory.adjust');
   const canViewFinancials = PermissionService.can(currentUser, 'ui.finance.overview.view');
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     try {
       const whs = inventoryService.getAllWarehouses();
       const stks = inventoryService.getWarehouseStock(selectedWarehouseId || undefined, search);
@@ -82,11 +79,11 @@ export const InventoryView: React.FC = () => {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [selectedWarehouseId, search, inventoryService, productService, transferData.fromWarehouseId]);
 
   useEffect(() => {
     loadData();
-  }, [selectedWarehouseId, search]);
+  }, [loadData]);
 
   const handleStockTransfer = (e: React.FormEvent) => {
     e.preventDefault();

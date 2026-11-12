@@ -3,7 +3,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { ModuleRegistryService } from './ModuleRegistryService';
 import { FeatureService } from './FeatureService';
 import { AppConfigService } from './AppConfigService';
-import { ACTION_REGISTRY, getActionDefinition, isKnownAction, type ActionDefinition } from '../../../config/actionRegistry';
+import { ACTION_REGISTRY, getActionDefinition, type ActionDefinition } from '../../../config/actionRegistry';
 import type { User } from '../../../types';
 
 export interface ResolvedAction {

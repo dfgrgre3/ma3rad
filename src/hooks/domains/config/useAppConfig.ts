@@ -1,11 +1,3 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import {
-  normalizePagePath,
-  type AppConfigEntry,
-  type AppConfigRule,
-} from '../../../config/appConfiguration';
-import { AppConfigService, type AppConfigFieldState, type AppConfigState } from '../../../services/domains/config/AppConfigService';
 import './useAppConfig_part01';
 import './useAppConfig_part02';
 export { useAppConfig } from './useAppConfig_part01';

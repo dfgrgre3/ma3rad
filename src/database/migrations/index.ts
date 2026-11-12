@@ -66,6 +66,7 @@ import { MIGRATION_PART_62 } from './part62';
 import { MIGRATION_PART_63 } from './part63';
 import { MIGRATION_PART_64 } from './part64';
 import { MIGRATION_PART_65 } from './part65';
+import { MIGRATION_PART_66 } from './part66';
 import { MIGRATION_PART_67 } from './part67';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
@@ -100,6 +101,7 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_63,
   MIGRATION_PART_64,
   MIGRATION_PART_65,
+  MIGRATION_PART_66,
   MIGRATION_PART_67,
   {
     id: '050_cash_shift_auto_close',

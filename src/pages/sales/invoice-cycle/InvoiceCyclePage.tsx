@@ -1,18 +1,16 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  FileText, CheckCircle2, Truck, DollarSign, RotateCcw, AlertTriangle,
-  Search, Plus, Eye, Printer, RefreshCw, ChevronLeft, ChevronRight,
-  Loader2, X, Clock, PackageCheck, Ban, CreditCard, Banknote,
-  ArrowRight, Filter, Calendar, Users, Warehouse, CheckSquare,
-  XCircle, Receipt, Package, TrendingUp, ShoppingCart,
+  FileText, CheckCircle2, Truck, DollarSign, AlertTriangle,
+  Search, Eye, Printer, RefreshCw, ChevronLeft, ChevronRight,
+  Loader2, X, Ban, CreditCard,
+  ArrowRight, CheckSquare,
+  Receipt, Package, TrendingUp,
 } from 'lucide-react';
 import { SalesService, InvoiceFilters } from '../../../services/domains/sales/SalesService';
-import { CustomerService } from '../../../services/domains/customers/CustomerService';
-import { InventoryService } from '../../../services/domains/inventory/InventoryService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { PrintService } from '../../../services/shared/PrintService';
-import { SalesInvoice, Customer, Warehouse as WarehouseType, PaymentType } from '../../../types';
+import { SalesInvoice, PaymentType } from '../../../types';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
@@ -359,7 +357,7 @@ const InvoiceDetailDrawer: React.FC<InvoiceDetailDrawerProps> = ({ invoice, onCl
 
 export const InvoiceCyclePage: React.FC = () => {
   const service = useMemo(() => new SalesService(), []);
-  const printService = useMemo(() => new PrintService(), []);
+  const _printService = useMemo(() => new PrintService(), []);
   const user = AuthService.getCurrentUser();
   const canView = PermissionService.can(user, 'ui.sales.cycle.view');
 

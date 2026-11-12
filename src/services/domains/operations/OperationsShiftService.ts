@@ -1429,7 +1429,7 @@ export class OperationsShiftService {
   }
 
   public addStaff(operationShiftId: string, employeeId: string, role: OperationStaffRole = 'STAFF'): void {
-    const actor = this.requireManage();
+    const _actor = this.requireManage();
     const shift = this.getInstance(operationShiftId);
     if (!['OPEN', 'HANDOVER_PENDING'].includes(shift.status)) {
       throw new Error('لا يمكن إضافة موظفين إلا لوردية مفتوحة.');
@@ -1787,7 +1787,7 @@ export class OperationsShiftService {
     description?: string;
   }): OperationShiftIncident {
     const actor = this.requireManage();
-    const shift = this.getInstance(operationShiftId);
+    const _shift = this.getInstance(operationShiftId);
     if (!input.title?.trim()) throw new Error('عنوان العطل أو الملاحظة مطلوب.');
     const type = input.type || 'NOTE';
     const severity = input.severity || 'MEDIUM';

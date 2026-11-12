@@ -117,7 +117,7 @@ export const PurchaseInventoryReportPage: React.FC = () => {
     if (!refreshCtx) return;
     if (initialRef.current) { initialRef.current = false; return; }
     if (canView && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
-  }, [refreshCtx?.refreshToken, canView, canViewInventory, canViewPurchases, load, tab]);
+  }, [refreshCtx, canView, canViewInventory, canViewPurchases, load, tab]);
 
   const TABS: { id: Tab; label: string; icon: React.ElementType; visible: boolean }[] = [
     { id: 'purchases', label: 'المشتريات', icon: ShoppingBag, visible: canViewPurchases },

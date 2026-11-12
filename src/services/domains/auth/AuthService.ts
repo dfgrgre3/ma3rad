@@ -485,7 +485,8 @@ export class AuthService {
         : [];
       if (active.length > 0 && sessionId) {
         AuthService.currentSessionId = sessionId;
-        AuthService.touchSession();
+        // Do not mutate the SQLite database while restoring the app. The
+        // regular session heartbeat updates last_seen_at after startup.
       } else {
         AuthService.startSession(user.id);
       }

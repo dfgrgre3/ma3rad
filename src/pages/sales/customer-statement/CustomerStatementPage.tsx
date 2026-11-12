@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   FileText, Search, Loader2, AlertTriangle, ChevronLeft, ChevronRight,
-  Users, DollarSign, RefreshCw, TrendingUp, TrendingDown, Calendar,
-  Receipt, CreditCard, Banknote, Eye, X, Printer, Download, MessageCircle,
-  CheckCircle2, Clock, AlertCircle, Filter,
+  Users, RefreshCw, Eye, X, Printer, Download, MessageCircle,
+  CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import { SalesService } from '../../../services/domains/sales/SalesService';
 import { CustomerService } from '../../../services/domains/customers/CustomerService';
@@ -12,7 +11,7 @@ import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { Customer, SalesInvoice } from '../../../types';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
-import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
+import { exportToExcel } from '../../../utils/export/export';
 import { CustomerStatementWhatsAppOptions } from '../../../components/sales/CustomerStatementWhatsAppOptions';
 
 const fmt = (n: number) =>
@@ -20,7 +19,7 @@ const fmt = (n: number) =>
 const fmtAbs = (n: number) =>
   new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Math.abs(Number(n) || 0)) + ' ج';
 
-const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
+const _PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
   PAID: { label: 'مسددة', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   PARTIAL: { label: 'جزئية', color: 'bg-amber-100 text-amber-700 border-amber-200' },
   UNPAID: { label: 'غير مسددة', color: 'bg-rose-100 text-rose-700 border-rose-200' },
@@ -134,7 +133,7 @@ const StatementTable: React.FC<StatementTableProps> = ({
 const StatementModal: React.FC<StatementModalProps> = ({ customer, canExport, onClose }) => {
   const customerService = useMemo(() => new CustomerService(), []);
   const salesService = useMemo(() => new SalesService(), []);
-  const printService = useMemo(() => new PrintService(), []);
+  const _printService = useMemo(() => new PrintService(), []);
   const [rows, setRows] = useState<CustomerStatementRow[]>([]);
   const [invoices, setInvoices] = useState<Array<SalesInvoice & { returnBalanceCredit?: number }>>([]);
   const [loading, setLoading] = useState(true);

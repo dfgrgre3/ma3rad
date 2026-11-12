@@ -1,28 +1,6 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { v4 as uuidv4 } from 'uuid';
-import { AuthService } from '../auth/AuthService';
-import { PermissionService } from '../auth/PermissionService';
 import { round2 } from './financials';
-import { localDateString } from '../../../utils/shared/date';
-import { postLedgerEntry } from '../../../database/repositories/ledger';
-import type {
-  FiscalYear,
-  FiscalPeriod,
-  BankAccount,
-  BankReconciliation,
-  BankReconciliationLine,
-  ExtendedChequeStatus,
-  ChequeStatusHistory,
-  CostCenter,
-  Budget,
-  BudgetItem,
-  CashForecastItem,
-  CashForecastDaySummary,
-  PaymentGateway,
-  PaymentGatewaySettlement,
-  MultiDimensionalReportFilters,
-} from '../../../types/finance';
-import type { Cheque } from './FinanceExtrasService';
+import type { BankAccount } from '../../../types/finance';
 import { FinanceEnterprisePart02 } from './FinanceEnterprisePart02';
 
 export abstract class FinanceEnterprisePart03 extends FinanceEnterprisePart02 {
@@ -55,7 +33,7 @@ public getBankAccounts(): BankAccount[] {
   }
 
 public saveBankAccount(input: Partial<BankAccount> & { accountName: string; bankName: string; accountNumber: string; glAccountId: string }): string {
-    const actor = this.requireManage();
+    this.requireManage();
     if (!input.accountName?.trim()) throw new Error('اسم الحساب البنكي مطلوب.');
     if (!input.bankName?.trim()) throw new Error('اسم البنك مطلوب.');
     if (!input.accountNumber?.trim()) throw new Error('رقم الحساب مطلوب.');

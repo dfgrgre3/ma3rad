@@ -71,7 +71,6 @@ export class PurchaseService {
 
   private fetchPurchases(search?: string): PurchaseInvoice[] {
     AuthService.requireAuth();
-    const actor = AuthService.getCurrentUser();
     const scope = this.branchAccess.sqlScope('pi.branch_id', 'w.branch_id');
     const companyScope = this.branchAccess.companyScope('pi.company_id');
     let sql = `

@@ -1,4 +1,4 @@
-import type { CeramicGrade, UnitType } from '../../types';
+
 import './productFormModel_part01';
 import './productFormModel_part02';
 import './productFormModel_part03';

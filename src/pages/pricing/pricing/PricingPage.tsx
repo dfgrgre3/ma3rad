@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Percent, Plus, Search, Trash2, Loader2, X, Power } from 'lucide-react';
 import { PricingService, PriceList, PriceListItem } from '../../../services/domains/sales/PricingService';
 import { ProductService } from '../../../services/domains/products/ProductService';
@@ -17,7 +17,7 @@ const CATEGORY_LABELS: Record<PriceList['customerType'], { label: string; color:
 const fmt = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.round(n)) + ' ج';
 
 export const PricingPage: React.FC = () => {
-  const service = new PricingService();
+  const service = useMemo(() => new PricingService(), []);
   const canManage = usePermission()('pricing.update');
   const [lists, setLists] = useState<PriceList[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -32,7 +32,7 @@ export const PricingPage: React.FC = () => {
   const [items, setItems] = useState<PriceListItem[]>([]);
   const [itemForm, setItemForm] = useState({ productId: '', priceM2: '', priceBox: '', minQuantityM2: '' });
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     try {
       setLists(service.getPriceLists());
@@ -43,9 +43,9 @@ export const PricingPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [service]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const loadItems = (list: PriceList) => {
     setActiveList(list);

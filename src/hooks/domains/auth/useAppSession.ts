@@ -25,7 +25,7 @@ export function useAppSession(
       branchId: settings.defaultBranchId || 'br_main',
       activityId: getEffectiveBusinessType(),
     });
-  }, [dbReady, currentUser?.id]);
+  }, [dbReady, currentUser]);
 
   // Idle timeout
   useEffect(() => {
@@ -52,7 +52,7 @@ export function useAppSession(
       events.forEach((event) => window.removeEventListener(event, bump));
       window.clearInterval(timer);
     };
-  }, [currentUser?.id, onSessionExpired]);
+  }, [currentUser, onSessionExpired]);
 
   // Scheduled shifts
   useEffect(() => {
@@ -73,7 +73,7 @@ export function useAppSession(
     checkScheduledShiftClosures();
     const timer = window.setInterval(checkScheduledShiftClosures, 30_000);
     return () => window.clearInterval(timer);
-  }, [dbReady, currentUser?.id]);
+  }, [dbReady, currentUser]);
 
   // Heartbeat & Alerts
   useEffect(() => {
@@ -86,5 +86,5 @@ export function useAppSession(
       window.clearInterval(heartbeat);
       window.clearInterval(alerts);
     };
-  }, [currentUser?.id]);
+  }, [currentUser]);
 }

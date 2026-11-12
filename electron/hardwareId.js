@@ -1,4 +1,4 @@
-const { execSync, execFile } = require('child_process');
+const { execSync } = require('child_process');
 const crypto = require('crypto');
 const os = require('os');
 const fs = require('node:fs');

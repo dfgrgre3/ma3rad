@@ -1,5 +1,4 @@
 import type { Database } from 'sql.js';
-import { addColumn } from './support';
 
 export function runEnterprisePart9(db: Database): void {
   // 9. Seed Standard Enterprise Accounts if not exist

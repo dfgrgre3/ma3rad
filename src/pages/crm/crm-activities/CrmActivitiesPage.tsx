@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Plus, Search, Calendar, CheckCircle2, Clock, Phone, AlertCircle, User, MessageSquare, X, Loader2 } from 'lucide-react';
+import { Activity, Plus, Search, CheckCircle2, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { CrmService, CrmActivity } from '../../../services/domains/crm/CrmService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';

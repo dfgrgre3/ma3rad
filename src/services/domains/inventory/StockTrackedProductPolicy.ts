@@ -1,5 +1,3 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import { isServiceProduct } from '../../../utils/products/productUnits';
 
 /**
  * Single policy used by every service that creates or changes stock quantities:

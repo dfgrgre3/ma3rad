@@ -84,9 +84,10 @@ export function useAppStartup() {
   useEffect(() => {
     void CentralLicenseService.initHardwareBinding();
     initDb();
+    const backupTimerCurrent = backupTimer.current;
     return () => {
       if (startupMaintenanceTimer.current) clearTimeout(startupMaintenanceTimer.current);
-      if (backupTimer.current) clearInterval(backupTimer.current);
+      if (backupTimerCurrent) clearInterval(backupTimerCurrent);
       void syncWorker.current?.stopAndWait();
       syncWorker.current = null;
     };
