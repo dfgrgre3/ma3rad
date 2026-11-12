@@ -98,12 +98,22 @@ export const DashboardPage: React.FC = () => {
 
   const refresh = useCallback(() => {
     setRefreshToken((key) => key + 1);
-    if (effectiveTab === 'pulse' || effectiveTab === 'all') setRefreshingOverview(true);
+    if (effectiveTab === 'pulse' || effectiveTab === 'all') {
+      setRefreshingOverview(true);
+    }
   }, [effectiveTab]);
+
   const handleOverviewDataLoaded = useCallback(() => {
     setLastUpdated(new Date());
     setRefreshingOverview(false);
   }, []);
+
+  // عند فتح الصفحة أو تبديل التبويب إلى قسم لا يحتوي OverviewSection، نضمن عدم بقاء حالة التحديث معلقة
+  useEffect(() => {
+    if (effectiveTab !== 'pulse' && effectiveTab !== 'all') {
+      setRefreshingOverview(false);
+    }
+  }, [effectiveTab]);
   const today = new Intl.DateTimeFormat('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date());
   const isOverview = effectiveTab === 'all';
 
