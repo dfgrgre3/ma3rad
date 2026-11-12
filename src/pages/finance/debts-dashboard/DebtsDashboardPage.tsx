@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useDashboardRefresh } from "../../../contexts/DashboardRefreshContext";
 import {
   Banknote,
   Search,
@@ -48,6 +49,8 @@ type PromiseRow = {
 };
 
 export const DebtsDashboardPage: React.FC = () => {
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
   const navigate = useNavigate();
   const debtService = new DebtService();
   const branchAccess = new BranchAccessService();
@@ -446,6 +449,12 @@ export const DebtsDashboardPage: React.FC = () => {
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    if (!refreshCtx) return;
+    if (initialRef.current) { initialRef.current = false; return; }
+    load();
+  }, [refreshCtx?.refreshToken, load]);
 
   const openPayment = (d: DebtRow) => {
     setTarget(d);

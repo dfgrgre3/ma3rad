@@ -159,19 +159,12 @@ export function assertLedgerDateOpenForPosting(db: Database, date: string): void
     throw new Error(`لا يمكن الترحيل في فترة محاسبية مقفلة: ${closedFiscalPeriod.name} (${closedFiscalPeriod.status}).`);
   }
 
-  const definedPeriod = queryLedgerRows<{ id: string }>(
+  const closedPeriodRow = queryLedgerRows<{ value: string }>(
     db,
-    'SELECT id FROM fiscal_periods WHERE ? >= start_date AND ? <= end_date LIMIT 1',
-    [date, date]
+    "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
   )[0];
-  if (!definedPeriod) {
-    const closedPeriodRow = queryLedgerRows<{ value: string }>(
-      db,
-      "SELECT value FROM system_settings WHERE key = 'accounting_closed_until_date'"
-    )[0];
-    if (closedPeriodRow?.value && date <= closedPeriodRow.value) {
-      throw new Error(`لا يمكن الترحيل في فترة محاسبية مغلقة (الفترة مغلقة حتى تاريخ: ${closedPeriodRow.value}).`);
-    }
+  if (closedPeriodRow?.value && date <= closedPeriodRow.value) {
+    throw new Error(`لا يمكن الترحيل في فترة محاسبية مغلقة (الفترة مغلقة حتى تاريخ: ${closedPeriodRow.value}).`);
   }
 }
 

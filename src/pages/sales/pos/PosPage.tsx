@@ -16,6 +16,7 @@ import { PricingService, type AppliedPromotion } from '../../../services/domains
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
 import { Product, Customer, Warehouse, CashRegister, CashShift, PaymentType, SystemSettings, ToneMixingConflict } from '../../../types';
 import { CeramicMath } from '../../../utils/products/ceramicMath';
+import { formatProductQuantity, getProductUnitLabel } from '../../../utils/products/productUnits';
 import { CeramicCalculatorModal } from '../../../components/products/CeramicCalculatorModal';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
 import { LayoutContext } from '../../../contexts/LayoutContext';
@@ -63,6 +64,8 @@ export const PosView: React.FC = () => {
   const [activeShift, setActiveShift] = useState<CashShift | null>(null);
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [stockMap, setStockMap] = useState<Record<string, number>>({});
+  const [discountedStocks, setDiscountedStocks] = useState<any[]>([]);
+  const [isDiscountedStocksOpen, setIsDiscountedStocksOpen] = useState(false);
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -180,6 +183,7 @@ export const PosView: React.FC = () => {
     setCart,
     applyCustomerPricing,
     addToCart,
+    addDiscountedToCart,
     addCalculatedToCart,
     updateCartQuantity,
     stepCartQuantity,
@@ -233,10 +237,16 @@ export const PosView: React.FC = () => {
         map[(r as any).productId] = r.availableM2 ?? r.quantityM2 ?? 0;
       }
       setStockMap(map);
-    } catch (e) {
-      console.error(e);
+    } catch (error: any) {
+      notify(error?.message || 'تعذر تحميل أرصدة المخزون.', 'error');
     }
-  }, [inventoryService]);
+    try {
+      setDiscountedStocks(inventoryService.getDiscountedSaleStocks(warehouseId));
+    } catch (error: any) {
+      setDiscountedStocks([]);
+      notify(error?.message || 'تعذر تحميل مخزون البيع المخفض.', 'error');
+    }
+  }, [inventoryService, notify]);
 
   const loadInitialData = useCallback(() => {
     try {
@@ -738,6 +748,18 @@ export const PosView: React.FC = () => {
           onClearFilters={clearFilters}
         />
 
+        <div className="flex items-center justify-between border-b border-slate-200 bg-purple-50/70 px-4 py-2">
+          <div className="text-xs font-bold text-purple-900">مخزون الفرز الثاني والبواقي له سعر وتكلفة منفصلان</div>
+          <button
+            type="button"
+            onClick={() => setIsDiscountedStocksOpen(true)}
+            disabled={!selectedWarehouseId || discountedStocks.length === 0}
+            className="rounded-lg border border-purple-200 bg-white px-3 py-1.5 text-xs font-black text-purple-800 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            البيع المخفض ({discountedStocks.length})
+          </button>
+        </div>
+
         <PosProductGrid
           products={filteredProducts}
           cart={cart}
@@ -930,6 +952,47 @@ export const PosView: React.FC = () => {
       </div>
 
       <PosToast toast={toast} />
+
+      {isDiscountedStocksOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-label="مخزون البيع المخفض">
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 className="text-sm font-black text-slate-900">مخزون البيع المخفض</h2>
+                <p className="mt-1 text-xs text-slate-500">كل بند يُخصم من سجل الحجر وتُستخدم تكلفته وسعره المعتمدان.</p>
+              </div>
+              <button type="button" onClick={() => setIsDiscountedStocksOpen(false)} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">إغلاق</button>
+            </div>
+            <div className="max-h-[65vh] space-y-2 overflow-auto p-4">
+              {discountedStocks.map((source) => {
+                const product = products.find((candidate) => candidate.id === source.productId);
+                if (!product) return null;
+                return (
+                  <div key={source.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-purple-100 bg-purple-50/50 p-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-black text-slate-900">{source.productName} <span className="font-mono text-xs text-purple-700">({source.specialNumber})</span></div>
+                      <div className="mt-1 text-xs text-slate-600">
+                        المتاح {formatProductQuantity(Number(source.availableQuantityM2), product)} • السعر {Number(source.discountedUnitPrice).toLocaleString('ar-EG')} ج.م / {getProductUnitLabel(product)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addDiscountedToCart(product, source);
+                        setIsDiscountedStocksOpen(false);
+                      }}
+                      className="rounded-lg bg-purple-700 px-3 py-2 text-xs font-black text-white hover:bg-purple-800"
+                    >
+                      أضف للسلة
+                    </button>
+                  </div>
+                );
+              })}
+              {discountedStocks.length === 0 && <p className="py-8 text-center text-sm text-slate-500">لا توجد كميات مسعّرة للبيع المخفض في هذا المخزن.</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       {successInvoice && (
         <SuccessInvoiceModal

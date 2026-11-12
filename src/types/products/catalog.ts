@@ -13,10 +13,34 @@ export interface Brand {
   createdAt: string;
 }
 
+export const WAREHOUSE_TYPES = [
+  'MAIN_WAREHOUSE',
+  'SHOWROOM',
+  'BRANCH_WAREHOUSE',
+  'TRANSIT_WAREHOUSE',
+  'RETURNS_WAREHOUSE',
+  'QUARANTINE_WAREHOUSE',
+] as const;
+
+export type WarehouseType = typeof WAREHOUSE_TYPES[number];
+
+export const isWarehouseType = (value: string): value is WarehouseType =>
+  WAREHOUSE_TYPES.some((warehouseType) => warehouseType === value);
+
+export const WAREHOUSE_TYPE_LABELS: Record<WarehouseType, string> = {
+  MAIN_WAREHOUSE: 'المخزن الرئيسي',
+  SHOWROOM: 'المعرض',
+  BRANCH_WAREHOUSE: 'مخزن فرع',
+  TRANSIT_WAREHOUSE: 'مخزن بضاعة بالطريق',
+  RETURNS_WAREHOUSE: 'مخزن المرتجعات',
+  QUARANTINE_WAREHOUSE: 'مخزن الحجر',
+};
+
 export interface Warehouse {
   id: string;
   name: string;
   code: string;
+  warehouseType: WarehouseType;
   branchId?: string;
   location?: string;
   isDefault: boolean;

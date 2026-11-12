@@ -63,6 +63,7 @@ test('inventory, report and party pages only expose data from accessible branche
            ('usr_page_scope', 'finance.debts.view', 'GRANT'),
            ('usr_page_scope', 'purchases.view', 'GRANT'),
            ('usr_page_scope', 'sales.view', 'GRANT'),
+           ('usr_page_scope', 'inventory.view', 'GRANT'),
            ('usr_page_scope', 'finance.view', 'GRANT'),
            ('usr_page_scope', 'finance.installments.view', 'GRANT')`
   );
@@ -107,6 +108,28 @@ test('inventory, report and party pages only expose data from accessible branche
     `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
      VALUES ('ws_page_a', 'wh_page_a', 'prod_page', 10, 0),
             ('ws_page_b', 'wh_page_b', 'prod_page', 5, 0)`
+  );
+  db.run(
+    `INSERT INTO products (id, sku, barcode, name, category_id, brand_id, grade, size,
+       base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2,
+       wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active)
+     SELECT 'prod_page_inactive', 'PAGE-PROD-INACTIVE', 'PAGE-PROD-INACTIVE', 'Inactive Page Product',
+       category_id, brand_id, grade, size, base_unit, sell_unit, pieces_per_box, meters_per_box,
+       0, selling_price_m2, wholesale_price_m2, min_selling_price_m2, min_stock_level, 0
+     FROM products WHERE id = 'prod_page'`
+  );
+  db.run(
+    `INSERT OR REPLACE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+     VALUES ('ws_page_inactive', 'wh_page_a', 'prod_page_inactive', 2, 0)`
+  );
+  db.run(
+    `INSERT OR REPLACE INTO inventory_cost_layers
+       (id, product_id, warehouse_id, source_type, received_at, quantity_received, quantity_remaining, unit_cost)
+     VALUES ('icl_page_a_1', 'prod_page', 'wh_page_a', 'PURCHASE', ?, 4, 4, 100),
+            ('icl_page_a_2', 'prod_page', 'wh_page_a', 'PURCHASE', ?, 6, 6, 150),
+            ('icl_page_b', 'prod_page', 'wh_page_b', 'PURCHASE', ?, 5, 5, 100),
+            ('icl_page_inactive', 'prod_page_inactive', 'wh_page_a', 'PURCHASE', ?, 2, 2, 10000)`,
+    [today, today, today, today]
   );
   db.run(
     `INSERT INTO purchase_invoices (id, invoice_number, date, supplier_id, warehouse_id, branch_id,
@@ -170,8 +193,18 @@ test('inventory, report and party pages only expose data from accessible branche
   assert.deepEqual(new DebtService().getTotals(), { receivable: 50, payable: 20, net: 30 });
   assert.ok(new DebtService().getDebts().every((debt) => debt.amount === 50 || debt.amount === 20));
   const valuation = new InventoryValuationService();
-  assert.deepEqual(valuation.getByWarehouse().map((warehouse) => warehouse.name), ['Page Warehouse A']);
-  assert.equal(valuation.getKpi().totalValue, 1000);
+  const warehouseValuations = valuation.getByWarehouse();
+  assert.deepEqual(warehouseValuations.map((warehouse) => warehouse.name), ['Page Warehouse A']);
+  assert.equal(warehouseValuations[0].costValue, 21300, 'warehouse valuation includes remaining FIFO costs for inactive stock');
+  assert.equal(warehouseValuations[0].itemsCount, 2, 'warehouse valuation includes inactive products with stock');
+  assert.equal(warehouseValuations[0].quantitiesByUnit.reduce((sum, row) => sum + row.quantity, 0), 12);
+  const valuationKpi = valuation.getKpi();
+  assert.equal(valuationKpi.totalValue, 21300);
+  assert.equal(valuationKpi.totalSkus, 2);
+  assert.deepEqual(valuationKpi.topValueItems.map((item) => item.name), ['Inactive Page Product', 'Page Product']);
+  assert.equal(valuationKpi.topValueItems[0].value, 20000);
+  assert.equal(valuationKpi.categoryBreakdown[0].items, 2);
+  assert.equal(valuationKpi.categoryBreakdown[0].value, 21300);
   const installments = new InstallmentService().getPageData();
   assert.deepEqual(installments.invoiceRows.map((row) => row[0]), ['si_page_a']);
   assert.deepEqual(installments.planRows.map((row) => row[0]), ['plan_page_a']);
@@ -191,8 +224,8 @@ test('inventory, report and party pages only expose data from accessible branche
   assert.equal(purchaseKpi.totalPurchases, 200);
 
   const inventoryKpi = loadInventoryKpi();
-  assert.equal(inventoryKpi.totalSkus, 1);
-  assert.equal(inventoryKpi.totalValue, 1000);
+  assert.equal(inventoryKpi.totalSkus, 2);
+  assert.equal(inventoryKpi.totalValue, 21300);
 
   assert.deepEqual(loadBranchAdjustments().map(row => row.id), ['adj_page_a']);
   assert.deepEqual(loadBranchCountSessions().map(row => row.id), ['cnt_page_a']);
@@ -230,7 +263,7 @@ test('inventory, report and party pages only expose data from accessible branche
   AuthService.setCurrentUser(admin);
   const branchAccess = new BranchAccessService();
   branchAccess.setCurrentBranchId('br_page_a', admin);
-  assert.equal(loadInventoryKpi().totalValue, 1000);
+  assert.equal(loadInventoryKpi().totalValue, 21300);
   assert.equal(new AnalyticsService().getSalesAnalytics(today, today).totalSales, 500);
   assert.deepEqual(loadBranchAdjustments().map(row => row.id), ['adj_page_a']);
   assert.equal(loadPurchaseKpi(today, today).totalPurchases, 200);
@@ -256,6 +289,8 @@ test('inventory, report and party pages only expose data from accessible branche
   db.run("DELETE FROM sales_invoices WHERE id IN ('si_page_a', 'si_page_b')");
   db.run("DELETE FROM stock_adjustments WHERE id IN ('adj_page_a', 'adj_page_b')");
   db.run("DELETE FROM stock_counts WHERE id IN ('cnt_page_a', 'cnt_page_b')");
-  db.run("DELETE FROM warehouse_stock WHERE id IN ('ws_page_a', 'ws_page_b')");
+  db.run("DELETE FROM inventory_cost_layers WHERE id IN ('icl_page_a_1', 'icl_page_a_2', 'icl_page_b', 'icl_page_inactive')");
+  db.run("DELETE FROM warehouse_stock WHERE id IN ('ws_page_a', 'ws_page_b', 'ws_page_inactive')");
+  db.run("DELETE FROM products WHERE id = 'prod_page_inactive'");
   AuthService.logout();
 });

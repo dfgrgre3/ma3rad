@@ -630,14 +630,14 @@ export class DatabaseManager {
 
     // 3. Default Warehouse
     this.db.run(`
-      INSERT INTO warehouses (id, name, code, location, is_default, is_active, branch_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, ['wh_main', 'المعرض الرئيسي', 'MAIN-01', 'صالة العرض والمخزن الملحق', 1, 1, DEFAULT_BRANCH_ID]);
+      INSERT INTO warehouses (id, name, code, location, warehouse_type, is_default, is_active, branch_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, ['wh_main', 'المعرض الرئيسي', 'MAIN-01', 'صالة العرض والمخزن الملحق', 'SHOWROOM', 1, 1, DEFAULT_BRANCH_ID]);
 
     this.db.run(`
-      INSERT INTO warehouses (id, name, code, location, is_default, is_active, branch_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, ['wh_ext', 'المخزن الخارجي الرئيسي', 'EXT-01', 'المنطقة الصناعية - عنبر 4', 0, 1, DEFAULT_BRANCH_ID]);
+      INSERT INTO warehouses (id, name, code, location, warehouse_type, is_default, is_active, branch_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, ['wh_ext', 'المخزن الخارجي الرئيسي', 'EXT-01', 'المنطقة الصناعية - عنبر 4', 'MAIN_WAREHOUSE', 0, 1, DEFAULT_BRANCH_ID]);
 
     // 4. Default Cash Register
     this.db.run(`

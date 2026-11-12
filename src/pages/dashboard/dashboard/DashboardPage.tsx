@@ -4,6 +4,7 @@ import {
   Award, Banknote, LayoutDashboard, ShoppingBag, ShoppingCart, Target, TrendingUp, Truck,
 } from 'lucide-react';
 import { DashboardHeader } from '../../../components/dashboard/DashboardHeader';
+import { DashboardRefreshContext } from '../../../contexts/DashboardRefreshContext';
 import { DashboardLoader } from '../../../components/dashboard/DashboardLoader';
 import { DashboardSectionNav } from '../../../components/dashboard/DashboardSectionNav';
 import { OverviewSection } from '../../../components/dashboard/OverviewSection';
@@ -45,7 +46,7 @@ export const DashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SectionId>(
     initialSection && SECTIONS_CONFIG.some((section) => section.id === initialSection) ? initialSection : 'pulse'
   );
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshToken, setRefreshToken] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshingOverview, setRefreshingOverview] = useState(false);
 
@@ -95,10 +96,10 @@ export const DashboardPage: React.FC = () => {
     document.querySelector('main.app-main')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const refresh = () => {
-    setRefreshKey((key) => key + 1);
+  const refresh = useCallback(() => {
+    setRefreshToken((key) => key + 1);
     if (effectiveTab === 'pulse' || effectiveTab === 'all') setRefreshingOverview(true);
-  };
+  }, [effectiveTab]);
   const handleOverviewDataLoaded = useCallback(() => {
     setLastUpdated(new Date());
     setRefreshingOverview(false);
@@ -107,8 +108,9 @@ export const DashboardPage: React.FC = () => {
   const isOverview = effectiveTab === 'all';
 
   return (
-    <div className="dashboard-page bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
-      <div className="space-y-4 p-3 sm:space-y-5 sm:p-5 lg:p-6">
+    <DashboardRefreshContext.Provider value={{ refreshToken, refresh }}>
+      <div className="dashboard-page bg-[#f3f3f3] dark:bg-[#1f1f1f]" dir="rtl">
+        <div className="space-y-4 p-3 sm:space-y-5 sm:p-5 lg:p-6">
         <DashboardHeader
           today={today}
           currentUser={currentUser}
@@ -129,53 +131,54 @@ export const DashboardPage: React.FC = () => {
             <SectionCard
               id="sec-pulse"
               title="نبض حركة اليوم"
-              subtitle={`ملخص المبيعات والمشتريات والأداء • آخر تحديث ${new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(lastUpdated)}`}
+              subtitle={`ملخص المبيعات والمشتريات والأداء • ${lastUpdated ? `آخر تحديث ${new Intl.DateTimeFormat('ar-EG', { hour: '2-digit', minute: '2-digit' }).format(lastUpdated)}` : 'لم يتم التحديث بعد'}`}
               icon={LayoutDashboard}
               iconBg="bg-teal-50 dark:bg-teal-950"
               iconColor="text-teal-700 dark:text-teal-300"
             >
-              <OverviewSection key={refreshKey} onDataLoaded={handleOverviewDataLoaded} />
+              <OverviewSection onDataLoaded={handleOverviewDataLoaded} />
             </SectionCard>
           </>
         )}
         {showSection('executive') && (
           <SectionCard id="sec-executive" title="الإدارة التنفيذية" subtitle="مؤشرات الأداء والأرباح والسيولة" icon={TrendingUp} iconBg="bg-indigo-50 dark:bg-indigo-950" iconColor="text-indigo-700 dark:text-indigo-300">
-            <Suspense key={refreshKey} fallback={<DashboardLoader />}><ExecutiveDashboard /></Suspense>
+            <Suspense fallback={<DashboardLoader />}><ExecutiveDashboard /></Suspense>
           </SectionCard>
         )}
         {showSection('sales') && (
           <SectionCard id="sec-sales" title="تحليلات المبيعات" subtitle="أداء البيع والأصناف والعملاء" icon={ShoppingCart} iconBg="bg-emerald-50 dark:bg-emerald-950" iconColor="text-emerald-700 dark:text-emerald-300">
-            <Suspense key={refreshKey} fallback={<DashboardLoader />}><SalesAnalyticsPage /></Suspense>
+            <Suspense fallback={<DashboardLoader />}><SalesAnalyticsPage /></Suspense>
           </SectionCard>
         )}
         {showSection('purchases') && (
           <SectionCard id="sec-purchases" title="المشتريات والمخزون" subtitle="حركة الفواتير وتقييم المخزون والموردين" icon={ShoppingBag} iconBg="bg-amber-50 dark:bg-amber-950" iconColor="text-amber-700 dark:text-amber-300">
-            <Suspense key={refreshKey} fallback={<DashboardLoader />}><PurchaseInventoryReportPage /></Suspense>
+            <Suspense fallback={<DashboardLoader />}><PurchaseInventoryReportPage /></Suspense>
           </SectionCard>
         )}
         {showSection('debts') && (
           <SectionCard id="sec-debts" title="الديون والذمم" subtitle="متابعة مستحقات العملاء والموردين" icon={Banknote} iconBg="bg-rose-50 dark:bg-rose-950" iconColor="text-rose-700 dark:text-rose-300">
-            <Suspense key={refreshKey} fallback={<DashboardLoader />}><DebtsDashboardPage /></Suspense>
+            <Suspense fallback={<DashboardLoader />}><DebtsDashboardPage /></Suspense>
           </SectionCard>
         )}
         {showSection('crm') && (
           <SectionCard id="sec-crm" title="إدارة العملاء والفرص" subtitle="متابعة العملاء المحتملين والأنشطة" icon={Target} iconBg="bg-violet-50 dark:bg-violet-950" iconColor="text-violet-700 dark:text-violet-300">
-            <Suspense key={refreshKey} fallback={<DashboardLoader />}><CrmDashboardPage /></Suspense>
+            <Suspense fallback={<DashboardLoader />}><CrmDashboardPage /></Suspense>
           </SectionCard>
         )}
         {showSection('fleet') && (
           <SectionCard id="sec-fleet" title="التوصيل والأسطول" subtitle="متابعة الشحنات والسائقين والمركبات" icon={Truck} iconBg="bg-cyan-50 dark:bg-cyan-950" iconColor="text-cyan-700 dark:text-cyan-300">
-            <Suspense key={refreshKey} fallback={<DashboardLoader />}><FleetDashboardPage /></Suspense>
+            <Suspense fallback={<DashboardLoader />}><FleetDashboardPage /></Suspense>
           </SectionCard>
         )}
         {showSection('hr') && (
           <SectionCard id="sec-hr" title="الموارد البشرية" subtitle="متابعة فريق العمل والحضور والعمولات" icon={Award} iconBg="bg-teal-50 dark:bg-teal-950" iconColor="text-teal-700 dark:text-teal-300">
-            <Suspense key={refreshKey} fallback={<DashboardLoader />}><HrDashboardPage /></Suspense>
+            <Suspense fallback={<DashboardLoader />}><HrDashboardPage /></Suspense>
           </SectionCard>
         )}
         <footer className="pb-1 text-center text-[10px] text-[#767676] dark:text-[#a6a6a6]">سيراميسيس</footer>
       </div>
     </div>
+    </DashboardRefreshContext.Provider>
   );
 };
 

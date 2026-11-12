@@ -3,10 +3,12 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { AuditService } from '../security/AuditService';
 import { branchAccess } from './branchAccess';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { CountSession } from '../../../types/inventory/countSessions';
 import { postCountItems } from './countSessionService_part05';
 
 export function approveCountSession(activeSession: CountSession): boolean {
+  ModuleRegistryService.assertModuleEnabled('inventory');
   if (activeSession.status === 'POSTED' || activeSession.status === 'CANCELLED') return false;
   const db = DatabaseManager.getInstance();
   const actor = AuthService.requireAuth();
@@ -43,6 +45,7 @@ export function approveCountSession(activeSession: CountSession): boolean {
 }
 
 export function rejectCountSession(activeSession: CountSession, reason: string): void {
+  ModuleRegistryService.assertModuleEnabled('inventory');
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.inventory.counts.approve');
   const db = DatabaseManager.getInstance();

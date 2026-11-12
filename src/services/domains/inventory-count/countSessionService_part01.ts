@@ -4,6 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { localDateString } from '../../../utils/shared/date';
 import { PermissionService } from '../auth/PermissionService';
 import { branchAccess } from './branchAccess';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { CountType } from '../../../types/inventory/countSessions';
 
 export interface StartCountSessionInput {
@@ -15,6 +16,7 @@ export interface StartCountSessionInput {
 }
 
 export function startCountSession(input: StartCountSessionInput): void {
+  ModuleRegistryService.assertModuleEnabled('inventory');
   const { warehouseId: selectedWarehouseId, countType, selectedProductIds, isBlindCount, notes } = input;
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.inventory.counts.count');

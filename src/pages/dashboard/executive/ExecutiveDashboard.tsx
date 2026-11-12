@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { useExecutiveDashboard } from '../../../hooks/domains/dashboard/useExecutiveDashboard';
+import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import { ExecutiveKpiGrid } from './ExecutiveKpiGrid';
 import { ExecutiveSalesChart } from './ExecutiveSalesChart';
 import { LowStockAlertsCard } from './LowStockAlertsCard';
@@ -30,6 +31,16 @@ export const ExecutiveDashboard: React.FC = () => {
     lastRefresh,
     refresh,
   } = useExecutiveDashboard();
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
+  useEffect(() => {
+    if (!refreshCtx) return;
+    if (initialRef.current) {
+      initialRef.current = false;
+      return;
+    }
+    refresh();
+  }, [refreshCtx?.refreshToken, refresh]);
 
   return (
     <div className="h-full min-w-0 overflow-y-auto bg-slate-50 text-slate-900 p-3 sm:p-4 lg:p-5 space-y-4 lg:space-y-5" dir="rtl">

@@ -23,7 +23,9 @@ public recordSpecialStock(input: {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
-    if (input.quantityM2 <= 0) throw new Error('الكمية يجب أن تكون أكبر من صفر.');
+    if (!Number.isFinite(input.quantityM2) || input.quantityM2 <= 0) {
+      throw new Error('الكمية يجب أن تكون رقماً صحيحاً أكبر من صفر.');
+    }
 
     return this.db.executeTransaction((txDb) => {
       const stock = this.getProductStock(input.productId, input.warehouseId);
@@ -95,11 +97,26 @@ public inspectSpecialStock(id: string, notes: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.adjust');
+    if (!notes.trim()) throw new Error('يجب تسجيل ملاحظات الفحص.');
 
-    this.db.run(`
-      UPDATE inventory_special_stocks
-      SET status = 'INSPECTED', inspection_notes = ?, inspected_by = ?, inspected_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [notes, actor.id, id]);
+    const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
+    const companyScope = this.branchAccess.companyScope('w.company_id', actor);
+    this.db.executeTransaction((txDb) => {
+      const item = txDb.query<any>(`
+        SELECT iss.id, iss.status, iss.warehouse_id AS warehouseId
+        FROM inventory_special_stocks iss
+        JOIN warehouses w ON w.id = iss.warehouse_id
+        WHERE iss.id = ? AND ${branchScope.clause} AND ${companyScope.clause}
+      `, [id, ...branchScope.params, ...companyScope.params])[0];
+      if (!item) throw new Error('السجل غير موجود.');
+      this.branchAccess.requireWarehouseAuthorization(item.warehouseId, actor);
+      if (item.status !== 'RECORDED') throw new Error('لا يمكن فحص هذا السجل إلا بعد تسجيله وقبل اتخاذ القرار.');
+
+      txDb.run(`
+        UPDATE inventory_special_stocks
+        SET status = 'INSPECTED', inspection_notes = ?, inspected_by = ?, inspected_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND status = 'RECORDED'
+      `, [notes.trim(), actor.id, id]);
+    });
   }
 }

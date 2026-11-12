@@ -16,6 +16,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { InventoryReceiptService } from './InventoryReceiptService';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { isServiceProduct } from '../../../utils/products/productUnits';
+import { localDateString } from '../../../utils/shared/date';
+import { round2 } from '../finance/financials';
 import type { ProductBatch, ToneMixingConflict } from '../../../types';
 
 export type { ProductBatch, ToneMixingConflict };
@@ -132,47 +137,91 @@ export class BatchService {
   /** إنشاء دفعة جديدة عند استلام شحنة سيراميك */
   public createBatch(data: CreateBatchDTO): ProductBatch {
     this.requireWrite(data.costPrice !== undefined);
+    if (!ModuleRegistryService.isInventoryTracked()) {
+      throw new Error('لا يمكن تسجيل استلام دفعة لأن إدارة المخزون غير مفعلة.');
+    }
     const actor = AuthService.requireAuth();
+    this.branchAccess.requireWarehouseAccess(data.warehouseId, actor);
+    const warehouse = this.db.query<{ companyId: string | null }>(
+      `SELECT company_id AS companyId FROM warehouses WHERE id = ? AND is_active = 1`,
+      [data.warehouseId]
+    )[0];
+    if (!warehouse) throw new Error('المخزن المحدد غير موجود أو غير نشط.');
+    if (warehouse.companyId) this.branchAccess.requireCompanyAccess(warehouse.companyId, actor);
 
     if (!data.batchNumber?.trim()) throw new Error('رقم الدفعة / التشغيلة مطلوب.');
     if (!data.toneShade?.trim()) throw new Error('نغمة اللون (Shade) مطلوبة.');
-    if (!data.quantityM2 || data.quantityM2 <= 0) throw new Error('الكمية يجب أن تكون أكبر من صفر.');
-
-    // منع تكرار رقم الدفعة لنفس الصنف في نفس المخزن
-    const dup = this.db.query<{ id: string }>(
-      `SELECT id FROM product_batches WHERE product_id = ? AND batch_number = ? AND warehouse_id = ?`,
-      [data.productId, data.batchNumber.trim(), data.warehouseId]
-    );
-    if (dup.length > 0) {
-      throw new Error(`رقم الدفعة "${data.batchNumber}" مسجل بالفعل لهذا الصنف في نفس المخزن.`);
+    const qtyM2 = round2(Number(data.quantityM2));
+    if (!Number.isFinite(qtyM2) || qtyM2 <= 0) throw new Error('الكمية يجب أن تكون أكبر من صفر.');
+    if (data.costPrice !== undefined && (!Number.isFinite(Number(data.costPrice)) || Number(data.costPrice) < 0)) {
+      throw new Error('تكلفة الوحدة يجب أن تكون صفراً أو أكثر.');
     }
-
     const id = `batch_${uuidv4().substring(0, 8)}`;
-    const qtyM2 = Math.max(0, Number(data.quantityM2) || 0);
+    const batchNumber = data.batchNumber.trim();
+    const receivedDate = data.receivedDate || localDateString();
 
-    this.db.run(
-      `INSERT INTO product_batches
-         (id, product_id, warehouse_id, batch_number, tone_shade, caliber,
-          production_date, received_date, supplier_id, cost_price,
-          quantity_m2, quantity_remaining_m2, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        data.productId,
-        data.warehouseId,
-        data.batchNumber.trim(),
-        data.toneShade.trim(),
-        data.caliber?.trim() || '0',
-        data.productionDate || null,
-        data.receivedDate   || null,
-        data.supplierId     || null,
-        Number(data.costPrice) || 0,
-        qtyM2,
-        qtyM2,                         // remaining = total on first entry
-        data.notes?.trim()  || null,
-        actor.id,
-      ]
-    );
+    this.db.executeTransaction((db) => {
+      const duplicate = db.query<{ id: string }>(
+        `SELECT id FROM product_batches WHERE product_id = ? AND batch_number = ? AND warehouse_id = ?`,
+        [data.productId, batchNumber, data.warehouseId]
+      );
+      if (duplicate.length > 0) {
+        throw new Error(`رقم الدفعة "${batchNumber}" مسجل بالفعل لهذا الصنف في نفس المخزن.`);
+      }
+
+      const product = db.query<{
+        name: string;
+        costPrice: number | string | null;
+        metersPerBox: number | string | null;
+        productType: string;
+        baseUnit: string;
+      }>(
+        `SELECT name, cost_price AS costPrice, meters_per_box AS metersPerBox,
+                product_type AS productType, base_unit AS baseUnit
+         FROM products WHERE id = ?`,
+        [data.productId]
+      )[0];
+      if (!product) throw new Error('الصنف المحدد غير موجود.');
+      if (isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit })) {
+        throw new Error('لا يمكن تسجيل استلام مخزني لصنف خدمي.');
+      }
+
+      const unitCost = round2(data.costPrice === undefined ? Number(product.costPrice) || 0 : Number(data.costPrice));
+      db.run(
+        `INSERT INTO product_batches
+           (id, product_id, warehouse_id, batch_number, tone_shade, caliber,
+            production_date, received_date, supplier_id, cost_price,
+            quantity_m2, quantity_remaining_m2, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id, data.productId, data.warehouseId, batchNumber, data.toneShade.trim(),
+          data.caliber?.trim() || '0', data.productionDate || null, receivedDate,
+          data.supplierId || null, unitCost, qtyM2, qtyM2, data.notes?.trim() || null, actor.id,
+        ]
+      );
+
+      const metersPerBox = Number(product.metersPerBox) || 1.44;
+      const boxesCount = product.productType === 'GENERAL'
+        ? product.baseUnit === 'BOX' ? qtyM2 : 0
+        : round2(qtyM2 / metersPerBox);
+      InventoryReceiptService.post(db, {
+        productId: data.productId,
+        warehouseId: data.warehouseId,
+        quantityM2: qtyM2,
+        boxesCount,
+        unitCost,
+        transactionNumberPrefix: 'TX-BATCH',
+        referenceType: 'BATCH_RECEIPT',
+        referenceId: id,
+        sourceType: 'BATCH_RECEIPT',
+        sourceId: id,
+        actorId: actor.id,
+        notes: `استلام دفعة ${batchNumber} - ${data.notes?.trim() || ''}`.trim(),
+        date: receivedDate,
+        batchId: id,
+        supplierId: data.supplierId || null,
+      });
+    });
 
     return this.getBatchById(id)!;
   }
@@ -192,7 +241,13 @@ export class BatchService {
       notes: string;
     }>
   ): void {
-    this.requireWrite(updates.costPrice !== undefined);
+    this.requireWrite();
+    if (updates.quantityM2 !== undefined || updates.quantityRemainingM2 !== undefined) {
+      throw new Error('لا يمكن تعديل كميات الدفعة مباشرة؛ سجّل حركة مخزنية لتغيير الرصيد.');
+    }
+    if (updates.costPrice !== undefined || updates.receivedDate !== undefined || updates.supplierId !== undefined) {
+      throw new Error('لا يمكن تعديل بيانات الاستلام أو تكلفته بعد ترحيل الحركة المخزنية.');
+    }
     const existing = this.getBatchById(id);
     if (!existing) throw new Error('Batch not found in the active branch.');
     this.branchAccess.requireWarehouseAccess(existing.warehouseId, AuthService.requireAuth());
@@ -202,11 +257,6 @@ export class BatchService {
     if (updates.toneShade            !== undefined) { fields.push('tone_shade = ?');            values.push(updates.toneShade); }
     if (updates.caliber              !== undefined) { fields.push('caliber = ?');               values.push(updates.caliber); }
     if (updates.productionDate       !== undefined) { fields.push('production_date = ?');       values.push(updates.productionDate || null); }
-    if (updates.receivedDate         !== undefined) { fields.push('received_date = ?');         values.push(updates.receivedDate || null); }
-    if (updates.supplierId           !== undefined) { fields.push('supplier_id = ?');           values.push(updates.supplierId || null); }
-    if (updates.costPrice            !== undefined) { fields.push('cost_price = ?');            values.push(Number(updates.costPrice) || 0); }
-    if (updates.quantityM2           !== undefined) { fields.push('quantity_m2 = ?');           values.push(Math.max(0, Number(updates.quantityM2) || 0)); }
-    if (updates.quantityRemainingM2  !== undefined) { fields.push('quantity_remaining_m2 = ?'); values.push(Math.max(0, Number(updates.quantityRemainingM2) || 0)); }
     if (updates.notes                !== undefined) { fields.push('notes = ?');                 values.push(updates.notes?.trim() || null); }
 
     if (fields.length === 0) return;
@@ -219,6 +269,17 @@ export class BatchService {
     this.requireWrite();
     const batch = this.getBatchById(id);
     if (!batch) throw new Error('الدفعة غير موجودة.');
+    const hasInventoryHistory = this.db.query<{ id: string }>(
+      `SELECT id FROM inventory_transactions
+       WHERE reference_type = 'BATCH_RECEIPT' AND reference_id = ?
+       UNION ALL
+       SELECT id FROM inventory_cost_layers WHERE batch_id = ?
+       LIMIT 1`,
+      [id, id]
+    ).length > 0;
+    if (hasInventoryHistory) {
+      throw new Error('لا يمكن حذف دفعة لها حركة مخزنية أو طبقة تكلفة؛ استخدم حركة تسوية أو مرتجع.');
+    }
     if ((batch.quantityRemainingM2 ?? 0) > 0.001) {
       throw new Error(`لا يمكن حذف الدفعة "${batch.batchNumber}" — يوجد رصيد متبقٍ ${batch.quantityRemainingM2.toFixed(2)} م². أفرّغها أولاً.`);
     }

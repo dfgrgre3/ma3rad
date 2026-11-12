@@ -46,7 +46,7 @@ export const CartLine: React.FC<CartLineProps> = ({
   const [isPriceMenuOpen, setIsPriceMenuOpen] = useState(false);
   const lineTotal = round2(item.quantityM2 * item.unitPrice - item.discountAmount);
   const isGeneral = item.product.productType === 'GENERAL' || item.product.baseUnit === 'SERVICE';
-  const tracksStock = !isGeneral;
+  const tracksStock = Boolean(item.specialStockId) || !isGeneral;
   const sellableUnits = getSellableUnits(item.product);
   const displayPrice = round2(pricePerUnit(item.unitPrice, item.soldBy, item.product));
   const overStock = tracksStock && item.quantityM2 > item.availableStockM2 && !enableNegativeStock;
@@ -102,6 +102,11 @@ export const CartLine: React.FC<CartLineProps> = ({
           <div className="text-[10px] text-slate-500 dark:text-slate-400">
             {isGeneral ? `الوحدة الأساسية: ${getProductUnitLabel(item.product)}` : `${item.product.size} • ${gradeLabel(item.product.grade)}`} • متاح {formatProductQuantity(item.availableStockM2, item.product)}
           </div>
+          {item.specialStockId && (
+            <div className="text-[10px] font-bold text-purple-700 dark:text-purple-300">
+              بيع مخفض • مصدر {item.specialNumber}
+            </div>
+          )}
         </div>
         </div>
         <button
@@ -173,13 +178,14 @@ export const CartLine: React.FC<CartLineProps> = ({
             value={displayPrice}
             onChange={(e) => { if (e.target.value !== '') onUpdatePrice(index, Number.parseFloat(e.target.value)); }}
             aria-label={`تغيير السعر للمنتج ${item.product.name}`}
-            className="w-16 text-center font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1 text-xs text-slate-900 dark:text-slate-100"
+            readOnly={Boolean(item.specialStockId)}
+            className={`w-16 text-center font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-1 text-xs text-slate-900 dark:text-slate-100 ${item.specialStockId ? 'opacity-70 cursor-not-allowed' : ''}`}
           />
           <span className="text-[10px] text-slate-500">ج.م</span>
           <span className="text-[10px] text-slate-500">/{getCartPriceUnitLabel(item)}</span>
 
           {/* زر تثبيت / اختيار السعر إذا كان مفعلاً أكثر من سعر */}
-          {sellingPriceTiersCount > 1 && (
+          {!item.specialStockId && sellingPriceTiersCount > 1 && (
             <div className="relative inline-block">
               <button
                 type="button"

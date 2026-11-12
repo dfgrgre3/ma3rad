@@ -17,6 +17,7 @@ import { postLedgerEntry } from '../src/database/repositories/ledger.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
 import { InventoryCostingService } from '../src/services/domains/inventory/InventoryCostingService.ts';
 import { FacilityManagementService } from '../src/services/domains/operations/FacilityManagementService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -290,17 +291,38 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.ok(returnEntry, 'sales return should post to the ledger');
   assert.equal(returnEntry.totalDebit, returnEntry.totalCredit, 'sales return journal entry should balance');
 
-  db.run(
-    `DELETE FROM journal_entries WHERE reference_type='SALES_RETURN' AND reference_id=?`,
-    [return1.id]
-  );
+  const legacyReturnId = `ret_legacy_backfill_${return1.id}`;
+  const legacyReturnNumber = `RET-LEGACY-${return1.id}`;
+  db.run(`
+    INSERT INTO sales_returns (
+      id, return_number, original_invoice_id, original_invoice_number, customer_id,
+      warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason, created_by
+    )
+    SELECT ?, ?, original_invoice_id, original_invoice_number, customer_id,
+      warehouse_id, date, total_amount, refunded_amount, remaining_to_balance, reason, created_by
+    FROM sales_returns WHERE id = ?
+  `, [legacyReturnId, legacyReturnNumber, return1.id]);
+  db.run(`
+    INSERT INTO sales_return_items (
+      id, return_id, product_id, product_name, grade, quantity_m2,
+      boxes_count, unit_price, unit_cost, total_refund
+    )
+    SELECT 'sri_legacy_backfill_' || id, ?, product_id, product_name, grade,
+      quantity_m2, boxes_count, unit_price, unit_cost, total_refund
+    FROM sales_return_items WHERE return_id = ?
+  `, [legacyReturnId, return1.id]);
   db.run(`DELETE FROM schema_migrations WHERE id='025_backfill_return_ledger_entries'`);
   const migrationReport = runMigrations(db.getDatabase());
   assert.ok(migrationReport.applied.includes('025_backfill_return_ledger_entries'));
   assert.equal(
+    q('SELECT COUNT(*) AS count FROM journal_entries WHERE reference_type=? AND reference_id=?', ['SALES_RETURN', legacyReturnId])[0].count,
+    1,
+    'return backfill should create exactly one journal entry for a legacy return with no entry'
+  );
+  assert.equal(
     q('SELECT COUNT(*) AS count FROM journal_entries WHERE reference_type=? AND reference_id=?', ['SALES_RETURN', return1.id])[0].count,
     1,
-    'return backfill should restore exactly one idempotent journal entry'
+    'return backfill must preserve existing linked journal entries'
   );
 
   // --- Cash sale (paid in full) then full return ---
@@ -365,9 +387,43 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(q('SELECT current_balance FROM cash_registers WHERE id=?', ['cr_main'])[0].currentBalance, 6000, 'balance refund leaves the cash register untouched');
   assert.equal(q('SELECT current_balance FROM customers WHERE id=?', [created.id])[0].currentBalance, -6000, 'full value credited to the customer balance');
 
-  new InventoryService().adjustStock(pid, 'wh_main', 279, 'تسوية اختبار');
+  const inventory = new InventoryService();
+  inventory.adjustStock(pid, 'wh_main', 279, 'تسوية اختبار');
+  const adjustmentId = q(
+    `SELECT sa.id FROM stock_adjustments sa
+     JOIN stock_adjustment_items sai ON sai.adjustment_id = sa.id
+     WHERE sa.status = 'PENDING_APPROVAL' AND sai.product_id = ?
+     ORDER BY sa.rowid DESC LIMIT 1`,
+    [pid]
+  )[0]?.id;
+  assert.ok(adjustmentId, 'adjustStock should create a pending workflow request');
+  assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 300,
+    'creating an adjustment must not change stock before approval and posting');
+  assert.throws(() => inventory.approveAdjustment(adjustmentId), /لا يمكن لمنشئ التسوية اعتمادها/);
+
+  const adjustmentApprover: User = {
+    id: 'usr_integration_adjustment_approver',
+    username: 'integration-adjustment-approver',
+    fullName: 'Integration Adjustment Approver',
+    role: 'ADMIN',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  db.run(
+    `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active)
+     VALUES (?, ?, 'test', ?, 'ADMIN', 1)`,
+    [adjustmentApprover.id, adjustmentApprover.username, adjustmentApprover.fullName]
+  );
+  AuthService.setCurrentUser(adjustmentApprover);
+  PermissionService.invalidate(adjustmentApprover);
+  inventory.approveAdjustment(adjustmentId);
+  assert.equal(q('SELECT status FROM stock_adjustments WHERE id=?', [adjustmentId])[0].status, 'PENDING_APPROVAL',
+    'approval must not post the stock adjustment');
+  inventory.postAdjustment(adjustmentId);
   const adjustmentEntry = q(
-    `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' ORDER BY rowid DESC LIMIT 1`
+    `SELECT id FROM journal_entries WHERE reference_type='INVENTORY_ADJUSTMENT' AND reference_id=?`,
+    [adjustmentId]
   )[0];
   assert.ok(adjustmentEntry, 'inventory adjustments should post to the ledger');
   const adjustmentLines = q(

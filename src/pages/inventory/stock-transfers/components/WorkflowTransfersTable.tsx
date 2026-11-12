@@ -4,6 +4,9 @@ import type { WorkflowTransfersTableProps } from '../../../../types/inventory/st
 
 export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
   transfers,
+  canApprove,
+  canExecute,
+  canReceive,
   onViewDetails,
   onApprove,
   onReject,
@@ -63,7 +66,7 @@ export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
                   التفاصيل
                 </button>
 
-                {t.status === 'REQUESTED' && (
+                {t.status === 'REQUESTED' && canApprove && (
                   <>
                     <button
                       onClick={() => onApprove(t.id)}
@@ -80,7 +83,7 @@ export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
                   </>
                 )}
 
-                {t.status === 'APPROVED' && (
+                {t.status === 'APPROVED' && canExecute && (
                   <button
                     onClick={() => onPrepare(t.id)}
                     className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
@@ -89,7 +92,7 @@ export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
                   </button>
                 )}
 
-                {t.status === 'PREPARING' && (
+                {t.status === 'PREPARING' && canExecute && (
                   <button
                     onClick={() => onDispatch(t.id)}
                     className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold"
@@ -100,19 +103,23 @@ export const WorkflowTransfersTable: React.FC<WorkflowTransfersTableProps> = ({
 
                 {t.status === 'IN_TRANSIT' && (
                   <>
-                    <button
-                      onClick={() => onOpenReceive(t)}
-                      className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-                    >
-                      استلام البضاعة
-                    </button>
-                    <button
-                      onClick={() => onReject(t.id)}
-                      className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-bold"
-                      title="رفض وإرجاع للمصدر"
-                    >
-                      رفض
-                    </button>
+                    {canReceive && (
+                      <button
+                        onClick={() => onOpenReceive(t)}
+                        className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                      >
+                        استلام البضاعة
+                      </button>
+                    )}
+                    {canApprove && (
+                      <button
+                        onClick={() => onReject(t.id)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 text-xs font-bold"
+                        title="رفض وإرجاع للمصدر"
+                      >
+                        رفض
+                      </button>
+                    )}
                   </>
                 )}
               </div>

@@ -3,9 +3,11 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { getStockQuantityLabel } from '../../../utils/products/productUnits';
 import { branchAccess } from './branchAccess';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { CountItem, CountSession } from '../../../types/inventory/countSessions';
 
 export function saveCountDraft(activeSession: CountSession, sessionItems: CountItem[]): void {
+  ModuleRegistryService.assertModuleEnabled('inventory');
   const db = DatabaseManager.getInstance();
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.inventory.counts.count');
@@ -44,6 +46,10 @@ export function saveCountDraft(activeSession: CountSession, sessionItems: CountI
 export interface CountStockInfo {
   reservedM2: number;
   metersPerBox: number;
+  piecesPerBox: number;
+  productType: string;
+  baseUnit: string;
+  customUnit: string | null;
 }
 
 export interface CountVarianceTotals {
@@ -52,15 +58,28 @@ export interface CountVarianceTotals {
 }
 
 export function getCountStockInfo(txDb: DatabaseManager, item: CountItem, warehouseId: string): CountStockInfo {
-  const stockRow = txDb.query<{ reservedM2: number | null; metersPerBox: number | null }>(
-    `SELECT ws.reserved_m2 AS reservedM2, p.meters_per_box AS metersPerBox FROM warehouse_stock ws
-     JOIN products p ON p.id = ws.product_id
-     WHERE ws.product_id = ? AND ws.warehouse_id = ?`,
-    [item.productId, warehouseId]
-  )[0];
+  const stockRow = txDb.query<{
+    reservedM2: number | null;
+    metersPerBox: number | null;
+    piecesPerBox: number | null;
+    productType: string | null;
+    baseUnit: string | null;
+    customUnit: string | null;
+  }>(`
+    SELECT ws.reserved_m2 AS reservedM2, p.meters_per_box AS metersPerBox,
+      p.pieces_per_box AS piecesPerBox, p.product_type AS productType,
+      p.base_unit AS baseUnit, p.custom_unit AS customUnit
+    FROM products p
+    LEFT JOIN warehouse_stock ws ON ws.product_id = p.id AND ws.warehouse_id = ?
+    WHERE p.id = ?
+  `, [warehouseId, item.productId])[0];
   return {
     reservedM2: stockRow ? Number(stockRow.reservedM2 || 0) : 0,
     metersPerBox: stockRow ? Number(stockRow.metersPerBox || 1.44) : 1.44,
+    piecesPerBox: stockRow ? Number(stockRow.piecesPerBox || 0) : 0,
+    productType: stockRow?.productType || item.productType || 'CERAMIC',
+    baseUnit: stockRow?.baseUnit || item.baseUnit || 'M2',
+    customUnit: stockRow?.customUnit || item.customUnit || null,
   };
 }
 

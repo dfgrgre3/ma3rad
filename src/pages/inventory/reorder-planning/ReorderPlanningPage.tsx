@@ -56,6 +56,7 @@ export const ReorderPlanningPage: React.FC = () => {
   };
 
   useEffect(() => {
+    setSelectedProductIds(new Set());
     loadData();
   }, [selectedWarehouseId]);
 
@@ -72,6 +73,10 @@ export const ReorderPlanningPage: React.FC = () => {
 
   const toggleSelect = (productId: string) => {
     if (!canCreatePurchaseRequest) return;
+    if (!selectedWarehouseId) {
+      toast.warning('اختر مستودعاً واحداً قبل تحديد أصناف طلب الشراء.');
+      return;
+    }
     const next = new Set(selectedProductIds);
     if (next.has(productId)) next.delete(productId);
     else next.add(productId);
@@ -80,6 +85,10 @@ export const ReorderPlanningPage: React.FC = () => {
 
   const selectAllCritical = () => {
     if (!canCreatePurchaseRequest) return;
+    if (!selectedWarehouseId) {
+      toast.warning('اختر مستودعاً واحداً قبل تحديد الأصناف الحرجة.');
+      return;
+    }
     const criticalIds = items
       .filter(i => i.stockStatus === 'OUT_OF_STOCK' || i.stockStatus === 'CRITICAL' || i.stockStatus === 'REORDER_NEEDED')
       .map(i => i.productId);
@@ -113,7 +122,15 @@ export const ReorderPlanningPage: React.FC = () => {
 
   const handleCreatePurchaseRequest = () => {
     if (!canCreatePurchaseRequest) return;
-    const selectedItemsList = items.filter(i => selectedProductIds.has(i.productId) && i.suggestedOrderM2 > 0);
+    if (!selectedWarehouseId) {
+      toast.warning('اختر مستودعاً واحداً قبل إنشاء طلب الشراء.');
+      return;
+    }
+    const selectedItemsList = items.filter(i =>
+      i.warehouseId === selectedWarehouseId
+      && selectedProductIds.has(i.productId)
+      && i.suggestedOrderM2 > 0
+    );
     if (selectedItemsList.length === 0) {
       toast.warning('اختر أصنافاً بها كميات إعادة طلب مقترحة.');
       return;
@@ -122,9 +139,8 @@ export const ReorderPlanningPage: React.FC = () => {
     setCreatingPO(true);
     try {
       const prService = new PurchaseRequestService();
-      const firstWh = selectedItemsList[0].warehouseId;
       const reqId = prService.createRequest({
-        warehouseId: firstWh,
+        warehouseId: selectedWarehouseId,
         priority: 'HIGH',
         notes: `طلب شراء آلي ناتج عن لوحة التخطيط وإعادة الطلب لعدد ${selectedItemsList.length} صنف`,
         items: selectedItemsList.map(item => ({
@@ -192,9 +208,10 @@ export const ReorderPlanningPage: React.FC = () => {
           {canCreatePurchaseRequest && (
             <button
               onClick={selectAllCritical}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
+              disabled={!selectedWarehouseId}
+              className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              تحديد الأصناف الحرجة
+              {selectedWarehouseId ? 'تحديد الأصناف الحرجة' : 'اختر مستودعاً أولاً'}
             </button>
           )}
 
@@ -352,7 +369,8 @@ export const ReorderPlanningPage: React.FC = () => {
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleSelect(item.productId)}
-                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          disabled={!selectedWarehouseId}
+                          className="rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:cursor-not-allowed"
                         />
                       )}
                     </td>

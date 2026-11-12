@@ -11,6 +11,10 @@ interface Adjustment {
   reason: string;
   date: string;
   adjustedBy: string;
+  createdBy?: string;
+  approvedByName?: string | null;
+  postedByName?: string | null;
+  approvalStatus?: string | null;
   type: 'ADD' | 'SUBTRACT' | 'DAMAGE' | 'OPENING_BALANCE';
   status: string;
   totalQuantityM2: number;
@@ -48,10 +52,10 @@ interface AdjustmentModalsProps {
   setSelectedWarehouseId: (id: string) => void;
   adjType: 'ADD' | 'SUBTRACT' | 'DAMAGE';
   setAdjType: (t: 'ADD' | 'SUBTRACT' | 'DAMAGE') => void;
-  products: { id: string; name: string; sku: string; costPrice: number; metersPerBox: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM'; customUnit?: string }[];
+  products: { id: string; name: string; sku: string; costPrice: number; metersPerBox: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit?: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM'; customUnit?: string }[];
   selectedProductId: string;
   setSelectedProductId: (id: string) => void;
-  selectedProduct: { id: string; name: string; sku: string; costPrice: number; metersPerBox: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM'; customUnit?: string } | undefined;
+  selectedProduct: { id: string; name: string; sku: string; costPrice: number; metersPerBox: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit?: 'M2' | 'LINEAR_METER' | 'BOX' | 'PIECE' | 'KG' | 'TON' | 'SET' | 'CUSTOM'; customUnit?: string } | undefined;
   selectedUnit: string;
   qtyM2: number;
   setQtyM2: (n: number) => void;
@@ -104,7 +108,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
         </button>
       </div>
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs bg-white p-4 rounded-xl border border-slate-200/60">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs bg-white p-4 rounded-xl border border-slate-200/60">
           <div>
             <div className="text-slate-500 mb-0.5">المستودع</div>
             <div className="font-bold text-slate-900">{selectedAdjustment.warehouse}</div>
@@ -122,6 +126,18 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
           <div>
             <div className="text-slate-500 mb-0.5">التاريخ</div>
             <div className="font-bold text-slate-900 font-mono">{selectedAdjustment.date}</div>
+          </div>
+          <div>
+            <div className="text-slate-500 mb-0.5">منشئ الطلب</div>
+            <div className="font-bold text-slate-900">{selectedAdjustment.adjustedBy}</div>
+          </div>
+          <div>
+            <div className="text-slate-500 mb-0.5">المعتمد</div>
+            <div className="font-bold text-slate-900">{selectedAdjustment.approvedByName || 'لم يعتمد بعد'}</div>
+          </div>
+          <div>
+            <div className="text-slate-500 mb-0.5">المرحّل</div>
+            <div className="font-bold text-slate-900">{selectedAdjustment.postedByName || 'لم ترحّل بعد'}</div>
           </div>
         </div>
 
@@ -236,7 +252,7 @@ export const AdjustmentModals: React.FC<AdjustmentModalsProps> = ({
             <label className="text-xs text-slate-455 font-bold block">الكمية ({selectedUnit})</label>
             <input
               type="number"
-              step={selectedProduct?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(selectedProduct.baseUnit) ? 1 : 0.01}
+              step={selectedProduct?.productType === 'GENERAL' && ['BOX', 'PIECE', 'SET'].includes(selectedProduct.baseUnit ?? '') ? 1 : 0.01}
               min="0.01"
               value={qtyM2 || ''}
               onChange={(e) => setQtyM2(Number.parseFloat(e.target.value) || 0)}

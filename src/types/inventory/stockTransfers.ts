@@ -34,6 +34,7 @@ export interface WarehouseSummaryGroup {
 
 export interface StockTransfersHeaderProps {
   loading: boolean;
+  canCreateTransfer: boolean;
   onCreateTransfer: () => void;
   onRefresh: () => void;
 }
@@ -49,6 +50,9 @@ export interface StockTransfersTabsProps {
 
 export interface WorkflowTransfersTableProps {
   transfers: any[];
+  canApprove: boolean;
+  canExecute: boolean;
+  canReceive: boolean;
   onViewDetails: (trf: any) => void;
   onApprove: (trfId: string) => void;
   onReject: (trfId: string) => void;

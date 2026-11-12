@@ -1,3 +1,3 @@
-import { InventoryServicePart13 } from './InventoryServicePart13';
+import { InventoryServicePart14 } from './InventoryServicePart14';
 
-export class InventoryService extends InventoryServicePart13 {}
+export class InventoryService extends InventoryServicePart14 {}

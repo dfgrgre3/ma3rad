@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
@@ -15,6 +16,8 @@ const money = (value: number) => new Intl.NumberFormat('ar-EG', { style: 'curren
 const branchAccess = new BranchAccessService();
 
 export const SalesAnalyticsPage: React.FC = () => {
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
   const can = usePermission();
   // الصفحة تُدمج داخل لوحة المعلومات، لذا تفحص صلاحيتها بنفسها لا صلاحية المسار الأب.
   const canView = can('sales.analytics.view') || can('sales.view');
@@ -22,6 +25,12 @@ export const SalesAnalyticsPage: React.FC = () => {
   const db = DatabaseManager.getInstance();
   const [period, setPeriod] = useState<'today' | '7days' | '30days' | 'all'>('30days');
   const [refresh, setRefresh] = useState(0);
+
+  useEffect(() => {
+    if (!refreshCtx) return;
+    if (initialRef.current) { initialRef.current = false; return; }
+    setRefresh((x) => x + 1);
+  }, [refreshCtx?.refreshToken]);
   const range = useMemo(() => {
     const to = new Date();
     const from = new Date(to);

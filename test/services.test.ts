@@ -662,6 +662,9 @@ test('financial statements use posted ledger balances as of the requested date',
 
 test('commissions and stock reservations lifecycle', async () => {
   const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
   const customer = q(`SELECT id FROM customers WHERE phone = '0111111111'`)[0];
 
   db.run(
@@ -743,6 +746,32 @@ test('commissions and stock reservations lifecycle', async () => {
   const consumed = reservations.getAvailability('prod_stmt_1', 'wh_main');
   assert.equal(consumed.onHand, before.onHand - 5);
   assert.equal(consumed.reserved, before.reserved);
+  const consumedMovement = q(
+    `SELECT id, quantity_m2 AS quantity, unit_cost AS unitCost, total_cost AS totalCost
+     FROM inventory_transactions WHERE reference_type = 'RESERVATION' AND reference_id = ?`,
+    [second.id]
+  )[0];
+  assert.equal(Number(consumedMovement.quantity), -5, 'reservation consumption must be an outbound movement');
+  assert.equal(Number(consumedMovement.totalCost), 500);
+  const consumptionLedger = q(
+    `SELECT coa.code AS code, jel.debit AS debit, jel.credit AS credit
+     FROM journal_entries je
+     JOIN journal_entry_lines jel ON jel.entry_id = je.id
+     JOIN chart_of_accounts coa ON coa.id = jel.account_id
+     WHERE je.reference_type = 'RESERVATION_CONSUMPTION' AND je.reference_id = ?`,
+    [consumedMovement.id]
+  );
+  assert.equal(consumptionLedger.find((line: any) => line.code === '5101')?.debit, 500);
+  assert.equal(consumptionLedger.find((line: any) => line.code === '1104')?.credit, 500);
+
+  const overdue = reservations.createReservation({
+    productId: 'prod_stmt_1', warehouseId: 'wh_main', quantityM2: 3,
+    expiresAt: '2000-01-01T00:00:00.000Z',
+  });
+  const expiration = reservations.expireOverdue();
+  assert.ok(expiration.released >= 1);
+  assert.equal(q(`SELECT status FROM stock_reservations WHERE id = ?`, [overdue.id])[0].status, 'EXPIRED');
+  assert.equal(reservations.getAvailability('prod_stmt_1', 'wh_main').reserved, before.reserved);
 });
 
 test('approved credit-limit request updates the customer automatically', async () => {

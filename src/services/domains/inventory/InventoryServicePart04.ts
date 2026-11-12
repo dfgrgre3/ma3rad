@@ -12,7 +12,12 @@ import { InventoryServicePart03 } from './InventoryServicePart03';
 export class InventoryServicePart04 extends InventoryServicePart03 {
 public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string): any[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.inventory.hub.transfer');
+    PermissionService.requireAny(actor, [
+      'inventory.transfer',
+      'inventory.transfer.workflow.approve',
+      'inventory.transfer.execute',
+      'inventory.transfer.receive',
+    ]);
     if (warehouseId) this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
     const fromScope = this.branchAccess.sqlScope(
       'w_out.branch_id',
@@ -92,7 +97,12 @@ public getTransfersList(dateFrom?: string, dateTo?: string, warehouseId?: string
 
 public getTransferSummaryByWarehouse(): { warehouseId: string; warehouseName: string; unitLabel: string; totalIn: number; totalOut: number }[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.inventory.hub.transfer');
+    PermissionService.requireAny(actor, [
+      'inventory.transfer',
+      'inventory.transfer.workflow.approve',
+      'inventory.transfer.execute',
+      'inventory.transfer.receive',
+    ]);
     const scope = this.branchAccess.sqlScope(
       'w.branch_id',
       '(SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = w.id ORDER BY bw.is_primary DESC, bw.branch_id LIMIT 1)',

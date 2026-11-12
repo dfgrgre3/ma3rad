@@ -44,19 +44,17 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
       setProducts(productService.getAllProducts());
       setStock(inventoryService.getWarehouseStock());
 
-      const showroom = nextWarehouses.find((warehouse) => /معرض|صالة العرض/i.test(warehouse.name));
-      const store = nextWarehouses.find((warehouse) =>
-        warehouse.id !== showroom?.id && /مخزن|مستودع/i.test(warehouse.name)
-      );
+      const showrooms = nextWarehouses.filter((warehouse) => warehouse.warehouseType === 'SHOWROOM');
+      const stores = nextWarehouses.filter((warehouse) => warehouse.warehouseType !== 'SHOWROOM');
       setShowroomWarehouseId((current) =>
-        nextWarehouses.some((warehouse) => warehouse.id === current)
+        showrooms.some((warehouse) => warehouse.id === current)
           ? current
-          : showroom?.id || nextWarehouses[0]?.id || ''
+          : showrooms[0]?.id || ''
       );
       setStoreWarehouseId((current) =>
-        nextWarehouses.some((warehouse) => warehouse.id === current)
+        stores.some((warehouse) => warehouse.id === current)
           ? current
-          : store?.id || nextWarehouses.find((warehouse) => warehouse.id !== (showroom?.id || nextWarehouses[0]?.id))?.id || ''
+          : stores[0]?.id || ''
       );
       setSelectedWarehouseId((current) =>
         current === '' || nextWarehouses.some((warehouse) => warehouse.id === current) ? current : ''
@@ -92,6 +90,8 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
       searchableProductIds.has(row.productId)
     );
   }, [searchableProducts, selectedWarehouseId, stock, warehouses]);
+  const showroomWarehouses = warehouses.filter((warehouse) => warehouse.warehouseType === 'SHOWROOM');
+  const storeWarehouses = warehouses.filter((warehouse) => warehouse.warehouseType !== 'SHOWROOM');
 
   const comparisonItems = useMemo(() => {
     const showroomStock = new Map(
@@ -194,7 +194,7 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold"
               >
                 <option value="">اختر مخزن المعرض</option>
-                {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                {showroomWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
               </select>
             </label>
             <label className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export const LocationStockPage: React.FC<LocationStockPageProps> = ({ mode }) =>
                 className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold"
               >
                 <option value="">اختر المخزن</option>
-                {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                {storeWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
               </select>
             </label>
             <label className="flex items-center gap-2">

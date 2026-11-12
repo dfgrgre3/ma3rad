@@ -1,11 +1,14 @@
 import './integration.setup.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import { runMigrations } from '../src/database/migrations/index.ts';
 import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
+import { BatchService } from '../src/services/domains/inventory/BatchService.ts';
+import type { User } from '../src/types/auth/identity.ts';
 import { approveCountSession, cancelCountSession, rejectCountSession, startCountSession, submitCountSession } from '../src/services/domains/inventory-count/countSessionService.ts';
 import { loadBranchCountSessions, loadCountSessionItems } from '../src/services/domains/inventory-count/countSessionData.ts';
 
@@ -148,6 +151,36 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
 
   // Place stock in location
   inventoryService.assignProductLocation(locId, prodId, 50);
+  const secondLocation = inventoryService.createWarehouseLocation({
+    warehouseId: whSource, zone: 'B', aisle: '01', shelf: '01', bin: 'A',
+    barcode: 'LOC-SRC-B-01-01-A', maxCapacityM2: 500,
+  });
+  const smallCapacityLocation = inventoryService.createWarehouseLocation({
+    warehouseId: whSource, zone: 'C', aisle: '01', shelf: '01', bin: 'A',
+    barcode: 'LOC-SRC-C-01-01-A', maxCapacityM2: 20,
+  });
+  assert.throws(
+    () => inventoryService.assignProductLocation(secondLocation.id, prodId, 51),
+    /يتجاوز رصيد المستودع/
+  );
+  assert.throws(
+    () => inventoryService.assignProductLocation(smallCapacityLocation.id, prodId, 21),
+    /سعة الموقع/
+  );
+  assert.equal(queryOne<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM warehouse_location_movements WHERE product_id = ?`, [prodId]
+  )?.count, 1, 'rejected assignments must not create movement history');
+  inventoryService.assignProductLocation(locId, prodId, 40);
+  inventoryService.assignProductLocation(locId, prodId, 50);
+  const locationMovements = db.query<{ movementType: string; fromLocationId: string | null; toLocationId: string | null; quantityM2: number }>(`
+    SELECT movement_type AS movementType, from_location_id AS fromLocationId,
+      to_location_id AS toLocationId, quantity_m2 AS quantityM2
+    FROM warehouse_location_movements WHERE product_id = ? ORDER BY rowid
+  `, [prodId]);
+  assert.deepEqual(locationMovements.map((movement) => movement.movementType), ['ASSIGN', 'RELEASE', 'ASSIGN']);
+  assert.equal(locationMovements[0].toLocationId, locId);
+  assert.equal(locationMovements[1].fromLocationId, locId);
+  assert.equal(locationMovements[2].quantityM2, 10);
   const locStock = inventoryService.getLocationProducts(locId);
   assert.equal(locStock.length, 1);
   assert.equal(locStock[0].quantityM2, 50);
@@ -168,7 +201,25 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   let xfer = queryOne<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId]);
   assert.equal(xfer?.status, 'REQUESTED');
 
-  // Step B: Approve
+  const transferApprover: User = {
+    id: 'usr_inv_transfer_approver',
+    username: 'inventory-transfer-approver',
+    fullName: 'Inventory Transfer Approver',
+    role: 'ADMIN',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  db.run(
+    `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active)
+     VALUES (?, ?, 'test', ?, 'ADMIN', 1)`,
+    [transferApprover.id, transferApprover.username, transferApprover.fullName]
+  );
+  assert.throws(() => inventoryService.approveTransfer(transferId), /لا يمكن لمنشئ طلب التحويل اعتماده/);
+
+  // Step B: A different administrator approves
+  AuthService.setCurrentUser(transferApprover);
+  PermissionService.invalidate(transferApprover);
   inventoryService.approveTransfer(transferId);
   xfer = queryOne<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId]);
   assert.equal(xfer?.status, 'APPROVED');
@@ -350,11 +401,44 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // 7. Reorder Planning Engine
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const salesCustomerId = queryOne<{ id: string }>('SELECT id FROM customers ORDER BY id LIMIT 1')?.id;
+  assert.ok(salesCustomerId, 'sales history fixture requires a customer');
+  db.run(`
+    INSERT INTO sales_invoices (
+      id, invoice_number, date, customer_id, warehouse_id, subtotal, total_amount,
+      paid_amount, remaining_amount, payment_type, payment_status, invoice_status, created_by
+    ) VALUES
+      ('inv_reorder_sale', 'INV-REORDER-SALE', date('now'), ?, ?, 60, 60, 60, 0, 'CASH', 'PAID', 'COMPLETED', ?),
+      ('inv_reorder_void', 'INV-REORDER-VOID', date('now'), ?, ?, 1000, 1000, 1000, 0, 'CASH', 'PAID', 'VOID', ?)
+  `, [salesCustomerId, whSource, adminId, salesCustomerId, whSource, adminId]);
+  db.run(`
+    INSERT INTO sales_invoice_items (
+      id, invoice_id, product_id, product_name, product_sku, product_grade, size, sold_by,
+      quantity_m2, boxes_count, pieces_count, unit_price, original_unit_price, unit_cost,
+      discount_amount, total_price, total_cost, profit, meters_per_box, pieces_per_box
+    ) VALUES
+      ('sii_reorder_sale', 'inv_reorder_sale', ?, 'Reorder sale product', 'SKU-INV-TILE', 'GRADE_1', '120x60', 'M2', 60, 42, 0, 1, 1, 0, 0, 60, 0, 60, 1.44, 2),
+      ('sii_reorder_void', 'inv_reorder_void', ?, 'Reorder sale product', 'SKU-INV-TILE', 'GRADE_1', '120x60', 'M2', 1000, 695, 0, 1, 1, 0, 0, 1000, 0, 1000, 1.44, 2)
+  `, [prodId, prodId]);
+  db.run(`
+    INSERT INTO sales_returns (
+      id, return_number, original_invoice_id, original_invoice_number, customer_id,
+      warehouse_id, date, total_amount, reason, created_by
+    ) VALUES ('ret_reorder_sale', 'RET-REORDER-SALE', 'inv_reorder_sale', 'INV-REORDER-SALE', ?, ?, date('now'), 10, 'Reorder net sales test', ?)
+  `, [salesCustomerId, whSource, adminId]);
+  db.run(`
+    INSERT INTO sales_return_items (
+      id, return_id, product_id, product_name, grade, quantity_m2,
+      boxes_count, unit_price, unit_cost, total_refund
+    ) VALUES ('sri_reorder_sale', 'ret_reorder_sale', ?, 'Reorder sale product', 'GRADE_1', 10, 7, 1, 0, 10)
+  `, [prodId]);
   const reorderPlans = inventoryService.getReorderPlanning(whSource);
   const plan = reorderPlans.find((p: any) => p.productId === prodId);
   assert.ok(plan, 'Reorder plan for product must be calculated');
   assert.equal(plan.reorderPoint, 60);
   assert.equal(plan.safetyStock, 20);
+  assert.equal(plan.salesPast60Days, 50, 'void sales are excluded and returns reduce recent consumption');
+  assert.equal(plan.dailySalesRate, 0.83, 'daily velocity uses net sales quantity');
   // Source stock is now ~65 m2 and reorder point is 60 m2; since stock > reorder, it may not flag.
   // Reduce stock to ensure it's below reorder point for testing
   db.run(`UPDATE warehouse_stock SET quantity_m2 = 50 WHERE warehouse_id = ? AND product_id = ?`, [whSource, prodId]);
@@ -392,18 +476,117 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
 
   // 9. Stocktake review requires a different authorized reviewer.
   new AuthService().createUser({ username: 'inventory_reviewer_test', password: 'Reviewer-pass-123!', fullName: 'Inventory Reviewer', role: 'MANAGER' });
-  startCountSession({ warehouseId: whSource, countType: 'PARTIAL', selectedProductIds: [prodId], isBlindCount: false, notes: 'approval workflow test' });
+  const pieceProductId = 'prod_inv_prof_general_piece';
+  const weightProductId = 'prod_inv_prof_general_kg';
+  db.run(`
+    INSERT OR IGNORE INTO products (
+      id, sku, barcode, name, category_id, brand_id, product_type, base_unit, custom_unit,
+      grade, size, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2,
+      wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active
+    ) VALUES
+      (?, 'SKU-INV-PIECE', 'BAR-INV-PIECE', 'منتج عام بالقطعة', 'cat_tiles_inv', 'br_royale_inv',
+       'GENERAL', 'PIECE', '', 'GENERAL', '', 'PIECE', 6, 1.44, 5, 10, 8, 7, 0, 1),
+      (?, 'SKU-INV-KG', 'BAR-INV-KG', 'منتج عام بالكيلوجرام', 'cat_tiles_inv', 'br_royale_inv',
+       'GENERAL', 'KG', '', 'GENERAL', '', 'KG', 4, 1.44, 5, 10, 8, 7, 0, 1)
+  `, [pieceProductId, weightProductId]);
+  db.run(`
+    INSERT OR IGNORE INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+    VALUES ('stk_inv_piece_count', ?, ?, 24, 0), ('stk_inv_kg_count', ?, ?, 30, 0)
+  `, [whSource, pieceProductId, whSource, weightProductId]);
+  startCountSession({
+    warehouseId: whSource,
+    countType: 'PARTIAL',
+    selectedProductIds: [prodId, pieceProductId, weightProductId],
+    isBlindCount: false,
+    notes: 'approval workflow test',
+  });
   const reviewSession = loadBranchCountSessions().find((session) => session.warehouseId === whSource && session.status === 'COUNTING');
   assert.ok(reviewSession, 'Count session should be created');
   const reviewItems = loadCountSessionItems(reviewSession!);
-  reviewItems[0].countedQuantityM2 = reviewItems[0].systemQuantityM2;
+  const ceramicItem = reviewItems.find((item) => item.productId === prodId)!;
+  const pieceItem = reviewItems.find((item) => item.productId === pieceProductId)!;
+  const weightItem = reviewItems.find((item) => item.productId === weightProductId)!;
+  ceramicItem.countedQuantityM2 = ceramicItem.systemQuantityM2 + 2.88;
+  ceramicItem.discrepancyReason = 'OTHER';
+  pieceItem.countedQuantityM2 = pieceItem.systemQuantityM2 + 12;
+  pieceItem.discrepancyReason = 'OTHER';
+  weightItem.countedQuantityM2 = weightItem.systemQuantityM2 + 3.6;
+  weightItem.discrepancyReason = 'OTHER';
   submitCountSession(reviewSession!, reviewItems);
   assert.equal(queryOne<{ status: string }>('SELECT status FROM stock_counts WHERE id = ?', [reviewSession!.id])?.status, 'REVIEW');
   assert.throws(() => approveCountSession(reviewSession!), 'Creator cannot approve their own count');
+  const priorCountCostingMethod = queryOne<{ value: string }>(
+    `SELECT value FROM system_settings WHERE key = 'costingMethod'`
+  )?.value;
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'FIFO')`);
   AuthService.login('inventory_reviewer_test', 'Reviewer-pass-123!');
-  approveCountSession(reviewSession!);
+  try {
+    approveCountSession(reviewSession!);
+  } finally {
+    if (priorCountCostingMethod === undefined) {
+      db.run(`DELETE FROM system_settings WHERE key = 'costingMethod'`);
+    } else {
+      db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', ?)`, [priorCountCostingMethod]);
+    }
+  }
   assert.equal(queryOne<{ status: string; approvalStatus: string }>('SELECT status, approval_status AS approvalStatus FROM stock_counts WHERE id = ?', [reviewSession!.id])?.status, 'POSTED');
   assert.equal(queryOne<{ approvalStatus: string }>('SELECT approval_status AS approvalStatus FROM stock_counts WHERE id = ?', [reviewSession!.id])?.approvalStatus, 'APPROVED');
+  const countBoxRows = db.query<{ transactionId: string; productId: string; boxesCount: number }>(`
+    SELECT id AS transactionId, product_id AS productId, boxes_count AS boxesCount
+    FROM inventory_transactions WHERE reference_type = 'STOCK_COUNT' AND reference_id = ?
+  `, [reviewSession!.id]);
+  const boxesByProduct = new Map(countBoxRows.map((row) => [row.productId, row.boxesCount]));
+  assert.equal(boxesByProduct.get(prodId), 2, 'ceramic variance converts from m² using meters per box');
+  assert.equal(boxesByProduct.get(pieceProductId), 2, 'piece variance converts using pieces per box');
+  assert.equal(boxesByProduct.get(weightProductId), 0, 'kilogram products without a box conversion keep boxes at zero');
+  const countCostLayers = db.query<{ productId: string; transactionId: string }>(`
+    SELECT product_id AS productId, source_transaction_id AS transactionId
+    FROM inventory_cost_layers
+    WHERE source_type = 'STOCK_COUNT_GAIN' AND source_id = ?
+  `, [reviewSession!.id]);
+  assert.deepEqual(
+    countCostLayers.map((layer) => layer.productId).sort(),
+    [prodId, pieceProductId, weightProductId].sort(),
+    'count gains must create FIFO cost layers for ceramic and general products'
+  );
+  assert.ok(countCostLayers.every((layer) => countBoxRows.some((transaction) => transaction.transactionId === layer.transactionId)));
+  assert.equal(queryOne<{ quantity: number }>(
+    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [whDest, prodId]
+  )?.quantity, 27, 'count posting must not alter stock in another warehouse');
+
+  db.run('UPDATE warehouse_stock SET reserved_m2 = 10 WHERE warehouse_id = ? AND product_id = ?', [whSource, prodId]);
+  const sourceBeforeReservedCount = queryOne<{ quantity: number }>(
+    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [whSource, prodId]
+  )?.quantity;
+  startCountSession({
+    warehouseId: whSource,
+    countType: 'PARTIAL',
+    selectedProductIds: [prodId],
+    isBlindCount: false,
+    notes: 'reserved stock count test',
+  });
+  const reservedSessionId = queryOne<{ id: string }>(
+    'SELECT id FROM stock_counts WHERE notes = ? ORDER BY rowid DESC LIMIT 1',
+    ['reserved stock count test']
+  )?.id;
+  const reservedSession = loadBranchCountSessions().find((session) => session.id === reservedSessionId);
+  assert.ok(reservedSession, 'Reserved stock count session should be created');
+  const reservedItems = loadCountSessionItems(reservedSession!);
+  reservedItems[0].countedQuantityM2 = 9;
+  reservedItems[0].discrepancyReason = 'OTHER';
+  submitCountSession(reservedSession!, reservedItems);
+  AuthService.setCurrentUser(transferApprover);
+  PermissionService.invalidate(transferApprover);
+  assert.throws(() => approveCountSession(reservedSession!), /أقل من الكمية المحجوزة/);
+  assert.equal(queryOne<{ quantity: number }>(
+    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [whSource, prodId]
+  )?.quantity, sourceBeforeReservedCount, 'a count below reserved stock must not post');
+  rejectCountSession(reservedSession!, 'Reserved quantity must be released or recounted');
+  db.run('UPDATE warehouse_stock SET reserved_m2 = 0 WHERE warehouse_id = ? AND product_id = ?', [whSource, prodId]);
+
   startCountSession({ warehouseId: whSource, countType: 'PARTIAL', selectedProductIds: [prodId], isBlindCount: false, notes: 'rejection workflow test' });
   const rejectedSession = loadBranchCountSessions().find((session) => session.warehouseId === whSource && session.status === 'COUNTING');
   assert.ok(rejectedSession, 'Second count session should be created');
@@ -438,13 +621,191 @@ test('5.4: Inventory & Warehouse Professional Lifecycle', async () => {
     cancelCountSession(session!);
   }
 
+  const countItemsBeforeMigration = queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM stock_count_items')?.count;
   db.run("DELETE FROM schema_migrations WHERE id = '107_inventory_count_type_options'");
   const migrationReport = runMigrations(db.getDatabase());
   assert.ok(migrationReport.applied.includes('107_inventory_count_type_options'));
   assert.equal(
     queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM stock_count_items')?.count,
-    queryOne<{ count: number }>('SELECT COUNT(*) AS count FROM stock_counts')?.count,
+    countItemsBeforeMigration,
     'the count table rebuild must preserve count items and their parent references'
   );
   assert.deepEqual(db.getDatabase().exec('PRAGMA foreign_key_check')[0]?.values ?? [], []);
+});
+
+test('inventory adjustments require independent approval before stock and ledger posting', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const suffix = randomUUID().replace(/-/g, '');
+  const warehouseId = `wh_adjust_${suffix}`;
+  const productId = `prod_adjust_${suffix}`;
+  const categoryId = `cat_adjust_${suffix}`;
+  const brandId = `brand_adjust_${suffix}`;
+  db.run(`INSERT INTO warehouses (id, code, name, branch_id, is_active) VALUES (?, ?, ?, 'br_main', 1)`,
+    [warehouseId, `WH-ADJ-${suffix}`, 'Adjustment workflow test warehouse']);
+  db.run('INSERT INTO categories (id, name) VALUES (?, ?)', [categoryId, `Adjustment workflow ${suffix}`]);
+  db.run('INSERT INTO brands (id, name) VALUES (?, ?)', [brandId, `Adjustment workflow ${suffix}`]);
+  db.run(`INSERT INTO products (
+    id, sku, barcode, name, category_id, brand_id, product_type, base_unit, custom_unit,
+    grade, size, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2,
+    wholesale_price_m2, min_selling_price_m2, min_stock_level, is_active
+  ) VALUES (?, ?, ?, ?, ?, ?, 'GENERAL', 'BOX', '', 'GENERAL', '', 'BOX', 1, 1, 5, 10, 8, 7, 0, 1)`, [
+    productId, `SKU-ADJ-${suffix}`, `BAR-ADJ-${suffix}`, 'Adjustment workflow box product', categoryId, brandId,
+  ]);
+  db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+    VALUES (?, ?, ?, 10, 0)`, [`stk_adjust_${suffix}`, warehouseId, productId]);
+
+  const inventory = new InventoryService();
+  inventory.adjustStock(productId, warehouseId, 12, 'Adjustment lifecycle test');
+  const adjustment = queryOne<{
+    id: string;
+    status: string;
+    approvalStatus: string;
+    createdBy: string;
+  }>(`
+    SELECT sa.id, sa.status, sa.approval_status AS approvalStatus, sa.created_by AS createdBy
+    FROM stock_adjustments sa
+    JOIN stock_adjustment_items sai ON sai.adjustment_id = sa.id
+    WHERE sa.warehouse_id = ? AND sai.product_id = ?
+    ORDER BY sa.rowid DESC LIMIT 1
+  `, [warehouseId, productId]);
+  assert.ok(adjustment);
+  assert.equal(adjustment!.status, 'PENDING_APPROVAL');
+  assert.equal(adjustment!.approvalStatus, 'PENDING');
+  assert.equal(queryOne<{ quantity: number }>(
+    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [warehouseId, productId]
+  )?.quantity, 10, 'requesting an adjustment must not move stock');
+  assert.throws(() => inventory.approveAdjustment(adjustment!.id), /لا يمكن لمنشئ التسوية اعتمادها/);
+
+  const approver: User = {
+    id: `usr_adjust_approver_${suffix}`,
+    username: `adjust-approver-${suffix}`,
+    fullName: 'Adjustment Approver',
+    role: 'ADMIN',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  db.run(`INSERT INTO users (id, username, password_hash, full_name, role, is_active)
+    VALUES (?, ?, 'test', ?, 'ADMIN', 1)`, [approver.id, approver.username, approver.fullName]);
+  AuthService.setCurrentUser(approver);
+  PermissionService.invalidate(approver);
+  inventory.approveAdjustment(adjustment!.id);
+  assert.equal(queryOne<{ status: string }>(
+    'SELECT status FROM stock_adjustments WHERE id = ?', [adjustment!.id]
+  )?.status, 'PENDING_APPROVAL');
+  assert.equal(queryOne<{ quantity: number }>(
+    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [warehouseId, productId]
+  )?.quantity, 10, 'approval alone must not post the adjustment');
+
+  inventory.postAdjustment(adjustment!.id);
+  const posted = queryOne<{
+    status: string;
+    approvalStatus: string;
+    createdBy: string;
+    approvedBy: string;
+    postedBy: string;
+    totalValue: number;
+  }>(`
+    SELECT status, approval_status AS approvalStatus, created_by AS createdBy,
+      approved_by AS approvedBy, posted_by AS postedBy, total_value AS totalValue
+    FROM stock_adjustments WHERE id = ?
+  `, [adjustment!.id]);
+  assert.deepEqual(posted, {
+    status: 'POSTED',
+    approvalStatus: 'APPROVED',
+    createdBy: adjustment!.createdBy,
+    approvedBy: approver.id,
+    postedBy: approver.id,
+    totalValue: 10,
+  });
+  assert.equal(queryOne<{ quantity: number }>(
+    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+    [warehouseId, productId]
+  )?.quantity, 12);
+  const transaction = queryOne<{ type: string; boxesCount: number; performedBy: string; totalCost: number }>(`
+    SELECT type, boxes_count AS boxesCount, performed_by AS performedBy, total_cost AS totalCost
+    FROM inventory_transactions WHERE reference_type = 'ADJUSTMENT' AND reference_id = ?
+  `, [adjustment!.id]);
+  assert.deepEqual(transaction, {
+    type: 'ADJUSTMENT_ADD',
+    boxesCount: 2,
+    performedBy: approver.id,
+    totalCost: 10,
+  }, 'general-product quantities, movement actor and cost must be recorded correctly');
+  assert.ok(queryOne<{ id: string }>(
+    `SELECT id FROM journal_entries WHERE reference_type = 'INVENTORY_ADJUSTMENT' AND reference_id = ?`,
+    [adjustment!.id]
+  ), 'posting an adjustment must create its accounting entry');
+  assert.deepEqual(
+    db.query<{ action: string; userId: string }>(
+      `SELECT action, user_id AS userId FROM audit_logs
+       WHERE module = 'INVENTORY_ADJUSTMENT' AND record_id = ? ORDER BY rowid`,
+      [adjustment!.id]
+    ),
+    [
+      { action: 'CREATE', userId: adjustment!.createdBy },
+      { action: 'APPROVE', userId: approver.id },
+      { action: 'POST', userId: approver.id },
+    ]
+  );
+});
+
+test('batch receipt posts stock movement and FIFO layer atomically', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  await PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+
+  const suffix = randomUUID().replace(/-/g, '');
+  const warehouseId = `wh_batch_${suffix}`;
+  const productId = `prod_batch_${suffix}`;
+  const categoryId = `cat_batch_${suffix}`;
+  const brandId = `brand_batch_${suffix}`;
+  db.run(`INSERT INTO warehouses (id, code, name, branch_id, is_active) VALUES (?, ?, ?, 'br_main', 1)`,
+    [warehouseId, `WH-BATCH-${suffix}`, 'Batch receipt test warehouse']);
+  db.run(`INSERT INTO categories (id, name) VALUES (?, ?)`, [categoryId, `Batch receipt test ${suffix}`]);
+  db.run(`INSERT INTO brands (id, name) VALUES (?, ?)`, [brandId, `Batch receipt test ${suffix}`]);
+  db.run(`INSERT INTO products (
+    id, sku, barcode, name, category_id, brand_id, grade, size, base_unit, sell_unit,
+    pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
+    min_selling_price_m2, min_stock_level, is_active
+  ) VALUES (?, ?, ?, ?, ?, ?, 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 8, 20, 15, 10, 1, 1)`, [
+    productId, `SKU-BATCH-${suffix}`, `BAR-BATCH-${suffix}`, 'Batch receipt test product', categoryId, brandId,
+  ]);
+
+  const batchService = new BatchService();
+  const batch = batchService.createBatch({
+    productId, warehouseId, batchNumber: `LOT-${suffix}`, toneShade: 'A12',
+    quantityM2: 7.25, costPrice: 12.5,
+  });
+  assert.equal(batch.quantityM2, 7.25);
+  assert.equal(batch.quantityRemainingM2, 7.25);
+  assert.equal(queryOne<{ quantity: number }>(
+    'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?',
+    [productId, warehouseId]
+  )?.quantity, 7.25);
+
+  const movement = queryOne<{ id: string; type: string; quantity: number; referenceId: string }>(`
+    SELECT id, type, quantity_m2 AS quantity, reference_id AS referenceId
+    FROM inventory_transactions WHERE reference_type = 'BATCH_RECEIPT' AND reference_id = ?
+  `, [batch.id]);
+  assert.deepEqual(movement && { type: movement.type, quantity: movement.quantity, referenceId: movement.referenceId }, {
+    type: 'PURCHASE', quantity: 7.25, referenceId: batch.id,
+  });
+  const layer = queryOne<{ quantity: number; unitCost: number; transactionId: string }>(`
+    SELECT quantity_remaining AS quantity, unit_cost AS unitCost, source_transaction_id AS transactionId
+    FROM inventory_cost_layers WHERE batch_id = ?
+  `, [batch.id]);
+  assert.deepEqual(layer, { quantity: 7.25, unitCost: 12.5, transactionId: movement?.id });
+
+  assert.throws(() => batchService.updateBatch(batch.id, { quantityM2: 20 }), /حركة مخزنية/);
+  assert.throws(() => batchService.updateBatch(batch.id, { quantityRemainingM2: 20 }), /حركة مخزنية/);
+  assert.throws(() => batchService.updateBatch(batch.id, { costPrice: 20 }), /بيانات الاستلام أو تكلفته/);
+  assert.throws(() => batchService.deleteBatch(batch.id), /لها حركة مخزنية أو طبقة تكلفة/);
 });

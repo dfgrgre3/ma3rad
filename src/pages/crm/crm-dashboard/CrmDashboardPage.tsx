@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
   Users, TrendingUp, Target, Phone, Activity, Calendar, Award, AlertCircle,
   ArrowUpRight, Clock, MessageSquare, Loader2, RefreshCw, Filter, BarChart3,
@@ -318,6 +319,8 @@ function RecentLeadsList({ leads }: { leads: Lead[] }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export const CrmDashboardPage: React.FC = () => {
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
   const service = useMemo(() => new CrmService(), []);
   const navigate = useNavigate();
   const [stats, setStats] = useState<CrmStats | null>(null);
@@ -338,6 +341,12 @@ export const CrmDashboardPage: React.FC = () => {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!refreshCtx) return;
+    if (initialRef.current) { initialRef.current = false; return; }
+    load();
+  }, [refreshCtx?.refreshToken, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

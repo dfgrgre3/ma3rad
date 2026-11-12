@@ -13,7 +13,12 @@ import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncServi
 export class InventoryServicePart08 extends InventoryServicePart07 {
 public getTransferItems(transferId: string): any[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.inventory.hub.transfer');
+  PermissionService.requireAny(actor, [
+    'inventory.transfer',
+    'inventory.transfer.workflow.approve',
+    'inventory.transfer.execute',
+    'inventory.transfer.receive',
+  ]);
     this.requireTransferWarehouseAuthorization(transferId, actor);
     return this.db.query<any>(`
       SELECT 
@@ -50,7 +55,7 @@ public createTransferRequest(input: {
   }): string {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.inventory.hub.transfer');
+    PermissionService.require(actor, 'inventory.transfer');
 
     if (input.fromWarehouseId === input.toWarehouseId) {
       throw new Error('لا يمكن التحويل لنفس المخزن.');
@@ -143,24 +148,36 @@ public createTransferRequest(input: {
 public approveTransfer(transferId: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.inventory.hub.transfer');
+  PermissionService.require(actor, 'inventory.transfer.workflow.approve');
 
-    const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
-    if (!transfer) throw new Error('طلب التحويل غير موجود.');
-    this.requireTransferWarehouseAuthorization(transferId, actor);
-    if (transfer.status !== 'REQUESTED') throw new Error('لا يمكن اعتماد تحويل ليس في حالة الطلب.');
+  const transfer = this.db.query<{ status: string; createdBy: string }>(
+    `SELECT status, created_by AS createdBy FROM stock_transfers WHERE id = ?`,
+    [transferId]
+  )[0];
+  if (!transfer) throw new Error('طلب التحويل غير موجود.');
+  this.requireTransferWarehouseAuthorization(transferId, actor);
+  if (transfer.status !== 'REQUESTED') throw new Error('لا يمكن اعتماد تحويل ليس في حالة الطلب.');
+  if (transfer.createdBy === actor.id) throw new Error('لا يمكن لمنشئ طلب التحويل اعتماده.');
 
-    this.db.run(`
+  this.db.executeTransaction((txDb) => {
+    const current = txDb.query<{ status: string; createdBy: string }>(
+      `SELECT status, created_by AS createdBy FROM stock_transfers WHERE id = ?`,
+      [transferId]
+    )[0];
+    if (!current || current.status !== 'REQUESTED') throw new Error('تم تحديث حالة التحويل؛ أعد تحميله.');
+    if (current.createdBy === actor.id) throw new Error('لا يمكن لمنشئ طلب التحويل اعتماده.');
+    txDb.run(`
       UPDATE stock_transfers
       SET status = 'APPROVED', approved_by = ?, approved_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ? AND status = 'REQUESTED'
     `, [actor.id, transferId]);
-  }
+  });
+}
 
 public prepareTransfer(transferId: string): void {
-    this.assertInventoryModuleEnabled();
-    const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.inventory.hub.transfer');
+  this.assertInventoryModuleEnabled();
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'inventory.transfer.execute');
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('طلب التحويل غير موجود.');

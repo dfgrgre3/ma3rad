@@ -6,6 +6,8 @@ import { PermissionService } from '../auth/PermissionService';
 import { round2 } from '../finance/financials';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { localDateString } from '../../../utils/shared/date';
+import { postLedgerEntry } from '../../../database/repositories/ledger';
 
 export * from '../../../types/sales/reservation';
 import type { StockReservation, ReservationReference } from '../../../types/sales/reservation';
@@ -133,39 +135,66 @@ export class ReservationService {
       [id]
     )[0];
     if (!row) throw new Error('الحجز غير موجود.');
-    this.branchAccess.requireWarehouseAccess(row.warehouseId, actor);
+    const branchId = this.branchAccess.requireWarehouseAccess(row.warehouseId, actor);
     if (row.status !== 'ACTIVE') throw new Error('لا يمكن تنفيذ حجز غير نشط.');
 
     this.db.executeTransaction((db) => {
-      const stock = db.query<any>(
-        `SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
-        [row.productId, row.warehouseId]
+      const currentReservation = db.query<any>(
+        `SELECT id, product_id AS productId, warehouse_id AS warehouseId,
+                quantity_m2 AS quantity, reference_type AS referenceType,
+                reference_id AS referenceId, status
+         FROM stock_reservations WHERE id = ?`,
+        [id]
       )[0];
-      if (!stock || Number(stock.quantity) < Number(row.quantity)) {
-        throw new Error('المخزون الفعلي غير كافٍ لتنفيذ الحجز.');
+      if (!currentReservation || currentReservation.status !== 'ACTIVE') {
+        throw new Error('لا يمكن تنفيذ حجز غير نشط.');
       }
-      const product = db.query<any>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [row.productId])[0];
+      const stock = db.query<any>(
+        `SELECT quantity_m2 AS quantity, reserved_m2 AS reserved
+         FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
+        [currentReservation.productId, currentReservation.warehouseId]
+      )[0];
+      if (!stock || Number(stock.quantity) < Number(currentReservation.quantity)
+        || Number(stock.reserved) < Number(currentReservation.quantity)) {
+        throw new Error('رصيد المخزون أو الكمية المحجوزة غير كافٍ لتنفيذ الحجز.');
+      }
+      const product = db.query<any>(`SELECT cost_price AS costPrice FROM products WHERE id = ?`, [currentReservation.productId])[0];
       const fifoPlan = InventoryCostingService.costingMethod(db) === 'FIFO'
-        ? InventoryCostingService.planFifo(db, row.productId, row.warehouseId, Number(row.quantity))
+        ? InventoryCostingService.planFifo(db, currentReservation.productId, currentReservation.warehouseId, Number(currentReservation.quantity))
         : null;
       const unitCost = fifoPlan?.unitCost ?? (Number(product?.costPrice) || 0);
+      const totalCost = round2(Number(currentReservation.quantity) * unitCost);
       const transactionId = `itx_${uuidv4().substring(0, 8)}`;
       db.run(
         `UPDATE warehouse_stock SET quantity_m2 = quantity_m2 - ?, reserved_m2 = MAX(0, reserved_m2 - ?),
            last_updated = CURRENT_TIMESTAMP WHERE product_id = ? AND warehouse_id = ?`,
-        [Number(row.quantity), Number(row.quantity), row.productId, row.warehouseId]
+        [Number(currentReservation.quantity), Number(currentReservation.quantity), currentReservation.productId, currentReservation.warehouseId]
       );
       db.run(
         `INSERT INTO inventory_transactions (id, transaction_number, product_id, warehouse_id, type,
            quantity_m2, unit_cost, total_cost, reference_type, reference_id, notes, performed_by)
          VALUES (?, ?, ?, ?, 'ADJUSTMENT_SUB', ?, ?, ?, 'RESERVATION', ?, ?, ?)`,
         [
-          transactionId, db.nextNumber('ITX'), row.productId, row.warehouseId,
-          Number(row.quantity), unitCost, round2(Number(row.quantity) * unitCost),
-          row.id, `تنفيذ حجز ${row.referenceType} ${row.referenceId || ''}`.trim(), actor.id,
+          transactionId, db.nextNumber('ITX'), currentReservation.productId, currentReservation.warehouseId,
+          -Number(currentReservation.quantity), unitCost, totalCost,
+          currentReservation.id, `تنفيذ حجز ${currentReservation.referenceType} ${currentReservation.referenceId || ''}`.trim(), actor.id,
         ]
       );
       if (fifoPlan) InventoryCostingService.consumeFifo(db, transactionId, fifoPlan);
+      if (totalCost > 0) {
+        postLedgerEntry(db.getDatabase(), {
+          date: localDateString(),
+          description: `تكلفة صرف الحجز ${currentReservation.id}`,
+          referenceType: 'RESERVATION_CONSUMPTION',
+          referenceId: transactionId,
+          createdBy: actor.id,
+          branchId,
+          lines: [
+            { accountCode: '5101', debit: totalCost, credit: 0 },
+            { accountCode: '1104', debit: 0, credit: totalCost },
+          ],
+        });
+      }
       db.run(
         `UPDATE stock_reservations SET status = 'CONSUMED', released_at = ? WHERE id = ?`,
         [new Date().toISOString(), id]

@@ -14,7 +14,7 @@ export class InventoryServicePart11 extends InventoryServicePart10 {
 public rejectTransfer(transferId: string, reason: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.inventory.hub.transfer');
+  PermissionService.require(actor, 'inventory.transfer.workflow.approve');
 
     const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
     if (!transfer) throw new Error('التحويل غير موجود.');

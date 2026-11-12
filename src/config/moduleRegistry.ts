@@ -65,7 +65,7 @@ export const MODULE_REGISTRY: ModuleDefinition[] = [
     description: 'الأصناف والوحدات والمخازن والحركات والجرد والتقييم.',
     dependencies: [],
     permissions: ['inventory.view'],
-    paths: ['/inventory', '/inventory/hub', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/stock-reservations', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/products', '/products/catalog', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
+    paths: ['/inventory', '/inventory/hub', '/inventory/warehouse-stock', '/inventory/showroom-stock', '/inventory/ledger', '/inventory/transfers', '/inventory/counts', '/inventory/valuation', '/inventory/adjustments', '/inventory/alerts', '/inventory/stock-reservations', '/inventory/reservations', '/inventory/reorder-planning', '/inventory/locations', '/inventory/damage-quarantine', '/inventory/reconciliation', '/products', '/products/catalog', '/categories', '/brands', '/products/attributes', '/pricing', '/promotions', '/products/barcodes'],
     businessEvents: ['stock.movement.posted', 'stock.count.posted', 'stock.adjusted'],
     settings: [
       { key: 'allowNegativeStock', label: 'السماح بالمخزون السالب', type: 'boolean', defaultValue: false },

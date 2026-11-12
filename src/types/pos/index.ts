@@ -16,6 +16,8 @@ export interface CartItem {
   piecesCount: number;
   /** Price per base unit; display/entry price is derived for `soldBy`. */
   unitPrice: number;
+  specialStockId?: string;
+  specialNumber?: string;
   discountAmount: number;
   availableStockM2: number;
   notes?: string;

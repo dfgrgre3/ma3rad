@@ -31,7 +31,7 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
       FROM warehouse_stock ws
       JOIN products p ON ws.product_id = p.id
       JOIN warehouses w ON w.id = ws.warehouse_id
-      WHERE p.is_active = 1 AND ${warehouseScope.clause} AND ${companyScope.clause}${warehouseFilter}
+      WHERE ${warehouseScope.clause} AND ${companyScope.clause}${warehouseFilter}
     `, physicalParams)[0];
     const totalPhysicalCost = Number(Number(physical?.totalCost || 0).toFixed(2));
     const totalPhysicalQty = Number(Number(physical?.totalQty || 0).toFixed(2));
@@ -63,7 +63,13 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
 
     const variancePhysicalVsFifo = Number((totalPhysicalCost - totalFifoLayerCost).toFixed(2));
     const varianceFifoVsGl = Number((totalFifoLayerCost - totalGlInventoryCost).toFixed(2));
-    const isBalanced = Math.abs(variancePhysicalVsFifo) < 0.05 && Math.abs(varianceFifoVsGl) < 0.05;
+    const variancePhysicalVsFifoQty = Number((totalPhysicalQty - totalFifoLayerQty).toFixed(2));
+    const quantityBalanced = Math.abs(variancePhysicalVsFifoQty) < 0.01;
+    const ledgerComparable = !warehouseId;
+    const isBalanced = quantityBalanced
+      && Math.abs(variancePhysicalVsFifo) < 0.05
+      && ledgerComparable
+      && Math.abs(varianceFifoVsGl) < 0.05;
 
     return {
       reconciliationDate: localDateString(),
@@ -74,7 +80,11 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
       totalFifoLayerCost,
       totalGlInventoryCost,
       variancePhysicalVsFifo,
+      variancePhysicalVsFifoQty,
+      quantityBalanced,
       varianceFifoVsGl,
+      ledgerScope: 'BRANCH_COMPANY',
+      ledgerComparable,
       status: isBalanced ? 'BALANCED' : 'DISCREPANCY_DETECTED',
       performedBy: actor.id,
       performedByName: actor.fullName,
@@ -101,13 +111,15 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
       INSERT INTO inventory_reconciliation_logs (
         id, reconciliation_date, branch_id, warehouse_id, total_physical_cost,
         total_fifo_layer_cost, total_gl_inventory_cost, variance_physical_vs_fifo,
-        variance_fifo_vs_gl, status, notes, performed_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        variance_fifo_vs_gl, variance_physical_vs_fifo_qty, ledger_comparable,
+        status, notes, performed_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `, [
       `rec_${uuidv4().substring(0, 8)}`, reconciliation.reconciliationDate, branchId, input.warehouseId || null,
       reconciliation.totalPhysicalCost, reconciliation.totalFifoLayerCost, reconciliation.totalGlInventoryCost,
-      reconciliation.variancePhysicalVsFifo, reconciliation.varianceFifoVsGl, reconciliation.status,
-      input.notes || null, actor.id
+      reconciliation.variancePhysicalVsFifo, reconciliation.varianceFifoVsGl,
+      reconciliation.variancePhysicalVsFifoQty, reconciliation.ledgerComparable ? 1 : 0,
+      reconciliation.status, input.notes || null, actor.id,
     ]);
   }
 
@@ -123,7 +135,9 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
         irl.total_fifo_layer_cost as totalFifoLayerCost,
         irl.total_gl_inventory_cost as totalGlInventoryCost,
         irl.variance_physical_vs_fifo as variancePhysicalVsFifo,
+        irl.variance_physical_vs_fifo_qty as variancePhysicalVsFifoQty,
         irl.variance_fifo_vs_gl as varianceFifoVsGl,
+        irl.ledger_comparable as ledgerComparable,
         irl.status, irl.notes,
         u.full_name as performedByName, irl.created_at as createdAt
       FROM inventory_reconciliation_logs irl

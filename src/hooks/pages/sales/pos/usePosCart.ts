@@ -66,6 +66,7 @@ export const usePosCart = ({
 
   const applyCustomerPricing = useCallback((customer: Customer | null) => {
     setCart((prev) => prev.map((item) => {
+      if (item.specialStockId) return item;
       try {
         return { ...item, unitPrice: pricingService.getEffectivePrice(item.product.id, customer?.id, item.quantityM2).priceM2 };
       } catch {
@@ -76,7 +77,7 @@ export const usePosCart = ({
 
   const addToCart = useCallback((product: Product, requestedM2?: number) => {
     setCart((prev) => {
-      const existingIndex = allowDuplicateItems ? -1 : prev.findIndex((item) => item.product.id === product.id);
+      const existingIndex = allowDuplicateItems ? -1 : prev.findIndex((item) => !item.specialStockId && item.product.id === product.id);
       const sellable = getSellableUnits(product);
       const preferred = product.sellUnit && sellable.includes(product.sellUnit)
         ? product.sellUnit
@@ -110,6 +111,51 @@ export const usePosCart = ({
       return [...prev, makeCartItem(product, stepM2)];
     });
   }, [selectedCustomer, pricingService, makeCartItem, allowDuplicateItems]);
+
+  const addDiscountedToCart = useCallback((product: Product, source: {
+    id: string;
+    specialNumber: string;
+    availableQuantityM2: number;
+    discountedUnitPrice: number;
+  }) => {
+    const sellable = getSellableUnits(product);
+    const preferred = product.sellUnit && sellable.includes(product.sellUnit) ? product.sellUnit : (product.baseUnit || 'M2');
+    const defaultStep = product.productType === 'GENERAL'
+      ? (preferred !== (product.baseUnit || 'M2') ? toBaseQuantity(1, preferred, product).quantity : 1)
+      : (product.metersPerBox || 1.44);
+    const quantity = Math.min(defaultStep, Number(source.availableQuantityM2));
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      notify('لا توجد كمية متاحة في سجل البيع المخفض المحدد.', 'error');
+      return;
+    }
+
+    setCart((prev) => {
+      const existingIndex = prev.findIndex((item) => item.specialStockId === source.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        const current = { ...updated[existingIndex] };
+        current.quantityM2 = round2(current.quantityM2 + quantity);
+        current.soldQuantity = round2(fromBaseQuantity(current.quantityM2, current.soldBy, current.product));
+        current.boxesCount = current.product.productType === 'GENERAL'
+          ? current.product.baseUnit === 'BOX' ? current.quantityM2 : 0
+          : CeramicMath.calculateBoxes(current.quantityM2, current.product.metersPerBox || 1.44, true);
+        current.piecesCount = current.product.productType === 'GENERAL'
+          ? current.product.baseUnit === 'PIECE' ? current.quantityM2 : 0
+          : CeramicMath.calculatePiecesFromBoxes(current.boxesCount, current.product.piecesPerBox || 4);
+        updated[existingIndex] = current;
+        return updated;
+      }
+      const item = makeCartItem(product, quantity);
+      return [...prev, {
+        ...item,
+        unitPrice: Number(source.discountedUnitPrice),
+        availableStockM2: Number(source.availableQuantityM2),
+        specialStockId: source.id,
+        specialNumber: source.specialNumber,
+      }];
+    });
+    notify(`تمت إضافة ${product.name} من سجل البيع المخفض ${source.specialNumber}`, 'success');
+  }, [makeCartItem, notify]);
 
   const addCalculatedToCart = (product: Product, quantityM2: number) => {
     addToCart(product, quantityM2);
@@ -188,6 +234,10 @@ export const usePosCart = ({
 
   const updateCartPrice = (index: number, value: number) => {
     if (!Number.isFinite(value) || value < 0) return;
+    if (cart[index]?.specialStockId) {
+      notify('سعر سجل البيع المخفض معتمد ولا يمكن تغييره من نقطة البيع.', 'error');
+      return;
+    }
     if (!can('sales.approve')) {
       notify('لا تملك صلاحية تعديل سعر الصنف', 'error');
       return;
@@ -216,6 +266,7 @@ export const usePosCart = ({
     setCart,
     applyCustomerPricing,
     addToCart,
+    addDiscountedToCart,
     addCalculatedToCart,
     updateCartQuantity,
     stepCartQuantity,

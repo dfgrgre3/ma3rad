@@ -190,7 +190,7 @@ export const ProductsView: React.FC = () => {
   const canDeleteProduct = PermissionService.can(permissionUser, 'ui.products.catalog.delete');
   const canExportProducts = PermissionService.can(permissionUser, 'ui.products.catalog.export');
   const canImportProducts = PermissionService.can(permissionUser, 'ui.products.catalog.import');
-  const canAdjustInventory = PermissionService.can(permissionUser, 'ui.inventory.hub.adjust');
+  const canAdjustInventory = PermissionService.can(permissionUser, 'inventory.adjust');
   const canCreateCategory = PermissionService.can(permissionUser, 'ui.categories.categories.create');
   const canCreateBrand = PermissionService.can(permissionUser, 'ui.brands.brands.create');
   const canViewCosts = PermissionService.can(permissionUser, 'ui.finance.overview.view');
@@ -709,28 +709,23 @@ export const ProductsView: React.FC = () => {
     }
   };
 
-  const saveOpeningStock = (productId: string) => {
+  const saveOpeningStock = (productId: string): number => {
     // A business that does not track inventory has no stock to open.
-    if (!tracksInventory) return;
-    openingRows
-      .filter((row) => row.warehouseId && row.meters > 0)
-      .forEach((row) => {
-        try {
-          inventoryService.adjustStock(
-            productId,
-            row.warehouseId,
-            round(row.meters, 3),
-            'رصيد افتتاحي عند تعريف الصنف',
-          );
-        } catch (err) {
-          console.error(err);
-        }
-      });
+    if (!tracksInventory) return 0;
+    const rows = openingRows.filter((row) => row.warehouseId && row.meters > 0);
+    rows.forEach((row) => inventoryService.createAdjustment({
+      productId,
+      warehouseId: row.warehouseId,
+      type: 'OPENING_BALANCE',
+      quantity: round(row.meters, 3),
+      reason: 'رصيد افتتاحي عند تعريف الصنف',
+    }));
+    return rows.length;
   };
 
-  const saveNewProductDetails = (productId: string) => {
+  const saveNewProductDetails = (productId: string): number => {
     saveNewProductImages(productId);
-    saveOpeningStock(productId);
+    return saveOpeningStock(productId);
   };
 
   const handleSaveSelectedProductFields = (fieldKeys: string[]): boolean => {
@@ -802,6 +797,7 @@ export const ProductsView: React.FC = () => {
     setIsSaving(true);
     try {
       const payload = buildProductPayload();
+      let openingStockRequests = 0;
 
       let productId = editingProduct?.id || '';
       if (editingProduct) {
@@ -828,13 +824,16 @@ export const ProductsView: React.FC = () => {
         removedImageIds.forEach((id) => {
           try { extraService.deleteImage(id); } catch (err) { console.error(err); }
         });
-        if (!editingProduct) saveNewProductDetails(productId);
+        if (!editingProduct) openingStockRequests = saveNewProductDetails(productId);
       }
 
       setIsModalOpen(false);
       loadProducts();
       loadStats();
       loadLookups();
+      if (openingStockRequests > 0) {
+        alert(`تم إنشاء ${openingStockRequests} طلب رصيد افتتاحي، ويظهر في المخزون بعد اعتماده وترحيله.`);
+      }
     } catch (err: any) {
       alert(`خطأ: ${err?.message || err}`);
     } finally {
@@ -923,17 +922,21 @@ export const ProductsView: React.FC = () => {
     try {
       const metersPerBox = stockProduct.metersPerBox || 0;
       rows.forEach((row) => {
-        const addMeters = metersPerBox > 0 ? row.addBoxes * metersPerBox : row.addBoxes;
-        inventoryService.adjustStock(
-          stockProduct.id,
-          row.warehouseId,
-          round(row.currentM2 + addMeters, 3),
-          stockReason || 'إضافة كمية للمخزون',
-        );
+        const quantity = stockProduct.productType === 'GENERAL'
+          ? row.addBoxes
+          : metersPerBox > 0 ? row.addBoxes * metersPerBox : row.addBoxes;
+        inventoryService.createAdjustment({
+          productId: stockProduct.id,
+          warehouseId: row.warehouseId,
+          type: 'ADD',
+          quantity: round(quantity, 3),
+          reason: stockReason || 'إضافة كمية للمخزون',
+        });
       });
       setStockProduct(null);
       loadProducts();
       loadStats();
+      alert(`تم إنشاء ${rows.length} طلب إضافة للمخزون، ويظهر الرصيد بعد اعتمادها وترحيلها.`);
     } catch (err: any) {
       alert(`تعذر إضافة الكمية: ${err?.message || err}`);
     } finally {
@@ -1141,12 +1144,14 @@ export const ProductsView: React.FC = () => {
           const warehouseName = pickCell(row, ['warehouse', 'المخزن']);
           const warehouseId = warehouseMap.get(warehouseName) || warehouses[0]?.id;
           if (tracksInventory && openingBoxes > 0 && warehouseId) {
-            inventoryService.adjustStock(
-              product.id,
+            const quantity = product.productType === 'GENERAL' ? openingBoxes : openingBoxes * metersPerBox;
+            inventoryService.createAdjustment({
+              productId: product.id,
               warehouseId,
-              round(openingBoxes * metersPerBox, 3),
-              'رصيد افتتاحي من استيراد جدول بيانات',
-            );
+              type: 'OPENING_BALANCE',
+              quantity: round(quantity, 3),
+              reason: 'رصيد افتتاحي من استيراد جدول بيانات',
+            });
           }
           created += 1;
         } catch (rowError: any) {

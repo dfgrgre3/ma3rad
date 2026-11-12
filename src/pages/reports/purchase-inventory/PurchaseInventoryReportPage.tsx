@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
   ShoppingBag, TrendingDown, Package, CalendarDays,
   Loader2, AlertCircle, RefreshCw, BarChart3, Handshake,
@@ -69,6 +70,8 @@ function HBar({ rows, color }: { rows: { label: string; value: number; sub?: str
 }
 
 export const PurchaseInventoryReportPage: React.FC = () => {
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
   const canView = PermissionService.can(user, 'ui.reports.hub.view');
@@ -109,6 +112,12 @@ export const PurchaseInventoryReportPage: React.FC = () => {
   useEffect(() => {
     if (canView && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
   }, [canView, canViewInventory, canViewPurchases, load, tab]);
+
+  useEffect(() => {
+    if (!refreshCtx) return;
+    if (initialRef.current) { initialRef.current = false; return; }
+    if (canView && (tab === 'inventory' ? canViewInventory : canViewPurchases)) load();
+  }, [refreshCtx?.refreshToken, canView, canViewInventory, canViewPurchases, load, tab]);
 
   const TABS: { id: Tab; label: string; icon: React.ElementType; visible: boolean }[] = [
     { id: 'purchases', label: 'المشتريات', icon: ShoppingBag, visible: canViewPurchases },

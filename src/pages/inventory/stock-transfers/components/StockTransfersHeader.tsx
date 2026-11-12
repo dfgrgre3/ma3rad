@@ -4,6 +4,7 @@ import type { StockTransfersHeaderProps } from '../../../../types/inventory/stoc
 
 export const StockTransfersHeader: React.FC<StockTransfersHeaderProps> = ({
   loading,
+  canCreateTransfer,
   onCreateTransfer,
   onRefresh,
 }) => (
@@ -19,13 +20,15 @@ export const StockTransfersHeader: React.FC<StockTransfersHeaderProps> = ({
     </div>
 
     <div className="flex items-center gap-2">
-      <button
-        onClick={onCreateTransfer}
-        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black shadow-md shadow-sky-600/20 transition active:scale-95"
-      >
-        <Plus className="w-4 h-4" />
-        طلب تحويل مخزني جديد
-      </button>
+      {canCreateTransfer && (
+        <button
+          onClick={onCreateTransfer}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-black shadow-md shadow-sky-600/20 transition active:scale-95"
+        >
+          <Plus className="w-4 h-4" />
+          طلب تحويل مخزني جديد
+        </button>
+      )}
 
       <button
         onClick={onRefresh}

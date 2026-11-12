@@ -44,6 +44,7 @@ export const DamageQuarantinePage: React.FC = () => {
   const [resolvingItem, setResolvingItem] = useState<any | null>(null);
   const [resolutionAction, setResolutionAction] = useState<'WRITE_OFF' | 'DOWNGRADE_SALE' | 'RESTORE_TO_STOCK'>('WRITE_OFF');
   const [resolutionNotes, setResolutionNotes] = useState('');
+  const [discountedUnitPrice, setDiscountedUnitPrice] = useState(0);
 
   const loadData = () => {
     setLoading(true);
@@ -124,13 +125,24 @@ export const DamageQuarantinePage: React.FC = () => {
     e.preventDefault();
     if (!canManage || !resolvingItem) return;
     try {
-      inventoryService.resolveSpecialStock(resolvingItem.id, resolutionAction, resolutionNotes);
+      if (resolvingItem.status === 'DOWNGRADED_SALE' && resolvingItem.discountedUnitPrice == null) {
+        inventoryService.setSpecialStockSalePrice(resolvingItem.id, Number(discountedUnitPrice));
+      } else {
+        inventoryService.resolveSpecialStock(
+          resolvingItem.id,
+          resolutionAction,
+          resolutionNotes,
+          resolutionAction === 'DOWNGRADE_SALE' ? Number(discountedUnitPrice) : undefined
+        );
+      }
       toast.success(
-        resolutionAction === 'WRITE_OFF'
+        resolvingItem.status === 'DOWNGRADED_SALE'
+          ? 'تم تحديد سعر البيع المخفض وربط السجل بمخزون نقطة البيع.'
+          : resolutionAction === 'WRITE_OFF'
           ? 'تم الإعدام المخزني وترحيل قيد الخسائر المحاسبية للأستاذ العام بنجاح.'
           : resolutionAction === 'RESTORE_TO_STOCK'
           ? 'تمت استعادة الكمية للمخزون الصالح للبيع وبناء طبقة تكلفة FIFO جديدة.'
-          : 'تم تصنيف الصنف للبيع المخفض (بواقي وفرز ثاني).'
+          : 'تم تصنيف الكمية للبيع المخفض وربطها بمصدرها المخزني.'
       );
       setResolvingItem(null);
       loadData();
@@ -141,6 +153,9 @@ export const DamageQuarantinePage: React.FC = () => {
 
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0);
   const fmtCur = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 0 }).format(Number(n) || 0) + ' ج.م';
+  const resolvingProduct = resolvingItem
+    ? allProducts.find((product) => product.id === resolvingItem.productId)
+    : undefined;
 
   const getCategoryBadge = (cat: string) => {
     switch (cat) {
@@ -157,7 +172,7 @@ export const DamageQuarantinePage: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (st: string) => {
+  const getStatusBadge = (st: string, remainingQuantityM2?: number) => {
     switch (st) {
       case 'RECORDED':
         return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700">مسجل وبانتظار الفحص</span>;
@@ -168,6 +183,9 @@ export const DamageQuarantinePage: React.FC = () => {
       case 'RESTORED_TO_STOCK':
         return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-emerald-100 text-emerald-700">مُستعاد للصالح للبيع</span>;
       case 'DOWNGRADED_SALE':
+        if (Number(remainingQuantityM2) <= 0) {
+          return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-slate-100 text-slate-600">نفدت كمية البيع المخفض</span>;
+        }
         return <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-purple-100 text-purple-700">معروض بسعر مخفض</span>;
       default:
         return <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100">{st}</span>;
@@ -351,9 +369,18 @@ export const DamageQuarantinePage: React.FC = () => {
                   </td>
                   <td className="px-3 py-2.5 text-center font-mono font-black text-slate-900">
                     {fmtCur(row.totalCost)}
+                    {row.status === 'DOWNGRADED_SALE' && (
+                      <div className="text-[10px] font-bold text-purple-700">
+                        {row.discountedUnitPrice == null
+                          ? 'بانتظار تحديد سعر البيع'
+                          : `سعر مخفض ${fmtCur(row.discountedUnitPrice)} / ${getProductUnitLabel(row)}`}
+                        {' • متبقٍ '}
+                        {formatProductQuantity(Number(row.remainingQuantityM2) || 0, row)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-center">
-                    {getStatusBadge(row.status)}
+                    {getStatusBadge(row.status, row.remainingQuantityM2)}
                   </td>
                   <td className="px-3 py-2.5 text-xs">
                     {row.resolutionNotes ? (
@@ -379,16 +406,43 @@ export const DamageQuarantinePage: React.FC = () => {
                         </button>
                       )}
 
-                      {canManage && !['WRITTEN_OFF', 'RESTORED_TO_STOCK'].includes(row.status) && (
+                      {canManage && row.status === 'RECORDED' && (
+                        <button
+                          onClick={() => {
+                            setInspectingItem(row);
+                            setInspectionNotes('');
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 transition"
+                          title="فحص السجل"
+                        >
+                          فحص
+                        </button>
+                      )}
+                      {canManage && row.status === 'INSPECTED' && (
                         <button
                           onClick={() => {
                             setResolvingItem(row);
                             setResolutionNotes('');
+                            setResolutionAction('WRITE_OFF');
+                            setDiscountedUnitPrice(0);
                           }}
                           className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
-                          title="إعدام / بيع مخفض / استعادة"
+                          title="اعتماد قرار الفحص"
                         >
-                          معالجة
+                          اعتماد القرار
+                        </button>
+                      )}
+                      {canManage && row.status === 'DOWNGRADED_SALE' && row.discountedUnitPrice == null && (
+                        <button
+                          onClick={() => {
+                            setResolvingItem(row);
+                            setResolutionNotes('');
+                            setDiscountedUnitPrice(Math.max(0, Number(allProducts.find((product) => product.id === row.productId)?.sellingPriceM2 || 0) * 0.8));
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 transition"
+                          title="تحديد سعر البيع لسجل قديم"
+                        >
+                          تحديد السعر
                         </button>
                       )}
                     </div>
@@ -551,28 +605,54 @@ export const DamageQuarantinePage: React.FC = () => {
             <p className="text-xs text-slate-500 mb-4">{resolvingItem.productName} ({formatProductQuantity(Number(resolvingItem.quantityM2), resolvingItem)} - بقيمة {fmtCur(resolvingItem.totalCost)})</p>
 
             <form onSubmit={handleResolveSubmit} className="space-y-3">
-              <div>
+              {resolvingItem.status !== 'DOWNGRADED_SALE' && <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">القرار المتخذ</label>
                 <select
                   value={resolutionAction}
                   onChange={(e: any) => setResolutionAction(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
                 >
-                  <option value="WRITE_OFF">إعدام مخزني محاسبي (تسجيل خسائر تلف في الأستاذ العام)</option>
-                  <option value="RESTORE_TO_STOCK">إعادة للمخزون الصالح (تبين سلامة البضاعة بعد الفحص)</option>
-                  <option value="DOWNGRADE_SALE">تصنيف للبيع المخفض (فرز ثاني / عروض بواقي)</option>
+                  {resolvingItem.status !== 'DOWNGRADED_SALE' && (
+                    <>
+                      <option value="WRITE_OFF">إعدام مخزني محاسبي (تسجيل خسائر تلف في الأستاذ العام)</option>
+                      <option value="RESTORE_TO_STOCK">إعادة للمخزون الصالح (تبين سلامة البضاعة بعد الفحص)</option>
+                      <option value="DOWNGRADE_SALE">تصنيف للبيع المخفض (فرز ثاني / عروض بواقي)</option>
+                    </>
+                  )}
                 </select>
-              </div>
+              </div>}
+
+              {(resolutionAction === 'DOWNGRADE_SALE' || resolvingItem.status === 'DOWNGRADED_SALE') && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                    سعر البيع المخفض لكل {getProductUnitLabel(resolvingItem)}
+                    {resolvingItem.status !== 'DOWNGRADED_SALE' && (
+                      <span className="font-normal"> (السعر الأساسي {fmtCur(Number(resolvingProduct ? resolvingProduct.sellingPriceM2 : 0))})</span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={discountedUnitPrice}
+                    onChange={(e) => setDiscountedUnitPrice(Number(e.target.value) || 0)}
+                    required
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">مبررات القرار والملاحظات</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  {resolvingItem.status === 'DOWNGRADED_SALE' ? 'مبررات القرار والملاحظات (اختياري)' : 'مبررات القرار والملاحظات'}
+                </label>
                 <textarea
                   rows={3}
                   value={resolutionNotes}
                   onChange={(e) => setResolutionNotes(e.target.value)}
                   placeholder="اعتماد محضر إعدام رقم..."
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-rose-500"
-                  required
+                  required={resolvingItem.status !== 'DOWNGRADED_SALE'}
                 />
               </div>
 
@@ -588,7 +668,7 @@ export const DamageQuarantinePage: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black"
                 >
-                  تنفيذ القرار وترحيل القيود
+                  {resolvingItem.status === 'DOWNGRADED_SALE' ? 'حفظ سعر البيع المخفض' : 'تنفيذ القرار وترحيل القيود'}
                 </button>
               </div>
             </form>

@@ -7,6 +7,7 @@ import { getCountStockInfo, saveCountDraft, validateCountItemMembership, validat
 import type { CountVarianceTotals } from './countSessionService_part02';
 import { updateCountItem } from './countSessionService_part03';
 import { postCountVariance } from './countSessionService_part04';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
 
 export function postCountItems(
   txDb: DatabaseManager,
@@ -43,19 +44,20 @@ export function postCountItems(
     if (item.varianceM2 !== 0 && !item.discrepancyReason?.trim()) {
       throw new Error(`Choose a discrepancy reason for ${item.productName} before posting.`);
     }
-    const { reservedM2, metersPerBox } = getCountStockInfo(txDb, item, warehouseId);
-    validateCountedQuantity(item, reservedM2);
+    const stockInfo = getCountStockInfo(txDb, item, warehouseId);
+    validateCountedQuantity(item, stockInfo.reservedM2);
     updateCountItem(txDb, item, actorId, activeSession.id);
 
     if (item.varianceM2 === 0) continue;
     totals.varianceCount++;
     totals.totalVarianceVal += Math.abs(item.varianceValue);
-    postCountVariance(txDb, activeSession, item, actorId, warehouseId, metersPerBox);
+    postCountVariance(txDb, activeSession, item, actorId, warehouseId, stockInfo);
   }
   return totals;
 }
 
 export function submitCountSession(activeSession: CountSession, sessionItems: CountItem[]): void {
+  ModuleRegistryService.assertModuleEnabled('inventory');
   if (sessionItems.some(item => item.countedQuantityM2 === null)) throw new Error('أكمل عد جميع الأصناف قبل إرسال الجرد للمراجعة.');
   for (const item of sessionItems) {
     if (item.countedQuantityM2 !== null && Number(item.countedQuantityM2) !== item.systemQuantityM2 && !item.discrepancyReason?.trim()) {

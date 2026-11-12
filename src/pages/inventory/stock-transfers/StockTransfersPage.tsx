@@ -8,8 +8,15 @@ import { CreateTransferModal } from './components/CreateTransferModal';
 import { ReceiveTransferModal } from './components/ReceiveTransferModal';
 import { TransferDetailsModal } from './components/TransferDetailsModal';
 import { useStockTransfers } from '../../../hooks/pages/inventory/stock-transfers/useStockTransfers';
+import { AuthService } from '../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../services/domains/auth/PermissionService';
 
 export const StockTransfersPage: React.FC = () => {
+  const actor = AuthService.getCurrentUser();
+  const canCreateTransfer = PermissionService.can(actor, 'inventory.transfer');
+  const canApprove = PermissionService.can(actor, 'inventory.transfer.workflow.approve');
+  const canExecute = PermissionService.can(actor, 'inventory.transfer.execute');
+  const canReceive = PermissionService.can(actor, 'inventory.transfer.receive');
   const {
     activeTab,
     setActiveTab,
@@ -55,7 +62,12 @@ export const StockTransfersPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
-      <StockTransfersHeader loading={loading} onCreateTransfer={openCreateModal} onRefresh={loadData} />
+      <StockTransfersHeader
+        loading={loading}
+        canCreateTransfer={canCreateTransfer}
+        onCreateTransfer={openCreateModal}
+        onRefresh={loadData}
+      />
 
       <StockTransfersTabs
         activeTab={activeTab}
@@ -70,6 +82,9 @@ export const StockTransfersPage: React.FC = () => {
         {activeTab === 'workflow' && (
           <WorkflowTransfersTable
             transfers={workflowTransfers}
+            canApprove={canApprove}
+            canExecute={canExecute}
+            canReceive={canReceive}
             onViewDetails={handleViewDetails}
             onApprove={handleApprove}
             onReject={handleReject}
@@ -84,7 +99,7 @@ export const StockTransfersPage: React.FC = () => {
         {activeTab === 'summary' && <WarehouseSummaryGrid warehouseSummary={warehouseSummary} />}
       </div>
 
-      {showCreateModal && (
+      {showCreateModal && canCreateTransfer && (
         <CreateTransferModal
           warehouses={warehouses}
           allProducts={allProducts}

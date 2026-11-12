@@ -12,6 +12,7 @@ import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { SettingsService } from '../config/SettingsService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
+import { isServiceProduct } from '../../../utils/products/productUnits';
 
 export interface CreatePurchaseDTO {
   supplierId: string;
@@ -290,9 +291,63 @@ export class PurchaseService {
         InventoryCostingService.addLayer(sqliteDb, {
           productId: item.productId, warehouseId: dto.warehouseId,
           sourceTransactionId: inventoryTransactionId, sourceType: 'PURCHASE', sourceId: purchaseId,
+          purchaseInvoiceId: purchaseId, supplierId: dto.supplierId,
           date: today, quantity: item.quantityM2, unitCost: item.effectiveUnitCost,
         });
       }
+    }
+  }
+
+  private linkGoodsReceiptCostLayers(
+    db: DatabaseManager,
+    grnId: string,
+    purchaseId: string,
+    dto: CreatePurchaseDTO,
+    preparedItems: any[],
+  ): void {
+    const receipt = db.query<{ supplierId: string; warehouseId: string }>(`
+      SELECT supplier_id AS supplierId, warehouse_id AS warehouseId
+      FROM goods_receipt_notes WHERE id = ?
+    `, [grnId])[0];
+    if (!receipt || receipt.supplierId !== dto.supplierId || receipt.warehouseId !== dto.warehouseId) {
+      throw new Error('إذن الاستلام لا يطابق المورد أو المخزن في فاتورة الشراء.');
+    }
+    const alreadyInvoiced = db.query<{ id: string }>(`
+      SELECT id FROM purchase_invoices WHERE grn_id = ? AND id != ? LIMIT 1
+    `, [grnId, purchaseId])[0];
+    if (alreadyInvoiced) throw new Error('إذن الاستلام مرتبط مسبقاً بفاتورة شراء أخرى.');
+
+    const expectedByProduct = new Map<string, number>();
+    for (const item of preparedItems) {
+      const product = db.query<{ productType: string; baseUnit: string }>(
+        `SELECT product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`,
+        [item.productId],
+      )[0];
+      if (!product || isServiceProduct(product)) continue;
+      expectedByProduct.set(
+        item.productId,
+        round2((expectedByProduct.get(item.productId) || 0) + Number(item.grnAcceptedQty)),
+      );
+    }
+
+    for (const [productId, expectedQuantity] of expectedByProduct) {
+      const layers = db.query<{ quantityReceived: number }>(`
+        SELECT quantity_received AS quantityReceived
+        FROM inventory_cost_layers
+        WHERE goods_receipt_id = ? AND product_id = ? AND warehouse_id = ?
+          AND purchase_invoice_id IS NULL
+        ORDER BY received_at, created_at, rowid
+      `, [grnId, productId, dto.warehouseId]);
+      const layerQuantity = round2(layers.reduce((sum, layer) => sum + Number(layer.quantityReceived), 0));
+      if (!layers.length || Math.abs(layerQuantity - expectedQuantity) > 0.009) {
+        throw new Error(`طبقات التكلفة في إذن الاستلام غير مطابقة لكمية الصنف ${productId} في الفاتورة.`);
+      }
+      db.run(`
+        UPDATE inventory_cost_layers
+        SET source_type = 'PURCHASE', source_id = ?, purchase_invoice_id = ?
+        WHERE goods_receipt_id = ? AND product_id = ? AND warehouse_id = ?
+          AND purchase_invoice_id IS NULL
+      `, [purchaseId, purchaseId, grnId, productId, dto.warehouseId]);
     }
   }
 
@@ -373,6 +428,9 @@ export class PurchaseService {
       const method = this.costingMethod();
       const alreadyReceivedInGrn = Boolean(dto.grnId);
       this.persistPurchaseItems(sqliteDb, dto, purchaseId, invoiceNumber, preparedItems, performedBy, today, alreadyReceivedInGrn, method, trackInventory);
+      if (trackInventory && dto.grnId) {
+        this.linkGoodsReceiptCostLayers(sqliteDb, dto.grnId, purchaseId, dto, preparedItems);
+      }
 
       sqliteDb.run(`
         UPDATE suppliers SET

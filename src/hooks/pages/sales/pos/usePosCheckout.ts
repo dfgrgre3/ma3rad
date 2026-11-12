@@ -190,9 +190,22 @@ export const usePosCheckout = ({
   }, [cart, discountAmount, shippingCost, extraFees, taxPercentage, paidAmount, paymentType, splitCash, splitCard, splitBank, splitCheque, splitCredit, selectedCustomer, selectedWarehouseId, can, remainingAmount, notify]);
 
   const validateStockAvailability = useCallback(() => {
-    if (settings?.enableNegativeStock ?? false) return true;
     const plannedByProduct = new Map<string, number>();
+    const plannedBySpecialStock = new Map<string, number>();
     for (const item of cart) {
+      if (item.specialStockId) {
+        const planned = round2((plannedBySpecialStock.get(item.specialStockId) || 0) + item.quantityM2);
+        plannedBySpecialStock.set(item.specialStockId, planned);
+        if (planned > item.availableStockM2) {
+          notify(
+            `الكمية تتجاوز المتبقي في سجل البيع المخفض ${item.specialNumber}: المتاح ${formatProductQuantity(item.availableStockM2, item.product)}`,
+            'error'
+          );
+          return false;
+        }
+        continue;
+      }
+      if (settings?.enableNegativeStock ?? false) continue;
       const available = stockOf(item.product.id);
       const planned = round2((plannedByProduct.get(item.product.id) || 0) + item.quantityM2);
       plannedByProduct.set(item.product.id, planned);
@@ -209,6 +222,7 @@ export const usePosCheckout = ({
 
   const validateMinimumPrices = useCallback(() => {
     for (const item of cart) {
+      if (item.specialStockId) continue;
       const min = item.product.minSellingPriceM2 || 0;
       if (min > 0 && item.unitPrice < min && !can('sales.approve')) {
         notify(`سعر «${item.product.name}» أقل من الحد الأدنى المسموح (${min}). يلزم اعتماد المسؤول`, 'error');
@@ -316,6 +330,7 @@ export const usePosCheckout = ({
       .filter((item) => item.product.productType !== 'GENERAL')
       .map((item) => ({
         productId: item.product.id,
+        specialStockId: item.specialStockId,
         productName: item.product.name,
         warehouseId: selectedWarehouseId,
         quantityM2: item.quantityM2,

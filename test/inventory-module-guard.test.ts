@@ -6,6 +6,7 @@ import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
+import { startCountSession } from '../src/services/domains/inventory-count/countSessionService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
@@ -36,27 +37,42 @@ test('deactivating the inventory module blocks new stock movements at the servic
   assert.equal(ModuleRegistryService.isModuleEnabled('inventory'), false);
 
   assert.throws(
-    () => inventory.adjustStock({
-      productId: 'p',
-      warehouseId: 'w',
-      quantityM2: 1,
-      reason: 'guard',
-      type: 'ADJUSTMENT_IN',
-    } as any),
-    /غير مفعّلة/
-  );
-  assert.throws(
-    () => inventory.transferStock({ productId: 'p', fromWarehouseId: 'a', toWarehouseId: 'b', quantityM2: 1 } as any),
+    () => inventory.adjustStock('p', 'w', 1, 'guard'),
     /غير مفعّلة/
   );
   assert.throws(
     () => inventory.createTransferRequest({ fromWarehouseId: 'a', toWarehouseId: 'b', items: [] }),
     /غير مفعّلة/
   );
+  assert.throws(() => inventory.transferStock('a', 'b', 'p', 1), /غير مفعّلة/);
+  assert.throws(() => inventory.transferWarehouseStock('a', 'b'), /غير مفعّلة/);
+  assert.throws(
+    () => inventory.createAdjustment({
+      productId: 'p',
+      warehouseId: 'w',
+      type: 'ADD',
+      quantity: 1,
+      reason: 'guard',
+    }),
+    /غير مفعّلة/
+  );
   assert.throws(() => inventory.approveTransfer('trf_missing'), /غير مفعّلة/);
   assert.throws(() => inventory.prepareTransfer('trf_missing'), /غير مفعّلة/);
   assert.throws(() => inventory.dispatchTransfer('trf_missing'), /غير مفعّلة/);
+  assert.throws(() => inventory.receiveTransfer('trf_missing', []), /غير مفعّلة/);
   assert.throws(() => inventory.rejectTransfer('trf_missing', 'guard'), /غير مفعّلة/);
+  assert.throws(() => inventory.approveAdjustment('adj_missing'), /غير مفعّلة/);
+  assert.throws(() => inventory.postAdjustment('adj_missing'), /غير مفعّلة/);
+  assert.throws(
+    () => startCountSession({
+      warehouseId: 'w',
+      countType: 'FULL',
+      selectedProductIds: [],
+      isBlindCount: false,
+      notes: '',
+    }),
+    /غير مفعّلة/
+  );
   assert.throws(() => inventory.inspectSpecialStock('spc_missing', 'guard'), /غير مفعّلة/);
   assert.throws(() => inventory.deleteWarehouseLocation('loc_missing'), /غير مفعّلة/);
   assert.throws(() => inventory.assignProductLocation('loc', 'p', 1), /غير مفعّلة/);

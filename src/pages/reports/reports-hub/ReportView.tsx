@@ -289,7 +289,8 @@ export const ReportView: React.FC<{ definition: ReportDefinition; onBack: () => 
       FROM products p
       LEFT JOIN warehouse_stock ws ON ws.product_id = p.id
       LEFT JOIN warehouses w ON w.id = ws.warehouse_id
-      WHERE p.is_active = 1 AND (${scope.clause} OR ws.id IS NULL)
+      WHERE (p.is_active = 1 OR COALESCE(ws.quantity_m2, 0) != 0)
+        AND (${scope.clause} OR ws.id IS NULL)
       ORDER BY p.name
     `, scope.params);
   }, [definition]);

@@ -9,6 +9,7 @@ import type { ReorderSuggestion, SupplierRfqRow, SupplierRfqItem, SupplierQuotat
 import { ProcurementServicePart02 } from './ProcurementServicePart02';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { isServiceProduct } from '../../../utils/products/productUnits';
+import { InventoryReceiptService } from '../inventory/InventoryReceiptService';
 
 type GoodsReceiptInputItem = {
   purchaseOrderItemId?: string;
@@ -195,26 +196,32 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     batchNumber: string,
     unitCost: number,
   ): void {
-    this.increaseWarehouseStock(db, dto.warehouseId, item.productId, item.acceptedQuantityM2);
+    let batchId: string | null = null;
     if (product.productType !== 'GENERAL') {
-      this.insertProductBatch(db, dto, item, actor.id, today, grnNumber, batchNumber, unitCost);
+      batchId = this.insertProductBatch(db, dto, item, actor.id, today, grnNumber, batchNumber, unitCost);
     }
-    this.insertGoodsReceiptInventoryTransaction(db, dto, item, product, actor.id, grnId, grnNumber, batchNumber, unitCost);
-  }
-
-  private increaseWarehouseStock(db: DatabaseManager, warehouseId: string, productId: string, quantity: number): void {
-    const stockRow = db.query<{ id: string }>(
-      `SELECT id FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
-      [productId, warehouseId],
-    )[0];
-    if (stockRow) {
-      db.run(`UPDATE warehouse_stock SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?`, [quantity, stockRow.id]);
-      return;
-    }
-    db.run(
-      `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES (?, ?, ?, ?, 0)`,
-      [`stk_${uuidv4().substring(0, 8)}`, warehouseId, productId, quantity],
-    );
+    const metersPerBox = Number(product.metersPerBox) || 1.44;
+    const boxesCount = product.productType === 'GENERAL'
+      ? product.baseUnit === 'BOX' ? item.acceptedQuantityM2 : 0
+      : round2(item.acceptedQuantityM2 / metersPerBox);
+    InventoryReceiptService.post(db, {
+      productId: item.productId,
+      warehouseId: dto.warehouseId,
+      quantityM2: item.acceptedQuantityM2,
+      boxesCount,
+      unitCost,
+      transactionNumberPrefix: 'TX-GRN',
+      referenceType: 'GRN',
+      referenceId: grnId,
+      sourceType: 'GRN',
+      sourceId: grnId,
+      actorId: actor.id,
+      notes: `استلام بضاعة إذن استلام رقم ${grnNumber} - لوت ${batchNumber}`,
+      date: today,
+      goodsReceiptId: grnId,
+      batchId,
+      supplierId: dto.supplierId,
+    });
   }
 
   private insertProductBatch(
@@ -226,45 +233,20 @@ export abstract class ProcurementServicePart03 extends ProcurementServicePart02 
     grnNumber: string,
     batchNumber: string,
     unitCost: number,
-  ): void {
+  ): string {
+    const batchId = `pb_${uuidv4().substring(0, 8)}`;
     db.run(`
       INSERT INTO product_batches (
         id, product_id, warehouse_id, batch_number, tone_shade, caliber,
         production_date, received_date, supplier_id, cost_price, quantity_m2, quantity_remaining_m2, notes, created_by
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      `pb_${uuidv4().substring(0, 8)}`, item.productId, dto.warehouseId, batchNumber,
+      batchId, item.productId, dto.warehouseId, batchNumber,
       item.toneShade || 'STD', item.caliber || '0', today, today, dto.supplierId,
       unitCost, item.acceptedQuantityM2, item.acceptedQuantityM2,
       `استلام مخزني إذن ${grnNumber}`, actorId,
     ]);
-  }
-
-  private insertGoodsReceiptInventoryTransaction(
-    db: DatabaseManager,
-    dto: GoodsReceiptInput,
-    item: GoodsReceiptInputItem,
-    product: GoodsReceiptProduct,
-    actorId: string,
-    grnId: string,
-    grnNumber: string,
-    batchNumber: string,
-    unitCost: number,
-  ): void {
-    const metersPerBox = Number(product.metersPerBox) || 1.44;
-    const boxesCount = product.productType === 'GENERAL'
-      ? product.baseUnit === 'BOX' ? item.acceptedQuantityM2 : 0
-      : round2(item.acceptedQuantityM2 / metersPerBox);
-    db.run(`
-      INSERT INTO inventory_transactions (
-        id, transaction_number, type, product_id, warehouse_id,
-        quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id, notes, performed_by
-      ) VALUES (?, ?, 'PURCHASE', ?, ?, ?, ?, ?, ?, 'GRN', ?, ?, ?)
-    `, [
-      `tx_${uuidv4().substring(0, 8)}`, db.nextNumber('TX-GRN'), item.productId, dto.warehouseId,
-      item.acceptedQuantityM2, boxesCount, unitCost, round2(item.acceptedQuantityM2 * unitCost), grnId,
-      `استلام بضاعة إذن استلام رقم ${grnNumber} - لوت ${batchNumber}`, actorId,
-    ]);
+    return batchId;
   }
 
   private updatePurchaseOrderStatus(db: DatabaseManager, purchaseOrderId?: string): void {

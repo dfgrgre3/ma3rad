@@ -4,6 +4,7 @@ export interface SalesInvoiceItem {
   id: string;
   invoiceId: string;
   productId: string;
+  specialStockId?: string | null;
   productName: string;
   productSku: string;
   productGrade: CeramicGrade;

@@ -724,7 +724,7 @@ export class LeaveService {
         [employeeId, year, end]
       )[0]?.days ?? 0);
       const remaining = yearBalance
-        - this.getYearlyRequestDays(employeeId, 'ANNUAL', year, undefined, 'APPROVED', end);
+        - this.getYearlyRequestDays(employeeId, 'ANNUAL', year, undefined, 'ALL', end);
       const policy = this.effectiveAnnualLeavePolicy(
         employeeId, employee.branchId, yearStart(year)
       );

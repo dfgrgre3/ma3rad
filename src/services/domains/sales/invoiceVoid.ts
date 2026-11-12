@@ -25,6 +25,32 @@ function restoreInvoiceItem(
   performedBy: string,
   item: InvoiceWithItems['items'][number]
 ): void {
+  if (item.specialStockId) {
+    const source = sqliteDb.query<any>(`
+      SELECT id FROM inventory_special_stocks
+      WHERE id = ? AND status = 'DOWNGRADED_SALE'
+    `, [item.specialStockId])[0];
+    if (!source) throw new Error('مصدر مخزون البيع المخفض الأصلي غير متاح؛ أوقف الإلغاء وسوِّ سجل المخزون يدوياً.');
+    sqliteDb.run(`
+      UPDATE inventory_special_stocks
+      SET remaining_quantity_m2 = remaining_quantity_m2 + ?
+      WHERE id = ? AND status = 'DOWNGRADED_SALE'
+    `, [item.quantityM2, item.specialStockId]);
+    sqliteDb.run(`
+      INSERT INTO inventory_transactions (
+        id, transaction_number, type, product_id, warehouse_id,
+        quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+        reference_id, notes, performed_by
+      ) VALUES (?, ?, 'VOID', ?, ?, ?, ?, ?, ?, 'SPECIAL_STOCK_SALE_VOID', ?, ?, ?)
+    `, [
+      `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-VOID'),
+      item.productId, inv.warehouseId, item.quantityM2, item.boxesCount,
+      item.unitCost, item.totalCost, item.id,
+      `عكس بيع مخزون مخفض في الفاتورة ${inv.invoiceNumber}: ${reason}`, performedBy
+    ]);
+    return;
+  }
+
   if (SettingsService.getSettings().costingMethod === 'FIFO') {
     const issue = sqliteDb.query<any>(`SELECT id FROM inventory_transactions
       WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE'

@@ -34,6 +34,7 @@ export class InventoryCostingService {
   static addLayer(db: DatabaseManager, input: {
     productId: string; warehouseId: string; sourceTransactionId?: string | null;
     sourceType: string; sourceId?: string | null; date: string; quantity: number; unitCost: number;
+    goodsReceiptId?: string | null; purchaseInvoiceId?: string | null; batchId?: string | null; supplierId?: string | null;
     estimated?: boolean;
   }): string {
     const quantity = round2(input.quantity);
@@ -43,10 +44,12 @@ export class InventoryCostingService {
     const id = `icl_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
     db.run(`INSERT INTO inventory_cost_layers
       (id,product_id,warehouse_id,source_transaction_id,source_type,source_id,received_at,
-       quantity_received,quantity_remaining,unit_cost,is_estimated)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`, [id, input.productId, input.warehouseId,
+       quantity_received,quantity_remaining,unit_cost,is_estimated,goods_receipt_id,
+       purchase_invoice_id,batch_id,supplier_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [id, input.productId, input.warehouseId,
       input.sourceTransactionId || null, input.sourceType, input.sourceId || null,
-      input.date, quantity, quantity, unitCost, input.estimated ? 1 : 0]);
+      input.date, quantity, quantity, unitCost, input.estimated ? 1 : 0,
+      input.goodsReceiptId || null, input.purchaseInvoiceId || null, input.batchId || null, input.supplierId || null]);
     return id;
   }
 

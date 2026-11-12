@@ -67,7 +67,9 @@ export const InventoryReconciliationPage: React.FC = () => {
   };
 
   const fmt = (n: number) => new Intl.NumberFormat('ar-EG', { maximumFractionDigits: 2 }).format(Number(n) || 0) + ' ج.م';
-  const isBalanced = reconciliation?.status === 'BALANCED';
+  const isBalanced = reconciliation?.status === 'BALANCED'
+    && reconciliation?.quantityBalanced === true
+    && reconciliation?.ledgerComparable === true;
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">
@@ -140,7 +142,11 @@ export const InventoryReconciliationPage: React.FC = () => {
                 <p className="text-xs text-slate-600 font-medium">
                   {isBalanced
                     ? 'لا توجد فروقات بين أرصدة البضاعة الفعلية ودفتر طبقات التكلفة FIFO وحساب الأستاذ العام (1104).'
-                    : 'يوجد تباين يحتاج إلى تدقيق الحركات غير المرحلة أو تسوية جردية لتطابق دفتر الأستاذ العام.'}
+                    : reconciliation?.ledgerComparable === false
+                      ? 'تمت مقارنة الكميات والقيم بين المخزون وFIFO. رصيد الأستاذ العام بنطاق الفرع/الشركة ولا يمكن مطابقته مباشرةً مع مستودع مفرد.'
+                      : reconciliation?.quantityBalanced === false
+                        ? 'توجد فروقات كمية بين الرصيد الفعلي وطبقات FIFO حتى إذا تطابقت القيمة المالية.'
+                        : 'يوجد تباين يحتاج إلى تدقيق الحركات غير المرحلة أو تسوية جردية.'}
                 </p>
               </div>
             </div>
@@ -190,24 +196,33 @@ export const InventoryReconciliationPage: React.FC = () => {
                 رصيد قيود اليومية المرحل لحساب 1104
               </div>
               <div className="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl mt-3 font-medium">
-                الرصيد الدفتري المالي المحاسبي المعتمد في الميزانية العمومية.
+                النطاق المحاسبي: الفرع والشركة. {reconciliation?.ledgerComparable === false
+                  ? 'غير قابل للمقارنة المباشرة بمخزون مستودع مفرد.'
+                  : 'متوافق مع نطاق المخزون المعروض.'}
               </div>
             </div>
           </div>
 
           {/* Variance Breakdown */}
-          <div className="mt-6 pt-4 border-t border-slate-200/60 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="mt-6 pt-4 border-t border-slate-200/60 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center justify-between bg-white/80 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-xs font-bold text-slate-700">الفارق بين الفعلي وطبقات FIFO:</span>
+              <span className="text-xs font-bold text-slate-700">فرق القيمة بين الفعلي وFIFO:</span>
               <span className={`font-mono font-black text-sm ${Math.abs(reconciliation?.variancePhysicalVsFifo || 0) < 0.05 ? 'text-emerald-600' : 'text-amber-600'}`}>
                 {fmt(reconciliation?.variancePhysicalVsFifo || 0)}
               </span>
             </div>
 
             <div className="flex items-center justify-between bg-white/80 border border-slate-200 p-3.5 rounded-xl">
-              <span className="text-xs font-bold text-slate-700">الفارق بين طبقات FIFO والأستاذ العام (1104):</span>
-              <span className={`font-mono font-black text-sm ${Math.abs(reconciliation?.varianceFifoVsGl || 0) < 0.05 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                {fmt(reconciliation?.varianceFifoVsGl || 0)}
+              <span className="text-xs font-bold text-slate-700">فرق الكمية بين الفعلي وFIFO:</span>
+              <span className={`font-mono font-black text-sm ${reconciliation?.quantityBalanced ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {Number(reconciliation?.variancePhysicalVsFifoQty || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between bg-white/80 border border-slate-200 p-3.5 rounded-xl">
+              <span className="text-xs font-bold text-slate-700">فرق FIFO / الأستاذ (1104):</span>
+              <span className={`font-mono font-black text-sm ${reconciliation?.ledgerComparable && Math.abs(reconciliation?.varianceFifoVsGl || 0) < 0.05 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {reconciliation?.ledgerComparable ? fmt(reconciliation?.varianceFifoVsGl || 0) : 'غير قابل للمقارنة'}
               </span>
             </div>
           </div>
@@ -232,7 +247,7 @@ export const InventoryReconciliationPage: React.FC = () => {
                   <th className="px-3 py-3 text-center">المخزون الفعلي</th>
                   <th className="px-3 py-3 text-center">طبقات FIFO</th>
                   <th className="px-3 py-3 text-center">الأستاذ العام (1104)</th>
-                  <th className="px-3 py-3 text-center">الفروقات</th>
+                  <th className="px-3 py-3 text-center">الفروقات والنطاق</th>
                   <th className="px-3 py-3 text-center">الحالة</th>
                   <th className="px-3 py-3">المحقق / ملاحظات</th>
                 </tr>
@@ -246,20 +261,29 @@ export const InventoryReconciliationPage: React.FC = () => {
                     <td className="px-3 py-2.5 text-center font-mono font-bold text-violet-700">{fmt(log.totalFifoLayerCost)}</td>
                     <td className="px-3 py-2.5 text-center font-mono font-bold text-emerald-700">{fmt(log.totalGlInventoryCost)}</td>
                     <td className="px-3 py-2.5 text-center font-mono text-xs font-black">
-                      {Math.abs(log.varianceFifoVsGl) < 0.05 ? (
-                        <span className="text-emerald-600 font-bold">0.00 ج.م</span>
-                      ) : (
-                        <span className="text-amber-600 font-black">{fmt(log.varianceFifoVsGl)}</span>
-                      )}
+                      <div>قيمة فعلي/FIFO: {fmt(log.variancePhysicalVsFifo)}</div>
+                      <div>كمية فعلي/FIFO: {log.variancePhysicalVsFifoQty == null
+                        ? 'غير مسجلة'
+                        : Number(log.variancePhysicalVsFifoQty).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</div>
+                      <div className="text-amber-700">FIFO/GL: {log.ledgerComparable
+                        ? fmt(log.varianceFifoVsGl)
+                        : 'نطاق الفرع/الشركة'}</div>
                     </td>
                     <td className="px-3 py-2.5 text-center">
-                      {log.status === 'BALANCED' ? (
+                      {log.status === 'BALANCED'
+                        && Boolean(log.ledgerComparable)
+                        && log.variancePhysicalVsFifoQty != null
+                        && Math.abs(Number(log.variancePhysicalVsFifoQty)) < 0.01
+                        && Math.abs(Number(log.variancePhysicalVsFifo)) < 0.05
+                        && Math.abs(Number(log.varianceFifoVsGl)) < 0.05 ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
                           <Check className="w-3 h-3" /> مطابق وموزون
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                          <AlertTriangle className="w-3 h-3" /> يوجد فروقات
+                          <AlertTriangle className="w-3 h-3" /> {log.variancePhysicalVsFifoQty == null || !log.ledgerComparable
+                            ? 'مطابقة غير مكتملة'
+                            : 'يوجد فروقات'}
                         </span>
                       )}
                     </td>
@@ -305,6 +329,15 @@ export const InventoryReconciliationPage: React.FC = () => {
                   <span className="text-slate-500">الأستاذ العام (1104):</span>
                   <span className="font-black">{fmt(reconciliation?.totalGlInventoryCost || 0)}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">فرق الكمية الفعلي/FIFO:</span>
+                  <span className="font-black">{Number(reconciliation?.variancePhysicalVsFifoQty || 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })}</span>
+                </div>
+                {!reconciliation?.ledgerComparable && (
+                  <div className="border-t border-slate-200 pt-1.5 text-amber-700 font-bold">
+                    رصيد GL بنطاق الفرع/الشركة وغير قابل للمقارنة بمستودع مفرد.
+                  </div>
+                )}
                 <div className="flex justify-between border-t border-slate-200 pt-1.5 font-bold">
                   <span>حالة المطابقة:</span>
                   <span className={isBalanced ? 'text-emerald-700' : 'text-amber-700'}>

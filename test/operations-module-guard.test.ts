@@ -6,6 +6,7 @@ import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { ModuleRegistryService } from '../src/services/domains/config/ModuleRegistryService.ts';
 import { OperationsService } from '../src/services/domains/operations/OperationsService.ts';
+import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const admin: User = {
@@ -89,4 +90,100 @@ test('delivery customer selector reads customers without an unsupported active c
 
   const customers = new OperationsService().getCustomersForSelect();
   assert.ok(customers.some((customer) => customer.id === 'cust_delivery_active_column_regression'));
+});
+
+test('warehouse types are saved independently of warehouse names', async () => {
+  await boot();
+  const operations = new OperationsService();
+  assert.equal(operations.getWarehouses().find((item) => item.id === 'wh_main')?.warehouseType, 'SHOWROOM');
+  const warehouse = operations.createWarehouse({
+    name: 'فرع شبين الرئيسي',
+    warehouseType: 'SHOWROOM',
+  });
+
+  assert.equal(warehouse.warehouseType, 'SHOWROOM');
+  operations.updateWarehouseType(warehouse.id, 'RETURNS_WAREHOUSE');
+  assert.equal(
+    new OperationsService().getWarehouses().find((item) => item.id === warehouse.id)?.warehouseType,
+    'RETURNS_WAREHOUSE'
+  );
+  assert.throws(
+    () => operations.updateWarehouseType(warehouse.id, 'INVALID' as never),
+    /نوع المخزن غير صالح/
+  );
+});
+
+test('warehouse administration requires an approved stock transfer before deactivation', async () => {
+  const db = await boot();
+  const operations = new OperationsService();
+  const source = operations.createWarehouse({ name: 'Warehouse lifecycle source' });
+  const destination = operations.createWarehouse({ name: 'Warehouse lifecycle destination' });
+  const categoryId = db.query<{ id: string }>('SELECT id FROM categories LIMIT 1')[0]?.id;
+  const brandId = db.query<{ id: string }>('SELECT id FROM brands LIMIT 1')[0]?.id;
+  assert.ok(categoryId);
+  assert.ok(brandId);
+
+  db.run(
+    `INSERT INTO products (id, sku, barcode, name, category_id, brand_id, size, base_unit, cost_price)
+     VALUES ('prod_wh_lifecycle', 'WH-LIFECYCLE', 'WH-LIFECYCLE', 'Warehouse lifecycle product', ?, ?, '60x60', 'M2', 12)`,
+    [categoryId, brandId]
+  );
+  db.run(
+    `INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
+     VALUES ('stk_wh_lifecycle', ?, 'prod_wh_lifecycle', 10, 0)`,
+    [source.id]
+  );
+
+  const updated = operations.updateWarehouse(source.id, {
+    name: 'Warehouse lifecycle edited',
+    location: 'North building',
+    warehouseType: 'RETURNS_WAREHOUSE',
+  });
+  assert.equal(updated.name, 'Warehouse lifecycle edited');
+  assert.equal(updated.location, 'North building');
+  assert.equal(updated.warehouseType, 'RETURNS_WAREHOUSE');
+
+  operations.setDefaultWarehouse(source.id);
+  assert.throws(() => operations.setWarehouseActive(source.id, false), /نقل جميع الأرصدة/);
+
+  const transferId = new InventoryService().requestWarehouseStockTransfer(
+    source.id,
+    destination.id,
+    'Warehouse lifecycle transfer'
+  );
+  assert.equal(
+    db.query<{ status: string }>('SELECT status FROM stock_transfers WHERE id = ?', [transferId])[0].status,
+    'REQUESTED'
+  );
+  assert.equal(
+    Number(db.query<{ quantity: number }>(
+      'SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+      [source.id, 'prod_wh_lifecycle']
+    )[0].quantity),
+    10
+  );
+  assert.equal(
+    Number(db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM stock_transfer_items WHERE transfer_id = ?',
+      [transferId]
+    )[0].count),
+    1
+  );
+  assert.throws(() => operations.setWarehouseActive(source.id, false), /نقل جميع الأرصدة/);
+
+  const emptyWarehouse = operations.createWarehouse({ name: 'Warehouse lifecycle empty' });
+  operations.setDefaultWarehouse(emptyWarehouse.id);
+  operations.setWarehouseActive(emptyWarehouse.id, false);
+  const disabledWarehouse = operations.getWarehouses().find((warehouse) => warehouse.id === emptyWarehouse.id);
+  assert.equal(disabledWarehouse?.isActive, false);
+  assert.equal(disabledWarehouse?.isDefault, false);
+  assert.equal(
+    Number(db.query<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM warehouses WHERE branch_id = ? AND is_active = 1 AND is_default = 1',
+      [source.branchId]
+    )[0].count),
+    1
+  );
+  operations.setWarehouseActive(emptyWarehouse.id, true);
+  assert.equal(operations.getWarehouses().find((warehouse) => warehouse.id === emptyWarehouse.id)?.isActive, true);
 });

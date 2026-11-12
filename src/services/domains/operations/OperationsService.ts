@@ -7,6 +7,7 @@ import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { BranchService } from '../organization/BranchService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
+import { isWarehouseType, type WarehouseType } from '../../../types/products/catalog';
 
 export interface Branch {
   id: string;
@@ -34,6 +35,7 @@ export interface WarehouseRow {
   id: string;
   name: string;
   code: string;
+  warehouseType: WarehouseType;
   location?: string | null;
   branchId?: string | null;
   branchName?: string;
@@ -286,11 +288,18 @@ export class OperationsService {
     }));
   }
 
-  public createWarehouse(input: { name: string; location?: string; branchId?: string }): WarehouseRow {
+  public createWarehouse(input: {
+    name: string;
+    location?: string;
+    branchId?: string;
+    warehouseType?: WarehouseType;
+  }): WarehouseRow {
     ModuleRegistryService.assertModuleEnabled('operations');
     this.requireManage('warehouses.manage');
     CentralUsageLimitService.assertWithin('maxWarehouses');
     if (!input.name.trim()) throw new Error('اسم المخزن مطلوب.');
+    const warehouseType = input.warehouseType ?? 'BRANCH_WAREHOUSE';
+    if (!isWarehouseType(warehouseType)) throw new Error('نوع المخزن غير صالح.');
     const actor = AuthService.requireAuth();
     const branchId = input.branchId
       ? (this.branchAccess.requireBranchAccess(input.branchId, actor), input.branchId)
@@ -303,12 +312,140 @@ export class OperationsService {
         [branchId]
       )[0]?.companyId ?? null;
       db.run(
-        `INSERT INTO warehouses (id, name, code, location, branch_id, company_id, is_default, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
-        [id, input.name.trim(), code, input.location || null, branchId, companyId]
+        `INSERT INTO warehouses (id, name, code, location, warehouse_type, branch_id, company_id, is_default, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)`,
+        [id, input.name.trim(), code, input.location || null, warehouseType, branchId, companyId]
       );
       return this.getWarehouses().find((w) => w.id === id)!;
     });
+  }
+
+  public updateWarehouseType(id: string, warehouseType: WarehouseType): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    const actor = AuthService.requireAuth();
+    this.requireManage('warehouses.manage');
+    if (!isWarehouseType(warehouseType)) throw new Error('نوع المخزن غير صالح.');
+    this.getManageableWarehouse(id, actor);
+    this.db.run('UPDATE warehouses SET warehouse_type = ? WHERE id = ?', [warehouseType, id]);
+  }
+
+  public updateWarehouse(id: string, input: {
+    name: string;
+    location?: string;
+    branchId?: string;
+    warehouseType?: WarehouseType;
+  }): WarehouseRow {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    const actor = AuthService.requireAuth();
+    this.requireManage('warehouses.manage');
+    const warehouse = this.getManageableWarehouse(id, actor);
+    const name = input.name.trim();
+    if (!name) throw new Error('اسم المخزن مطلوب.');
+    if (input.warehouseType && !isWarehouseType(input.warehouseType)) {
+      throw new Error('نوع المخزن غير صالح.');
+    }
+    if (this.db.query<{ id: string }>('SELECT id FROM warehouses WHERE name = ? AND id <> ?', [name, id]).length) {
+      throw new Error('يوجد مخزن آخر بهذا الاسم.');
+    }
+
+    let branchId = warehouse.branchId;
+    let companyId = this.db.query<{ companyId: string | null }>(
+      'SELECT company_id AS companyId FROM warehouses WHERE id = ?',
+      [id]
+    )[0]?.companyId ?? null;
+    if (input.branchId && input.branchId !== branchId) {
+      this.branchAccess.requireBranchAccess(input.branchId, actor);
+      const branch = this.db.query<{ companyId: string | null; isActive: number }>(
+        'SELECT company_id AS companyId, is_active AS isActive FROM branches WHERE id = ?',
+        [input.branchId]
+      )[0];
+      if (!branch || Number(branch.isActive) !== 1) throw new Error('الفرع المحدد غير موجود أو غير نشط.');
+      branchId = input.branchId;
+      companyId = branch.companyId;
+    }
+
+    this.db.run(
+      `UPDATE warehouses SET name = ?, location = ?, warehouse_type = COALESCE(?, warehouse_type),
+        branch_id = ?, company_id = ? WHERE id = ?`,
+      [name, input.location?.trim() || null, input.warehouseType ?? null, branchId, companyId, id]
+    );
+    return this.getWarehouses().find((warehouseRow) => warehouseRow.id === id)!;
+  }
+
+  public setWarehouseActive(id: string, active: boolean): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    const actor = AuthService.requireAuth();
+    this.requireManage('warehouses.manage');
+    const warehouse = this.getManageableWarehouse(id, actor);
+    this.db.executeTransaction((db) => {
+      const current = db.query<{ isActive: number; isDefault: number }>(
+        'SELECT is_active AS isActive, is_default AS isDefault FROM warehouses WHERE id = ?',
+        [id]
+      )[0];
+      if (!current) throw new Error('المخزن غير موجود.');
+      if (active) {
+        db.run('UPDATE warehouses SET is_active = 1 WHERE id = ?', [id]);
+        return;
+      }
+
+      const hasStock = db.query<{ id: string }>(
+        `SELECT id FROM warehouse_stock
+         WHERE warehouse_id = ? AND (
+           ABS(COALESCE(quantity_m2, 0)) > 0.000001 OR ABS(COALESCE(reserved_m2, 0)) > 0.000001
+         )
+         LIMIT 1`,
+        [id]
+      ).length > 0;
+      if (hasStock) throw new Error('لا يمكن تعطيل المخزن قبل نقل جميع الأرصدة وإلغاء الحجوزات المرتبطة به.');
+
+      if (Number(current.isDefault)) {
+        const replacement = db.query<{ id: string }>(
+          `SELECT id FROM warehouses
+           WHERE branch_id IS ? AND is_active = 1 AND id <> ?
+           ORDER BY name, id LIMIT 1`,
+          [warehouse.branchId ?? null, id]
+        )[0];
+        if (!replacement) throw new Error('لا يمكن تعطيل المخزن الافتراضي قبل تفعيل مخزن آخر وتعيينه افتراضياً.');
+        db.run('UPDATE warehouses SET is_default = 0 WHERE branch_id IS ?', [warehouse.branchId ?? null]);
+        db.run('UPDATE warehouses SET is_default = 1 WHERE id = ?', [replacement.id]);
+      }
+      db.run('UPDATE warehouses SET is_active = 0, is_default = 0 WHERE id = ?', [id]);
+    });
+  }
+
+  public setDefaultWarehouse(id: string): void {
+    ModuleRegistryService.assertModuleEnabled('operations');
+    const actor = AuthService.requireAuth();
+    this.requireManage('warehouses.manage');
+    const warehouse = this.getManageableWarehouse(id, actor);
+    this.db.executeTransaction((db) => {
+      const current = db.query<{ isActive: number }>(
+        'SELECT is_active AS isActive FROM warehouses WHERE id = ?',
+        [id]
+      )[0];
+      if (!current || Number(current.isActive) !== 1) throw new Error('يجب تفعيل المخزن قبل تعيينه افتراضياً.');
+      db.run('UPDATE warehouses SET is_default = 0 WHERE branch_id IS ?', [warehouse.branchId ?? null]);
+      db.run('UPDATE warehouses SET is_default = 1 WHERE id = ?', [id]);
+    });
+  }
+
+  private getManageableWarehouse(id: string, actor: ReturnType<typeof AuthService.requireAuth>): { branchId: string | null } {
+    const warehouse = this.db.query<{ branchId: string | null }>(
+      'SELECT branch_id AS branchId FROM warehouses WHERE id = ?',
+      [id]
+    )[0];
+    if (!warehouse) throw new Error('المخزن غير موجود.');
+
+    const branchIds = warehouse.branchId
+      ? [warehouse.branchId]
+      : this.db.query<{ branchId: string }>(
+        'SELECT branch_id AS branchId FROM branch_warehouses WHERE warehouse_id = ?',
+        [id]
+      ).map((row) => row.branchId);
+    const currentBranchId = this.branchAccess.getCurrentBranchId(actor);
+    if (!branchIds.includes(currentBranchId)) throw new Error('المخزن لا يتبع الفرع النشط الحالي.');
+    this.branchAccess.requireBranchAuthorization(currentBranchId, actor);
+    return warehouse;
   }
 
   // ── Drivers ────────────────────────────────────────────────────────────────

@@ -79,7 +79,12 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   // Inventory
   { code: 'inventory.view', name: 'عرض المخزون', module: 'INVENTORY' },
   { code: 'inventory.adjust', name: 'تسوية المخزون', module: 'INVENTORY' },
+  { code: 'inventory.adjustment.approve', name: 'اعتماد تسوية المخزون', module: 'INVENTORY' },
+  { code: 'inventory.adjustment.post', name: 'ترحيل تسوية المخزون', module: 'INVENTORY' },
   { code: 'inventory.transfer', name: 'تحويل بين المخازن', module: 'INVENTORY' },
+  { code: 'inventory.transfer.workflow.approve', name: 'اعتماد طلب التحويل المخزني', module: 'INVENTORY' },
+  { code: 'inventory.transfer.execute', name: 'تنفيذ وإرسال التحويل المخزني', module: 'INVENTORY' },
+  { code: 'inventory.transfer.receive', name: 'استلام التحويل المخزني', module: 'INVENTORY' },
   { code: 'inventory.count', name: 'جرد المخزون', module: 'INVENTORY' },
   { code: 'inventory.count.approve', name: 'اعتماد جرد المخزون', module: 'INVENTORY' },
   { code: 'inventory.export', name: 'تصدير بيانات المخزون', module: 'INVENTORY' },
@@ -654,6 +659,11 @@ const MANAGER_RESTRICTED = new Set([
   'finance.fiscal_closing.execute',
   'finance.journal.post',
   'hr.contracts.approve',
+  'inventory.adjustment.approve',
+  'inventory.adjustment.post',
+  'inventory.transfer.workflow.approve',
+  'inventory.transfer.execute',
+  'inventory.transfer.receive',
 ]);
 
 export const ROLE_DEFAULTS: Record<string, string[]> = {
@@ -1223,7 +1233,11 @@ export class PermissionService {
   }
 
   private static ensureAdminDataPermissions(db: DatabaseManager): void {
-    for (const permission of ['admin.data.export', 'admin.data.delete', 'inventory.count.approve']) {
+    for (const permission of [
+      'admin.data.export', 'admin.data.delete', 'inventory.count.approve',
+      'inventory.adjustment.approve', 'inventory.adjustment.post',
+      'inventory.transfer.workflow.approve', 'inventory.transfer.execute', 'inventory.transfer.receive',
+    ]) {
       db.run(
         'INSERT OR IGNORE INTO role_permissions (role_code, permission_code) VALUES (?, ?)',
         ['ADMIN', permission]

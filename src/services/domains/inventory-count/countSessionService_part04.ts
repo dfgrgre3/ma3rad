@@ -4,6 +4,8 @@ import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { localDateString } from '../../../utils/shared/date';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import type { CountItem, CountSession } from '../../../types/inventory/countSessions';
+import { conversionFactor, fromBaseQuantity } from '../../../utils/products/uom';
+import type { CountStockInfo } from './countSessionService_part02';
 import { updateWarehouseStock } from './countSessionService_part03';
 
 export function postCountVariance(
@@ -12,7 +14,7 @@ export function postCountVariance(
   item: CountItem,
   actorId: string,
   warehouseId: string,
-  metersPerBox: number
+  stockInfo: CountStockInfo
 ): void {
   const diffM2 = item.varianceM2;
   const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
@@ -27,7 +29,12 @@ export function postCountVariance(
   const txId = `tx_${uuidv4().substring(0, 8)}`;
   const txNum = txDb.nextNumber('TX-CNT');
   const txType = diffM2 > 0 ? 'ADJUSTMENT_ADD' : 'ADJUSTMENT_SUB';
-  const boxesCount = Number((diffM2 / metersPerBox).toFixed(2));
+  const boxFactor = stockInfo.productType === 'SERVICE' || stockInfo.baseUnit === 'SERVICE'
+    ? null
+    : conversionFactor(stockInfo.baseUnit, 'BOX', stockInfo);
+  const boxesCount = boxFactor === null
+    ? 0
+    : Number(fromBaseQuantity(diffM2, 'BOX', stockInfo).toFixed(2));
   txDb.run(`
     INSERT INTO inventory_transactions (
       id, transaction_number, type, product_id, warehouse_id,

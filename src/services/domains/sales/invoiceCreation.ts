@@ -40,6 +40,8 @@ type PreparedSaleItem = {
   totalCost: number;
   profit: number;
   fifoPlan: ReturnType<typeof InventoryCostingService.planFifo> | null;
+  specialStockId: string | null;
+  specialNumber: string | null;
   metersPerBox: number;
   piecesPerBox: number;
   productType: string;
@@ -163,7 +165,8 @@ function buildPreparedItem(
   plannedFifoByLayer: Map<string, number>,
   costingMethod: string,
   trackInventory: boolean,
-  allowNegativeStock: boolean
+  allowNegativeStock: boolean,
+  plannedSpecialStock: Map<string, number>
 ): PreparedSaleItem {
   const product = sqliteDb.query(`SELECT * FROM products WHERE id = ? AND is_active = 1`, [item.productId])[0] as any;
   if (!product) throw new Error(`المنتج ذو المعرف ${item.productId} غير موجود أو غير نشط.`);
@@ -175,10 +178,34 @@ function buildPreparedItem(
   const serviceLine = isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
   const tracksStock = trackInventory && !serviceLine;
   const unitLabel = getUnitLabel(product);
-  validateProductPricing(item, product, actor, units.baseUnitPrice);
+  let specialStock: any | undefined;
+  if (item.specialStockId) {
+    if (!tracksStock) throw new Error('لا يمكن بيع مصدر المخزون المخفض لصنف لا يتتبع المخزون.');
+    specialStock = sqliteDb.query(`
+      SELECT id, special_number AS specialNumber, product_id AS productId,
+        warehouse_id AS warehouseId, status, remaining_quantity_m2 AS remainingQuantityM2,
+        discounted_unit_price AS discountedUnitPrice, unit_cost AS unitCost
+      FROM inventory_special_stocks WHERE id = ?
+    `, [item.specialStockId])[0];
+    if (!specialStock || specialStock.status !== 'DOWNGRADED_SALE'
+      || specialStock.productId !== item.productId || specialStock.warehouseId !== dto.warehouseId
+      || Number(specialStock.remainingQuantityM2) <= 0) {
+      throw new Error('مصدر مخزون البيع المخفض غير متاح أو لا يطابق الصنف والمخزن المحددين.');
+    }
+    const alreadyPlanned = plannedSpecialStock.get(item.specialStockId) || 0;
+    if (Number(specialStock.remainingQuantityM2) - alreadyPlanned < baseQuantity) {
+      throw new Error(`الكمية المتاحة من سجل البيع المخفض ${specialStock.specialNumber} غير كافية.`);
+    }
+    if (round2(units.baseUnitPrice) !== round2(Number(specialStock.discountedUnitPrice))) {
+      throw new Error('سعر البيع لا يطابق السعر المعتمد لمصدر المخزون المخفض.');
+    }
+    plannedSpecialStock.set(item.specialStockId, round2(alreadyPlanned + baseQuantity));
+  } else {
+    validateProductPricing(item, product, actor, units.baseUnitPrice);
+  }
 
   let stockSufficient = true;
-  if (tracksStock) {
+  if (tracksStock && !specialStock) {
     const availableM2 = getAvailableStockM2(sqliteDb, item.productId, dto.warehouseId);
     const alreadyPlanned = plannedByProduct.get(item.productId) || 0;
     if (allowNegativeStock) {
@@ -191,7 +218,7 @@ function buildPreparedItem(
     plannedByProduct.set(item.productId, alreadyPlanned + baseQuantity);
   }
 
-  const fifoPlan = tracksStock && (!allowNegativeStock || stockSufficient)
+  const fifoPlan = tracksStock && !specialStock && (!allowNegativeStock || stockSufficient)
     ? getFifoPlan(sqliteDb, item, dto, baseQuantity, plannedFifoByLayer, costingMethod)
     : null;
   // Financials are computed in the unit the cashier used, so a price of
@@ -199,7 +226,7 @@ function buildPreparedItem(
   // per-m² conversion. Costs are converted to the same unit for the margin.
   const costPerSellUnit = fifoPlan
     ? fifoPlan.totalCost / (units.sellQuantity || 1)
-    : (item.unitCost ?? product.costPrice ?? 0) * units.factor;
+    : (specialStock ? Number(specialStock.unitCost) : item.unitCost ?? product.costPrice ?? 0) * units.factor;
   const line = computeSaleLine({
     quantity: units.sellQuantity,
     unitPrice: units.sellUnitPrice,
@@ -232,6 +259,8 @@ function buildPreparedItem(
     totalCost: line.lineCost,
     profit: line.lineProfit,
     fifoPlan,
+    specialStockId: specialStock?.id || null,
+    specialNumber: specialStock?.specialNumber || null,
     metersPerBox,
     piecesPerBox,
     productType: product.productType,
@@ -251,9 +280,13 @@ function prepareSaleItems(
   const preparedItems: PreparedSaleItem[] = [];
   const plannedByProduct = new Map<string, number>();
   const plannedFifoByLayer = new Map<string, number>();
+  const plannedSpecialStock = new Map<string, number>();
 
   for (const item of dto.items) {
-    const preparedItem = buildPreparedItem(sqliteDb, dto, item, actor, plannedByProduct, plannedFifoByLayer, costingMethod, trackInventory, allowNegativeStock);
+    const preparedItem = buildPreparedItem(
+      sqliteDb, dto, item, actor, plannedByProduct, plannedFifoByLayer, costingMethod,
+      trackInventory, allowNegativeStock, plannedSpecialStock
+    );
     totalLineDiscount += preparedItem.discountAmount;
     preparedItems.push(preparedItem);
   }
@@ -325,16 +358,45 @@ function insertInvoiceItems(
       INSERT INTO sales_invoice_items (
         id, invoice_id, product_id, product_name, product_sku, product_grade, size,
         sold_by, quantity_m2, quantity, uom, boxes_count, pieces_count, unit_price, original_unit_price,
-        unit_cost, discount_amount, total_price, total_cost, profit, meters_per_box, pieces_per_box
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        unit_cost, discount_amount, total_price, total_cost, profit, meters_per_box, pieces_per_box, special_stock_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       item.id, item.invoiceId, item.productId, item.productName, item.productSku, item.productGrade,
       item.size, item.soldBy, item.quantityM2, item.quantityM2, item.baseUom, item.boxesCount, item.piecesCount,
       item.unitPrice, item.originalUnitPrice, round2(item.unitCost), item.discountAmount,
-      item.totalPrice, item.totalCost, item.profit, item.metersPerBox, item.piecesPerBox
+      item.totalPrice, item.totalCost, item.profit, item.metersPerBox, item.piecesPerBox, item.specialStockId
     ]);
 
     if (!item.tracksStock) continue;
+    if (item.specialStockId) {
+      const source = sqliteDb.query(`
+        SELECT remaining_quantity_m2 AS remainingQuantityM2, status
+        FROM inventory_special_stocks WHERE id = ?
+      `, [item.specialStockId])[0];
+      if (!source || source.status !== 'DOWNGRADED_SALE' || Number(source.remainingQuantityM2) < item.quantityM2) {
+        throw new Error(`نفدت الكمية المتاحة من سجل البيع المخفض ${item.specialNumber || item.specialStockId}.`);
+      }
+      sqliteDb.run(`
+        UPDATE inventory_special_stocks
+        SET remaining_quantity_m2 = remaining_quantity_m2 - ?
+        WHERE id = ? AND status = 'DOWNGRADED_SALE' AND remaining_quantity_m2 >= ?
+      `, [item.quantityM2, item.specialStockId, item.quantityM2]);
+
+      const txId = `tx_${uuidv4().substring(0, 8)}`;
+      sqliteDb.run(`
+        INSERT INTO inventory_transactions (
+          id, transaction_number, type, product_id, warehouse_id,
+          quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
+          reference_id, notes, performed_by
+        ) VALUES (?, ?, 'SALE', ?, ?, ?, ?, ?, ?, 'SPECIAL_STOCK_SALE', ?, ?, ?)
+      `, [
+        txId, sqliteDb.nextNumber('TX-SALE'), item.productId, dto.warehouseId,
+        -item.quantityM2, -item.boxesCount, round2(item.unitCost), item.totalCost,
+        item.id, `بيع مخزون مخفض ${item.specialNumber || ''} بموجب فاتورة ${invoiceNumber}`.trim(), actor.id
+      ]);
+      continue;
+    }
+
     const stockUpdate = sqliteDb.query(
       `SELECT id FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
       [item.productId, dto.warehouseId]

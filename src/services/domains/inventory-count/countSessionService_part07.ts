@@ -2,9 +2,11 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { branchAccess } from './branchAccess';
+import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { CountSession } from '../../../types/inventory/countSessions';
 
 export function cancelCountSession(activeSession: CountSession): void {
+  ModuleRegistryService.assertModuleEnabled('inventory');
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.inventory.counts.count');
   const db = DatabaseManager.getInstance();

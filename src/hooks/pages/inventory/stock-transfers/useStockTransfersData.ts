@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { InventoryService } from '../../../../services/domains/inventory/InventoryService';
 import { ProductService } from '../../../../services/domains/products/ProductService';
+import { AuthService } from '../../../../services/domains/auth/AuthService';
+import { PermissionService } from '../../../../services/domains/auth/PermissionService';
 import { Warehouse } from '../../../../types';
 import { useToast } from '../../../../components/ui/Toast';
 import { buildTransferSummaryFields, groupSummaryByWarehouse } from '../../../../pages/inventory/stock-transfers/components/helpers';
@@ -28,7 +30,8 @@ export function useStockTransfersData() {
     try {
       const whs = inventoryService.getAllWarehouses();
       setWarehouses(whs);
-      setAllProducts(productService.getAllProducts());
+      const canCreateTransfer = PermissionService.can(AuthService.getCurrentUser(), 'inventory.transfer');
+      setAllProducts(canCreateTransfer ? productService.getAllProducts() : []);
 
       const wfList = inventoryService.getTransfersWithDetails(
         statusFilter === 'ALL' ? undefined : statusFilter,

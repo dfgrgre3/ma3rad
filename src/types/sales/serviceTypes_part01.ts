@@ -9,6 +9,8 @@ export interface CreateSaleDTO {
   projectId?: string;
   items: {
     productId: string;
+    /** Source special-stock record for approved discounted sale inventory. */
+    specialStockId?: string;
     /** Unit the cashier entered the line in; kept for display/reporting. */
     soldBy: string;
     /** Legacy base-unit quantity. Ignored for math when `uom` + `quantity` are given. */

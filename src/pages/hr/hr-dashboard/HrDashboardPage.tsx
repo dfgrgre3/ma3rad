@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
   Users, TrendingUp, Wallet, Clock, Calendar, Award, AlertCircle, Loader2, BriefcaseBusiness,
   RefreshCw, UserCheck, UserX, BarChart3, Activity, ArrowUpRight, HardHat,
@@ -235,6 +236,8 @@ function LocationChart({ locations }: { locations: { location: string; count: nu
 }
 
 export const HrDashboardPage: React.FC = () => {
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
   const canManage = PermissionService.can(user, 'ui.employees.employees.manage');
@@ -256,6 +259,12 @@ export const HrDashboardPage: React.FC = () => {
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (!refreshCtx) return;
+    if (initialRef.current) { initialRef.current = false; return; }
+    load();
+  }, [refreshCtx?.refreshToken, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

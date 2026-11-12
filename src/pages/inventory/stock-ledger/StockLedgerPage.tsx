@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Search, Filter, Download, TrendingUp, TrendingDown, ArrowRight, Package } from 'lucide-react';
+import { BookOpen, Search, Download } from 'lucide-react';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { BranchAccessService } from '../../../services/domains/auth/BranchAccessService';
 import { format } from 'date-fns';
@@ -19,6 +19,7 @@ interface LedgerEntry {
   qtyIn: number;
   qtyOut: number;
   qtyLoss: number;
+  previousBalance: number;
   balance: number;
   ref: string;
   user: string;
@@ -28,13 +29,19 @@ interface LedgerEntry {
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
   PURCHASE:         { label: 'شراء', color: 'text-emerald-600' },
   SALE:             { label: 'بيع', color: 'text-sky-600' },
+  PURCHASE_RETURN:  { label: 'مرتجع شراء', color: 'text-amber-600' },
+  SALES_RETURN:     { label: 'مرتجع بيع', color: 'text-violet-600' },
   RETURN_IN:        { label: 'مرتجع وارد', color: 'text-violet-600' },
   RETURN_OUT:       { label: 'مرتجع صادر', color: 'text-amber-600' },
   TRANSFER_IN:      { label: 'تحويل وارد', color: 'text-teal-600' },
   TRANSFER_OUT:     { label: 'تحويل صادر', color: 'text-orange-600' },
+  ADJUSTMENT_ADD:   { label: 'تسوية إضافة', color: 'text-emerald-600' },
+  ADJUSTMENT_SUB:   { label: 'تسوية خصم', color: 'text-yellow-600' },
   ADJUSTMENT:       { label: 'تسوية', color: 'text-yellow-400' },
   OPENING_BALANCE:  { label: 'رصيد افتتاحي', color: 'text-slate-500' },
+  STOCK_COUNT:      { label: 'تسوية جرد', color: 'text-indigo-600' },
   DAMAGE:           { label: 'تالف', color: 'text-rose-600' },
+  VOID:             { label: 'إلغاء', color: 'text-slate-500' },
 };
 
 const branchAccess = new BranchAccessService();
@@ -46,10 +53,11 @@ export const StockLedgerPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
-  const branchAccess = new BranchAccessService();
 
   useEffect(() => {
     try {
@@ -66,36 +74,80 @@ export const StockLedgerPage: React.FC = () => {
   useEffect(() => {
     setPage(1);
     loadData();
-  }, [search, typeFilter, warehouseFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, typeFilter, warehouseFilter, fromDate, toDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = () => {
     setLoading(true);
     try {
       const scope = branchAccess.warehouseBranchScope('w');
       let sql = `
+        WITH balances AS (
+          SELECT it.id,
+                 COALESCE(SUM(it.quantity_m2) OVER (
+                   PARTITION BY it.product_id, it.warehouse_id
+                   ORDER BY it.created_at ASC, it.rowid ASC
+                   ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                 ), 0) AS previous_balance,
+                 SUM(it.quantity_m2) OVER (
+                   PARTITION BY it.product_id, it.warehouse_id
+                   ORDER BY it.created_at ASC, it.rowid ASC
+                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                 ) AS balance
+          FROM inventory_transactions it
+          JOIN warehouses w ON w.id = it.warehouse_id
+          WHERE ${scope.clause}
+        )
         SELECT it.id, it.created_at as date, p.name as product,
                p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit,
                w.name as warehouse, it.type,
-               CASE WHEN it.quantity_m2 > 0 THEN it.quantity_m2 ELSE 0 END as qty_in,
-               CASE WHEN it.quantity_m2 < 0 AND COALESCE(it.reference_type, '') != 'TRANSFER_LOSS'
-                    THEN ABS(it.quantity_m2) ELSE 0 END as qty_out,
-               CASE WHEN it.quantity_m2 < 0 AND COALESCE(it.reference_type, '') = 'TRANSFER_LOSS'
-                    THEN ABS(it.quantity_m2) ELSE 0 END as qty_loss,
-               0 as balance,
-               COALESCE(it.transaction_number,'') as ref,
+               CASE WHEN it.quantity_m2 > 0 THEN it.quantity_m2 ELSE 0 END as qtyIn,
+               CASE WHEN it.quantity_m2 < 0
+                         AND it.type != 'DAMAGE'
+                         AND COALESCE(it.reference_type, '') != 'TRANSFER_LOSS'
+                    THEN ABS(it.quantity_m2) ELSE 0 END as qtyOut,
+               CASE WHEN it.quantity_m2 < 0
+                         AND (it.type = 'DAMAGE' OR COALESCE(it.reference_type, '') = 'TRANSFER_LOSS')
+                    THEN ABS(it.quantity_m2) ELSE 0 END as qtyLoss,
+               b.previous_balance AS previousBalance,
+               b.balance AS balance,
+               COALESCE(si.invoice_number, pi.invoice_number,
+                        sr.original_invoice_number, pr.original_invoice_number,
+                        sr.return_number, pr.return_number, st.transfer_number, sc.count_number,
+                        sa.adjustment_number, it.transaction_number, it.reference_id, '') as ref,
                COALESCE(u.full_name,'النظام') as user,
                COALESCE(it.notes,'') as notes
         FROM inventory_transactions it
         JOIN products p ON p.id = it.product_id
         JOIN warehouses w ON w.id = it.warehouse_id
+        JOIN balances b ON b.id = it.id
         LEFT JOIN users u ON u.id = it.performed_by
+        LEFT JOIN sales_invoices si
+          ON si.id = it.reference_id AND it.reference_type IN ('INVOICE', 'SALES_INVOICE')
+        LEFT JOIN purchase_invoices pi
+          ON pi.id = it.reference_id AND it.reference_type IN ('PURCHASE', 'PURCHASE_INVOICE')
+        LEFT JOIN sales_returns sr
+          ON sr.id = it.reference_id AND it.reference_type = 'SALES_RETURN'
+        LEFT JOIN purchase_returns pr
+          ON pr.id = it.reference_id AND it.reference_type = 'PURCHASE_RETURN'
+        LEFT JOIN stock_transfers st
+          ON st.id = it.reference_id AND it.reference_type = 'TRANSFER'
+        LEFT JOIN stock_counts sc
+          ON sc.id = it.reference_id AND it.reference_type = 'STOCK_COUNT'
+        LEFT JOIN stock_adjustments sa
+          ON sa.id = it.reference_id
         WHERE 1=1 AND ${scope.clause}
       `;
       const params: string[] = [...scope.params];
+      params.push(...scope.params);
 
       if (search) {
-        sql += ` AND (p.name LIKE ? OR it.transaction_number LIKE ?)`;
-        params.push(`%${search}%`, `%${search}%`);
+        sql += ` AND (p.name LIKE ? OR it.transaction_number LIKE ? OR it.reference_id LIKE ?
+                      OR si.invoice_number LIKE ? OR pi.invoice_number LIKE ?
+                      OR sr.return_number LIKE ? OR pr.return_number LIKE ?
+                      OR sr.original_invoice_number LIKE ? OR pr.original_invoice_number LIKE ?
+                      OR st.transfer_number LIKE ? OR sc.count_number LIKE ?
+                      OR sa.adjustment_number LIKE ?)`;
+        params.push(...Array(12).fill(`%${search}%`));
       }
       if (typeFilter) {
         sql += ` AND it.type = ?`;
@@ -105,10 +157,35 @@ export const StockLedgerPage: React.FC = () => {
         sql += ` AND it.warehouse_id = ?`;
         params.push(warehouseFilter);
       }
+      if (fromDate) {
+        sql += ` AND date(it.created_at) >= date(?)`;
+        params.push(fromDate);
+      }
+      if (toDate) {
+        sql += ` AND date(it.created_at) <= date(?)`;
+        params.push(toDate);
+      }
 
-      sql += ` ORDER BY it.created_at DESC LIMIT 200`;
+      sql += ` ORDER BY it.created_at DESC, it.rowid DESC`;
 
-      const rows = DatabaseManager.getInstance().query<any>(sql, params);
+      const rows = DatabaseManager.getInstance().query<{
+        id: string;
+        date: string;
+        product: string;
+        productType: 'CERAMIC' | 'GENERAL';
+        baseUnit: string;
+        customUnit?: string;
+        warehouse: string;
+        type: string;
+        qtyIn: number;
+        qtyOut: number;
+        qtyLoss: number;
+        previousBalance: number;
+        balance: number;
+        ref: string;
+        user: string;
+        notes: string;
+      }>(sql, params);
       const data: LedgerEntry[] = rows.map(r => ({
         id: r.id,
         date: format(new Date(r.date), 'dd/MM/yyyy HH:mm'),
@@ -121,6 +198,7 @@ export const StockLedgerPage: React.FC = () => {
         qtyIn: r.qtyIn || 0,
         qtyOut: r.qtyOut || 0,
         qtyLoss: r.qtyLoss || 0,
+        previousBalance: r.previousBalance || 0,
         balance: r.balance || 0,
         ref: r.ref,
         user: r.user,
@@ -141,7 +219,12 @@ export const StockLedgerPage: React.FC = () => {
   const exportLedger = () => {
     exportToExcel({
       title: 'سجل حركة المخزون',
-      subtitle: `${warehouses.find((w) => w.id === warehouseFilter)?.name ?? 'كل المخازن'} · ${entries.length} حركة`,
+      subtitle: [
+        warehouses.find((w) => w.id === warehouseFilter)?.name ?? 'كل المخازن',
+        fromDate && `من ${fromDate}`,
+        toDate && `إلى ${toDate}`,
+        `${entries.length} حركة`,
+      ].filter(Boolean).join(' · '),
       fileName: 'stock-ledger',
       permission: 'inventory.export',
       columns: [
@@ -152,7 +235,8 @@ export const StockLedgerPage: React.FC = () => {
         { key: 'qtyIn', label: 'وارد' },
         { key: 'qtyOut', label: 'صادر' },
         { key: 'qtyLoss', label: 'تالف' },
-        { key: 'balance', label: 'الرصيد' },
+        { key: 'previousBalance', label: 'الرصيد السابق' },
+        { key: 'balance', label: 'الرصيد بعد الحركة' },
         { key: 'ref', label: 'المرجع' },
         { key: 'user', label: 'المستخدم' },
         { key: 'notes', label: 'ملاحظات' },
@@ -160,6 +244,7 @@ export const StockLedgerPage: React.FC = () => {
       rows: entries.map((entry) => ({
         ...entry,
         type: TYPE_LABELS[entry.type]?.label ?? entry.type,
+        previousBalance: formatProductQuantity(entry.previousBalance, entry as any),
         balance: formatProductQuantity(entry.balance, entry as any),
       })),
     });
@@ -221,6 +306,27 @@ export const StockLedgerPage: React.FC = () => {
           <option value="">كل المخازن</option>
           {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
         </select>
+
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          من
+          <input
+            type="date"
+            value={fromDate}
+            onChange={e => setFromDate(e.target.value)}
+            aria-label="من تاريخ"
+            className="px-2 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          إلى
+          <input
+            type="date"
+            value={toDate}
+            onChange={e => setToDate(e.target.value)}
+            aria-label="إلى تاريخ"
+            className="px-2 py-2 bg-slate-100 text-sm text-slate-700 rounded-lg border border-slate-300 focus:border-sky-500 focus:outline-none"
+          />
+        </label>
       </div>
 
       {/* Table */}
@@ -235,10 +341,10 @@ export const StockLedgerPage: React.FC = () => {
             <p className="text-sm">لا توجد حركات مطابقة</p>
           </div>
         ) : (
-          <table className="w-full text-xs min-w-[900px]">
+          <table className="w-full text-xs min-w-[1250px]">
             <thead className="bg-white sticky top-0 z-10">
               <tr>
-                {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد', 'صادر', 'فقد / تلف', 'المرجع', 'المستخدم'].map(h => (
+                {['التاريخ', 'المنتج', 'المخزن', 'النوع', 'وارد', 'صادر', 'فقد / تلف', 'الرصيد السابق', 'الرصيد بعد الحركة', 'المرجع الأصلي', 'المستخدم'].map(h => (
                   <th key={h} className="px-4 py-3 text-right font-bold text-slate-500 border-b border-slate-200">{h}</th>
                 ))}
               </tr>
@@ -262,6 +368,12 @@ export const StockLedgerPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-amber-600 font-bold">
                       {r.qtyLoss > 0 ? `-${formatProductQuantity(r.qtyLoss, r)}` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 font-bold">
+                      {formatProductQuantity(r.previousBalance, r)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-900 font-bold">
+                      {formatProductQuantity(r.balance, r)}
                     </td>
                     <td className="px-4 py-3 text-slate-500 font-mono">{r.ref || '—'}</td>
                     <td className="px-4 py-3 text-slate-500">{r.user}</td>

@@ -18,13 +18,15 @@ export const InventoryView: React.FC = () => {
   const inventoryLabel = useBusinessTerm('modules.inventory');
   const { label: businessProfileLabel } = useBusinessProfileMeta();
   const [stockList, setStockList] = useState<any[]>([]);
+  const [inactiveStockList, setInactiveStockList] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<IWarehouse[]>([]);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [search, setSearch] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'STOCK' | 'TRANSFERS' | 'LOGS'>('STOCK');
+  const [activeTab, setActiveTab] = useState<'STOCK' | 'INACTIVE_STOCK' | 'LOGS'>('STOCK');
+  const displayedStockList = activeTab === 'INACTIVE_STOCK' ? inactiveStockList : stockList;
 
   // Transfer Modal State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
@@ -51,19 +53,21 @@ export const InventoryView: React.FC = () => {
   const inventoryService = new InventoryService();
   const productService = new ProductService();
   const currentUser = AuthService.getCurrentUser();
-  const canTransfer = PermissionService.can(currentUser, 'ui.inventory.hub.transfer');
-  const canAdjust = PermissionService.can(currentUser, 'ui.inventory.hub.adjust');
+  const canTransfer = PermissionService.can(currentUser, 'inventory.transfer');
+  const canAdjust = PermissionService.can(currentUser, 'inventory.adjust');
   const canViewFinancials = PermissionService.can(currentUser, 'ui.finance.overview.view');
 
   const loadData = () => {
     try {
       const whs = inventoryService.getAllWarehouses();
       const stks = inventoryService.getWarehouseStock(selectedWarehouseId || undefined, search);
+      const inactiveStks = inventoryService.getInactiveWarehouseStock(selectedWarehouseId || undefined, search);
       const txs = inventoryService.getTransactions(100);
       const prods = productService.getAllProducts();
 
       setWarehouses(whs);
       setStockList(stks);
+      setInactiveStockList(inactiveStks);
       setTransactions(txs);
       setProducts(prods);
 
@@ -87,16 +91,19 @@ export const InventoryView: React.FC = () => {
   const handleStockTransfer = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      inventoryService.transferStock(
-        transferData.fromWarehouseId,
-        transferData.toWarehouseId,
-        transferData.productId,
-        transferData.quantityM2,
-        transferData.notes
-      );
+      inventoryService.createTransferRequest({
+        fromWarehouseId: transferData.fromWarehouseId,
+        toWarehouseId: transferData.toWarehouseId,
+        items: [{
+          productId: transferData.productId,
+          quantityM2: transferData.quantityM2,
+          notes: transferData.notes,
+        }],
+        notes: transferData.notes,
+      });
       setIsTransferModalOpen(false);
       loadData();
-      alert('تم التحويل المخزني بنجاح وتحديث أرصدة المخازن.');
+      alert('تم إنشاء طلب التحويل المخزني، وبانتظار الاعتماد والتجهيز والشحن والاستلام.');
     } catch (err: any) {
       alert(`خطأ في التحويل: ${err.message || err}`);
     }
@@ -105,15 +112,21 @@ export const InventoryView: React.FC = () => {
   const handleStockAdjustment = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      inventoryService.adjustStock(
-        adjustData.productId,
-        adjustData.warehouseId,
-        adjustData.actualM2,
-        adjustData.reason
-      );
+      const difference = Number((adjustData.actualM2 - adjustData.currentM2).toFixed(3));
+      if (difference === 0) {
+        setIsAdjustModalOpen(false);
+        return;
+      }
+      inventoryService.createAdjustment({
+        productId: adjustData.productId,
+        warehouseId: adjustData.warehouseId,
+        type: difference > 0 ? 'ADD' : 'SUBTRACT',
+        quantity: Math.abs(difference),
+        reason: adjustData.reason,
+      });
       setIsAdjustModalOpen(false);
       loadData();
-      alert('تم اعتماد التسوية الجردية بنجاح.');
+      alert('تم إنشاء طلب التسوية، وبانتظار اعتماد مستخدم آخر ثم ترحيلها.');
     } catch (err: any) {
       alert(`خطأ في التسوية: ${err.message || err}`);
     }
@@ -155,6 +168,16 @@ export const InventoryView: React.FC = () => {
           أرصدة المخازن الحالية
         </button>
         <button
+          onClick={() => setActiveTab('INACTIVE_STOCK')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+ activeTab === 'INACTIVE_STOCK'
+ ? 'bg-sky-600 text-slate-900 shadow-md'
+ : 'bg-white text-slate-500'
+ }`}
+        >
+          المخزون المتوقف ({inactiveStockList.length})
+        </button>
+        <button
           onClick={() => setActiveTab('LOGS')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
  activeTab === 'LOGS'
@@ -166,8 +189,13 @@ export const InventoryView: React.FC = () => {
         </button>
       </div>
 
-      {activeTab === 'STOCK' ? (
+      {activeTab !== 'LOGS' ? (
         <div className="space-y-4">
+          {activeTab === 'INACTIVE_STOCK' && (
+            <p className="text-xs text-amber-800">
+              أصناف معطلة ما زالت لها كميات فعلية بالمخزون؛ لا تُحتسب ضمن القائمة الرئيسية للأصناف النشطة.
+            </p>
+          )}
           {/* Filters */}
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-[240px] relative">
@@ -218,14 +246,14 @@ export const InventoryView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 ">
-                  {stockList.length === 0 ? (
+                  {displayedStockList.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="py-12 text-center text-slate-500">
                         لا يوجد رصيد مسجل بالمخازن المحددة.
                       </td>
                     </tr>
                   ) : (
-                    stockList.map((stk) => (
+                    displayedStockList.map((stk) => (
                       <tr key={stk.id} className="hover:bg-slate-100 transition">
                         <td className="p-3.5 font-bold text-sky-600">{stk.warehouseName}</td>
                         <td className="p-3.5">
@@ -331,7 +359,7 @@ export const InventoryView: React.FC = () => {
       {isTransferModalOpen && canTransfer && (
         <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900">تحويل مخزني بين الفروع والمخازن</h3>
+            <h3 className="text-base font-extrabold text-slate-900">طلب تحويل مخزني بين الفروع والمخازن</h3>
 
             <form onSubmit={handleStockTransfer} className="space-y-3 text-xs">
               <div>
@@ -410,7 +438,7 @@ export const InventoryView: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl shadow-lg shadow-sky-600/30"
                 >
-                  تنفيذ التحويل
+                  إرسال الطلب للاعتماد
                 </button>
               </div>
             </form>
@@ -422,7 +450,7 @@ export const InventoryView: React.FC = () => {
       {isAdjustModalOpen && canAdjust && (
         <div className="fixed inset-0 bg-white backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900">تسوية جردية للمخزون</h3>
+            <h3 className="text-base font-extrabold text-slate-900">طلب تسوية جردية للمخزون</h3>
 
             <form onSubmit={handleStockAdjustment} className="space-y-3 text-xs">
               <div className="bg-slate-50 p-3 rounded-xl">
@@ -467,7 +495,7 @@ export const InventoryView: React.FC = () => {
                   type="submit"
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30"
                 >
-                  اعتماد التسوية
+                  إرسال الطلب للاعتماد
                 </button>
               </div>
             </form>

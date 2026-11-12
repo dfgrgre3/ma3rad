@@ -5,24 +5,35 @@ import { InventoryServicePart04 } from './InventoryServicePart04';
 
 export class InventoryWarehouseLocationService extends InventoryServicePart04 {
   public getWarehouseLocations(warehouseId?: string, search?: string): any[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.inventory.hub.view');
+    if (warehouseId) this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
+    const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
+    const companyScope = this.branchAccess.companyScope('w.company_id', actor);
     let sql = `
       SELECT 
         wl.id, wl.warehouse_id as warehouseId, w.name as warehouseName,
         wl.zone, wl.aisle, wl.shelf, wl.bin, wl.barcode,
         wl.max_capacity_m2 as maxCapacityM2, wl.notes, wl.is_active as isActive,
         wl.created_at as createdAt,
-        COALESCE((SELECT SUM(pls.quantity_m2) FROM product_location_stock pls
+        COALESCE((SELECT SUM(CASE
+          WHEN p.base_unit = 'M2' THEN pls.quantity_m2
+          WHEN p.base_unit = 'BOX' AND p.meters_per_box > 0 THEN pls.quantity_m2 * p.meters_per_box
+          WHEN p.base_unit = 'PIECE' AND p.meters_per_box > 0 AND p.pieces_per_box > 0
+            THEN pls.quantity_m2 * p.meters_per_box / p.pieces_per_box
+          ELSE 0 END)
+          FROM product_location_stock pls
           JOIN products p ON p.id = pls.product_id
-          WHERE pls.location_id = wl.id AND p.product_type != 'GENERAL'), 0) as currentOccupiedM2,
+          WHERE pls.location_id = wl.id), 0) as currentOccupiedM2,
         COALESCE((SELECT COUNT(DISTINCT pls.product_id) FROM product_location_stock pls
           JOIN products p ON p.id = pls.product_id
           WHERE pls.location_id = wl.id AND pls.quantity_m2 > 0 AND p.product_type = 'GENERAL'), 0) as generalProductsCount,
         COALESCE((SELECT COUNT(DISTINCT pls.product_id) FROM product_location_stock pls WHERE pls.location_id = wl.id AND pls.quantity_m2 > 0), 0) as productsCount
       FROM warehouse_locations wl
       JOIN warehouses w ON wl.warehouse_id = w.id
-      WHERE wl.is_active = 1
+      WHERE wl.is_active = 1 AND ${branchScope.clause} AND ${companyScope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...branchScope.params, ...companyScope.params];
     if (warehouseId) {
       sql += ` AND wl.warehouse_id = ?`;
       params.push(warehouseId);
@@ -50,8 +61,10 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
-    const wh = this.db.query<any>(`SELECT code FROM warehouses WHERE id = ?`, [input.warehouseId])[0];
+    const wh = this.db.query<any>(`SELECT code, company_id AS companyId FROM warehouses WHERE id = ?`, [input.warehouseId])[0];
     if (!wh) throw new Error('المخزن غير موجود.');
+    this.branchAccess.requireWarehouseAuthorization(input.warehouseId, actor);
+    if (wh.companyId) this.branchAccess.requireCompanyAccess(wh.companyId, actor);
 
     const zone = input.zone.trim().toUpperCase();
     const aisle = input.aisle.trim().toUpperCase();
@@ -88,8 +101,13 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.adjust');
 
-    const existing = this.db.query<any>(`SELECT * FROM warehouse_locations WHERE id = ?`, [id])[0];
+    const existing = this.db.query<any>(`
+      SELECT wl.*, w.company_id AS companyId FROM warehouse_locations wl
+      JOIN warehouses w ON w.id = wl.warehouse_id WHERE wl.id = ?
+    `, [id])[0];
     if (!existing) throw new Error('الموقع غير موجود.');
+    this.branchAccess.requireWarehouseAuthorization(existing.warehouseId ?? existing.warehouse_id, actor);
+    if (existing.companyId) this.branchAccess.requireCompanyAccess(existing.companyId, actor);
 
     if (input.barcode && input.barcode !== existing.barcode) {
       const dup = this.db.query<any>(`SELECT id FROM warehouse_locations WHERE barcode = ? AND id != ?`, [input.barcode, id])[0];
@@ -122,6 +140,15 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.adjust');
+
+    const location = this.db.query<any>(`
+      SELECT wl.warehouse_id AS warehouseId, w.company_id AS companyId
+      FROM warehouse_locations wl JOIN warehouses w ON w.id = wl.warehouse_id
+      WHERE wl.id = ?
+    `, [id])[0];
+    if (!location) throw new Error('الموقع غير موجود.');
+    this.branchAccess.requireWarehouseAuthorization(location.warehouseId, actor);
+    if (location.companyId) this.branchAccess.requireCompanyAccess(location.companyId, actor);
 
     const occupied = this.db.query<any>(`SELECT SUM(quantity_m2) as qty FROM product_location_stock WHERE location_id = ?`, [id])[0];
     if (occupied && Number(occupied.qty || 0) > 0) {

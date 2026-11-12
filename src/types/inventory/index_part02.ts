@@ -55,10 +55,16 @@ export interface InventoryReconciliation {
   warehouseId?: string;
   warehouseName?: string;
   totalPhysicalCost: number;
+  totalPhysicalQty: number;
   totalFifoLayerCost: number;
+  totalFifoLayerQty: number;
   totalGlInventoryCost: number;
   variancePhysicalVsFifo: number;
+  variancePhysicalVsFifoQty: number;
   varianceFifoVsGl: number;
+  quantityBalanced: boolean;
+  ledgerScope: 'BRANCH_COMPANY';
+  ledgerComparable: boolean;
   status: 'BALANCED' | 'DISCREPANCY_DETECTED' | 'RESOLVED';
   notes?: string;
   performedBy: string;

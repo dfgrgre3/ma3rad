@@ -15,6 +15,7 @@ import { DailyOperationsService } from '../src/services/domains/operations/Daily
 import { OperationsService } from '../src/services/domains/operations/OperationsService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import { InventoryCostingService } from '../src/services/domains/inventory/InventoryCostingService.ts';
+import { BatchService } from '../src/services/domains/inventory/BatchService.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 test('branch access enforces assigned and explicit central scopes in service queries', async () => {
@@ -32,9 +33,10 @@ test('branch access enforces assigned and explicit central scopes in service que
   );
   db.run(
     `INSERT INTO warehouses (id, name, code, branch_id, is_active)
-     VALUES ('wh_scope_a', 'Scope Warehouse A', 'SCOPE-WA', 'br_scope_a', 1),
-            ('wh_scope_b', 'Scope Warehouse B', 'SCOPE-WB', 'br_scope_b', 1)`
+         VALUES ('wh_scope_a', 'Scope Warehouse A', 'SCOPE-WA', 'br_scope_a', 1),
+           ('wh_scope_b', 'Scope Warehouse B', 'SCOPE-WB', 'br_scope_b', 1)`
   );
+      db.run(`UPDATE warehouses SET company_id = 'cmp_main' WHERE id IN ('wh_scope_a', 'wh_scope_b')`);
   db.run(
     `INSERT INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id)
      VALUES ('cr_scope_a', 'Scope Register A', 0, 1, 1, 'br_scope_a'),
@@ -72,6 +74,8 @@ test('branch access enforces assigned and explicit central scopes in service que
             ('usr_scope', 'purchases.approve', 'GRANT'),
             ('usr_scope', 'cashier.view', 'GRANT'),
             ('usr_scope', 'cashier.expense', 'GRANT'),
+            ('usr_scope', 'inventory.view', 'GRANT'),
+            ('usr_scope', 'inventory.adjust', 'GRANT'),
             ('usr_scope', 'inventory.transfer', 'GRANT')`
   );
   PermissionService.invalidate(user);
@@ -88,6 +92,10 @@ test('branch access enforces assigned and explicit central scopes in service que
      VALUES ('trf_scope_a_to_b', 'TRF-SCOPE-A-B', '2026-01-01', 'wh_scope_a', 'wh_scope_b', 'REQUESTED', 0, 'usr_scope')`
   );
   const inventory = new InventoryService();
+  assert.throws(() => inventory.getReorderPlanning('wh_scope_b'), /ليس لديك صلاحية الوصول/);
+  assert.throws(() => inventory.getSpecialStocks({ warehouseId: 'wh_scope_b' }), /ليس لديك صلاحية الوصول/);
+  assert.throws(() => inventory.getWarehouseLocations('wh_scope_b'), /ليس لديك صلاحية الوصول/);
+  assert.deepEqual(inventory.getTransfersWithDetails(), []);
   assert.throws(() => inventory.getTransferItems('trf_scope_a_to_b'), /ليس لديك صلاحية الوصول/);
   assert.equal(inventory.getTransfersList().length, 0);
   assert.ok(inventory.getTransferSummaryByWarehouse().every((row) => row.warehouseId !== 'wh_scope_b'));
@@ -134,6 +142,51 @@ test('branch access enforces assigned and explicit central scopes in service que
     INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
     VALUES ('stk_scope_return', 'wh_scope_a', 'prod_scope_return', 1, 0)
   `);
+  assert.throws(
+    () => inventory.transferStock('wh_scope_a', 'wh_scope_b', 'prod_scope_return', 1, 'unauthorized destination'),
+    /ليس لديك صلاحية الوصول/
+  );
+  assert.equal(
+    db.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM stock_transfers WHERE notes = 'unauthorized destination'`
+    )[0].count,
+    0,
+    'legacy transfer entry points must not bypass destination warehouse authorization'
+  );
+  assert.equal(
+    db.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM warehouse_stock WHERE warehouse_id = 'wh_scope_b' AND product_id = 'prod_scope_return'`
+    )[0].count,
+    0,
+    'failed transfer authorization must not create destination stock'
+  );
+  db.run(`
+    INSERT INTO warehouse_locations (id, warehouse_id, zone, aisle, shelf, bin, barcode)
+    VALUES ('loc_scope_b', 'wh_scope_b', 'B', '01', '01', '01', 'SCOPE-B-LOC')
+  `);
+  db.run(`
+    INSERT INTO product_location_stock (id, location_id, product_id, quantity_m2)
+    VALUES ('pls_scope_b', 'loc_scope_b', 'prod_scope_return', 1)
+  `);
+  db.run(`
+    INSERT INTO inventory_special_stocks (
+      id, special_number, warehouse_id, product_id, category, quantity_m2, created_by
+    ) VALUES ('special_scope_b', 'SPEC-SCOPE-B', 'wh_scope_b', 'prod_scope_return', 'BROKEN', 1, 'usr_scope')
+  `);
+  assert.ok(inventory.getReorderPlanning().every(row => row.warehouseId === 'wh_scope_a'));
+  assert.throws(() => inventory.getLocationProducts('loc_scope_b'), /الموقع غير موجود/);
+  assert.ok(inventory.getSpecialStocks().every(row => row.warehouseId !== 'wh_scope_b'));
+  assert.throws(
+    () => inventory.resolveSpecialStock('special_scope_b', 'WRITE_OFF', 'out of scope'),
+    /السجل غير موجود/
+  );
+  assert.throws(
+    () => new BatchService().createBatch({
+      productId: 'prod_scope_return', warehouseId: 'wh_scope_b', batchNumber: 'SCOPE-B',
+      toneShade: 'A', quantityM2: 1,
+    }),
+    /ليس لديك صلاحية الوصول|لا يتبع الفرع النشط الحالي/
+  );
   const purchaseReturns = new PurchaseReturnService();
   assert.deepEqual(purchaseReturns.getAllReturns().map(row => row.id), ['pret_scope_a']);
   assert.equal(purchaseReturns.getReturnById('pret_scope_b'), null);
@@ -484,17 +537,30 @@ test('inventory reconciliation and audit logs are limited to the active branch a
        'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10, 20, 15, 10, 1, 1)
   `);
   db.run(`
+    INSERT INTO products
+      (id, sku, barcode, name, category_id, brand_id, grade, size, base_unit, sell_unit,
+       pieces_per_box, meters_per_box, cost_price, selling_price_m2, wholesale_price_m2,
+       min_selling_price_m2, min_stock_level, is_active)
+    VALUES ('prod_recon_qty_scope', 'RECON-QTY-SKU', 'RECON-QTY-BAR', 'Quantity drift product',
+       'cat_floor', 'br_cleo', 'GRADE_1', '60x60', 'M2', 'M2', 4, 1.44, 10, 20, 15, 10, 1, 1)
+  `);
+  db.run(`
     INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
     VALUES ('stk_recon_scope_a', 'wh_recon_scope_a', 'prod_recon_scope', 3, 0),
-           ('stk_recon_scope_b', 'wh_recon_scope_b', 'prod_recon_scope', 500, 0)
+           ('stk_recon_scope_b', 'wh_recon_scope_b', 'prod_recon_scope', 500, 0),
+           ('stk_recon_qty_scope_a', 'wh_recon_scope_a', 'prod_recon_qty_scope', 2, 0)
   `);
   InventoryCostingService.addLayer(db, {
     productId: 'prod_recon_scope', warehouseId: 'wh_recon_scope_a', sourceType: 'TEST',
-    sourceId: 'recon_scope_a', date: '2026-01-01', quantity: 3, unitCost: 8,
+    sourceId: 'recon_scope_a', date: '2026-01-01', quantity: 3, unitCost: 10,
   });
   InventoryCostingService.addLayer(db, {
     productId: 'prod_recon_scope', warehouseId: 'wh_recon_scope_b', sourceType: 'TEST',
     sourceId: 'recon_scope_b', date: '2026-01-01', quantity: 500, unitCost: 1000,
+  });
+  InventoryCostingService.addLayer(db, {
+    productId: 'prod_recon_qty_scope', warehouseId: 'wh_recon_scope_a', sourceType: 'TEST',
+    sourceId: 'recon_qty_scope_a', date: '2026-01-01', quantity: 1, unitCost: 20,
   });
 
   const accountId = db.query<{ id: string }>(
@@ -505,14 +571,14 @@ test('inventory reconciliation and audit logs are limited to the active branch a
     INSERT INTO journal_entries
       (id, entry_number, date, description, reference_type, reference_id,
        total_debit, total_credit, is_posted, created_by, branch_id, company_id)
-    VALUES ('je_recon_scope_a', 'JE-RECON-SCOPE-A', '2026-01-01', 'Branch A inventory',
-       'TEST', 'recon_scope_a', 80, 80, 1, 'usr_recon_scope', 'br_recon_scope_a', 'cmp_main'),
+     VALUES ('je_recon_scope_a', 'JE-RECON-SCOPE-A', '2026-01-01', 'Branch A inventory',
+       'TEST', 'recon_scope_a', 50, 50, 1, 'usr_recon_scope', 'br_recon_scope_a', 'cmp_main'),
            ('je_recon_scope_b', 'JE-RECON-SCOPE-B', '2026-01-01', 'Branch B inventory',
        'TEST', 'recon_scope_b', 500000, 500000, 1, 'usr_recon_scope', 'br_recon_scope_b', 'cmp_main')
   `);
   db.run(`
     INSERT INTO journal_entry_lines (id, entry_id, account_id, debit, credit)
-    VALUES ('jel_recon_scope_a', 'je_recon_scope_a', ?, 80, 0),
+    VALUES ('jel_recon_scope_a', 'je_recon_scope_a', ?, 50, 0),
            ('jel_recon_scope_b', 'je_recon_scope_b', ?, 500000, 0)
   `, [accountId, accountId]);
 
@@ -538,6 +604,16 @@ test('inventory reconciliation and audit logs are limited to the active branch a
   assert.equal(result.totalPhysicalCost, Number(expectedPhysical.toFixed(2)));
   assert.equal(result.totalFifoLayerCost, Number(expectedFifo.toFixed(2)));
   assert.equal(result.totalGlInventoryCost, Number(expectedLedger.toFixed(2)));
+  assert.equal(result.totalPhysicalCost, result.totalFifoLayerCost);
+  assert.equal(result.totalFifoLayerCost, result.totalGlInventoryCost);
+  assert.equal(result.variancePhysicalVsFifoQty, 1);
+  assert.equal(result.quantityBalanced, false);
+  assert.equal(result.status, 'DISCREPANCY_DETECTED');
+
+  const warehouseResult = inventory.reconcileInventoryWithGL('wh_recon_scope_a');
+  assert.equal(warehouseResult.ledgerScope, 'BRANCH_COMPANY');
+  assert.equal(warehouseResult.ledgerComparable, false);
+  assert.equal(warehouseResult.status, 'DISCREPANCY_DETECTED');
 
   db.run(`
     INSERT INTO inventory_reconciliation_logs (
@@ -561,6 +637,8 @@ test('inventory reconciliation and audit logs are limited to the active branch a
   assert.ok(logs.every((log) => log.branchId === 'br_recon_scope_a'));
   const savedLog = logs.find((log) => log.warehouseId === 'wh_recon_scope_a');
   assert.ok(savedLog);
+  assert.equal(savedLog.ledgerComparable, 0);
+  assert.equal(savedLog.variancePhysicalVsFifoQty, 1);
   const recalculated = inventory.reconcileInventoryWithGL('wh_recon_scope_a');
   assert.equal(savedLog.totalPhysicalCost, recalculated.totalPhysicalCost);
   assert.notEqual(savedLog.totalPhysicalCost, untrustedSnapshot.totalPhysicalCost);

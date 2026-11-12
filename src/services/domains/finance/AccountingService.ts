@@ -245,7 +245,17 @@ export class AccountingService {
       - Number(returnStats.monthReturns || 0)
       + Number(returnStats.monthReturnedCost || 0);
     const monthExp = expenseStats.monthExpenses || 0;
-    const monthNet = monthGross - monthExp;
+    // Unify the profit source of truth with the executive dashboard / P&L:
+    // net profit is derived from posted journal entries (revenue & expense
+    // accounts), so unposted invoices and expenses without ledger entries do
+    // not affect it. Fall back to the invoice/expense based figure only when
+    // no posted entries exist for the period.
+    let monthNet = monthGross - monthExp;
+    try {
+      monthNet = this.getDashboardProfitData(monthStart, today).netProfit;
+    } catch {
+      // keep operational estimate if ledger query is unavailable
+    }
     const monthSales = Number(salesStats.monthSales || 0) - Number(returnStats.monthReturns || 0);
     const todaySales = Number(salesStats.todaySales || 0) - Number(returnStats.todayReturns || 0);
 
@@ -726,10 +736,10 @@ export class AccountingService {
     const today = localDateString();
     const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
-    const prevMonth = new Date();
-    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonthStart = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-01`;
-    const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()}`;
+    const prevMonthLastDay = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate();
+    const prevMonthEnd = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-${String(Math.min(now.getDate(), prevMonthLastDay)).padStart(2, '0')}`;
     const scope = this.branchScope('si.branch_id');
 
     const summaries = this.db.query<any>(`
@@ -820,6 +830,166 @@ export class AccountingService {
       currentMonthInvoices: currentMonth.invoices,
     };
   }
+
+  public getDailyComparison(): MonthlyComparison {
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
+    const now = new Date();
+    const today = localDateString();
+    const yesterdayDate = new Date(now);
+    yesterdayDate.setDate(now.getDate() - 1);
+    const yesterday = localDateString(yesterdayDate);
+    const scope = this.branchScope('si.branch_id');
+
+    const summarize = (from: string, to: string) => {
+      const revenue = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS v
+        FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const returns = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(sr.total_amount), 0) AS v
+        FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const profit = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(si.gross_profit), 0) AS v
+        FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const returnedCost = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) AS v
+        FROM sales_return_items sri JOIN sales_returns sr ON sr.id = sri.return_id
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const invoices = Number(this.db.query<any>(`
+        SELECT COUNT(*) AS v FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      return {
+        sales: Number((revenue - returns).toFixed(2)),
+        profit: Number((profit - returns + returnedCost).toFixed(2)),
+        invoices,
+      };
+    };
+
+    const current = summarize(today, today);
+    const previous = summarize(yesterday, yesterday);
+    return {
+      currentMonth: current,
+      previousMonth: previous,
+      salesGrowth: previous.sales > 0 ? Number(((current.sales - previous.sales) / previous.sales * 100).toFixed(1)) : null,
+      invoiceGrowth: previous.invoices > 0 ? Number(((current.invoices - previous.invoices) / previous.invoices * 100).toFixed(1)) : null,
+      currentMonthInvoices: current.invoices,
+    };
+  }
+
+  public getYearlyComparison(): MonthlyComparison {
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
+    const now = new Date();
+    const today = localDateString();
+    const yearStart = `${now.getFullYear()}-01-01`;
+    const prevYearStart = `${now.getFullYear() - 1}-01-01`;
+    const prevYearSameDay = `${now.getFullYear() - 1}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const scope = this.branchScope('si.branch_id');
+
+    const summarize = (from: string, to: string) => {
+      const revenue = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS v
+        FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const returns = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(sr.total_amount), 0) AS v
+        FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const profit = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(si.gross_profit), 0) AS v
+        FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const returnedCost = Number(this.db.query<any>(`
+        SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) AS v
+        FROM sales_return_items sri JOIN sales_returns sr ON sr.id = sri.return_id
+        JOIN sales_invoices si ON si.id = sr.original_invoice_id
+        WHERE sr.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      const invoices = Number(this.db.query<any>(`
+        SELECT COUNT(*) AS v FROM sales_invoices si WHERE si.date BETWEEN ? AND ? AND si.invoice_status != 'VOID' AND ${scope.clause}
+      `, [from, to, ...scope.params])[0]?.v || 0);
+      return {
+        sales: Number((revenue - returns).toFixed(2)),
+        profit: Number((profit - returns + returnedCost).toFixed(2)),
+        invoices,
+      };
+    };
+
+    const current = summarize(yearStart, today);
+    const previous = summarize(prevYearStart, prevYearSameDay);
+    return {
+      currentMonth: current,
+      previousMonth: previous,
+      salesGrowth: previous.sales > 0 ? Number(((current.sales - previous.sales) / previous.sales * 100).toFixed(1)) : null,
+      invoiceGrowth: previous.invoices > 0 ? Number(((current.invoices - previous.invoices) / previous.invoices * 100).toFixed(1)) : null,
+      currentMonthInvoices: current.invoices,
+    };
+  }
+
+  public getNetSalesAnalysis(dateFrom?: string, dateTo?: string): { grossSales: number; returns: number; netSales: number; returnedCost: number; netProfit: number; invoices: number; returnRate: number } {
+    this.requireView('dashboard.view');
+    PermissionService.require(AuthService.requireAuth(), 'ui.sales.invoices.view', '/sales');
+    const scope = this.branchScope('si.branch_id');
+    const conditions = ['si.invoice_status != \'VOID\'', scope.clause];
+    const params: any[] = [...scope.params];
+    if (dateFrom) { conditions.push('si.date >= ?'); params.unshift(dateFrom); }
+    if (dateTo) { conditions.push('si.date <= ?'); params.unshift(dateTo); }
+    // rebuild params order: dates first then scope
+    const orderedParams: any[] = [];
+    if (dateFrom) orderedParams.push(dateFrom);
+    if (dateTo) orderedParams.push(dateTo);
+    orderedParams.push(...scope.params);
+
+    const grossSales = Number(this.db.query<any>(`
+      SELECT COALESCE(SUM(si.subtotal - si.discount_amount), 0) AS v
+      FROM sales_invoices si WHERE ${conditions.join(' AND ')}
+    `, orderedParams)[0]?.v || 0);
+    const returns = Number(this.db.query<any>(`
+      SELECT COALESCE(SUM(sr.total_amount), 0) AS v
+      FROM sales_returns sr JOIN sales_invoices si ON si.id = sr.original_invoice_id
+      WHERE si.invoice_status != 'VOID' AND ${scope.clause}
+        ${dateFrom ? 'AND sr.date >= ?' : ''} ${dateTo ? 'AND sr.date <= ?' : ''}
+    `, [...scope.params, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : [])])[0]?.v || 0);
+    const returnedCost = Number(this.db.query<any>(`
+      SELECT COALESCE(SUM(sri.quantity_m2 * sri.unit_cost), 0) AS v
+      FROM sales_return_items sri JOIN sales_returns sr ON sr.id = sri.return_id
+      JOIN sales_invoices si ON si.id = sr.original_invoice_id
+      WHERE si.invoice_status != 'VOID' AND ${scope.clause}
+        ${dateFrom ? 'AND sr.date >= ?' : ''} ${dateTo ? 'AND sr.date <= ?' : ''}
+    `, [...scope.params, ...(dateFrom ? [dateFrom] : []), ...(dateTo ? [dateTo] : [])])[0]?.v || 0);
+    const profit = Number(this.db.query<any>(`
+      SELECT COALESCE(SUM(si.gross_profit), 0) AS v
+      FROM sales_invoices si WHERE ${conditions.join(' AND ')}
+    `, orderedParams)[0]?.v || 0);
+    const invoices = Number(this.db.query<any>(`
+      SELECT COUNT(*) AS v FROM sales_invoices si WHERE ${conditions.join(' AND ')}
+    `, orderedParams)[0]?.v || 0);
+    const netSales = grossSales - returns;
+    const netProfit = profit - returns + returnedCost;
+    const returnRate = grossSales > 0 ? Number(((returns / grossSales) * 100).toFixed(1)) : 0;
+    return {
+      grossSales: Number(grossSales.toFixed(2)),
+      returns: Number(returns.toFixed(2)),
+      netSales: Number(netSales.toFixed(2)),
+      returnedCost: Number(returnedCost.toFixed(2)),
+      netProfit: Number(netProfit.toFixed(2)),
+      invoices,
+      returnRate,
+    };
+  }
+
+  // Aliases for common naming variants
+  public getDayComparison() { return this.getDailyComparison(); }
+  public getYearComparison() { return this.getYearlyComparison(); }
+  public getNetSales(dateFrom?: string, dateTo?: string) { return this.getNetSalesAnalysis(dateFrom, dateTo); }
+  public getNetSalesAfterReturns(dateFrom?: string, dateTo?: string) { return this.getNetSalesAnalysis(dateFrom, dateTo); }
 
   public getTopCustomers(limit = 5): { name: string; totalPurchases: number; purchaseCount: number }[] {
     this.requireView('ui.customers.list.view');

@@ -10,6 +10,21 @@ import { InventoryCostingService } from './InventoryCostingService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 
+type WarehouseStockView = WarehouseStock & {
+  productName: string;
+  sku: string;
+  barcode: string;
+  grade: string;
+  size: string;
+  metersPerBox: number;
+  costPrice: number;
+  sellingPriceM2: number;
+  productType: 'CERAMIC' | 'GENERAL';
+  baseUnit: UnitType;
+  customUnit: string;
+  minStockLevel: number;
+};
+
 export class InventoryServicePart01 {
 protected db = DatabaseManager.getInstance();
 protected branchAccess = new BranchAccessService();
@@ -41,7 +56,15 @@ public getAllWarehouses(): Warehouse[] {
       );
   }
 
-public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock & { productName: string; sku: string; barcode: string; grade: string; size: string; metersPerBox: number; costPrice: number; sellingPriceM2: number; productType: 'CERAMIC' | 'GENERAL'; baseUnit: UnitType; customUnit: string })[] {
+public getWarehouseStock(warehouseId?: string, search?: string): WarehouseStockView[] {
+    return this.queryWarehouseStock(warehouseId, search, 'active');
+  }
+
+public getInactiveWarehouseStock(warehouseId?: string, search?: string): WarehouseStockView[] {
+    return this.queryWarehouseStock(warehouseId, search, 'inactive');
+  }
+
+private queryWarehouseStock(warehouseId: string | undefined, search: string | undefined, productStatus: 'active' | 'inactive'): WarehouseStockView[] {
     AuthService.requireAuth();
     if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId);
     const scope = this.branchAccess.sqlScope(
@@ -59,6 +82,7 @@ public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock
         p.product_type as productType, p.base_unit as baseUnit, p.custom_unit as customUnit,
         p.meters_per_box as metersPerBox, p.pieces_per_box as piecesPerBox,
         p.cost_price as costPrice, p.selling_price_m2 as sellingPriceM2,
+        COALESCE(p.min_stock_level, 0) as minStockLevel,
         COALESCE(movement_totals.quantity_in, 0) AS quantityIn,
         COALESCE(movement_totals.quantity_out, 0) AS quantityOut
       FROM warehouse_stock ws
@@ -73,7 +97,8 @@ public getWarehouseStock(warehouseId?: string, search?: string): (WarehouseStock
         GROUP BY product_id, warehouse_id
       ) movement_totals ON movement_totals.product_id = ws.product_id
                        AND movement_totals.warehouse_id = ws.warehouse_id
-      WHERE p.is_active = 1 AND ${scope.clause} AND ${company.clause}
+      WHERE ${productStatus === 'inactive' ? 'p.is_active = 0 AND COALESCE(ws.quantity_m2, 0) != 0' : 'p.is_active = 1'}
+        AND ${scope.clause} AND ${company.clause}
     `;
     const params: any[] = [...scope.params, ...company.params];
 

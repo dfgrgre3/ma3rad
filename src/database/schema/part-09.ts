@@ -48,15 +48,19 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
   adjustment_type TEXT NOT NULL CHECK(adjustment_type IN ('ADD', 'SUBTRACT', 'DAMAGE', 'OPENING_BALANCE')),
   reason TEXT NOT NULL,
   status TEXT DEFAULT 'DRAFT' CHECK(status IN ('DRAFT', 'PENDING_APPROVAL', 'POSTED', 'REJECTED', 'CANCELLED')),
+  approval_status TEXT DEFAULT 'PENDING' CHECK(approval_status IN ('PENDING', 'APPROVED', 'REJECTED')),
   total_quantity_m2 REAL NOT NULL DEFAULT 0,
   total_value REAL NOT NULL DEFAULT 0,
   approved_by TEXT,
   approved_at TEXT,
+  posted_by TEXT,
+  posted_at TEXT,
   notes TEXT,
   created_by TEXT NOT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
   FOREIGN KEY (approved_by) REFERENCES users(id),
+  FOREIGN KEY (posted_by) REFERENCES users(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 

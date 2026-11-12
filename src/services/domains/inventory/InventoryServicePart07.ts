@@ -10,19 +10,30 @@ import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { InventoryServicePart06 } from './InventoryServicePart06';
 
 export class InventoryServicePart07 extends InventoryServicePart06 {
-public resolveSpecialStock(id: string, action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 'RESTORE_TO_STOCK', notes: string): void {
+public resolveSpecialStock(
+    id: string,
+    action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 'RESTORE_TO_STOCK',
+    notes: string,
+    discountedUnitPrice?: number
+  ): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.inventory.hub.adjust');
+    if (!notes.trim()) throw new Error('يجب تسجيل مبررات القرار.');
 
-    const item = this.db.query<any>(`SELECT * FROM inventory_special_stocks WHERE id = ?`, [id])[0];
+    const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
+    const companyScope = this.branchAccess.companyScope('w.company_id', actor);
+    const item = this.db.query<any>(`
+      SELECT iss.* FROM inventory_special_stocks iss
+      JOIN warehouses w ON w.id = iss.warehouse_id
+      WHERE iss.id = ? AND ${branchScope.clause} AND ${companyScope.clause}
+    `, [id, ...branchScope.params, ...companyScope.params])[0];
     if (!item) throw new Error('السجل غير موجود.');
-    if (['WRITTEN_OFF', 'RESTORED_TO_STOCK'].includes(item.status)) {
-      throw new Error('تمت معالجة هذا السجل مسبقاً.');
-    }
+    const warehouseId = item.warehouseId ?? item.warehouse_id;
+    this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
+    if (item.status !== 'INSPECTED') throw new Error('يجب فحص السجل واعتماد نتيجة الفحص قبل اتخاذ القرار.');
 
     const productId = item.productId ?? item.product_id;
-    const warehouseId = item.warehouseId ?? item.warehouse_id;
     const quantityM2 = Number(item.quantityM2 ?? item.quantity_m2 ?? 0);
     const unitCost = Number(item.unitCost ?? item.unit_cost ?? 0);
     const totalCost = Number(item.totalCost ?? item.total_cost ?? (quantityM2 * unitCost));
@@ -30,6 +41,10 @@ public resolveSpecialStock(id: string, action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 
 
     this.db.executeTransaction((txDb) => {
       const today = localDateString();
+      const current = txDb.query<any>(`
+        SELECT status FROM inventory_special_stocks WHERE id = ?
+      `, [id])[0];
+      if (current?.status !== 'INSPECTED') throw new Error('تم تغيير حالة السجل؛ أعد تحميله قبل اعتماد القرار.');
 
       if (action === 'WRITE_OFF') {
         // Accounting write-off: Dr 5201 (Damage Loss) / Cr 1104 (Inventory)
@@ -49,8 +64,8 @@ public resolveSpecialStock(id: string, action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 
         txDb.run(`
           UPDATE inventory_special_stocks
           SET status = 'WRITTEN_OFF', resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `, [notes, actor.id, id]);
+          WHERE id = ? AND status = 'INSPECTED'
+        `, [notes.trim(), actor.id, id]);
 
       } else if (action === 'RESTORE_TO_STOCK') {
         // Restore back to warehouse stock + create cost layer
@@ -95,20 +110,103 @@ public resolveSpecialStock(id: string, action: 'WRITE_OFF' | 'DOWNGRADE_SALE' | 
         txDb.run(`
           UPDATE inventory_special_stocks
           SET status = 'RESTORED_TO_STOCK', resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `, [notes, actor.id, id]);
+          WHERE id = ? AND status = 'INSPECTED'
+        `, [notes.trim(), actor.id, id]);
 
       } else if (action === 'DOWNGRADE_SALE') {
+        const price = Number(discountedUnitPrice);
+        const product = txDb.query<any>(`
+          SELECT selling_price_m2 AS sellingPrice FROM products WHERE id = ?
+        `, [productId])[0];
+        if (!Number.isFinite(price) || price <= 0 || price >= Number(product?.sellingPrice || 0)) {
+          throw new Error('يجب تحديد سعر بيع مخفض موجب وأقل من سعر البيع الأساسي.');
+        }
         txDb.run(`
           UPDATE inventory_special_stocks
-          SET status = 'DOWNGRADED_SALE', resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `, [notes, actor.id, id]);
+          SET status = 'DOWNGRADED_SALE', remaining_quantity_m2 = quantity_m2,
+              discounted_unit_price = ?, resolution_notes = ?, resolved_by = ?, resolved_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND status = 'INSPECTED'
+        `, [price, notes.trim(), actor.id, id]);
       }
     });
   }
 
+public setSpecialStockSalePrice(id: string, discountedUnitPrice: number): void {
+  this.assertInventoryModuleEnabled();
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'ui.inventory.hub.adjust');
+  const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
+  const companyScope = this.branchAccess.companyScope('w.company_id', actor);
+  const item = this.db.query<any>(`
+    SELECT iss.status, iss.discounted_unit_price AS discountedUnitPrice,
+      iss.product_id AS productId, iss.warehouse_id AS warehouseId,
+      p.selling_price_m2 AS sellingPrice
+    FROM inventory_special_stocks iss
+    JOIN warehouses w ON w.id = iss.warehouse_id
+    JOIN products p ON p.id = iss.product_id
+    WHERE iss.id = ? AND ${branchScope.clause} AND ${companyScope.clause}
+  `, [id, ...branchScope.params, ...companyScope.params])[0];
+  if (!item) throw new Error('السجل غير موجود.');
+  this.branchAccess.requireWarehouseAuthorization(item.warehouseId, actor);
+  if (item.status !== 'DOWNGRADED_SALE' || item.discountedUnitPrice != null) {
+    throw new Error('يمكن تحديد السعر مرة واحدة فقط لسجل بيع مخفض لم يُسعّر بعد.');
+  }
+  const price = Number(discountedUnitPrice);
+  if (!Number.isFinite(price) || price <= 0 || price >= Number(item.sellingPrice || 0)) {
+    throw new Error('يجب تحديد سعر بيع مخفض موجب وأقل من سعر البيع الأساسي.');
+  }
+  this.db.executeTransaction((txDb) => {
+    const current = txDb.query<any>(`
+      SELECT status, discounted_unit_price AS discountedUnitPrice
+      FROM inventory_special_stocks WHERE id = ?
+    `, [id])[0];
+    if (current?.status !== 'DOWNGRADED_SALE' || current.discountedUnitPrice != null) {
+      throw new Error('تم تغيير السجل؛ أعد تحميله قبل تحديد السعر.');
+    }
+    txDb.run(`
+      UPDATE inventory_special_stocks SET discounted_unit_price = ?
+      WHERE id = ? AND status = 'DOWNGRADED_SALE' AND discounted_unit_price IS NULL
+    `, [price, id]);
+  });
+}
+
+public getDiscountedSaleStocks(warehouseId: string): any[] {
+  this.assertInventoryModuleEnabled();
+  const actor = AuthService.requireAuth();
+  PermissionService.require(actor, 'sales.create');
+  this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
+  const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
+  const companyScope = this.branchAccess.companyScope('w.company_id', actor);
+  return this.db.query<any>(`
+    SELECT iss.id, iss.special_number AS specialNumber, iss.product_id AS productId,
+      iss.warehouse_id AS warehouseId, iss.remaining_quantity_m2 AS availableQuantityM2,
+      iss.discounted_unit_price AS discountedUnitPrice, iss.unit_cost AS unitCost,
+      p.name AS productName, p.sku, p.grade, p.size, p.product_type AS productType,
+      p.base_unit AS baseUnit, p.custom_unit AS customUnit, p.meters_per_box AS metersPerBox,
+      p.pieces_per_box AS piecesPerBox, p.selling_price_m2 AS originalUnitPrice
+    FROM inventory_special_stocks iss
+    JOIN warehouses w ON w.id = iss.warehouse_id
+    JOIN products p ON p.id = iss.product_id
+    WHERE iss.warehouse_id = ? AND iss.status = 'DOWNGRADED_SALE'
+      AND iss.remaining_quantity_m2 > 0 AND iss.discounted_unit_price IS NOT NULL
+      AND ${branchScope.clause} AND ${companyScope.clause}
+    ORDER BY iss.created_at, iss.special_number
+  `, [warehouseId, ...branchScope.params, ...companyScope.params]);
+}
+
 public getTransfersWithDetails(status?: string, warehouseId?: string): any[] {
+  const actor = AuthService.requireAuth();
+  PermissionService.requireAny(actor, [
+    'inventory.transfer',
+    'inventory.transfer.workflow.approve',
+    'inventory.transfer.execute',
+    'inventory.transfer.receive',
+  ]);
+  if (warehouseId) this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
+  const fromScope = this.branchAccess.warehouseBranchScope('w_from', undefined, actor);
+  const toScope = this.branchAccess.warehouseBranchScope('w_to', undefined, actor);
+  const fromCompanyScope = this.branchAccess.companyScope('w_from.company_id', actor);
+  const toCompanyScope = this.branchAccess.companyScope('w_to.company_id', actor);
     let sql = `
       SELECT 
         st.id, st.transfer_number as transferNumber, st.date,
@@ -130,9 +228,13 @@ public getTransfersWithDetails(status?: string, warehouseId?: string): any[] {
       LEFT JOIN users u_app ON st.approved_by = u_app.id
       LEFT JOIN users u_disp ON st.dispatched_by = u_disp.id
       LEFT JOIN users u_rec ON st.received_by = u_rec.id
-      WHERE 1=1
+      WHERE ${fromScope.clause} AND ${toScope.clause}
+        AND ${fromCompanyScope.clause} AND ${toCompanyScope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [
+      ...fromScope.params, ...toScope.params,
+      ...fromCompanyScope.params, ...toCompanyScope.params,
+    ];
     if (status && status !== 'ALL') {
       sql += ` AND st.status = ?`;
       params.push(status);

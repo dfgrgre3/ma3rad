@@ -461,3 +461,26 @@ test('annual leave accrues monthly, prorates on service, and caps year-end carry
   });
   assert.equal(service.getAnnualBalanceAsOf(terminatedEmployeeId, '2024-01-16'), 1.3333);
 });
+
+test('annual leave as-of date keeps pending leave reserved before approval', async () => {
+  const db = await boot();
+  const service = new LeaveService();
+  const employeeId = createEmployee();
+  db.run("UPDATE employees SET joined_date = '2026-01-01' WHERE id = ?", [employeeId]);
+  service.saveAnnualAccrualPolicy({
+    effectiveFrom: '2026-01-01',
+    annualEntitlementDays: 24,
+    carryoverLimitDays: 0,
+    prorateOnService: false,
+  });
+
+  const request = service.requestLeave({
+    employeeId,
+    leaveType: 'ANNUAL',
+    startDate: '2026-11-10',
+    endDate: '2026-11-11',
+  });
+  assert.equal(service.getAnnualBalanceAsOf(employeeId, '2026-11-11'), 18);
+  service.decide(request.id, 'APPROVED');
+  assert.equal(service.getAnnualBalanceAsOf(employeeId, '2026-11-11'), 18);
+});

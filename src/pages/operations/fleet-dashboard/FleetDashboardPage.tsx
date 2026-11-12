@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import {
   Truck, Users, Car, MapPin, Clock, CheckCircle2, AlertCircle, XCircle,
   Loader2, RefreshCw, BarChart3, ArrowUpRight, Calendar, Package,
@@ -173,6 +174,8 @@ function DriverLeaderboard({ stats }: { stats: FleetStats['driverStats'] }) {
 }
 
 export const FleetDashboardPage: React.FC = () => {
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
   const service = useMemo(() => new OperationsService(), []);
   const navigate = useNavigate();
   const user = AuthService.getCurrentUser();
@@ -194,6 +197,12 @@ export const FleetDashboardPage: React.FC = () => {
   };
 
   useEffect(() => { if (canView) load(); }, []);
+
+  useEffect(() => {
+    if (!refreshCtx || !canView) return;
+    if (initialRef.current) { initialRef.current = false; return; }
+    load();
+  }, [refreshCtx?.refreshToken, canView, load]);
 
   return (
     <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden" dir="rtl">

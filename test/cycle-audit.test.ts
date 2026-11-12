@@ -9,10 +9,13 @@ import { SupplierService } from '../src/services/domains/suppliers/SupplierServi
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { PurchaseService } from '../src/services/domains/purchases/PurchaseService.ts';
 import { PurchaseOrderService } from '../src/services/domains/purchases/PurchaseOrderService.ts';
+import { PurchaseReturnService } from '../src/services/domains/purchases/PurchaseReturnService.ts';
 import { ProcurementService } from '../src/services/domains/procurement/ProcurementService.ts';
 import { InventoryService } from '../src/services/domains/inventory/InventoryService.ts';
 import { ReservationService } from '../src/services/domains/sales/ReservationService.ts';
+import { MIGRATIONS } from '../src/database/migrations/index.ts';
 import { localDateString } from '../src/utils/shared/date.ts';
+import type { User } from '../src/types/auth/identity.ts';
 
 /**
  * Systematic cycle audit: every documented mutation must leave the same
@@ -335,9 +338,26 @@ test('purchase cycle audit: PO, GRN, invoice and three-way matching agree', asyn
   });
   assertDocumentNumber('GRN', receipt.grn.grnNumber);
   assert.equal(stockOf(productId), 90, 'goods receipt is the only stock movement');
-  assertDocumentNumber('TX-GRN', one<{ number: string }>(
-    `SELECT transaction_number AS number FROM inventory_transactions WHERE reference_id = ?`, [receipt.grn.id]
-  ).number);
+  const grnTransaction = one<{ id: string; number: string }>(
+    `SELECT id, transaction_number AS number FROM inventory_transactions WHERE reference_id = ?`, [receipt.grn.id]
+  );
+  assertDocumentNumber('TX-GRN', grnTransaction.number);
+  const receivedLayer = one<{
+    sourceTransactionId: string; goodsReceiptId: string; purchaseInvoiceId: string | null;
+    batchId: string; supplierId: string; unitCost: number; quantityReceived: number;
+  }>(`
+    SELECT source_transaction_id AS sourceTransactionId, goods_receipt_id AS goodsReceiptId,
+      purchase_invoice_id AS purchaseInvoiceId, batch_id AS batchId, supplier_id AS supplierId,
+      unit_cost AS unitCost, quantity_received AS quantityReceived
+    FROM inventory_cost_layers WHERE source_transaction_id = ?
+  `, [grnTransaction.id]);
+  assert.equal(receivedLayer.sourceTransactionId, grnTransaction.id);
+  assert.equal(receivedLayer.goodsReceiptId, receipt.grn.id);
+  assert.equal(receivedLayer.purchaseInvoiceId, null);
+  assert.equal(receivedLayer.supplierId, supplier.id);
+  assert.equal(receivedLayer.unitCost, 10);
+  assert.equal(receivedLayer.quantityReceived, 90);
+  assert.ok(receivedLayer.batchId, 'the GRN FIFO layer must retain its product batch');
   assert.equal(one<{ status: string }>(`SELECT status FROM purchase_orders WHERE id = ?`, [order.id]).status, 'PARTIAL');
   assert.equal(one<{ received: number }>(`SELECT received_m2 AS received FROM purchase_order_items WHERE id = ?`, [order.items[0].id]).received, 90);
 
@@ -370,6 +390,17 @@ test('purchase cycle audit: PO, GRN, invoice and three-way matching agree', asyn
   assert.equal(storedMatch.priceVariance, 0);
   assert.equal(storedMatch.qtyVariance, 0);
   assert.equal(stockOf(productId), 90, 'invoicing a GRN must not receive stock twice');
+  const linkedLayer = one<{
+    sourceType: string; sourceId: string; goodsReceiptId: string; purchaseInvoiceId: string;
+  }>(`
+    SELECT source_type AS sourceType, source_id AS sourceId, goods_receipt_id AS goodsReceiptId,
+      purchase_invoice_id AS purchaseInvoiceId
+    FROM inventory_cost_layers WHERE source_transaction_id = ?
+  `, [grnTransaction.id]);
+  assert.equal(linkedLayer.sourceType, 'PURCHASE');
+  assert.equal(linkedLayer.sourceId, purchase.id);
+  assert.equal(linkedLayer.goodsReceiptId, receipt.grn.id);
+  assert.equal(linkedLayer.purchaseInvoiceId, purchase.id);
   assert.equal(one<{ balance: number }>(`SELECT current_balance AS balance FROM suppliers WHERE id = ?`, [supplier.id]).balance, 500);
 
   assertLedgerDocument('PURCHASE_INVOICE', purchase.id);
@@ -425,6 +456,107 @@ test('purchase cycle audit: PO, GRN, invoice and three-way matching agree', asyn
   assert.equal(one<{ status: string }>(`SELECT status FROM purchase_orders WHERE id = ?`, [order.id]).status, 'RECEIVED');
   assert.equal(one<{ received: number }>(`SELECT received_m2 AS received FROM purchase_order_items WHERE id = ?`, [order.items[0].id]).received, 100);
   assertLedgerDocument('PURCHASE_INVOICE', remainder.id);
+
+  const purchaseReturn = new PurchaseReturnService().createReturn({
+    purchaseId: purchase.id,
+    reason: 'إرجاع من طبقة استلام GRN الأصلية',
+    refundMethod: 'BALANCE',
+    items: [{ productId, quantityM2: 5 }],
+  });
+  assert.ok(purchaseReturn.id);
+  assert.equal(stockOf(productId), 95);
+  assert.equal(one<{ quantity: number }>(`
+    SELECT quantity_remaining AS quantity FROM inventory_cost_layers WHERE source_transaction_id = ?
+  `, [grnTransaction.id]).quantity, 85);
+});
+
+test('legacy GRN FIFO backfill restores only provably unconsumed receipt layers', async () => {
+  const db = await boot();
+  const supplier = new SupplierService().createSupplier({
+    name: 'مورد ترحيل طبقات الاستلام القديمة',
+    phone: '01000009004',
+    paymentTermsDays: 30,
+  } as any);
+  const productId = 'prod_audit_legacy_grn';
+  seedProduct({ id: productId, stock: 0, cost: 2 });
+  const receipt = new ProcurementService().createGoodsReceipt({
+    supplierId: supplier.id,
+    warehouseId: 'wh_main',
+    items: [{
+      productId,
+      receivedQuantityM2: 4,
+      acceptedQuantityM2: 4,
+      batchNumber: 'LEGACY-GRN-LOT',
+      unitCost: 7,
+    }],
+  });
+  const transaction = one<{ id: string }>(
+    `SELECT id FROM inventory_transactions WHERE reference_type = 'GRN' AND reference_id = ?`,
+    [receipt.grn.id],
+  );
+  const purchase = new PurchaseService().createPurchase({
+    supplierId: supplier.id,
+    warehouseId: 'wh_main',
+    grnId: receipt.grn.id,
+    items: [{ productId, quantityM2: 4, boxesCount: 3, unitCost: 7, grnAcceptedQty: 4 }],
+    paidAmount: 0,
+    paymentType: 'CREDIT',
+  });
+
+  q(`DELETE FROM inventory_cost_layers WHERE source_transaction_id = ?`, [transaction.id]);
+  const backfill = MIGRATIONS.find((migration) => migration.id === '178_inventory_fifo_grn_provenance');
+  assert.ok(backfill, 'the legacy FIFO provenance migration must be registered');
+  backfill.up(db.getDatabase());
+
+  const recovered = one<{
+    sourceType: string; sourceId: string; sourceTransactionId: string; goodsReceiptId: string;
+    purchaseInvoiceId: string; batchId: string; supplierId: string; unitCost: number; quantity: number;
+  }>(`
+    SELECT source_type AS sourceType, source_id AS sourceId, source_transaction_id AS sourceTransactionId,
+      goods_receipt_id AS goodsReceiptId, purchase_invoice_id AS purchaseInvoiceId,
+      batch_id AS batchId, supplier_id AS supplierId, unit_cost AS unitCost,
+      quantity_received AS quantity
+    FROM inventory_cost_layers WHERE source_transaction_id = ?
+  `, [transaction.id]);
+  assert.equal(recovered.sourceType, 'PURCHASE');
+  assert.equal(recovered.sourceId, purchase.id);
+  assert.equal(recovered.sourceTransactionId, transaction.id);
+  assert.equal(recovered.goodsReceiptId, receipt.grn.id);
+  assert.equal(recovered.purchaseInvoiceId, purchase.id);
+  assert.ok(recovered.batchId);
+  assert.equal(recovered.supplierId, supplier.id);
+  assert.equal(recovered.unitCost, 7);
+  assert.equal(recovered.quantity, 4);
+
+  const ambiguousProductId = 'prod_audit_legacy_grn_ambiguous';
+  seedProduct({ id: ambiguousProductId, stock: 0, cost: 3 });
+  const ambiguousReceipt = new ProcurementService().createGoodsReceipt({
+    supplierId: supplier.id,
+    warehouseId: 'wh_main',
+    items: [{
+      productId: ambiguousProductId,
+      receivedQuantityM2: 2,
+      acceptedQuantityM2: 2,
+      batchNumber: 'LEGACY-GRN-AMBIGUOUS',
+      unitCost: 8,
+    }],
+  });
+  const ambiguousTransaction = one<{ id: string }>(
+    `SELECT id FROM inventory_transactions WHERE reference_type = 'GRN' AND reference_id = ?`,
+    [ambiguousReceipt.grn.id],
+  );
+  q(`DELETE FROM inventory_cost_layers WHERE source_transaction_id = ?`, [ambiguousTransaction.id]);
+  q(`
+    INSERT INTO inventory_cost_layers (
+      id, product_id, warehouse_id, source_type, received_at,
+      quantity_received, quantity_remaining, unit_cost, is_estimated
+    ) VALUES (?, ?, 'wh_main', 'OPENING_ESTIMATE', ?, 2, 2, 3, 1)
+  `, [`icl_legacy_ambiguous_${ambiguousProductId}`, ambiguousProductId, localDateString()]);
+  backfill.up(db.getDatabase());
+  assert.equal(one<{ count: number }>(`
+    SELECT COUNT(*) AS count FROM inventory_cost_layers
+    WHERE goods_receipt_id = ?
+  `, [ambiguousReceipt.grn.id]).count, 0, 'ambiguous historical stock must not be double-layered');
 });
 
 test('inventory and accounting audit: movements, reservations, transfers and ledger reconcile', async () => {
@@ -436,14 +568,45 @@ test('inventory and accounting audit: movements, reservations, transfers and led
   const stockBaseline = stockOf(productId, 'wh_main');
   const transactionBaseline = transactionSum(productId, 'wh_main');
 
-  // ── Transfer moves value without creating or destroying it ───────────────
-  inventory.transferStock('wh_main', 'wh_ext', productId, 5, 'تدقيق تحويل');
+  // ── Transfer requests do not move stock until approved, dispatched and received ──
+  const transferNotes = 'تدقيق تحويل';
+  inventory.transferStock('wh_main', 'wh_ext', productId, 5, transferNotes);
+  const transferId = one<{ id: string }>(
+    `SELECT id FROM stock_transfers WHERE notes = ? ORDER BY rowid DESC LIMIT 1`,
+    [transferNotes]
+  ).id;
+  assert.equal(stockOf(productId, 'wh_main'), stockBaseline);
+  assert.equal(stockOf(productId, 'wh_ext'), 0);
+
+  const approver: User = {
+    id: 'usr_cycle_transfer_approver',
+    username: 'cycle-transfer-approver',
+    fullName: 'Cycle Transfer Approver',
+    role: 'ADMIN',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+  q(
+    `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active)
+     VALUES (?, ?, 'test', ?, 'ADMIN', 1)`,
+    [approver.id, approver.username, approver.fullName]
+  );
+  assert.throws(() => inventory.approveTransfer(transferId), /لا يمكن لمنشئ طلب التحويل اعتماده/);
+  AuthService.setCurrentUser(approver);
+  PermissionService.invalidate(approver);
+  inventory.approveTransfer(transferId);
+  inventory.prepareTransfer(transferId);
+  inventory.dispatchTransfer(transferId);
+  const transferItem = inventory.getTransferItems(transferId)[0];
+  inventory.receiveTransfer(transferId, [{ itemId: transferItem.id, receivedM2: 5 }]);
+
   assert.equal(stockOf(productId, 'wh_main'), stockBaseline - 5);
   assert.equal(stockOf(productId, 'wh_ext'), 5);
   const transferTypes = q<{ type: string; quantity: number; referenceType: string }>(
     `SELECT type, quantity_m2 AS quantity, reference_type AS referenceType FROM inventory_transactions
-     WHERE product_id = ? AND reference_type = 'TRANSFER' ORDER BY created_at DESC, rowid DESC LIMIT 2`,
-    [productId]
+     WHERE product_id = ? AND reference_type = 'TRANSFER' AND reference_id = ? ORDER BY created_at DESC, rowid DESC`,
+    [productId, transferId]
   );
   assert.deepEqual(
     transferTypes.map((row) => row.type).sort(),
@@ -452,12 +615,11 @@ test('inventory and accounting audit: movements, reservations, transfers and led
   assert.equal(transferTypes.reduce((sum, row) => sum + Number(row.quantity), 0), 0, 'transfer legs must cancel out');
   const transferReferenceIds = q<{ referenceId: string }>(
     `SELECT reference_id AS referenceId FROM inventory_transactions
-     WHERE product_id = ? AND reference_type = 'TRANSFER' ORDER BY created_at DESC, rowid DESC LIMIT 2`,
-    [productId]
+     WHERE product_id = ? AND reference_type = 'TRANSFER' AND reference_id = ? ORDER BY created_at DESC, rowid DESC`,
+    [productId, transferId]
   );
   assert.equal(transferReferenceIds[0].referenceId, transferReferenceIds[1].referenceId);
-  const transferReportRows = inventory.getTransfersList(undefined, undefined, 'wh_main')
-    .filter((row: any) => String(row.transferNotes).includes('تدقيق تحويل'));
+  const transferReportRows = inventory.getTransfersList(undefined, undefined, 'wh_main');
   assert.equal(transferReportRows.length, 1);
   assert.equal(transferReportRows[0].quantityM2, 5);
 

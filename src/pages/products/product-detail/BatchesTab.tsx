@@ -112,12 +112,12 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
               onClick={() => setFormOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold transition"
             >
-              <Plus className="w-4 h-4" /> تسجيل دفعة / تشغيلة جديدة
+              <Plus className="w-4 h-4" /> تسجيل استلام دفعة / تشغيلة
             </button>
           ) : (
             <form onSubmit={handleAdd} className="bg-white border border-sky-200 rounded-xl p-5 space-y-4">
               <div className="flex items-center justify-between mb-1">
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2"><Palette className="w-4 h-4 text-sky-500" /> تسجيل دفعة / تشغيلة جديدة</h4>
+                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2"><Palette className="w-4 h-4 text-sky-500" /> تسجيل استلام دفعة / تشغيلة</h4>
                 <button type="button" onClick={() => setFormOpen(false)} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
@@ -164,7 +164,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
               <div className="flex gap-2 justify-end">
                 <button type="button" onClick={() => setFormOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">إلغاء</button>
                 <button type="submit" disabled={saving} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5">
-                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} حفظ الدفعة
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} تسجيل الاستلام
                 </button>
               </div>
             </form>
@@ -178,7 +178,7 @@ export const BatchesTab: React.FC<BatchesTabProps> = ({ productId, canEdit, canV
           <div className="text-center py-16 text-slate-500">
             <Palette className="w-10 h-10 mx-auto mb-3 text-slate-300" />
             <p className="text-sm font-medium">لا توجد دفعات مسجلة لهذا الصنف</p>
-            <p className="text-xs text-slate-400 mt-1">سجّل أول دفعة عند استلام الشحنة لتفعيل التتبع وتحذيرات خلط النغمات</p>
+            <p className="text-xs text-slate-400 mt-1">تسجيل الدفعة ينشئ استلاماً مخزنياً ويحدّث الرصيد ودفتر الحركة وطبقة التكلفة تلقائياً</p>
           </div>
         ) : (
           <table className="w-full text-sm text-right">

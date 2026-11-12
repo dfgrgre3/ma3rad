@@ -5,6 +5,7 @@ import { PermissionService } from '../../../services/domains/auth/PermissionServ
 import { CentralLicenseService } from '../../../services/domains/licensing/CentralLicenseService';
 import { scheduleAutomaticBackupChecks } from '../../../services/infrastructure/backup/BackupScheduler';
 import { NotificationService } from '../../../services/domains/notifications/NotificationService';
+import { ReservationService } from '../../../services/domains/sales/ReservationService';
 import { toAppError } from '../../../errors/appError';
 import { ElectronSyncTransport } from '../../../sync/ElectronSyncTransport';
 import { SyncEngine } from '../../../sync/SyncEngine';
@@ -169,6 +170,25 @@ export function useAppStartup() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!dbReady) return;
+    const reservations = new ReservationService();
+    const releaseExpired = () => {
+      try {
+        const result = reservations.expireOverdue();
+        if (result.failed > 0) {
+          console.warn(`Automatic reservation expiry failed for ${result.failed} reservation(s).`);
+        }
+      } catch (error) {
+        console.error('Automatic reservation expiry could not run:', error);
+      }
+    };
+
+    releaseExpired();
+    const timer = setInterval(releaseExpired, 60_000);
+    return () => clearInterval(timer);
+  }, [dbReady]);
 
   return {
     dbReady, initError, recoveryRequired, recoveryBusy, currentUser,

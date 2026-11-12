@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { useDashboardRefresh } from '../../contexts/DashboardRefreshContext';
 import { Activity, AlertTriangle } from 'lucide-react';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
@@ -20,11 +21,14 @@ interface OverviewSectionProps {
 }
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }) => {
+  const refreshCtx = useDashboardRefresh();
+  const initialRef = useRef(true);
   const {
     metrics,
     chartData,
     topProducts,
     loading,
+    refreshing,
     dashboardError,
     monthlyComparison,
     topCustomers,
@@ -46,6 +50,15 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({ onDataLoaded }
   useEffect(() => {
     if (!loading && !refreshing) onDataLoaded?.();
   }, [loading, onDataLoaded, refreshing]);
+
+  useEffect(() => {
+    if (!refreshCtx) return;
+    if (initialRef.current) {
+      initialRef.current = false;
+      return;
+    }
+    loadData();
+  }, [refreshCtx?.refreshToken, loadData]);
 
   if (!metrics && loading) {
     return (

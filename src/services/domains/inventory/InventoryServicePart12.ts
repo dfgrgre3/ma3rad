@@ -11,6 +11,11 @@ import { InventoryServicePart11 } from './InventoryServicePart11';
 
 export class InventoryServicePart12 extends InventoryServicePart11 {
 public getReorderPlanning(warehouseId?: string, search?: string): any[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.inventory.hub.view');
+    if (warehouseId) this.branchAccess.requireWarehouseAuthorization(warehouseId, actor);
+    const branchScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
+    const companyScope = this.branchAccess.companyScope('w.company_id', actor);
     let sql = `
       SELECT 
         p.id as productId, p.name as productName, p.sku as productSku,
@@ -31,20 +36,33 @@ public getReorderPlanning(warehouseId?: string, search?: string): any[] {
           JOIN purchase_orders po ON poi.purchase_order_id = po.id
           WHERE poi.product_id = p.id AND po.warehouse_id = w.id AND po.status IN ('SENT', 'CONFIRMED', 'PARTIAL')
         ), 0) as onOrderStockM2,
-        COALESCE((
-          SELECT SUM(sii.quantity_m2)
-          FROM sales_invoice_items sii
-          JOIN sales_invoices si ON sii.invoice_id = si.id
-          WHERE sii.product_id = p.id AND si.warehouse_id = w.id
-            AND si.date >= date('now', '-60 days')
-        ), 0) as salesPast60Days
+        MAX(0,
+          COALESCE((
+            SELECT SUM(sii.quantity_m2)
+            FROM sales_invoice_items sii
+            JOIN sales_invoices si ON sii.invoice_id = si.id
+            WHERE sii.product_id = p.id AND si.warehouse_id = w.id
+              AND si.date >= date('now', '-60 days') AND si.date <= date('now')
+              AND COALESCE(si.invoice_status, 'COMPLETED') != 'VOID'
+          ), 0) - COALESCE((
+            SELECT SUM(sri.quantity_m2)
+            FROM sales_return_items sri
+            JOIN sales_returns sr ON sr.id = sri.return_id
+            JOIN sales_invoices original ON original.id = sr.original_invoice_id
+            WHERE sri.product_id = p.id AND sr.warehouse_id = w.id
+              AND original.warehouse_id = w.id
+              AND sr.date >= date('now', '-60 days') AND sr.date <= date('now')
+              AND COALESCE(original.invoice_status, 'COMPLETED') != 'VOID'
+          ), 0)
+        ) as salesPast60Days
       FROM products p
       CROSS JOIN warehouses w
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN warehouse_stock ws ON p.id = ws.product_id AND w.id = ws.warehouse_id
       WHERE p.is_active = 1 AND w.is_active = 1
+        AND ${branchScope.clause} AND ${companyScope.clause}
     `;
-    const params: any[] = [];
+    const params: any[] = [...branchScope.params, ...companyScope.params];
     if (warehouseId) {
       sql += ` AND w.id = ?`;
       params.push(warehouseId);
