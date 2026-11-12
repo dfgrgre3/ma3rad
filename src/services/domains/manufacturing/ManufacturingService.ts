@@ -4,6 +4,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { localDateString } from '../../../utils/shared/date';
 import type { User } from '../../../types/auth/identity';
 
@@ -686,6 +687,13 @@ export class ManufacturingService {
           `UPDATE warehouse_stock SET quantity_m2 = quantity_m2 - ?, last_updated = ? WHERE warehouse_id = ? AND product_id = ?`,
           [material.plannedQty, now, warehouseId, material.productId]
         );
+        InventoryLocationStockService.release(db, {
+          warehouseId,
+          productId: material.productId,
+          quantity: material.plannedQty,
+          actorId: actor.id,
+          reason: 'صرف مواد إنتاج',
+        });
         const txNumber = db.nextNumber('INV');
         db.run(
           `INSERT INTO inventory_transactions (id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at)
@@ -701,6 +709,13 @@ export class ManufacturingService {
          ON CONFLICT(warehouse_id, product_id) DO UPDATE SET quantity_m2 = quantity_m2 + ?, last_updated = ?`,
         [`ws_${uuidv4().replace(/-/g, '').slice(0, 12)}`, warehouseId, order.productId, order.quantity, now, order.quantity, now]
       );
+      InventoryLocationStockService.receive(db, {
+        warehouseId,
+        productId: order.productId,
+        quantity: order.quantity,
+        actorId: actor.id,
+        reason: 'استلام منتج مصنّع',
+      });
       const finishedTxNumber = db.nextNumber('INV');
       db.run(
         `INSERT INTO inventory_transactions (id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at)
@@ -1058,6 +1073,13 @@ export class ManufacturingService {
           `UPDATE warehouse_stock SET quantity_m2 = quantity_m2 - ?, last_updated = ? WHERE warehouse_id = ? AND product_id = ?`,
           [qty, new Date().toISOString(), warehouseId, productId]
         );
+        InventoryLocationStockService.release(this.db, {
+          warehouseId,
+          productId,
+          quantity: qty,
+          actorId: actor.id,
+          reason: 'إتلاف (Scrap)',
+        });
         const txNumber = this.db.nextNumber('INV');
         this.db.run(
           `INSERT INTO inventory_transactions (id, transaction_number, type, product_id, warehouse_id, quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id, notes, performed_by, created_at)

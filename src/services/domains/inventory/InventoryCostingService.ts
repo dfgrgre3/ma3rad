@@ -181,15 +181,55 @@ export class InventoryCostingService {
     this.consumeFifo(db, transactionId, plan);
   }
 
+  /**
+   * Moves FIFO layers from one warehouse to another while preserving the exact
+   * consumed unit costs. The outbound consumption is recorded against
+   * `transactionId` so the transfer can be audited and reversed.
+   */
+  static moveLayers(db: DatabaseManager, input: {
+    fromWarehouseId: string;
+    toWarehouseId: string;
+    productId: string;
+    quantity: number;
+    transactionId: string;
+    transferId: string;
+    sourceType?: string;
+    plan?: FifoCostPlan | null;
+    reservedByLayer?: Map<string, number>;
+  }): { plan: FifoCostPlan; layers: Array<{ id: string; quantity: number; unitCost: number }> } {
+    const plan = input.plan
+      || this.planFifo(db, input.productId, input.fromWarehouseId, input.quantity, input.reservedByLayer || new Map());
+    this.consumeFifo(db, input.transactionId, plan);
+    const layers = plan.allocations.map((row) => ({
+      id: this.addLayer(db, {
+        productId: input.productId,
+        warehouseId: input.toWarehouseId,
+        sourceTransactionId: input.transactionId,
+        sourceType: input.sourceType || 'TRANSFER',
+        sourceId: input.transferId,
+        date: localDateString(),
+        quantity: row.quantity,
+        unitCost: row.unitCost,
+      }),
+      quantity: row.quantity,
+      unitCost: row.unitCost,
+    }));
+    return { plan, layers };
+  }
+
   static transferLayers(db: DatabaseManager, fromWarehouseId: string, toWarehouseId: string,
     productId: string, quantity: number, transferId: string, plan: FifoCostPlan | null = null, reservedByLayer: Map<string, number> = new Map()): FifoCostPlan {
-    const costPlan = plan || this.planFifo(db, productId, fromWarehouseId, quantity, reservedByLayer);
-    for (const row of costPlan.allocations) {
-      db.run('UPDATE inventory_cost_layers SET quantity_remaining=MAX(0,quantity_remaining-?) WHERE id=?', [row.quantity,row.layerId]);
-      this.addLayer(db, { productId, warehouseId: toWarehouseId, sourceType: 'TRANSFER', sourceId: transferId,
-        date: localDateString(), quantity: row.quantity, unitCost: row.unitCost });
-    }
-    return costPlan;
+    const result = this.moveLayers(db, {
+      fromWarehouseId,
+      toWarehouseId,
+      productId,
+      quantity,
+      transactionId: `icl_move_${uuidv4().replace(/-/g, '').slice(0, 12)}`,
+      transferId,
+      plan,
+      reservedByLayer,
+    });
+    return result.plan;
   }
 
   static removeUnusedSource(db: DatabaseManager, sourceType: string, sourceId: string): void {

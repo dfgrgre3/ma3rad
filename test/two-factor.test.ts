@@ -7,6 +7,7 @@ import { AuthService, TwoFactorRequiredError } from '../src/services/domains/aut
 import {
   base32Decode,
   base32Encode,
+  generateHOTP,
   generateTOTP,
   twoFactorAuth,
 } from '../src/services/domains/auth/twoFactorAuth.ts';
@@ -26,6 +27,25 @@ test('TOTP matches the RFC 6238 SHA-1 test vectors', () => {
     assert.equal(generateTOTP(RFC_SECRET, time), expected, `T=${time}`);
   }
   assert.equal(generateTOTP(RFC_SECRET, 59, 30, 8), '94287082');
+});
+
+test('HOTP matches the RFC 4226 SHA-1 test vectors', () => {
+  const expectedCodes = [
+    '755224',
+    '287082',
+    '359152',
+    '969429',
+    '338314',
+    '254676',
+    '287922',
+    '162583',
+    '399871',
+    '520489',
+  ];
+
+  expectedCodes.forEach((expected, counter) => {
+    assert.equal(generateHOTP(RFC_SECRET, counter), expected, `counter=${counter}`);
+  });
 });
 
 test('base32 round-trips arbitrary bytes', () => {

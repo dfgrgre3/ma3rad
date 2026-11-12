@@ -3043,6 +3043,116 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    id: '184_inventory_cost_layer_landed_cost',
+    description: 'Preserve the receipt unit cost and record landed-cost adjustments on FIFO layers',
+    up: (db: Database) => {
+      addColumn(db, 'inventory_cost_layers', 'original_unit_cost', 'REAL');
+      addColumn(db, 'inventory_cost_layers', 'landed_cost_share', 'REAL NOT NULL DEFAULT 0');
+      addColumn(db, 'inventory_cost_layers', 'cost_updated_at', 'TEXT');
+    },
+  },
+  {
+    id: '185_inventory_transfer_batch_and_transit_tracking',
+    description: 'Track batches and cost layers across the transit warehouse and make transfer dispatch/receive idempotent',
+    up: (db: Database) => {
+      addColumn(db, 'stock_transfers', 'transit_warehouse_id', 'TEXT');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS stock_transfer_operations (
+          id TEXT PRIMARY KEY,
+          transfer_id TEXT NOT NULL,
+          operation TEXT NOT NULL CHECK(operation IN ('DISPATCH', 'RECEIVE', 'REJECT')),
+          idempotency_key TEXT NOT NULL,
+          result_reference TEXT,
+          payload_json TEXT,
+          created_by TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(transfer_id, operation, idempotency_key),
+          FOREIGN KEY (transfer_id) REFERENCES stock_transfers(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_transfer_operations_transfer
+          ON stock_transfer_operations(transfer_id, operation);
+
+        CREATE TABLE IF NOT EXISTS stock_transfer_receipts (
+          id TEXT PRIMARY KEY,
+          transfer_id TEXT NOT NULL,
+          receipt_number TEXT UNIQUE NOT NULL,
+          idempotency_key TEXT NOT NULL UNIQUE,
+          payload_json TEXT,
+          received_by TEXT NOT NULL,
+          received_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          total_received_m2 REAL NOT NULL DEFAULT 0,
+          total_lost_m2 REAL NOT NULL DEFAULT 0,
+          notes TEXT,
+          FOREIGN KEY (transfer_id) REFERENCES stock_transfers(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_transfer_receipts_transfer
+          ON stock_transfer_receipts(transfer_id, received_at);
+
+        CREATE TABLE IF NOT EXISTS stock_transfer_batch_allocations (
+          id TEXT PRIMARY KEY,
+          transfer_item_id TEXT NOT NULL,
+          source_batch_id TEXT,
+          transit_batch_id TEXT,
+          destination_batch_id TEXT,
+          batch_number TEXT NOT NULL,
+          tone_shade TEXT,
+          caliber TEXT,
+          quantity_m2 REAL NOT NULL,
+          received_m2 REAL NOT NULL DEFAULT 0,
+          lost_m2 REAL NOT NULL DEFAULT 0,
+          reverted_m2 REAL NOT NULL DEFAULT 0,
+          unit_cost REAL NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (transfer_item_id) REFERENCES stock_transfer_items(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_transfer_batch_allocations_item
+          ON stock_transfer_batch_allocations(transfer_item_id);
+      `);
+    },
+  },
+  {
+    id: '186_inventory_returns_location_and_bin_controls',
+    description: 'Track the source and disposition of returned goods, audit location transfers, and support bin-level counts',
+    up: (db: Database) => {
+      addColumn(db, 'sales_return_items', 'source_type', 'TEXT');
+      addColumn(db, 'sales_return_items', 'special_stock_id', 'TEXT');
+      addColumn(db, 'sales_return_items', 'disposition', 'TEXT');
+      addColumn(db, 'warehouse_location_movements', 'reason', 'TEXT');
+      addColumn(db, 'stock_counts', 'location_id', 'TEXT');
+      addColumn(db, 'stock_count_items', 'location_id', 'TEXT');
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_sales_return_items_special_stock
+          ON sales_return_items(special_stock_id);
+        CREATE INDEX IF NOT EXISTS idx_stock_count_items_location
+          ON stock_count_items(count_id, location_id);
+      `);
+    },
+  },
+  {
+    id: '187_inventory_reorder_planning_and_stock_tracked_policy',
+    description: 'Per-warehouse reorder planning overrides and stock-tracked product policy support',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS product_warehouse_planning (
+          product_id TEXT NOT NULL,
+          warehouse_id TEXT NOT NULL,
+          min_stock_level REAL,
+          max_stock_level REAL,
+          safety_stock REAL,
+          reorder_point REAL,
+          lead_time_days INTEGER,
+          review_period_days INTEGER,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (product_id, warehouse_id),
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+          FOREIGN KEY (warehouse_id) REFERENCES warehouses(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_product_warehouse_planning_warehouse
+          ON product_warehouse_planning(warehouse_id, product_id);
+      `);
+    },
+  },
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);

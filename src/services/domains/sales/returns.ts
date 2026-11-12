@@ -3,6 +3,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { SettingsService } from '../config/SettingsService';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { BatchService } from '../inventory/BatchService';
 import { localDateString } from '../../../utils/shared/date';
 import { getProductUnitLabel, isServiceProduct } from '../../../utils/products/productUnits';
@@ -12,7 +13,7 @@ import { calculateDiscountedReturnAmount, calculateReturnTax, computeReturnImpac
 import type { SalesReturn } from '../../../types';
 import type { DatabaseManager } from '../../../database/repositories/databaseManager';
 import type { InvoiceWithItems, SalesContext } from './context';
-import type { ReturnRequestItem } from '../../../types/sales/serviceTypes';
+import type { ReturnRequestItem, ReturnDisposition } from '../../../types/sales/serviceTypes';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { PartnerService } from '../customers/PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
@@ -48,7 +49,13 @@ interface ReturnProduct {
   baseUnit: string;
 }
 
-type AuthoritativeReturnItem = ReturnRequestItem & { returnAmount: number };
+type AuthoritativeReturnItem = ReturnRequestItem & {
+  returnAmount: number;
+  /** Special-stock record the sold line came from, after source resolution. */
+  resolvedSpecialStockId: string | null;
+  /** Where the returned quantity must be placed. */
+  resolvedDisposition: ReturnDisposition;
+};
 
 export function createSaleReturn(
   ctx: SalesContext,
@@ -181,6 +188,7 @@ function createReturnInTransaction(
   const { invoiceId, returnId, today, inv, items, refundCash, options, actor } = params;
   validateReturnQuantities(sqliteDb, invoiceId, inv, requestedByProduct);
   const authoritativeItems = getAuthoritativeReturnItems(inv, items);
+  validateReturnSourceQuantities(sqliteDb, invoiceId, authoritativeItems);
   const returnNumber = sqliteDb.nextNumber('RET');
   const totalReturnAmount = round2(authoritativeItems.reduce((sum, item) => sum + item.returnAmount, 0));
   const taxableInvoiceBase = Math.max(0, Number(inv.subtotal || 0) - Number(inv.discountAmount || 0));
@@ -311,7 +319,27 @@ function getAuthoritativeReturnItems(
   returnItems: ReturnRequestItem[]
 ): AuthoritativeReturnItem[] {
   return returnItems.map((item) => {
-    const soldLines = inv.items.filter((line) => line.productId === item.productId);
+    const requestedSource = item.specialStockId ? String(item.specialStockId) : null;
+    const allSoldLines = inv.items.filter((line) => line.productId === item.productId);
+    if (!allSoldLines.length) {
+      throw new Error('الصنف غير موجود في الفاتورة الأصلية.');
+    }
+    const soldLines = requestedSource
+      ? allSoldLines.filter((line) => (line.specialStockId || null) === requestedSource)
+      : allSoldLines;
+    if (!soldLines.length) {
+      throw new Error('سجل المخزون المخفض المحدد لا يطابق بنداً في الفاتورة الأصلية.');
+    }
+    const sources = new Set<string | null>(soldLines.map((line) => line.specialStockId || null));
+    if (!requestedSource && sources.size > 1) {
+      throw new Error('الصنف مسجّل في الفاتورة من أكثر من مصدر (مخزون عادي وسجل بيع مخفض). حدد المصدر المُرجع.');
+    }
+    const resolvedSpecialStockId = requestedSource || (sources.size === 1 ? [...sources][0] : null);
+    const resolvedDisposition: ReturnDisposition = item.disposition
+      || (resolvedSpecialStockId ? 'SPECIAL_STOCK' : 'RESTOCK');
+    if (resolvedDisposition === 'SPECIAL_STOCK' && !resolvedSpecialStockId) {
+      throw new Error('لا يمكن إعادة صنف إلى المخزون الخاص دون تحديد سجل المصدر.');
+    }
     const soldQuantity = soldLines.reduce((sum, line) => sum + Number(line.quantityM2 || 0), 0);
     const weightedPrice = (key: 'unitPrice' | 'unitCost') => soldQuantity > 0
       ? soldLines.reduce((sum, line) => sum + Number(line[key] || 0) * Number(line.quantityM2 || 0), 0) / soldQuantity
@@ -320,6 +348,8 @@ function getAuthoritativeReturnItems(
       ...item,
       unitPrice: round2(weightedPrice('unitPrice')),
       unitCost: round2(weightedPrice('unitCost')),
+      resolvedSpecialStockId,
+      resolvedDisposition,
       returnAmount: calculateDiscountedReturnAmount(
         item.quantityM2,
         soldLines.map((line) => ({
@@ -333,6 +363,40 @@ function getAuthoritativeReturnItems(
       ),
     };
   });
+}
+
+/**
+ * Returning a discounted-sale line must never consume the allowance of the
+ * regular stock line (or of another discounted batch). The source is part of
+ * the returned quantity's identity.
+ */
+function validateReturnSourceQuantities(
+  sqliteDb: DatabaseManager,
+  invoiceId: string,
+  items: AuthoritativeReturnItem[]
+): void {
+  const requestedBySource = new Map<string, number>();
+  for (const item of items) {
+    if (!item.resolvedSpecialStockId) continue;
+    const key = `${item.productId}|${item.resolvedSpecialStockId}`;
+    requestedBySource.set(key, (requestedBySource.get(key) || 0) + Number(item.quantityM2 || 0));
+  }
+  for (const [key, requested] of requestedBySource) {
+    const [productId, specialStockId] = key.split('|');
+    const sold = Number(sqliteDb.query<{ q: number }>(`
+      SELECT COALESCE(SUM(quantity_m2), 0) AS q FROM sales_invoice_items
+      WHERE invoice_id = ? AND product_id = ? AND special_stock_id = ?
+    `, [invoiceId, productId, specialStockId])[0]?.q || 0);
+    const alreadyReturned = Number(sqliteDb.query<{ q: number }>(`
+      SELECT COALESCE(SUM(sri.quantity_m2), 0) AS q
+      FROM sales_return_items sri
+      JOIN sales_returns sr ON sr.id = sri.return_id
+      WHERE sr.original_invoice_id = ? AND sri.product_id = ? AND sri.special_stock_id = ?
+    `, [invoiceId, productId, specialStockId])[0]?.q || 0);
+    if (requested + alreadyReturned > sold + 1e-6) {
+      throw new Error('كمية الإرجاع من سجل المخزون المخفض تتجاوز الكمية المباعة منه في الفاتورة.');
+    }
+  }
 }
 
 function insertSalesReturn(
@@ -393,37 +457,52 @@ function processReturnItem(
 
   const boxesCount = getReturnedBoxesCount(product, item.quantityM2);
   const serviceLine = isServiceProduct({ productType: product.productType, baseUnit: product.baseUnit });
-  const itemFifoEnabled = fifoEnabled && !serviceLine;
-  const actualCost = itemFifoEnabled
+  const specialStockId = item.resolvedSpecialStockId;
+  const disposition = item.resolvedDisposition;
+  // Special-stock sales never consumed FIFO layers or regular stock, so their
+  // cost comes from the invoice line and must not be restored through FIFO.
+  // Quarantined/damaged returns are also kept out of the saleable pool.
+  const shouldRestoreFifo = fifoEnabled && !serviceLine
+    && !specialStockId && disposition === 'RESTOCK';
+  const actualCost = shouldRestoreFifo
     ? InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2)
     : 0;
-  const unitCost = itemFifoEnabled
+  const unitCost = shouldRestoreFifo
     ? round2(actualCost / item.quantityM2)
     : item.unitCost > 0 ? item.unitCost : 0;
   const returnItemId = `ritem_${uuidv4().substring(0, 8)}`;
-  insertSalesReturnItem(sqliteDb, item, product, returnId, returnItemId, boxesCount, unitCost, lineTotal);
+  insertSalesReturnItem(
+    sqliteDb, item, product, returnId, returnItemId, boxesCount, unitCost, lineTotal,
+    specialStockId, disposition,
+  );
   if (params.trackInventory && !serviceLine) {
-    restoreReturnStock(sqliteDb, inv.warehouseId, item, product);
-    insertReturnInventoryTransaction(sqliteDb, params, item, returnId, boxesCount, unitCost);
+    if (disposition === 'SPECIAL_STOCK') {
+      restoreToSpecialStock(sqliteDb, params, item, product, returnItemId, specialStockId!, unitCost, boxesCount);
+    } else if (disposition === 'QUARANTINE' || disposition === 'DAMAGED') {
+      holdReturnedAsSpecialStock(sqliteDb, params, item, product, returnItemId, disposition, unitCost, boxesCount);
+    } else {
+      restoreReturnStock(sqliteDb, inv.warehouseId, item, product, actor.id);
+      insertReturnInventoryTransaction(sqliteDb, params, item, returnId, boxesCount, unitCost);
 
-    if (product.productType !== 'GENERAL') {
-      new BatchService().restoreForSaleReturn({
-        returnItemId,
-        invoiceId,
-        productId: item.productId,
-        warehouseId: inv.warehouseId,
-        quantityM2: item.quantityM2,
-        costPrice: unitCost,
-        performedBy: actor.id,
-        reason: item.reason,
-      });
+      if (product.productType !== 'GENERAL') {
+        new BatchService().restoreForSaleReturn({
+          returnItemId,
+          invoiceId,
+          productId: item.productId,
+          warehouseId: inv.warehouseId,
+          quantityM2: item.quantityM2,
+          costPrice: unitCost,
+          performedBy: actor.id,
+          reason: item.reason,
+        });
+      }
     }
   }
   // Service lines posted a direct cost against accrued service costs at sale
   // time (5102/2105); a return must reverse the proportional amount.
   const serviceCost = serviceLine ? round2(item.quantityM2 * (item.unitCost || 0)) : 0;
   return {
-    inventoryCost: itemFifoEnabled ? actualCost : (serviceLine ? 0 : round2(item.quantityM2 * unitCost)),
+    inventoryCost: shouldRestoreFifo ? actualCost : (serviceLine ? 0 : round2(item.quantityM2 * unitCost)),
     serviceCost,
   };
 }
@@ -442,23 +521,95 @@ function insertSalesReturnItem(
   returnItemId: string,
   boxesCount: number,
   unitCost: number,
-  lineTotal: number
+  lineTotal: number,
+  specialStockId: string | null,
+  disposition: ReturnDisposition,
 ): void {
   sqliteDb.run(`
     INSERT INTO sales_return_items (
-      id, return_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, return_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund,
+      source_type, special_stock_id, disposition
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     returnItemId, returnId, item.productId, product.name, product.grade,
     item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
+    specialStockId ? 'SPECIAL_STOCK_SALE' : 'INVOICE', specialStockId, disposition,
   ]);
+}
+
+/**
+ * Returns the quantity to the special-stock record it was sold from. Its cost
+ * was already carved out of the regular warehouse, so this restores the
+ * remaining quantity without touching regular stock or FIFO layers.
+ */
+function restoreToSpecialStock(
+  sqliteDb: DatabaseManager,
+  params: ReturnTransactionParams,
+  item: AuthoritativeReturnItem,
+  product: ReturnProduct,
+  returnItemId: string,
+  specialStockId: string,
+  unitCost: number,
+  boxesCount: number,
+): void {
+  const source = sqliteDb.query<{ id: string; quantityM2: number }>(`
+    SELECT id, quantity_m2 AS quantityM2 FROM inventory_special_stocks WHERE id = ?
+  `, [specialStockId])[0];
+  if (!source) throw new Error('سجل المخزون الخاص المرتبط بالصنف غير موجود.');
+  sqliteDb.run(`
+    UPDATE inventory_special_stocks
+    SET remaining_quantity_m2 = MIN(quantity_m2, remaining_quantity_m2 + ?)
+    WHERE id = ?
+  `, [item.quantityM2, specialStockId]);
+  insertReturnInventoryTransaction(sqliteDb, params, item, returnItemId, boxesCount, unitCost, {
+    referenceType: 'SPECIAL_STOCK_RETURN',
+    referenceId: specialStockId,
+    notes: `مرتجع بيع مخفض إلى السجل ${specialStockId}`,
+  });
+}
+
+/**
+ * Holds a returned item outside the saleable pool until its state is decided:
+ * a new special-stock record (quarantine or damaged) is created instead of
+ * silently returning it to regular stock.
+ */
+function holdReturnedAsSpecialStock(
+  sqliteDb: DatabaseManager,
+  params: ReturnTransactionParams,
+  item: AuthoritativeReturnItem,
+  product: ReturnProduct,
+  returnItemId: string,
+  disposition: 'QUARANTINE' | 'DAMAGED',
+  unitCost: number,
+  boxesCount: number,
+): void {
+  const { inv, actor } = params;
+  const specialId = `spc_${uuidv4().substring(0, 8)}`;
+  const category = disposition === 'DAMAGED' ? 'DAMAGED' : 'QUARANTINE_INSPECTION';
+  sqliteDb.run(`
+    INSERT INTO inventory_special_stocks (
+      id, special_number, warehouse_id, product_id, category,
+      quantity_m2, boxes_count, unit_cost, total_cost, status,
+      source_type, source_id, notes, created_by, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECORDED', 'SALES_RETURN', ?, ?, ?, CURRENT_TIMESTAMP)
+  `, [
+    specialId, sqliteDb.nextNumber('SPC'), inv.warehouseId, item.productId, category,
+    item.quantityM2, boxesCount, unitCost, round2(item.quantityM2 * unitCost),
+    returnItemId, `مرتجع مبيعات محتفظ به (${disposition}): ${item.reason || ''}`.trim(), actor.id,
+  ]);
+  insertReturnInventoryTransaction(sqliteDb, params, item, returnItemId, boxesCount, unitCost, {
+    referenceType: 'SPECIAL_STOCK_RETURN_HOLD',
+    referenceId: specialId,
+    notes: `مرتجع مبيعات محتفظ به خارج المخزون المتاح (${category})`,
+  });
 }
 
 function restoreReturnStock(
   sqliteDb: DatabaseManager,
   warehouseId: string,
   item: ReturnRequestItem,
-  product: ReturnProduct
+  product: ReturnProduct,
+  actorId: string,
 ): void {
   const stockRow = sqliteDb.query<{ productId: string }>(
     `SELECT product_id AS productId FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?`,
@@ -470,6 +621,14 @@ function restoreReturnStock(
     SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
     WHERE product_id = ? AND warehouse_id = ?
   `, [item.quantityM2, item.productId, warehouseId]);
+
+  InventoryLocationStockService.receive(sqliteDb, {
+    warehouseId,
+    productId: item.productId,
+    quantity: item.quantityM2,
+    actorId,
+    reason: `مرتجع مبيعات للصنف ${product.name}`,
+  });
 }
 
 function insertReturnInventoryTransaction(
@@ -478,7 +637,11 @@ function insertReturnInventoryTransaction(
   item: ReturnRequestItem,
   returnId: string,
   boxesCount: number,
-  unitCost: number
+  unitCost: number,
+  reference: { referenceType: string; referenceId: string; notes?: string } = {
+    referenceType: 'INVOICE',
+    referenceId: returnId,
+  },
 ): void {
   const { inv, actor } = params;
   sqliteDb.run(`
@@ -486,12 +649,12 @@ function insertReturnInventoryTransaction(
       id, transaction_number, type, product_id, warehouse_id,
       quantity_m2, boxes_count, unit_cost, total_cost, reference_type,
       reference_id, notes, performed_by
-    ) VALUES (?, ?, 'SALES_RETURN', ?, ?, ?, ?, ?, ?, 'INVOICE', ?, ?, ?)
+    ) VALUES (?, ?, 'SALES_RETURN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     `tx_${uuidv4().substring(0, 8)}`, sqliteDb.nextNumber('TX-RET'),
     item.productId, inv.warehouseId, item.quantityM2, boxesCount, unitCost,
-    round2(item.quantityM2 * unitCost), returnId,
-    `مرتجع مبيعات للفاتورة ${inv.invoiceNumber}`, actor.id,
+    round2(item.quantityM2 * unitCost), reference.referenceType, reference.referenceId,
+    reference.notes || `مرتجع مبيعات للفاتورة ${inv.invoiceNumber}`, actor.id,
   ]);
 }
 

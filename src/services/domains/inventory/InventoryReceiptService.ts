@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { InventoryCostingService } from './InventoryCostingService';
+import { InventoryLocationStockService } from './InventoryLocationStockService';
 import { round2 } from '../finance/financials';
 
 export interface InventoryReceiptPostingInput {
@@ -40,6 +41,14 @@ export class InventoryReceiptService {
         [`stk_${uuidv4().substring(0, 8)}`, input.warehouseId, input.productId, input.quantityM2],
       );
     }
+
+    InventoryLocationStockService.receive(db, {
+      warehouseId: input.warehouseId,
+      productId: input.productId,
+      quantity: input.quantityM2,
+      actorId: input.actorId,
+      reason: input.notes,
+    });
 
     const transactionId = `tx_${uuidv4().substring(0, 8)}`;
     db.run(`

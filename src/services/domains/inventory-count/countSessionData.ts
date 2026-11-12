@@ -65,6 +65,7 @@ export function loadCountSessionItems(session: CountSession): CountItem[] {
       sci.variance_value as varianceValue,
       COALESCE(sci.discrepancy_reason, '') as discrepancyReason,
       COALESCE(sci.notes, '') as notes,
+      sci.location_id as locationId,
       COALESCE(p.product_type, 'CERAMIC') as productType,
       p.base_unit as baseUnit, p.custom_unit as customUnit
     FROM stock_count_items sci

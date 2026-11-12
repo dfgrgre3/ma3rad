@@ -6,6 +6,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
+import { InventoryLocationStockService } from './InventoryLocationStockService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { InventoryServicePart06 } from './InventoryServicePart06';
 
@@ -74,6 +75,14 @@ public resolveSpecialStock(
           SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
           WHERE product_id = ? AND warehouse_id = ?
         `, [quantityM2, productId, warehouseId]);
+
+        InventoryLocationStockService.receive(txDb, {
+          warehouseId,
+          productId,
+          quantity: quantityM2,
+          actorId: actor.id,
+          reason: `إعادة المخزون المفحوص للصالح للبيع (${specialNumber})`,
+        });
 
         const txId = `tx_${uuidv4().substring(0, 8)}`;
         const txNum = txDb.nextNumber('TX-RES');

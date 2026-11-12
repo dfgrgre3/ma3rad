@@ -33,6 +33,8 @@ export interface CountItem {
   varianceValue: number;
   discrepancyReason?: string;
   notes: string;
+  /** When set, the count targets a single bin/location instead of the whole warehouse. */
+  locationId?: string;
 }
 
 export interface WarehouseOption {

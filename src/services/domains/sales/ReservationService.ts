@@ -1,5 +1,6 @@
 ﻿import { DatabaseManager } from '../../../database/repositories/databaseManager';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
@@ -170,6 +171,13 @@ export class ReservationService {
            last_updated = CURRENT_TIMESTAMP WHERE product_id = ? AND warehouse_id = ?`,
         [Number(currentReservation.quantity), Number(currentReservation.quantity), currentReservation.productId, currentReservation.warehouseId]
       );
+      InventoryLocationStockService.release(db, {
+        warehouseId: currentReservation.warehouseId,
+        productId: currentReservation.productId,
+        quantity: Number(currentReservation.quantity),
+        actorId: actor.id,
+        reason: `تنفيذ حجز ${currentReservation.referenceType}`,
+      });
       db.run(
         `INSERT INTO inventory_transactions (id, transaction_number, product_id, warehouse_id, type,
            quantity_m2, unit_cost, total_cost, reference_type, reference_id, notes, performed_by)

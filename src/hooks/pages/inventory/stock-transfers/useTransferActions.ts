@@ -13,6 +13,7 @@ export function useTransferActions(onSuccess: () => void) {
   const [requestNotes, setRequestNotes] = useState('');
   const [requestItems, setRequestItems] = useState<TransferRequestItem[]>([]);
   const [receivingTransfer, setReceivingTransfer] = useState<any | null>(null);
+  const [receivingKey, setReceivingKey] = useState('');
   const [receivingItems, setReceivingItems] = useState<any[]>([]);
   const [receiptInputs, setReceiptInputs] = useState<Record<string, ReceiptInput>>({});
   const [detailTransfer, setDetailTransfer] = useState<any | null>(null);
@@ -56,6 +57,7 @@ export function useTransferActions(onSuccess: () => void) {
 
   const handleOpenReceive = (trf: any) => {
     setReceivingTransfer(trf);
+    setReceivingKey(crypto.randomUUID());
     try {
       const items = inventoryService.getTransferItems(trf.id);
       setReceivingItems(items);
@@ -80,9 +82,12 @@ export function useTransferActions(onSuccess: () => void) {
         damagedM2: Number(val.damagedM2 || 0),
         notes: val.notes,
       }));
-      inventoryService.receiveTransfer(receivingTransfer.id, receipts);
+      inventoryService.receiveTransfer(receivingTransfer.id, receipts, {
+        idempotencyKey: receivingKey,
+      });
       toast.success('تم تأكيد استلام الشحنة وإضافتها لمخزن الوجهة.');
       setReceivingTransfer(null);
+      setReceivingKey('');
       onSuccess();
     } catch (err: any) {
       toast.error(err?.message || 'فشل تأكيد الاستلام.');

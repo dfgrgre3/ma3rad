@@ -3,6 +3,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { localDateString } from '../../../utils/shared/date';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import type { CountItem, CountSession } from '../../../types/inventory/countSessions';
 import { conversionFactor, fromBaseQuantity } from '../../../utils/products/uom';
 import type { CountStockInfo } from './countSessionService_part02';
@@ -24,7 +25,30 @@ export function postCountVariance(
   const unitCost = fifoPlan?.unitCost ?? Number(item.unitCost);
   const value = Math.round(Math.abs(diffM2 * unitCost) * 100) / 100;
 
-  updateWarehouseStock(txDb, item, warehouseId);
+  if (item.locationId) {
+    const delta = Number((Number(item.countedQuantityM2 || 0) - Number(item.systemQuantityM2)).toFixed(3));
+    const stockExists = txDb.query<{ id: string; quantityM2: number }>(
+      'SELECT id, quantity_m2 AS quantityM2 FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?',
+      [warehouseId, item.productId]
+    )[0];
+    if (stockExists) {
+      txDb.run('UPDATE warehouse_stock SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP WHERE warehouse_id = ? AND product_id = ?',
+        [delta, warehouseId, item.productId]);
+    } else if (delta > 0) {
+      txDb.run('INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES (?, ?, ?, ?, 0)',
+        [`stk_${uuidv4().substring(0, 8)}`, warehouseId, item.productId, delta]);
+    }
+    InventoryLocationStockService.adjustBin(txDb, {
+      warehouseId,
+      productId: item.productId,
+      locationId: item.locationId,
+      quantity: delta,
+      actorId,
+      reason: 'تسوية جرد الخانة',
+    });
+  } else {
+    updateWarehouseStock(txDb, item, warehouseId, actorId);
+  }
 
   const txId = `tx_${uuidv4().substring(0, 8)}`;
   const txNum = txDb.nextNumber('TX-CNT');

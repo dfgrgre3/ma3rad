@@ -189,7 +189,7 @@ export const IMPACT_REGISTRY: readonly ImpactOperation[] = [
       { target: 'inventory.stockSource', status: 'wired', note: 'عند dispatch', files: ['src/services/domains/inventory/InventoryServicePart08.ts'] },
       { target: 'inventory.stockDestination', status: 'wired', note: 'عند receive (أو INSERT صف جديد)', files: ['src/services/domains/inventory/InventoryServicePart10.ts'] },
       { target: 'inventory.transaction', status: 'wired', files: ['src/services/domains/inventory/InventoryServicePart09.ts', 'src/services/domains/inventory/InventoryServicePart10.ts'] },
-      { target: 'ledger.transferLoss', status: 'partial', note: 'قيد TRANSFER_LOSS مالي (5201/1104) لكن بلا حركة inventory_transactions للكمية المفقودة ⇒ تفاوت دفتري', files: ['src/services/domains/inventory/InventoryServicePart10.ts'] },
+      { target: 'ledger.transferLoss', status: 'wired', note: 'قيد TRANSFER_LOSS مالي (5201/1104) مع حركة كمية موثقة تُستبعد من الرصيد التراكمي حتى لا تُخصم مرتين', files: ['src/services/domains/inventory/InventoryServicePart10.ts', 'src/pages/inventory/stock-ledger/StockLedgerPage.tsx'] },
       { target: 'workflow.compensation', status: 'missing', note: 'خطوات REQUESTED→…→RECEIVED معاملات مستقلة؛ لا تعويض/saga عند التراجع بعد الشحن', files: ['src/services/domains/inventory/InventoryServicePart08.ts'] },
     ],
   },

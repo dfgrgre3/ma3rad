@@ -16,6 +16,8 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
   ): any {
     if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId, actor);
 
+    const costingMethod = InventoryCostingService.costingMethod(this.db);
+
     const warehouseScope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
     const companyScope = this.branchAccess.companyScope('w.company_id', actor);
     const physicalParams: any[] = [...warehouseScope.params, ...companyScope.params];
@@ -26,15 +28,15 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
     }
 
     const physical = this.db.query<any>(`
-      SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS totalCost,
+      SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) AS costPriceValue,
              COALESCE(SUM(ws.quantity_m2), 0) AS totalQty
       FROM warehouse_stock ws
       JOIN products p ON ws.product_id = p.id
       JOIN warehouses w ON w.id = ws.warehouse_id
       WHERE ${warehouseScope.clause} AND ${companyScope.clause}${warehouseFilter}
     `, physicalParams)[0];
-    const totalPhysicalCost = Number(Number(physical?.totalCost || 0).toFixed(2));
-    const totalPhysicalQty = Number(Number(physical?.totalQty || 0).toFixed(2));
+    const physicalQty = Number(Number(physical?.totalQty || 0).toFixed(2));
+    const costPriceValue = Number(Number(physical?.costPriceValue || 0).toFixed(2));
 
     const fifoParams: any[] = [...warehouseScope.params, ...companyScope.params];
     if (warehouseId) fifoParams.push(warehouseId);
@@ -46,8 +48,11 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
       WHERE icl.quantity_remaining > 0
         AND ${warehouseScope.clause} AND ${companyScope.clause}${warehouseFilter}
     `, fifoParams)[0];
-    const totalFifoLayerCost = Number(Number(fifo?.totalFifoCost || 0).toFixed(2));
-    const totalFifoLayerQty = Number(Number(fifo?.totalFifoQty || 0).toFixed(2));
+    const layerValue = Number(Number(fifo?.totalFifoCost || 0).toFixed(2));
+    const layerQty = Number(Number(fifo?.totalFifoQty || 0).toFixed(2));
+
+    // Value of physical stock according to the configured costing method.
+    const physicalValue = costingMethod === 'FIFO' ? layerValue : costPriceValue;
 
     const ledgerBranchScope = this.branchAccess.sqlScope('je.branch_id', undefined, actor);
     const ledgerCompanyScope = this.branchAccess.companyScope('je.company_id', actor);
@@ -59,30 +64,73 @@ export class InventoryServicePart13 extends InventoryServicePart12 {
       WHERE je.is_posted = 1 AND coa.code = '1104'
         AND ${ledgerBranchScope.clause} AND ${ledgerCompanyScope.clause}
     `, [...ledgerBranchScope.params, ...ledgerCompanyScope.params])[0];
-    const totalGlInventoryCost = Number(Number(ledger?.balance || 0).toFixed(2));
+    const glBalance = Number(Number(ledger?.balance || 0).toFixed(2));
 
-    const variancePhysicalVsFifo = Number((totalPhysicalCost - totalFifoLayerCost).toFixed(2));
-    const varianceFifoVsGl = Number((totalFifoLayerCost - totalGlInventoryCost).toFixed(2));
-    const variancePhysicalVsFifoQty = Number((totalPhysicalQty - totalFifoLayerQty).toFixed(2));
-    const quantityBalanced = Math.abs(variancePhysicalVsFifoQty) < 0.01;
+    const quantityVariance = Number((physicalQty - layerQty).toFixed(2));
+    const quantityBalanced = Math.abs(quantityVariance) < 0.01;
+    const valueVariance = Number((physicalValue - layerValue).toFixed(2));
+    const valueBalanced = Math.abs(valueVariance) < 0.05;
+
+    // GL is maintained at branch/company level, so a warehouse-scoped request
+    // cannot be matched directly; the difference must be explained, not hidden.
     const ledgerComparable = !warehouseId;
-    const isBalanced = quantityBalanced
-      && Math.abs(variancePhysicalVsFifo) < 0.05
-      && ledgerComparable
-      && Math.abs(varianceFifoVsGl) < 0.05;
+    const glVariance = Number((layerValue - glBalance).toFixed(2));
+    const glBalanced = ledgerComparable && Math.abs(glVariance) < 0.05;
+
+    const unmatchableReasons: string[] = [];
+    if (warehouseId) {
+      unmatchableReasons.push('حساب الأستاذ العام (1104) يُدار على مستوى الفرع/الشركة، لذا لا يمكن مطابقته مباشرة على مستوى مستودع مستقل؛ المطابقة ممكنة فقط على مستوى الفرع/الشركة.');
+    }
+    if (!quantityBalanced) {
+      unmatchableReasons.push(`فروق كمية: المخزون الفعلي ${physicalQty} مقابل طبقات التكلفة ${layerQty} (فرق ${quantityVariance}).`);
+    }
+    if (!valueBalanced) {
+      unmatchableReasons.push(`فروق قيمة: قيمة المخزون ${physicalValue} مقابل طبقات التكلفة ${layerValue} (فرق ${valueVariance}).`);
+    }
+    if (ledgerComparable && !glBalanced) {
+      unmatchableReasons.push(`فروق أستاذ عام: طبقات التكلفة ${layerValue} مقابل رصيد GL ${glBalance} (فرق ${glVariance}).`);
+    }
+
+    const isBalanced = quantityBalanced && valueBalanced && glBalanced;
 
     return {
       reconciliationDate: localDateString(),
       warehouseId: warehouseId || null,
-      totalPhysicalQty,
-      totalPhysicalCost,
-      totalFifoLayerQty,
-      totalFifoLayerCost,
-      totalGlInventoryCost,
-      variancePhysicalVsFifo,
-      variancePhysicalVsFifoQty,
+      costingMethod,
+      // 1. Quantity reconciliation
+      quantityReconciliation: {
+        physicalQty,
+        layerQty,
+        varianceQty: quantityVariance,
+        balanced: quantityBalanced,
+      },
+      // 2. Value reconciliation (by configured costing method)
+      valueReconciliation: {
+        method: costingMethod,
+        physicalValue,
+        layerValue,
+        variance: valueVariance,
+        balanced: valueBalanced,
+      },
+      // 3. GL reconciliation (by available accounting scope)
+      glReconciliation: {
+        glBalance,
+        comparable: ledgerComparable,
+        variance: ledgerComparable ? glVariance : null,
+        balanced: glBalanced,
+      },
+      // 4. Explanations for differences that cannot be matched at warehouse level
+      unmatchableReasons,
+      // Backward-compatible flat fields
+      totalPhysicalQty: physicalQty,
+      totalPhysicalCost: physicalValue,
+      totalFifoLayerQty: layerQty,
+      totalFifoLayerCost: layerValue,
+      totalGlInventoryCost: glBalance,
+      variancePhysicalVsFifo: valueVariance,
+      variancePhysicalVsFifoQty: quantityVariance,
       quantityBalanced,
-      varianceFifoVsGl,
+      varianceFifoVsGl: glVariance,
       ledgerScope: 'BRANCH_COMPANY',
       ledgerComparable,
       status: isBalanced ? 'BALANCED' : 'DISCREPANCY_DETECTED',

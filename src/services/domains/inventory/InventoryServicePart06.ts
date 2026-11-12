@@ -6,6 +6,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
+import { InventoryLocationStockService } from './InventoryLocationStockService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { InventoryServicePart05 } from './InventoryServicePart05';
 
@@ -59,6 +60,14 @@ public recordSpecialStock(input: {
         SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
         WHERE product_id = ? AND warehouse_id = ?
       `, [input.quantityM2, input.productId, input.warehouseId]);
+
+      InventoryLocationStockService.release(txDb, {
+        warehouseId: input.warehouseId,
+        productId: input.productId,
+        quantity: input.quantityM2,
+        actorId: actor.id,
+        reason: `تحويل إلى مخزون خاص (${input.category})`,
+      });
 
       // 2. Insert into inventory_transactions (IMMUTABLE LEDGER)
       const txType: InventoryTransactionType = input.category === 'DAMAGED' || input.category === 'BROKEN' ? 'DAMAGE' : 'ADJUSTMENT_SUB';

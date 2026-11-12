@@ -7,7 +7,10 @@ import type { UomProduct } from '../../../utils/products/uom_part01';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { InventoryCostingService } from './InventoryCostingService';
+import { InventoryLocationStockService } from './InventoryLocationStockService';
 import { InventoryServicePart13 } from './InventoryServicePart13';
+import { StockTrackedProductPolicy } from './StockTrackedProductPolicy';
+import { WarehouseTypePolicy } from '../operations/WarehouseTypePolicy';
 
 type AdjustmentType = 'ADD' | 'SUBTRACT' | 'DAMAGE' | 'OPENING_BALANCE';
 type AdjustmentSign = 1 | -1;
@@ -112,6 +115,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     if (!input.reason.trim()) throw new Error('سبب التسوية مطلوب.');
     const product = this.getAdjustmentProduct(this.db, input.productId);
     if (!product) throw new Error('الصنف المحدد غير موجود.');
+    StockTrackedProductPolicy.assertStockTracked(this.db, input.productId, 'التسويات المخزنية');
     const adjustmentId = `adj_${uuidv4().substring(0, 8)}`;
     const date = localDateString();
 
@@ -229,7 +233,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
           ? 'ADJUSTMENT_ADD'
           : current.adjustmentType === 'DAMAGE' ? 'DAMAGE' : 'ADJUSTMENT_SUB';
 
-        this.applyPostedAdjustmentStock(txDb, item.productId, current.warehouseId, item.quantity * sign);
+        this.applyPostedAdjustmentStock(txDb, item.productId, current.warehouseId, item.quantity * sign, actor.id);
         txDb.run(`
           INSERT INTO inventory_transactions (
             id, transaction_number, type, product_id, warehouse_id,
@@ -308,6 +312,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.adjust');
+    StockTrackedProductPolicy.assertStockTracked(this.db, productId, 'التسويات المخزنية');
     const currentStock = this.getProductStock(productId, warehouseId);
     const currentQuantity = Number(currentStock?.quantityM2 || 0);
     if (!Number.isFinite(actualQuantityM2) || actualQuantityM2 < 0) {
@@ -364,7 +369,8 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
     db: DatabaseManager,
     productId: string,
     warehouseId: string,
-    delta: number
+    delta: number,
+    actorId: string,
   ): void {
     const stock = db.query<{ id: string }>(
       'SELECT id FROM warehouse_stock WHERE product_id = ? AND warehouse_id = ?',
@@ -376,6 +382,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
         SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
         WHERE id = ?
       `, [delta, stock.id]);
+      InventoryLocationStockService.applyDelta(db, { warehouseId, productId, quantity: delta, actorId }, delta > 0 ? 'ASSIGN' : 'RELEASE');
       return;
     }
     if (delta < 0) throw new Error('لا يوجد رصيد كافٍ في المخزن لترحيل التسوية.');
@@ -383,6 +390,7 @@ export class InventoryServicePart14 extends InventoryServicePart13 {
       INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2)
       VALUES (?, ?, ?, ?, 0)
     `, [`stk_${uuidv4().substring(0, 8)}`, warehouseId, productId, delta]);
+    InventoryLocationStockService.receive(db, { warehouseId, productId, quantity: delta, actorId });
   }
 
   private recordPostedAdjustmentAudit(

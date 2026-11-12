@@ -171,6 +171,18 @@ test('5.3: Procurement Lifecycle - Reorder, RFQ, GRN, Landed Cost, 3-Way Matchin
 
   assert.ok(inv.id);
   assert.equal(inv.supplierInvoiceNumber, 'INV-SUP-1001');
+
+  const grnLayer = db.query<any>(`
+    SELECT quantity_received AS quantityReceived, unit_cost AS unitCost,
+           original_unit_cost AS originalUnitCost, landed_cost_share AS landedCostShare,
+           purchase_invoice_id AS purchaseInvoiceId
+    FROM inventory_cost_layers
+    WHERE goods_receipt_id = ? AND product_id = ?
+  `, [grnResult.grn.id, prodId])[0];
+  assert.equal(grnLayer.purchaseInvoiceId, inv.id);
+  assert.equal(grnLayer.originalUnitCost, 100, 'The pre-landed receipt cost must be preserved');
+  assert.equal(grnLayer.unitCost, 107, 'FIFO layer must carry the landed invoice cost, not the receipt cost');
+  assert.equal(grnLayer.landedCostShare, 1260);
   const invoiceDueDate = db.query<any>(`
     SELECT pi.due_date, date(pi.date, '+' || s.payment_terms_days || ' days') AS expected_due_date
     FROM purchase_invoices pi

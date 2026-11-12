@@ -2,6 +2,8 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { v4 as uuidv4 } from 'uuid';
 import { InventoryServicePart04 } from './InventoryServicePart04';
+import { round2 } from '../finance/financials';
+import { InventoryLocationStockService } from './InventoryLocationStockService';
 
 export class InventoryWarehouseLocationService extends InventoryServicePart04 {
   public getWarehouseLocations(warehouseId?: string, search?: string): any[] {
@@ -72,6 +74,15 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
     const bin = input.bin.trim().toUpperCase();
     const generatedBarcode = input.barcode?.trim() || `${wh.code}-${zone}-${aisle}-${shelf}-${bin}`;
 
+    if (input.maxCapacityM2 !== undefined && input.maxCapacityM2 !== null) {
+      if (!Number.isFinite(input.maxCapacityM2) || input.maxCapacityM2 < 0) {
+        throw new Error('السعة (m²) يجب أن تكون رقماً غير سالب.');
+      }
+    }
+    const maxCapacity = input.maxCapacityM2 === undefined || input.maxCapacityM2 === null
+      ? 0
+      : Number(input.maxCapacityM2);
+
     const existing = this.db.query<any>(`SELECT id FROM warehouse_locations WHERE barcode = ?`, [generatedBarcode])[0];
     if (existing) throw new Error(`الباركود ${generatedBarcode} مستخدم لموقع آخر بالفعل.`);
 
@@ -82,7 +93,7 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `, [
       id, input.warehouseId, zone, aisle, shelf, bin,
-      generatedBarcode, input.maxCapacityM2 || 0, input.notes?.trim() || null
+      generatedBarcode, maxCapacity, input.notes?.trim() || null
     ]);
 
     return this.getWarehouseLocations(input.warehouseId).find((l: any) => l.id === id);
@@ -114,6 +125,16 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
       if (dup) throw new Error('الباركود مستخدم لموقع آخر.');
     }
 
+    if (input.maxCapacityM2 !== undefined && input.maxCapacityM2 !== null) {
+      if (!Number.isFinite(input.maxCapacityM2) || input.maxCapacityM2 < 0) {
+        throw new Error('السعة (m²) يجب أن تكون رقماً غير سالباً.');
+      }
+      const currentOccupied = this.getLocationOccupiedM2(id);
+      if (input.maxCapacityM2 > 0 && currentOccupied > input.maxCapacityM2 + 0.009) {
+        throw new Error(`لا يمكن تقليل سعة الموقع إلى أقل من الإشغال الحالي (${round2(currentOccupied)} m²).`);
+      }
+    }
+
     this.db.run(`
       UPDATE warehouse_locations
       SET zone = COALESCE(?, zone),
@@ -136,6 +157,77 @@ export class InventoryWarehouseLocationService extends InventoryServicePart04 {
     ]);
   }
 
+  private getLocationOccupiedM2(locationId: string): number {
+    const row = this.db.query<any>(`
+      SELECT COALESCE(SUM(CASE
+        WHEN p.base_unit = 'M2' THEN pls.quantity_m2
+        WHEN p.base_unit = 'BOX' AND p.meters_per_box > 0 THEN pls.quantity_m2 * p.meters_per_box
+        WHEN p.base_unit = 'PIECE' AND p.meters_per_box > 0 AND p.pieces_per_box > 0
+          THEN pls.quantity_m2 * p.meters_per_box / p.pieces_per_box
+        ELSE 0 END), 0) AS occupied
+      FROM product_location_stock pls
+      JOIN products p ON p.id = pls.product_id
+      WHERE pls.location_id = ?
+    `, [locationId])[0];
+    return Number(row?.occupied || 0);
+  }
+
+  public transferStockBetweenLocations(input: {
+    warehouseId: string;
+    productId: string;
+    fromLocationId: string;
+    toLocationId: string;
+    quantityM2: number;
+    reason?: string;
+    notes?: string;
+  }): void {
+    this.assertInventoryModuleEnabled();
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'ui.inventory.hub.adjust');
+    if (input.fromLocationId === input.toLocationId) {
+      throw new Error('يجب اختيار رفّين مختلفين للنقل.');
+    }
+    const fromLoc = this.db.query<any>(`
+      SELECT wl.id, wl.warehouse_id AS warehouseId, wl.is_active AS isActive, w.company_id AS companyId
+      FROM warehouse_locations wl JOIN warehouses w ON w.id = wl.warehouse_id
+      WHERE wl.id = ?
+    `, [input.fromLocationId])[0];
+    const toLoc = this.db.query<any>(`
+      SELECT wl.id, wl.warehouse_id AS warehouseId, wl.is_active AS isActive, wl.max_capacity_m2 AS maxCapacity,
+        w.company_id AS companyId
+      FROM warehouse_locations wl JOIN warehouses w ON w.id = wl.warehouse_id
+      WHERE wl.id = ?
+    `, [input.toLocationId])[0];
+    if (!fromLoc || !toLoc) throw new Error('أحد الرفّين غير موجود.');
+    if (fromLoc.warehouseId !== input.warehouseId || toLoc.warehouseId !== input.warehouseId) {
+      throw new Error('يجب أن ينتمي الرفان إلى نفس المستودع.');
+    }
+    this.branchAccess.requireWarehouseAuthorization(input.warehouseId, actor);
+    if (fromLoc.companyId) this.branchAccess.requireCompanyAccess(fromLoc.companyId, actor);
+    if (toLoc.companyId) this.branchAccess.requireCompanyAccess(toLoc.companyId, actor);
+    if (!fromLoc.isActive || !toLoc.isActive) throw new Error('لا يمكن النقل من/إلى رف غير نشط.');
+
+    const qty = Number(input.quantityM2);
+    if (!Number.isFinite(qty) || qty <= 0) throw new Error('كمية النقل يجب أن تكون أكبر من صفر.');
+
+    const occupied = this.getLocationOccupiedM2(input.toLocationId);
+    const maxCapacity = Number(toLoc.maxCapacity || 0);
+    if (maxCapacity > 0 && occupied + qty > maxCapacity + 0.009) {
+      throw new Error(`سعة الرف الوجهة غير كافية (المشغول ${round2(occupied)} m² من ${maxCapacity} m²).`);
+    }
+
+    this.db.executeTransaction((txDb) => {
+      InventoryLocationStockService.transferBetweenBins(txDb, {
+        warehouseId: input.warehouseId,
+        productId: input.productId,
+        fromLocationId: input.fromLocationId,
+        toLocationId: input.toLocationId,
+        quantity: qty,
+        actorId: actor.id,
+        reason: input.reason || 'نقل بين رفّين (Bin-to-Bin)',
+      });
+    });
+  }
   public deleteWarehouseLocation(id: string): void {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();

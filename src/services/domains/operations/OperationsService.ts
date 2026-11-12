@@ -5,6 +5,8 @@ import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { AuditService } from '../security/AuditService';
+import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { BranchService } from '../organization/BranchService';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
 import { isWarehouseType, type WarehouseType } from '../../../types/products/catalog';
@@ -42,7 +44,7 @@ export interface WarehouseRow {
   isDefault: boolean;
   isActive: boolean;
   productsCount?: number;
-  stockM2?: number;
+  stockValue?: number;
   createdAt: string;
 }
 
@@ -264,15 +266,35 @@ export class OperationsService {
   }
 
   // ── Warehouses ─────────────────────────────────────────────────────────────
+  private warehouseHasStockHistory(warehouseId: string): boolean {
+    const checks = [
+      'SELECT 1 FROM warehouse_stock WHERE warehouse_id = ? AND (quantity_m2 <> 0 OR reserved_m2 <> 0) LIMIT 1',
+      'SELECT 1 FROM inventory_transactions WHERE warehouse_id = ? LIMIT 1',
+      'SELECT 1 FROM inventory_cost_layers WHERE warehouse_id = ? LIMIT 1',
+      'SELECT 1 FROM sales_invoices WHERE warehouse_id = ? LIMIT 1',
+      'SELECT 1 FROM purchase_invoices WHERE warehouse_id = ? LIMIT 1',
+      'SELECT 1 FROM stock_transfers WHERE from_warehouse_id = ? OR to_warehouse_id = ? OR transit_warehouse_id = ? LIMIT 1',
+    ];
+    for (const sql of checks) {
+      const params = sql.includes('transit_warehouse_id') ? [warehouseId, warehouseId, warehouseId] : [warehouseId];
+      if (this.db.query<any>(sql, params).length) return true;
+    }
+    return false;
+  }
+
   public getWarehouses(search = ''): WarehouseRow[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.warehouses.warehouses.view');
     PermissionService.require(actor, 'operations.view');
     const scope = this.branchAccess.sqlScope('w.branch_id', undefined, actor);
+    const fifo = InventoryCostingService.costingMethod(this.db) === 'FIFO';
+    const valueExpr = fifo
+      ? `(SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) FROM inventory_cost_layers icl WHERE icl.warehouse_id = w.id AND icl.quantity_remaining > 0)`
+      : `(SELECT COALESCE(SUM(ws.quantity_m2 * p.cost_price), 0) FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id WHERE ws.warehouse_id = w.id)`;
     let sql = `
       SELECT w.*, b.name AS branch_name,
         (SELECT COUNT(DISTINCT ws.product_id) FROM warehouse_stock ws WHERE ws.warehouse_id = w.id AND ws.quantity_m2 > 0) AS products_count,
-        (SELECT COALESCE(SUM(ws.quantity_m2), 0) FROM warehouse_stock ws WHERE ws.warehouse_id = w.id) AS stock_m2
+        ${valueExpr} AS stock_value
       FROM warehouses w LEFT JOIN branches b ON b.id = w.branch_id WHERE ${scope.clause}`;
     const params: any[] = [...scope.params];
     if (search.trim()) {
@@ -354,6 +376,9 @@ export class OperationsService {
       [id]
     )[0]?.companyId ?? null;
     if (input.branchId && input.branchId !== branchId) {
+    if (this.warehouseHasStockHistory(id)) {
+      throw new Error('لا يمكن تغيير فرع/شركة مستودع يملك تاريخاً مخزنياً (أرصدة أو حركات أو فواتير أو طبقات تكلفة).');
+    }
       this.branchAccess.requireBranchAccess(input.branchId, actor);
       const branch = this.db.query<{ companyId: string | null; isActive: number }>(
         'SELECT company_id AS companyId, is_active AS isActive FROM branches WHERE id = ?',

@@ -3,6 +3,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { SettingsService } from '../config/SettingsService';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { BatchService } from '../inventory/BatchService';
 import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode } from '../../../database/repositories/ledger';
@@ -63,6 +64,14 @@ function restoreInvoiceItem(
     SET quantity_m2 = quantity_m2 + ?, last_updated = CURRENT_TIMESTAMP
     WHERE product_id = ? AND warehouse_id = ?
   `, [item.quantityM2, item.productId, inv.warehouseId]);
+
+  InventoryLocationStockService.receive(sqliteDb, {
+    warehouseId: inv.warehouseId,
+    productId: item.productId,
+    quantity: item.quantityM2,
+    actorId: performedBy,
+    reason: `إلغاء فاتورة ${inv.invoiceNumber}`,
+  });
 
   if (item.productType !== 'GENERAL') {
     new BatchService().restoreForInvoiceVoid({

@@ -3,6 +3,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { FinancialStatementsService } from './FinancialStatementsService';
+import { InventoryCostingService } from '../inventory/InventoryCostingService';
 import { localDateString } from '../../../utils/shared/date';
 import { round2 } from '../finance/financials';
 
@@ -1660,12 +1661,19 @@ export class ReportCenterService {
         SELECT COALESCE(SUM(amount), 0) AS total FROM customer_payments
         WHERE date >= ? AND date <= ? AND branch_id = ?
       `, [from, to, branch.id])[0]?.total || 0;
-      const stock = this.db.query<any>(`
-        SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS value
-        FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
-        JOIN warehouses w ON w.id = ws.warehouse_id
-        WHERE w.branch_id = ?
-      `, [branch.id])[0]?.value || 0;
+      const stock = InventoryCostingService.costingMethod(this.db) === 'FIFO'
+        ? this.db.query<any>(`
+            SELECT COALESCE(SUM(icl.quantity_remaining * icl.unit_cost), 0) AS value
+            FROM inventory_cost_layers icl
+            JOIN warehouses w ON w.id = icl.warehouse_id
+            WHERE icl.quantity_remaining > 0.009 AND w.branch_id = ?
+          `, [branch.id])[0] || {}
+        : this.db.query<any>(`
+            SELECT COALESCE(SUM(ws.quantity_m2 * COALESCE(p.cost_price, 0)), 0) AS value
+            FROM warehouse_stock ws JOIN products p ON p.id = ws.product_id
+            JOIN warehouses w ON w.id = ws.warehouse_id
+            WHERE w.branch_id = ?
+          `, [branch.id])[0] || {};
       const salesValue = round2(num(sales.sales));
       const returnsValue = round2(num(returns.returns));
       const netSales = round2(salesValue - returnsValue);
@@ -1681,7 +1689,7 @@ export class ReportCenterService {
         margin: netSales ? round2((adjustedProfit / netSales) * 100) : 0,
         expenses: round2(num(expenses)),
         collections: round2(num(collections)),
-        stockValue: round2(num(stock)),
+        stockValue: round2(num(stock.value)),
         growth: num(previousSales) ? round2(((salesValue - num(previousSales)) / Math.abs(num(previousSales))) * 100) : 0,
       };
     });

@@ -6,3 +6,4 @@ export type { InvoiceStats } from './serviceTypes_part01';
 export type { ReturnableItem } from './serviceTypes_part02';
 export type { ReturnStats } from './serviceTypes_part02';
 export type { ReturnRequestItem } from './serviceTypes_part02';
+export type { ReturnDisposition } from './serviceTypes_part02';

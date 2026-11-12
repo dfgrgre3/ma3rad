@@ -9,6 +9,7 @@ import { CustomerSupplyService } from '../customers/CustomerSupplyService';
 import { localDateString } from '../../../utils/shared/date';
 import { paymentAccountCode, postLedgerEntry } from '../../../database/repositories/ledger';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { SettingsService } from '../config/SettingsService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
@@ -260,6 +261,13 @@ export class PurchaseService {
             VALUES (?, ?, ?, ?, 0)
           `, [`stk_${uuidv4().substring(0, 8)}`, dto.warehouseId, item.productId, item.quantityM2]);
         }
+        InventoryLocationStockService.receive(sqliteDb, {
+          warehouseId: dto.warehouseId,
+          productId: item.productId,
+          quantity: item.quantityM2,
+          actorId: performedBy,
+          reason: `شراء توريد بموجب فاتورة ${invoiceNumber}`,
+        });
       }
 
       const prevQty = stockRow ? Number(stockRow.quantityM2) : 0;
@@ -317,37 +325,68 @@ export class PurchaseService {
     `, [grnId, purchaseId])[0];
     if (alreadyInvoiced) throw new Error('إذن الاستلام مرتبط مسبقاً بفاتورة شراء أخرى.');
 
-    const expectedByProduct = new Map<string, number>();
+    const expectedByProduct = new Map<string, { quantity: number; effectiveCost: number }>();
     for (const item of preparedItems) {
       const product = db.query<{ productType: string; baseUnit: string }>(
         `SELECT product_type AS productType, base_unit AS baseUnit FROM products WHERE id = ?`,
         [item.productId],
       )[0];
       if (!product || isServiceProduct(product)) continue;
-      expectedByProduct.set(
-        item.productId,
-        round2((expectedByProduct.get(item.productId) || 0) + Number(item.grnAcceptedQty)),
-      );
+      const acceptedQuantity = Number(item.grnAcceptedQty);
+      const current = expectedByProduct.get(item.productId) || { quantity: 0, effectiveCost: 0 };
+      current.quantity = round2(current.quantity + acceptedQuantity);
+      current.effectiveCost = round2(current.effectiveCost + acceptedQuantity * Number(item.effectiveUnitCost));
+      expectedByProduct.set(item.productId, current);
     }
 
-    for (const [productId, expectedQuantity] of expectedByProduct) {
-      const layers = db.query<{ quantityReceived: number }>(`
-        SELECT quantity_received AS quantityReceived
+    for (const [productId, expected] of expectedByProduct) {
+      const layers = db.query<{
+        id: string;
+        quantityReceived: number;
+        unitCost: number;
+        originalUnitCost: number | null;
+      }>(`
+        SELECT id, quantity_received AS quantityReceived, unit_cost AS unitCost,
+               original_unit_cost AS originalUnitCost
         FROM inventory_cost_layers
         WHERE goods_receipt_id = ? AND product_id = ? AND warehouse_id = ?
           AND purchase_invoice_id IS NULL
         ORDER BY received_at, created_at, rowid
       `, [grnId, productId, dto.warehouseId]);
       const layerQuantity = round2(layers.reduce((sum, layer) => sum + Number(layer.quantityReceived), 0));
-      if (!layers.length || Math.abs(layerQuantity - expectedQuantity) > 0.009) {
+      if (!layers.length || Math.abs(layerQuantity - expected.quantity) > 0.009) {
         throw new Error(`طبقات التكلفة في إذن الاستلام غير مطابقة لكمية الصنف ${productId} في الفاتورة.`);
       }
-      db.run(`
-        UPDATE inventory_cost_layers
-        SET source_type = 'PURCHASE', source_id = ?, purchase_invoice_id = ?
-        WHERE goods_receipt_id = ? AND product_id = ? AND warehouse_id = ?
-          AND purchase_invoice_id IS NULL
-      `, [purchaseId, purchaseId, grnId, productId, dto.warehouseId]);
+
+      // The purchase invoice is the authoritative landed-cost document: the
+      // receipt layer must end up carrying the invoice unit cost (purchase
+      // price + allocated freight/loading/customs/insurance/other), otherwise
+      // FIFO issues keep using the pre-landed receipt cost.
+      const targetTotal = round2(expected.effectiveCost);
+      let distributed = 0;
+      const layerUpdates = layers.map((layer, index) => {
+        const quantity = Number(layer.quantityReceived);
+        const isLast = index === layers.length - 1;
+        const value = isLast ? round2(targetTotal - distributed) : round2(targetTotal * (quantity / layerQuantity));
+        distributed = round2(distributed + value);
+        const newUnitCost = quantity > 0 ? round2(value / quantity) : Number(layer.unitCost);
+        const originalUnitCost = layer.originalUnitCost ?? Number(layer.unitCost);
+        const landedShare = round2((newUnitCost - originalUnitCost) * quantity);
+        return { id: layer.id, newUnitCost, originalUnitCost, landedShare };
+      });
+
+      for (const layer of layerUpdates) {
+        db.run(`
+          UPDATE inventory_cost_layers
+          SET source_type = 'PURCHASE', source_id = ?, purchase_invoice_id = ?,
+              original_unit_cost = COALESCE(original_unit_cost, ?),
+              unit_cost = ?, landed_cost_share = ?, cost_updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `, [
+          purchaseId, purchaseId, layer.originalUnitCost,
+          layer.newUnitCost, layer.landedShare, layer.id,
+        ]);
+      }
     }
   }
 
@@ -726,6 +765,13 @@ export class PurchaseService {
          WHERE product_id = ? AND warehouse_id = ?`,
         [item.quantityM2, item.productId, invoice.warehouseId]
       );
+      InventoryLocationStockService.release(db, {
+        warehouseId: invoice.warehouseId,
+        productId: item.productId,
+        quantity: item.quantityM2,
+        actorId,
+        reason: `حذف فاتورة توريد ${invoice.invoiceNumber}`,
+      });
       db.run(
         `INSERT INTO inventory_transactions (
            id, transaction_number, type, product_id, warehouse_id,

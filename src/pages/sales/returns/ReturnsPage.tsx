@@ -57,7 +57,12 @@ const RETURN_REASONS = [
 
 type ReturnRow = SalesReturn & { customerName: string; invoiceNumber: string };
 type ReturnDetail = SalesReturn & { items: SalesReturnItem[]; customerName?: string; invoiceNumber?: string };
-type ReturnLine = ReturnableItem & { quantityM2: number; reason: string; entryUnit: string };
+type ReturnLine = ReturnableItem & {
+  quantityM2: number;
+  reason: string;
+  entryUnit: string;
+  disposition: 'RESTOCK' | 'SPECIAL_STOCK' | 'QUARANTINE' | 'DAMAGED';
+};
 
 export const ReturnsPage: React.FC = () => {
   const returnIdempotency = useIdempotencyKey();
@@ -152,6 +157,7 @@ export const ReturnsPage: React.FC = () => {
       quantityM2: 0,
       reason: '',
       entryUnit: r.baseUnit || 'M2',
+      disposition: r.defaultDisposition || 'RESTOCK',
     })));
   }, [service]);
 
@@ -254,6 +260,7 @@ export const ReturnsPage: React.FC = () => {
           selected.map((l) => ({
             productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
             unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'استبدال',
+            specialStockId: l.specialStockId ?? null, disposition: l.disposition,
           })),
           newItems.map((n) => ({
             productId: n.productId, soldBy: 'PIECE', quantityM2: n.quantityM2, boxesCount: n.boxesCount,
@@ -269,6 +276,7 @@ export const ReturnsPage: React.FC = () => {
           selected.map((l) => ({
             productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
             unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'مرتجع سيراميك',
+            specialStockId: l.specialStockId ?? null, disposition: l.disposition,
           })),
           refundCash && refundMethod !== 'BALANCE',
           AuthService.getCurrentUser()?.id || 'usr_admin',
@@ -498,6 +506,7 @@ export const ReturnsPage: React.FC = () => {
                       <th className="px-3 py-2">سعر الوحدة</th>
                       <th className="px-3 py-2 w-28">كمية الإرجاع</th>
                       <th className="px-3 py-2 w-32">السبب</th>
+                      <th className="px-3 py-2 w-32">مصير المرتجع</th>
                       <th className="px-3 py-2">الإجمالي</th>
                     </tr>
                   </thead>
@@ -541,6 +550,14 @@ export const ReturnsPage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-3 py-2"><input list="return-reasons" value={l.reason} onChange={(e) => setLine(idx, { reason: e.target.value })} placeholder="كسر / عيب..." className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg" /></td>
+                        <td className="px-3 py-2">
+                          <select value={l.disposition} onChange={(e) => setLine(idx, { disposition: e.target.value as ReturnLine['disposition'] })} className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold">
+                            <option value="RESTOCK">إعادة للمخزون</option>
+                            {l.specialStockId && <option value="SPECIAL_STOCK">إعادة للمخزون الخاص</option>}
+                            <option value="QUARANTINE">حجر / فحص</option>
+                            <option value="DAMAGED">تالف</option>
+                          </select>
+                        </td>
                         <td className="px-3 py-2 font-bold text-rose-600">{fmt(l.quantityM2 * l.unitPrice)}</td>
                       </tr>
                     ))}

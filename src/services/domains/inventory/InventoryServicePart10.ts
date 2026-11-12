@@ -1,12 +1,12 @@
 import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import type { Warehouse, WarehouseStock, InventoryTransaction, InventoryTransactionType, UnitType } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { InventoryCostingService } from './InventoryCostingService';
-import { getProductUnitLabel } from '../../../utils/products/productUnits';
+import { InventoryLocationStockService } from './InventoryLocationStockService';
+import { InventoryTransferTrackingService } from './InventoryTransferTrackingService';
 import { InventoryServicePart09 } from './InventoryServicePart09';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
 
@@ -17,7 +17,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
     lostM2?: number;
     damagedM2?: number;
     notes?: string;
-  }>): void {
+  }>, options: { idempotencyKey?: string; notes?: string } = {}): { receiptId: string; replayed: boolean } {
     this.assertInventoryModuleEnabled();
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'inventory.transfer.receive');
@@ -25,28 +25,57 @@ public receiveTransfer(transferId: string, receipts: Array<{
       throw new Error('يجب تسجيل استلام بند واحد على الأقل.');
     }
 
-    const transfer = this.db.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
-    if (!transfer) throw new Error('طلب التحويل غير موجود.');
-    this.requireTransferWarehouseAuthorization(transferId, actor);
-    if (transfer.status !== 'IN_TRANSIT' && transfer.status !== 'RECEIVED_PARTIAL') {
-      throw new Error('لا يمكن استلام تحويل ليس قيد النقل (IN_TRANSIT).');
-    }
+    const idempotencyKey = options.idempotencyKey?.trim() || `RECEIVE:${uuidv4()}`;
+    const payloadJson = JSON.stringify(receipts);
 
-    const fromWarehouseId = transfer.fromWarehouseId ?? transfer.from_warehouse_id;
-    const toWarehouseId = transfer.toWarehouseId ?? transfer.to_warehouse_id;
-    const transferNumber = transfer.transferNumber ?? transfer.transfer_number ?? transfer.id;
-    const totalShippedM2 = Number(this.db.query<{ total: number }>(
-      'SELECT COALESCE(SUM(shipped_m2), 0) AS total FROM stock_transfer_items WHERE transfer_id = ?',
-      [transferId]
-    )[0]?.total || 0);
+    return this.db.executeTransaction((txDb) => {
+      const transfer = txDb.query<any>(`SELECT * FROM stock_transfers WHERE id = ?`, [transferId])[0];
+      if (!transfer) throw new Error('طلب التحويل غير موجود.');
+      this.requireTransferWarehouseAuthorization(transferId, actor);
 
-    this.db.executeTransaction((txDb) => {
-      const totals = this.processTransferReceipts(
+      // Replaying the same receipt authorization must not post stock again.
+      const existing = InventoryTransferTrackingService.findReceiptByKey(txDb, transferId, idempotencyKey);
+      if (existing) {
+        if (existing.payloadJson && existing.payloadJson !== payloadJson) {
+          throw new Error('مفتاح تكرار الاستلام مستخدم بالفعل لطلب استلام مختلف.');
+        }
+        return { receiptId: existing.id, replayed: true };
+      }
+
+      if (transfer.status !== 'IN_TRANSIT' && transfer.status !== 'RECEIVED_PARTIAL') {
+        throw new Error('لا يمكن استلام تحويل ليس قيد النقل (IN_TRANSIT).');
+      }
+
+      const fromWarehouseId = transfer.fromWarehouseId ?? transfer.from_warehouse_id;
+      const toWarehouseId = transfer.toWarehouseId ?? transfer.to_warehouse_id;
+      const transitWarehouseId: string | null = transfer.transitWarehouseId ?? transfer.transit_warehouse_id ?? null;
+      const transferNumber = transfer.transferNumber ?? transfer.transfer_number ?? transfer.id;
+      const totalShippedM2 = Number(txDb.query<{ total: number }>(
+        'SELECT COALESCE(SUM(shipped_m2), 0) AS total FROM stock_transfer_items WHERE transfer_id = ?',
+        [transferId]
+      )[0]?.total || 0);
+
+      const receiptId = InventoryTransferTrackingService.createReceipt(txDb, {
+        transferId,
+        idempotencyKey,
+        payloadJson,
+        receivedBy: actor.id,
+        notes: options.notes,
+      });
+
+      const receiptReceived = receipts.reduce((sum, receipt) => sum + Math.max(0, Number(receipt.receivedM2 || 0)), 0);
+      const receiptLost = receipts.reduce(
+        (sum, receipt) => sum + Math.max(0, Number(receipt.lostM2 || 0)) + Math.max(0, Number(receipt.damagedM2 || 0)),
+        0,
+      );
+
+      this.processTransferReceipts(
         txDb,
         transfer,
         receipts,
         toWarehouseId,
         fromWarehouseId,
+        transitWarehouseId,
         transferNumber,
         actor
       );
@@ -54,12 +83,27 @@ public receiveTransfer(transferId: string, receipts: Array<{
         SELECT COALESCE(SUM(received_m2), 0) AS totalReceived,
                COALESCE(SUM(lost_m2 + damaged_m2), 0) AS totalLost
         FROM stock_transfer_items WHERE transfer_id = ?
-      `, [transferId])[0] || totals;
+      `, [transferId])[0] || { totalReceived: 0, totalLost: 0 };
       this.updateTransferReceiptStatus(txDb, transferId, totalShippedM2, {
         totalReceived: Number(cumulative.totalReceived) || 0,
         totalLost: Number(cumulative.totalLost) || 0,
       }, actor.id);
+
+      InventoryTransferTrackingService.finalizeReceipt(txDb, receiptId, {
+        received: receiptReceived,
+        lost: receiptLost,
+      });
+      InventoryTransferTrackingService.recordOperation(txDb, {
+        transferId,
+        operation: 'RECEIVE',
+        idempotencyKey,
+        resultReference: receiptId,
+        payloadJson,
+        actorId: actor.id,
+      });
       new BusinessRecordSyncService(txDb).capture(txDb, 'stock_transfer', transferId, 'UPDATE');
+
+      return { receiptId, replayed: false };
     });
   }
 
@@ -69,6 +113,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
     receipts: Array<{ itemId: string; receivedM2: number; lostM2?: number; damagedM2?: number; notes?: string }>,
     toWarehouseId: string,
     fromWarehouseId: string,
+    transitWarehouseId: string | null,
     transferNumber: string,
     actor: ReturnType<typeof AuthService.requireAuth>
   ): { totalReceived: number; totalLost: number } {
@@ -113,6 +158,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
         transfer,
         toWarehouseId,
         fromWarehouseId,
+        transitWarehouseId,
         transferNumber,
         actor
       );
@@ -131,6 +177,7 @@ public receiveTransfer(transferId: string, receipts: Array<{
     transfer: any,
     toWarehouseId: string,
     fromWarehouseId: string,
+    transitWarehouseId: string | null,
     transferNumber: string,
     actor: ReturnType<typeof AuthService.requireAuth>
   ): number {
@@ -147,10 +194,27 @@ public receiveTransfer(transferId: string, receipts: Array<{
 
     if (received > 0) {
       this.recordTransferReceipt(
-        txDb, productId, itemUnitCost, received, transfer, toWarehouseId, fromWarehouseId, transferNumber, actor
+        txDb, productId, itemUnitCost, received, transfer, toWarehouseId, fromWarehouseId,
+        transitWarehouseId, transferNumber, actor
       );
     }
-    this.recordTransferLoss(txDb, lost + damaged, itemUnitCost, productId, productName, transfer, transferNumber, actor);
+    this.recordTransferLoss(
+      txDb, lost + damaged, itemUnitCost, productId, productName, transfer,
+      transitWarehouseId, transferNumber, actor
+    );
+
+    if (transitWarehouseId) {
+      InventoryTransferTrackingService.receiveBatches(txDb, {
+        transferItemId: item.id,
+        productId,
+        transitWarehouseId,
+        toWarehouseId,
+        received,
+        lost: lost + damaged,
+        transferNumber,
+        actorId: actor.id,
+      });
+    }
 
     txDb.run(`
       UPDATE stock_transfer_items
@@ -169,9 +233,46 @@ public receiveTransfer(transferId: string, receipts: Array<{
     transfer: any,
     toWarehouseId: string,
     fromWarehouseId: string,
+    transitWarehouseId: string | null,
     transferNumber: string,
     actor: ReturnType<typeof AuthService.requireAuth>
   ): void {
+    const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
+    let receiptUnitCost = itemUnitCost;
+    let transitPlan: ReturnType<typeof InventoryCostingService.planFifo> | null = null;
+    let transitOutTransactionId: string | null = null;
+
+    if (transitWarehouseId) {
+      transitOutTransactionId = `tx_${uuidv4().substring(0, 8)}`;
+      if (fifoEnabled) {
+        transitPlan = InventoryCostingService.planFifo(txDb, productId, transitWarehouseId, received);
+        receiptUnitCost = transitPlan.unitCost;
+      }
+      InventoryTransferTrackingService.ensureWarehouseStock(txDb, transitWarehouseId, productId, -received);
+      txDb.run(`
+        INSERT INTO inventory_transactions (
+          id, transaction_number, type, product_id, warehouse_id,
+          quantity_m2, boxes_count, unit_cost, total_cost, reference_type, reference_id,
+          notes, performed_by, created_at
+        ) VALUES (?, ?, 'TRANSFER_OUT', ?, ?, ?, 0, ?, ?, 'TRANSFER_TRANSIT_OUT', ?, ?, ?, CURRENT_TIMESTAMP)
+      `, [
+        transitOutTransactionId, txDb.nextNumber('TX-TRF-TRANSIT-OUT'), productId, transitWarehouseId,
+        -received, receiptUnitCost, Number((received * receiptUnitCost).toFixed(2)),
+        transfer.id, `خروج شحنة من مخزن النقل لاستلامها في ${toWarehouseId} (${transferNumber})`, actor.id,
+      ]);
+      if (transitPlan) {
+        InventoryCostingService.moveLayers(txDb, {
+          fromWarehouseId: transitWarehouseId,
+          toWarehouseId,
+          productId,
+          quantity: received,
+          transactionId: transitOutTransactionId,
+          transferId: transfer.id,
+          plan: transitPlan,
+        });
+      }
+    }
+
     const destStock = txDb.query<any>(
       `SELECT id FROM warehouse_stock WHERE warehouse_id = ? AND product_id = ?`,
       [toWarehouseId, productId]
@@ -188,6 +289,14 @@ public receiveTransfer(transferId: string, receipts: Array<{
         VALUES (?, ?, ?, ?, 0)
       `, [`stk_${uuidv4().substring(0, 8)}`, toWarehouseId, productId, received]);
     }
+
+    InventoryLocationStockService.receive(txDb, {
+      warehouseId: toWarehouseId,
+      productId,
+      quantity: received,
+      actorId: actor.id,
+      reason: `استلام تحويل مخزني (${transferNumber})`,
+    });
 
     const txId = `tx_${uuidv4().substring(0, 8)}`;
     const txNum = txDb.nextNumber('TX-TRF-IN');
@@ -207,11 +316,11 @@ public receiveTransfer(transferId: string, receipts: Array<{
       ) VALUES (?, ?, 'TRANSFER_IN', ?, ?, ?, ?, ?, ?, 'TRANSFER', ?, ?, ?, CURRENT_TIMESTAMP)
     `, [
       txId, txNum, productId, toWarehouseId,
-      received, boxes, itemUnitCost, Number((received * itemUnitCost).toFixed(2)),
+      received, boxes, receiptUnitCost, Number((received * receiptUnitCost).toFixed(2)),
       transfer.id, `استلام تحويل مخزني (${transferNumber}) من ${fromWarehouseId}`, actor.id
     ]);
 
-    if (InventoryCostingService.costingMethod(txDb) === 'FIFO') {
+    if (fifoEnabled && !transitWarehouseId) {
       InventoryCostingService.addLayer(txDb, {
         productId,
         warehouseId: toWarehouseId,
@@ -232,11 +341,26 @@ public receiveTransfer(transferId: string, receipts: Array<{
     productId: string,
     productName: string,
     transfer: any,
+    transitWarehouseId: string | null,
     transferNumber: string,
     actor: ReturnType<typeof AuthService.requireAuth>
   ): void {
-    const lossCost = Number((lossQuantity * itemUnitCost).toFixed(2));
     if (lossQuantity <= 0) return;
+
+    const fifoEnabled = InventoryCostingService.costingMethod(txDb) === 'FIFO';
+    let lossCost = Number((lossQuantity * itemUnitCost).toFixed(2));
+    let lossWarehouseId = transfer.fromWarehouseId ?? transfer.from_warehouse_id;
+    let lossPlan: ReturnType<typeof InventoryCostingService.planFifo> | null = null;
+
+    if (transitWarehouseId) {
+      lossWarehouseId = transitWarehouseId;
+      if (fifoEnabled) {
+        lossPlan = InventoryCostingService.planFifo(txDb, productId, transitWarehouseId, lossQuantity);
+        lossCost = lossPlan.totalCost;
+      }
+      InventoryTransferTrackingService.ensureWarehouseStock(txDb, transitWarehouseId, productId, -lossQuantity);
+    }
+
     const lossTransactionId = `tx_${uuidv4().substring(0, 8)}`;
     txDb.run(`
       INSERT INTO inventory_transactions (
@@ -246,10 +370,15 @@ public receiveTransfer(transferId: string, receipts: Array<{
       ) VALUES (?, ?, 'DAMAGE', ?, ?, ?, 0, ?, ?, 'TRANSFER_LOSS', ?, ?, ?, CURRENT_TIMESTAMP)
     `, [
       lossTransactionId, txDb.nextNumber('TX-TRF-LOSS'), productId,
-      transfer.fromWarehouseId ?? transfer.from_warehouse_id, -lossQuantity,
+      lossWarehouseId, -lossQuantity,
       itemUnitCost, lossCost, transfer.id,
       `فقد/تلف أثناء التحويل ${transferNumber} - الصنف ${productName}`, actor.id,
     ]);
+
+    if (lossPlan) {
+      InventoryCostingService.consumeFifo(txDb, lossTransactionId, lossPlan);
+    }
+
     if (lossCost <= 0) return;
 
     postLedgerEntry(txDb.getDatabase(), {
@@ -283,7 +412,10 @@ public receiveTransfer(transferId: string, receipts: Array<{
       UPDATE stock_transfers
       SET status = ?, total_received_m2 = ?, total_lost_m2 = ?,
           received_by = ?, received_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE id = ? AND status IN ('IN_TRANSIT', 'RECEIVED_PARTIAL')
     `, [finalStatus, totals.totalReceived, totals.totalLost, actorId, transferId]);
+    if (InventoryTransferTrackingService.changedRows(txDb) !== 1) {
+      throw new Error('تم تحديث حالة التحويل من طلب آخر؛ أعد تحميل الطلب.');
+    }
   }
 }

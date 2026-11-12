@@ -5,7 +5,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
 import type { SalesContext } from './context';
-import type { CreateSaleDTO, InvoiceFilters, InvoiceStats, ReturnableItem, ReturnRequestItem, ReturnStats } from '../../../types/sales/serviceTypes';
+import type { CreateSaleDTO, InvoiceFilters, InvoiceStats, ReturnableItem, ReturnRequestItem, ReturnDisposition, ReturnStats } from '../../../types/sales/serviceTypes';
 import {
   fetchInvoiceById,
   fetchInvoicePayments,
@@ -29,7 +29,7 @@ import {
   fetchTopReturnReasons,
 } from './returnQueries';
 
-export type { CreateSaleDTO, InvoiceFilters, InvoiceStats, ReturnableItem, ReturnRequestItem, ReturnStats };
+export type { CreateSaleDTO, InvoiceFilters, InvoiceStats, ReturnableItem, ReturnRequestItem, ReturnDisposition, ReturnStats };
 
 export class SalesService {
   private db = DatabaseManager.getInstance();

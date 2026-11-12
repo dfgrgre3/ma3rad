@@ -3,6 +3,7 @@ import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { SettingsService } from '../config/SettingsService';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { BatchService } from '../inventory/BatchService';
 import { localDateString } from '../../../utils/shared/date';
 import { getProductUnitLabel, isServiceProduct } from '../../../utils/products/productUnits';
@@ -10,6 +11,7 @@ import { paymentAccountCode } from '../../../database/repositories/ledger';
 import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../finance/financials';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { WarehouseTypePolicy } from '../operations/WarehouseTypePolicy';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
 import { PartnerService } from '../customers/PartnerService';
 import { defaultEffectEngine } from '../effects/EffectEngine';
@@ -411,6 +413,14 @@ function insertInvoiceItems(
       WHERE product_id = ? AND warehouse_id = ?
     `, [item.quantityM2, item.productId, dto.warehouseId]);
 
+    InventoryLocationStockService.release(sqliteDb, {
+      warehouseId: dto.warehouseId,
+      productId: item.productId,
+      quantity: item.quantityM2,
+      actorId: actor.id,
+      reason: `بيع بموجب فاتورة ${invoiceNumber}`,
+    });
+
     const txId = `tx_${uuidv4().substring(0, 8)}`;
     sqliteDb.run(`
       INSERT INTO inventory_transactions (
@@ -544,6 +554,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
   const actor = AuthService.requireAuth();
   PermissionService.require(actor, 'ui.sales.invoices.create');
   CentralUsageLimitService.assertWithin('maxInvoices');
+  WarehouseTypePolicy.assertSellable(ctx.db, dto.warehouseId, 'البيع');
   const { branchId, cashRegisterId } = resolveCashRegister(ctx, dto, actor);
   const companyId = ctx.db.query<{ companyId: string | null }>(
     `SELECT b.company_id AS companyId FROM branches b WHERE b.id = ?`,

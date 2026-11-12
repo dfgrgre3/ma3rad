@@ -1,12 +1,8 @@
-import { DatabaseManager } from '../../../database/repositories/databaseManager';
-import type { Warehouse, WarehouseStock, InventoryTransaction, InventoryTransactionType, UnitType } from '../../../types';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
-import { postLedgerEntry } from '../../../database/repositories/ledger';
-import { InventoryCostingService } from './InventoryCostingService';
-import { getProductUnitLabel } from '../../../utils/products/productUnits';
+import { InventoryTransferTrackingService } from './InventoryTransferTrackingService';
 import { InventoryServicePart07 } from './InventoryServicePart07';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
 
@@ -36,6 +32,29 @@ public getTransferItems(transferId: string): any[] {
     `, [transferId]);
   }
 
+  public getTransferBatchAllocations(transferId: string): any[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.requireAny(actor, [
+      'inventory.transfer',
+      'inventory.transfer.workflow.approve',
+      'inventory.transfer.execute',
+      'inventory.transfer.receive',
+    ]);
+    this.requireTransferWarehouseAuthorization(transferId, actor);
+    return this.db.query<any>(`
+      SELECT a.id, a.transfer_item_id AS transferItemId,
+        a.source_batch_id AS sourceBatchId, a.transit_batch_id AS transitBatchId,
+        a.destination_batch_id AS destinationBatchId, a.batch_number AS batchNumber,
+        a.tone_shade AS toneShade, a.caliber, a.quantity_m2 AS quantityM2,
+        a.received_m2 AS receivedM2, a.lost_m2 AS lostM2, a.reverted_m2 AS revertedM2,
+        a.unit_cost AS unitCost, sti.product_id AS productId, sti.product_name AS productName
+      FROM stock_transfer_batch_allocations a
+      JOIN stock_transfer_items sti ON sti.id = a.transfer_item_id
+      WHERE sti.transfer_id = ?
+      ORDER BY a.created_at, a.id
+    `, [transferId]);
+  }
+
 protected requireTransferWarehouseAuthorization(transferId: string, actor: ReturnType<typeof AuthService.requireAuth>): void {
     const transfer = this.db.query<{ fromWarehouseId: string; toWarehouseId: string }>(
       `SELECT from_warehouse_id AS fromWarehouseId, to_warehouse_id AS toWarehouseId
@@ -62,6 +81,14 @@ public createTransferRequest(input: {
     }
     this.branchAccess.requireWarehouseAuthorization(input.fromWarehouseId, actor);
     this.branchAccess.requireWarehouseAuthorization(input.toWarehouseId, actor);
+    InventoryTransferTrackingService.assertSameCompany(this.db, input.fromWarehouseId, input.toWarehouseId);
+    const destination = this.db.query<{ type: string }>(
+      `SELECT warehouse_type AS type FROM warehouses WHERE id = ?`,
+      [input.toWarehouseId]
+    )[0];
+    if (destination?.type === 'TRANSIT_WAREHOUSE') {
+      throw new Error('لا يمكن إنشاء تحويل إلى مخزن البضاعة أثناء النقل مباشرة. اختر مخزن الوجهة الفعلي.');
+    }
     if (!input.items || input.items.length === 0) {
       throw new Error('يجب إضافة صنف واحد على الأقل للتحويل.');
     }

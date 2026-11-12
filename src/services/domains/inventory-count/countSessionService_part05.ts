@@ -26,7 +26,8 @@ export function postCountItems(
     SELECT id, product_id AS productId, product_name AS productName,
       system_quantity_m2 AS systemQuantityM2, counted_quantity_m2 AS countedQuantityM2,
       variance_m2 AS varianceM2, unit_cost AS unitCost, variance_value AS varianceValue,
-      COALESCE(discrepancy_reason, '') AS discrepancyReason, COALESCE(notes, '') AS notes
+      COALESCE(discrepancy_reason, '') AS discrepancyReason, COALESCE(notes, '') AS notes,
+      location_id AS locationId
     FROM stock_count_items WHERE count_id = ?`, [activeSession.id]);
   for (const item of canonicalItems) {
     const submittedItem = submitted.get(item.id);
@@ -45,7 +46,7 @@ export function postCountItems(
       throw new Error(`Choose a discrepancy reason for ${item.productName} before posting.`);
     }
     const stockInfo = getCountStockInfo(txDb, item, warehouseId);
-    validateCountedQuantity(item, stockInfo.reservedM2);
+    if (!item.locationId) validateCountedQuantity(item, stockInfo.reservedM2);
     updateCountItem(txDb, item, actorId, activeSession.id);
 
     if (item.varianceM2 === 0) continue;

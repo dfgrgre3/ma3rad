@@ -7,6 +7,7 @@ import { localDateString } from '../../../utils/shared/date';
 import { postLedgerEntry } from '../../../database/repositories/ledger';
 import { round2 } from '../finance/financials';
 import { InventoryCostingService } from '../inventory/InventoryCostingService';
+import { InventoryLocationStockService } from '../inventory/InventoryLocationStockService';
 import { BusinessRecordSyncService } from '../../../sync/BusinessRecordSyncService';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 
@@ -358,6 +359,14 @@ export class PurchaseReturnService {
           UPDATE warehouse_stock SET quantity_m2 = quantity_m2 - ?, last_updated = CURRENT_TIMESTAMP
           WHERE product_id = ? AND warehouse_id = ?
         `, [item.quantityM2, item.productId, purchase.warehouseId]);
+
+        InventoryLocationStockService.release(db, {
+          warehouseId: purchase.warehouseId,
+          productId: item.productId,
+          quantity: item.quantityM2,
+          actorId: actor.id,
+          reason: `مرتجع مشتريات بموجب ${returnNumber}`,
+        });
 
         const returnTransactionId = `tx_${uuidv4().substring(0, 8)}`;
         const fifoPlan = InventoryCostingService.costingMethod(db) === 'FIFO'

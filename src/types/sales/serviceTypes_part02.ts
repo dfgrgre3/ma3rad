@@ -1,3 +1,5 @@
+export type ReturnDisposition = 'RESTOCK' | 'SPECIAL_STOCK' | 'QUARANTINE' | 'DAMAGED';
+
 export interface ReturnableItem {
   productId: string;
   productName: string;
@@ -14,6 +16,13 @@ export interface ReturnableItem {
   productType?: 'CERAMIC' | 'GENERAL';
   baseUnit?: string;
   customUnit?: string;
+  /** Discounted special-stock record the line was sold from, when applicable. */
+  specialStockId?: string | null;
+  specialNumber?: string | null;
+  /** Where the sold quantity came from: regular invoice stock or a special-stock sale. */
+  sourceType?: 'INVOICE' | 'SPECIAL_STOCK_SALE';
+  /** Default disposition applied when the caller does not pick one. */
+  defaultDisposition?: ReturnDisposition;
 }
 
 export interface ReturnStats {
@@ -42,4 +51,11 @@ export interface ReturnRequestItem {
   unitPrice: number;
   unitCost: number;
   reason: string;
+  /** Special-stock record the sold line came from (discounted sales). */
+  specialStockId?: string | null;
+  /**
+   * Where the returned goods go. Defaults to the original source:
+   * regular sales restock, special-stock sales go back to their own record.
+   */
+  disposition?: ReturnDisposition;
 }

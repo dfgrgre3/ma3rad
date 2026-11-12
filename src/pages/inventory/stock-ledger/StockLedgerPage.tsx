@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { formatProductQuantity } from '../../../utils/products/productUnits';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { exportToExcel } from '../../../utils/export/export';
+import { STOCK_LEDGER_BALANCE_AMOUNT } from './stockLedgerBalance';
 
 interface LedgerEntry {
   id: string;
@@ -83,12 +84,12 @@ export const StockLedgerPage: React.FC = () => {
       let sql = `
         WITH balances AS (
           SELECT it.id,
-                 COALESCE(SUM(it.quantity_m2) OVER (
+                 COALESCE(SUM(${STOCK_LEDGER_BALANCE_AMOUNT}) OVER (
                    PARTITION BY it.product_id, it.warehouse_id
                    ORDER BY it.created_at ASC, it.rowid ASC
                    ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
                  ), 0) AS previous_balance,
-                 SUM(it.quantity_m2) OVER (
+                 SUM(${STOCK_LEDGER_BALANCE_AMOUNT}) OVER (
                    PARTITION BY it.product_id, it.warehouse_id
                    ORDER BY it.created_at ASC, it.rowid ASC
                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
