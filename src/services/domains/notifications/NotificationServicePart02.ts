@@ -3,6 +3,7 @@ import { NotificationServicePart01 } from './NotificationServicePart01';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { HrAlertsService } from '../hr/HrAlertsService';
 
 export abstract class NotificationServicePart02 extends NotificationServicePart01 {
 public runScheduledChecks(): { created: number } {
@@ -132,6 +133,17 @@ public runScheduledChecks(): { created: number } {
           'SALES_INVOICE',
           invoice.id
         );
+      }
+
+      // ─── تنبيهات الموارد البشرية ───
+      try {
+        const hrAlerts = new HrAlertsService();
+        const hrResult = hrAlerts.runHrAlerts();
+        if (hrResult.created > 0) {
+          console.log(`HR Alerts created: ${hrResult.created} — ${hrResult.details.join(', ')}`);
+        }
+      } catch (error) {
+        console.warn('HR scheduled alert checks failed:', error);
       }
     } catch (error) {
       console.warn('Scheduled notification checks failed:', error);

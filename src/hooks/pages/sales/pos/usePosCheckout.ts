@@ -1,10 +1,10 @@
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+﻿import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { BatchService } from '../../../../services/domains/inventory/BatchService';
 import { AppConfigService } from '../../../../services/domains/config/AppConfigService';
 import { ApprovalService } from '../../../../services/domains/approvals/ApprovalService';
 import type { CashierService } from '../../../../services/domains/finance/CashierService';
 import type { LoyaltyService } from '../../../../services/domains/sales/LoyaltyService';
-import type { PricingService, AppliedPromotion } from '../../../../services/domains/sales/PricingService';
+import type { AppliedPromotion } from '../../../../services/domains/sales/PricingService';
 import type { SalesService } from '../../../../services/domains/sales/SalesService';
 import type { CashShift, Customer, PaymentType, SystemSettings, ToneMixingConflict } from '../../../../types';
 import { formatProductQuantity } from '../../../../utils/products/productUnits';
@@ -64,7 +64,6 @@ interface UsePosCheckoutOptions {
   cashierService: CashierService;
   batchService: BatchService;
   loyaltyService: LoyaltyService;
-  pricingService: PricingService;
   performedBy: string;
   loadStock: (warehouseId: string) => void;
   onInvoiceCreated: (invoiceId: string) => void;
@@ -121,7 +120,6 @@ export const usePosCheckout = ({
   cashierService,
   batchService,
   loyaltyService,
-  pricingService,
   performedBy,
   loadStock,
   onInvoiceCreated,
@@ -387,48 +385,13 @@ export const usePosCheckout = ({
           { method: 'CHEQUE', amount: splitCheque },
         ].filter((payment) => payment.amount > 0) as { method: PaymentType; amount: number }[]) : undefined,
         notes,
-        performedBy
+        performedBy,
+        loyaltyRedemption: redeemPoints > 0 ? { points: redeemPoints, discountAmount: loyaltyDiscount } : undefined,
+        promotionUsage: appliedPromotion ? { promotionId: appliedPromotion.promotionId, couponCode: couponCode || undefined, discountAmount: appliedPromotion.discountAmount } : undefined,
       });
       onInvoiceCreated(invoice.id);
 
       setSuccessInvoice(invoice);
-      let loyaltyRedemptionError: string | null = null;
-      if (redeemPoints > 0) {
-        try {
-          loyaltyService.redeemPoints({
-            customerId: selectedCustomer.id,
-            points: redeemPoints,
-            referenceType: 'SALES_INVOICE',
-            referenceId: invoice.id,
-            description: `استبدال نقاط مقابل فاتورة ${invoice.invoiceNumber}`,
-          });
-        } catch (error: any) {
-          loyaltyRedemptionError = error?.message || 'خطأ غير معروف';
-        }
-      }
-      if (appliedPromotion) {
-        try {
-          pricingService.recordPromotionUsage(appliedPromotion.promotionId, invoice.id, couponCode || undefined, appliedPromotion.discountAmount);
-        } catch {
-          // Promotion tracking is supplementary to the completed sale.
-        }
-      }
-      if (selectedCustomer.id) {
-        try {
-          const points = Math.floor((invoice.totalAmount || 0) / 10);
-          if (points > 0) {
-            loyaltyService.earnPoints({
-              customerId: selectedCustomer.id,
-              points,
-              referenceType: 'SALES_INVOICE',
-              referenceId: invoice.id,
-              description: `نقاط من فاتورة ${invoice.invoiceNumber}`
-            });
-          }
-        } catch {
-          // Loyalty tracking is supplementary to the completed sale.
-        }
-      }
       setCart([]);
       setDiscountAmount(0);
       setPromotionDiscount(0);
@@ -444,10 +407,8 @@ export const usePosCheckout = ({
       if (selectedWarehouseId) loadStock(selectedWarehouseId);
       setActiveShift(cashierService.getActiveShift());
       notify(
-        loyaltyRedemptionError
-          ? `تم إصدار الفاتورة ${invoice.invoiceNumber}، لكن تعذر خصم نقاط الولاء: ${loyaltyRedemptionError}`
-          : `تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح`,
-        loyaltyRedemptionError ? 'warning' : 'success'
+        `تم إصدار الفاتورة ${invoice.invoiceNumber} بنجاح`,
+        'success'
       );
     } catch (error: any) {
       notify(error.message || 'خطأ أثناء حفظ الفاتورة', 'error');
@@ -461,7 +422,7 @@ export const usePosCheckout = ({
     promotionDiscount, loyaltyDiscount, taxPercentage, taxAmount, shippingCost, extraFees, discountPercentage,
     paidAmount, paymentType, splitCash, splitCard, splitBank, splitCheque, notes,
     redeemPoints,
-    performedBy, appliedPromotion, pricingService, couponCode, loyaltyService,
+    performedBy, appliedPromotion, couponCode,
     setCart, setDiscountAmount, setPromotionDiscount, setLoyaltyDiscount,
     setAppliedPromotion, setCouponCode, setRedeemPoints, setShippingCost,
     setExtraFees,

@@ -9,6 +9,8 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
   customerService,
   customerSearch,
   filteredCustomers,
+  hasMoreCustomers,
+  onLoadMoreCustomers,
   canCreateCustomer,
   onCustomerSearchChange,
   onSelectCustomer,
@@ -38,6 +40,8 @@ export const PosCartPanel: React.FC<PosCartPanelProps> = ({
       customerService={customerService}
       customerSearch={customerSearch}
       filteredCustomers={filteredCustomers}
+      hasMoreCustomers={hasMoreCustomers}
+      onLoadMoreCustomers={onLoadMoreCustomers}
       canCreateCustomer={canCreateCustomer}
       onSearchChange={onCustomerSearchChange}
       onSelectCustomer={onSelectCustomer}

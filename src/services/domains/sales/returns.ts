@@ -25,6 +25,7 @@ type ReturnOptions = {
   shiftId?: string;
   refundMethod?: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'BALANCE';
   idempotencyKey?: string;
+  requestFingerprint?: string;
 };
 
 interface ReturnTransactionParams {
@@ -73,24 +74,54 @@ export function createSaleReturn(
   if (inv.invoiceStatus === 'VOID') throw new Error('لا يمكن مرتجعة فاتورة ملغاة.');
 
   const refundMethod = options.refundMethod || 'CASH';
+  const invoiceBranchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
   if (refundMethod === 'CASH' && refundCash) {
-    const branchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
-    const registerId = options.registerId || ctx.branchAccess.getDefaultRegisterId(branchId, actor);
-    ctx.branchAccess.requireRegisterAccess(registerId, actor, branchId);
+    const registerId = options.registerId || ctx.branchAccess.getDefaultRegisterId(invoiceBranchId, actor);
+    ctx.branchAccess.requireRegisterAccess(registerId, actor, invoiceBranchId);
     options = { ...options, registerId };
   }
+
+  const normalizedItems = normalizeReturnUnits(ctx, returnItems);
+  const fingerprintItems = normalizedItems.map((item) => ({
+    productId: item.productId,
+    quantityM2: round2(Number(item.quantityM2)),
+    quantity: item.quantity == null ? null : round2(Number(item.quantity)),
+    uom: item.uom || null,
+    boxesCount: round2(Number(item.boxesCount || 0)),
+    unitPrice: round2(Number(item.unitPrice || 0)),
+    unitCost: round2(Number(item.unitCost || 0)),
+    reason: item.reason || '',
+    specialStockId: item.specialStockId || null,
+    disposition: item.disposition || null,
+  })).sort((left, right) => {
+    const leftKey = JSON.stringify(left);
+    const rightKey = JSON.stringify(right);
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  });
+  const requestFingerprint = JSON.stringify({
+    invoiceId,
+    refundCash: Boolean(refundCash),
+    refundMethod,
+    registerId: options.registerId || null,
+    shiftId: options.shiftId || null,
+    items: fingerprintItems,
+  });
 
   const idempotencyKey = options.idempotencyKey;
   if (idempotencyKey) {
     const prior = ctx.db.query<any>(
       `SELECT id, return_number, original_invoice_id, original_invoice_number, customer_id, warehouse_id,
-              date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason, refund_method, created_by, created_at
+              date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason, refund_method,
+              request_fingerprint, created_by, created_at
        FROM sales_returns WHERE idempotency_key = ?`,
       [idempotencyKey]
     )[0];
     if (prior) {
       if (prior.original_invoice_id !== invoiceId) {
         throw new Error('The sales return idempotency key was already used for a different invoice.');
+      }
+      if (!prior.request_fingerprint || prior.request_fingerprint !== requestFingerprint) {
+        throw new Error('The sales return idempotency key was already used with different return details.');
       }
       return {
         id: prior.id,
@@ -112,23 +143,54 @@ export function createSaleReturn(
     }
   }
 
-  const normalizedItems = normalizeReturnUnits(ctx, returnItems);
+  options = { ...options, requestFingerprint };
   const requestedByProduct = validateReturnRequest(inv, normalizedItems);
   const returnId = `ret_${uuidv4().substring(0, 8)}`;
   const today = localDateString();
   const trackInventory = ModuleRegistryService.isInventoryTracked();
 
-  return ctx.db.executeTransaction((sqliteDb) => createReturnInTransaction(sqliteDb, {
-    invoiceId,
-    returnId,
-    today,
-    inv,
-    items: normalizedItems,
-    refundCash,
-    options,
-    actor,
-    trackInventory,
-  }, requestedByProduct));
+  return ctx.db.executeTransaction((sqliteDb) => {
+    validateReturnShift(ctx, sqliteDb, options, actor, invoiceBranchId, refundMethod, refundCash, inv.paidAmount);
+    return createReturnInTransaction(sqliteDb, {
+      invoiceId,
+      returnId,
+      today,
+      inv,
+      items: normalizedItems,
+      refundCash,
+      options,
+      actor,
+      trackInventory,
+    }, requestedByProduct);
+  });
+}
+
+function validateReturnShift(
+  ctx: SalesContext,
+  sqliteDb: DatabaseManager,
+  options: ReturnOptions,
+  actor: ReturnType<typeof AuthService.requireAuth>,
+  invoiceBranchId: string,
+  refundMethod: NonNullable<ReturnOptions['refundMethod']>,
+  refundCash: boolean,
+  invoicePaidAmount: number
+): void {
+  if (refundMethod === 'CASH' && refundCash && Number(invoicePaidAmount || 0) > 0 && !options.shiftId) {
+    throw new Error('An open cash shift is required for a cash refund.');
+  }
+  if (!options.shiftId) return;
+  const shift = ctx.branchAccess.requireShiftAccess(options.shiftId, actor, options.registerId);
+  if (shift.status !== 'OPEN') throw new Error('The selected cash shift is closed.');
+  if (shift.branchId !== invoiceBranchId) throw new Error('The selected cash shift belongs to a different branch.');
+  const persistedShift = sqliteDb.query<{ status: string; branchId: string; registerId: string }>(
+    `SELECT status, branch_id AS branchId, register_id AS registerId FROM cash_shifts WHERE id = ?`,
+    [options.shiftId]
+  )[0];
+  if (!persistedShift || persistedShift.status !== 'OPEN'
+    || persistedShift.branchId !== invoiceBranchId
+    || (options.registerId && persistedShift.registerId !== options.registerId)) {
+    throw new Error('The selected cash shift is not open for this invoice branch and register.');
+  }
 }
 
 /**
@@ -213,7 +275,7 @@ function createReturnInTransaction(
   const returnedCost = params.trackInventory ? returnCosts.inventoryCost : 0;
   const returnedServiceCost = params.trackInventory ? returnCosts.serviceCost : 0;
   const ledgerLines = buildReturnLedgerLines(params, totalReturnAmount, returnTax, impact, returnedCost, returnedServiceCost);
-  updateShiftRefunds(sqliteDb, options.shiftId, impact.cashRefund);
+  updateShiftRefunds(sqliteDb, options.shiftId, refundMethod === 'CASH' ? impact.cashRefund : 0);
   updateInvoiceReturnedAmount(sqliteDb, invoiceId, totalReturnIncludingTax, impact.balanceDelta);
 
   const effects: Effect[] = [
@@ -414,14 +476,15 @@ function insertSalesReturn(
     INSERT INTO sales_returns (
       id, return_number, original_invoice_id, original_invoice_number, customer_id,
       warehouse_id, date, total_amount, return_tax_amount, refunded_amount, remaining_to_balance, reason,
-      register_id, shift_id, refund_method, created_by, idempotency_key
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      register_id, shift_id, refund_method, created_by, idempotency_key, request_fingerprint
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     returnId, returnNumber, inv.id, inv.invoiceNumber, inv.customerId,
     inv.warehouseId, today, totalReturnAmount, returnTaxAmount, impact.cashRefund, impact.balanceDelta,
     items[0]?.reason || 'مرتجع سيراميك',
     impact.cashRefund > 0 && refundMethod === 'CASH' ? options.registerId : null,
     options.shiftId || null, refundMethod, actor.id, options.idempotencyKey || null,
+    options.requestFingerprint || null,
   ]);
 }
 

@@ -2199,6 +2199,58 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   {
+    id: '101_order_deposits',
+    description: 'Track order deposits and their receipt/settlement links.',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS order_deposits (
+          id TEXT PRIMARY KEY,
+          deposit_number TEXT NOT NULL UNIQUE,
+          order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+          customer_id TEXT NOT NULL REFERENCES customers(id),
+          amount REAL NOT NULL CHECK(amount > 0),
+          payment_method TEXT NOT NULL,
+          register_id TEXT REFERENCES cash_registers(id),
+          shift_id TEXT REFERENCES cash_shifts(id),
+          receipt_id TEXT REFERENCES customer_payments(id),
+          bank_account_id TEXT REFERENCES bank_accounts(id),
+          invoice_id TEXT REFERENCES sales_invoices(id),
+          date TEXT NOT NULL,
+          created_by TEXT NOT NULL REFERENCES users(id),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_order_deposits_order ON order_deposits(order_id, date);
+      `);
+    },
+  },
+  {
+    id: '102_order_deposit_account',
+    description: 'Add the customer order deposits liability account.',
+    up: (db: Database) => {
+      db.run(`INSERT OR IGNORE INTO chart_of_accounts (id, code, name, type, parent_code, balance, is_active)
+        VALUES ('acc_2106', '2106', 'دفعات مقدمة من العملاء', 'LIABILITY', NULL, 0, 1)`);
+    },
+  },
+  {
+    id: '103_order_lifecycle_dimensions',
+    description: 'Separate order delivery, billing, and financial lifecycle states.',
+    up: (db: Database) => {
+      addColumn(db, 'orders', 'delivery_status', "TEXT NOT NULL DEFAULT 'PENDING'");
+      addColumn(db, 'orders', 'billing_status', "TEXT NOT NULL DEFAULT 'NOT_INVOICED'");
+      addColumn(db, 'orders', 'financial_status', "TEXT NOT NULL DEFAULT 'UNPAID'");
+      db.exec(`
+        UPDATE orders SET
+          billing_status = CASE WHEN invoice_id IS NOT NULL THEN 'INVOICED' ELSE 'NOT_INVOICED' END,
+          financial_status = CASE WHEN paid_amount >= total_amount - 0.009 THEN 'PAID' WHEN paid_amount > 0 THEN 'PARTIAL' ELSE 'UNPAID' END,
+          delivery_status = CASE
+            WHEN EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id AND oi.delivered_m2 > 0)
+              AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id AND oi.delivered_m2 + 0.009 < oi.quantity_m2) THEN 'DELIVERED'
+            WHEN EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id AND oi.delivered_m2 > 0) THEN 'PARTIAL'
+            ELSE 'PENDING' END;
+      `);
+    },
+  },
+  {
     id: '101_user_two_factor_auth',
     description: 'Per-user TOTP/HOTP secrets and hashed recovery codes',
     up: (db: Database) => {
@@ -3153,6 +3205,38 @@ export const MIGRATIONS: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_product_warehouse_planning_warehouse
           ON product_warehouse_planning(warehouse_id, product_id);
       `);
+    },
+  },
+  {
+    id: '188_quotation_branch_company_scope',
+    description: 'Add branch and company ownership to sales quotations and backfill it from their warehouse.',
+    up: (db: Database) => {
+      addColumn(db, 'quotations', 'branch_id', 'TEXT');
+      addColumn(db, 'quotations', 'company_id', 'TEXT');
+      db.exec(`
+        UPDATE quotations
+        SET branch_id = COALESCE(
+          (SELECT w.branch_id FROM warehouses w WHERE w.id = quotations.warehouse_id),
+          (SELECT id FROM branches WHERE is_main = 1 ORDER BY created_at LIMIT 1)
+        )
+        WHERE branch_id IS NULL;
+        UPDATE quotations
+        SET company_id = COALESCE(
+          (SELECT b.company_id FROM branches b WHERE b.id = quotations.branch_id),
+          (SELECT c.company_id FROM customers c WHERE c.id = quotations.customer_id),
+          'cmp_main'
+        )
+        WHERE company_id IS NULL;
+        CREATE INDEX IF NOT EXISTS idx_quotations_branch_date ON quotations(branch_id, date DESC);
+        CREATE INDEX IF NOT EXISTS idx_quotations_company ON quotations(company_id);
+      `);
+    },
+  },
+  {
+    id: '189_sales_return_request_fingerprint',
+    description: 'Persist the normalized request fingerprint for idempotent sales return retries.',
+    up: (db: Database) => {
+      addColumn(db, 'sales_returns', 'request_fingerprint', 'TEXT');
     },
   },
 ].flat().sort((left, right) => {

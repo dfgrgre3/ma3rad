@@ -715,6 +715,20 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                   </div>
                 )}
 
+                {detail.execution && (
+                  <div className="p-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/30">
+                    <div className="text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1">تنفيذ الحل والمراجع</div>
+                    <div className="text-xs text-slate-700 dark:text-slate-200">
+                      الإجراء: <strong>{detail.execution.referenceType}</strong>
+                      {detail.execution.referenceId && <span className="font-mono" dir="ltr"> — {detail.execution.referenceId}</span>}
+                    </div>
+                    {detail.execution.returnId && <div className="text-xs text-slate-700 dark:text-slate-200 mt-1">رقم المرتجع: <span className="font-mono" dir="ltr">{detail.execution.returnId}</span></div>}
+                    {detail.execution.replacementInvoiceId && <div className="text-xs text-slate-700 dark:text-slate-200 mt-1">الفاتورة البديلة: <span className="font-mono" dir="ltr">{detail.execution.replacementInvoiceId}</span></div>}
+                    {detail.execution.amount > 0 && <div className="text-xs text-slate-700 dark:text-slate-200 mt-1">المبلغ المسوّى: <strong>{fmtCurrency(detail.execution.amount)}</strong></div>}
+                    <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{detail.execution.details}</p>
+                  </div>
+                )}
+
                 <div>
                   <h4 className="text-xs font-bold text-slate-500 mb-2">سجل المطالبة</h4>
                   <div className="space-y-2">
@@ -766,7 +780,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                     </>
                   )}
                   {detail.status === 'APPROVED' && (
-                    <PermissionGate permission="ui.sales.after_sales.update">
+                    <PermissionGate permission="ui.sales.after_sales.resolve">
                       <button onClick={() => openDecision(detail, 'resolve')} className="px-3 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition flex items-center gap-1.5">
                         <PackageCheck className="w-4 h-4" /> تسجيل الحل
                       </button>
@@ -819,11 +833,17 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                       <option key={value} value={value}>{RESOLUTION_LABELS[value]}</option>
                     ))}
                   </select>
+                  {decision.resolutionType === 'REFUND' && (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">سينشئ النظام مرتجعًا ماليًا ويضيف المبلغ إلى رصيد العميل، مع عزل الكمية المرتجعة للفحص.</p>
+                  )}
+                  {decision.resolutionType === 'REPLACEMENT' && (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">سينشئ النظام المرتجع ويعزل الصنف المعيب، ثم يصدر فاتورة بديلة ويصرف الكمية من المخزون.</p>
+                  )}
                 </div>
               )}
               <div>
                 <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                  ملاحظات {decision.action === 'reject' ? '*' : ''}
+                  ملاحظات {decision.action === 'reject' || (decision.action === 'resolve' && ['REPAIR', 'OTHER'].includes(decision.resolutionType)) ? '*' : ''}
                 </label>
                 <textarea
                   rows={3}
@@ -846,7 +866,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
               </button>
               <button
                 onClick={submitDecision}
-                disabled={deciding}
+                disabled={deciding || (decision.action === 'resolve' && !decision.resolutionType)}
                 className="px-5 py-2 text-sm font-bold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-50 rounded-xl transition flex items-center gap-1.5"
               >
                 {deciding ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}

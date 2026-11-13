@@ -6,6 +6,7 @@ import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { CustomerService } from '../src/services/domains/customers/CustomerService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
+import { CashierService } from '../src/services/domains/finance/CashierService.ts';
 
 function q(sql: string, params: any[] = []): any[] {
   return DatabaseManager.getInstance().query(sql, params);
@@ -102,6 +103,36 @@ test('mixed payment: نقدي + بطاقة + آجل (مثال 1000 + 2000 + 1000
   // بعد الإلغاء يعود رصيد العميل كما كان
   const afterVoid = q('SELECT current_balance AS currentBalance FROM customers WHERE id = ?', [customer.id])[0] as any;
   assert.equal(Number(afterVoid.currentBalance), 0);
+});
+
+test('void reverses split tender totals on the invoice shift and cash from its non-default register', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const registerId = 'cr_void_nondefault';
+  db.run(`INSERT OR REPLACE INTO cash_registers (id, name, current_balance, is_default, is_active, branch_id) VALUES (?, ?, 100, 0, 1, 'br_main')`, [registerId, 'Register Void Nondefault']);
+  const shift = new CashierService().openShift(registerId, 'usr_admin', 100);
+  const customer = new CustomerService().createCustomer({
+    name: `عميل إلغاء وردية ${Date.now()}`, phone: `015${String(Date.now()).slice(-8)}`, customerType: 'RETAIL', creditLimit: 50000,
+  });
+  seedProduct(db, 'prod_void_shift_multi');
+  const invoice = new SalesService().createSale({
+    customerId: customer.id, warehouseId: 'wh_main', shiftId: shift.id,
+    items: [{ productId: 'prod_void_shift_multi', soldBy: 'M2', quantityM2: 20, boxesCount: 14, piecesCount: 0, unitPrice: 300 }],
+    paidAmount: 4000, paymentType: 'MIXED',
+    payments: [{ method: 'CASH', amount: 1000 }, { method: 'CARD', amount: 1500 }, { method: 'BANK_TRANSFER', amount: 1500 }],
+  });
+  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', [registerId])[0].balance), 1100);
+  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].balance), 0);
+  assert.deepEqual(Object.values(q('SELECT total_sales_cash AS cash, total_sales_card AS card, total_sales_transfer AS transfer FROM cash_shifts WHERE id = ?', [shift.id])[0]).map(Number), [1000, 1500, 1500]);
+
+  new SalesService().voidInvoice(invoice.id, 'اختبار عكس وردية وخزينة');
+  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', [registerId])[0].balance), 100);
+  assert.equal(Number(q('SELECT current_balance AS balance FROM cash_registers WHERE id = ?', ['cr_main'])[0].balance), 0);
+  assert.deepEqual(Object.values(q('SELECT total_sales_cash AS cash, total_sales_card AS card, total_sales_transfer AS transfer FROM cash_shifts WHERE id = ?', [shift.id])[0]).map(Number), [0, 0, 0]);
+  db.run('DELETE FROM cash_shifts WHERE id = ?', [shift.id]);
+  db.run('DELETE FROM cash_registers WHERE id = ?', [registerId]);
 });
 
 test('mixed payment: إطار آجل يصل في payments لا يُسجَّل كدفعة (يبقى متبقياً على العميل)', async () => {

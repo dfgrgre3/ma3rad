@@ -118,7 +118,8 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
   return ctx.db.executeTransaction((sqliteDb) => {
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     const linkedPayments = sqliteDb.query<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM customer_payments WHERE invoice_id = ?',
+      `SELECT COUNT(*) AS count FROM customer_payments WHERE invoice_id = ?
+       AND id NOT IN (SELECT receipt_id FROM order_deposits WHERE receipt_id IS NOT NULL)`,
       [invoiceId]
     )[0]?.count ?? 0;
     const linkedPlan = sqliteDb.query<any>(`SELECT COUNT(*) AS count FROM installment_plans WHERE invoice_id=? AND status!='CANCELLED'`, [invoiceId])[0]?.count || 0;
@@ -144,19 +145,51 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
 
     if (inv.paidAmount > 0) {
       // Reverse the cash portion of the payment (including split payments).
-      const cashPortion = sqliteDb.query<{ amount: number }>(
-        `SELECT COALESCE(SUM(amount), 0) AS amount
-         FROM sales_invoice_payments WHERE invoice_id = ? AND method = 'CASH'`,
+      const invoicePayments = sqliteDb.query<{ method: string; amount: number }>(
+        `SELECT method, COALESCE(SUM(amount), 0) AS amount FROM sales_invoice_payments WHERE invoice_id = ? GROUP BY method`,
         [invoiceId]
-      )[0]?.amount ?? 0;
+      );
+      const cashPortion = invoicePayments.find((payment) => payment.method === 'CASH')?.amount ?? 0;
       if (cashPortion > 0) {
         const branchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
-        const registerId = ctx.branchAccess.getDefaultRegisterId(branchId, actor);
+        const shiftRegister = inv.shiftId
+          ? sqliteDb.query<{ registerId: string }>('SELECT register_id AS registerId FROM cash_shifts WHERE id = ?', [inv.shiftId])[0]?.registerId
+          : null;
+        const registerId = shiftRegister || ctx.branchAccess.getDefaultRegisterId(branchId, actor);
         sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [cashPortion, registerId]);
       } else if (inv.paymentType === 'CASH' && inv.paidAmount > 0) {
         const branchId = ctx.branchAccess.requireWarehouseAccess(inv.warehouseId, actor);
-        const registerId = ctx.branchAccess.getDefaultRegisterId(branchId, actor);
+        const shiftRegister = inv.shiftId
+          ? sqliteDb.query<{ registerId: string }>('SELECT register_id AS registerId FROM cash_shifts WHERE id = ?', [inv.shiftId])[0]?.registerId
+          : null;
+        const registerId = shiftRegister || ctx.branchAccess.getDefaultRegisterId(branchId, actor);
         sqliteDb.run(`UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?`, [inv.paidAmount, registerId]);
+      }
+
+      if (inv.shiftId) {
+        const methodTotals = invoicePayments.length ? invoicePayments : [{ method: inv.paymentType, amount: inv.paidAmount }];
+        const cash = methodTotals.filter((payment) => payment.method === 'CASH').reduce((sum, payment) => sum + Number(payment.amount), 0);
+        const card = methodTotals.filter((payment) => payment.method === 'CARD').reduce((sum, payment) => sum + Number(payment.amount), 0);
+        const transfer = methodTotals.filter((payment) => payment.method === 'BANK_TRANSFER' || payment.method === 'CHEQUE').reduce((sum, payment) => sum + Number(payment.amount), 0);
+        sqliteDb.run(`UPDATE cash_shifts SET total_sales_cash = MAX(0, total_sales_cash - ?), total_sales_card = MAX(0, total_sales_card - ?), total_sales_transfer = MAX(0, total_sales_transfer - ?) WHERE id = ?`, [round2(cash), round2(card), round2(transfer), inv.shiftId]);
+      }
+    }
+
+    const settledDeposits = sqliteDb.query<{ amount: number }>(
+      `SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE invoice_id = ?`, [invoiceId]
+    )[0]?.amount ?? 0;
+    if (settledDeposits > 0) {
+      const depositReceipts = sqliteDb.query<{ amount: number; paymentMethod: string; registerId: string | null; shiftId: string | null; bankAccountId: string | null }>(
+        `SELECT amount, payment_method AS paymentMethod, register_id AS registerId, shift_id AS shiftId, bank_account_id AS bankAccountId FROM order_deposits WHERE invoice_id = ?`, [invoiceId]
+      );
+      for (const receipt of depositReceipts) {
+        if (receipt.paymentMethod === 'CASH' && receipt.registerId) {
+          sqliteDb.run('UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?', [receipt.amount, receipt.registerId]);
+          if (receipt.shiftId) sqliteDb.run('UPDATE cash_shifts SET total_customer_payments = MAX(0, total_customer_payments - ?) WHERE id = ?', [receipt.amount, receipt.shiftId]);
+        }
+        if (receipt.paymentMethod === 'BANK_TRANSFER' && receipt.bankAccountId) {
+          sqliteDb.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [receipt.amount, receipt.bankAccountId]);
+        }
       }
     }
 
@@ -169,11 +202,12 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     const reversedPaymentLines = splitPaymentsForLedger.length > 0
       ? splitPaymentsForLedger.map((row) => ({ accountCode: paymentAccountCode(row.method), debit: 0, credit: round2(row.amount) }))
       : (inv.paidAmount > 0 ? [{ accountCode: paymentAccountCode(inv.paymentType), debit: 0, credit: inv.paidAmount }] : []);
-    const invoiceCost = trackInventory
-      ? round2(inv.items
-        .filter((item) => !isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit }))
-        .reduce((sum, item) => sum + Number(item.totalCost || 0), 0))
-      : 0;
+    const inventoryCost = trackInventory
+      ? round2(inv.items.filter((item) => !isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit }))
+        .reduce((sum, item) => sum + Number(item.totalCost || 0), 0)) : 0;
+    const serviceCost = trackInventory
+      ? round2(inv.items.filter((item) => isServiceProduct({ productType: item.productType, baseUnit: item.baseUnit }))
+        .reduce((sum, item) => sum + Number(item.totalCost || 0), 0)) : 0;
     const effects: Effect[] = [
       {
         type: 'ledger.post',
@@ -192,7 +226,9 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
               ...(inv.taxAmount > 0 ? [{ accountCode: '2102', debit: inv.taxAmount, credit: 0 }] : []),
               ...reversedPaymentLines,
               ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),
-              ...(invoiceCost > 0 ? [{ accountCode: '1104', debit: invoiceCost, credit: 0 }, { accountCode: '5101', debit: 0, credit: invoiceCost }] : []),
+              ...(settledDeposits > 0 ? [{ accountCode: '1103', debit: round2(settledDeposits), credit: 0 }, { accountCode: '2106', debit: 0, credit: round2(settledDeposits) }] : []),
+              ...(inventoryCost > 0 ? [{ accountCode: '1104', debit: inventoryCost, credit: 0 }, { accountCode: '5101', debit: 0, credit: inventoryCost }] : []),
+              ...(serviceCost > 0 ? [{ accountCode: '2105', debit: serviceCost, credit: 0 }, { accountCode: '5102', debit: 0, credit: serviceCost }] : []),
             ],
           },
         },
@@ -222,6 +258,15 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     });
 
     sqliteDb.run(`UPDATE sales_invoices SET invoice_status = 'VOID', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [invoiceId]);
+    if (inv.orderId) {
+      const orderDeposits = sqliteDb.query<{ amount: number }>('SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE order_id = ?', [inv.orderId])[0]?.amount ?? 0;
+      sqliteDb.run('UPDATE order_deposits SET invoice_id = NULL WHERE invoice_id = ?', [invoiceId]);
+      sqliteDb.run('UPDATE customer_payments SET invoice_id = NULL WHERE id IN (SELECT receipt_id FROM order_deposits WHERE order_id = ?)', [inv.orderId]);
+      sqliteDb.run(`UPDATE orders SET status = CASE WHEN delivery_status = 'PENDING' THEN 'CONFIRMED' ELSE 'PARTIAL' END,
+        billing_status = 'NOT_INVOICED', paid_amount = ?, remaining_amount = MAX(0, total_amount - ?),
+        financial_status = CASE WHEN ? >= total_amount - 0.009 THEN 'PAID' WHEN ? > 0 THEN 'PARTIAL' ELSE 'UNPAID' END
+        WHERE invoice_id = ?`, [orderDeposits, orderDeposits, orderDeposits, orderDeposits, invoiceId]);
+    }
 
     return ctx.getInvoiceById(invoiceId)!;
   });

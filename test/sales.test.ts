@@ -130,6 +130,8 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.equal(stock.q, 90);
 
   // partial payment completes the invoice
+  assert.throws(() => svc.recordInvoicePayment(invoice.id, 1001), /يتجاوز المتبقي/);
+  assert.equal(svc.getInvoiceById(invoice.id)!.remainingAmount, 1000);
   svc.recordInvoicePayment(invoice.id, 1000);
   const paid = svc.getInvoiceById(invoice.id)!;
   assert.equal(paid.remainingAmount, 0);

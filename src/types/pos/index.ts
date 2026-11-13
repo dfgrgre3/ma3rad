@@ -25,6 +25,7 @@ export interface CartItem {
 
 export interface HeldOrder {
   id: string;
+  createdBy?: string;
   label: string;
   createdAt: string;
   customerId: string;

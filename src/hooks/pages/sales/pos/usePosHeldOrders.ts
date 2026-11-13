@@ -98,41 +98,57 @@ export const usePosHeldOrders = ({
   const heldOrdersRef = useRef<HeldOrder[]>([]);
 
   useEffect(() => {
+    if (!currentUserId) {
+      heldOrdersRef.current = [];
+      setHeldOrders([]);
+      return;
+    }
     try {
-      const dbRows = heldOrderService.getAll();
-      let restored: HeldOrder[] = [];
-      if (dbRows.length > 0) {
-        restored = dbRows.map((r) => { try { return JSON.parse(r.data) as HeldOrder; } catch { return null; } }).filter(Boolean) as HeldOrder[];
-      } else {
-        const raw = localStorage.getItem(HELD_STORAGE_KEY);
-        if (raw) {
-          const parsed: unknown = JSON.parse(raw);
-          restored = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
-          restored.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
-        }
+      const dbRows = heldOrderService.getAll(currentUserId);
+      const restored: HeldOrder[] = dbRows.flatMap((r) => {
+        try { return [{ ...JSON.parse(r.data) as HeldOrder, createdBy: r.createdBy || currentUserId }]; }
+        catch { return []; }
+      });
+      const raw = localStorage.getItem(`${HELD_STORAGE_KEY}:${currentUserId}`);
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        const localOrders = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
+        const merged = new Map(restored.map((order) => [order.id, order]));
+        localOrders.forEach((order) => merged.set(order.id, { ...order, createdBy: currentUserId }));
+        restored.splice(0, restored.length, ...merged.values());
+        restored.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
       }
       heldOrdersRef.current = restored;
       setHeldOrders(restored);
-    } catch {
+    } catch (error) {
       heldOrdersRef.current = [];
       setHeldOrders([]);
+      notify(error instanceof Error ? `تعذر تحميل الطلبات المعلقة: ${error.message}` : 'تعذر تحميل الطلبات المعلقة', 'error');
     }
-  }, [heldOrderService, currentUserId]);
+  }, [heldOrderService, currentUserId, notify]);
 
   const persistHeld = (orders: HeldOrder[] | ((current: HeldOrder[]) => HeldOrder[])) => {
     const next = typeof orders === 'function' ? orders(heldOrdersRef.current) : orders;
-    heldOrdersRef.current = next;
-    setHeldOrders(next);
+    if (!currentUserId) {
+      notify('تعذر حفظ الطلب المعلق: المستخدم غير محدد', 'error');
+      return;
+    }
+    const owned = next.map((order) => ({ ...order, createdBy: currentUserId }));
+    const previous = heldOrdersRef.current;
+    heldOrdersRef.current = owned;
+    setHeldOrders(owned);
     try {
-      localStorage.setItem(HELD_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Storage may be full; the database copy remains available.
+      localStorage.setItem(`${HELD_STORAGE_KEY}:${currentUserId}`, JSON.stringify(owned));
+    } catch (error) {
+      notify(error instanceof Error ? `تعذر حفظ نسخة الطلبات المحلية: ${error.message}` : 'تعذر حفظ نسخة الطلبات المحلية', 'error');
     }
     try {
-      heldOrderService.clearAll();
-      next.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
-    } catch {
-      // Keep local storage as the recovery copy if database persistence fails.
+      const previousIds = new Set(previous.map((order) => order.id));
+      const nextIds = new Set(owned.map((order) => order.id));
+      previousIds.forEach((id) => { if (!nextIds.has(id)) heldOrderService.delete(id, currentUserId); });
+      owned.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
+    } catch (error) {
+      notify(error instanceof Error ? `تعذر حفظ الطلبات في قاعدة البيانات: ${error.message}` : 'تعذر حفظ الطلبات في قاعدة البيانات', 'error');
     }
   };
 
@@ -143,6 +159,7 @@ export const usePosHeldOrders = ({
     }
     const hold: HeldOrder = {
       id: `hold_${Date.now()}`,
+      createdBy: currentUserId || '',
       label: `طلب معلّق (${new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })})`,
       createdAt: new Date().toISOString(),
       customerId: selectedCustomer?.id || '',
@@ -165,6 +182,7 @@ export const usePosHeldOrders = ({
       redeemPoints,
       loyaltyDiscount,
     };
+    if (!currentUserId) { notify('يلزم تسجيل الدخول قبل تعليق الطلب', 'error'); return; }
     persistHeld((prev) => [hold, ...prev]);
     setCart([]);
     setDiscountAmount(0);
@@ -185,6 +203,7 @@ export const usePosHeldOrders = ({
   };
 
   const resumeHeldOrder = (order: HeldOrder) => {
+    if (!currentUserId || order.createdBy !== currentUserId) { notify('لا تملك صلاحية استرجاع هذا الطلب', 'error'); return; }
     const customer = order.customerId ? customerService.getCustomerById(order.customerId) : null;
     setSelectedCustomer(customer);
     if (order.warehouseId) setSelectedWarehouseId(order.warehouseId);
@@ -216,6 +235,9 @@ export const usePosHeldOrders = ({
   };
 
   const deleteHeldOrder = (id: string) => {
+    if (!currentUserId || !heldOrdersRef.current.some((order) => order.id === id && order.createdBy === currentUserId)) {
+      notify('لا تملك صلاحية حذف هذا الطلب', 'error'); return;
+    }
     persistHeld((prev) => prev.filter((order) => order.id !== id));
   };
 

@@ -306,7 +306,7 @@ const PAGES: PageSpec[] = [
     actions: [...APPROVE, 'refund', 'convert', 'print', 'share', 'timeline'],
     sections: [section('orders', 'الطلبات'), section('deposits', 'العربونات'), section('refunds', 'المسترد')] },
   { key: 'after_sales', label: 'خدمة ما بعد البيع والضمان', module: 'SALES', route: '/sales/after-sales', legacyView: 'sales.after_sales.view',
-    actions: [...WRITE, 'submit', 'approve', 'reject', 'warranty', 'repairs', 'claims', 'print', 'timeline'],
+    actions: [...WRITE, 'submit', 'approve', 'reject', 'resolve', 'warranty', 'repairs', 'claims', 'print', 'timeline'],
     sections: [section('warranties', 'الضمانات'), section('repairs', 'الإصلاحات'), section('claims', 'المطالبات')] },
   { key: 'reservations', label: 'حجوزات المبيعات', module: 'SALES', route: '/sales/reservations', legacyView: 'sales.reservations.view',
     actions: [...WRITE, 'submit', 'approve', 'reject', 'cancel', 'refund', 'convert', 'print', 'timeline'],

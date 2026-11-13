@@ -166,6 +166,8 @@ export class SalesService {
       warehouseId?: string;
       shiftId?: string;
       notes?: string;
+      discountPercentage?: number;
+      taxPercentage?: number;
     } = {}
   ): { return: SalesReturn; invoice: SalesInvoice } {
     ModuleRegistryService.assertModuleEnabled('sales');
@@ -189,6 +191,8 @@ export class SalesService {
         items: newItems,
         paidAmount: 0,
         paymentType: 'CREDIT',
+        discountPercentage: options.discountPercentage,
+        taxPercentage: options.taxPercentage,
         notes: options.notes || `استبدال من فاتورة ${inv.invoiceNumber}`,
         performedBy,
       });

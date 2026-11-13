@@ -5,6 +5,8 @@ import { PermissionService } from '../auth/PermissionService';
 import { SalesService } from './SalesService';
 import { round2 } from '../finance/financials';
 import type { PaymentType, SalesInvoice } from '../../../types';
+import { CashierService } from '../finance/CashierService';
+import { paymentAccountCode, postLedgerEntry } from '../../../database/repositories/ledger';
 import { localDateString } from '../../../utils/shared/date';
 import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { normalizeUom } from '../../../utils/products/uom';
@@ -34,6 +36,10 @@ export interface Order {
   paidAmount: number;
   remainingAmount: number;
   status: OrderStatus;
+  deliveryStatus?: 'PENDING' | 'PARTIAL' | 'DELIVERED';
+  billingStatus?: 'NOT_INVOICED' | 'INVOICED';
+  financialStatus?: 'UNPAID' | 'PARTIAL' | 'PAID';
+  bankAccountId?: string | null;
   notes?: string | null;
   deliveryNotes?: string | null;
   deliveredAt?: string | null;
@@ -389,7 +395,7 @@ export class OrderService {
     PermissionService.require(actor, 'orders.approve');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
-    if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
+    if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
       throw new Error('لا يمكن تسجيل تسليم لطلب مكتمل أو ملغي.');
     }
     if (order.status === 'PENDING') {
@@ -404,8 +410,9 @@ export class OrderService {
         const item = byId.get(line.itemId);
         if (!item) throw new Error('بند التسليم غير موجود في الطلب.');
         const remaining = round2(Number(item.quantityM2) - Number(item.deliveredM2 || 0));
-        const quantity = round2(Math.min(Number(line.quantityM2), remaining));
+        const quantity = round2(Number(line.quantityM2));
         if (remaining <= 0) throw new Error(`تم تسليم الصنف "${item.productName}" بالكامل بالفعل.`);
+        if (quantity > remaining + 0.009) throw new Error(`كمية التسليم تتجاوز المتبقي للصنف "${item.productName}" (${remaining}).`);
         return { item, quantity };
       });
     if (prepared.length === 0) throw new Error('أدخل كمية تسليم أكبر من صفر لبند واحد على الأقل.');
@@ -428,9 +435,10 @@ export class OrderService {
 
       db.run(
         `UPDATE orders SET status = ?, delivery_notes = COALESCE(?, delivery_notes),
+          delivery_status = ?,
           delivered_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE delivered_at END,
           updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [nextStatus, note || null, markDeliveredAt && fullyDelivered ? 1 : 0, id]
+        [nextStatus, note || null, fullyDelivered ? 'DELIVERED' : 'PARTIAL', markDeliveredAt && fullyDelivered ? 1 : 0, id]
       );
 
       this.logStatus(
@@ -457,15 +465,16 @@ export class OrderService {
     );
   }
 
-  public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string): Order {
+  public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string, bankAccountId?: string): Order {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'orders.update');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
-    if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
+    if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
       throw new Error('لا يمكن تسجيل عربون لطلب مكتمل أو ملغي.');
     }
-    const deposit = round2(Math.max(0, amount));
+    const deposit = round2(Number(amount));
+    if (!Number.isFinite(deposit)) throw new Error('مبلغ العربون غير صحيح.');
     if (deposit <= 0) throw new Error('مبلغ العربون يجب أن يكون أكبر من صفر.');
     const newPaid = round2(Number(order.paidAmount || 0) + deposit);
     if (newPaid > order.totalAmount) {
@@ -473,18 +482,46 @@ export class OrderService {
     }
     const newRemaining = round2(order.totalAmount - newPaid);
 
+    const cashier = new CashierService();
+    const shift = cashier.getActiveShift(actor.id, order.branchId || undefined);
+    if (shift && shift.status !== 'OPEN') throw new Error('وردية التحصيل مغلقة.');
+    const registerId = shift?.registerId || this.branchAccess.getDefaultRegisterId(order.branchId || this.branchAccess.getCurrentBranchId(), actor);
+    const date = localDateString();
+    let cashAccount = paymentAccountCode(paymentType);
+    if (paymentType === 'BANK_TRANSFER') {
+      if (!bankAccountId) throw new Error('حدد الحساب البنكي الذي استقبل التحويل.');
+      const bank = this.db.query<{ glAccountCode: string }>(`SELECT coa.code AS glAccountCode FROM bank_accounts ba JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ? AND ba.is_active = 1`, [bankAccountId])[0];
+      if (!bank) throw new Error('الحساب البنكي غير موجود أو غير نشط.');
+      cashAccount = bank.glAccountCode;
+    }
+
     return this.db.executeTransaction((db) => {
+      const receiptId = `cpay_${uuidv4().substring(0, 8)}`;
+      const receiptNumber = db.nextNumber('REC');
+      db.run(`INSERT INTO customer_payments (id, receipt_number, customer_id, invoice_id, amount, payment_type, date, register_id, shift_id, notes, performed_by, branch_id)
+        VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, order.customerId, deposit, paymentType, date, registerId, shift?.id || null, notes || `عربون للطلب ${order.orderNumber}`, actor.id, order.branchId || null]);
+      postLedgerEntry(db.getDatabase(), {
+        date, description: `Order deposit ${order.orderNumber} (${receiptNumber})`, referenceType: 'ORDER_DEPOSIT', referenceId: receiptId, createdBy: actor.id,
+        lines: [{ accountCode: cashAccount, debit: deposit, credit: 0 }, { accountCode: '2106', debit: 0, credit: deposit }],
+      });
+      if (paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [deposit, registerId]);
+      if (paymentType === 'BANK_TRANSFER' && bankAccountId) db.run('UPDATE bank_accounts SET current_balance = current_balance + ? WHERE id = ?', [deposit, bankAccountId]);
+      if (shift) {
+        if (paymentType === 'CASH') db.run('UPDATE cash_shifts SET total_customer_payments = total_customer_payments + ? WHERE id = ?', [deposit, shift.id]);
+      }
+      db.run(`INSERT INTO order_deposits (id, deposit_number, order_id, customer_id, amount, payment_method, register_id, shift_id, receipt_id, bank_account_id, date, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, id, order.customerId, deposit, paymentType, registerId, shift?.id || null, receiptId, bankAccountId || null, date, actor.id]);
       db.run(
-        `UPDATE orders SET paid_amount = ?, remaining_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [newPaid, newRemaining, id]
+        `UPDATE orders SET paid_amount = ?, remaining_amount = ?, financial_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [newPaid, newRemaining, newPaid >= order.totalAmount - 0.009 ? 'PAID' : 'PARTIAL', id]
       );
       this.logStatus(
         db, id, order.status, order.status,
-        `تسجيل عربون/دفعة بقيمة ${deposit} ج (${paymentType}) ${notes || ''}`.trim(),
+        `سند قبض ${receiptNumber} بقيمة ${deposit} ج (${paymentType}) ${notes || ''}`.trim(),
         actor.id, actor.fullName
       );
       this.audit(actor.id, actor.fullName, 'تسجيل عربون طلب', id, {
-        orderNumber: order.orderNumber, deposit, totalPaid: newPaid, remaining: newRemaining
+        orderNumber: order.orderNumber, receiptId, receiptNumber, deposit, totalPaid: newPaid, remaining: newRemaining
       });
       return this.getOrder(id)!;
     });
@@ -500,7 +537,7 @@ export class OrderService {
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
     if (order.invoiceId) throw new Error('تم إصدار فاتورة لهذا الطلب بالفعل.');
-    if (['COMPLETED', 'CANCELLED'].includes(order.status)) {
+    if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
       throw new Error('لا يمكن إصدار فاتورة لطلب مكتمل أو ملغي.');
     }
     if (!order.items || order.items.length === 0) throw new Error('الطلب لا يحتوي على بنود.');
@@ -509,9 +546,14 @@ export class OrderService {
     this.branchAccess.requireWarehouseAccess(warehouseId);
     const total = round2(order.totalAmount);
     const paymentType: PaymentType = options.paymentType || 'CREDIT';
-    const paidAmount = paymentType === 'CASH' && options.paidAmount === undefined
-      ? total
-      : round2(Math.min(total, Math.max(0, options.paidAmount || 0)));
+    const existingDeposits = round2(Number(order.paidAmount || 0));
+    const additionalPaid = paymentType === 'CASH' && options.paidAmount === undefined
+      ? round2(total - existingDeposits)
+      : round2(Math.max(0, Number(options.paidAmount || 0)));
+    const paidAmount = round2(existingDeposits + additionalPaid);
+    if (paidAmount > total + 0.009) throw new Error('إجمالي العربون والدفعة الجديدة يتجاوز إجمالي الطلب.');
+    const newPaymentAmount = round2(paidAmount - existingDeposits);
+    const invoicePaymentType = newPaymentAmount > 0 ? paymentType : 'CREDIT';
 
     return this.db.executeTransaction(() => {
       // The sale itself consumes stock; release the reservation first so the
@@ -535,21 +577,37 @@ export class OrderService {
         discountAmount: order.discountAmount,
         taxAmount: order.taxAmount,
         shippingCost: order.shippingCost,
-        paidAmount,
-        paymentType,
+        paidAmount: newPaymentAmount,
+        paymentType: invoicePaymentType,
         notes: options.notes || `فاتورة مبيعات للطلب ${order.orderNumber}`,
       });
 
+      const depositRows = this.db.query<{ id: string; amount: number; paymentMethod: string }>(
+        'SELECT id, amount, payment_method AS paymentMethod FROM order_deposits WHERE order_id = ? AND invoice_id IS NULL', [id]
+      );
+      const depositTotal = round2(depositRows.reduce((sum, deposit) => sum + Number(deposit.amount), 0));
+      if (Math.abs(depositTotal - existingDeposits) > 0.01) throw new Error('إجمالي العربون المسجل لا يطابق سندات القبض؛ راجع الطلب قبل الفوترة.');
       this.db.run(
-        `UPDATE orders SET status = 'COMPLETED', invoice_id = ?, paid_amount = ?,
-         remaining_amount = ?, delivered_at = COALESCE(delivered_at, CURRENT_TIMESTAMP),
+        `UPDATE orders SET status = 'COMPLETED', billing_status = 'INVOICED', financial_status = ?, invoice_id = ?, paid_amount = ?,
+         remaining_amount = ?,
          updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [invoice.id, invoice.paidAmount, invoice.remainingAmount, id]
+        [paidAmount >= total - 0.009 ? 'PAID' : paidAmount > 0 ? 'PARTIAL' : 'UNPAID', invoice.id, paidAmount, round2(total - paidAmount), id]
       );
       this.db.run(
-        `UPDATE order_items SET invoiced_m2 = quantity_m2, delivered_m2 = quantity_m2 WHERE order_id = ?`,
+        `UPDATE order_items SET invoiced_m2 = quantity_m2 WHERE order_id = ?`,
         [id]
       );
+      if (depositTotal > 0) {
+        this.db.run('UPDATE sales_invoices SET paid_amount = paid_amount + ?, remaining_amount = MAX(0, remaining_amount - ?), payment_status = CASE WHEN remaining_amount - ? <= 0.009 THEN \'PAID\' WHEN paid_amount + ? > 0 THEN \'PARTIAL\' ELSE \'UNPAID\' END WHERE id = ?', [depositTotal, depositTotal, depositTotal, depositTotal, invoice.id]);
+        this.db.run('UPDATE customers SET current_balance = current_balance - ? WHERE id = ?', [depositTotal, order.customerId]);
+        postLedgerEntry(this.db.getDatabase(), {
+          date: localDateString(), description: `Settle order deposits for invoice ${invoice.invoiceNumber}`,
+          referenceType: 'ORDER_DEPOSIT_SETTLEMENT', referenceId: invoice.id, createdBy: actor.id,
+          lines: [{ accountCode: '2106', debit: depositTotal, credit: 0 }, { accountCode: '1103', debit: 0, credit: depositTotal }],
+        });
+        this.db.run('UPDATE order_deposits SET invoice_id = ? WHERE order_id = ? AND invoice_id IS NULL', [invoice.id, id]);
+        this.db.run(`UPDATE customer_payments SET invoice_id = ? WHERE id IN (SELECT receipt_id FROM order_deposits WHERE invoice_id = ?)`, [invoice.id, invoice.id]);
+      }
       this.logStatus(this.db, id, order.status, 'COMPLETED', `إصدار فاتورة ${invoice.invoiceNumber}`, actor.id, actor.fullName);
       this.audit(actor.id, actor.fullName, 'تحويل طلب إلى فاتورة مبيعات', id, {
         orderNumber: order.orderNumber,
@@ -557,7 +615,7 @@ export class OrderService {
         invoiceNumber: invoice.invoiceNumber,
         totalAmount: invoice.totalAmount,
       });
-      return invoice;
+      return this.sales.getInvoiceById(invoice.id)!;
     });
   }
 

@@ -96,6 +96,10 @@ CREATE TABLE IF NOT EXISTS electronic_invoices (
   accepted_date TEXT,
   rejection_reason TEXT,
   tax_authority_reference TEXT,
+  submission_uuid TEXT,
+  provider_response TEXT,
+  request_fingerprint TEXT,
+  request_payload TEXT,
   total_tax REAL DEFAULT 0,
   total_amount REAL DEFAULT 0,
   created_by TEXT,
@@ -106,7 +110,7 @@ CREATE TABLE IF NOT EXISTS electronic_invoices (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_electronic_invoices_sales ON electronic_invoices(sales_invoice_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_electronic_invoices_sales_unique ON electronic_invoices(sales_invoice_id);
 CREATE INDEX IF NOT EXISTS idx_electronic_invoices_status ON electronic_invoices(status);
 
 -- 27. LOYALTY PROGRAM (نقاط الولاء)

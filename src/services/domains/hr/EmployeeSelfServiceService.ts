@@ -177,6 +177,63 @@ export class EmployeeSelfServiceService {
     }));
   }
 
+  /** تفاصيل قسيمة راتب لفترة معينة (البيانات المفصلة للطباعة). */
+  static getMyPayslipDetail(period: string): MyPayslip & {
+    expectedWorkdays: number; absentDays: number; unpaidLeaveDays: number;
+    lateMinutes: number; overtimeMinutes: number; manualDeductionAmount: number;
+    socialInsuranceBase: number; socialInsuranceEmployerShare: number; socialInsuranceTotal: number;
+    grossAmount: number; netAmount: number; paymentMethod: string | null;
+    payoutStatus: string | null; details: any; warnings: string[];
+    employeeId: string; branchId: string; salaryType: string; baseSalary: number;
+  } {
+    const { employeeId } = this.requirePortal();
+    const row = this.db.query<any>(
+      `SELECT pri.id, pri.period, pri.employee_id AS employeeId, pri.branch_id AS branchId,
+              pri.salary_type AS salaryType, pri.base_salary AS baseSalary,
+              pri.expected_workdays AS expectedWorkdays, pri.absent_days AS absentDays,
+              pri.unpaid_leave_days AS unpaidLeaveDays, pri.late_minutes AS lateMinutes,
+              pri.overtime_minutes AS overtimeMinutes, pri.base_amount AS baseAmount,
+              pri.overtime_amount AS overtimeAmount, pri.bonus_amount AS bonusAmount,
+              pri.commission_amount AS commissionAmount, pri.allowance_amount AS allowanceAmount,
+              pri.loan_deduction_amount AS loanDeductionAmount, pri.advance_amount AS advanceAmount,
+              pri.manual_deduction_amount AS manualDeductionAmount,
+              pri.attendance_deduction_amount AS attendanceDeductionAmount, pri.tax_amount AS taxAmount,
+              pri.social_insurance_base AS socialInsuranceBase,
+              pri.social_insurance_employee_share AS socialInsuranceEmployeeShare,
+              pri.social_insurance_employer_share AS socialInsuranceEmployerShare,
+              pri.social_insurance_total AS socialInsuranceTotal,
+              pri.gross_amount AS grossAmount, pri.net_amount AS netAmount,
+              pri.payment_method AS paymentMethod, pri.payout_status AS payoutStatus,
+              pri.paid_amount AS paidAmount, pri.payment_reference AS paymentReference,
+              pri.warning_json AS warningJson, pri.detail_json AS detailJson,
+              pr.status AS runStatus, pr.paid_at AS paidAt
+       FROM payroll_run_items pri
+       JOIN payroll_runs pr ON pr.id = pri.payroll_run_id
+       WHERE pri.employee_id = ? AND pr.period = ? AND pr.status != 'DRAFT'`,
+      [employeeId, period]
+    )[0];
+    if (!row) throw new Error('قسيمة الراتب غير موجودة لهذه الفترة.');
+    return {
+      id: row.id, period: row.period, runStatus: row.runStatus,
+      grossAmount: Number(row.grossAmount) || 0, netAmount: Number(row.netAmount) || 0,
+      baseAmount: Number(row.baseAmount) || 0, overtimeAmount: Number(row.overtimeAmount) || 0,
+      bonusAmount: Number(row.bonusAmount) || 0, commissionAmount: Number(row.commissionAmount) || 0,
+      allowanceAmount: Number(row.allowanceAmount) || 0, loanDeductionAmount: Number(row.loanDeductionAmount) || 0,
+      advanceAmount: Number(row.advanceAmount) || 0, attendanceDeductionAmount: Number(row.attendanceDeductionAmount) || 0,
+      taxAmount: Number(row.taxAmount) || 0, payoutStatus: row.payoutStatus || null,
+      paymentMethod: row.paymentMethod || null, paidAt: row.paidAt || null,
+      expectedWorkdays: Number(row.expectedWorkdays) || 0, absentDays: Number(row.absentDays) || 0,
+      unpaidLeaveDays: Number(row.unpaidLeaveDays) || 0, lateMinutes: Number(row.lateMinutes) || 0,
+      overtimeMinutes: Number(row.overtimeMinutes) || 0, manualDeductionAmount: Number(row.manualDeductionAmount) || 0,
+      socialInsuranceBase: Number(row.socialInsuranceBase) || 0,
+      socialInsuranceEmployerShare: Number(row.socialInsuranceEmployerShare) || 0,
+      socialInsuranceTotal: Number(row.socialInsuranceTotal) || 0,
+      details: row.detailJson ? JSON.parse(row.detailJson) : {},
+      warnings: row.warningJson ? JSON.parse(row.warningJson) : [],
+      employeeId: row.employeeId, branchId: row.branchId, salaryType: row.salaryType, baseSalary: Number(row.baseSalary) || 0,
+    };
+  }
+
   static getMyAttendance(fromDate?: string, toDate?: string): MyAttendanceRecord[] {
     const { employeeId } = this.requirePortal();
     const conditions = ['employee_id = ?'];

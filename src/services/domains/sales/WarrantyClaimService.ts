@@ -5,6 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { round2 } from '../finance/financials';
 import { localDateString } from '../../../utils/shared/date';
+import { SalesService } from './SalesService';
 
 export type WarrantyClaimStatus =
   | 'OPEN'
@@ -70,6 +71,16 @@ export interface WarrantyClaim {
   createdAt: string;
   updatedAt: string;
   events?: WarrantyClaimEvent[];
+  execution?: {
+    resolutionType: WarrantyResolutionType;
+    referenceType: string;
+    referenceId?: string | null;
+    returnId?: string | null;
+    replacementInvoiceId?: string | null;
+    amount: number;
+    details: string;
+    executedAt: string;
+  } | null;
 }
 
 export interface EligibleWarrantyItem {
@@ -162,7 +173,7 @@ const TRANSITIONS: Record<WarrantyClaimAction, {
     closes: true,
   },
   resolve: {
-    permission: 'ui.sales.after_sales.update',
+    permission: 'ui.sales.after_sales.resolve',
     from: ['APPROVED'],
     to: 'RESOLVED',
     decided: false,
@@ -194,7 +205,14 @@ const CLAIM_SELECT = `
          c.resolution_notes AS resolutionNotes, c.decided_by AS decidedBy,
          ud.full_name AS decidedByName, c.decided_at AS decidedAt, c.closed_at AS closedAt,
          c.created_by AS createdBy, uc.full_name AS createdByName,
-         c.created_at AS createdAt, c.updated_at AS updatedAt
+         c.created_at AS createdAt, c.updated_at AS updatedAt,
+         wx.resolution_type AS executionResolutionType,
+         wx.reference_type AS executionReferenceType,
+         wx.reference_id AS executionReferenceId,
+         wx.return_id AS executionReturnId,
+         wx.replacement_invoice_id AS executionReplacementInvoiceId,
+         wx.amount AS executionAmount, wx.details AS executionDetails,
+         wx.executed_at AS executionDate
   FROM customer_warranty_claims c
   JOIN customers cu ON cu.id = c.customer_id
   JOIN sales_invoices si ON si.id = c.invoice_id
@@ -203,7 +221,8 @@ const CLAIM_SELECT = `
   LEFT JOIN sales_invoice_items sii ON sii.id = c.invoice_item_id
   LEFT JOIN branches b ON b.id = c.branch_id
   LEFT JOIN users uc ON uc.id = c.created_by
-  LEFT JOIN users ud ON ud.id = c.decided_by`;
+  LEFT JOIN users ud ON ud.id = c.decided_by
+  LEFT JOIN warranty_claim_executions wx ON wx.claim_id = c.id`;
 
 function addMonths(dateString: string, months: number): string {
   const base = new Date(`${String(dateString || '').substring(0, 10)}T00:00:00`);
@@ -292,6 +311,11 @@ export class WarrantyClaimService {
        ORDER BY e.created_at ASC, e.id ASC`,
       [id]
     );
+    const execution = this.db.query<any>(`SELECT resolution_type AS resolutionType,
+      reference_type AS referenceType, reference_id AS referenceId, return_id AS returnId,
+      replacement_invoice_id AS replacementInvoiceId, amount, details, executed_at AS executedAt
+      FROM warranty_claim_executions WHERE claim_id = ?`, [id])[0];
+    claim.execution = execution || null;
     return claim;
   }
 
@@ -372,6 +396,10 @@ export class WarrantyClaimService {
       `SELECT c.product_id AS productId, COALESCE(SUM(c.quantity_m2), 0) AS quantity
        FROM customer_warranty_claims c
        WHERE c.invoice_id = ? AND c.status NOT IN ('REJECTED', 'CANCELLED')
+         AND NOT EXISTS (
+           SELECT 1 FROM warranty_claim_executions wx
+           WHERE wx.claim_id = c.id AND wx.return_id IS NOT NULL
+         )
        GROUP BY c.product_id`,
       [invoiceId]
     )) {
@@ -480,6 +508,12 @@ export class WarrantyClaimService {
     if (resolutionType && !RESOLUTION_TYPES.includes(resolutionType)) {
       throw new Error('نوع الحل غير صحيح.');
     }
+    if (action === 'resolve' && (!resolutionType || resolutionType === 'REJECTED')) {
+      throw new Error('يجب اختيار نوع حل صالح قبل إنهاء المطالبة.');
+    }
+    if (action === 'resolve' && (resolutionType === 'REPAIR' || resolutionType === 'OTHER') && !String(notes || '').trim()) {
+      throw new Error('يجب تسجيل تفاصيل تنفيذ الحل قبل إغلاق المطالبة.');
+    }
 
     const now = new Date().toISOString();
     const fields = ['status = ?', 'updated_at = ?'];
@@ -506,6 +540,11 @@ export class WarrantyClaimService {
     params.push(id);
 
     this.db.executeTransaction((db) => {
+      const current = this.scopedClaim(id);
+      if (!current || current.status !== claim.status || !config.from.includes(current.status)) {
+        throw new Error('تغيرت المطالبة منذ آخر قراءة؛ أعد تحميلها قبل المتابعة.');
+      }
+      if (action === 'resolve') this.executeResolution(db, current, actor.id, resolutionType as Exclude<WarrantyResolutionType, 'REJECTED'>, cleanNotes);
       db.run(`UPDATE customer_warranty_claims SET ${fields.join(', ')} WHERE id = ?`, params);
       db.run(
         `INSERT INTO customer_warranty_claim_events
@@ -516,6 +555,98 @@ export class WarrantyClaimService {
     });
 
     return this.scopedClaim(id)!;
+  }
+
+  private executeResolution(
+    db: DatabaseManager,
+    claim: WarrantyClaim,
+    actorId: string,
+    resolutionType: Exclude<WarrantyResolutionType, 'REJECTED'>,
+    notes: string,
+  ): void {
+    if (db.query('SELECT id FROM warranty_claim_executions WHERE claim_id = ?', [claim.id]).length) {
+      throw new Error('تم تنفيذ حل هذه المطالبة مسبقًا.');
+    }
+
+    let referenceType = 'WARRANTY_SERVICE';
+    let referenceId: string | null = claim.id;
+    let returnId: string | null = null;
+    let replacementInvoiceId: string | null = null;
+    let amount = 0;
+    let details = notes || `تم تنفيذ حل الضمان: ${resolutionType}`;
+
+    if (resolutionType === 'REFUND' || resolutionType === 'REPLACEMENT') {
+      const sales = new SalesService();
+      const invoice = db.query<any>(`SELECT id, warehouse_id AS warehouseId,
+        discount_percentage AS discountPercentage, tax_percentage AS taxPercentage
+        FROM sales_invoices WHERE id = ? AND invoice_status = 'COMPLETED'`, [claim.invoiceId])[0];
+      if (!invoice) throw new Error('لا يمكن تنفيذ الحل لأن فاتورة البيع لم تعد مكتملة.');
+      const sourceLines = db.query<any>(`SELECT special_stock_id AS specialStockId,
+        quantity_m2 AS quantity, boxes_count AS boxes, pieces_count AS pieces,
+        unit_price AS unitPrice, unit_cost AS unitCost, discount_amount AS discountAmount
+        FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ?`, [claim.invoiceId, claim.productId]);
+      if (!sourceLines.length) throw new Error('بند الصنف غير موجود في الفاتورة الأصلية.');
+      const sourceIds = new Set(sourceLines.map((line) => line.specialStockId || 'REGULAR'));
+      if (sourceIds.size > 1) throw new Error('يجب مراجعة المصدر المخزني للكمية يدويًا قبل تنفيذ المرتجع.');
+      const specialStockId = sourceLines[0].specialStockId || null;
+      const returnItems = [{
+        productId: claim.productId,
+        quantityM2: claim.quantityM2,
+        boxesCount: 0,
+        unitPrice: 0,
+        unitCost: 0,
+        specialStockId,
+        disposition: 'QUARANTINE' as const,
+        reason: `Warranty ${claim.claimNumber}: ${claim.issueDescription}`,
+      }];
+
+      if (resolutionType === 'REFUND') {
+        const returned = sales.returnSale(claim.invoiceId, returnItems, false, actorId, {
+          refundMethod: 'BALANCE',
+          idempotencyKey: `WARRANTY-${claim.id}`,
+        });
+        referenceType = 'SALES_RETURN';
+        referenceId = returnId = returned.id;
+        amount = round2(Number(returned.remainingToBalance || 0));
+        details = notes || `Customer balance credit; returned goods quarantined. ${returned.returnNumber}`;
+      } else {
+        const soldQuantity = sourceLines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+        if (!(soldQuantity > 0)) throw new Error('The original sold quantity is invalid for replacement.');
+        const ratio = claim.quantityM2 / soldQuantity;
+        const weighted = (key: 'unitPrice' | 'unitCost') => sourceLines.reduce(
+          (sum, line) => sum + Number(line[key] || 0) * Number(line.quantity || 0), 0,
+        ) / soldQuantity;
+        const newItem = {
+          productId: claim.productId,
+          soldBy: 'M2',
+          quantityM2: claim.quantityM2,
+          boxesCount: round2(sourceLines.reduce((sum, line) => sum + Number(line.boxes || 0), 0) * ratio),
+          piecesCount: Math.round(sourceLines.reduce((sum, line) => sum + Number(line.pieces || 0), 0) * ratio),
+          unitPrice: round2(weighted('unitPrice')),
+          unitCost: round2(weighted('unitCost')),
+          discountAmount: round2(sourceLines.reduce((sum, line) => sum + Number(line.discountAmount || 0), 0) * ratio),
+        };
+        const exchange = sales.exchangeSale(claim.invoiceId, returnItems, [newItem], actorId, {
+          discountPercentage: Number(invoice.discountPercentage || 0),
+          taxPercentage: Number(invoice.taxPercentage || 0),
+          notes: `Warranty replacement ${claim.claimNumber}`,
+        });
+        referenceType = 'SALES_EXCHANGE';
+        referenceId = exchange.invoice.id;
+        returnId = exchange.return.id;
+        replacementInvoiceId = exchange.invoice.id;
+        amount = round2(Number(exchange.return.remainingToBalance || 0));
+        details = notes || `Returned goods quarantined; replacement invoice ${exchange.invoice.invoiceNumber} created.`;
+      }
+    }
+
+    db.run(`INSERT INTO warranty_claim_executions (
+      id, claim_id, resolution_type, status, reference_type, reference_id,
+      return_id, replacement_invoice_id, amount, details, executed_by, executed_at
+    ) VALUES (?, ?, ?, 'EXECUTED', ?, ?, ?, ?, ?, ?, ?, ?)`, [
+      `wcex_${uuidv4()}`, claim.id, resolutionType, referenceType, referenceId,
+      returnId, replacementInvoiceId, amount, details, actorId, new Date().toISOString(),
+    ]);
   }
 
   public stats(): WarrantyClaimsStats {

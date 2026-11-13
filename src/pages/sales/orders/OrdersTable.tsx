@@ -30,7 +30,7 @@ interface OrdersTableProps {
 }
 
 export const OrdersTable: React.FC<OrdersTableProps> = ({
-  orders, pageItems, page, totalPages, pageSize, _canCreate, canUpdate, _canApprove, canDelete,
+  orders, pageItems, page, totalPages, pageSize, canUpdate, canDelete,
   onViewDetails, onPrintOrder, onOpenTimeline, onShareOnWhatsApp, onEditOrder,
   onOpenDelivery, onOpenConvert, onRemoveOrder, onPrevPage, onNextPage,
 }) => (
@@ -83,7 +83,14 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                   })()}
                 </td>
                 <td className="px-4 py-3 font-black text-slate-900">{fmt(o.totalAmount)}</td>
-                <td className="px-4 py-3"><span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>{st.label}</span></td>
+                <td className="px-4 py-3">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${st.color}`}>{st.label}</span>
+                  <div className="mt-1 flex flex-col gap-0.5 text-[9px] font-bold text-slate-500">
+                    <span>التسليم: {o.deliveryStatus === 'DELIVERED' ? 'كامل' : o.deliveryStatus === 'PARTIAL' ? 'جزئي' : 'لم يبدأ'}</span>
+                    <span>الفوترة: {o.billingStatus === 'INVOICED' ? 'مفوتر' : 'غير مفوتر'}</span>
+                    <span>ماليًا: {o.financialStatus === 'PAID' ? 'مسدد' : o.financialStatus === 'PARTIAL' ? 'جزئي' : 'غير مسدد'}</span>
+                  </div>
+                </td>
                 <td className="px-4 py-3 font-mono text-[10px] text-emerald-600">{o.invoiceNumber || '—'}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-1">

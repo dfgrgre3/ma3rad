@@ -29,6 +29,9 @@ export const ConvertInvoiceModal: React.FC<ConvertInvoiceModalProps> = ({
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs flex items-center justify-between">
         <span className="text-slate-500">قيمة الطلب</span><span className="font-black text-emerald-700">{fmt(convertTarget.totalAmount)}</span>
       </div>
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+        العربون المقبوض سابقًا: <strong>{fmt(convertTarget.paidAmount)}</strong>. أدخل هنا الدفعة الجديدة فقط؛ ستُسوّى سندات العربون مع الفاتورة دون تحصيلها مرة أخرى.
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-bold text-slate-700 mb-1">طريقة الدفع</label>
@@ -40,7 +43,7 @@ export const ConvertInvoiceModal: React.FC<ConvertInvoiceModalProps> = ({
           </select>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">المبلغ المدفوع مقدماً</label>
+          <label className="block text-xs font-bold text-slate-700 mb-1">دفعة جديدة عند إصدار الفاتورة</label>
           <input type="number" min={0} step="0.01" value={convertPaid} onChange={(e) => setConvertPaid(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono" />
         </div>
       </div>

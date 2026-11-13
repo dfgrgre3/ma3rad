@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS quotations (
   date TEXT NOT NULL,
   valid_until TEXT NOT NULL,
   customer_id TEXT NOT NULL,
+  branch_id TEXT,
+  company_id TEXT,
   customer_name TEXT,
   customer_phone TEXT,
   subtotal REAL NOT NULL,
@@ -73,6 +75,8 @@ CREATE TABLE IF NOT EXISTS quotations (
   created_by TEXT NOT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+  FOREIGN KEY (company_id) REFERENCES companies(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 

@@ -54,11 +54,15 @@ export const PosView: React.FC = () => {
   const effectiveUser = actingUser || currentUser;
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsTotal, setProductsTotal] = useState(0);
+  const [productPage, setProductPage] = useState(1);
   const [gradeOptions, setGradeOptions] = useState<ProductGradeOption[]>([]);
   const [invoiceOperationalFields, setInvoiceOperationalFields] = useState<OperationalFieldDefinition[]>([]);
   const [invoiceOperationalValues, setInvoiceOperationalValues] = useState<Record<string, string>>({});
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customersTotal, setCustomersTotal] = useState(0);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [registers, setRegisters] = useState<CashRegister[]>([]);
   const [activeShift, setActiveShift] = useState<CashShift | null>(null);
@@ -178,6 +182,46 @@ export const PosView: React.FC = () => {
     visibleSizes, visibleColors, filteredCustomers, hasActiveFilters, clearFilters,
   } = usePosCatalog({ products, categories, customers, stockOf });
 
+  useEffect(() => {
+    try {
+      const result = productService.getProductsPage(searchQuery.trim(), selectedCategory === 'ALL' ? undefined : selectedCategory,
+        selectedBrand === 'ALL' ? undefined : selectedBrand, 1, 48, { status: 'active' });
+      setProductPage(1);
+      setProducts(result.items);
+      setProductsTotal(result.totalItems);
+    } catch (error: any) {
+      notify(error?.message || 'تعذر البحث عن الأصناف', 'error');
+    }
+  }, [productService, searchQuery, selectedCategory, selectedBrand, notify]);
+
+  const loadMoreProducts = useCallback(() => {
+    const nextPage = productPage + 1;
+    const result = productService.getProductsPage(searchQuery.trim(), selectedCategory === 'ALL' ? undefined : selectedCategory,
+      selectedBrand === 'ALL' ? undefined : selectedBrand, nextPage, 48, { status: 'active' });
+    setProducts((current) => [...current, ...result.items]);
+    setProductPage(nextPage);
+  }, [productPage, productService, searchQuery, selectedCategory, selectedBrand]);
+
+  useEffect(() => {
+    if (!customerSearch.trim()) { setCustomers([]); setCustomersTotal(0); setCustomerPage(1); return; }
+    try {
+      const result = customerService.getCustomersPage(customerSearch.trim(), 1, 40);
+      setCustomerPage(1);
+      setCustomers(result.items);
+      setCustomersTotal(result.totalItems);
+    } catch (error: any) {
+      notify(error?.message || 'تعذر البحث عن العملاء', 'error');
+    }
+  }, [customerService, customerSearch, notify]);
+
+  const loadMoreCustomers = useCallback(() => {
+    const nextPage = customerPage + 1;
+    const result = customerService.getCustomersPage(customerSearch.trim(), nextPage, 40);
+    setCustomers((current) => [...current, ...result.items]);
+    setCustomerPage(nextPage);
+    setCustomersTotal(result.totalItems);
+  }, [customerPage, customerService, customerSearch]);
+
   const {
     cart,
     setCart,
@@ -250,9 +294,8 @@ export const PosView: React.FC = () => {
 
   const loadInitialData = useCallback(() => {
     try {
-      const allProds = productService.getAllProducts();
-      const allCusts = customerService.getAllCustomers();
-      const listCustomers = allCusts.filter((customer) => customer.id !== 'cust_cash');
+      const firstProductsPage = productService.getProductsPage('', undefined, undefined, 1, 48, { status: 'active' });
+      const allCusts = customerService.getCustomersPage('', 1, 1).items;
       const allWhs = inventoryService.getAllWarehouses();
       const allCats = categoryService.getAllCategories();
       const allRegs = cashierService.getAllRegisters();
@@ -264,8 +307,9 @@ export const PosView: React.FC = () => {
       const defaultWarehouse = allWhs[0];
       const shift = cashierService.getActiveShift();
 
-      setProducts(allProds);
-      setCustomers(listCustomers);
+      setProducts(firstProductsPage.items);
+      setProductsTotal(firstProductsPage.totalItems);
+      setCustomers([]);
       setWarehouses(allWhs);
       setCategories(allCats);
       setRegisters(allRegs);
@@ -459,7 +503,6 @@ export const PosView: React.FC = () => {
     cashierService,
     batchService,
     loyaltyService,
-    pricingService,
     performedBy: effectiveUser?.id || currentUser?.id || 'usr_admin',
     loadStock,
     onInvoiceCreated: (invoiceId) => {
@@ -739,7 +782,7 @@ export const PosView: React.FC = () => {
           selectedColor={selectedColor}
           onColorChange={setSelectedColor}
           onOpenCalculator={() => setIsCalculatorOpen(true)}
-          productsCount={products.length}
+          productsCount={productsTotal}
           visibleCategories={visibleCategories}
           selectedCategory={selectedCategory}
           onCategoryChange={setSelectedCategory}
@@ -762,6 +805,8 @@ export const PosView: React.FC = () => {
 
         <PosProductGrid
           products={filteredProducts}
+          productsTotal={productsTotal}
+          onLoadMore={loadMoreProducts}
           cart={cart}
           stockOf={stockOf}
           gradeLabel={gradeLabel}
@@ -810,6 +855,8 @@ export const PosView: React.FC = () => {
         </div>
         <PosCartPanel
           selectedCustomer={selectedCustomer}
+          hasMoreCustomers={customers.length < customersTotal}
+          onLoadMoreCustomers={loadMoreCustomers}
           customerSearch={customerSearch}
           filteredCustomers={filteredCustomers}
           canCreateCustomer={can('customers.create')}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDashboardRefresh } from '../../../contexts/DashboardRefreshContext';
 import { Link } from 'react-router-dom';
 import { Activity, ArrowDownRight, ArrowUpRight, Banknote, CalendarDays, FileText, Package, ShoppingCart, Users } from 'lucide-react';
@@ -17,20 +17,13 @@ const branchAccess = new BranchAccessService();
 
 export const SalesAnalyticsPage: React.FC = () => {
   const refreshCtx = useDashboardRefresh();
-  const initialRef = useRef(true);
   const can = usePermission();
   // الصفحة تُدمج داخل لوحة المعلومات، لذا تفحص صلاحيتها بنفسها لا صلاحية المسار الأب.
   const canView = can('sales.analytics.view') || can('sales.view');
   const canOpenPos = can('sales.pos.view');
   const db = DatabaseManager.getInstance();
   const [period, setPeriod] = useState<'today' | '7days' | '30days' | 'all'>('30days');
-  const [, setRefresh] = useState(0);
-
-  useEffect(() => {
-    if (!refreshCtx) return;
-    if (initialRef.current) { initialRef.current = false; return; }
-    setRefresh((x) => x + 1);
-  }, [refreshCtx]);
+  const [refresh, setRefresh] = useState(0);
   const range = useMemo(() => {
     const to = new Date();
     const from = new Date(to);
@@ -91,7 +84,9 @@ export const SalesAnalyticsPage: React.FC = () => {
       count: entry.count,
     }));
     return [{ summary, products, customers, daily }];
-  }, [db, range]);
+  // These values intentionally invalidate the cached query when sales data changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, range, refreshCtx?.refreshToken, refresh]);
   const avg = data.summary.count ? data.summary.revenue / data.summary.count : 0;
   const maxDaily = Math.max(1, ...data.daily.map(x => Number(x.revenue)));
   const cards = [

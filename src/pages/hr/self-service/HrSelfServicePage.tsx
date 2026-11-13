@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   UserRound, Wallet, CheckSquare, CalendarDays, ShieldAlert, GraduationCap,
-  Star, Gift, Inbox, Send,
+  Star, Gift, Inbox, Send, ChevronRight, Printer, X,
 } from 'lucide-react';
 import {
   EmployeeSelfServiceService, MyProfile, MyPayslip, MyAttendanceRecord, MyLeaveRequestRecord,
@@ -41,6 +41,24 @@ export const HrSelfServicePage: React.FC = () => {
   const [requests, setRequests] = useState<MySelfServiceRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [payslipDetail, setPayslipDetail] = useState<any>(null);
+
+  const viewPayslipDetail = useCallback((period: string) => {
+    try {
+      setPayslipDetail(EmployeeSelfServiceService.getMyPayslipDetail(period));
+    } catch (e: any) {
+      setError(e?.message || 'تعذر تحميل تفاصيل القسيمة.');
+    }
+  }, []);
+
+  const printPayslipDetail = useCallback(() => {
+    window.print();
+  }, []);
+
+  const closePayslipDetail = useCallback(() => {
+    setPayslipDetail(null);
+    setError(null);
+  }, []);
 
   const [leaveForm, setLeaveForm] = useState({ leaveType: 'ANNUAL', startDate: todayStr(), endDate: todayStr(), reason: '' });
   const [complaintForm, setComplaintForm] = useState({ subject: '', description: '' });
@@ -141,7 +159,7 @@ export const HrSelfServicePage: React.FC = () => {
                 <h3 className="text-sm font-black mb-3">كشوف رواتبي</h3>
                 {payslips.length === 0 && <p className="text-xs text-slate-400">لا توجد دورات رواتب معتمدة بعد.</p>}
                 {payslips.map((p) => (
-                  <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs space-y-1">
+                  <div key={p.id} className="rounded-lg border border-slate-100 px-3 py-2 text-xs space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold">دورة {p.period} • {label(p.runStatus)}</span>
                       <span className="font-black text-emerald-700">الصافي: {money(p.netAmount)}</span>
@@ -160,6 +178,13 @@ export const HrSelfServicePage: React.FC = () => {
                       {p.attendanceDeductionAmount ? ` + خصم حضور ${money(p.attendanceDeductionAmount)}` : ''}
                       {p.paidAt ? ` • صُرف ${p.paidAt.slice(0, 10)}` : ''}
                     </div>
+                    <button
+                      onClick={() => viewPayslipDetail(p.period)}
+                      className="flex items-center justify-between w-full rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-[10px] font-bold text-sky-700"
+                    >
+                      <span>عرض التفاصيل والطباعة</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -373,6 +398,72 @@ export const HrSelfServicePage: React.FC = () => {
               </div>
             )}
           </>
+        )}
+        {payslipDetail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl border border-slate-200 w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <button onClick={closePayslipDetail} className="rounded-lg p-1.5 hover:bg-slate-100 text-slate-500">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="border-b-2 border-slate-800 pb-4 mb-6 flex justify-between items-start">
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">قسيمة راتب شهرية</h2>
+                  <p className="text-xs text-slate-500">
+                    الموظف: {payslipDetail.employeeName} • الدورة: {payslipDetail.period} • الحالة: {label(payslipDetail.runStatus)}
+                  </p>
+                </div>
+                <button onClick={printPayslipDetail} className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs font-bold text-white">
+                  <Printer className="w-4 h-4" /> طباعة القسيمة
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-xs text-slate-500 mb-6">
+                <div><span className="font-bold text-slate-700">طريقة الصرف:</span> {payslipDetail.paymentMethod === 'CASH' ? 'نقدي' : payslipDetail.paymentMethod === 'BANK_TRANSFER' ? 'تحويل بنكي' : 'محفظة إلكترونية'}</div>
+                <div><span className="font-bold text-slate-700">تاريخ الطباعة:</span> {new Date().toLocaleDateString('ar-EG')}</div>
+              </div>
+
+              <table className="w-full text-right text-sm mb-6">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr>
+                    <th className="px-3 py-2 text-slate-500 font-bold">البند</th>
+                    <th className="px-3 py-2 text-slate-500 font-bold text-left">المبلغ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr><td className="px-3 py-2">الراتب الأساسي</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.baseAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">العمل الإضافي</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.overtimeAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">المكافآت</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.bonusAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">العمولات المعتمدة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.commissionAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">البدلات الشهرية</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.allowanceAmount)}</td></tr>
+                  <tr><td className="px-3 py-2 bg-emerald-50"><span className="font-bold">الإجمالي الاستحقاقات</span></td><td className="px-3 py-2 font-mono font-bold text-emerald-700 text-left">{money(payslipDetail.grossAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">خصم الحضور والإجازة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.attendanceDeductionAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">الخصومات المعتمدة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.manualDeductionAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">السلف</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.advanceAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">أقساط القروض</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.loanDeductionAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">الضريبة</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.taxAmount)}</td></tr>
+                  <tr><td className="px-3 py-2">تأمينات اجتماعية (موظف)</td><td className="px-3 py-2 font-mono text-left">{money(payslipDetail.socialInsuranceEmployeeShare)}</td></tr>
+                  <tr className="bg-rose-25"><td className="px-3 py-2 font-bold">صافي الراتب المستحق</td><td className="px-3 py-2 font-mono font-bold text-rose-700 text-left">{money(payslipDetail.netAmount)}</td></tr>
+                </tbody>
+              </table>
+
+              {payslipDetail.warnings && payslipDetail.warnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                  <h4 className="text-xs font-bold text-amber-800 mb-2">تنبيهات:</h4>
+                  <ul className="text-xs text-amber-700 space-y-1 list-disc pl-4">
+                    {payslipDetail.warnings.map((w: string, i: number) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="border-t border-slate-200 pt-4 text-xs text-slate-500 text-center">
+                قسيمة راتب إلكترونية تُنشأ من نظام إدارة الموارد البشرية. توثيق Informational ولا يُعتبر بديلاً عن السند المالي الموقع.
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

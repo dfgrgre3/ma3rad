@@ -1,5 +1,5 @@
 import {
-  Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Briefcase, Building2, CalendarDays, Car,
+  Activity, BadgeDollarSign, BarChart3, Bell, Boxes, Briefcase, Building2, Calendar, CalendarDays, Car,
   CheckSquare, Clock3, Cpu, CreditCard, Download, Factory, FileSignature, FileSpreadsheet, FileText,
   Gift, GraduationCap, HardHat, Landmark, Network, RefreshCw, Settings, ShieldAlert, ShieldCheck,
   ShoppingCart, SlidersHorizontal, Sparkles, Star, Trash2, Truck, UserPlus, UserRound, Wallet, Warehouse,
@@ -32,6 +32,9 @@ export const NAV_GROUPS_02: NavGroupDef[] = [
     icon: HardHat,
     color: 'text-amber-600',
     items: [
+      { label: 'تنبيهات الموارد البشرية', to: '/hr/alerts', icon: Bell, perm: 'employees.view' },
+      { label: 'كشوف المرتبات', to: '/employees/payroll/payslips', icon: FileText, perm: 'employees.payroll.view' },
+      { label: 'تقويم الرواتب والصرف', to: '/employees/payroll/calendar', icon: Calendar, perm: 'employees.payroll.view' },
       { label: 'لوحة الموارد البشرية', to: '/hr/dashboard', icon: HardHat, perm: 'employees.view' },
       { label: 'الموظفون', to: '/employees', icon: HardHat, perm: 'employees.view' },
       { label: 'الحضور والانصراف', to: '/employees/attendance', icon: CheckSquare, perm: 'employees.view' },

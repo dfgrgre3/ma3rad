@@ -2,6 +2,7 @@ import { DatabaseManager } from '../../../database/repositories/databaseManager'
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from '../auth/AuthService';
 import { PermissionService } from '../auth/PermissionService';
+import { BranchAccessService } from '../auth/BranchAccessService';
 import { SalesService } from './SalesService';
 import { OrderService, type Order } from './OrderService';
 import { round2 } from '../finance/financials';
@@ -86,6 +87,8 @@ export interface Quotation {
   date: string;
   validUntil: string;
   customerId: string;
+  branchId?: string | null;
+  companyId?: string | null;
   customerName?: string;
   customerPhone?: string;
   warehouseId?: string | null;
@@ -144,21 +147,27 @@ export interface ConvertQuotationOptions {
 export class QuotationService {
   private db = DatabaseManager.getInstance();
   private sales = new SalesService();
+  private branchAccess = new BranchAccessService();
 
-  /** Flip overdue pending quotations to EXPIRED. Cheap idempotent UPDATE. */
+  /** Explicit, permission-checked expiry operation for scheduled/admin workflows. */
   public expireOverdue(): void {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'quotations.update');
+    const scope = this.quotationScope(actor, '');
     const today = localDateString();
     this.db.run(
       `UPDATE quotations
        SET status = 'EXPIRED', updated_at = CURRENT_TIMESTAMP
-       WHERE status = 'PENDING' AND valid_until < ?`,
-      [today]
+       WHERE status = 'PENDING' AND valid_until < ? AND ${scope.clause}`,
+      [today, ...scope.params]
     );
   }
 
   public getQuotations(filters: QuotationFilters = {}): Quotation[] {
-    this.expireOverdue();
-    const { where, params } = this.buildWhere(filters);
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'quotations.view');
+    const scope = this.quotationScope(actor);
+    const { where, params } = this.buildWhere(filters, scope.clause);
     return this.db.query<Quotation>(
       `SELECT q.*, c.name AS customer_name, c.phone AS customer_phone,
               si.invoice_number AS converted_invoice_number,
@@ -172,11 +181,18 @@ export class QuotationService {
        LEFT JOIN orders o ON o.id = q.converted_order_id
        ${where}
        ORDER BY q.date DESC, q.created_at DESC`,
-      params
+      [...scope.params, ...params]
     );
   }
 
   public getQuotation(id: string): Quotation | null {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'quotations.view');
+    return this.fetchQuotation(id, actor);
+  }
+
+  private fetchQuotation(id: string, actor: ReturnType<typeof AuthService.requireAuth>): Quotation | null {
+    const scope = this.quotationScope(actor);
     const rows = this.db.query<Quotation>(
       `SELECT q.*, c.name AS customer_name, c.phone AS customer_phone,
               si.invoice_number AS converted_invoice_number,
@@ -185,41 +201,61 @@ export class QuotationService {
        JOIN customers c ON c.id = q.customer_id
        LEFT JOIN sales_invoices si ON si.id = q.converted_invoice_id
        LEFT JOIN orders o ON o.id = q.converted_order_id
-       WHERE q.id = ?`,
-      [id]
+       WHERE q.id = ? AND ${scope.clause}`,
+      [id, ...scope.params]
     );
     if (rows.length === 0) return null;
     return {
       ...rows[0],
-      items: this.getItems(id),
-      serviceItems: this.getServiceItems(id),
+      items: this.fetchItems(id, actor),
+      serviceItems: this.fetchServiceItems(id, actor),
     };
   }
 
   public getServiceItems(quotationId: string): QuotationServiceItem[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'quotations.view');
+    return this.fetchServiceItems(quotationId, actor);
+  }
+
+  private fetchServiceItems(quotationId: string, actor: ReturnType<typeof AuthService.requireAuth>): QuotationServiceItem[] {
+    const scope = this.quotationScope(actor);
     return this.db.query<QuotationServiceItem>(
       `SELECT id, quotation_id AS quotationId, product_id AS productId, description, unit, quantity,
               unit_price AS unitPrice, discount_amount AS discountAmount, total_price AS totalPrice
-       FROM quotation_service_items WHERE quotation_id = ? ORDER BY rowid ASC`,
-      [quotationId]
+       FROM quotation_service_items qsi WHERE quotation_id = ? AND EXISTS (
+         SELECT 1 FROM quotations q WHERE q.id = qsi.quotation_id AND ${scope.clause}
+       ) ORDER BY rowid ASC`,
+      [quotationId, ...scope.params]
     );
   }
 
   public getItems(quotationId: string): QuotationItem[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'quotations.view');
+    return this.fetchItems(quotationId, actor);
+  }
+
+  private fetchItems(quotationId: string, actor: ReturnType<typeof AuthService.requireAuth>): QuotationItem[] {
+    const scope = this.quotationScope(actor);
     return this.db.query<QuotationItem>(
       `SELECT qi.*, p.meters_per_box,
               p.product_type AS productType, p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM quotation_items qi
        LEFT JOIN products p ON p.id = qi.product_id
-       WHERE qi.quotation_id = ?
+       WHERE qi.quotation_id = ? AND EXISTS (
+         SELECT 1 FROM quotations q WHERE q.id = qi.quotation_id AND ${scope.clause}
+       )
        ORDER BY qi.rowid ASC`,
-      [quotationId]
+      [quotationId, ...scope.params]
     );
   }
 
   public getStats(filters: QuotationFilters = {}): QuotationStats {
-    this.expireOverdue();
-    const { where, params } = this.buildWhere(filters);
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'quotations.view');
+    const scope = this.quotationScope(actor);
+    const { where, params } = this.buildWhere(filters, scope.clause);
     const row = this.db.query<any>(
       `SELECT
          COUNT(*) AS total,
@@ -236,8 +272,9 @@ export class QuotationService {
                            AND q.valid_until >= date('now') THEN 1 ELSE 0 END), 0) AS expiringSoon
        FROM quotations q
        JOIN customers c ON c.id = q.customer_id
+       LEFT JOIN sales_invoices si ON si.id = q.converted_invoice_id
        ${where}`,
-      params
+      [...scope.params, ...params]
     )[0] || {};
     return {
       total: Number(row.total || 0),
@@ -270,6 +307,12 @@ export class QuotationService {
     const today = localDateString();
     const validUntil = localDateString(addLocalDays(new Date(), validDays));
     const id = `qtn_${uuidv4().substring(0, 8)}`;
+    const branchId = input.warehouseId
+      ? this.branchAccess.requireWarehouseAccess(input.warehouseId, actor)
+      : this.branchAccess.getCurrentBranchId(actor);
+    const companyId = this.db.query<{ companyId: string }>(
+      `SELECT company_id AS companyId FROM branches WHERE id = ?`, [branchId]
+    )[0]?.companyId || null;
 
     return this.db.executeTransaction((db) => {
       if (headerDiscount > 0 || prepared.some((i) => i.discountAmount > 0)
@@ -283,12 +326,12 @@ export class QuotationService {
       db.run(
         `INSERT INTO quotations (
            id, quotation_number, date, valid_until, customer_id, customer_name, customer_phone,
-           warehouse_id, subtotal, discount_amount, tax_amount, total_amount, status, notes,
+           branch_id, company_id, warehouse_id, subtotal, discount_amount, tax_amount, total_amount, status, notes,
            sales_rep_id, project_id, created_by, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
         [
           id, quotationNumber, today, validUntil, input.customerId, customer.name, customer.phone || null,
-          input.warehouseId || null, subtotal, headerDiscount, taxAmount, totalAmount,
+          branchId, companyId, input.warehouseId || null, subtotal, headerDiscount, taxAmount, totalAmount,
           input.notes || null, input.salesRepId || null, input.projectId || null, actor.id,
         ]
       );
@@ -311,7 +354,7 @@ export class QuotationService {
       this.audit(actor.id, actor.fullName, 'إنشاء عرض سعر', id, {
         quotationNumber, totalAmount, items: prepared.length + preparedServices.length,
       });
-      return this.getQuotation(id)!;
+      return this.fetchQuotation(id, actor)!;
     });
   }
 
@@ -335,6 +378,12 @@ export class QuotationService {
     const totalAmount = round2(Math.max(0, subtotal - headerDiscount + taxAmount));
     const validDays = Math.max(1, Math.min(365, Number(input.validDays) || 15));
     const validUntil = localDateString(addLocalDays(new Date(), validDays));
+    const branchId = input.warehouseId
+      ? this.branchAccess.requireWarehouseAccess(input.warehouseId, actor)
+      : existing.branchId || this.branchAccess.getCurrentBranchId(actor);
+    const companyId = this.db.query<{ companyId: string }>(
+      `SELECT company_id AS companyId FROM branches WHERE id = ?`, [branchId]
+    )[0]?.companyId || null;
 
     return this.db.executeTransaction((db) => {
       if (headerDiscount > 0 || prepared.some((i) => i.discountAmount > 0)
@@ -346,14 +395,14 @@ export class QuotationService {
 
       db.run(
         `UPDATE quotations SET
-           customer_id = ?, customer_name = ?, customer_phone = ?, warehouse_id = ?,
+           customer_id = ?, customer_name = ?, customer_phone = ?, branch_id = ?, company_id = ?, warehouse_id = ?,
            valid_until = ?, subtotal = ?, discount_amount = ?, tax_amount = ?, total_amount = ?,
            status = 'PENDING', notes = ?, sales_rep_id = ?, project_id = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
+         WHERE id = ? AND ${this.quotationScope(actor, '').clause}`,
         [
-          input.customerId, customer.name, customer.phone || null, input.warehouseId || null,
+          input.customerId, customer.name, customer.phone || null, branchId, companyId, input.warehouseId || null,
           validUntil, subtotal, headerDiscount, taxAmount, totalAmount,
-          input.notes || null, input.salesRepId || null, input.projectId || null, id,
+          input.notes || null, input.salesRepId || null, input.projectId || null, id, ...this.quotationScope(actor, '').params,
         ]
       );
 
@@ -377,7 +426,7 @@ export class QuotationService {
       this.audit(actor.id, actor.fullName, 'تعديل عرض سعر', id, {
         quotationNumber: existing.quotationNumber, totalAmount, items: prepared.length + preparedServices.length,
       });
-      return this.getQuotation(id)!;
+      return this.fetchQuotation(id, actor)!;
     });
   }
 
@@ -394,18 +443,19 @@ export class QuotationService {
     }
     this.db.run(
       `UPDATE quotations SET status = ?, valid_until = CASE WHEN ? = 'PENDING' THEN ? ELSE valid_until END,
-       updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+       updated_at = CURRENT_TIMESTAMP WHERE id = ? AND ${this.quotationScope(actor, '').clause}`,
       [
         status,
         status,
         localDateString(addLocalDays(new Date(), 15)),
         id,
+        ...this.quotationScope(actor, '').params,
       ]
     );
     this.audit(actor.id, actor.fullName, status === 'CANCELLED' ? 'إلغاء عرض سعر' : 'إعادة فتح عرض سعر', id, {
       quotationNumber: existing.quotationNumber, from: existing.status, to: status,
     });
-    return this.getQuotation(id)!;
+    return this.fetchQuotation(id, actor)!;
   }
 
   public deleteQuotation(id: string): void {
@@ -417,8 +467,12 @@ export class QuotationService {
       throw new Error('لا يمكن حذف عرض سعر تم تحويله إلى فاتورة.');
     }
     this.db.executeTransaction((db) => {
-      db.run(`DELETE FROM quotation_items WHERE quotation_id = ?`, [id]);
-      db.run(`DELETE FROM quotations WHERE id = ?`, [id]);
+      db.run(`DELETE FROM quotation_items WHERE quotation_id = ? AND EXISTS (
+        SELECT 1 FROM quotations q WHERE q.id = quotation_items.quotation_id
+          AND ${this.quotationScope(actor).clause}
+      )`, [id, ...this.quotationScope(actor).params]);
+      db.run(`DELETE FROM quotations WHERE id = ? AND ${this.quotationScope(actor, '').clause}`,
+        [id, ...this.quotationScope(actor, '').params]);
       this.audit(actor.id, actor.fullName, 'حذف عرض سعر', id, {
         quotationNumber: existing.quotationNumber, totalAmount: existing.totalAmount,
       });
@@ -460,6 +514,9 @@ export class QuotationService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'orders.create');
     const quotation = this.getQuotation(id);
+    if (quotation && (quotation.status === 'EXPIRED' || quotation.validUntil < localDateString())) {
+      throw new Error('Quotation has expired. Reopen it or extend its validity before conversion.');
+    }
     if (!quotation) throw new Error('عرض السعر غير موجود.');
     if (quotation.status === 'CANCELLED') throw new Error('لا يمكن تحويل عرض سعر ملغي.');
     if (quotation.status === 'CONVERTED') throw new Error('تم تحويل هذا العرض إلى فاتورة بالفعل.');
@@ -469,18 +526,23 @@ export class QuotationService {
     }
     if (!quotation.items || quotation.items.length === 0) throw new Error('لا توجد بنود في عرض السعر.');
 
-    const warehouseId = options.warehouseId || quotation.warehouseId || this.defaultWarehouseId();
+    const warehouseId = options.warehouseId || quotation.warehouseId || this.defaultWarehouseId(actor);
+    if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId, actor);
     if (!warehouseId) throw new Error('لا يوجد مخزن صالح لإنشاء الطلب.');
 
+    return this.db.executeTransaction(() => {
+    const fresh = this.fetchQuotation(id, actor);
+    if (!fresh || fresh.status !== 'PENDING' || fresh.convertedOrderId || fresh.convertedInvoiceId
+      || fresh.validUntil < localDateString()) throw new Error('Quotation was already converted or is no longer valid.');
     const order = new OrderService().createOrder({
-      customerId: quotation.customerId,
+      customerId: fresh.customerId,
       warehouseId,
-      quotationId: quotation.id,
+      quotationId: fresh.id,
       expectedDeliveryDate: options.expectedDeliveryDate,
       notes: options.notes || `طلب مبيعات من عرض السعر ${quotation.quotationNumber}`,
-      discountAmount: quotation.discountAmount,
-      taxAmount: quotation.taxAmount,
-      items: quotation.items.map((item) => ({
+      discountAmount: fresh.discountAmount,
+      taxAmount: fresh.taxAmount,
+      items: fresh.items!.map((item) => ({
         productId: item.productId,
         quantityM2: item.quantityM2,
         unitPrice: item.unitPrice,
@@ -489,11 +551,17 @@ export class QuotationService {
     });
 
     this.db.run(
-      `UPDATE quotations SET converted_order_id = ?, warehouse_id = ?,
+      `UPDATE quotations SET status = 'CONVERTED', converted_order_id = ?, warehouse_id = ?,
         follow_up_date = NULL, follow_up_notes = NULL,
-        updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [order.id, warehouseId, id]
+        updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDING'
+          AND converted_order_id IS NULL AND converted_invoice_id IS NULL
+          AND valid_until >= ? AND ${this.quotationScope(actor, '').clause}`,
+      [order.id, warehouseId, id, localDateString(), ...this.quotationScope(actor, '').params]
     );
+    if (!this.db.query<{ id: string }>(
+      `SELECT id FROM quotations WHERE id = ? AND converted_order_id = ? AND status = 'CONVERTED'`,
+      [id, order.id]
+    ).length) throw new Error('Quotation conversion could not be committed.');
     this.audit(actor.id, actor.fullName, 'تحويل عرض سعر إلى طلب مبيعات', id, {
       quotationNumber: quotation.quotationNumber,
       orderId: order.id,
@@ -501,6 +569,7 @@ export class QuotationService {
       totalAmount: order.totalAmount,
     });
     return order;
+    });
   }
 
   public scheduleFollowUp(id: string, date: string | null, notes?: string | null): Quotation {
@@ -510,13 +579,14 @@ export class QuotationService {
     if (!quotation) throw new Error('عرض السعر غير موجود.');
     if (quotation.status === 'CONVERTED') throw new Error('لا يمكن جدولة متابعة لعرض محوّل.');
     this.db.run(
-      `UPDATE quotations SET follow_up_date = ?, follow_up_notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [date || null, notes || null, id]
+      `UPDATE quotations SET follow_up_date = ?, follow_up_notes = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND ${this.quotationScope(actor, '').clause}`,
+      [date || null, notes || null, id, ...this.quotationScope(actor, '').params]
     );
     this.audit(actor.id, actor.fullName, date ? 'جدولة متابعة عرض سعر' : 'إلغاء متابعة عرض سعر', id, {
       quotationNumber: quotation.quotationNumber, followUpDate: date, notes,
     });
-    return this.getQuotation(id)!;
+    return this.fetchQuotation(id, actor)!;
   }
 
   /** Mark that the customer was contacted about a pending quotation. */
@@ -529,8 +599,8 @@ export class QuotationService {
       `UPDATE quotations SET contact_count = COALESCE(contact_count, 0) + 1,
         last_contact_at = CURRENT_TIMESTAMP,
         follow_up_notes = COALESCE(?, follow_up_notes),
-        updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [note || null, id]
+        updated_at = CURRENT_TIMESTAMP WHERE id = ? AND ${this.quotationScope(actor, '').clause}`,
+      [note || null, id, ...this.quotationScope(actor, '').params]
     );
     this.audit(actor.id, actor.fullName, 'تسجيل متابعة عميل على عرض سعر', id, {
       quotationNumber: quotation.quotationNumber, note,
@@ -542,6 +612,9 @@ export class QuotationService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'sales.create');
     const quotation = this.getQuotation(id);
+    if (quotation && (quotation.convertedOrderId || quotation.convertedInvoiceId)) {
+      throw new Error('Quotation already has a linked sales transaction.');
+    }
     if (!quotation) throw new Error('عرض السعر غير موجود.');
     if (quotation.status === 'CONVERTED') {
       throw new Error('تم تحويل هذا العرض إلى فاتورة بالفعل.');
@@ -559,7 +632,8 @@ export class QuotationService {
       throw new Error('لا توجد بنود في عرض السعر.');
     }
 
-    const warehouseId = options.warehouseId || quotation.warehouseId || this.defaultWarehouseId();
+    const warehouseId = options.warehouseId || quotation.warehouseId || this.defaultWarehouseId(actor);
+    if (warehouseId) this.branchAccess.requireWarehouseAccess(warehouseId, actor);
     if (!warehouseId) throw new Error('لا يوجد مخزن صالح لإصدار الفاتورة.');
 
     const total = round2(quotation.totalAmount);
@@ -569,10 +643,13 @@ export class QuotationService {
       : round2(Math.min(total, Math.max(0, options.paidAmount || 0)));
 
     return this.db.executeTransaction(() => {
+      const fresh = this.fetchQuotation(id, actor);
+      if (!fresh || fresh.status !== 'PENDING' || fresh.convertedOrderId || fresh.convertedInvoiceId
+        || fresh.validUntil < localDateString()) throw new Error('Quotation was already converted or is no longer valid.');
       const invoice = this.sales.createSale({
-        customerId: quotation.customerId,
+        customerId: fresh.customerId,
         warehouseId,
-        items: quotation.items!.map((item) => ({
+        items: fresh.items!.map((item) => ({
           productId: item.productId,
           soldBy: this.baseUnitOf(item.productId),
           quantityM2: item.quantityM2,
@@ -581,8 +658,8 @@ export class QuotationService {
           unitPrice: item.unitPrice,
           discountAmount: item.discountAmount,
         })),
-        discountAmount: quotation.discountAmount,
-        taxAmount: quotation.taxAmount,
+        discountAmount: fresh.discountAmount,
+        taxAmount: fresh.taxAmount,
         paidAmount,
         paymentType,
         notes: options.notes || `تحويل من عرض سعر ${quotation.quotationNumber}`,
@@ -591,9 +668,15 @@ export class QuotationService {
       this.db.run(
         `UPDATE quotations SET status = 'CONVERTED', converted_invoice_id = ?, warehouse_id = ?,
          follow_up_date = NULL, follow_up_notes = NULL,
-         updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [invoice.id, warehouseId, id]
+         updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDING'
+          AND converted_order_id IS NULL AND converted_invoice_id IS NULL
+          AND valid_until >= ? AND ${this.quotationScope(actor, '').clause}`,
+        [invoice.id, warehouseId, id, localDateString(), ...this.quotationScope(actor, '').params]
       );
+      if (!this.db.query<{ id: string }>(
+        `SELECT id FROM quotations WHERE id = ? AND converted_invoice_id = ? AND status = 'CONVERTED'`,
+        [id, invoice.id]
+      ).length) throw new Error('Quotation conversion could not be committed.');
       this.audit(actor.id, actor.fullName, 'تحويل عرض سعر إلى فاتورة', id, {
         quotationNumber: quotation.quotationNumber,
         invoiceId: invoice.id,
@@ -605,12 +688,16 @@ export class QuotationService {
   }
 
   public getDefaultWarehouseId(): string | undefined {
-    return this.defaultWarehouseId();
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'quotations.view');
+    return this.defaultWarehouseId(actor);
   }
 
-  private defaultWarehouseId(): string | undefined {
+  private defaultWarehouseId(actor = AuthService.requireAuth()): string | undefined {
+    const scope = this.branchAccess.warehouseBranchScope('w', undefined, actor);
     return this.db.query<{ id: string }>(
-      `SELECT id FROM warehouses WHERE is_active = 1 ORDER BY is_default DESC, created_at ASC LIMIT 1`
+      `SELECT w.id FROM warehouses w WHERE w.is_active = 1 AND ${scope.clause}
+       ORDER BY w.is_default DESC, w.created_at ASC LIMIT 1`, scope.params
     )[0]?.id;
   }
 
@@ -723,8 +810,21 @@ export class QuotationService {
     }
   }
 
-  private buildWhere(filters: QuotationFilters): { where: string; params: any[] } {
-    let where = 'WHERE 1 = 1';
+  private quotationScope(actor: ReturnType<typeof AuthService.requireAuth>, alias = 'q') {
+    const prefix = alias ? `${alias}.` : '';
+    return this.branchAccess.sqlScope(
+      `${prefix}branch_id`,
+      `COALESCE(
+        (SELECT w.branch_id FROM warehouses w WHERE w.id = ${prefix}warehouse_id),
+        (SELECT bw.branch_id FROM branch_warehouses bw WHERE bw.warehouse_id = ${prefix}warehouse_id
+         ORDER BY bw.is_primary DESC, bw.branch_id ASC LIMIT 1)
+      )`,
+      actor
+    );
+  }
+
+  private buildWhere(filters: QuotationFilters, branchClause: string): { where: string; params: any[] } {
+    let where = `WHERE ${branchClause}`;
     const params: any[] = [];
     if (filters.status && filters.status !== 'ALL') {
       where += ` AND q.status = ?`;

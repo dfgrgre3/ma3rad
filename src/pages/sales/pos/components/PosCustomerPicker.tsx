@@ -27,6 +27,8 @@ export interface PosCustomerPickerProps {
   customerService: Pick<CustomerService, 'getCustomersPage'>;
   customerSearch: string;
   filteredCustomers: Customer[];
+  hasMoreCustomers?: boolean;
+  onLoadMoreCustomers?: () => void;
   canCreateCustomer: boolean;
   onSearchChange: (value: string) => void;
   onSelectCustomer: (customer: Customer) => void;
@@ -44,6 +46,8 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
   customerService,
   customerSearch,
   filteredCustomers,
+  hasMoreCustomers = false,
+  onLoadMoreCustomers,
   canCreateCustomer,
   onSearchChange,
   onSelectCustomer,
@@ -127,6 +131,7 @@ export const PosCustomerPicker: React.FC<PosCustomerPickerProps> = ({
                 </button>
               ))
             )}
+            {hasMoreCustomers && onLoadMoreCustomers && <button type="button" onClick={onLoadMoreCustomers} className="w-full border-t border-slate-100 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-50">تحميل المزيد من العملاء</button>}
           </div>
         )}
       </div>

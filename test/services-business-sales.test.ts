@@ -209,6 +209,27 @@ test('voiding a services invoice reverses money only, and goods still need stock
   }), /غير كافٍ/);
 });
 
+test('void reverses service accrual cost for a mixed goods and service invoice when inventory tracking is enabled', async () => {
+  const db = await boot();
+  applyCeramicsProfile(db);
+  db.run(`INSERT INTO products (id, product_type, custom_unit, sku, barcode, name, category_id, brand_id, size, base_unit, sell_unit, pieces_per_box, meters_per_box, cost_price, selling_price_m2, min_selling_price_m2, is_active) VALUES ('prod_void_service_mix', 'CERAMIC', '', 'SKU-VOID-MIX', 'BAR-VOID-MIX', 'بلاط مختلط', 'cat_floor', 'br_cleo', '60x60', 'M2', 'M2', 4, 1.44, 50, 80, 0, 1)`);
+  db.run(`INSERT INTO warehouse_stock (id, warehouse_id, product_id, quantity_m2, reserved_m2) VALUES ('stk_void_service_mix', 'wh_main', 'prod_void_service_mix', 10, 0)`);
+  const customer = new CustomerService().createCustomer({ name: `عميل خليط خدمة وبضاعة ${Date.now()}`, phone: `016${String(Date.now()).slice(-8)}`, customerType: 'RETAIL', creditLimit: 0 });
+  const invoice = new SalesService().createSale({
+    customerId: customer.id, warehouseId: 'wh_main', paidAmount: 230, paymentType: 'CASH',
+    items: [
+      { productId: 'prod_void_service_mix', soldBy: 'M2', quantityM2: 1, boxesCount: 0, piecesCount: 0, unitPrice: 80 },
+      { productId: serviceProductId, soldBy: 'PIECE', quantityM2: 1, boxesCount: 0, piecesCount: 1, unitPrice: 150, unitCost: 40 },
+    ],
+  });
+  assert.equal(ledgerAmount(db, 'SALES_INVOICE', invoice.id, '5102').debit, 40);
+  assert.equal(ledgerAmount(db, 'SALES_INVOICE', invoice.id, '2105').credit, 40);
+  new SalesService().voidInvoice(invoice.id, 'اختبار عكس تكلفة الخدمة المختلطة');
+  assert.equal(ledgerAmount(db, 'SALES_VOID', invoice.id, '5102').credit, 40);
+  assert.equal(ledgerAmount(db, 'SALES_VOID', invoice.id, '2105').debit, 40);
+  assert.equal(Number(db.query<{ quantityM2: number }>("SELECT quantity_m2 AS quantityM2 FROM warehouse_stock WHERE product_id = 'prod_void_service_mix' AND warehouse_id = 'wh_main'")[0].quantityM2), 10);
+});
+
 test('service products default to the profile unit instead of ceramic defaults', async () => {
   await boot();
   const product = new ProductService().createProduct({

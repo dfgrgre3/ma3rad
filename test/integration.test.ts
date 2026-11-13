@@ -361,16 +361,25 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   const orderSvc = new OrderService();
   orderSvc.updateStatus(order.id, 'CONFIRMED');
   orderSvc.updateStatus(order.id, 'PROCESSING');
+  orderSvc.recordDeposit(order.id, 1000, 'CASH', 'عربون اختبار');
   const firstDelivery = orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 10 }], 'تسليم أول');
   assert.equal(firstDelivery.status, 'PARTIAL');
   assert.equal(firstDelivery.items![0].deliveredM2, 10);
+  assert.equal(firstDelivery.deliveryStatus, 'PARTIAL');
+  assert.throws(() => orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 11 }]), /تتجاوز المتبقي/);
   orderSvc.recordDelivery(order.id, [{ itemId: order.items![0].id, quantityM2: 10 }], 'تسليم ثانٍ');
   assert.equal(orderSvc.getOrder(order.id)!.items![0].deliveredM2, 20);
-  assert.equal(orderSvc.getStatusHistory(order.id).length, 5, 'create + 2 status changes + 2 deliveries');
+  assert.equal(orderSvc.getOrder(order.id)!.deliveryStatus, 'DELIVERED');
+  assert.equal(orderSvc.getStatusHistory(order.id).length, 6, 'create + 2 status changes + deposit + 2 deliveries');
 
   const orderInvoice = orderSvc.convertToInvoice(order.id, { paymentType: 'CASH' });
   assert.equal(orderInvoice.totalAmount, 6000);
+  assert.equal(orderInvoice.paidAmount, 6000, 'invoice includes the deposit and the newly collected balance');
+  assert.equal(orderInvoice.remainingAmount, 0);
   assert.equal(q('SELECT status FROM orders WHERE id=?', [order.id])[0].status, 'COMPLETED');
+  assert.equal(q('SELECT invoice_id FROM order_deposits WHERE order_id=?', [order.id])[0].invoiceId, orderInvoice.id);
+  assert.equal(q("SELECT COUNT(*) AS count FROM journal_entries WHERE reference_type='ORDER_DEPOSIT_SETTLEMENT' AND reference_id=?", [orderInvoice.id])[0].count, 1);
+  assert.equal(q('SELECT delivery_status FROM orders WHERE id=?', [order.id])[0].deliveryStatus, 'DELIVERED');
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 280);
   assert.equal(q('SELECT reserved_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].reservedM2, 0);
 

@@ -1348,6 +1348,21 @@ export class EmployeeService {
     return this.readPayrollRun(run);
   }
 
+  static getAllPayrollRuns(): PayrollRun[] {
+    const actor = this.requirePayrollView();
+    const scope = this.branchAccess.sqlScope('pr.branch_id', undefined, actor);
+    const rows = this.db.query<any>(
+      `SELECT pr.id, pr.period, pr.branch_id AS branchId, pr.status,
+              pr.created_at AS createdAt, pr.approved_at AS approvedAt,
+              pr.paid_at AS paidAt, pr.closed_at AS closedAt
+       FROM payroll_runs pr
+       WHERE ${scope.clause}
+       ORDER BY pr.period DESC`,
+      [...scope.params]
+    );
+    return rows.map((run) => this.readPayrollRun(run));
+  }
+
   private static readPayrollRun(run: any): PayrollRun {
     const items = this.db.query<any>(
       `SELECT id, employee_id AS employeeId, branch_id AS branchId, employee_name AS employeeName,

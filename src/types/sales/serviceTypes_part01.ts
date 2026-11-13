@@ -36,6 +36,8 @@ export interface CreateSaleDTO {
   payments?: { method: PaymentType; amount: number; reference?: string }[];
   notes?: string;
   performedBy?: string;
+  loyaltyRedemption?: { points: number; discountAmount: number };
+  promotionUsage?: { promotionId: string; couponCode?: string; discountAmount: number };
 }
 
 export interface InvoiceFilters {

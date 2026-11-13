@@ -11,6 +11,7 @@ import { ProductService } from '../../../services/domains/products/ProductServic
 import { PrintService } from '../../../services/shared/PrintService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { PermissionService } from '../../../services/domains/auth/PermissionService';
+import { CashierService } from '../../../services/domains/finance/CashierService';
 import { SalesInvoice, SalesReturn, SalesReturnItem, Product } from '../../../types';
 import { exportToExcel, buildExportHtml } from '../../../utils/export/export';
 import { DocumentPreviewModal } from '../../../components/documents/DocumentPreviewModal';
@@ -68,6 +69,7 @@ export const ReturnsPage: React.FC = () => {
   const returnIdempotency = useIdempotencyKey();
   const location = useLocation() as { state?: { invoiceId?: string } };
   const service = useMemo(() => new SalesService(), []);
+  const cashierService = useMemo(() => new CashierService(), []);
   const productService = useMemo(() => new ProductService(), []);
   const printService = useMemo(() => new PrintService(), []);
   const fieldService = useMemo(() => new OperationalFieldService(), []);
@@ -271,6 +273,13 @@ export const ReturnsPage: React.FC = () => {
         );
         fieldService.setRecordValues('sales_returns', exchanged.return.id, operationalFieldValues, 'create');
       } else {
+        const cashRefund = refundCash && refundMethod === 'CASH' && Number(invoiceInfo?.paidAmount || 0) > 0;
+        const activeShift = cashRefund
+          ? cashierService.getActiveShift(AuthService.getCurrentUser()?.id, invoiceInfo?.branchId)
+          : null;
+        if (cashRefund && !activeShift) {
+          throw new Error('افتح وردية نقدية على فرع الفاتورة قبل تسجيل التعويض النقدي.');
+        }
         const returned = service.returnSale(
           invoiceId,
           selected.map((l) => ({
@@ -280,7 +289,12 @@ export const ReturnsPage: React.FC = () => {
           })),
           refundCash && refundMethod !== 'BALANCE',
           AuthService.getCurrentUser()?.id || 'usr_admin',
-          { refundMethod, idempotencyKey: returnIdempotency.getKey() }
+          {
+            refundMethod,
+            idempotencyKey: returnIdempotency.getKey(),
+            registerId: activeShift?.registerId,
+            shiftId: activeShift?.id,
+          }
         );
         fieldService.setRecordValues('sales_returns', returned.id, operationalFieldValues, 'create');
         returnIdempotency.resetKey();

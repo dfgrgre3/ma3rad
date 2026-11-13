@@ -7,6 +7,8 @@ export interface PosCartPanelProps {
   customerService: Pick<CustomerService, 'getCustomersPage'>;
   customerSearch: string;
   filteredCustomers: Customer[];
+  hasMoreCustomers?: boolean;
+  onLoadMoreCustomers?: () => void;
   canCreateCustomer: boolean;
   onCustomerSearchChange: (value: string) => void;
   onSelectCustomer: (customer: Customer) => void;

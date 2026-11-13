@@ -12,6 +12,8 @@ export type PosProductViewMode = 'grid' | 'list';
 
 export interface PosProductGridProps {
   products: Product[];
+  productsTotal?: number;
+  onLoadMore?: () => void;
   cart: CartItem[];
   stockOf: (productId: string) => number;
   gradeLabel: (grade: Product['grade']) => string;
@@ -32,6 +34,8 @@ const PAGE_SIZE = 48;
 
 export const PosProductGrid: React.FC<PosProductGridProps> = ({
   products,
+  productsTotal = products.length,
+  onLoadMore,
   cart,
   stockOf,
   gradeLabel,
@@ -452,6 +456,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
                   </button>
                 </div>
               )}
+              {onLoadMore && products.length < productsTotal && <div className="flex shrink-0 justify-center pt-3"><button type="button" onClick={onLoadMore} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 shadow-sm">تحميل الصفحة التالية</button></div>}
             </>
           ) : (
             <>
@@ -469,6 +474,7 @@ export const PosProductGrid: React.FC<PosProductGridProps> = ({
                   </button>
                 </div>
               )}
+              {onLoadMore && products.length < productsTotal && <div className="flex justify-center pt-4"><button type="button" onClick={onLoadMore} className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-600 shadow-sm">تحميل الصفحة التالية</button></div>}
             </>
           )
         )}

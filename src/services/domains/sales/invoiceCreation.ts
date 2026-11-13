@@ -11,6 +11,7 @@ import { paymentAccountCode } from '../../../database/repositories/ledger';
 import { resolveSaleUnits, type ResolvedSaleUnits } from './unitResolution';
 import { computeSaleLine, computeSaleTotals, round2 } from '../finance/financials';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { applyLoyaltyMovementInTransaction } from './LoyaltyService';
 import { WarehouseTypePolicy } from '../operations/WarehouseTypePolicy';
 import { CentralUsageLimitService } from '../licensing/CentralUsageLimitService';
 import { PartnerService } from '../customers/PartnerService';
@@ -614,6 +615,59 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
 
     insertInvoiceItems(sqliteDb, dto, preparedItems, invoiceId, invoiceNumber, actor, costingMethod, allowNegativeStock);
     updateCustomerAndCash(sqliteDb, dto, totals, cashRegisterId);
+
+    if (dto.loyaltyRedemption) {
+      const { points, discountAmount } = dto.loyaltyRedemption;
+      if (!Number.isSafeInteger(points) || points <= 0 || points > 1_000_000_000 || round2(discountAmount) !== points) {
+        throw new Error('بيانات استبدال نقاط الولاء غير صحيحة.');
+      }
+      PermissionService.require(actor, 'ui.loyalty.program.redeem');
+      if (sqliteDb.query<{ id: string }>(
+        `SELECT id FROM loyalty_transactions WHERE customer_id = ? AND type = 'REDEEM'
+         AND reference_type = 'SALES_INVOICE' AND reference_id = ? LIMIT 1`, [dto.customerId, invoiceId]
+      ).length) throw new Error('Loyalty points were already redeemed for this invoice.');
+      const loyalty = sqliteDb.query<{ currentPoints: number; totalPointsRedeemed: number }>(
+        'SELECT current_points AS currentPoints, total_points_redeemed AS totalPointsRedeemed FROM customer_loyalty WHERE customer_id = ?',
+        [dto.customerId]
+      )[0];
+      if (!loyalty || Number(loyalty.currentPoints) < points) throw new Error('رصيد نقاط الولاء غير كافٍ.');
+      const now = new Date().toISOString();
+      sqliteDb.run(`UPDATE customer_loyalty SET current_points = current_points - ?, total_points_redeemed = total_points_redeemed + ?, last_activity_at = ? WHERE customer_id = ? AND current_points >= ?`, [points, points, now, dto.customerId, points]);
+      const updatedLoyalty = sqliteDb.query<{ currentPoints: number }>('SELECT current_points AS currentPoints FROM customer_loyalty WHERE customer_id = ?', [dto.customerId])[0];
+      if (!updatedLoyalty || Number(updatedLoyalty.currentPoints) !== Number(loyalty.currentPoints) - points) {
+        throw new Error('تعذر خصم نقاط الولاء؛ أُلغيت الفاتورة.');
+      }
+      sqliteDb.run(`INSERT INTO loyalty_transactions (id, customer_id, type, points, reference_type, reference_id, description, created_by, created_at) VALUES (?, ?, 'REDEEM', ?, 'SALES_INVOICE', ?, ?, ?, ?)`, [`ltx_${uuidv4().substring(0, 8)}`, dto.customerId, -points, invoiceId, `استبدال نقاط مقابل فاتورة ${invoiceNumber}`, actor.id, now]);
+    }
+
+    if (PermissionService.can(actor, 'ui.loyalty.program.earn')) {
+      const earnedPoints = Math.floor(Number(totals.totalAmount || 0) / 10);
+      if (earnedPoints > 0) {
+        applyLoyaltyMovementInTransaction(sqliteDb, {
+          customerId: dto.customerId,
+          points: earnedPoints,
+          type: 'EARN',
+          referenceType: 'SALES_INVOICE',
+          referenceId: invoiceId,
+          description: `Points earned from invoice ${invoiceNumber}`,
+          actor,
+        });
+      }
+    }
+
+    if (dto.promotionUsage) {
+      const { promotionId, couponCode, discountAmount } = dto.promotionUsage;
+      const promotion = sqliteDb.query<any>(`SELECT usage_limit AS usageLimit, usage_count AS usageCount, starts_at AS startsAt, ends_at AS endsAt, is_active AS isActive FROM promotions WHERE id = ?`, [promotionId])[0];
+      const today = localDateString();
+      if (!promotion || !promotion.isActive || promotion.startsAt > today || promotion.endsAt < today
+        || (Number(promotion.usageLimit) > 0 && Number(promotion.usageCount) >= Number(promotion.usageLimit))) {
+        throw new Error('العرض لم يعد صالحاً أو تجاوز حد الاستخدام؛ أُلغيت الفاتورة.');
+      }
+      sqliteDb.run('INSERT INTO promotion_usage (id, promotion_id, invoice_id, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?)', [`pu_${uuidv4().substring(0, 8)}`, promotionId, invoiceId, couponCode || null, discountAmount]);
+      sqliteDb.run('UPDATE promotions SET usage_count = usage_count + 1 WHERE id = ? AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)', [promotionId]);
+      const currentUsage = sqliteDb.query<{ usageCount: number }>('SELECT usage_count AS usageCount FROM promotions WHERE id = ?', [promotionId])[0]?.usageCount;
+      if (Number(currentUsage) !== Number(promotion.usageCount) + 1) throw new Error('تجاوز العرض حد الاستخدام بالتزامن؛ أُلغيت الفاتورة.');
+    }
 
     // Persist split-payment breakdown (one row per method).
     for (const p of payments) {

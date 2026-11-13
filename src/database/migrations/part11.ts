@@ -1,4 +1,6 @@
 import { addColumn, type Migration } from './support';
+import { queryLedgerRows } from '../repositories/ledger';
+import bcrypt from 'bcryptjs';
 
 export const MIGRATION_PART_11: Migration[] = [
 {

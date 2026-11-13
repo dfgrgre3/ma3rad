@@ -31,8 +31,12 @@ export function recordInvoicePaymentEntry(
   if (invoice.remainingAmount <= 0) throw new Error('الفاتورة مسددة بالكامل بالفعل.');
   const invoiceBranchId = invoice.branchId || ctx.branchAccess.requireWarehouseAccess(invoice.warehouseId, actor);
 
-  const value = round2(Math.min(Math.max(0, amount || 0), invoice.remainingAmount));
-  if (value <= 0) throw new Error('يجب أن يكون مبلغ التحصيل أكبر من الصفر.');
+  const requestedAmount = Number(amount);
+  if (!Number.isFinite(requestedAmount) || requestedAmount <= 0) throw new Error('يجب أن يكون مبلغ التحصيل أكبر من الصفر.');
+  const value = round2(requestedAmount);
+  if (value - round2(invoice.remainingAmount) > 0.009) {
+    throw new Error(`مبلغ التحصيل (${value.toFixed(2)}) يتجاوز المتبقي على الفاتورة (${round2(invoice.remainingAmount).toFixed(2)}).`);
+  }
 
   const today = paymentDate || localDateString();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || Number.isNaN(Date.parse(`${today}T00:00:00Z`)) ||

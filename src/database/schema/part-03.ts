@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS sales_returns (
   refunded_amount REAL NOT NULL DEFAULT 0,
   remaining_to_balance REAL NOT NULL DEFAULT 0,
   reason TEXT NOT NULL,
+  request_fingerprint TEXT,
   created_by TEXT NOT NULL,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (original_invoice_id) REFERENCES sales_invoices(id),

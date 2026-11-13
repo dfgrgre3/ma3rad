@@ -123,6 +123,8 @@ export const appRoutes: RouteDef[] = [
   { path: 'employees', element: <P.EmployeesPage /> },
   { path: 'employees/attendance', element: <P.AttendancePage /> },
   { path: 'employees/payroll', element: <P.PayrollPage /> },
+  { path: 'employees/payroll/payslips', element: <P.PayslipsPage /> },
+  { path: 'employees/payroll/calendar', element: <P.PayrollCalendarPage /> },
   { path: 'employees/commissions', element: <P.CommissionsPage /> },
   { path: 'employees/leave', element: <P.LeavePage /> },
   { path: 'employees/contracts', element: <P.EmployeeContractsPage /> },
@@ -141,6 +143,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'hr/clearance', element: <P.EmployeeClearancePage /> },
   { path: 'hr/social-insurance', element: <P.PayrollSocialInsurancePage /> },
   { path: 'hr/attendance-devices', element: <P.AttendanceDevicesPage /> },
+  { path: 'hr/alerts', element: <P.HrAlertsPage /> },
 
   // Reports
   { path: 'reports', element: <P.ReportsHubPage /> },

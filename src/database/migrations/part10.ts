@@ -1,4 +1,6 @@
 import { addColumn, type Migration } from './support';
+import { queryLedgerRows } from '../repositories/ledger';
+import { v4 as uuidv4 } from 'uuid';
 
 export const MIGRATION_PART_10: Migration[] = [
 {

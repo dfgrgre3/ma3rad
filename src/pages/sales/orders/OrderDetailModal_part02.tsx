@@ -31,6 +31,11 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
       />
       <Info label="القيمة" value={fmt(detail.totalAmount)} sub={`${detail.items?.length || 0} بند`} />
     </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+      <Info label="المحصل" value={fmt(detail.paidAmount)} sub={detail.financialStatus === 'PAID' ? 'مسدد بالكامل' : detail.financialStatus === 'PARTIAL' ? 'تحصيل جزئي' : 'لم يتم التحصيل'} />
+      <Info label="المتبقي" value={fmt(detail.remainingAmount)} sub={detail.financialStatus === 'PAID' ? 'الرصيد مسدد' : 'مستحق على العميل'} />
+      <Info label="حالة العملية" value={detail.deliveryStatus === 'DELIVERED' ? 'التسليم كامل' : detail.deliveryStatus === 'PARTIAL' ? 'تسليم جزئي' : 'لم يبدأ التسليم'} sub={detail.billingStatus === 'INVOICED' ? `تمت الفوترة (${detail.invoiceNumber || ''})` : 'لم تصدر فاتورة'} />
+    </div>
     <div className="border border-slate-200 rounded-xl overflow-x-auto mb-4">
       <table className="w-full text-right text-[11px] min-w-[600px]">
         <thead className="bg-slate-50 text-slate-500 font-bold">
@@ -72,7 +77,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({
           {detail.status === 'PENDING' ? 'تأكيد الطلب' : 'بدء التجهيز'}
         </button>
       )}
-      {['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(detail.status) && (
+      {['PENDING', 'CONFIRMED', 'PROCESSING', 'PARTIAL'].includes(detail.status) && detail.billingStatus !== 'INVOICED' && (
         <button onClick={() => onOpenConvert(detail)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5" /> إصدار فاتورة وإتمام</button>
       )}
       {canApprove && !['COMPLETED', 'CANCELLED'].includes(detail.status) && (
