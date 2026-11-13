@@ -16,6 +16,10 @@ test('3.4: enforce default password change, password policy, and session invalid
   // 1. Logging in with default admin password forces password change
   const admin = AuthService.login('admin', 'admin123');
   assert.equal(admin.mustChangePassword, true, 'Default admin password must be flagged for mandatory change');
+  assert.throws(() => AuthService.requireAuth(), /إكمال إعداد الحساب/);
+  for (const permission of ['sales.create', 'inventory.adjust', 'finance.post']) {
+    assert.throws(() => PermissionService.require(admin, permission), /إكمال إعداد الحساب/);
+  }
   const originalFullName = admin.fullName;
 
   // 2. Password policy rejects weak or default passwords

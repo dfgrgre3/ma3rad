@@ -108,3 +108,37 @@ test('database manager state survives module re-evaluation during HMR', async ()
     DatabaseManager.setNumberFormatter(null);
   }
 });
+
+test('flush forces fallback idle timer persistence and status reports it as saving', async () => {
+  let persistedSnapshot: Uint8Array | null = null;
+  let saveCalls = 0;
+  (globalThis as any).window.ceramisys = {
+    db: {
+      load: async () => persistedSnapshot,
+      save: async (bytes: Uint8Array) => {
+        saveCalls++;
+        persistedSnapshot = bytes;
+        return { ok: true };
+      },
+    },
+  };
+  const host = globalThis as any;
+  const originalRequestIdleCallback = host.requestIdleCallback;
+  try {
+    delete host.requestIdleCallback;
+    const manager = DatabaseManager.getInstance();
+    await manager.initialize();
+    await manager.flush();
+    const beforeTransaction = saveCalls;
+    manager.run("INSERT OR REPLACE INTO system_settings (key, value) VALUES ('idle_flush_test', 'saved')");
+    manager.scheduleDebouncedSave(0);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(manager.getPersistenceStatus().status, 'saving');
+    await manager.flush();
+    assert.equal(saveCalls, beforeTransaction + 1, 'flush should persist immediately instead of waiting for the fallback timer');
+    assert.equal(manager.getPersistenceStatus().status, 'saved');
+  } finally {
+    if (originalRequestIdleCallback === undefined) delete host.requestIdleCallback;
+    else host.requestIdleCallback = originalRequestIdleCallback;
+  }
+});

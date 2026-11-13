@@ -1,5 +1,6 @@
 ﻿import { DatabaseManager } from '../database/repositories/databaseManager.ts';
 import type { SyncDataScope, SyncEvent, SyncOperation } from '../types/sync/index.ts';
+import { SUPPORTED_SYNC_ENTITY_TYPES } from './SyncPolicyService.ts';
 import { v4 as uuidv4 } from 'uuid';
 
 interface OutboxRow {
@@ -86,6 +87,8 @@ export class OutboxRepository {
   }
 
   listPending(limit = 100, policyGate?: { configured: boolean; authority: boolean }): SyncEvent[] {
+    const policyEntityTypes = SUPPORTED_SYNC_ENTITY_TYPES.filter((entityType) => entityType !== 'sync_policy');
+    const entityTypePlaceholders = policyEntityTypes.map(() => '?').join(',');
     const rows = this.dbManager.query<OutboxRow>(
       `SELECT * FROM sync_outbox
        WHERE delivery_status IN ('PENDING','FAILED')
@@ -93,7 +96,7 @@ export class OutboxRepository {
          AND (? = 0 OR (
            (entity_type='sync_policy' AND ? = 1)
            OR (
-             entity_type IN ('category','brand','product','customer','supplier','sales_invoice','sales_return','purchase_invoice','purchase_return','stock_transfer','expense')
+             entity_type IN (${entityTypePlaceholders})
              AND EXISTS (
                SELECT 1 FROM sync_entity_policies policy
                WHERE policy.entity_type=sync_outbox.entity_type
@@ -123,7 +126,10 @@ export class OutboxRepository {
          )
        ORDER BY CASE WHEN entity_type='sync_policy' THEN 0 ELSE 1 END, rowid ASC
        LIMIT ?`,
-      [Number(policyGate?.configured ?? false), Number(policyGate?.authority ?? false), Number(policyGate?.authority ?? false), limit]
+      [
+        Number(policyGate?.configured ?? false), Number(policyGate?.authority ?? false),
+        ...policyEntityTypes, Number(policyGate?.authority ?? false), limit,
+      ]
     );
     return rows.map(rowToEvent);
   }

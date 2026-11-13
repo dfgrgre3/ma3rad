@@ -13,7 +13,7 @@ import { PullChangesService, EventDispatcher } from '../src/sync/PullChangesServ
 import { PushChangesService } from '../src/sync/PushChangesService.ts';
 import { SyncWorker } from '../src/sync/SyncWorker.ts';
 import { MasterDataSyncService } from '../src/sync/MasterDataSyncService.ts';
-import { SyncPolicyService } from '../src/sync/SyncPolicyService.ts';
+import { SUPPORTED_SYNC_ENTITY_TYPES, SyncPolicyService } from '../src/sync/SyncPolicyService.ts';
 import { BusinessRecordSyncService } from '../src/sync/BusinessRecordSyncService.ts';
 import { MIGRATIONS } from '../src/database/migrations/index.ts';
 import type { SyncEvent } from '../src/types/sync/index.ts';
@@ -123,6 +123,36 @@ test('sync policies: admin settings persist and gate master-data outbox capture'
     });
     acknowledgeTenantOutbox(manager, identity.tenantId);
     MasterDataSyncService.configure(null);
+  }
+});
+
+test('sync policies: every supported entity type can pass the outbox policy gate', async () => {
+  const manager = await boot();
+  const identity = {
+    tenantId: `all-types-tenant-${uuidv4()}`,
+    branchId: `all-types-branch-${uuidv4()}`,
+    deviceId: `all-types-device-${uuidv4()}`,
+    canManagePolicies: true,
+  };
+  const policies = new SyncPolicyService(manager);
+  const outbox = new OutboxRepository(manager);
+  SyncPolicyService.configureIdentity(identity);
+  try {
+    for (const entityType of SUPPORTED_SYNC_ENTITY_TYPES) {
+      policies.update({ entityType, enabled: true, outboundEnabled: true, inboundEnabled: true, dataScope: 'TENANT' });
+      outbox.enqueue({
+        tenantId: identity.tenantId, branchId: identity.branchId, deviceId: identity.deviceId,
+        entityType, entityId: `entity-${entityType}`, operationType: 'UPSERT',
+        dataScope: 'TENANT', payload: {},
+      });
+    }
+    const pendingTypes = new Set(outbox.listPending(500, SyncPolicyService.pushGate())
+      .filter((event) => event.tenantId === identity.tenantId)
+      .map((event) => event.entityType));
+    assert.deepEqual([...pendingTypes].sort(), [...SUPPORTED_SYNC_ENTITY_TYPES].sort());
+  } finally {
+    acknowledgeTenantOutbox(manager, identity.tenantId);
+    SyncPolicyService.configureIdentity(null);
   }
 });
 

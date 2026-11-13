@@ -198,6 +198,10 @@ export class AuthService {
     return authSession.requireAuth();
   }
 
+  private static requireSetupAuth(): User {
+    return authSession.requireAuth({ allowIncompleteSetup: true });
+  }
+
   public static setCurrentUser(user: User): void {
     authSession.setCurrentUser(user);
     PermissionService.invalidate(user);
@@ -1046,7 +1050,7 @@ export class AuthService {
   }
 
   public changeOwnPassword(userId: string, currentPassword: string, newPassword: string): void {
-    const currentUser = AuthService.requireAuth();
+    const currentUser = AuthService.requireSetupAuth();
     if (currentUser.id !== userId) {
       throw new Error('يمكنك تغيير كلمة مرور حسابك الحالي فقط.');
     }
@@ -1080,7 +1084,7 @@ export class AuthService {
     fullName?: string,
     deferForcedSetupCompletion = false
   ): Promise<void> {
-    const currentUser = AuthService.requireAuth();
+    const currentUser = AuthService.requireSetupAuth();
     if (currentUser.id !== userId) {
       throw new Error('يمكنك تغيير كلمة مرور حسابك الحالي فقط.');
     }
@@ -1121,7 +1125,7 @@ export class AuthService {
   }
 
   public async setOwnSecurityKeyAsync(userId: string, securityKey: string): Promise<void> {
-    const currentUser = AuthService.requireAuth();
+    const currentUser = AuthService.requireSetupAuth();
     if (currentUser.id !== userId) {
       throw new Error('يمكنك إنشاء مفتاح الأمان لحسابك الحالي فقط.');
     }
@@ -1166,7 +1170,7 @@ export class AuthService {
     userId: string,
     account: { username: string; fullName: string; phone: string; password: string }
   ): User {
-    const currentUser = AuthService.requireAuth();
+    const currentUser = AuthService.requireSetupAuth();
     if (currentUser.id !== userId || currentUser.role !== 'ADMIN') {
       throw new Error('يجب تسجيل الدخول بحساب المدير الأساسي لإكمال تهيئته.');
     }

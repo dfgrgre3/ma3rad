@@ -43,6 +43,7 @@
     "test:sync": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/sync-foundation.test.ts test/electron-sync-relay.test.cjs test/electron-sync-config.test.cjs",
     "test:security-scope": "node --import ./test/register-hook.mjs --test --test-force-exit --test-concurrency=1 test/security-scope-regressions.test.ts",
     "compile:bytenode": "node scripts/compile-bytenode.cjs",
+    "verify:bytecode-integrity": "node scripts/verify-bytecode-integrity.cjs",
     "bundle:secure": "node scripts/restore-source.cjs && npm run build && npm run compile:bytenode && node scripts/prepare-production-bundle.cjs"
   },
   "build": {

@@ -36,7 +36,9 @@ export interface SyncEntityPolicy {
   updatedAt: string;
 }
 
-const SUPPORTED_ENTITY_TYPES = new Set<string>(SUPPORTED_SYNC_ENTITIES.map((item) => item.entityType));
+export const SUPPORTED_SYNC_ENTITY_TYPES: readonly SupportedSyncEntity[] =
+  SUPPORTED_SYNC_ENTITIES.map((item) => item.entityType);
+const SUPPORTED_ENTITY_TYPES = new Set<string>(SUPPORTED_SYNC_ENTITY_TYPES);
 const REMOTE_BUSINESS_RECORD_TYPES = new Set([
   'sales_invoice',
   'sales_return',

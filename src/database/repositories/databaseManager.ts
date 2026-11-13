@@ -834,9 +834,10 @@ export class DatabaseManager {
 
   /** Wait for all pending disk writes (used before shutdown/backup/restore). */
   public async flush(): Promise<void> {
-    if (this.debounceSaveTimer || this.idleSaveHandle !== null) {
+    if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.idleSaveTimer !== null) {
       clearTimeout(this.debounceSaveTimer);
       this.debounceSaveTimer = null;
+      this.cancelIdleSave();
       this.saveToStorage();
     }
     while (this.isPersisting || this.pendingSnapshot) {
@@ -861,7 +862,7 @@ export class DatabaseManager {
   public getPersistenceStatus(): { status: 'saving' | 'saved' | 'error' | 'unencrypted' | 'unavailable'; error?: string; code?: string } {
     if (this.lastPersistError) return { status: 'error', error: this.lastPersistError, code: this.lastPersistErrorCode || 'DATABASE_PERSIST_FAILED' };
     if (this.storageBackend === 'none') return { status: 'unavailable' };
-    if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.isPersisting || this.pendingSnapshot) {
+    if (this.debounceSaveTimer || this.idleSaveHandle !== null || this.idleSaveTimer !== null || this.isPersisting || this.pendingSnapshot) {
       return { status: 'saving' };
     }
     if (this.storageBackend === 'localStorage') return { status: 'unencrypted' };

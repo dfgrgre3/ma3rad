@@ -15,9 +15,12 @@ export const authSession = {
   },
 
   /** Throws if no user is authenticated. Use at the top of every service method (brief §108). */
-  requireAuth(): User {
+  requireAuth(options: { allowIncompleteSetup?: boolean } = {}): User {
     if (!currentUser) {
       throw new Error('يجب تسجيل الدخول لتنفيذ هذا الإجراء.');
+    }
+    if (currentUser.mustChangePassword && !options.allowIncompleteSetup) {
+      throw new Error('يجب إكمال إعداد الحساب قبل استخدام خدمات النظام.');
     }
     return currentUser;
   },

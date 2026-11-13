@@ -189,6 +189,10 @@ export class PermissionChecker {
 
   /** Server-side (service-layer) enforcement — never trust the UI. */
   public static require(user: User | null, required: string, scope?: string): void {
+    if (user?.mustChangePassword) {
+      PermissionChecker.audit(user, 'محاولة استخدام النظام قبل إكمال إعداد الحساب', 'SECURITY', `perm:${required}`, null, { required, path: scope ?? null });
+      throw new Error('يجب إكمال إعداد الحساب قبل استخدام خدمات النظام.');
+    }
     const locallyAllowed = PermissionChecker.hasRoleGrant(user, required);
     const centrallyDisabled = CentralFeaturePermissionService.isPermissionDisabled(required);
     const pageAllowed = scope === undefined || CentralFeaturePermissionService.allowsPermission(required, scope);
