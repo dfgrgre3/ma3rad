@@ -155,4 +155,32 @@ test('discounted special stock is inspected, priced, sold, and linked to its sou
     WHERE reference_type='SPECIAL_STOCK_RETURN' AND reference_id=?`, [source.id])[0]?.count, 1);
   assert.equal(db.query<{ count: number }>(`SELECT COUNT(*) AS count FROM inventory_transactions
     WHERE reference_type='SPECIAL_STOCK_RETURN_HOLD' AND reference_id=?`, [returnedSaleItem.id])[0]?.count, 0);
+
+  const mixedSourceInvoice = sales.createSale({
+    customerId: customerId!, warehouseId,
+    items: [
+      { productId, soldBy: 'M2', uom: 'M2', quantity: 1, quantityM2: 1, boxesCount: 0, piecesCount: 0, unitPrice: 30 },
+      { productId, soldBy: 'M2', uom: 'M2', quantity: 1, quantityM2: 1, boxesCount: 0, piecesCount: 0, unitPrice: 35 },
+      { productId, specialStockId: source.id, soldBy: 'M2', uom: 'M2', quantity: 1, quantityM2: 1, boxesCount: 0, piecesCount: 0, unitPrice: 15 },
+    ],
+    paidAmount: 80, paymentType: 'CASH',
+  });
+  const returnable = sales.getReturnableItems(mixedSourceInvoice.id);
+  assert.equal(returnable.length, 3);
+  const pricedRegularLine = returnable.find((item) => item.sourceType === 'INVOICE' && item.unitPrice === 35);
+  assert.ok(pricedRegularLine?.invoiceItemId);
+  assert.equal(returnable.find((item) => item.sourceType === 'INVOICE')?.specialStockId, null);
+  assert.equal(returnable.find((item) => item.sourceType === 'SPECIAL_STOCK_SALE')?.specialStockId, source.id);
+  const regularReturn = sales.returnSale(mixedSourceInvoice.id, [{
+    productId, invoiceItemId: pricedRegularLine!.invoiceItemId, quantityM2: 1, boxesCount: 0, unitPrice: 35, unitCost: 10,
+    reason: 'Return specific regular stock line', sourceType: 'REGULAR', disposition: 'RESTOCK',
+  }], false);
+  assert.equal(regularReturn.totalAmount, 35);
+  const returnedItem = sales.getReturnItems(regularReturn.id)[0];
+  assert.equal(returnedItem.invoiceItemId, pricedRegularLine!.invoiceItemId);
+  const otherRegularLine = returnable.find((item) => item.sourceType === 'INVOICE' && item.invoiceItemId !== pricedRegularLine!.invoiceItemId)!;
+  assert.throws(() => sales.returnSale(mixedSourceInvoice.id, [
+    { productId, invoiceItemId: pricedRegularLine!.invoiceItemId, quantityM2: 0.5, boxesCount: 0, unitPrice: 35, unitCost: 10, reason: 'Exceed this line', sourceType: 'REGULAR' },
+    { productId, invoiceItemId: otherRegularLine.invoiceItemId, quantityM2: 0.5, boxesCount: 0, unitPrice: 30, unitCost: 10, reason: 'Use remaining allowance', sourceType: 'REGULAR' },
+  ], false), /سطر الفاتورة المحدد/);
 });

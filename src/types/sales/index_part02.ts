@@ -58,6 +58,7 @@ export interface SalesReturn {
 export interface SalesReturnItem {
   id: string;
   returnId: string;
+  invoiceItemId?: string | null;
   productId: string;
   productName: string;
   grade: CeramicGrade;
@@ -68,6 +69,9 @@ export interface SalesReturnItem {
   unitPrice: number;
   unitCost: number;
   totalRefund: number;
+  sourceType?: 'INVOICE' | 'SPECIAL_STOCK_SALE' | null;
+  specialStockId?: string | null;
+  disposition?: 'RESTOCK' | 'SPECIAL_STOCK' | 'QUARANTINE' | 'DAMAGED' | null;
   productType?: 'CERAMIC' | 'GENERAL';
   baseUnit?: UnitType;
   customUnit?: string;

@@ -362,54 +362,87 @@ export class WarrantyClaimService {
     const remainingDays = daysUntil(expiry);
 
     const rows = this.db.query<any>(
-      `SELECT sii.product_id AS productId, MIN(sii.id) AS invoiceItemId,
-              MAX(sii.product_name) AS productName, MAX(sii.product_grade) AS grade,
-              MAX(sii.size) AS size, SUM(sii.quantity_m2) AS soldQuantity,
-              SUM(sii.boxes_count) AS boxesCount,
-              MAX(sii.meters_per_box) AS metersPerBox,
-              CASE WHEN SUM(sii.quantity_m2) > 0
-                   THEN SUM(sii.total_price) / SUM(sii.quantity_m2) ELSE 0 END AS unitPrice,
+      `SELECT sii.id AS invoiceItemId, sii.product_id AS productId,
+              sii.product_name AS productName, sii.product_grade AS grade,
+              sii.size, sii.quantity_m2 AS soldQuantity, sii.boxes_count AS boxesCount,
+              sii.meters_per_box AS metersPerBox,
+              CASE WHEN sii.quantity_m2 > 0 THEN sii.total_price / sii.quantity_m2 ELSE 0 END AS unitPrice,
               p.sku AS productSku, p.product_type AS productType,
               p.base_unit AS baseUnit, p.custom_unit AS customUnit
        FROM sales_invoice_items sii
        LEFT JOIN products p ON p.id = sii.product_id
        WHERE sii.invoice_id = ?
-       GROUP BY sii.product_id
-       ORDER BY productName ASC`,
+       ORDER BY productName ASC, sii.id ASC`,
       [invoiceId]
     );
 
-    const returned = new Map<string, number>();
+    const returnedByItem = new Map<string, number>();
+    const legacyReturned = new Map<string, number>();
     for (const row of this.db.query<any>(
-      `SELECT sri.product_id AS productId, COALESCE(SUM(sri.quantity_m2), 0) AS quantity
+      `SELECT CASE WHEN sii.id IS NULL THEN NULL ELSE sii.id END AS invoiceItemId,
+              sri.product_id AS productId, COALESCE(SUM(sri.quantity_m2), 0) AS quantity
        FROM sales_return_items sri
        JOIN sales_returns sr ON sr.id = sri.return_id
+       LEFT JOIN sales_invoice_items sii ON sii.id = sri.invoice_item_id
+         AND sii.invoice_id = sr.original_invoice_id AND sii.product_id = sri.product_id
        WHERE sr.original_invoice_id = ?
-       GROUP BY sri.product_id`,
+       GROUP BY CASE WHEN sii.id IS NULL THEN NULL ELSE sii.id END, sri.product_id`,
       [invoiceId]
     )) {
-      returned.set(row.productId, round2(Number(row.quantity || 0)));
+      const quantity = round2(Number(row.quantity || 0));
+      if (row.invoiceItemId) returnedByItem.set(row.invoiceItemId, quantity);
+      else legacyReturned.set(row.productId, quantity);
     }
 
-    const claimed = new Map<string, number>();
+    const claimedByItem = new Map<string, number>();
+    const legacyClaimed = new Map<string, number>();
     for (const row of this.db.query<any>(
-      `SELECT c.product_id AS productId, COALESCE(SUM(c.quantity_m2), 0) AS quantity
+      `SELECT CASE WHEN sii.id IS NULL THEN NULL ELSE sii.id END AS invoiceItemId,
+              c.product_id AS productId, COALESCE(SUM(c.quantity_m2), 0) AS quantity
        FROM customer_warranty_claims c
+       LEFT JOIN sales_invoice_items sii ON sii.id = c.invoice_item_id
+         AND sii.invoice_id = c.invoice_id AND sii.product_id = c.product_id
        WHERE c.invoice_id = ? AND c.status NOT IN ('REJECTED', 'CANCELLED')
          AND NOT EXISTS (
            SELECT 1 FROM warranty_claim_executions wx
            WHERE wx.claim_id = c.id AND wx.return_id IS NOT NULL
          )
-       GROUP BY c.product_id`,
+       GROUP BY CASE WHEN sii.id IS NULL THEN NULL ELSE sii.id END, c.product_id`,
       [invoiceId]
     )) {
-      claimed.set(row.productId, round2(Number(row.quantity || 0)));
+      const quantity = round2(Number(row.quantity || 0));
+      if (row.invoiceItemId) claimedByItem.set(row.invoiceItemId, quantity);
+      else legacyClaimed.set(row.productId, quantity);
+    }
+
+    const rowsByProduct = new Map<string, any[]>();
+    for (const row of rows) rowsByProduct.set(row.productId, [...(rowsByProduct.get(row.productId) || []), row]);
+    const returned = new Map(returnedByItem);
+    const claimed = new Map(claimedByItem);
+    for (const [productId, productRows] of rowsByProduct) {
+      let unallocatedReturns = legacyReturned.get(productId) || 0;
+      for (const row of productRows) {
+        const lineSold = round2(Number(row.soldQuantity || 0));
+        const lineReturns = returned.get(row.invoiceItemId) || 0;
+        const allocation = Math.min(Math.max(0, lineSold - lineReturns), unallocatedReturns);
+        if (allocation > 0) returned.set(row.invoiceItemId, round2(lineReturns + allocation));
+        unallocatedReturns = round2(unallocatedReturns - allocation);
+      }
+      let unallocatedClaims = legacyClaimed.get(productId) || 0;
+      for (const row of productRows) {
+        const lineSold = round2(Number(row.soldQuantity || 0));
+        const lineReturns = returned.get(row.invoiceItemId) || 0;
+        const lineClaims = claimed.get(row.invoiceItemId) || 0;
+        const allocation = Math.min(Math.max(0, lineSold - lineReturns - lineClaims), unallocatedClaims);
+        if (allocation > 0) claimed.set(row.invoiceItemId, round2(lineClaims + allocation));
+        unallocatedClaims = round2(unallocatedClaims - allocation);
+      }
     }
 
     return rows.map((row) => {
       const soldQuantity = round2(Number(row.soldQuantity || 0));
-      const returnedQuantity = returned.get(row.productId) || 0;
-      const claimedQuantity = claimed.get(row.productId) || 0;
+      const returnedQuantity = returned.get(row.invoiceItemId) || 0;
+      const claimedQuantity = claimed.get(row.invoiceItemId) || 0;
       const availableQuantity = round2(Math.max(0, soldQuantity - returnedQuantity - claimedQuantity));
       return {
         productId: row.productId,
@@ -439,7 +472,7 @@ export class WarrantyClaimService {
   public createClaim(input: CreateWarrantyClaimInput): WarrantyClaim {
     const actor = this.require('ui.sales.after_sales.create');
     const quantity = round2(Number(input.quantityM2));
-    if (!(quantity > 0)) throw new Error('كمية المطالبة يجب أن تكون أكبر من صفر.');
+    if (!Number.isFinite(quantity) || !(quantity > 0)) throw new Error('كمية المطالبة يجب أن تكون أكبر من صفر.');
     const issue = String(input.issueDescription || '').trim();
     if (!issue) throw new Error('يجب كتابة وصف المشكلة أو العيب.');
     const claimType = input.claimType || 'WARRANTY';
@@ -449,9 +482,20 @@ export class WarrantyClaimService {
     if (!invoice) throw new Error('الفاتورة غير موجودة أو لا تنتمي إلى فرع متاح لك.');
 
     const months = Math.max(0, Math.trunc(Number(input.warrantyMonths ?? DEFAULT_WARRANTY_MONTHS)));
-    const eligible = this.computeEligibleItems(input.invoiceId, months)
-      .find((item) => item.productId === input.productId);
+    const productItems = this.computeEligibleItems(input.invoiceId, months)
+      .filter((item) => item.productId === input.productId);
+    if (input.invoiceItemId && !productItems.some((item) => item.invoiceItemId === input.invoiceItemId)) {
+      throw new Error('Invoice line does not belong to the selected invoice and product.');
+    }
+    const availableProductItems = productItems.filter((item) => item.availableQuantity > 0);
+    if (!input.invoiceItemId && availableProductItems.length > 1) {
+      throw new Error('Select a specific invoice line for this warranty claim.');
+    }
+    const eligible = input.invoiceItemId
+      ? productItems.find((item) => item.invoiceItemId === input.invoiceItemId)
+      : availableProductItems[0];
     if (!eligible) throw new Error('الصنف غير موجود ضمن بنود هذه الفاتورة.');
+    if (!eligible.invoiceItemId) throw new Error('A warranty claim must be linked to a valid invoice line.');
     if (quantity > eligible.availableQuantity) {
       throw new Error(`الكمية المتاحة للمطالبة ${eligible.availableQuantity} فقط.`);
     }
@@ -465,7 +509,7 @@ export class WarrantyClaimService {
 
     this.db.executeTransaction((db) => {
       const currentEligible = this.computeEligibleItems(input.invoiceId, months)
-        .find((item) => item.productId === input.productId);
+        .find((item) => item.invoiceItemId === eligible.invoiceItemId && item.productId === input.productId);
       if (!currentEligible || quantity > currentEligible.availableQuantity) {
         throw new Error(`Eligible warranty quantity changed; available quantity is ${currentEligible?.availableQuantity ?? 0}.`);
       }
@@ -477,7 +521,7 @@ export class WarrantyClaimService {
            warranty_expires_at, issue_description, created_by, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?, ?)`,
         [
-          id, claimNumber, invoice.id, input.invoiceItemId || eligible.invoiceItemId || null,
+          id, claimNumber, invoice.id, eligible.invoiceItemId,
           invoice.customerId, input.productId, invoice.branchId || null, invoice.warehouseId || null,
           claimType, quantity, months, eligible.warrantyExpiresAt, issue, actor.id, now, now,
         ]

@@ -17,6 +17,7 @@ export const appRoutes: RouteDef[] = [
   // Sales & POS
   { path: 'sales/analytics', element: <P.SalesAnalyticsPage /> },
   { path: 'sales/cycle', element: <P.InvoiceCyclePage /> },
+  { path: 'sales/e-invoicing', element: <P.SalesHubPage /> },
   { path: 'sales/statement', element: <P.CustomerStatementPage /> },
   { path: 'sales/orders-deposits', element: <P.SalesOrdersDepositsPage /> },
   { path: 'sales/reservations', element: <Navigate to="/sales/orders-deposits" replace /> },

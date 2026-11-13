@@ -380,7 +380,7 @@ export const usePosCheckout = ({
           boxesCount: item.boxesCount,
           piecesCount: item.piecesCount,
           unitPrice: round2(pricePerUnit(item.unitPrice, item.soldBy, item.product)),
-          unitCost: item.product.costPrice,
+          pricingSource: 'POS',
           discountAmount: item.discountAmount
         })),
         discountAmount: round2(discountAmount + promotionDiscount + loyaltyDiscount),

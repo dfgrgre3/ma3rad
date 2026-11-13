@@ -1,6 +1,6 @@
 import React from 'react';
-import { Receipt, DollarSign, ArrowUpRight } from 'lucide-react';
-import type { Order } from '../../../services/domains/sales/OrderService';
+import { Receipt, DollarSign, ArrowUpRight, RotateCcw } from 'lucide-react';
+import type { Order, OrderDeposit } from '../../../services/domains/sales/OrderService';
 import { fmtCurrency } from './helpers';
 import { orderStatusBadges, orderStatusLabels } from './constants';
 
@@ -8,16 +8,22 @@ interface OrdersDepositsTableProps {
   orders: Order[];
   canCreate?: boolean;
   canInvoice?: boolean;
+  canRefund?: boolean;
+  depositsByOrder: Record<string, OrderDeposit[]>;
   onRecordDeposit: (order: Order) => void;
   onConvertToInvoice: (order: Order) => void;
+  onRefundDeposit: (deposit: OrderDeposit) => void;
 }
 
 export const OrdersDepositsTable: React.FC<OrdersDepositsTableProps> = ({
   orders,
   canCreate = false,
   canInvoice = false,
+  canRefund = false,
+  depositsByOrder,
   onRecordDeposit,
   onConvertToInvoice,
+  onRefundDeposit,
 }) => {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden">
@@ -62,7 +68,23 @@ export const OrdersDepositsTable: React.FC<OrdersDepositsTableProps> = ({
                       {fmtCurrency(o.totalAmount)}
                     </td>
                     <td className="p-3.5 font-bold text-emerald-600 dark:text-emerald-400">
-                      {fmtCurrency(o.paidAmount)}
+                      <div>{fmtCurrency(o.paidAmount)}</div>
+                      <div className="mt-1 space-y-1">
+                        {(depositsByOrder[o.id] || []).map((deposit) => (
+                          <div key={deposit.id} className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                            <span>{deposit.depositNumber}: {fmtCurrency(deposit.amount)}</span>
+                            {deposit.refundNumber ? (
+                              <span className="text-rose-600 dark:text-rose-400">مردود ({deposit.refundNumber})</span>
+                            ) : deposit.invoiceId ? (
+                              <span>مسوّى بفاتورة</span>
+                            ) : canRefund ? (
+                              <button type="button" onClick={() => onRefundDeposit(deposit)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40" title="رد العربون">
+                                <RotateCcw className="h-3 w-3" /> رد العربون
+                              </button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="p-3.5 font-bold text-rose-600 dark:text-rose-400">
                       {fmtCurrency(o.remainingAmount)}

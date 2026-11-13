@@ -1,6 +1,7 @@
 export type ReturnDisposition = 'RESTOCK' | 'SPECIAL_STOCK' | 'QUARANTINE' | 'DAMAGED';
 
 export interface ReturnableItem {
+  invoiceItemId: string;
   productId: string;
   productName: string;
   grade: string;
@@ -41,6 +42,8 @@ export interface ReturnStats {
 
 export interface ReturnRequestItem {
   productId: string;
+  /** Original sales invoice item that this return line consumes. */
+  invoiceItemId?: string;
   /** Base-unit quantity, used when `uom`/`quantity` are not supplied. */
   quantityM2: number;
   /** Optional selling unit for the returned quantity (e.g. BOX). */
@@ -53,6 +56,8 @@ export interface ReturnRequestItem {
   reason: string;
   /** Special-stock record the sold line came from (discounted sales). */
   specialStockId?: string | null;
+  /** Explicit source of the original sale line; required when a product has multiple sources. */
+  sourceType?: 'REGULAR' | 'SPECIAL';
   /**
    * Where the returned goods go. Defaults to the original source:
    * regular sales restock, special-stock sales go back to their own record.

@@ -105,7 +105,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
   const [invoiceId, setInvoiceId] = useState('');
   const [eligibleItems, setEligibleItems] = useState<EligibleWarrantyItem[]>([]);
   const [loadingEligible, setLoadingEligible] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedInvoiceItemId, setSelectedInvoiceItemId] = useState('');
   const [claimType, setClaimType] = useState<WarrantyClaimType>('WARRANTY');
   const [warrantyMonths, setWarrantyMonths] = useState(12);
   const [quantity, setQuantity] = useState('');
@@ -134,14 +134,14 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
     loadData();
   }, [loadData]);
 
-  const selectedItem = eligibleItems.find((item) => item.productId === selectedProductId) || null;
+  const selectedItem = eligibleItems.find((item) => item.invoiceItemId === selectedInvoiceItemId) || null;
   const selectedInvoice = invoices.find((invoice) => invoice.id === invoiceId) || null;
   const claimableItems = eligibleItems.filter((item) => item.availableQuantity > 0);
 
   const resetCreateForm = () => {
     setInvoiceId('');
     setEligibleItems([]);
-    setSelectedProductId('');
+    setSelectedInvoiceItemId('');
     setClaimType('WARRANTY');
     setWarrantyMonths(12);
     setQuantity('');
@@ -155,7 +155,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
 
   const loadEligible = (nextInvoiceId: string, months = warrantyMonths) => {
     setInvoiceId(nextInvoiceId);
-    setSelectedProductId('');
+    setSelectedInvoiceItemId('');
     setQuantity('');
     if (!nextInvoiceId) {
       setEligibleItems([]);
@@ -179,7 +179,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
   };
 
   const selectItem = (item: EligibleWarrantyItem) => {
-    setSelectedProductId(item.productId);
+    setSelectedInvoiceItemId(item.invoiceItemId || '');
     setQuantity(String(item.availableQuantity));
     if (!item.warrantyActive) setClaimType('COMPLAINT');
   };
@@ -548,9 +548,9 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
                           {claimableItems.map((item) => (
                             <tr
-                              key={item.productId}
+                              key={item.invoiceItemId || item.productId}
                               onClick={() => selectItem(item)}
-                              className={`cursor-pointer transition ${selectedProductId === item.productId
+                              className={`cursor-pointer transition ${selectedInvoiceItemId === item.invoiceItemId
                                 ? 'bg-sky-50 dark:bg-sky-950/40'
                                 : 'hover:bg-slate-50 dark:hover:bg-slate-700/30'}`}
                             >
@@ -572,7 +572,7 @@ export const WarrantyClaimsPanel: React.FC<Props> = ({ invoices }) => {
                                 <span className="block text-[10px] text-slate-400 font-mono">{item.warrantyExpiresAt}</span>
                               </td>
                               <td className="p-2.5 text-center">
-                                {selectedProductId === item.productId
+                                {selectedInvoiceItemId === item.invoiceItemId
                                   ? <CheckCircle2 className="w-4 h-4 text-sky-600 mx-auto" />
                                   : <span className="block w-4 h-4 rounded-full border border-slate-300 mx-auto" />}
                               </td>

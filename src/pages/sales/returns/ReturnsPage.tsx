@@ -228,25 +228,32 @@ export const ReturnsPage: React.FC = () => {
     setLine(idx, { quantityM2: base });
   };
 
-  const total = round2(lines.reduce((sum, line) => {
+  const lineReturnAmounts = lines.map((line) => {
     const soldLines = (invoiceInfo?.items || [])
-      .filter((item) => item.productId === line.productId)
+      .filter((item) => item.id === line.invoiceItemId)
       .map((item) => ({
         quantity: item.quantityM2,
         totalPrice: item.totalPrice,
         unitPrice: item.unitPrice,
         discountAmount: item.discountAmount,
       }));
-    return sum + calculateDiscountedReturnAmount(
+    return calculateDiscountedReturnAmount(
       line.quantityM2,
       soldLines,
       invoiceInfo?.subtotal || 0,
       invoiceInfo?.discountAmount || 0
     );
-  }, 0));
+  });
+  const total = round2(lineReturnAmounts.reduce((sum, amount) => sum + amount, 0));
   const taxableBase = Math.max(0, (invoiceInfo?.subtotal || 0) - (invoiceInfo?.discountAmount || 0));
   const returnTax = calculateReturnTax(total, invoiceInfo?.taxAmount || 0, taxableBase);
   const totalIncludingTax = round2(total + returnTax);
+  const lineReturnTotals = lineReturnAmounts.map((amount) => round2(amount + (total > 0 ? returnTax * amount / total : 0)));
+  const lastSelectedLine = lineReturnAmounts.reduce((last, amount, index) => amount > 0 ? index : last, -1);
+  if (lastSelectedLine >= 0) {
+    const displayedTotal = round2(lineReturnTotals.reduce((sum, amount) => sum + amount, 0));
+    lineReturnTotals[lastSelectedLine] = round2(lineReturnTotals[lastSelectedLine] + totalIncludingTax - displayedTotal);
+  }
   const refundPreview = useMemo(() => {
     if (!invoiceInfo) return { cash: 0, balance: 0 };
     const impact = computeReturnImpact({
@@ -273,9 +280,9 @@ export const ReturnsPage: React.FC = () => {
         const exchanged = service.exchangeSale(
           invoiceId,
           selected.map((l) => ({
-            productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
+            productId: l.productId, invoiceItemId: l.invoiceItemId, quantityM2: l.quantityM2, boxesCount: 0,
             unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'استبدال',
-            specialStockId: l.specialStockId ?? null, disposition: l.disposition,
+            specialStockId: l.specialStockId ?? null, sourceType: l.specialStockId ? 'SPECIAL' : 'REGULAR', disposition: l.disposition,
           })),
           newItems.map((n) => ({
             productId: n.productId, soldBy: 'PIECE', quantityM2: n.quantityM2, boxesCount: n.boxesCount,
@@ -296,9 +303,9 @@ export const ReturnsPage: React.FC = () => {
         const returned = service.returnSale(
           invoiceId,
           selected.map((l) => ({
-            productId: l.productId, quantityM2: l.quantityM2, boxesCount: 0,
+            productId: l.productId, invoiceItemId: l.invoiceItemId, quantityM2: l.quantityM2, boxesCount: 0,
             unitPrice: l.unitPrice, unitCost: l.unitCost, reason: l.reason || 'مرتجع سيراميك',
-            specialStockId: l.specialStockId ?? null, disposition: l.disposition,
+            specialStockId: l.specialStockId ?? null, sourceType: l.specialStockId ? 'SPECIAL' : 'REGULAR', disposition: l.disposition,
           })),
           refundCash && refundMethod !== 'BALANCE',
           AuthService.getCurrentUser()?.id || 'usr_admin',
@@ -540,8 +547,8 @@ export const ReturnsPage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {lines.map((l, idx) => (
-                      <tr key={l.productId}>
-                        <td className="px-3 py-2 font-semibold text-slate-800">{l.productName}<div className="text-[9px] text-slate-400 font-normal">{l.size} • {l.grade}</div></td>
+                      <tr key={l.invoiceItemId}>
+                        <td className="px-3 py-2 font-semibold text-slate-800">{l.productName}<div className="text-[9px] text-slate-400 font-normal">{l.size} • {l.grade}</div><div className={`text-[9px] font-bold ${l.specialStockId ? 'text-amber-700' : 'text-sky-700'}`}>{l.specialStockId ? `مخزون مخفض • ${l.specialNumber || l.specialStockId}` : 'مخزون عادي'}</div></td>
                         <td className="px-3 py-2 font-mono">{formatProductQuantity(l.soldM2, l)}</td>
                         <td className="px-3 py-2 font-mono text-slate-500">{formatProductQuantity(l.returnedM2, l)}</td>
                         <td className="px-3 py-2 font-mono font-bold text-emerald-600">{formatProductQuantity(l.returnableM2, l)}</td>
@@ -586,7 +593,7 @@ export const ReturnsPage: React.FC = () => {
                             <option value="DAMAGED">تالف</option>
                           </select>
                         </td>
-                        <td className="px-3 py-2 font-bold text-rose-600">{fmt(l.quantityM2 * l.unitPrice)}</td>
+                        <td className="px-3 py-2 font-bold text-rose-600">{fmt(lineReturnTotals[idx] || 0)}</td>
                       </tr>
                     ))}
                   </tbody>

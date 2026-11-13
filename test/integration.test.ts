@@ -386,6 +386,28 @@ test('end-to-end: weighted-average costing, sale, and return accounting', async 
   assert.equal(q('SELECT quantity_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].quantityM2, 280);
   assert.equal(q('SELECT reserved_m2 FROM warehouse_stock WHERE product_id=? AND warehouse_id=?', [pid, 'wh_main'])[0].reservedM2, 0);
 
+  const voidOrder = orderSvc.createOrder({
+    customerId: created.id, warehouseId: 'wh_main',
+    items: [{ productId: pid, quantityM2: 1, unitPrice: 300 }],
+  });
+  orderSvc.updateStatus(voidOrder.id, 'CONFIRMED');
+  orderSvc.recordDeposit(voidOrder.id, 100, 'CASH', 'Deposit before invoice void');
+  const depositSettledInvoice = orderSvc.convertToInvoice(voidOrder.id, { paymentType: 'CREDIT' });
+  assert.equal(depositSettledInvoice.paidAmount, 100);
+  new SalesService().voidInvoice(depositSettledInvoice.id, 'Void deposit-settled invoice');
+  const voidDepositLedger = q(`
+    SELECT coa.code AS code, SUM(jel.debit) AS debit, SUM(jel.credit) AS credit
+    FROM journal_entries je JOIN journal_entry_lines jel ON jel.entry_id = je.id
+    JOIN chart_of_accounts coa ON coa.id = jel.account_id
+    WHERE je.reference_type = 'SALES_VOID' AND je.reference_id = ? GROUP BY coa.code
+  `, [depositSettledInvoice.id]);
+  const receivableVoid = voidDepositLedger.find((line: any) => line.code === '1103');
+  const depositLiabilityVoid = voidDepositLedger.find((line: any) => line.code === '2106');
+  assert.equal(Number(receivableVoid?.debit || 0), 0, 'deposit reversal must not add a redundant debit on receivables');
+  assert.equal(Number(receivableVoid?.credit || 0), 200);
+  assert.equal(Number(depositLiabilityVoid?.debit || 0), 0);
+  assert.equal(Number(depositLiabilityVoid?.credit || 0), 100);
+
   // --- Refund to customer balance instead of cash ---
   const balanceReturn = new SalesService().returnSale(
     orderInvoice.id,

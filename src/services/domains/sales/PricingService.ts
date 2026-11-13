@@ -86,19 +86,30 @@ export class PricingService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.pricing.pricing.update');
     if (!input.name.trim()) throw new Error('اسم قائمة الأسعار مطلوب.');
+    const validFrom = this.normalizeDate(input.validFrom, 'تاريخ البداية');
+    const validTo = this.normalizeDate(input.validTo, 'تاريخ النهاية');
+    this.assertDateRange(validFrom, validTo);
 
     const id = `pl_${uuidv4().substring(0, 8)}`;
     return this.db.executeTransaction((db) => {
       const code = db.nextNumber('PL');
+      const previousDefaults = input.isDefault ? db.query<any>('SELECT * FROM price_lists WHERE is_default = 1') : [];
       if (input.isDefault) db.run(`UPDATE price_lists SET is_default = 0`);
       db.run(
         `INSERT INTO price_lists (id, code, name, customer_type, valid_from, valid_to, is_default, notes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, code, input.name.trim(), input.customerType || 'RETAIL',
-          input.validFrom || null, input.validTo || null, input.isDefault ? 1 : 0, input.notes || null,
+          validFrom, validTo, input.isDefault ? 1 : 0, input.notes || null,
         ]
       );
+      this.auditPriceChange(db, actor, 'Create price list', id, null, {
+        name: input.name.trim(), customerType: input.customerType || 'RETAIL', validFrom, validTo,
+        isDefault: Boolean(input.isDefault), notes: input.notes || null,
+      });
+      for (const previous of previousDefaults) {
+        this.auditPriceChange(db, actor, 'Unset default price list', previous.id, previous, { ...previous, is_default: 0 });
+      }
       return this.getPriceLists().find((p) => p.id === id)!;
     });
   }
@@ -106,21 +117,38 @@ export class PricingService {
   public updatePriceList(id: string, patch: Partial<PriceList>): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.pricing.pricing.update');
-    if (patch.isDefault) this.db.run(`UPDATE price_lists SET is_default = 0`);
-    this.db.run(
-      `UPDATE price_lists SET
-        name = COALESCE(?, name), customer_type = COALESCE(?, customer_type),
-        valid_from = COALESCE(?, valid_from), valid_to = COALESCE(?, valid_to),
-        is_default = COALESCE(?, is_default), is_active = COALESCE(?, is_active),
-        notes = COALESCE(?, notes), updated_at = ?
-       WHERE id = ?`,
-      [
-        patch.name ?? null, patch.customerType ?? null, patch.validFrom ?? null, patch.validTo ?? null,
-        patch.isDefault === undefined ? null : (patch.isDefault ? 1 : 0),
-        patch.isActive === undefined ? null : (patch.isActive ? 1 : 0),
-        patch.notes ?? null, new Date().toISOString(), id,
-      ]
-    );
+    this.db.executeTransaction((db) => {
+      const old = db.query<any>('SELECT * FROM price_lists WHERE id = ?', [id])[0];
+      if (!old) throw new Error('Price list not found.');
+      const has = (key: keyof PriceList) => Object.prototype.hasOwnProperty.call(patch, key);
+      const sets = (key: keyof PriceList) => has(key) && patch[key] !== undefined;
+      const nextValidFrom = sets('validFrom') ? this.normalizeDate(patch.validFrom, 'Start date') : old.valid_from;
+      const nextValidTo = sets('validTo') ? this.normalizeDate(patch.validTo, 'End date') : old.valid_to;
+      this.assertDateRange(nextValidFrom, nextValidTo);
+      if (patch.name !== undefined && !String(patch.name).trim()) throw new Error('Price list name is required.');
+      const previousDefaults = patch.isDefault ? db.query<any>('SELECT * FROM price_lists WHERE is_default = 1 AND id != ?', [id]) : [];
+      if (patch.isDefault) db.run('UPDATE price_lists SET is_default = 0');
+
+      const assignments: string[] = [];
+      const values: any[] = [];
+      const set = (column: string, value: any) => { assignments.push(`${column} = ?`); values.push(value); };
+      if (patch.name !== undefined) set('name', String(patch.name).trim());
+      if (patch.customerType !== undefined) set('customer_type', patch.customerType);
+      if (sets('validFrom')) set('valid_from', nextValidFrom);
+      if (sets('validTo')) set('valid_to', nextValidTo);
+      if (patch.isDefault !== undefined) set('is_default', patch.isDefault ? 1 : 0);
+      if (patch.isActive !== undefined) set('is_active', patch.isActive ? 1 : 0);
+      if (patch.notes !== undefined) set('notes', patch.notes);
+      if (!assignments.length) return;
+      assignments.push('updated_at = ?');
+      values.push(new Date().toISOString(), id);
+      db.run(`UPDATE price_lists SET ${assignments.join(', ')} WHERE id = ?`, values);
+      const updated = db.query<any>('SELECT * FROM price_lists WHERE id = ?', [id])[0];
+      this.auditPriceChange(db, actor, 'Update price list', id, old, updated);
+      for (const previous of previousDefaults) {
+        this.auditPriceChange(db, actor, 'Unset default price list', previous.id, previous, { ...previous, is_default: 0 });
+      }
+    });
   }
 
   public togglePriceList(id: string, active: boolean): void {
@@ -139,27 +167,40 @@ export class PricingService {
   public addPriceListItem(input: { priceListId: string; productId: string; priceM2: number; priceBox?: number; minQuantityM2?: number }): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.pricing.pricing.update');
-    if (!(input.priceM2 > 0)) throw new Error('سعر المتر يجب أن يكون أكبر من صفر.');
+    const priceM2 = Number(input.priceM2);
+    const priceBox = input.priceBox === undefined ? 0 : Number(input.priceBox);
+    const minQuantityM2 = input.minQuantityM2 === undefined ? 0 : Number(input.minQuantityM2);
+    if (!Number.isFinite(priceM2) || priceM2 <= 0) throw new Error('Meter price must be a finite number greater than zero.');
+    if (!Number.isFinite(priceBox) || priceBox < 0) throw new Error('Box price must be a finite non-negative number.');
+    if (!Number.isFinite(minQuantityM2) || minQuantityM2 < 0) throw new Error('Minimum quantity must be a finite non-negative number.');
     const existing = this.db.query(
       `SELECT id FROM price_list_items WHERE price_list_id = ? AND product_id = ? AND min_quantity_m2 = ?`,
-      [input.priceListId, input.productId, input.minQuantityM2 || 0]
+      [input.priceListId, input.productId, minQuantityM2]
     )[0];
     if (existing) throw new Error('هذا الصنف موجود بالفعل في القائمة بنفس حد الكمية.');
 
-    this.db.run(
-      `INSERT INTO price_list_items (id, price_list_id, product_id, price_m2, price_box, min_quantity_m2)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        `pli_${uuidv4().substring(0, 8)}`, input.priceListId, input.productId,
-        input.priceM2, input.priceBox || 0, input.minQuantityM2 || 0,
-      ]
-    );
+    const id = `pli_${uuidv4().substring(0, 8)}`;
+    this.db.executeTransaction((db) => {
+      db.run(
+        `INSERT INTO price_list_items (id, price_list_id, product_id, price_m2, price_box, min_quantity_m2)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [id, input.priceListId, input.productId, priceM2, priceBox, minQuantityM2]
+      );
+      this.auditPriceChange(db, actor, 'Add price list item', id, null, {
+        priceListId: input.priceListId, productId: input.productId, priceM2, priceBox, minQuantityM2,
+      });
+    });
   }
 
   public deletePriceListItem(id: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.pricing.pricing.update');
-    this.db.run(`DELETE FROM price_list_items WHERE id = ?`, [id]);
+    this.db.executeTransaction((db) => {
+      const old = db.query<any>('SELECT * FROM price_list_items WHERE id = ?', [id])[0];
+      if (!old) return;
+      db.run('DELETE FROM price_list_items WHERE id = ?', [id]);
+      this.auditPriceChange(db, actor, 'Delete price list item', id, old, null);
+    });
   }
 
   public getPromotions(search = ''): Promotion[] {
@@ -251,22 +292,44 @@ export class PricingService {
     );
   }
 
-  public setCustomerOverride(input: { customerId: string; productId: string; priceM2: number; validFrom?: string; validTo?: string; notes?: string }): void {
+  public setCustomerOverride(input: { customerId: string; productId: string; priceM2: number; validFrom?: string | null; validTo?: string | null; notes?: string }): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.pricing.pricing.update');
-    this.db.run(
-      `INSERT INTO customer_price_overrides (id, customer_id, product_id, price_m2, valid_from, valid_to, approved_by, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(customer_id, product_id) DO UPDATE SET price_m2 = excluded.price_m2,
-         valid_from = excluded.valid_from, valid_to = excluded.valid_to, approved_by = excluded.approved_by`,
-      [uuidv4(), input.customerId, input.productId, input.priceM2, input.validFrom || null, input.validTo || null, actor.id, input.notes || null]
-    );
+    const priceM2 = Number(input.priceM2);
+    if (!Number.isFinite(priceM2) || priceM2 <= 0) throw new Error('Customer override price must be a finite number greater than zero.');
+    const validFrom = this.normalizeDate(input.validFrom, 'Start date');
+    const validTo = this.normalizeDate(input.validTo, 'End date');
+    this.assertDateRange(validFrom, validTo);
+    if (!input.customerId || !input.productId) throw new Error('Customer and product are required for a price override.');
+    this.db.executeTransaction((db) => {
+      const old = db.query<any>(
+        'SELECT * FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [input.customerId, input.productId]
+      )[0] || null;
+      db.run(
+        `INSERT INTO customer_price_overrides (id, customer_id, product_id, price_m2, valid_from, valid_to, approved_by, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(customer_id, product_id) DO UPDATE SET price_m2 = excluded.price_m2,
+           valid_from = excluded.valid_from, valid_to = excluded.valid_to, approved_by = excluded.approved_by, notes = excluded.notes`,
+        [uuidv4(), input.customerId, input.productId, priceM2, validFrom, validTo, actor.id, input.notes ?? old?.notes ?? null]
+      );
+      const updated = db.query<any>(
+        'SELECT * FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [input.customerId, input.productId]
+      )[0];
+      this.auditPriceChange(db, actor, old ? 'Update customer price override' : 'Create customer price override', updated.id, old, updated);
+    });
   }
 
   public deleteCustomerOverride(customerId: string, productId: string): void {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.pricing.pricing.update');
-    this.db.run(`DELETE FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?`, [customerId, productId]);
+    this.db.executeTransaction((db) => {
+      const old = db.query<any>(
+        'SELECT * FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [customerId, productId]
+      )[0];
+      if (!old) return;
+      db.run('DELETE FROM customer_price_overrides WHERE customer_id = ? AND product_id = ?', [customerId, productId]);
+      this.auditPriceChange(db, actor, 'Delete customer price override', old.id, old, null);
+    });
   }
 
   /**
@@ -340,16 +403,17 @@ export class PricingService {
   }
 
   /** Evaluate the same canonical promotions created by the pricing console. */
-  public evaluatePromotions(cart: PromotionCartItem[], couponCode?: string): AppliedPromotion | null {
+  public evaluatePromotions(cart: PromotionCartItem[], couponCode?: string, onlyPromotionId?: string): AppliedPromotion | null {
     if (!cart.length) return null;
     const today = localDateString();
     const rows = this.db.query<any>(
       `SELECT * FROM promotions
        WHERE is_active = 1 AND starts_at <= ? AND ends_at >= ?
+         AND (? IS NULL OR id = ?)
          AND (usage_limit IS NULL OR usage_limit = 0 OR usage_count < usage_limit)
          AND (min_order_amount = 0 OR min_order_amount <= ?)
        ORDER BY discount_percentage DESC, discount_amount DESC, starts_at DESC`,
-      [today, today, cart.reduce((sum, item) => sum + item.amount, 0)]
+      [today, today, onlyPromotionId || null, onlyPromotionId || null, cart.reduce((sum, item) => sum + item.amount, 0)]
     );
 
     let best: AppliedPromotion | null = null;
@@ -415,12 +479,34 @@ export class PricingService {
     ));
   }
 
-  public recordPromotionUsage(promotionId: string, invoiceId: string, couponCode: string | undefined, discountAmount: number): void {
-    this.db.executeTransaction((db) => {
-      db.run('INSERT INTO promotion_usage (id, promotion_id, invoice_id, coupon_code, discount_amount) VALUES (?, ?, ?, ?, ?)',
-        [`pu_${uuidv4().substring(0, 8)}`, promotionId, invoiceId, couponCode || null, discountAmount]);
-      db.run('UPDATE promotions SET usage_count = usage_count + 1 WHERE id = ?', [promotionId]);
-    });
+  private normalizeDate(value: string | null | undefined, label: string): string | null {
+    if (value === undefined || value === null || value === '') return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${label} must use YYYY-MM-DD format.`);
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+      throw new Error(`${label} is not a valid calendar date.`);
+    }
+    return value;
+  }
+
+  private assertDateRange(validFrom: string | null, validTo: string | null): void {
+    if (validFrom && validTo && validTo < validFrom) throw new Error('End date must not be earlier than start date.');
+  }
+
+  private auditPriceChange(
+    db: DatabaseManager,
+    actor: { id: string; fullName: string },
+    action: string,
+    recordId: string,
+    oldValues: unknown,
+    newValues: unknown
+  ): void {
+    db.run(
+      `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, old_values, new_values)
+       VALUES (?, ?, ?, ?, 'PRICING', ?, ?, ?)`,
+      [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, action, recordId,
+        oldValues === null ? null : JSON.stringify(oldValues), newValues === null ? null : JSON.stringify(newValues)]
+    );
   }
 
 }

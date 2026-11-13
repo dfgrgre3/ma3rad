@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { BookmarkPlus, Loader2, Clock, Plus } from 'lucide-react';
 import { ReservationService, StockReservation } from '../../../services/domains/sales/ReservationService';
-import { OrderService, Order } from '../../../services/domains/sales/OrderService';
+import { OrderService, Order, OrderDeposit } from '../../../services/domains/sales/OrderService';
 import { ProductService } from '../../../services/domains/products/ProductService';
 import { OperationsService } from '../../../services/domains/operations/OperationsService';
 import { FinanceEnterpriseService } from '../../../services/domains/finance/FinanceEnterpriseService';
@@ -51,6 +51,7 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
   // Data states
   const [reservations, setReservations] = useState<StockReservation[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [depositsByOrder, setDepositsByOrder] = useState<Record<string, OrderDeposit[]>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
 
@@ -89,7 +90,9 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
         setReservations(resService.getReservations({ status: statusFilter, search }));
         setOrders([]);
       } else {
-        setOrders(orderService.getOrders(search, statusFilter === 'ALL' ? 'ALL' : statusFilter as any));
+        const loadedOrders = orderService.getOrders(search, statusFilter === 'ALL' ? 'ALL' : statusFilter as any);
+        setOrders(loadedOrders);
+        setDepositsByOrder(Object.fromEntries(loadedOrders.map((order) => [order.id, orderService.getOrderDeposits(order.id)])));
         setReservations([]);
       }
     } catch (e: any) {
@@ -223,6 +226,19 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
     }
   };
 
+  const handleRefundDeposit = (deposit: OrderDeposit) => {
+    if (!canManageOrdersDeposits || deposit.refundable <= 0) return;
+    const reason = window.prompt(`سبب رد العربون ${deposit.depositNumber} (${fmtCurrency(deposit.amount)}):`);
+    if (reason === null) return;
+    try {
+      orderService.refundDeposit(deposit.id, reason);
+      toast.success(`تم رد العربون ${deposit.depositNumber} بنجاح.`);
+      loadData();
+    } catch (e: any) {
+      toast.error(e?.message || 'تعذر رد العربون.');
+    }
+  };
+
   // Handle Convert Order to Invoice
   const handleConvertToInvoice = (order: Order) => {
     if (!canConvertOrder) return;
@@ -334,12 +350,15 @@ export const ReservationsDepositPage: React.FC<ReservationsDepositPageProps> = (
           orders={orders}
           canCreate={canManageOrdersDeposits}
           canInvoice={canConvertOrder}
+          canRefund={canManageOrdersDeposits}
+          depositsByOrder={depositsByOrder}
           onRecordDeposit={(order) => {
             setDepositModalOrder(order);
             setDepositAmount('');
             setDepositNotes('');
             depositIdempotency.resetKey();
           }}
+          onRefundDeposit={handleRefundDeposit}
           onConvertToInvoice={handleConvertToInvoice}
         />
       ) : (

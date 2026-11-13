@@ -1,6 +1,6 @@
 import React, { lazy } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Receipt, BarChart3, Workflow, UserRound, BookmarkPlus, ShieldCheck, FileText, Package2, RotateCcw } from 'lucide-react';
+import { Receipt, BarChart3, Workflow, UserRound, BookmarkPlus, ShieldCheck, FileText, Package2, RotateCcw, FileWarning } from 'lucide-react';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
 import { WorkspaceHub } from '../../common/workspace-hub/WorkspaceHub';
 import type { WorkspaceHubTab } from '../../common/workspace-hub/WorkspaceHub';
@@ -14,6 +14,7 @@ const AfterSalesPage = lazy(() => import('../after-sales/AfterSalesPage').then((
 const QuotationsPage = lazy(() => import('../quotations/QuotationsPage').then((module) => ({ default: module.QuotationsPage })));
 const OrdersPage = lazy(() => import('../orders/OrdersPage').then((module) => ({ default: module.OrdersPage })));
 const ReturnsPage = lazy(() => import('../returns/ReturnsPage').then((module) => ({ default: module.ReturnsPage })));
+const ElectronicInvoiceReadinessPage = lazy(() => import('../electronic-invoicing/ElectronicInvoiceReadinessPage').then((module) => ({ default: module.ElectronicInvoiceReadinessPage })));
 
 const TABS: WorkspaceHubTab[] = [
   { id: 'invoices', label: 'فواتير المبيعات', path: '/sales', icon: Receipt },
@@ -25,6 +26,7 @@ const TABS: WorkspaceHubTab[] = [
   { id: 'quotations', label: 'عروض الأسعار', path: '/quotations', icon: FileText },
   { id: 'orders', label: 'الطلبات', path: '/orders', icon: Package2 },
   { id: 'returns', label: 'المرتجعات', path: '/returns', icon: RotateCcw },
+  { id: 'electronic-invoicing', label: 'الفاتورة الإلكترونية', path: '/sales/e-invoicing', icon: FileWarning },
 ];
 
 const REQUIRED_PERMISSION: Record<string, string> = {
@@ -37,6 +39,7 @@ const REQUIRED_PERMISSION: Record<string, string> = {
   quotations: 'quotations.view',
   orders: 'orders.view',
   returns: 'returns.view',
+  'electronic-invoicing': 'electronic_invoices.view',
 };
 
 const PAGE_BY_TAB = {
@@ -49,6 +52,7 @@ const PAGE_BY_TAB = {
   quotations: QuotationsPage,
   orders: OrdersPage,
   returns: ReturnsPage,
+  'electronic-invoicing': ElectronicInvoiceReadinessPage,
 } as const;
 
 export const SalesHubPage: React.FC = () => {

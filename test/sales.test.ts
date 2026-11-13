@@ -239,6 +239,86 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.equal(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0].q, stockBeforeRejectedVoid);
 });
 
+test('FIFO invoice void restores allocations for duplicate product lines', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const customer = new CustomerService().createCustomer({
+    name: 'FIFO duplicate lines', phone: '01070000001', customerType: 'RETAIL', creditLimit: 0,
+  });
+  const productId = 'prod_fifo_duplicate_void';
+  seedProduct(db, productId);
+  db.run('UPDATE warehouse_stock SET quantity_m2 = 30 WHERE product_id = ? AND warehouse_id = ?', [productId, 'wh_main']);
+  db.run('DELETE FROM inventory_cost_layers WHERE product_id = ? AND warehouse_id = ?', [productId, 'wh_main']);
+  db.run(`INSERT INTO inventory_cost_layers (
+    id, product_id, warehouse_id, source_type, received_at, quantity_received, quantity_remaining, unit_cost
+  ) VALUES ('icl_fifo_duplicate_void', ?, 'wh_main', 'OPENING_ESTIMATE', '2026-01-01', 30, 30, 100)`, [productId]);
+  const previousMethod = q(`SELECT value FROM system_settings WHERE key = 'costingMethod'`)[0]?.value;
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'FIFO')`);
+  try {
+    const sales = new SalesService();
+    const invoice = sales.createSale({
+      customerId: customer.id,
+      warehouseId: 'wh_main',
+      items: [10, 5, 7].map((quantityM2) => ({
+        productId, soldBy: 'M2', quantityM2, boxesCount: 0, piecesCount: 0, unitPrice: 300,
+      })),
+      paidAmount: 0,
+      paymentType: 'CASH',
+    });
+    const issueCount = q(`SELECT COUNT(*) AS count FROM inventory_transactions
+      WHERE reference_type = 'INVOICE' AND reference_id = ? AND product_id = ? AND type = 'SALE'`, [invoice.id, productId])[0].count;
+    assert.equal(issueCount, 3);
+
+    sales.voidInvoice(invoice.id, 'FIFO duplicate line regression');
+
+    const layer = q(`SELECT quantity_remaining AS quantity FROM inventory_cost_layers WHERE id = 'icl_fifo_duplicate_void'`)[0];
+    const stock = q(`SELECT quantity_m2 AS quantity FROM warehouse_stock WHERE product_id = ? AND warehouse_id = 'wh_main'`, [productId])[0];
+    const allocation = q(`SELECT SUM(quantity) AS issued, SUM(quantity_restored) AS restored FROM inventory_cost_allocations
+      WHERE outbound_transaction_id IN (SELECT id FROM inventory_transactions WHERE reference_type = 'INVOICE' AND reference_id = ? AND type = 'SALE')`, [invoice.id])[0];
+    assert.equal(Number(layer.quantity), 30);
+    assert.equal(Number(stock.quantity), 30);
+    assert.equal(Number(allocation.issued), 22);
+    assert.equal(Number(allocation.restored), 22);
+  } finally {
+    if (previousMethod === undefined) db.run(`DELETE FROM system_settings WHERE key = 'costingMethod'`);
+    else db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', ?)`, [previousMethod]);
+  }
+});
+
+test('average cost ignores caller supplied sale item cost', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  AuthService.login('admin', 'admin123');
+  const customer = new CustomerService().createCustomer({
+    name: 'Average cost source', phone: '01070000002', customerType: 'RETAIL', creditLimit: 0,
+  });
+  const productId = 'prod_average_cost_source';
+  seedProduct(db, productId, { cost: 100 });
+  const previousMethod = q(`SELECT value FROM system_settings WHERE key = 'costingMethod'`)[0]?.value;
+  db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', 'AVERAGE_COST')`);
+  try {
+    const invoice = new SalesService().createSale({
+      customerId: customer.id,
+      warehouseId: 'wh_main',
+      items: [{
+        productId, soldBy: 'M2', quantityM2: 2, boxesCount: 0, piecesCount: 0,
+        unitPrice: 300, unitCost: 1,
+      }],
+      paidAmount: 0,
+      paymentType: 'CASH',
+    });
+    assert.equal(invoice.totalCost, 200);
+    const storedItem = q(`SELECT unit_cost AS unitCost FROM sales_invoice_items WHERE invoice_id = ?`, [invoice.id])[0];
+    assert.equal(Number(storedItem.unitCost), 100);
+  } finally {
+    if (previousMethod === undefined) db.run(`DELETE FROM system_settings WHERE key = 'costingMethod'`);
+    else db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', ?)`, [previousMethod]);
+  }
+});
+
 test('sales returns allocate line and invoice discounts before applying invoice tax', async () => {
   const db = DatabaseManager.getInstance();
   await db.initialize();

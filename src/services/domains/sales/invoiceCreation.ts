@@ -22,6 +22,7 @@ import '../effects/handlers/salesInvoiceHandlers';
 import type { SalesInvoice, PaymentType } from '../../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from '../../../types/sales/serviceTypes';
+import { PricingService } from './PricingService';
 
 type PreparedSaleItem = {
   id: string;
@@ -134,9 +135,19 @@ function getUnitLabel(product: any): string {
   });
 }
 
-function validateProductPricing(item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number): void {
+function validateProductPricing(sqliteDb: any, dto: CreateSaleDTO, item: CreateSaleDTO['items'][number], product: any, actor: any, baseUnitPrice: number, quantityM2: number): void {
   if (!Number.isFinite(baseUnitPrice) || baseUnitPrice < 0) throw new Error('سعر بيع الصنف غير صحيح.');
-  if (round2(baseUnitPrice) !== Number(product.sellingPriceM2) && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
+  let approvedPolicyPrice = round2(Number(product.sellingPriceM2));
+  if (item.pricingSource === 'POS') {
+    const pricing = new PricingService();
+    const effective = pricing.getEffectivePrice(item.productId, dto.customerId, quantityM2);
+    approvedPolicyPrice = round2(effective.priceM2);
+    if (String(item.soldBy).toUpperCase() === 'BOX' && Number(effective.priceBox) > 0) {
+      const metersPerBox = Number(product.metersPerBox) || 1.44;
+      approvedPolicyPrice = round2(Number(effective.priceBox) / metersPerBox);
+    }
+  }
+  if (round2(baseUnitPrice) !== approvedPolicyPrice && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
     throw new Error(`لا تملك صلاحية تعديل سعر الصنف «${product.name}».`);
   }
   if (round2(baseUnitPrice) < (product.minSellingPriceM2 || 0)) {
@@ -255,7 +266,7 @@ function buildPreparedItem(
     }
     plannedSpecialStock.set(item.specialStockId, round2(alreadyPlanned + baseQuantity));
   } else {
-    validateProductPricing(item, product, actor, units.baseUnitPrice);
+    validateProductPricing(sqliteDb, dto, item, product, actor, units.baseUnitPrice, baseQuantity);
   }
 
   let stockSufficient = true;
@@ -280,7 +291,10 @@ function buildPreparedItem(
   // per-m² conversion. Costs are converted to the same unit for the margin.
   const costPerSellUnit = fifoPlan
     ? fifoPlan.totalCost / (units.sellQuantity || 1)
-    : (specialStock ? Number(specialStock.unitCost) : item.unitCost ?? product.costPrice ?? 0) * units.factor;
+    // Average cost is sourced from the product row loaded inside this transaction.
+    // Never trust a caller supplied unitCost; special stock and FIFO use their
+    // own database backed cost records above.
+    : (specialStock ? Number(specialStock.unitCost) : Number(product.costPrice) || 0) * units.factor;
   const line = computeSaleLine({
     quantity: units.sellQuantity,
     unitPrice: units.sellUnitPrice,
@@ -382,6 +396,38 @@ function validateDiscountAndCredit(
     throw new Error(
       `تجاوز حد الائتمان للعميل "${customer.name}". الرصيد الحالي ${customer.currentBalance} + الآجل ${totals.remainingAmount} يتجاوز الحد ${limit}.`
     );
+  }
+}
+
+function validatePromotionEligibility(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  preparedItems: PreparedSaleItem[],
+): void {
+  if (!dto.promotionUsage) return;
+  const cart = preparedItems.map((item) => {
+    const product = sqliteDb.query<{ categoryId: string | null; brandId: string | null }>(
+      'SELECT category_id AS categoryId, brand_id AS brandId FROM products WHERE id = ?', [item.productId]
+    )[0];
+    const quantity = Number(item.quantityM2);
+    const unitPrice = Number(item.unitPrice);
+    return {
+      productId: item.productId,
+      categoryId: product?.categoryId,
+      brandId: product?.brandId,
+      qty: quantity,
+      unitPrice,
+      amount: round2(quantity * unitPrice),
+    };
+  });
+  const evaluated = new PricingService().evaluatePromotions(
+    cart,
+    dto.promotionUsage.couponCode,
+    dto.promotionUsage.promotionId,
+  );
+  if (!evaluated || evaluated.promotionId !== dto.promotionUsage.promotionId
+    || round2(evaluated.discountAmount) !== round2(dto.promotionUsage.discountAmount)) {
+    throw new Error('العرض الترويجي غير مؤهل لهذه الفاتورة أو قيمة الخصم لا تطابق شروط العرض.');
   }
 }
 
@@ -633,6 +679,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     const allowNegativeStock = sysSettings.enableNegativeStock === true;
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod, trackInventory, allowNegativeStock);
+    validatePromotionEligibility(sqliteDb, dto, preparedItems);
     const headerDiscount = dto.discountAmount || 0;
     const totals = computeSaleTotals({
       lines: preparedItems.map((p) => ({

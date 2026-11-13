@@ -602,7 +602,7 @@ test('pricing and financial statements: overrides, aging and balance sheet', asy
   const sale = new SalesService().createSale({
     customerId: customer.id,
     warehouseId: 'wh_main',
-    items: [{ productId: pid, soldBy: 'M2', quantityM2: 10, boxesCount: 7, piecesCount: 28, unitPrice: 260 }],
+    items: [{ productId: pid, soldBy: 'M2', quantityM2: 10, boxesCount: 7, piecesCount: 28, unitPrice: 260, pricingSource: 'POS' }],
     paidAmount: 0,
     paymentType: 'CREDIT',
   });

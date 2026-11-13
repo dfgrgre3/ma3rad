@@ -56,8 +56,6 @@ test('promotions created in pricing evaluate to the same discounts POS applies',
   const coupon = create({ promotionType: 'FIXED_AMOUNT', discountAmount: 3, couponCode: 'SAVE3' });
   assert.equal(pricing.evaluatePromotions(cart), null, 'coupon-only promotion is not applied without its code');
   assert.equal(pricing.evaluatePromotions(cart, 'save3')?.discountAmount, 3);
-  pricing.recordPromotionUsage(coupon.id, 'invoice-promo-test', 'SAVE3', 3);
-  assert.equal(db.query<{ usageCount: number }>('SELECT usage_count FROM promotions WHERE id = ?', [coupon.id])[0].usageCount, 1);
 
   db.run(`INSERT INTO promotions (id, code, name, promotion_type, type, value, buy_qty, get_qty,
     starts_at, ends_at, start_date, end_date, created_by)
@@ -127,7 +125,7 @@ test('POS totals match persisted invoice for stacked discounts, tax, and shippin
     discountAmount: 20, promotionDiscount: 10, loyaltyDiscount: 5,
     taxPercentage: 10, shippingCost: 7, paidAmount: 177.5, activeShift: null,
   });
-  const invoice = new SalesService().createSale({
+  const saleDto: Parameters<SalesService['createSale']>[0] = {
     customerId: customer.id, warehouseId: 'wh_main',
     items: [{ productId: 'prod_pos_totals_parity', soldBy: 'M2', quantityM2: 2, boxesCount: 0,
       piecesCount: 0, unitPrice: 100, discountAmount: 10 }],
@@ -135,12 +133,34 @@ test('POS totals match persisted invoice for stacked discounts, tax, and shippin
     paidAmount: posTotals.totalAmount, paymentType: 'CASH',
     promotionUsage: { promotionId: 'promo_pos_totals_parity', discountAmount: 10 },
     loyaltyRedemption: { points: 5, discountAmount: 5 },
-  });
+  };
+  assert.throws(
+    () => new SalesService().createSale({ ...saleDto, promotionUsage: { ...saleDto.promotionUsage, discountAmount: 9 } }),
+    /قيمة الخصم لا تطابق شروط العرض/
+  );
+  const invoice = new SalesService().createSale(saleDto);
   assert.equal(posTotals.taxableBase, 155);
   assert.equal(posTotals.taxAmount, 15.5);
   assert.equal(posTotals.totalAmount, 177.5);
   assert.equal(invoice.totalAmount, posTotals.totalAmount);
   assert.equal(invoice.remainingAmount, posTotals.remainingAmount);
+  assert.equal(loyalty.getCustomerLoyalty(customer.id)?.currentPoints, 17);
+  loyalty.redeemPoints({
+    customerId: customer.id, points: 10, referenceType: 'TEST_SPEND', referenceId: 'points-spent-after-sale',
+  });
+
+  new SalesService().voidInvoice(invoice.id, 'void promotion and loyalty usage');
+
+  assert.equal(loyalty.getCustomerLoyalty(customer.id)?.currentPoints, 5, 'void restores redeemed points and removes unspent earned points');
+  assert.equal(loyalty.getCustomerLoyalty(customer.id)?.totalPointsEarned, 5);
+  assert.equal(loyalty.getCustomerLoyalty(customer.id)?.totalPointsRedeemed, 10, 'later redemptions remain in the customer history');
+  assert.equal(db.query<{ points: number }>(`SELECT SUM(points) AS points FROM loyalty_transactions
+    WHERE reference_type = 'SALES_INVOICE_VOID' AND reference_id = ? AND type = 'ADJUST' AND points < 0`, [invoice.id])[0]?.points, -7,
+  'only the invoice points still in the balance are reclaimed');
+  assert.equal(db.query<{ usageCount: number }>('SELECT usage_count AS usageCount FROM promotions WHERE id = ?', ['promo_pos_totals_parity'])[0]?.usageCount, 0);
+  assert.equal(db.query<{ reversedAt: string | null }>('SELECT reversed_at AS reversedAt FROM promotion_usage WHERE invoice_id = ?', [invoice.id])[0]?.reversedAt != null, true);
+  assert.equal(db.query<{ count: number }>(`SELECT COUNT(*) AS count FROM loyalty_transactions
+    WHERE reference_type = 'SALES_INVOICE_VOID' AND reference_id = ? AND type = 'ADJUST'`, [invoice.id])[0]?.count, 2);
 });
 
 test('POS expected closing cash includes partner cash movements', () => {

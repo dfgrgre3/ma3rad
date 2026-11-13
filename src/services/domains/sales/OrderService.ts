@@ -76,6 +76,19 @@ export interface OrderItem {
   customUnit?: string;
 }
 
+export interface OrderDeposit {
+  id: string;
+  orderId: string;
+  depositNumber: string;
+  amount: number;
+  paymentMethod: PaymentType;
+  date: string;
+  invoiceId: string | null;
+  refundId: string | null;
+  refundNumber: string | null;
+  refundable: number;
+}
+
 export interface OrderDeliveryLine {
   itemId: string;
   quantityM2: number;
@@ -201,6 +214,21 @@ export class OrderService {
     );
     if (rows.length === 0) return null;
     return { ...rows[0], items: this.getOrderItems(id) };
+  }
+
+  public getOrderDeposits(orderId: string): OrderDeposit[] {
+    PermissionService.require(AuthService.requireAuth(), 'sales.view');
+    if (!this.getOrder(orderId)) return [];
+    return this.db.query<OrderDeposit>(
+      `SELECT od.id, od.order_id AS orderId, od.deposit_number AS depositNumber,
+              od.amount, od.payment_method AS paymentMethod, od.date, od.invoice_id AS invoiceId,
+              odr.id AS refundId, odr.refund_number AS refundNumber,
+              CASE WHEN od.invoice_id IS NULL AND odr.id IS NULL THEN od.amount ELSE 0 END AS refundable
+       FROM order_deposits od
+       LEFT JOIN order_deposit_refunds odr ON odr.order_deposit_id = od.id
+       WHERE od.order_id = ? ORDER BY od.date, od.created_at, od.id`,
+      [orderId]
+    );
   }
 
   public getOrderItems(orderId: string): OrderItem[] {
@@ -480,6 +508,7 @@ export class OrderService {
   public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string, bankAccountId?: string, idempotencyKey?: string): Order {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'orders.update');
+    if (!['CASH', 'CARD', 'BANK_TRANSFER'].includes(paymentType)) throw new Error('طريقة الدفع غير مدعومة لعربون الطلب.');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
     if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
@@ -563,6 +592,98 @@ export class OrderService {
         orderNumber: order.orderNumber, receiptId, receiptNumber, deposit, totalPaid: newPaid, remaining: Math.max(0, newRemaining)
       });
       return this.getOrder(id)!;
+    });
+  }
+
+  public refundDeposit(depositId: string, reason: string): string {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'sales.orders_deposits.manage');
+    const cleanReason = String(reason || '').trim();
+    if (!cleanReason) throw new Error('يجب تسجيل سبب رد العربون.');
+
+    return this.db.executeTransaction((db) => {
+      const deposit = db.query<{
+        id: string; orderId: string; orderNumber: string; customerId: string; amount: number;
+        paymentMethod: PaymentType; registerId: string | null; shiftId: string | null;
+        bankAccountId: string | null; invoiceId: string | null; branchId: string | null;
+        paidAmount: number; totalAmount: number;
+      }>(
+        `SELECT od.id, od.order_id AS orderId, o.order_number AS orderNumber,
+                od.customer_id AS customerId, od.amount, od.payment_method AS paymentMethod,
+                od.register_id AS registerId, od.shift_id AS shiftId, od.bank_account_id AS bankAccountId,
+                od.invoice_id AS invoiceId, o.branch_id AS branchId,
+                o.paid_amount AS paidAmount, o.total_amount AS totalAmount
+         FROM order_deposits od JOIN orders o ON o.id = od.order_id WHERE od.id = ?`,
+        [depositId]
+      )[0];
+      if (!deposit) throw new Error('عربون الطلب غير موجود.');
+      if (!['CASH', 'CARD', 'BANK_TRANSFER'].includes(deposit.paymentMethod)) {
+        throw new Error('طريقة الدفع المسجلة لهذا العربون لا تدعم الرد من هذا المسار.');
+      }
+      const scopedOrder = this.getOrder(deposit.orderId);
+      if (!scopedOrder) throw new Error('لا تملك صلاحية الوصول إلى هذا الطلب.');
+      if (deposit.paymentMethod === 'CASH' && deposit.registerId) {
+        this.branchAccess.requireRegisterAccess(deposit.registerId, actor, deposit.branchId || undefined);
+      }
+      if (deposit.invoiceId) throw new Error('تمت تسوية هذا العربون على فاتورة؛ يجب معالجة رد الفاتورة من مسار المرتجعات.');
+      const existing = db.query<{ id: string }>('SELECT id FROM order_deposit_refunds WHERE order_deposit_id = ?', [depositId])[0];
+      if (existing) return existing.id;
+
+      const amount = round2(Number(deposit.amount));
+      const paidAmount = round2(Number(deposit.paidAmount));
+      if (amount <= 0 || paidAmount + 0.009 < amount) throw new Error('رصيد العربون لا يتطابق مع المبلغ المدفوع للطلب.');
+      let cashAccount = paymentAccountCode(deposit.paymentMethod);
+      if (deposit.paymentMethod === 'BANK_TRANSFER') {
+        if (!deposit.bankAccountId) throw new Error('الحساب البنكي المرتبط بالعربون غير محدد.');
+        const bank = db.query<{ glAccountCode: string }>(
+          `SELECT coa.code AS glAccountCode FROM bank_accounts ba
+           JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ?`,
+          [deposit.bankAccountId]
+        )[0];
+        if (!bank) throw new Error('الحساب البنكي المرتبط بالعربون غير موجود.');
+        cashAccount = bank.glAccountCode;
+      }
+
+      const date = localDateString();
+      const refundId = `odrf_${uuidv4().substring(0, 12)}`;
+      const refundNumber = db.nextNumber('ODR');
+      db.run(
+        `INSERT INTO order_deposit_refunds
+          (id, refund_number, order_deposit_id, order_id, customer_id, amount, payment_method,
+           register_id, shift_id, bank_account_id, date, reason, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [refundId, refundNumber, deposit.id, deposit.orderId, deposit.customerId, amount,
+          deposit.paymentMethod, deposit.registerId, deposit.shiftId, deposit.bankAccountId, date, cleanReason, actor.id]
+      );
+      const newPaid = round2(paidAmount - amount);
+      const normalizedPaid = Math.max(0, newPaid);
+      const newRemaining = round2(Number(deposit.totalAmount) - normalizedPaid);
+      db.run(
+        `UPDATE orders SET paid_amount = ?, remaining_amount = ?,
+           financial_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [normalizedPaid, Math.max(0, newRemaining), normalizedPaid <= 0.009 ? 'UNPAID' : 'PARTIAL', deposit.orderId]
+      );
+      postLedgerEntry(db.getDatabase(), {
+        date, description: `Refund order deposit ${deposit.orderNumber} (${refundNumber})`,
+        referenceType: 'ORDER_DEPOSIT_REFUND', referenceId: refundId, createdBy: actor.id,
+        lines: [{ accountCode: '2106', debit: amount, credit: 0 }, { accountCode: cashAccount, debit: 0, credit: amount }],
+      });
+      if (deposit.paymentMethod === 'CASH') {
+        if (!deposit.registerId) throw new Error('الصندوق المرتبط بالعربون غير محدد.');
+        db.run('UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?', [amount, deposit.registerId]);
+        if (deposit.shiftId) db.run('UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?', [amount, deposit.shiftId]);
+      } else if (deposit.paymentMethod === 'BANK_TRANSFER' && deposit.bankAccountId) {
+        db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, deposit.bankAccountId]);
+      }
+      this.logStatus(db, deposit.orderId, scopedOrder.status, scopedOrder.status,
+        `رد عربون ${deposit.depositNumber} بمبلغ ${amount}؛ السبب: ${cleanReason}`, actor.id, actor.fullName);
+      db.run(
+        `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
+         VALUES (?, ?, ?, ?, 'SALES', ?, ?)`,
+        [`aud_${uuidv4().substring(0, 8)}`, actor.id, actor.fullName, 'رد عربون طلب', deposit.orderId,
+          JSON.stringify({ depositId, refundId, refundNumber, amount, paymentMethod: deposit.paymentMethod, reason: cleanReason })]
+      );
+      return refundId;
     });
   }
 

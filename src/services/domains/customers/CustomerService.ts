@@ -374,6 +374,10 @@ export class CustomerService {
       [paymentId]
     )[0];
     if (!payment) throw new Error('سند القبض غير موجود.');
+    const linkedOrderDeposit = this.db.query<{ id: string }>(
+      'SELECT id FROM order_deposits WHERE receipt_id = ? LIMIT 1', [paymentId]
+    )[0];
+    if (linkedOrderDeposit) throw new Error('This receipt is an order deposit. Use the refund action on the orders and deposits screen.');
     this.branchAccess.requireBranchAccess(payment.branchId, actor);
     if (payment.registerId) this.branchAccess.requireRegisterAccess(payment.registerId, actor, payment.branchId);
     if (payment.invoiceId) throw new Error('سند مرتبط بفاتورة بيع. اعكسه من تفاصيل الفاتورة.');

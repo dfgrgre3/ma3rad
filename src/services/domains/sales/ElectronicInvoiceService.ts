@@ -142,6 +142,21 @@ export class ElectronicInvoiceService {
     return provider;
   }
 
+  public getIntegrationReadiness(): {
+    ready: boolean;
+    providerConfigured: boolean;
+    documentBuilderConfigured: boolean;
+  } {
+    PermissionService.require(AuthService.requireAuth(), 'electronic_invoices.view');
+    const providerConfigured = Boolean(this.providerFactory);
+    const documentBuilderConfigured = Boolean(this.documentBuilder);
+    return {
+      ready: providerConfigured && documentBuilderConfigured,
+      providerConfigured,
+      documentBuilderConfigured,
+    };
+  }
+
   private invoiceSelect(): string {
     return `SELECT si.*, si.branch_id AS branch_id, si.company_id AS company_id,
       w.branch_id AS warehouse_branch_id,
@@ -155,7 +170,7 @@ export class ElectronicInvoiceService {
 
   public getAllElectronicInvoices(status?: ElectronicInvoiceStatus): ElectronicInvoice[] {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.view');
+    PermissionService.require(actor, 'electronic_invoices.view');
     const { branch, company } = this.scope(actor);
     const conditions = [`${branch.clause}`, `${company.clause}`];
     const params: any[] = [...branch.params, ...company.params];
@@ -173,7 +188,7 @@ export class ElectronicInvoiceService {
 
   public getElectronicInvoiceById(id: string): ElectronicInvoice | null {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.view');
+    PermissionService.require(actor, 'electronic_invoices.view');
     return this.queryElectronicInvoiceById(id, actor);
   }
 
@@ -194,7 +209,7 @@ export class ElectronicInvoiceService {
 
   public getElectronicInvoiceBySalesInvoice(salesInvoiceId: string): ElectronicInvoice | null {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.view');
+    PermissionService.require(actor, 'electronic_invoices.view');
     const { branch, company } = this.scope(actor);
     return this.db.query<ElectronicInvoice>(`
       SELECT ei.* FROM electronic_invoices ei
@@ -206,7 +221,7 @@ export class ElectronicInvoiceService {
 
   public createElectronicInvoice(dto: CreateElectronicInvoiceDTO): ElectronicInvoice {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.create');
+    PermissionService.require(actor, 'electronic_invoices.create');
     const { branch, company } = this.scope(actor);
     const salesInvoice = this.db.query<InvoiceRow>(`${this.invoiceSelect()}
       WHERE si.id = ? AND ${branch.clause} AND ${company.clause}`,
@@ -242,7 +257,7 @@ export class ElectronicInvoiceService {
 
   public async submitElectronicInvoice(id: string): Promise<ElectronicInvoice> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.submit');
+    PermissionService.require(actor, 'electronic_invoices.submit');
     const invoice = this.queryElectronicInvoiceById(id, actor);
     if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة أو خارج نطاق الفرع أو الشركة.');
     if (invoice.status === 'SENT') return this.syncElectronicInvoice(id);
@@ -279,13 +294,13 @@ export class ElectronicInvoiceService {
   /** Acceptance is authoritative only after a status query against ETA. */
   public acceptElectronicInvoice(id: string, _taxAuthorityReference?: string): Promise<ElectronicInvoice> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.accept');
+    PermissionService.require(actor, 'electronic_invoices.accept');
     return this.reconcileFromProvider(id, actor);
   }
 
   public async syncElectronicInvoice(id: string): Promise<ElectronicInvoice> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.view');
+    PermissionService.require(actor, 'electronic_invoices.view');
     return this.reconcileFromProvider(id, actor);
   }
 
@@ -314,13 +329,13 @@ export class ElectronicInvoiceService {
 
   public rejectElectronicInvoice(id: string, _reason: string): Promise<ElectronicInvoice> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.reject');
+    PermissionService.require(actor, 'electronic_invoices.reject');
     return this.reconcileFromProvider(id, actor);
   }
 
   public async cancelElectronicInvoice(id: string, reason: string): Promise<ElectronicInvoice> {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.cancel');
+    PermissionService.require(actor, 'electronic_invoices.cancel');
     const invoice = this.queryElectronicInvoiceById(id, actor);
     if (!invoice) throw new Error('الفاتورة الإلكترونية غير موجودة أو خارج نطاق الفرع أو الشركة.');
     if (invoice.status !== 'ACCEPTED' || !invoice.taxAuthorityReference || !reason.trim()) throw new Error('يجب أن يكون المستند مقبولًا وله معرّف ETA وسبب إلغاء.');
@@ -343,7 +358,7 @@ export class ElectronicInvoiceService {
 
   public getStats(): { total: number; draft: number; sent: number; accepted: number; rejected: number; cancelled: number } {
     const actor = AuthService.requireAuth();
-    PermissionService.require(actor, 'ui.e_invoicing.invoices.view');
+    PermissionService.require(actor, 'electronic_invoices.view');
     const { branch, company } = this.scope(actor);
     const rows = this.db.query<any>(`SELECT ei.status, COUNT(*) as cnt
       FROM electronic_invoices ei JOIN sales_invoices si ON si.id = ei.sales_invoice_id

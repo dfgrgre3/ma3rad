@@ -781,8 +781,8 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
                 <b className="text-emerald-600">{fmt(row.amount)}</b>,
                 <span className="text-slate-600">{PAY_LABEL[row.paymentType] || row.paymentType}</span>,
                 <span className="text-slate-500">{row.performedByName || '—'}</span>,
-                <span className="text-slate-500">{row.notes || '—'}</span>,
-                canCustomerPay ? (
+                <span className="text-slate-500">{row.isOrderDepositRefunded ? `تم رد العربون · ${row.notes || ''}` : row.notes || '—'}</span>,
+                canCustomerPay && !row.isOrderDeposit ? (
                   <button title="حذف السند" onClick={() => deleteCustomerPayment(row)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                 ) : <span className="text-slate-300">—</span>,
               ])}

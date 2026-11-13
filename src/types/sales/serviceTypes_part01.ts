@@ -22,6 +22,8 @@ export interface CreateSaleDTO {
     boxesCount: number;
     piecesCount: number;
     unitPrice: number;
+    /** Indicates the price was selected by the POS pricing resolver. The service still revalidates it. */
+    pricingSource?: 'POS';
     unitCost?: number;
     discountAmount?: number;
   }[];

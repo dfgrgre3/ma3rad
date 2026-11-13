@@ -86,6 +86,7 @@ export function createSaleReturn(
   const normalizedItems = normalizeReturnUnits(ctx, returnItems);
   const fingerprintItems = normalizedItems.map((item) => ({
     productId: item.productId,
+    invoiceItemId: item.invoiceItemId || null,
     quantityM2: round2(Number(item.quantityM2)),
     quantity: item.quantity == null ? null : round2(Number(item.quantity)),
     uom: item.uom || null,
@@ -399,17 +400,40 @@ function getAuthoritativeReturnItems(
     if (!allSoldLines.length) {
       throw new Error('الصنف غير موجود في الفاتورة الأصلية.');
     }
-    const soldLines = requestedSource
-      ? allSoldLines.filter((line) => (line.specialStockId || null) === requestedSource)
-      : allSoldLines;
+    const invoiceItemLine = item.invoiceItemId
+      ? inv.items.find((line) => line.id === item.invoiceItemId && line.productId === item.productId)
+      : undefined;
+    if (item.invoiceItemId && !invoiceItemLine) {
+      throw new Error('سطر الفاتورة الأصلي غير موجود أو لا يطابق الصنف المحدد.');
+    }
+    if (invoiceItemLine && item.sourceType === 'REGULAR' && invoiceItemLine.specialStockId) {
+      throw new Error('سطر الفاتورة المحدد تابع لمخزون مخفض وليس للمخزون العادي.');
+    }
+    if (invoiceItemLine && item.sourceType === 'SPECIAL'
+      && (invoiceItemLine.specialStockId || null) !== requestedSource) {
+      throw new Error('معرف المخزون الخاص لا يطابق سطر الفاتورة المحدد.');
+    }
+    if (item.sourceType === 'SPECIAL' && !requestedSource) {
+      throw new Error('يجب تحديد سجل المخزون الخاص للمصدر المخفض.');
+    }
+    if (item.sourceType === 'REGULAR' && requestedSource) {
+      throw new Error('لا يتطابق معرف المخزون الخاص مع مصدر السطر العادي.');
+    }
+    const soldLines = invoiceItemLine
+      ? [invoiceItemLine]
+      : item.sourceType === 'REGULAR'
+      ? allSoldLines.filter((line) => !line.specialStockId)
+      : requestedSource
+        ? allSoldLines.filter((line) => (line.specialStockId || null) === requestedSource)
+        : allSoldLines;
     if (!soldLines.length) {
       throw new Error('سجل المخزون المخفض المحدد لا يطابق بنداً في الفاتورة الأصلية.');
     }
     const sources = new Set<string | null>(soldLines.map((line) => line.specialStockId || null));
-    if (!requestedSource && sources.size > 1) {
+    if (!item.sourceType && !requestedSource && sources.size > 1) {
       throw new Error('الصنف مسجّل في الفاتورة من أكثر من مصدر (مخزون عادي وسجل بيع مخفض). حدد المصدر المُرجع.');
     }
-    const resolvedSpecialStockId = requestedSource || (sources.size === 1 ? [...sources][0] : null);
+    const resolvedSpecialStockId = item.sourceType === 'REGULAR' ? null : requestedSource || (sources.size === 1 ? [...sources][0] : null);
     const resolvedDisposition: ReturnDisposition = item.disposition
       || (resolvedSpecialStockId ? 'SPECIAL_STOCK' : 'RESTOCK');
     if (resolvedDisposition === 'SPECIAL_STOCK' && !resolvedSpecialStockId) {
@@ -451,23 +475,38 @@ function validateReturnSourceQuantities(
   items: AuthoritativeReturnItem[]
 ): void {
   const requestedBySource = new Map<string, number>();
+  const requestedByInvoiceLine = new Map<string, number>();
   for (const item of items) {
-    if (!item.resolvedSpecialStockId) continue;
-    const key = `${item.productId}|${item.resolvedSpecialStockId}`;
+    if (item.invoiceItemId) requestedByInvoiceLine.set(item.invoiceItemId,
+      (requestedByInvoiceLine.get(item.invoiceItemId) || 0) + Number(item.quantityM2 || 0));
+    const key = `${item.productId}|${item.resolvedSpecialStockId || ''}`;
     requestedBySource.set(key, (requestedBySource.get(key) || 0) + Number(item.quantityM2 || 0));
+  }
+  for (const [invoiceItemId, requested] of requestedByInvoiceLine) {
+    const sold = Number(sqliteDb.query<{ q: number }>(
+      'SELECT quantity_m2 AS q FROM sales_invoice_items WHERE id = ? AND invoice_id = ?',
+      [invoiceItemId, invoiceId]
+    )[0]?.q || 0);
+    const alreadyReturned = Number(sqliteDb.query<{ q: number }>(
+      'SELECT COALESCE(SUM(quantity_m2), 0) AS q FROM sales_return_items WHERE invoice_item_id = ?',
+      [invoiceItemId]
+    )[0]?.q || 0);
+    if (sold <= 0 || requested + alreadyReturned > sold + 1e-6) {
+      throw new Error('كمية الإرجاع تتجاوز الكمية القابلة للإرجاع من سطر الفاتورة المحدد.');
+    }
   }
   for (const [key, requested] of requestedBySource) {
     const [productId, specialStockId] = key.split('|');
     const sold = Number(sqliteDb.query<{ q: number }>(`
       SELECT COALESCE(SUM(quantity_m2), 0) AS q FROM sales_invoice_items
-      WHERE invoice_id = ? AND product_id = ? AND special_stock_id = ?
-    `, [invoiceId, productId, specialStockId])[0]?.q || 0);
+      WHERE invoice_id = ? AND product_id = ? AND special_stock_id IS ?
+    `, [invoiceId, productId, specialStockId || null])[0]?.q || 0);
     const alreadyReturned = Number(sqliteDb.query<{ q: number }>(`
       SELECT COALESCE(SUM(sri.quantity_m2), 0) AS q
       FROM sales_return_items sri
       JOIN sales_returns sr ON sr.id = sri.return_id
-      WHERE sr.original_invoice_id = ? AND sri.product_id = ? AND sri.special_stock_id = ?
-    `, [invoiceId, productId, specialStockId])[0]?.q || 0);
+      WHERE sr.original_invoice_id = ? AND sri.product_id = ? AND sri.special_stock_id IS ?
+    `, [invoiceId, productId, specialStockId || null])[0]?.q || 0);
     if (requested + alreadyReturned > sold + 1e-6) {
       throw new Error('كمية الإرجاع من سجل المخزون المخفض تتجاوز الكمية المباعة منه في الفاتورة.');
     }
@@ -604,11 +643,11 @@ function insertSalesReturnItem(
 ): void {
   sqliteDb.run(`
     INSERT INTO sales_return_items (
-      id, return_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund,
+      id, return_id, invoice_item_id, product_id, product_name, grade, quantity_m2, boxes_count, unit_price, unit_cost, total_refund,
       source_type, special_stock_id, disposition
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
-    returnItemId, returnId, item.productId, product.name, product.grade,
+    returnItemId, returnId, item.invoiceItemId || null, item.productId, product.name, product.grade,
     item.quantityM2, boxesCount, item.unitPrice, unitCost, lineTotal,
     specialStockId ? 'SPECIAL_STOCK_SALE' : 'INVOICE', specialStockId, disposition,
   ]);

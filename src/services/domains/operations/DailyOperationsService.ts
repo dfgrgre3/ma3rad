@@ -163,6 +163,8 @@ export interface DailyDebtPaymentRow {
   paymentType: string;
   notes?: string | null;
   performedByName?: string | null;
+  isOrderDeposit?: number;
+  isOrderDepositRefunded?: number;
 }
 
 export interface DailyDueInstallmentRow {
@@ -417,8 +419,12 @@ export class DailyOperationsService {
     const paymentScope = this.branchAccess.sqlScope('cp.branch_id', 'cr.branch_id', actor);
     const payments = this.db.query<DailyDebtPaymentRow>(
       `SELECT cp.id, cp.receipt_number AS receiptNumber, c.name AS customerName,
-              cp.amount, cp.payment_type AS paymentType, cp.notes, cp.invoice_id AS invoiceId, u.full_name AS performedByName
+              cp.amount, cp.payment_type AS paymentType, cp.notes, cp.invoice_id AS invoiceId, u.full_name AS performedByName,
+              CASE WHEN od.id IS NULL THEN 0 ELSE 1 END AS isOrderDeposit,
+              CASE WHEN odr.id IS NULL THEN 0 ELSE 1 END AS isOrderDepositRefunded
        FROM customer_payments cp
+       LEFT JOIN order_deposits od ON od.receipt_id = cp.id
+       LEFT JOIN order_deposit_refunds odr ON odr.order_deposit_id = od.id
        LEFT JOIN cash_registers cr ON cr.id = cp.register_id
        LEFT JOIN customers c ON c.id = cp.customer_id
        LEFT JOIN users u ON u.id = cp.performed_by

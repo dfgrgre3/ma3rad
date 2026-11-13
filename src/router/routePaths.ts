@@ -6,6 +6,7 @@ export const APP_ROUTE_PATHS = [
   "tools",
   "sales/analytics",
   "sales/cycle",
+  "sales/e-invoicing",
   "sales/statement",
   "sales/orders-deposits",
   "sales/reservations",

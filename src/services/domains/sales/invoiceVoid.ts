@@ -18,6 +18,71 @@ import { defaultEffectEngine } from '../effects/EffectEngine';
 import type { Effect } from '../../../types/effects';
 import '../effects/handlers/salesInvoiceHandlers';
 
+function reverseInvoiceLoyalty(db: DatabaseManager, invoiceId: string, customerId: string, actor: any): {
+  earned: number; redeemed: number; reclaimed: number; previouslySpent: number;
+} {
+  const movements = db.query<{ type: string; points: number }>(
+    `SELECT type, COALESCE(SUM(points), 0) AS points FROM loyalty_transactions
+     WHERE customer_id = ? AND reference_type = 'SALES_INVOICE' AND reference_id = ?
+       AND type IN ('EARN', 'REDEEM') GROUP BY type`, [customerId, invoiceId]
+  );
+  const earned = Math.max(0, Number(movements.find((row) => row.type === 'EARN')?.points || 0));
+  const redeemed = Math.max(0, -Number(movements.find((row) => row.type === 'REDEEM')?.points || 0));
+  if (!earned && !redeemed) return { earned: 0, redeemed: 0, reclaimed: 0, previouslySpent: 0 };
+
+  const loyalty = db.query<{ currentPoints: number; totalPointsEarned: number; totalPointsRedeemed: number }>(
+    `SELECT current_points AS currentPoints, total_points_earned AS totalPointsEarned,
+            total_points_redeemed AS totalPointsRedeemed FROM customer_loyalty WHERE customer_id = ?`, [customerId]
+  )[0];
+  if (!loyalty) throw new Error('Customer loyalty balance is missing while voiding an invoice.');
+  const reclaimed = Math.min(Math.max(0, Number(loyalty.currentPoints)), earned);
+  const previouslySpent = earned - reclaimed;
+  const currentPoints = Number(loyalty.currentPoints) - reclaimed + redeemed;
+  const totalPointsEarned = Math.max(0, Number(loyalty.totalPointsEarned) - earned);
+  const totalPointsRedeemed = Math.max(0, Number(loyalty.totalPointsRedeemed) - redeemed);
+  const tierId = db.query<{ id: string }>(
+    `SELECT id FROM loyalty_tiers WHERE is_active = 1 AND min_points <= ? ORDER BY min_points DESC LIMIT 1`,
+    [totalPointsEarned]
+  )[0]?.id || null;
+  const now = new Date().toISOString();
+  db.run(`UPDATE customer_loyalty SET current_points = ?, total_points_earned = ?, total_points_redeemed = ?,
+    tier_id = ?, last_activity_at = ? WHERE customer_id = ?`,
+  [currentPoints, totalPointsEarned, totalPointsRedeemed, tierId, now, customerId]);
+
+  for (const points of [-reclaimed, redeemed]) {
+    if (!points) continue;
+    db.run(`INSERT INTO loyalty_transactions
+      (id, customer_id, type, points, reference_type, reference_id, description, created_by, created_at)
+      VALUES (?, ?, 'ADJUST', ?, 'SALES_INVOICE_VOID', ?, ?, ?, ?)`,
+    [`ltx_${uuidv4().substring(0, 8)}`, customerId, points, invoiceId,
+      `Invoice ${invoiceId} void reversal (${points < 0 ? 'earned points removed' : 'redeemed points restored'})`, actor.id, now]);
+  }
+  return { earned, redeemed, reclaimed, previouslySpent };
+}
+
+function reverseInvoicePromotionUsage(db: DatabaseManager, invoiceId: string, actor: any, reason: string): {
+  usageRows: number; promotions: Array<{ promotionId: string; reversedUses: number }>;
+} {
+  const usages = db.query<{ id: string; promotionId: string }>(
+    `SELECT id, promotion_id AS promotionId FROM promotion_usage
+     WHERE invoice_id = ? AND reversed_at IS NULL`, [invoiceId]
+  );
+  const counts = new Map<string, number>();
+  for (const usage of usages) counts.set(usage.promotionId, (counts.get(usage.promotionId) || 0) + 1);
+  for (const [promotionId, count] of counts) {
+    db.run(`UPDATE promotions SET usage_count = MAX(0, usage_count - ?) WHERE id = ?`, [count, promotionId]);
+  }
+  const now = new Date().toISOString();
+  for (const usage of usages) {
+    db.run(`UPDATE promotion_usage SET reversed_at = ?, reversed_by = ?, reversal_reason = ?
+      WHERE id = ? AND reversed_at IS NULL`, [now, actor.id, reason, usage.id]);
+  }
+  return {
+    usageRows: usages.length,
+    promotions: Array.from(counts, ([promotionId, reversedUses]) => ({ promotionId, reversedUses })),
+  };
+}
+
 function restoreInvoiceItem(
   sqliteDb: DatabaseManager,
   inv: InvoiceWithItems,
@@ -53,11 +118,7 @@ function restoreInvoiceItem(
   }
 
   if (SettingsService.getSettings().costingMethod === 'FIFO') {
-    const issue = sqliteDb.query<any>(`SELECT id FROM inventory_transactions
-      WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE'
-      ORDER BY created_at,id LIMIT 1`, [invoiceId, item.productId])[0];
-    if (!issue) throw new Error('The original FIFO sale issue is missing; reconcile the invoice before voiding it.');
-    InventoryCostingService.restoreIssue(sqliteDb, issue.id);
+    InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2);
   }
   sqliteDb.run(`
     UPDATE warehouse_stock
@@ -185,6 +246,8 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
     const settledDeposits = sqliteDb.query<{ amount: number }>(
       `SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE invoice_id = ?`, [invoiceId]
     )[0]?.amount ?? 0;
+    const loyaltyReversal = reverseInvoiceLoyalty(sqliteDb, invoiceId, inv.customerId, actor);
+    const promotionReversal = reverseInvoicePromotionUsage(sqliteDb, invoiceId, actor, reason);
 
     // عكس قيد البيع: نتبع بالضبط الحسابات التي خُصمت عند الإنشاء (أطر الدفع المسجلة)
     const splitPaymentsForLedger = sqliteDb.query<{ method: string; amount: number; bankAccountId: string | null }>(
@@ -232,8 +295,7 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
               ...(inv.taxAmount > 0 ? [{ accountCode: '2102', debit: inv.taxAmount, credit: 0 }] : []),
               ...reversedPaymentLines,
               ...(inv.remainingAmount > 0 ? [{ accountCode: '1103', debit: 0, credit: inv.remainingAmount }] : []),
-              ...(settledDeposits > 0 ? [{ accountCode: '1103', debit: round2(settledDeposits), credit: 0 }, { accountCode: '2106', debit: 0, credit: round2(settledDeposits) }] : []),
-              ...(settledDeposits > 0 ? [{ accountCode: '1103', debit: 0, credit: round2(settledDeposits) }] : []),
+              ...(settledDeposits > 0 ? [{ accountCode: '2106', debit: 0, credit: round2(settledDeposits) }] : []),
               ...(inventoryCost > 0 ? [{ accountCode: '1104', debit: inventoryCost, credit: 0 }, { accountCode: '5101', debit: 0, credit: inventoryCost }] : []),
               ...(serviceCost > 0 ? [{ accountCode: '2105', debit: serviceCost, credit: 0 }, { accountCode: '5102', debit: 0, credit: serviceCost }] : []),
             ],
@@ -245,7 +307,11 @@ export function voidSalesInvoice(ctx: SalesContext, invoiceId: string, reason: s
         payload: {
           aggregateType: 'sales_invoice',
           aggregateId: invoiceId,
-          data: { recordId: invoiceId, action: 'إلغاء فاتورة مبيعات', module: 'SALES', oldValues: { invoiceNumber: inv.invoiceNumber }, newValues: { reason } },
+          data: {
+            recordId: invoiceId, action: 'إلغاء فاتورة مبيعات', module: 'SALES',
+            oldValues: { invoiceNumber: inv.invoiceNumber },
+            newValues: { reason, loyaltyReversal, promotionReversal },
+          },
         },
       },
       {

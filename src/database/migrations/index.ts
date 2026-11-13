@@ -3239,6 +3239,49 @@ export const MIGRATIONS: Migration[] = [
       addColumn(db, 'sales_returns', 'request_fingerprint', 'TEXT');
     },
   },
+  {
+    id: '190_sales_return_invoice_item_identity',
+    description: 'Link every sales return item to its original invoice line for accurate quantity and value reconciliation.',
+    up: (db: Database) => {
+      addColumn(db, 'sales_return_items', 'invoice_item_id', 'TEXT REFERENCES sales_invoice_items(id) ON DELETE SET NULL');
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_sales_return_items_invoice_item ON sales_return_items(invoice_item_id);`);
+    },
+  },
+  {
+    id: '191_promotion_usage_reversal_audit',
+    description: 'Keep promotion usage history while recording invoice void reversals.',
+    up: (db: Database) => {
+      addColumn(db, 'promotion_usage', 'reversed_at', 'TEXT');
+      addColumn(db, 'promotion_usage', 'reversed_by', 'TEXT');
+      addColumn(db, 'promotion_usage', 'reversal_reason', 'TEXT');
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_promotion_usage_invoice_reversed ON promotion_usage(invoice_id, reversed_at);`);
+    },
+  },
+  {
+    id: '192_order_deposit_refunds',
+    description: 'Track full order deposit refunds with an auditable, unique reversal record.',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS order_deposit_refunds (
+          id TEXT PRIMARY KEY,
+          refund_number TEXT NOT NULL UNIQUE,
+          order_deposit_id TEXT NOT NULL UNIQUE REFERENCES order_deposits(id),
+          order_id TEXT NOT NULL REFERENCES orders(id),
+          customer_id TEXT NOT NULL REFERENCES customers(id),
+          amount REAL NOT NULL CHECK(amount > 0),
+          payment_method TEXT NOT NULL,
+          register_id TEXT REFERENCES cash_registers(id),
+          shift_id TEXT REFERENCES cash_shifts(id),
+          bank_account_id TEXT REFERENCES bank_accounts(id),
+          date TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          created_by TEXT NOT NULL REFERENCES users(id),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_order_deposit_refunds_order ON order_deposit_refunds(order_id, date);
+      `);
+    },
+  },
 ].flat().sort((left, right) => {
   const leftNumber = Number(/^([0-9]+)/.exec(left.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
   const rightNumber = Number(/^([0-9]+)/.exec(right.id || '')?.[1] ?? Number.MAX_SAFE_INTEGER);
