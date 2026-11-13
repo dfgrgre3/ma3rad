@@ -22,13 +22,17 @@ export const ElectronicInvoiceReadinessPage: React.FC = () => {
         </div>
       </header>
 
-      <section className="rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-800 dark:bg-amber-950/30" role="status">
+      <section className={`rounded-2xl border p-5 ${readiness.ready ? 'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30' : 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30'}`} role="status" aria-live="polite">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+          {readiness.ready
+            ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
+            : <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />}
           <div>
-            <h2 className="font-black text-amber-950 dark:text-amber-100">التكامل غير مهيأ حاليًا</h2>
-            <p className="mt-1 text-sm leading-6 text-amber-900 dark:text-amber-200">
-              لا يرسل النظام الفواتير إلى ETA في هذا الإصدار. هذه الشاشة تعرض حالة الإعداد فقط؛ لا تنشئ مسودة ولا ترسل مستندًا.
+            <h2 className="font-black text-slate-950 dark:text-slate-100">{readiness.ready ? 'جاهز للإرسال إلى ETA' : 'التكامل غير مهيأ حاليًا'}</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-800 dark:text-slate-200">
+              {readiness.ready
+                ? 'تم إعداد موفر ETA وباني المستند. حالة الجاهزية لا تعني قبول الفواتير؛ تظهر النتيجة بعد الإرسال ومزامنة الحالة.'
+                : 'لا يرسل النظام الفواتير إلى ETA في هذا الإصدار. هذه الشاشة تعرض حالة الإعداد فقط؛ لا تنشئ مسودة ولا ترسل مستندًا.'}
             </p>
           </div>
         </div>

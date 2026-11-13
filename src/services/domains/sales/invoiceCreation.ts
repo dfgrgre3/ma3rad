@@ -23,6 +23,8 @@ import type { SalesInvoice, PaymentType } from '../../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from '../../../types/sales/serviceTypes';
 import { PricingService } from './PricingService';
+import { AppConfigService } from '../config/AppConfigService';
+import { basePriceFromUnitPrice } from '../../../utils/products/uom';
 
 type PreparedSaleItem = {
   id: string;
@@ -143,8 +145,7 @@ function validateProductPricing(sqliteDb: any, dto: CreateSaleDTO, item: CreateS
     const effective = pricing.getEffectivePrice(item.productId, dto.customerId, quantityM2);
     approvedPolicyPrice = round2(effective.priceM2);
     if (String(item.soldBy).toUpperCase() === 'BOX' && Number(effective.priceBox) > 0) {
-      const metersPerBox = Number(product.metersPerBox) || 1.44;
-      approvedPolicyPrice = round2(Number(effective.priceBox) / metersPerBox);
+      approvedPolicyPrice = round2(basePriceFromUnitPrice(Number(effective.priceBox), 'BOX', product));
     }
   }
   if (round2(baseUnitPrice) !== approvedPolicyPrice && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
@@ -368,7 +369,8 @@ function validateDiscountAndCredit(
   dto: CreateSaleDTO,
   actor: any,
   totals: ReturnType<typeof computeSaleTotals>,
-  totalLineDiscount: number
+  totalLineDiscount: number,
+  discountApprovalThresholdPercent: number
 ): void {
   const headerDiscount = dto.discountAmount || 0;
   if (!Number.isFinite(headerDiscount) || headerDiscount < 0) throw new Error('مبلغ الخصم غير صحيح.');
@@ -377,6 +379,10 @@ function validateDiscountAndCredit(
   }
   if (totalLineDiscount + headerDiscount > 0) {
     PermissionService.require(actor, 'ui.sales.invoices.discount');
+    const discountBase = Number(totals.subtotal || 0);
+    const discountPercent = discountBase > 0 ? ((totalLineDiscount + headerDiscount) / discountBase) * 100 : 0;
+    const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', discountApprovalThresholdPercent);
+    if (discountPercent > threshold) PermissionService.require(actor, 'ui.sales.invoices.approve');
   }
 
   if (totals.remainingAmount > 0 && !PermissionService.can(actor, 'ui.sales.invoices.credit')) {
@@ -533,7 +539,7 @@ function insertInvoiceItems(
       -item.quantityM2, -item.boxesCount, round2(item.unitCost), item.totalCost,
       invoiceId, `بيع بموجب فاتورة ${invoiceNumber}`, actor.id
     ]);
-    if (costingMethod === 'FIFO' && item.fifoPlan) InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan);
+    if (costingMethod === 'FIFO' && item.fifoPlan) InventoryCostingService.consumeFifo(sqliteDb, txId, item.fifoPlan, item.id);
 
     if (item.productType !== 'GENERAL') {
       const batchResult = new BatchService().deductFromBatches(item.productId, dto.warehouseId, item.quantityM2, { allowShortfall: allowNegativeStock });
@@ -692,7 +698,8 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       paidAmount: dto.paidAmount,
     });
 
-    validateDiscountAndCredit(sqliteDb, dto, actor, totals, totalLineDiscount);
+    validateDiscountAndCredit(sqliteDb, dto, actor, totals, totalLineDiscount,
+      Number(sysSettings.discountApprovalThresholdPercent ?? 10));
 
     // Without inventory tracking there is no inventory asset to relieve, so the
     // invoice-level cost and margin stay at zero. Line costs are still stored so

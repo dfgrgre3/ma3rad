@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { DatabaseManager } from '../src/database/repositories/databaseManager.ts';
 import {
   baseQuantityAsM2,
+  basePriceFromUnitPrice,
   convertQuantity,
   conversionFactor,
   fromBaseQuantity,
@@ -59,6 +60,19 @@ test('base quantity can be expressed as square meters only for area-dimension pr
   assert.equal(baseQuantityAsM2(2, { ...ceramic, baseUnit: 'BOX' }), 2.88);
   assert.equal(baseQuantityAsM2(4, { ...ceramic, baseUnit: 'PIECE' }), 1.44);
   assert.equal(baseQuantityAsM2(5, generalKg), 0);
+});
+
+test('box price converts to the product base price for M2, PIECE, and BOX base units', () => {
+  const m2Product = { productType: 'CERAMIC', baseUnit: 'M2', metersPerBox: 1.44, piecesPerBox: 4 };
+  const pieceProduct = { productType: 'GENERAL', baseUnit: 'PIECE', metersPerBox: 1, piecesPerBox: 12 };
+  const boxProduct = { productType: 'GENERAL', baseUnit: 'BOX', metersPerBox: 1.44, piecesPerBox: 4 };
+
+  assert.equal(toBaseQuantity(1, 'BOX', m2Product).quantity, 1.44);
+  assert.equal(basePriceFromUnitPrice(144, 'BOX', m2Product), 100);
+  assert.equal(toBaseQuantity(1, 'BOX', pieceProduct).quantity, 12);
+  assert.equal(basePriceFromUnitPrice(120, 'BOX', pieceProduct), 10);
+  assert.equal(toBaseQuantity(1, 'BOX', boxProduct).quantity, 1);
+  assert.equal(basePriceFromUnitPrice(120, 'BOX', boxProduct), 120);
 });
 
 test('database lines fill uom and quantity from the product base unit automatically', async () => {

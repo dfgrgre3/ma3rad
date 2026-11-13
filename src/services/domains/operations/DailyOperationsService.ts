@@ -165,6 +165,7 @@ export interface DailyDebtPaymentRow {
   performedByName?: string | null;
   isOrderDeposit?: number;
   isOrderDepositRefunded?: number;
+  movementType?: 'COLLECTION' | 'ORDER_DEPOSIT_REFUND';
 }
 
 export interface DailyDueInstallmentRow {
@@ -421,10 +422,12 @@ export class DailyOperationsService {
       `SELECT cp.id, cp.receipt_number AS receiptNumber, c.name AS customerName,
               cp.amount, cp.payment_type AS paymentType, cp.notes, cp.invoice_id AS invoiceId, u.full_name AS performedByName,
               CASE WHEN od.id IS NULL THEN 0 ELSE 1 END AS isOrderDeposit,
-              CASE WHEN odr.id IS NULL THEN 0 ELSE 1 END AS isOrderDepositRefunded
+              CASE WHEN od.id IS NOT NULL AND COALESCE((
+                SELECT SUM(refund.amount) FROM order_deposit_refunds refund WHERE refund.order_deposit_id = od.id
+              ), 0) >= cp.amount - 0.009 THEN 1 ELSE 0 END AS isOrderDepositRefunded,
+              'COLLECTION' AS movementType
        FROM customer_payments cp
        LEFT JOIN order_deposits od ON od.receipt_id = cp.id
-       LEFT JOIN order_deposit_refunds odr ON odr.order_deposit_id = od.id
        LEFT JOIN cash_registers cr ON cr.id = cp.register_id
        LEFT JOIN customers c ON c.id = cp.customer_id
        LEFT JOIN users u ON u.id = cp.performed_by
@@ -432,6 +435,21 @@ export class DailyOperationsService {
        ORDER BY cp.created_at DESC`,
       [day, ...paymentScope.params]
     );
+    const refundScope = this.branchAccess.sqlScope('o.branch_id', undefined, actor);
+    const depositRefunds = this.db.query<DailyDebtPaymentRow>(
+      `SELECT odr.id, odr.refund_number AS receiptNumber, c.name AS customerName,
+              -odr.amount AS amount, odr.payment_method AS paymentType, odr.reason AS notes,
+              u.full_name AS performedByName, 1 AS isOrderDeposit, 1 AS isOrderDepositRefunded,
+              'ORDER_DEPOSIT_REFUND' AS movementType
+       FROM order_deposit_refunds odr
+       JOIN orders o ON o.id = odr.order_id
+       JOIN customers c ON c.id = odr.customer_id
+       LEFT JOIN users u ON u.id = odr.created_by
+       WHERE odr.date = ? AND ${refundScope.clause}
+       ORDER BY odr.created_at DESC`,
+      [day, ...refundScope.params]
+    );
+    payments.push(...depositRefunds);
 
     const installmentScope = this.branchAccess.sqlScope('p.branch_id', 'si.branch_id', actor);
     const dueInstallments = this.db.query<DailyDueInstallmentRow>(

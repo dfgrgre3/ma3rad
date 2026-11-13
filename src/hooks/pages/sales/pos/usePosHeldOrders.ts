@@ -111,12 +111,16 @@ export const usePosHeldOrders = ({
       });
       const raw = localStorage.getItem(`${HELD_STORAGE_KEY}:${currentUserId}`);
       if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        const localOrders = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
-        const merged = new Map(restored.map((order) => [order.id, order]));
-        localOrders.forEach((order) => merged.set(order.id, { ...order, createdBy: currentUserId }));
-        restored.splice(0, restored.length, ...merged.values());
-        restored.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          const localOrders = Array.isArray(parsed) ? parsed as HeldOrder[] : [];
+          const merged = new Map(restored.map((order) => [order.id, order]));
+          localOrders.forEach((order) => merged.set(order.id, { ...order, createdBy: currentUserId }));
+          restored.splice(0, restored.length, ...merged.values());
+          restored.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
+        } catch (error) {
+          notify(error instanceof Error ? `Local held orders are corrupt: ${error.message}` : 'Local held orders are corrupt', 'error');
+        }
       }
       heldOrdersRef.current = restored;
       setHeldOrders(restored);
@@ -127,18 +131,18 @@ export const usePosHeldOrders = ({
     }
   }, [heldOrderService, currentUserId, notify]);
 
-  const persistHeld = (orders: HeldOrder[] | ((current: HeldOrder[]) => HeldOrder[])) => {
+  const persistHeld = (orders: HeldOrder[] | ((current: HeldOrder[]) => HeldOrder[])): boolean => {
     const next = typeof orders === 'function' ? orders(heldOrdersRef.current) : orders;
     if (!currentUserId) {
       notify('تعذر حفظ الطلب المعلق: المستخدم غير محدد', 'error');
-      return;
+      return false;
     }
     const owned = next.map((order) => ({ ...order, createdBy: currentUserId }));
     const previous = heldOrdersRef.current;
-    heldOrdersRef.current = owned;
-    setHeldOrders(owned);
+    let persisted = false;
     try {
       localStorage.setItem(`${HELD_STORAGE_KEY}:${currentUserId}`, JSON.stringify(owned));
+      persisted = true;
     } catch (error) {
       notify(error instanceof Error ? `تعذر حفظ نسخة الطلبات المحلية: ${error.message}` : 'تعذر حفظ نسخة الطلبات المحلية', 'error');
     }
@@ -147,9 +151,14 @@ export const usePosHeldOrders = ({
       const nextIds = new Set(owned.map((order) => order.id));
       previousIds.forEach((id) => { if (!nextIds.has(id)) heldOrderService.delete(id, currentUserId); });
       owned.forEach((order) => heldOrderService.save(order.id, JSON.stringify(order), currentUserId));
+      persisted = true;
     } catch (error) {
       notify(error instanceof Error ? `تعذر حفظ الطلبات في قاعدة البيانات: ${error.message}` : 'تعذر حفظ الطلبات في قاعدة البيانات', 'error');
     }
+    if (!persisted) return false;
+    heldOrdersRef.current = owned;
+    setHeldOrders(owned);
+    return true;
   };
 
   const holdCurrentOrder = () => {
@@ -183,7 +192,7 @@ export const usePosHeldOrders = ({
       loyaltyDiscount,
     };
     if (!currentUserId) { notify('يلزم تسجيل الدخول قبل تعليق الطلب', 'error'); return; }
-    persistHeld((prev) => [hold, ...prev]);
+    if (!persistHeld((prev) => [hold, ...prev])) return;
     setCart([]);
     setDiscountAmount(0);
     setTaxPercentage(defaultTaxPercentage || 0);

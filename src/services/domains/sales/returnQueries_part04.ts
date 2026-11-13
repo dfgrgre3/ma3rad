@@ -15,7 +15,7 @@ export function fetchReturnableItems(ctx: SalesContext, invoiceId: string): Retu
      FROM sales_invoice_items sii
      LEFT JOIN products p ON p.id = sii.product_id
      LEFT JOIN inventory_special_stocks iss ON iss.id = sii.special_stock_id
-     WHERE sii.invoice_id = ? ORDER BY sii.rowid`,
+     WHERE sii.invoice_id = ? ORDER BY sii.product_name ASC, sii.id ASC`,
     [invoiceId]
   );
   const returnedByLine = new Map<string, number>();

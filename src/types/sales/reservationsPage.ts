@@ -4,7 +4,7 @@ import { getProductUnitLabel } from '../../utils/products/productUnits';
 
 export type ReservationReferenceType = 'ORDER' | 'QUOTATION' | 'PROJECT' | 'MANUAL';
 
-export type DepositPaymentType = 'CASH' | 'CARD' | 'BANK_TRANSFER';
+export type DepositPaymentType = 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHEQUE';
 
 export type ReservationTab = 'orders' | 'reservations';
 

@@ -630,7 +630,7 @@ export class WarrantyClaimService {
         discount_percentage AS discountPercentage, tax_percentage AS taxPercentage
         FROM sales_invoices WHERE id = ? AND invoice_status = 'COMPLETED'`, [claim.invoiceId])[0];
       if (!invoice) throw new Error('لا يمكن تنفيذ الحل لأن فاتورة البيع لم تعد مكتملة.');
-      const sourceLines = db.query<any>(`SELECT special_stock_id AS specialStockId,
+      const sourceLines = db.query<any>(`SELECT id AS invoiceItemId, special_stock_id AS specialStockId,
         quantity_m2 AS quantity, boxes_count AS boxes, pieces_count AS pieces,
         unit_price AS unitPrice, unit_cost AS unitCost, discount_amount AS discountAmount
         FROM sales_invoice_items WHERE invoice_id = ? AND product_id = ?`, [claim.invoiceId, claim.productId]);
@@ -638,7 +638,9 @@ export class WarrantyClaimService {
       const sourceIds = new Set(sourceLines.map((line) => line.specialStockId || 'REGULAR'));
       if (sourceIds.size > 1) throw new Error('يجب مراجعة المصدر المخزني للكمية يدويًا قبل تنفيذ المرتجع.');
       const specialStockId = sourceLines[0].specialStockId || null;
+      if (sourceLines.length !== 1) throw new Error('يجب تحديد سطر الفاتورة الأصلي للمطالبة قبل تنفيذ المرتجع.');
       const returnItems = [{
+        invoiceItemId: sourceLines[0].invoiceItemId,
         productId: claim.productId,
         quantityM2: claim.quantityM2,
         boxesCount: 0,

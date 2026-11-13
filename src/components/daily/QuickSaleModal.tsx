@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Loader2, Save, Percent, Truck, Barcode } from 'lucide-react';
 import { SalesService } from '../../services/domains/sales/SalesService';
+import { AppConfigService } from '../../services/domains/config/AppConfigService';
+import { SettingsService } from '../../services/domains/config/SettingsService';
+import { ApprovalService } from '../../services/domains/approvals/ApprovalService';
+import { AuthService } from '../../services/domains/auth/AuthService';
+import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { InventoryService } from '../../services/domains/inventory/InventoryService';
 import { useToast } from '../ui/Toast';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
@@ -136,6 +141,31 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
     }
     if (!Number.isFinite(total) || total <= 0) { toast.error('إجمالي الفاتورة غير صحيح'); return; }
     if (discount > subtotal) { toast.error('الخصم لا يمكن أن يتجاوز قيمة الأصناف'); return; }
+    if (discount > 0) {
+      const configuredThreshold = SettingsService.getSettings().discountApprovalThresholdPercent ?? 10;
+      const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', configuredThreshold);
+      const discountPercent = subtotal > 0 ? discount / subtotal * 100 : 0;
+      if (discountPercent > threshold) {
+        const actor = AuthService.getCurrentUser();
+        if (!PermissionService.can(actor, 'ui.sales.invoices.approve')) {
+          try {
+            const request = new ApprovalService().createRequest({
+              requestType: 'DISCOUNT',
+              title: `اعتماد خصم ${discountPercent.toFixed(1)}% على فاتورة بيع سريعة`,
+              description: `العميل: ${customerId} — الخصم ${discount} من إجمالي ${subtotal} ج.م (الحد ${threshold}%).`,
+              requestedValue: discount,
+              currentValue: subtotal,
+              priority: 'HIGH',
+              referenceType: 'MANUAL',
+            });
+            toast.error(`الخصم يتجاوز الحد (${threshold}%). أُرسل طلب اعتماد ${request.requestNumber}؛ أعد البيع بعد الاعتماد.`);
+          } catch (error: any) {
+            toast.error(error?.message || 'الخصم يتجاوز الحد ويلزم اعتماد المسؤول');
+          }
+          return;
+        }
+      }
+    }
     if (taxRate > 100) { toast.error('نسبة الضريبة يجب ألا تتجاوز 100٪'); return; }
     if (!Number.isFinite(effectivePaid) || effectivePaid < 0 || effectivePaid > total) {
       toast.error('المبلغ المدفوع يجب أن يكون بين صفر وإجمالي الفاتورة');

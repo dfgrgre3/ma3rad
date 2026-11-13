@@ -43,7 +43,7 @@ export interface ReturnStats {
 export interface ReturnRequestItem {
   productId: string;
   /** Original sales invoice item that this return line consumes. */
-  invoiceItemId?: string;
+  invoiceItemId: string;
   /** Base-unit quantity, used when `uom`/`quantity` are not supplied. */
   quantityM2: number;
   /** Optional selling unit for the returned quantity (e.g. BOX). */

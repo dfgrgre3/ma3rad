@@ -292,7 +292,8 @@ export class HrAlertsService {
   /** إشعارات أقساط القروض المستحقة للموظفين */
   private checkLoanInstallments(actor: User, horizon: string): { created: number } {
     let created = 0;
-    const scope = this.branchAccess.sqlScope('l.branch_id', undefined, actor);
+    // HR loans inherit their branch from the employee; hr_loans has no branch_id.
+    const scope = this.branchAccess.sqlScope('e.branch_id', undefined, actor);
     const departmentScope = this.departmentAccess.sqlScope('e.department_id', actor);
 
     const rows = this.db.query<any>(`

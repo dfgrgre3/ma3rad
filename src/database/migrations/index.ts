@@ -3265,7 +3265,7 @@ export const MIGRATIONS: Migration[] = [
         CREATE TABLE IF NOT EXISTS order_deposit_refunds (
           id TEXT PRIMARY KEY,
           refund_number TEXT NOT NULL UNIQUE,
-          order_deposit_id TEXT NOT NULL UNIQUE REFERENCES order_deposits(id),
+          order_deposit_id TEXT NOT NULL REFERENCES order_deposits(id),
           order_id TEXT NOT NULL REFERENCES orders(id),
           customer_id TEXT NOT NULL REFERENCES customers(id),
           amount REAL NOT NULL CHECK(amount > 0),
@@ -3278,6 +3278,45 @@ export const MIGRATIONS: Migration[] = [
           created_by TEXT NOT NULL REFERENCES users(id),
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE INDEX IF NOT EXISTS idx_order_deposit_refunds_order ON order_deposit_refunds(order_id, date);
+      `);
+    },
+  },
+  {
+    id: '193_allow_partial_order_deposit_refunds',
+    description: 'Allow multiple partial refund records for one order deposit.',
+    up: (db: Database) => {
+      const indexes = db.exec(`PRAGMA index_list('order_deposit_refunds')`)[0]?.values || [];
+      const hasUniqueDepositIndex = indexes.some((row) => {
+        if (Number(row[2]) !== 1) return false;
+        const name = String(row[1]).replace(/"/g, '""');
+        const columns = db.exec(`PRAGMA index_info("${name}")`)[0]?.values || [];
+        return columns.length === 1 && String(columns[0][2]) === 'order_deposit_id';
+      });
+      if (!hasUniqueDepositIndex) return;
+      db.exec(`
+        CREATE TABLE order_deposit_refunds_partial (
+          id TEXT PRIMARY KEY,
+          refund_number TEXT NOT NULL UNIQUE,
+          order_deposit_id TEXT NOT NULL REFERENCES order_deposits(id),
+          order_id TEXT NOT NULL REFERENCES orders(id),
+          customer_id TEXT NOT NULL REFERENCES customers(id),
+          amount REAL NOT NULL CHECK(amount > 0),
+          payment_method TEXT NOT NULL,
+          register_id TEXT REFERENCES cash_registers(id),
+          shift_id TEXT REFERENCES cash_shifts(id),
+          bank_account_id TEXT REFERENCES bank_accounts(id),
+          date TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          created_by TEXT NOT NULL REFERENCES users(id),
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO order_deposit_refunds_partial
+          SELECT id, refund_number, order_deposit_id, order_id, customer_id, amount, payment_method,
+                 register_id, shift_id, bank_account_id, date, reason, created_by, created_at
+          FROM order_deposit_refunds;
+        DROP TABLE order_deposit_refunds;
+        ALTER TABLE order_deposit_refunds_partial RENAME TO order_deposit_refunds;
         CREATE INDEX IF NOT EXISTS idx_order_deposit_refunds_order ON order_deposit_refunds(order_id, date);
       `);
     },

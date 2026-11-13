@@ -16,6 +16,7 @@ export function conversionFactor(
 
   const boxToBase = (): number | null => {
     const base = normalizeUom(product.baseUnit, product);
+    if (base === 'BOX') return 1;
     if (base === 'M2') {
       const meters = Number(product.metersPerBox) || 0;
       return meters > 0 ? meters : null;

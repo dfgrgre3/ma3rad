@@ -395,6 +395,9 @@ function getAuthoritativeReturnItems(
   returnItems: ReturnRequestItem[]
 ): AuthoritativeReturnItem[] {
   return returnItems.map((item) => {
+    if (!item.invoiceItemId) {
+      throw new Error('يجب تحديد سطر الفاتورة الأصلي لكل بند مرتجع.');
+    }
     const requestedSource = item.specialStockId ? String(item.specialStockId) : null;
     const allSoldLines = inv.items.filter((line) => line.productId === item.productId);
     if (!allSoldLines.length) {
@@ -581,7 +584,7 @@ function processReturnItem(
   const shouldRestoreFifo = fifoEnabled && !serviceLine
     && !specialStockId && disposition === 'RESTOCK';
   const actualCost = shouldRestoreFifo
-    ? InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2)
+    ? InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2, item.invoiceItemId)
     : 0;
   const unitCost = shouldRestoreFifo
     ? round2(actualCost / item.quantityM2)

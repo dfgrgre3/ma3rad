@@ -358,8 +358,8 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
   const filteredPayments = useMemo(() => {
     const rows: any[] = data?.payments || [];
     const term = search.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter((row) => `${row.receiptNumber} ${row.customerName || ''} ${row.performedByName || ''}`.toLowerCase().includes(term));
+    return rows.filter((row) => !row.isOrderDepositRefunded || row.movementType === 'ORDER_DEPOSIT_REFUND')
+      .filter((row) => !term || `${row.receiptNumber} ${row.customerName || ''} ${row.performedByName || ''}`.toLowerCase().includes(term));
   }, [data, search]);
 
   const deleteExpense = (row: any) => {
@@ -776,12 +776,12 @@ const DailyPage: React.FC<{ kind: DailyKind }> = ({ kind }) => {
               headers={['الإيصال', 'العميل', 'المبلغ', 'طريقة الدفع', 'بواسطة', 'ملاحظات', 'إجراءات']}
               empty="لا توجد تحصيلات اليوم"
               rows={filteredPayments.map((row: any) => [
-                <span className="font-mono text-emerald-600">{row.receiptNumber}</span>,
+                <span className={`font-mono ${row.movementType === 'ORDER_DEPOSIT_REFUND' ? 'text-rose-600' : 'text-emerald-600'}`}>{row.receiptNumber}</span>,
                 <span className="font-semibold text-slate-900">{row.customerName || '—'}</span>,
-                <b className="text-emerald-600">{fmt(row.amount)}</b>,
+                <b className={row.amount < 0 ? 'text-rose-600' : 'text-emerald-600'}>{fmt(row.amount)}</b>,
                 <span className="text-slate-600">{PAY_LABEL[row.paymentType] || row.paymentType}</span>,
                 <span className="text-slate-500">{row.performedByName || '—'}</span>,
-                <span className="text-slate-500">{row.isOrderDepositRefunded ? `تم رد العربون · ${row.notes || ''}` : row.notes || '—'}</span>,
+                <span className="text-slate-500">{row.movementType === 'ORDER_DEPOSIT_REFUND' ? `رد عربون · ${row.notes || ''}` : row.isOrderDepositRefunded ? `تم رد العربون · ${row.notes || ''}` : row.notes || '—'}</span>,
                 canCustomerPay && !row.isOrderDeposit ? (
                   <button title="حذف السند" onClick={() => deleteCustomerPayment(row)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
                 ) : <span className="text-slate-300">—</span>,

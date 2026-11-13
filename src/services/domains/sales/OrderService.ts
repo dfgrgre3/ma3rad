@@ -12,6 +12,8 @@ import { getProductUnitLabel } from '../../../utils/products/productUnits';
 import { normalizeUom } from '../../../utils/products/uom';
 import { resolveSaleUnits } from './unitResolution';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { AppConfigService } from '../config/AppConfigService';
+import { SettingsService } from '../config/SettingsService';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED';
 
@@ -278,12 +280,13 @@ export class OrderService {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'orders.create');
     if (!input.customerId) throw new Error('يجب اختيار العميل.');
-    const items = this.normalizeItems(input.items);
+    const items = this.normalizeItems(input.items, actor);
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
 
     const warehouse = this.resolveWarehouse(input.warehouseId);
     const branchId = this.branchAccess.requireWarehouseAccess(warehouse);
     const totals = this.computeTotals(items, input);
+    this.validateOrderDiscounts(items, input, actor);
     const id = `ord_${uuidv4().substring(0, 8)}`;
 
     return this.db.executeTransaction((db) => {
@@ -332,18 +335,20 @@ export class OrderService {
       throw new Error('لا يمكن تعديل طلب بعد تأكيده. يمكنك إلغاؤه وإنشاء طلب جديد.');
     }
     const existingDeposits = Number(this.db.query<{ amount: number }>(
-      'SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE order_id = ?', [id]
+      `SELECT COALESCE(SUM(od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
+         WHERE r.order_deposit_id = od.id), 0)), 0) AS amount FROM order_deposits od WHERE od.order_id = ?`, [id]
     )[0]?.amount || 0);
     if (existingDeposits > 0) {
       throw new Error('لا يمكن تعديل طلب عليه عربون قبل تسوية العربون أو رده.');
     }
     if (!input.customerId) throw new Error('يجب اختيار العميل.');
-    const items = this.normalizeItems(input.items);
+    const items = this.normalizeItems(input.items, actor);
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
 
     const warehouse = this.resolveWarehouse(input.warehouseId || existing.warehouseId);
     const branchId = this.branchAccess.requireWarehouseAccess(warehouse);
     const totals = this.computeTotals(items, input);
+    this.validateOrderDiscounts(items, input, actor);
 
     return this.db.executeTransaction((db) => {
       this.releaseReservations(db, existing.warehouseId, existing.items || []);
@@ -405,7 +410,8 @@ export class OrderService {
     this.db.executeTransaction((db) => {
       if (status === 'CANCELLED') {
         const depositTotal = Number(db.query<{ amount: number }>(
-          'SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposits WHERE order_id = ?', [id]
+          `SELECT COALESCE(SUM(od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
+             WHERE r.order_deposit_id = od.id), 0)), 0) AS amount FROM order_deposits od WHERE od.order_id = ?`, [id]
         )[0]?.amount || 0);
         if (depositTotal > 0) {
           throw new Error('لا يمكن إلغاء طلب عليه عربون قبل تسوية العربون أو رده.');
@@ -444,13 +450,17 @@ export class OrderService {
     if (!order.items || order.items.length === 0) throw new Error('الطلب لا يحتوي على بنود.');
 
     const byId = new Map(order.items.map((item) => [item.id, item]));
-    const prepared = (lines || [])
-      .filter((line) => Number(line.quantityM2) > 0)
-      .map((line) => {
-        const item = byId.get(line.itemId);
+    const aggregatedLines = new Map<string, number>();
+    for (const line of lines || []) {
+      const quantity = Number(line.quantityM2);
+      if (!Number.isFinite(quantity) || quantity < 0) throw new Error('Invalid delivery quantity.');
+      if (quantity > 0) aggregatedLines.set(line.itemId, round2((aggregatedLines.get(line.itemId) || 0) + quantity));
+    }
+    const prepared = [...aggregatedLines.entries()]
+      .map(([itemId, quantity]) => {
+        const item = byId.get(itemId);
         if (!item) throw new Error('بند التسليم غير موجود في الطلب.');
         const remaining = round2(Number(item.quantityM2) - Number(item.deliveredM2 || 0));
-        const quantity = round2(Number(line.quantityM2));
         if (remaining <= 0) throw new Error(`تم تسليم الصنف "${item.productName}" بالكامل بالفعل.`);
         if (quantity > remaining + 0.009) throw new Error(`كمية التسليم تتجاوز المتبقي للصنف "${item.productName}" (${remaining}).`);
         return { item, quantity };
@@ -508,7 +518,7 @@ export class OrderService {
   public recordDeposit(id: string, amount: number, paymentType: PaymentType = 'CASH', notes?: string, bankAccountId?: string, idempotencyKey?: string): Order {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'orders.update');
-    if (!['CASH', 'CARD', 'BANK_TRANSFER'].includes(paymentType)) throw new Error('طريقة الدفع غير مدعومة لعربون الطلب.');
+    if (!['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(paymentType)) throw new Error('طريقة الدفع غير مدعومة لعربون الطلب.');
     const order = this.getOrder(id);
     if (!order) throw new Error('الطلب غير موجود.');
     if (['COMPLETED', 'CANCELLED'].includes(order.status) || order.billingStatus === 'INVOICED') {
@@ -525,8 +535,8 @@ export class OrderService {
     let cashAccount = paymentAccountCode(paymentType);
     if (paymentType === 'BANK_TRANSFER') {
       if (!bankAccountId) throw new Error('حدد الحساب البنكي الذي استقبل التحويل.');
-      const bank = this.db.query<{ glAccountCode: string }>(`SELECT coa.code AS glAccountCode FROM bank_accounts ba JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ? AND ba.is_active = 1`, [bankAccountId])[0];
-      if (!bank) throw new Error('الحساب البنكي غير موجود أو غير نشط.');
+      const bank = this.db.query<{ glAccountCode: string; branchId: string | null }>(`SELECT coa.code AS glAccountCode, ba.branch_id AS branchId FROM bank_accounts ba JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ? AND ba.is_active = 1`, [bankAccountId])[0];
+      if (!order.branchId || !bank || bank.branchId !== order.branchId) throw new Error('الحساب البنكي غير نشط أو لا يتبع لفرع الطلب.');
       cashAccount = bank.glAccountCode;
     }
 
@@ -574,6 +584,7 @@ export class OrderService {
         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [receiptId, receiptNumber, current.customerId, deposit, paymentType, date, registerId, shift?.id || null, notes || `عربون للطلب ${order.orderNumber}`, actor.id, current.branchId || null, idempotencyKey || null]);
       postLedgerEntry(db.getDatabase(), {
         date, description: `Order deposit ${order.orderNumber} (${receiptNumber})`, referenceType: 'ORDER_DEPOSIT', referenceId: receiptId, createdBy: actor.id,
+        branchId: current.branchId,
         lines: [{ accountCode: cashAccount, debit: deposit, credit: 0 }, { accountCode: '2106', debit: 0, credit: deposit }],
       });
       if (paymentType === 'CASH') db.run('UPDATE cash_registers SET current_balance = current_balance + ? WHERE id = ?', [deposit, registerId]);
@@ -617,7 +628,7 @@ export class OrderService {
         [depositId]
       )[0];
       if (!deposit) throw new Error('عربون الطلب غير موجود.');
-      if (!['CASH', 'CARD', 'BANK_TRANSFER'].includes(deposit.paymentMethod)) {
+      if (!['CASH', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(deposit.paymentMethod)) {
         throw new Error('طريقة الدفع المسجلة لهذا العربون لا تدعم الرد من هذا المسار.');
       }
       const scopedOrder = this.getOrder(deposit.orderId);
@@ -626,21 +637,26 @@ export class OrderService {
         this.branchAccess.requireRegisterAccess(deposit.registerId, actor, deposit.branchId || undefined);
       }
       if (deposit.invoiceId) throw new Error('تمت تسوية هذا العربون على فاتورة؛ يجب معالجة رد الفاتورة من مسار المرتجعات.');
-      const existing = db.query<{ id: string }>('SELECT id FROM order_deposit_refunds WHERE order_deposit_id = ?', [depositId])[0];
-      if (existing) return existing.id;
-
-      const amount = round2(Number(deposit.amount));
+      const refundedBefore = Number(db.query<{ amount: number }>(
+        'SELECT COALESCE(SUM(amount), 0) AS amount FROM order_deposit_refunds WHERE order_deposit_id = ?', [depositId]
+      )[0]?.amount || 0);
+      const amount = round2(Number(deposit.amount) - refundedBefore);
       const paidAmount = round2(Number(deposit.paidAmount));
-      if (amount <= 0 || paidAmount + 0.009 < amount) throw new Error('رصيد العربون لا يتطابق مع المبلغ المدفوع للطلب.');
+      if (amount <= 0.009 || paidAmount + 0.009 < amount) throw new Error('رصيد العربون المتاح للرد غير كافٍ.');
+      const refundRegisterId = deposit.paymentMethod === 'CASH' ? deposit.registerId : null;
+      const refundShift = refundRegisterId ? db.query<{ id: string }>(
+        `SELECT id FROM cash_shifts WHERE register_id = ? AND status = 'OPEN' ORDER BY opened_at DESC LIMIT 1`,
+        [refundRegisterId]
+      )[0] : null;
       let cashAccount = paymentAccountCode(deposit.paymentMethod);
       if (deposit.paymentMethod === 'BANK_TRANSFER') {
         if (!deposit.bankAccountId) throw new Error('الحساب البنكي المرتبط بالعربون غير محدد.');
-        const bank = db.query<{ glAccountCode: string }>(
-          `SELECT coa.code AS glAccountCode FROM bank_accounts ba
-           JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ?`,
+        const bank = db.query<{ glAccountCode: string; branchId: string | null }>(
+          `SELECT coa.code AS glAccountCode, ba.branch_id AS branchId FROM bank_accounts ba
+           JOIN chart_of_accounts coa ON coa.id = ba.gl_account_id WHERE ba.id = ? AND ba.is_active = 1`,
           [deposit.bankAccountId]
         )[0];
-        if (!bank) throw new Error('الحساب البنكي المرتبط بالعربون غير موجود.');
+        if (!deposit.branchId || !bank || bank.branchId !== deposit.branchId) throw new Error('الحساب البنكي غير نشط أو لا يتبع لفرع الطلب.');
         cashAccount = bank.glAccountCode;
       }
 
@@ -653,7 +669,7 @@ export class OrderService {
            register_id, shift_id, bank_account_id, date, reason, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [refundId, refundNumber, deposit.id, deposit.orderId, deposit.customerId, amount,
-          deposit.paymentMethod, deposit.registerId, deposit.shiftId, deposit.bankAccountId, date, cleanReason, actor.id]
+          deposit.paymentMethod, refundRegisterId, refundShift?.id || null, deposit.bankAccountId, date, cleanReason, actor.id]
       );
       const newPaid = round2(paidAmount - amount);
       const normalizedPaid = Math.max(0, newPaid);
@@ -665,18 +681,18 @@ export class OrderService {
       );
       postLedgerEntry(db.getDatabase(), {
         date, description: `Refund order deposit ${deposit.orderNumber} (${refundNumber})`,
-        referenceType: 'ORDER_DEPOSIT_REFUND', referenceId: refundId, createdBy: actor.id,
+        referenceType: 'ORDER_DEPOSIT_REFUND', referenceId: refundId, createdBy: actor.id, branchId: deposit.branchId,
         lines: [{ accountCode: '2106', debit: amount, credit: 0 }, { accountCode: cashAccount, debit: 0, credit: amount }],
       });
       if (deposit.paymentMethod === 'CASH') {
         if (!deposit.registerId) throw new Error('الصندوق المرتبط بالعربون غير محدد.');
         db.run('UPDATE cash_registers SET current_balance = current_balance - ? WHERE id = ?', [amount, deposit.registerId]);
-        if (deposit.shiftId) db.run('UPDATE cash_shifts SET total_customer_payments = total_customer_payments - ? WHERE id = ?', [amount, deposit.shiftId]);
+        if (refundShift) db.run('UPDATE cash_shifts SET total_refunds = total_refunds + ? WHERE id = ?', [amount, refundShift.id]);
       } else if (deposit.paymentMethod === 'BANK_TRANSFER' && deposit.bankAccountId) {
         db.run('UPDATE bank_accounts SET current_balance = current_balance - ? WHERE id = ?', [amount, deposit.bankAccountId]);
       }
       this.logStatus(db, deposit.orderId, scopedOrder.status, scopedOrder.status,
-        `رد عربون ${deposit.depositNumber} بمبلغ ${amount}؛ السبب: ${cleanReason}`, actor.id, actor.fullName);
+        `رد عربون ${deposit.orderNumber} بمبلغ ${amount}؛ السبب: ${cleanReason}`, actor.id, actor.fullName);
       db.run(
         `INSERT INTO audit_logs (id, user_id, user_name, action, module, record_id, new_values)
          VALUES (?, ?, ?, ?, 'SALES', ?, ?)`,
@@ -733,6 +749,7 @@ export class OrderService {
           piecesCount: Math.round(item.boxesCount * 4),
           unitPrice: item.unitPrice,
           discountAmount: item.discountAmount,
+          pricingSource: 'POS',
         })),
         discountAmount: order.discountAmount,
         taxAmount: order.taxAmount,
@@ -743,9 +760,11 @@ export class OrderService {
       });
 
       const depositRows = this.db.query<{ id: string; amount: number; paymentMethod: string }>(
-        'SELECT id, amount, payment_method AS paymentMethod FROM order_deposits WHERE order_id = ? AND invoice_id IS NULL', [id]
+        `SELECT od.id, od.amount - COALESCE((SELECT SUM(r.amount) FROM order_deposit_refunds r
+           WHERE r.order_deposit_id = od.id), 0) AS amount, od.payment_method AS paymentMethod
+         FROM order_deposits od WHERE od.order_id = ? AND od.invoice_id IS NULL`, [id]
       );
-      const depositTotal = round2(depositRows.reduce((sum, deposit) => sum + Number(deposit.amount), 0));
+      const depositTotal = round2(depositRows.reduce((sum, deposit) => sum + Math.max(0, Number(deposit.amount)), 0));
       if (Math.abs(depositTotal - existingDeposits) > 0.01) throw new Error('إجمالي العربون المسجل لا يطابق سندات القبض؛ راجع الطلب قبل الفوترة.');
       this.db.run(
         `UPDATE orders SET status = 'COMPLETED', billing_status = 'INVOICED', financial_status = ?, invoice_id = ?, paid_amount = ?,
@@ -821,14 +840,15 @@ export class OrderService {
     return fallback.id;
   }
 
-  private normalizeItems(items: OrderItemInput[]) {
+  private normalizeItems(items: OrderItemInput[], actor: any) {
     const filtered = (items || []).filter((i) =>
       i.productId && (Number(i.quantity) > 0 || Number(i.quantityM2) > 0)
     );
     return filtered.map((item) => {
       const product = this.db.query<any>(
         `SELECT id, name, grade, meters_per_box AS metersPerBox, pieces_per_box AS piecesPerBox, is_active,
-                product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit
+                product_type AS productType, base_unit AS baseUnit, custom_unit AS customUnit,
+                min_selling_price_m2 AS minSellingPriceM2
          FROM products WHERE id = ?`,
         [item.productId]
       )[0];
@@ -838,11 +858,16 @@ export class OrderService {
       // Orders store base-unit quantities like every other stock path; the
       // entered unit only affects how the line was typed and priced.
       const units = resolveSaleUnits(item, product);
+      if (round2(units.baseUnitPrice) < Number(product.minSellingPriceM2 || 0)) {
+        PermissionService.require(actor, 'sales.approve');
+      }
       const unitPrice = Math.max(0, units.baseUnitPrice);
-      const discountAmount = round2(Math.min(
-        Math.max(0, Number(item.discountAmount) || 0),
-        units.gross
-      ));
+      const requestedDiscount = Number(item.discountAmount || 0);
+      if (!Number.isFinite(requestedDiscount) || requestedDiscount < 0 || requestedDiscount > units.gross + 0.009) {
+        throw new Error(`Invalid discount for product "${product.name}".`);
+      }
+      const discountAmount = round2(requestedDiscount);
+      if (discountAmount > 0) PermissionService.require(actor, 'sales.discount');
       const metersPerBox = Number(product.metersPerBox) || 1.44;
       const soldInBoxes = normalizeUom(units.sellUnit, product) === 'BOX';
       const boxesCount = soldInBoxes
@@ -868,7 +893,11 @@ export class OrderService {
 
   private computeTotals(items: ReturnType<OrderService['normalizeItems']>, input: OrderInput) {
     const subtotal = round2(items.reduce((s, i) => s + i.totalPrice, 0));
-    const discountAmount = round2(Math.min(Math.max(0, Number(input.discountAmount) || 0), subtotal));
+    const requestedDiscount = Number(input.discountAmount || 0);
+    if (!Number.isFinite(requestedDiscount) || requestedDiscount < 0 || requestedDiscount > subtotal + 0.009) {
+      throw new Error('Order discount is invalid or exceeds the item subtotal.');
+    }
+    const discountAmount = round2(requestedDiscount);
     const taxAmount = round2(Math.max(0, Number(input.taxAmount) || 0));
     const shippingCost = round2(Math.max(0, Number(input.shippingCost) || 0));
     return {
@@ -878,6 +907,19 @@ export class OrderService {
       shippingCost,
       totalAmount: round2(Math.max(0, subtotal - discountAmount + taxAmount + shippingCost)),
     };
+  }
+
+  private validateOrderDiscounts(items: ReturnType<OrderService['normalizeItems']>, input: OrderInput, actor: any): void {
+    const lineDiscounts = round2(items.reduce((sum, item) => sum + item.discountAmount, 0));
+    const headerDiscount = round2(Math.max(0, Number(input.discountAmount) || 0));
+    const totalDiscount = round2(lineDiscounts + headerDiscount);
+    if (totalDiscount <= 0) return;
+    PermissionService.require(actor, 'sales.discount');
+    const grossSubtotal = round2(items.reduce((sum, item) => sum + item.totalPrice + item.discountAmount, 0));
+    const configuredThreshold = SettingsService.getSettings().discountApprovalThresholdPercent ?? 10;
+    const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', configuredThreshold);
+    const discountPercent = grossSubtotal > 0 ? totalDiscount / grossSubtotal * 100 : 0;
+    if (discountPercent > threshold) PermissionService.require(actor, 'sales.approve');
   }
 
   private assertStockAndReserve(

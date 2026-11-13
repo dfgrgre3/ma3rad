@@ -221,6 +221,19 @@ export class SalesFinancialReconciliationService {
     `, bankScope.params)[0];
     checks.push(this.addCheck('banks', 'أرصدة البنوك مقابل الأستاذ العام', accountBalance('1102'), Number(bankAccounts?.balance || 0),
       'مقارنة حساب البنوك 1102 بإجمالي أرصدة الحسابات البنكية المرتبطة بالفرع النشط.'));
+    const depositScope = mergedScope('o.branch_id', 'b.company_id');
+    const outstandingDeposits = Number(this.db.query<{ amount: number }>(`
+      SELECT COALESCE(SUM(MAX(0, od.amount - COALESCE((
+        SELECT SUM(r.amount) FROM order_deposit_refunds r WHERE r.order_deposit_id = od.id
+      ), 0))), 0) AS amount
+      FROM order_deposits od
+      JOIN orders o ON o.id = od.order_id
+      JOIN branches b ON b.id = o.branch_id
+      WHERE od.invoice_id IS NULL AND ${depositScope.clause}
+    `, depositScope.params)[0]?.amount || 0);
+    checks.push(this.addCheck('order_deposits', 'التزامات عربونات الطلبات مقابل الأستاذ العام',
+      -accountBalance('2106'), outstandingDeposits,
+      'مقارنة رصيد التزامات العربونات 2106 بالعربونات غير المسواة بعد خصم المبالغ المرتجعة.'));
     return checks;
   }
 

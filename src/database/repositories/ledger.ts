@@ -65,7 +65,15 @@ function resolvePostingBranchId(db: Database, posting: LedgerPosting): string | 
     COMMISSION_APPROVAL: 'commissions',
     COMMISSION_PAYMENT: 'commissions',
     COMMISSION_CANCELLATION: 'commissions',
+    ORDER_DEPOSIT: 'customer_payments',
   };
+  if (posting.referenceType === 'ORDER_DEPOSIT_REFUND') {
+    return queryLedgerRows<{ branch_id: string | null }>(db, `
+      SELECT o.branch_id
+      FROM order_deposit_refunds r JOIN orders o ON o.id = r.order_id
+      WHERE r.id = ?
+    `, [referenceId])[0]?.branch_id ?? null;
+  }
   const sourceTable = sourceByType[posting.referenceType];
   if (posting.referenceType === 'PAYROLL_SALARY_ACCRUAL' || posting.referenceType === 'PAYROLL_ADVANCE_APPLICATION') {
     return queryLedgerRows<{ branch_id: string | null }>(

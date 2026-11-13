@@ -114,6 +114,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
             >
               <option value="CASH">نقدي (خزينة المعرض)</option>
               <option value="CARD">بطاقة بنكية / فيزا</option>
+              <option value="CHEQUE">شيك</option>
               <option value="BANK_TRANSFER">تحويل بنكي / إنستاباي</option>
             </select>
           </div>

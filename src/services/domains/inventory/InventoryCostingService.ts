@@ -90,15 +90,15 @@ export class InventoryCostingService {
     return { quantity, totalCost, unitCost: round2(totalCost / quantity), allocations };
   }
 
-  static consumeFifo(db: DatabaseManager, transactionId: string, plan: FifoCostPlan): void {
+  static consumeFifo(db: DatabaseManager, transactionId: string, plan: FifoCostPlan, invoiceItemId?: string): void {
     for (const [allocationOrder, row] of plan.allocations.entries()) {
       const result = db.query<{ id: string }>(`SELECT id FROM inventory_cost_layers
         WHERE id=? AND quantity_remaining+0.009>=?`, [row.layerId, row.quantity])[0];
       if (!result) throw new Error('A FIFO layer changed while the transaction was being posted. Retry the transaction.');
       db.run(`UPDATE inventory_cost_layers SET quantity_remaining=MAX(0,quantity_remaining-?) WHERE id=?`, [row.quantity, row.layerId]);
       db.run(`INSERT INTO inventory_cost_allocations
-        (id,outbound_transaction_id,layer_id,allocation_order,quantity,unit_cost) VALUES (?,?,?,?,?,?)`,
-        [`icla_${uuidv4().replace(/-/g, '').slice(0, 12)}`, transactionId, row.layerId, allocationOrder, row.quantity, row.unitCost]);
+        (id,outbound_transaction_id,layer_id,allocation_order,quantity,unit_cost,invoice_item_id) VALUES (?,?,?,?,?,?,?)`,
+        [`icla_${uuidv4().replace(/-/g, '').slice(0, 12)}`, transactionId, row.layerId, allocationOrder, row.quantity, row.unitCost, invoiceItemId || null]);
     }
   }
 
@@ -138,10 +138,19 @@ export class InventoryCostingService {
     return round2(cost);
   }
 
-  static restoreInvoiceIssue(db: DatabaseManager, invoiceId: string, productId: string, quantity: number): number {
-    const issues = db.query<{ id: string }>(`SELECT id FROM inventory_transactions
-      WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE' ORDER BY created_at,rowid`,
-      [invoiceId, productId]);
+  static restoreInvoiceIssue(db: DatabaseManager, invoiceId: string, productId: string, quantity: number, invoiceItemId?: string): number {
+    const lineIssues = invoiceItemId
+      ? db.query<{ id: string }>(`SELECT outbound_transaction_id AS id FROM inventory_cost_allocations
+          WHERE invoice_item_id=? AND outbound_transaction_id IN (
+            SELECT id FROM inventory_transactions WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE'
+          ) GROUP BY outbound_transaction_id ORDER BY MIN(allocation_order),MIN(created_at),outbound_transaction_id`,
+        [invoiceItemId, invoiceId, productId])
+      : [];
+    // Older allocations have no invoice-line key. Preserve their legacy product-level
+    // restoration path only when no line-linked allocation exists for the return.
+    const issues = lineIssues.length ? lineIssues : db.query<{ id: string }>(`SELECT id FROM inventory_transactions
+          WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE' ORDER BY created_at,rowid`,
+        [invoiceId, productId]);
     let needed = round2(quantity);
     let cost = 0;
     for (const issue of issues) {

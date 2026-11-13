@@ -659,6 +659,7 @@ export class QuotationService {
           piecesCount: Math.round(item.boxesCount * 4),
           unitPrice: item.unitPrice,
           discountAmount: item.discountAmount,
+          pricingSource: 'POS',
         })),
         discountAmount: fresh.discountAmount,
         taxAmount: fresh.taxAmount,

@@ -136,5 +136,10 @@ export const MIGRATION_PART_10: Migration[] = [
         ]);
       }
     },
+  },
+{
+    id: '041_fifo_allocation_invoice_item',
+    description: 'Link FIFO issue allocations to their sales invoice line for precise returns',
+    up: (db) => addColumn(db, 'inventory_cost_allocations', 'invoice_item_id', 'TEXT REFERENCES sales_invoice_items(id)'),
   }
 ];
