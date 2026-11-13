@@ -68,6 +68,10 @@ import { MIGRATION_PART_64 } from './part64';
 import { MIGRATION_PART_65 } from './part65';
 import { MIGRATION_PART_66 } from './part66';
 import { MIGRATION_PART_67 } from './part67';
+import { MIGRATION_PART_68 } from './part68';
+import { MIGRATION_PART_69 } from './part69';
+import { MIGRATION_PART_70 } from './part70';
+import { MIGRATION_PART_71 } from './part71';
 import { MIGRATION_ENTERPRISE } from './enterprise';
 import { addColumn, columnExists, DEFAULT_BRANCH_ID, DEFAULT_SETTINGS, tableExists } from './support';
 
@@ -88,6 +92,27 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_11,
   MIGRATION_PART_12,
   MIGRATION_PART_13,
+  {
+    id: '014_payroll_notification_settings',
+    description: 'Add payroll notification settings per branch for due/overdue alerts',
+    up: (db: Database) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS payroll_notification_settings (
+          branch_id TEXT PRIMARY KEY,
+          enabled INTEGER NOT NULL DEFAULT 1,
+          due_horizon_days INTEGER NOT NULL DEFAULT 7 CHECK(due_horizon_days >= 1 AND due_horizon_days <= 30),
+          overdue_horizon_days INTEGER NOT NULL DEFAULT 0 CHECK(overdue_horizon_days >= 0 AND overdue_horizon_days <= 30),
+          notify_due INTEGER NOT NULL DEFAULT 1,
+          notify_overdue INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_by TEXT,
+          FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_payroll_notification_settings_branch ON payroll_notification_settings(branch_id);
+      `);
+    },
+  },
   MIGRATION_ENTERPRISE,
   MIGRATION_PART_54,
   MIGRATION_PART_55,
@@ -103,6 +128,10 @@ export const MIGRATIONS: Migration[] = [
   MIGRATION_PART_65,
   MIGRATION_PART_66,
   MIGRATION_PART_67,
+  MIGRATION_PART_68,
+  MIGRATION_PART_69,
+  MIGRATION_PART_70,
+  MIGRATION_PART_71,
   {
     id: '050_cash_shift_auto_close',
     description: 'Track automatically closed cashier shifts',

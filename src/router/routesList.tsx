@@ -126,6 +126,7 @@ export const appRoutes: RouteDef[] = [
   { path: 'employees/payroll', element: <P.PayrollPage /> },
   { path: 'employees/payroll/payslips', element: <P.PayslipsPage /> },
   { path: 'employees/payroll/calendar', element: <P.PayrollCalendarPage /> },
+  { path: 'employees/payroll/notification-settings', element: <P.PayrollNotificationSettingsPage /> },
   { path: 'employees/commissions', element: <P.CommissionsPage /> },
   { path: 'employees/leave', element: <P.LeavePage /> },
   { path: 'employees/contracts', element: <P.EmployeeContractsPage /> },

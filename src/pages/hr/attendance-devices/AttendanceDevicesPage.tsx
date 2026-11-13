@@ -247,7 +247,7 @@ export const AttendanceDevicesPage: React.FC = () => {
         };
       });
       const result = AttendanceDeviceService.importDeviceRecords({ deviceId: importForm.deviceId, records: parsed });
-      setImportSummary(`تم العثور على ${result.recordsFound} سجل، جديد ${result.recordsNew}، مكرر ${result.recordsDuplicate}، معالَج ${result.recordsProcessed}، متخطى ${result.recordsSkipped}، أخطاء ${result.recordsError}.`);
+      setImportSummary(`تم العثور على ${result.recordsFound} سجل، مستورد ${result.recordsNew}، مكرر ${result.recordsDuplicate}، قيد المعالجة ${result.recordsNew}، متخطى ${result.recordsSkipped}، أخطاء ${result.recordsError}.`);
       setNotice('تم استيراد سجلات البصمة.');
       loadRecords();
       load();

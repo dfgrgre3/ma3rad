@@ -29,4 +29,8 @@ export class ApprovalService {
   cancel(id: string): void {
     this.requests.cancel(id);
   }
+
+  findApprovedDiscountRequest(customerId: string | null | undefined, amount: number): { id: string } | null {
+    return this.requests.findApprovedDiscountRequest(customerId, amount);
+  }
 }

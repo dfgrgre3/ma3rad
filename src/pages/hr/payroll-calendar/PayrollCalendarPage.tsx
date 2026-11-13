@@ -27,6 +27,11 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+function parsePeriod(period: string): { year: number; month: number } {
+  const [y, m] = period.split('-').map(Number);
+  return { year: y, month: m };
+}
+
 export const PayrollCalendarPage: React.FC = () => {
   const actor = AuthService.getCurrentUser();
   const canView = PermissionService.canAny(actor, [
@@ -36,8 +41,9 @@ export const PayrollCalendarPage: React.FC = () => {
     'employees.payroll.manage', 'employees.payroll.approve', 'employees.manage',
   ]);
 
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
+  const now = new Date();
+  const defaultPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [period, setPeriod] = useState<string>(defaultPeriod);
   const [view, setView] = useState<PayrollCalendarMonthView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,39 +59,60 @@ export const PayrollCalendarPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
   const [runDetail, setRunDetail] = useState<PayrollRun | null>(null);
 
+  const { year, month } = useMemo(() => parsePeriod(period), [period]);
+
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     try {
       const svc = new PayrollCalendarService();
-      setView(svc.getCalendarMonth(year, month));
-      setOverdue(svc.getOverdueAndMissing());
-      setError(null);
+      const monthView = svc.getCalendarMonth(year, month);
+      setView(monthView);
+      try {
+        setOverdue(svc.getOverdueAndMissing());
+      } catch (overdueErr) {
+        console.warn('Failed to load overdue data:', overdueErr);
+        setOverdue(null);
+      }
     } catch (e: any) {
+      console.error('PayrollCalendar load error:', e);
       setError(e?.message || 'تعذر تحميل تقويم الرواتب.');
+      setView(null);
+      setOverdue(null);
     } finally {
       setLoading(false);
     }
   }, [year, month]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const prevMonth = () => {
-    setMonth((currentMonth) => {
-      const nextMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-      setYear((currentYear) => (currentMonth === 1 ? currentYear - 1 : currentYear));
-      return nextMonth;
+  const prevMonth = useCallback(() => {
+    setPeriod(current => {
+      const [y, m] = current.split('-').map(Number);
+      const newMonth = m === 1 ? 12 : m - 1;
+      const newYear = m === 1 ? y - 1 : y;
+      return `${newYear}-${String(newMonth).padStart(2, '0')}`;
     });
-  };
+  }, []);
 
-  const nextMonth = () => {
-    setMonth((currentMonth) => {
-      const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
-      setYear((currentYear) => (currentMonth === 12 ? currentYear + 1 : currentYear));
-      return nextMonth;
+  const nextMonth = useCallback(() => {
+    setPeriod(current => {
+      const [y, m] = current.split('-').map(Number);
+      const newMonth = m === 12 ? 1 : m + 1;
+      const newYear = m === 12 ? y + 1 : y;
+      return `${newYear}-${String(newMonth).padStart(2, '0')}`;
     });
-  };
+  }, []);
 
-  const currentPeriod = `${year}-${String(month).padStart(2, '0')}`;
+  const goToToday = useCallback(() => {
+    const today = new Date();
+    setPeriod(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`);
+  }, []);
+
+  const currentPeriod = period;
+  const [monthName] = [MONTH_NAMES_AR[month]];
 
   const runForPeriod = useMemo(() => {
     if (!view) return null;
@@ -93,6 +120,20 @@ export const PayrollCalendarPage: React.FC = () => {
   }, [view, currentPeriod]);
 
   const formatMoney = (n: number) => `${Number(n || 0).toLocaleString('ar-EG')} ج.م`;
+
+  const openRunDetail = useCallback((targetPeriod: string) => {
+    setSelectedPeriod(targetPeriod);
+    try {
+      setRunDetail(EmployeeService.getPayrollRun(targetPeriod)!);
+    } catch {
+      setRunDetail(null);
+    }
+  }, []);
+
+  const closeRunDetail = useCallback(() => {
+    setSelectedPeriod(null);
+    setRunDetail(null);
+  }, []);
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6 bg-slate-50 text-slate-900" dir="rtl">
@@ -111,16 +152,12 @@ export const PayrollCalendarPage: React.FC = () => {
             <ChevronRight className="w-4 h-4 rotate-180" />
           </button>
           <span className="font-bold text-slate-900 whitespace-nowrap">
-            {MONTH_NAMES_AR[month]} {year}
+            {monthName} {year}
           </span>
           <button onClick={nextMonth} disabled={loading} className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-50">
             <ChevronRight className="w-4 h-4" />
           </button>
-          <button onClick={() => {
-            const now = new Date();
-            setYear(now.getFullYear());
-            setMonth(now.getMonth() + 1);
-          }} className="text-xs font-bold text-sky-600 hover:text-sky-700">اليوم</button>
+          <button onClick={goToToday} className="text-xs font-bold text-sky-600 hover:text-sky-700">اليوم</button>
         </div>
       </div>
 
@@ -140,7 +177,7 @@ export const PayrollCalendarPage: React.FC = () => {
         <>
           {/* ملخص الشهر */}
           <div className="mx-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            <StatCard label="الفترة" value={`${MONTH_NAMES_AR[month]} ${year}`} icon={<Calendar className="w-4 h-4" />} color="text-slate-600" bg="bg-slate-50" />
+            <StatCard label="الفترة" value={`${monthName} ${year}`} icon={<Calendar className="w-4 h-4" />} color="text-slate-600" bg="bg-slate-50" />
             <StatCard label="المستحق إجمالياً" value={formatMoney(view?.totalExpected ?? 0)} icon={<Wallet className="w-4 h-4" />} color="text-sky-700" bg="bg-sky-50" />
             <StatCard label="المصروف" value={formatMoney(view?.totalPaid ?? 0)} icon={<CheckCircle2 className="w-4 h-4" />} color="text-emerald-700" bg="bg-emerald-50" />
             <StatCard label="المتبقي" value={formatMoney(view?.totalRemaining ?? 0)} icon={<Clock className="w-4 h-4" />} color="text-amber-700" bg="bg-amber-50" />
@@ -148,12 +185,12 @@ export const PayrollCalendarPage: React.FC = () => {
             <StatCard label="دفعات موظفين ناقصة" value={view?.missingPaymentsCount ?? 0} icon={<Activity className="w-4 h-4" />} color="text-rose-700" bg="bg-rose-50" />
           </div>
 
-          {/* événements الشهر */}
+          {/* أحداث الشهر */}
           <div className="mx-6 bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-black flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-slate-400" /> أحداث الرواتب في {MONTH_NAMES_AR[month]} {year}
+                  <Activity className="w-4 h-4 text-slate-400" /> أحداث الرواتب في {monthName} {year}
                 </h3>
                 <p className="text-[10px] text-slate-500 mt-1">كل دورة رواتب تمثل حدثاً في التقويم المالي مع تاريخ الاستحقاق وحالة الصرف</p>
               </div>
@@ -181,7 +218,7 @@ export const PayrollCalendarPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {view?.events.map((event) => {
+                    {view.events.map((event) => {
                       const meta = STATUS_LABELS[event.status];
                       return (
                         <tr key={event.id} className={`hover:bg-slate-50/70 transition-colors ${event.isOverdue ? 'bg-rose-25' : ''}`}>
@@ -208,12 +245,7 @@ export const PayrollCalendarPage: React.FC = () => {
                             <div className="flex gap-1">
                               {canManage && (
                                 <button
-                                  onClick={() => {
-                                    setSelectedPeriod(event.period);
-                                    try {
-                                      setRunDetail(EmployeeService.getPayrollRun(event.period)!);
-                                    } catch { setRunDetail(null); }
-                                  }}
+                                  onClick={() => openRunDetail(event.period)}
                                   className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 font-bold text-slate-600"
                                 >
                                   <Banknote className="w-3 h-3" /> تفصيل
@@ -221,12 +253,7 @@ export const PayrollCalendarPage: React.FC = () => {
                               )}
                               {event.missingPayments.length > 0 && (
                                 <button
-                                  onClick={() => {
-                                    setSelectedPeriod(event.period);
-                                    try {
-                                      setRunDetail(EmployeeService.getPayrollRun(event.period)!);
-                                    } catch { setRunDetail(null); }
-                                  }}
+                                  onClick={() => openRunDetail(event.period)}
                                   className="flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 font-bold text-rose-700"
                                 >
                                   <AlertTriangle className="w-3 h-3" /> ناقص
@@ -303,7 +330,7 @@ export const PayrollCalendarPage: React.FC = () => {
                   </h3>
                   <p className="text-[10px] text-slate-500 mt-1">حالة الصرف لكل موظف والمبالغ المستحقة والمصروفة</p>
                 </div>
-                <button onClick={() => { setSelectedPeriod(null); setRunDetail(null); }} className="rounded-lg p-1.5 hover:bg-slate-100 text-slate-500">
+                <button onClick={closeRunDetail} className="rounded-lg p-1.5 hover:bg-slate-100 text-slate-500">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -339,8 +366,8 @@ export const PayrollCalendarPage: React.FC = () => {
                           </td>
                           <td className="px-3 py-3 text-slate-400 text-[10px] truncate max-w-[120px]">{item.paymentReference || '—'}</td>
                         </tr>
-                      )}
-                    )}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

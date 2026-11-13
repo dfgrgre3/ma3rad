@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Database, Download, HardDrive, Table2, RefreshCw, ShieldCheck, Wrench, Eye, Search, Upload, X } from 'lucide-react';
 import {
   DataAdminService, type StorageStats, type TableInfo,
-  type DataImportPreview, type DataImportSheet,
+  type DataImportConflictPolicy, type DataImportPreview, type DataImportSheet,
 } from '../../../services/domains/admin/DataAdminService';
 import { BackupService } from '../../../services/infrastructure/backup/BackupService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
@@ -17,7 +17,7 @@ export const AdminDataTab: React.FC = () => {
   const can = usePermission();
   const allowed = can('admin.data');
   const canExport = can('admin.data.export');
-  const canImport = can('admin.data.delete');
+  const canImport = can('admin.data.import');
   const canImportBackup = can('settings.backup');
   const service = useMemo(() => new DataAdminService(), []);
   const backupService = useMemo(() => new BackupService(), []);
@@ -36,6 +36,7 @@ export const AdminDataTab: React.FC = () => {
     sourceType: 'xlsx' | 'backup';
   } | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [conflictPolicy, setConflictPolicy] = useState<DataImportConflictPolicy>('overwrite');
 
   const load = () => {
     if (!allowed) return;
@@ -98,7 +99,7 @@ export const AdminDataTab: React.FC = () => {
       const sheets = sourceType === 'backup'
         ? await backupService.readBackupDataForImport(file)
         : parseAdminDataWorkbook(await file.arrayBuffer(), file.name);
-      const preview = service.previewDataImport(sheets);
+      const preview = service.previewDataImport(sheets, conflictPolicy);
       setPendingImport({ fileName: file.name, sheets, preview, sourceType });
     } catch (error: any) {
       toast.error('تعذر قراءة ملف الاستيراد', error?.message);
@@ -109,7 +110,7 @@ export const AdminDataTab: React.FC = () => {
     if (!pendingImport) return;
     setIsImporting(true);
     try {
-      const result = await service.importData(pendingImport.sheets);
+      const result = await service.importData(pendingImport.sheets, conflictPolicy);
       setPendingImport(null);
       setSelected(null);
       setRows([]);
@@ -216,6 +217,35 @@ export const AdminDataTab: React.FC = () => {
                   ? 'هذه نسخة مشفرة كاملة. أدخل كلمة مرورها لعرض مقارنة السجلات. عند القبول ستُضاف السجلات الجديدة وتُستبدل السجلات المتعارضة؛ لن تُحذف بقية البيانات ولن تُستبدل قاعدة البيانات كاملة. الجداول المحمية، مثل المستخدمين والصلاحيات وإعدادات النظام وسجل التدقيق وتسلسل أرقام المستندات، لن تُستورد.'
                   : 'ستُضاف السجلات الجديدة، وستظهر السجلات المطابقة لمفتاح موجود مع مقارنة القيم قبل اعتماد استبدالها. لن تُحذف السجلات غير الموجودة في الملف. لن تُستورد الجداول المحمية، مثل المستخدمين والصلاحيات وإعدادات النظام وسجل التدقيق وتسلسل أرقام المستندات.'}
               </div>
+              <label className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                <span>سياسة التعارض:</span>
+                <select
+                  value={conflictPolicy}
+                  disabled={isImporting}
+                  onChange={(event) => {
+                    const next = event.target.value as DataImportConflictPolicy;
+                    setConflictPolicy(next);
+                    try {
+                      const pending = pendingImport;
+                      setPendingImport({
+                        ...pending,
+                        preview: service.previewDataImport(pending.sheets, next),
+                      });
+                    } catch (error: any) {
+                      toast.error('تعذر إعادة حساب المعاينة', error?.message);
+                    }
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <option value="overwrite">استبدال قيم السجلات الموجودة</option>
+                  <option value="skip">تخطي السجلات الموجودة والاحتفاظ بقيمها</option>
+                </select>
+                <span className="font-normal text-slate-500">
+                  {conflictPolicy === 'overwrite'
+                    ? 'ستُستبدل جميع أعمدة السجل الموجود بقيم الملف.'
+                    : 'لن تُلمس السجلات الموجودة؛ ستُضاف السجلات الجديدة فقط.'}
+                </span>
+              </label>
               <div className="flex flex-wrap gap-2 text-xs font-bold">
                 <span className="rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">جداول: {pendingImport.preview.tables.length}</span>
                 <span className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">جديد: {pendingImport.preview.newRows}</span>

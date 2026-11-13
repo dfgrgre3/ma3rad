@@ -18,7 +18,7 @@ import {
 import { getRegisteredConfigTargets } from '../../../config/appConfigTargets';
 import { APP_ROUTE_PATHS } from '../../../router/routePaths';
 import { NAV_GROUPS } from '../../../config/navigation';
-import { AppConfigService, type AppConfigVersion, type AppConfigState } from '../../../services/domains/config/AppConfigService';
+import { AppConfigService, MAX_APP_CONFIG_IMPORT_LENGTH, type AppConfigVersion, type AppConfigState } from '../../../services/domains/config/AppConfigService';
 import { ModuleRegistryService } from '../../../services/domains/config/ModuleRegistryService';
 import { AuthService } from '../../../services/domains/auth/AuthService';
 import { usePermission } from '../../../hooks/domains/auth/usePermission';
@@ -470,9 +470,16 @@ export const AppConfigurationPage: React.FC = () => {
                       onChange={(event) => {
                         const file = event.target.files?.[0];
                         if (!file) return;
+                        if (file.size > MAX_APP_CONFIG_IMPORT_LENGTH) {
+                          toast.error('ملف التكوين كبير جدًا', `الحد الأقصى ${Math.round(MAX_APP_CONFIG_IMPORT_LENGTH / 1024)} كيلوبايت.`);
+                          event.target.value = '';
+                          return;
+                        }
                         const reader = new FileReader();
                         reader.onload = () => setImportText(String(reader.result || ''));
+                        reader.onerror = () => toast.error('تعذر قراءة ملف التكوين.');
                         reader.readAsText(file);
+                        event.target.value = '';
                       }}
                     />
                   </label>

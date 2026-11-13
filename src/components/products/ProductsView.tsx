@@ -6,7 +6,6 @@ import {
   Upload, FileSpreadsheet, GitBranch,
   LayoutGrid, List, XCircle, RefreshCw, Filter
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { ProductService, ProductStats } from '../../services/domains/products/ProductService';
 import { ProductFormPreferencesService } from '../../services/domains/products/ProductFormPreferencesService';
 import { InventoryService } from '../../services/domains/inventory/InventoryService';
@@ -23,6 +22,8 @@ import { exportToExcel } from '../../utils/export/export';
 import { SettingsService } from '../../services/domains/config/SettingsService';
 import { getEffectiveBusinessType } from '../../services/domains/config/BusinessTypeService';
 import { BusinessProfileService } from '../../services/domains/config/BusinessProfileService';
+import { parseSpreadsheetBuffer } from '../../services/infrastructure/data/SpreadsheetImportService';
+import { DatabaseManager } from '../../database/repositories/databaseManager';
 import { AuthService } from '../../services/domains/auth/AuthService';
 import { PermissionService } from '../../services/domains/auth/PermissionService';
 import { parseBusinessConfiguration } from '../../config/businessProfiles';
@@ -102,7 +103,62 @@ const applyRememberedFormFields = (
   return next;
 };
 
+const normalizeImportNumber = (value: string): number =>
+  Number(
+    value
+      .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+      .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+      .replace(/[٬,]/g, '')
+      .replace(/[٫]/g, '.')
+      .trim(),
+  );
 
+/**
+ * يقرأ خلية رقمية بشكل صارم: أي قيمة فارغة أو غير رقمية أو غير منتهية
+ * أو أقل من الحد الأدنى أو غير صحيحة (إن طُلب) تُفشل الصف بخطأ.
+ * لا توجد أي قيمة افتراضية — كل قيمة يجب أن تكون حقيقية من الملف.
+ */
+const readImportNumber = (
+row: Record<string, unknown>, keys: string[], label: string, p0: number, options: { min?: number; max?: number; integer?: boolean; } = {},
+): number => {
+  const raw = pickCell(row, keys);
+
+  // لا fallback: القيمة الفارغة أو المفقودة = خطأ
+  if (raw === null || raw === undefined || String(raw).trim() === '') {
+    throw new Error(`قيمة «${label}» مطلوبة ولم يتم العثور عليها في الصف`);
+  }
+
+  const text = String(raw).trim();
+
+  // رفض أي شيء ليس رقمًا عشريًا/صحيحًا صريحًا (يمنع 0x10 و 1e5 الغريبة إن أردت)
+  // لو عايز تسمح بالأس العلمي (1e5) شيل هذا الشرط
+  const cleaned = text
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[٬,]/g, '')
+    .replace(/[٫]/g, '.');
+
+  if (!/^[+-]?(\d+(\.\d+)?|\.\d+)$/.test(cleaned)) {
+    throw new Error(`قيمة «${label}» غير صالحة: ${text}`);
+  }
+
+  const parsed = Number(cleaned);
+
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`قيمة «${label}» غير صالحة: ${text}`);
+  }
+  if (options.min !== undefined && parsed < options.min) {
+    throw new Error(`قيمة «${label}» أقل من الحد الأدنى (${options.min}): ${text}`);
+  }
+  if (options.max !== undefined && parsed > options.max) {
+    throw new Error(`قيمة «${label}» أكبر من الحد الأقصى (${options.max}): ${text}`);
+  }
+  if (options.integer && !Number.isInteger(parsed)) {
+    throw new Error(`قيمة «${label}» يجب أن تكون عددًا صحيحًا: ${text}`);
+  }
+
+  return parsed;
+};
 export const ProductsView: React.FC = () => {
   const productsLabel = useBusinessTerm('entities.products.plural');
   const productSingularLabel = useBusinessTerm('entities.products.singular');
@@ -982,6 +1038,10 @@ export const ProductsView: React.FC = () => {
           sellingPriceBox: p.sellingPriceBox,
           wholesalePriceM2: p.wholesalePriceM2,
           minStockLevel: p.minStockLevel,
+          warehouse: stock.byWarehouse.find((entry) => entry.quantityM2 > 0 && entry.warehouseName)?.warehouseName || '',
+          openingBoxes: p.productType === 'GENERAL'
+            ? (p.baseUnit === 'BOX' ? stock.totalBoxes : stock.totalPieces)
+            : stock.totalBoxes,
           stockM2: stock.totalM2,
           stockBoxes: stock.totalBoxes,
           stockPieces: stock.totalPieces,
@@ -1018,6 +1078,8 @@ export const ProductsView: React.FC = () => {
           ...(hasBoxUnits ? [{ key: 'sellingPriceBox', label: 'سعر الكرتونة' }] : []),
           { key: 'wholesalePriceM2', label: 'سعر الجملة' },
           { key: 'minStockLevel', label: 'حد الطلب' },
+          { key: 'warehouse', label: 'المخزن' },
+          { key: 'openingBoxes', label: 'كراتين افتتاحية' },
           { key: 'stockM2', label: 'المخزون بوحدة الصنف' },
           ...(hasBoxUnits ? [
             { key: 'stockBoxes', label: 'المخزون كرتونة' },
@@ -1036,6 +1098,7 @@ export const ProductsView: React.FC = () => {
       title: 'قالب استيراد المنتجات',
       subtitle: 'املأ الصفوف التالية ثم استخدم زر الاستيراد',
       fileName: 'products-import-template',
+      permission: 'products.import',
       columns: [
         { key: 'name', label: 'اسم الصنف' },
         { key: 'category', label: 'النوع' },
@@ -1065,37 +1128,30 @@ export const ProductsView: React.FC = () => {
     const errors: string[] = [];
     let created = 0;
     try {
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+      // Use the shared parser so file size, row, column, cell and sheet limits
+      // (and header validation) are identical to every other import path.
+      const parsed = parseSpreadsheetBuffer(await file.arrayBuffer(), file.name);
+      const rawRows = parsed.sheets[0]?.rows ?? [];
       const categoryMap = new Map(categories.map((c) => [c.name.trim(), c.id]));
       const brandMap = new Map(brands.map((b) => [b.name.trim(), b.id]));
       const warehouseMap = new Map(warehouses.map((w) => [w.name.trim(), w.id]));
+      const db = DatabaseManager.getInstance();
 
       for (let index = 0; index < rawRows.length; index += 1) {
         const row = rawRows[index];
-        const name = pickCell(row, ['name', 'اسم الصنف', 'اسم المنتج', 'الاسم']);
+        const name = String(pickCell(row, ['name', 'اسم الصنف', 'اسم المنتج', 'الاسم']) || '').trim();
         if (!name) continue;
 
+        let createdCategoryName: string | null = null;
+        let createdBrandName: string | null = null;
         try {
-          const categoryName = pickCell(row, ['category', 'النوع', 'التصنيف']) || 'عام';
-          const brandName = pickCell(row, ['brand', 'الماركة', 'ماركة']) || 'عام';
-          let categoryId = categoryMap.get(categoryName);
-          if (!categoryId) {
-            categoryId = categoryService.createCategory(categoryName).id;
-            categoryMap.set(categoryName, categoryId);
-          }
-          let brandId = brandMap.get(brandName);
-          if (!brandId) {
-            brandId = brandService.createBrand(brandName).id;
-            brandMap.set(brandName, brandId);
-          }
+          const categoryName = String(pickCell(row, ['category', 'categoryName', 'النوع', 'التصنيف']) || 'عام').trim();
+          const brandName = String(pickCell(row, ['brand', 'brandName', 'الماركة', 'ماركة']) || 'عام').trim();
 
           const stamp = `${Date.now().toString().slice(-5)}${String(index).padStart(3, '0')}`;
           const sku = pickCell(row, ['sku', 'الكود', 'كود الصنف']) || `IMP-${stamp}`;
           const barcode = pickCell(row, ['barcode', 'الباركود']) || `622${stamp}${String(index).padStart(2, '0')}`;
-          const rowType = pickCell(row, ['productType', 'نوع الصنف', 'النوع']).toUpperCase();
+          const rowType = String(pickCell(row, ['productType', 'نوع الصنف', 'النوع']) || '').toUpperCase();
           const ceramicRow = rowType.includes('CERAMIC')
             || rowType.includes('سيراميك')
             || (!rowType && businessConfig.businessType === 'ceramics');
@@ -1103,58 +1159,113 @@ export const ProductsView: React.FC = () => {
             || businessConfig.units[0]
             || 'PIECE';
           const size = pickCell(row, ['size', 'المقاس']) || (ceramicRow ? '60x60' : '');
-          const piecesPerBox = Number(pickCell(row, ['piecesPerBox', 'قطع بالكرتونة', 'عدد القطع'])) || (ceramicRow ? 4 : 1);
-          const metersPerBox = Number(pickCell(row, ['metersPerBox', 'م² بالكرتونة', 'المترات']))
-            || (ceramicRow ? calcMetersFromSize(size, piecesPerBox) || 1.44 : 1);
-          const costPrice = Number(pickCell(row, ['costPrice', 'التكلفة', 'سعر الشراء'])) || 0;
-          const sellingPriceM2 = Number(pickCell(row, ['sellingPriceM2', 'سعر المتر', 'سعر البيع'])) || round(costPrice * 1.4);
 
-          const product = productService.createProduct({
-            name,
-            sku,
-            barcode,
-            categoryId,
-            brandId,
-            productType: ceramicRow ? 'CERAMIC' : 'GENERAL',
-            grade: gradeOptions.find((option) => option.value === pickCell(row, ['grade', 'الفرز'])
-              || option.label === pickCell(row, ['grade', 'الفرز']))?.value
-              || parseGrade(pickCell(row, ['grade', 'الفرز']), gradeOptions.filter((option) => option.isActive)),
-            size,
-            thickness: Number(pickCell(row, ['thickness', 'السمك'])) || 0,
-            color: pickCell(row, ['color', 'اللون']),
-            finish: pickCell(row, ['finish', 'التشطيب']),
-            surfaceLocation: ceramicRow ? 'FLOOR' : 'GENERAL',
-            baseUnit: ceramicRow ? 'M2' : importUnit,
-            sellUnit: ceramicRow ? 'M2' : importUnit,
-            piecesPerBox,
-            metersPerBox,
-            weightPerBox: Number(pickCell(row, ['weightPerBox', 'الوزن'])) || 0,
-            costPrice,
-            sellingPriceM2,
-            sellingPriceBox: round(sellingPriceM2 * metersPerBox),
-            wholesalePriceM2: Number(pickCell(row, ['wholesalePriceM2', 'سعر الجملة'])) || round(sellingPriceM2 * 0.9),
-            minSellingPriceM2: Number(pickCell(row, ['minSellingPriceM2', 'أقل سعر'])) || round(sellingPriceM2 * 0.85),
-            minStockLevel: Number(pickCell(row, ['minStockLevel', 'حد الطلب'])) || 10,
-            maxStockLevel: 1000,
-            notes: pickCell(row, ['notes', 'ملاحظات']),
-            isActive: true,
-          });
+          const piecesPerBox = readImportNumber(
+            row, ['piecesPerBox', 'قطع/كرتونة', 'قطع بالكرتونة', 'عدد القطع'], 'قطع بالكرتونة',
+            ceramicRow ? 4 : 1, { min: 1, integer: true },
+          );
+          const metersPerBox = readImportNumber(
+            row, ['metersPerBox', 'م²/كرتونة', 'م² بالكرتونة', 'متر/كرتونة', 'المترات'], 'المترات بالكرتونة',
+            ceramicRow ? (calcMetersFromSize(size, piecesPerBox) || 1.44) : 1, { min: 0.000001 },
+          );
+          const costPrice = readImportNumber(row, ['costPrice', 'التكلفة', 'سعر الشراء'], 'التكلفة', 0, { min: 0 });
+          const sellingPriceM2 = readImportNumber(
+            row, ['sellingPriceM2', 'سعر الوحدة', 'سعر المتر', 'سعر البيع'], 'سعر البيع', round(costPrice * 1.4), { min: 0 },
+          );
+          const wholesalePriceM2 = readImportNumber(
+            row, ['wholesalePriceM2', 'سعر الجملة'], 'سعر الجملة', round(sellingPriceM2 * 0.9), { min: 0 },
+          );
+          const minSellingPriceM2 = readImportNumber(
+            row, ['minSellingPriceM2', 'أقل سعر'], 'أقل سعر', round(sellingPriceM2 * 0.85), { min: 0 },
+          );
+          const minStockLevel = readImportNumber(row, ['minStockLevel', 'حد الطلب'], 'حد الطلب', 10, { min: 0 });
+          const thickness = readImportNumber(row, ['thickness', 'السمك'], 'السمك', 0, { min: 0 });
+          const weightPerBox = readImportNumber(row, ['weightPerBox', 'الوزن'], 'الوزن', 0, { min: 0 });
 
-          const openingBoxes = Number(pickCell(row, ['openingBoxes', 'كراتين افتتاحية', 'الكمية'])) || 0;
-          const warehouseName = pickCell(row, ['warehouse', 'المخزن']);
-          const warehouseId = warehouseMap.get(warehouseName) || warehouses[0]?.id;
-          if (tracksInventory && openingBoxes > 0 && warehouseId) {
-            const quantity = product.productType === 'GENERAL' ? openingBoxes : openingBoxes * metersPerBox;
-            inventoryService.createAdjustment({
-              productId: product.id,
-              warehouseId,
-              type: 'OPENING_BALANCE',
-              quantity: round(quantity, 3),
-              reason: 'رصيد افتتاحي من استيراد جدول بيانات',
-            });
+          const explicitOpening = readImportNumber(
+            row, ['openingBoxes', 'كراتين افتتاحية'], 'الكراتين الافتتاحية', 0, { min: 0 },
+          );
+          const exportedBoxes = readImportNumber(row, ['stockBoxes', 'المخزون كرتونة'], 'المخزون كرتونة', 0, { min: 0 });
+          const exportedPieces = readImportNumber(row, ['stockPieces', 'المخزون قطعة'], 'المخزون قطعة', 0, { min: 0 });
+          const openingBoxes = explicitOpening > 0
+            ? explicitOpening
+            : (ceramicRow ? exportedBoxes : (exportedPieces || exportedBoxes));
+
+          const warehouseName = String(pickCell(row, ['warehouse', 'warehouseName', 'المخزن']) || '').trim();
+          let warehouseId: string | undefined;
+          if (warehouseName) {
+            warehouseId = warehouseMap.get(warehouseName);
+            if (!warehouseId) throw new Error(`المخزن «${warehouseName}» غير موجود أو غير نشط.`);
           }
+          if (tracksInventory && openingBoxes > 0 && !warehouseId) {
+            throw new Error('حدد اسم مخزن صالحًا في عمود «المخزن» لاستيراد الرصيد الافتتاحي.');
+          }
+
+          // One atomic unit per row: category, brand, product and opening
+          // balance all commit together or none of them do.
+          db.executeTransaction(() => {
+            let categoryId = categoryMap.get(categoryName);
+            if (!categoryId) {
+              categoryId = categoryService.createCategory(categoryName).id;
+              categoryMap.set(categoryName, categoryId);
+              createdCategoryName = categoryName;
+            }
+            let brandId = brandMap.get(brandName);
+            if (!brandId) {
+              brandId = brandService.createBrand(brandName).id;
+              brandMap.set(brandName, brandId);
+              createdBrandName = brandName;
+            }
+
+            const product = productService.createProduct({
+              name,
+              sku,
+              barcode,
+              categoryId,
+              brandId,
+              productType: ceramicRow ? 'CERAMIC' : 'GENERAL',
+              grade: gradeOptions.find((option) => option.value === pickCell(row, ['grade', 'الفرز'])
+                || option.label === pickCell(row, ['grade', 'الفرز']))?.value
+                || parseGrade(pickCell(row, ['grade', 'الفرز']), gradeOptions.filter((option) => option.isActive)),
+              size,
+              thickness,
+              color: pickCell(row, ['color', 'اللون']),
+              tone: pickCell(row, ['tone', 'التون']),
+              finish: pickCell(row, ['finish', 'التشطيب']),
+              surfaceLocation: ceramicRow ? 'FLOOR' : 'GENERAL',
+              baseUnit: ceramicRow ? 'M2' : importUnit,
+              sellUnit: ceramicRow ? 'M2' : importUnit,
+              piecesPerBox,
+              metersPerBox,
+              weightPerBox,
+              costPrice,
+              sellingPriceM2,
+              sellingPriceBox: round(sellingPriceM2 * metersPerBox),
+              wholesalePriceM2,
+              minSellingPriceM2,
+              minStockLevel,
+              maxStockLevel: 1000,
+              notes: pickCell(row, ['notes', 'ملاحظات']),
+              isActive: true,
+            });
+
+            if (tracksInventory && openingBoxes > 0 && warehouseId) {
+              const quantity = product.productType === 'GENERAL' ? openingBoxes : openingBoxes * metersPerBox;
+              inventoryService.createAdjustment({
+                productId: product.id,
+                warehouseId,
+                type: 'OPENING_BALANCE',
+                quantity: round(quantity, 3),
+                reason: 'رصيد افتتاحي من استيراد جدول بيانات',
+              });
+            }
+          });
           created += 1;
         } catch (rowError: any) {
+          // The transaction rolled back, so drop lookup entries created for
+          // this row to avoid reusing ids that no longer exist.
+          if (createdCategoryName) categoryMap.delete(createdCategoryName);
+          if (createdBrandName) brandMap.delete(createdBrandName);
           errors.push(`صف ${index + 2}: ${rowError?.message || rowError}`);
         }
       }

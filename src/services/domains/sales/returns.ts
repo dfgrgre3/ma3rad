@@ -709,7 +709,7 @@ function holdReturnedAsSpecialStock(
     INSERT INTO inventory_special_stocks (
       id, special_number, warehouse_id, product_id, category,
       quantity_m2, boxes_count, unit_cost, total_cost, status,
-      source_type, source_id, notes, created_by, created_at
+      source_type, source_id, inspection_notes, created_by, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECORDED', 'SALES_RETURN', ?, ?, ?, CURRENT_TIMESTAMP)
   `, [
     specialId, sqliteDb.nextNumber('SPC'), inv.warehouseId, item.productId, category,

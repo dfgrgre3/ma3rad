@@ -66,6 +66,7 @@ export const AttendanceDevicesPage = lazy(() => import('../pages/hr/attendance-d
 export const HrAlertsPage = lazy(() => import('../pages/hr/alerts/HrAlertsPage').then(m => ({ default: m.HrAlertsPage })));
 export const PayslipsPage = lazy(() => import('../pages/hr/payslips/PayslipsPage').then(m => ({ default: m.PayslipsPage })));
 export const PayrollCalendarPage = lazy(() => import('../pages/hr/payroll-calendar/PayrollCalendarPage').then(m => ({ default: m.PayrollCalendarPage })));
+export const PayrollNotificationSettingsPage = lazy(() => import('../pages/hr/payroll-notification-settings/PayrollNotificationSettingsPage').then(m => ({ default: m.PayrollNotificationSettingsPage })));
 
 // CRM & Customers
 export const CustomersView = lazy(() => import('../components/customers/CustomersView').then(m => ({ default: m.CustomersView })));

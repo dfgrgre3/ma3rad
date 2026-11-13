@@ -400,6 +400,19 @@ export class AttendanceService {
 
   static getMonthlyReport(period: string): AttendanceReportRow[] {
     const actor = this.requireView();
+    return this.buildMonthlyReport(period, actor);
+  }
+
+  static getMonthlyReportForExport(period: string): AttendanceReportRow[] {
+    const actor = AuthService.requireAuth();
+    PermissionService.require(actor, 'employees.attendance.export');
+    return this.buildMonthlyReport(period, actor);
+  }
+
+  private static buildMonthlyReport(
+    period: string,
+    actor: ReturnType<typeof AuthService.requireAuth>,
+  ): AttendanceReportRow[] {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) throw new Error('صيغة الشهر غير صحيحة (YYYY-MM).');
     const scope = this.employeeDataScope(actor);
     return this.db.query<AttendanceReportRow>(

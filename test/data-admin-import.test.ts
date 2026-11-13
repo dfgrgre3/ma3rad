@@ -45,10 +45,17 @@ test('previews conflicts and merges XLSX and encrypted backup records', async ()
   const service = new DataAdminService();
   const exported = service.exportTableData('data_import_test').sheets[0];
   assert.equal(exported.rows[0].account_name, 'قبل');
-  const protectedExport = service.exportTableData('users').sheets[0];
+  assert.throws(() => service.exportTableData('users'), /محمي/);
+  const fullExport = service.exportAllData();
+  assert.equal(
+    fullExport.sheets.some((sheet) => sheet.name === 'users' || sheet.name === 'user_2fa'),
+    false,
+  );
+  const usersColumns = service.getColumns('users').map((column) => column.name);
   const protectedSheet: DataImportSheet = {
-    ...protectedExport,
-    rows: protectedExport.rows.map((row) => ({ ...row, full_name: 'Imported Name' })),
+    name: 'users',
+    columns: usersColumns,
+    rows: [{ id: 'usr_data_import_admin', full_name: 'Imported Name' }],
   };
 
   const sheets: DataImportSheet[] = [
@@ -131,6 +138,18 @@ test('previews conflicts and merges XLSX and encrypted backup records', async ()
 
   const backupResult = await service.importData(backupSheets);
   assert.ok(backupResult.updatedRows >= 2);
+  assert.equal(
+    db.query<{ accountName: string }>(`SELECT account_name FROM data_import_test WHERE id = 'existing'`)[0].accountName,
+    'بعد'
+  );
+
+  const skipPreview = service.previewDataImport(parsed, 'skip');
+  assert.equal(skipPreview.tables[0].conflictRows, 2);
+  const skipResult = await service.importData(parsed, 'skip');
+  assert.deepEqual(
+    { inserted: skipResult.insertedRows, updated: skipResult.updatedRows },
+    { inserted: 0, updated: 0 },
+  );
   assert.equal(
     db.query<{ accountName: string }>(`SELECT account_name FROM data_import_test WHERE id = 'existing'`)[0].accountName,
     'بعد'

@@ -5,6 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { localDateString } from '../../../utils/shared/date';
 import { round2 } from '../finance/financials';
 import { BranchAccessService } from '../auth/BranchAccessService';
+import { ProjectService } from '../projects/ProjectService';
 
 export type PurchaseRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ORDERED' | 'CANCELLED';
 export type RequestPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
@@ -14,6 +15,7 @@ export interface PurchaseRequest {
   requestNumber: string;
   date: string;
   branchId?: string | null;
+  projectId?: string | null;
   branchName?: string;
   warehouseId?: string | null;
   warehouseName?: string;
@@ -69,6 +71,11 @@ export class PurchaseRequestService {
     return this.db.query<PurchaseRequest>(sql, params);
   }
 
+  public getProjectRequests(projectId: string): PurchaseRequest[] {
+    if (!new ProjectService().getProjectById(projectId)) throw new Error('المشروع غير موجود أو لا تملك صلاحية الوصول إليه.');
+    return this.getRequests().filter((request) => request.projectId === projectId);
+  }
+
   public getItems(requestId: string): any[] {
     const actor = AuthService.requireAuth();
     PermissionService.require(actor, 'ui.purchases.requests.view');
@@ -92,6 +99,7 @@ export class PurchaseRequestService {
     neededBy?: string;
     priority?: RequestPriority;
     notes?: string;
+    projectId?: string;
     items: PurchaseRequestItemInput[];
   }): PurchaseRequest {
     const actor = AuthService.requireAuth();
@@ -100,6 +108,9 @@ export class PurchaseRequestService {
     if (items.length === 0) throw new Error('أضف صنفاً واحداً على الأقل بكمية أكبر من صفر.');
 
     let branchId = input.branchId;
+    if (input.projectId && !new ProjectService().getProjectById(input.projectId)) {
+      throw new Error('المشروع غير موجود أو لا تملك صلاحية الوصول إليه.');
+    }
     if (input.warehouseId) {
       const warehouseBranchId = this.branchAccess.requireWarehouseAccess(input.warehouseId, actor);
       if (branchId && branchId !== warehouseBranchId) {
@@ -115,12 +126,12 @@ export class PurchaseRequestService {
       const requestNumber = db.nextNumber('PRQ');
       db.run(
         `INSERT INTO purchase_requests (id, request_number, date, branch_id, warehouse_id, requested_by,
-          needed_by, priority, status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
+          needed_by, priority, status, notes, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)`,
         [
           id, requestNumber, localDateString(), branchId,
           input.warehouseId || null, actor.id, input.neededBy || null,
-          input.priority || 'NORMAL', input.notes || null,
+          input.priority || 'NORMAL', input.notes || null, input.projectId || null,
         ]
       );
       for (const item of items) {

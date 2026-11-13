@@ -52,6 +52,7 @@ export const exportPurchaseInvoices = ({ date, data, rows, plain, toast }: Purch
         paymentStatusLabel: PAY_LABEL[row.paymentStatus] || row.paymentStatus,
       })),
       fileName: `daily-purchases-${date}`,
+      permission: 'purchases.export',
     });
     toast.success('تم تصدير فواتير التوريد');
   } catch (e: any) {

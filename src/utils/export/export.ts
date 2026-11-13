@@ -15,13 +15,20 @@ export interface ExportOptions {
   kpis?: Array<{ label: string; value: string | number; hint?: string }>;
   notes?: string[];
   /** Permission code enforced before the document is built or written (for example `sales.export`). */
-  permission?: string;
+  permission: string;
 }
 
 const stamp = () => localDateString();
 
 function safeName(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '-');
+}
+
+function assertExportPermission(permission: string): void {
+  if (!permission) {
+    throw new Error('يجب تحديد صلاحية تصدير صريحة قبل تنزيل البيانات.');
+  }
+  ExportService.assertAllowed(permission);
 }
 
 /**
@@ -32,7 +39,7 @@ export function buildExportHtml(
   { title, subtitle, columns, rows, kpis, notes, permission }: ExportOptions,
   _autoPrint = false
 ): string {
-  if (permission) ExportService.assertAllowed(permission);
+  assertExportPermission(permission);
   const esc = (s: unknown) =>
     String(s ?? '')
       .replace(/&/g, '&amp;')
@@ -266,7 +273,7 @@ export async function downloadPdf(html: string, fileName: string): Promise<boole
 }
 
 export function exportToExcel({ title, subtitle, columns, rows, fileName, kpis, permission }: ExportOptions): void {
-  if (permission) ExportService.assertAllowed(permission);
+  assertExportPermission(permission);
 
   let companyName = 'معرض السيراميك والبورسلين';
   try {

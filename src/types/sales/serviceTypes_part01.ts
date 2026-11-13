@@ -41,6 +41,8 @@ export interface CreateSaleDTO {
   performedBy?: string;
   loyaltyRedemption?: { points: number; discountAmount: number };
   promotionUsage?: { promotionId: string; couponCode?: string; discountAmount: number };
+  /** Approved DISCOUNT request id authorising a manual discount above the policy threshold. */
+  discountApprovalId?: string;
 }
 
 export interface InvoiceFilters {

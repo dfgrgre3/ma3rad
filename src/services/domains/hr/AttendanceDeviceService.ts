@@ -468,7 +468,9 @@ export class AttendanceDeviceService {
         recordsNew += 1;
       }
 
-      recordsProcessed = recordsNew;
+      // Rows are queued as PENDING; they are only "processed" once the
+      // attendance processing pass converts them into attendance entries.
+      recordsProcessed = 0;
       const status = recordsError > 0 && recordsNew === 0 ? 'ERROR' : 'COMPLETED';
       db.run(
         `UPDATE hr_attendance_import_logs

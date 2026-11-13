@@ -62,6 +62,13 @@ export class DynamicDataService {
     }
     return actor;
   }
+  private requireExport() {
+    const actor = this.actor();
+    if (!PermissionService.can(actor, 'admin.data') && !PermissionService.can(actor, 'settings.dynamic_data.manage')) {
+      PermissionService.require(actor, 'settings.dynamic_data.export');
+    }
+    return actor;
+  }
 
   listEntities(search = ''): DynamicEntity[] {
     this.requireView();
@@ -110,8 +117,12 @@ export class DynamicDataService {
     const allRows = sheets.map(sheet => ({ sheet: sheet.name, headers: sheet.headers, rows: sheet.rows }));
     if(!allRows.length) throw new Error('الملف لا يحتوي على صفوف بيانات.');
     if(allRows.length>1){
-      const outcomes=allRows.map(tab=>this.importSheets(buffer,fileName,[{name:tab.sheet,headers:tab.headers,rows:tab.rows}],undefined));
-      return {...outcomes[0],entities:outcomes.map(x=>x.entity),imported:outcomes.reduce((n,x)=>n+x.imported,0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:outcomes.flatMap(x=>x.errors)};
+      // The whole workbook is one unit of work: if a later sheet fails, the
+      // sheets imported before it are rolled back through the outer transaction.
+      return this.db.executeTransaction(() => {
+        const outcomes=allRows.map(tab=>this.importSheets(buffer,fileName,[{name:tab.sheet,headers:tab.headers,rows:tab.rows}],undefined));
+        return {...outcomes[0],entities:outcomes.map(x=>x.entity),imported:outcomes.reduce((n,x)=>n+x.imported,0),skipped:outcomes.reduce((n,x)=>n+x.skipped,0),errors:outcomes.flatMap(x=>x.errors)};
+      });
     }
     const parsed=allRows[0]; const typeName=(requestedType||parsed.sheet||fileName.replace(/\.[^.]+$/,'')).trim();
     if(!typeName) throw new Error('اكتب اسمًا لهذا النوع الجديد من البيانات.');
@@ -120,14 +131,14 @@ export class DynamicDataService {
     const entity=this.saveEntity(typeName,parsed.headers,parsed.rows,actor.id);
     const batchId=id('dib'); const errors:Array<{row:number;message:string}>=[]; let imported=0;
     this.db.executeTransaction(()=>{
-      this.db.run('INSERT INTO dynamic_import_batches (id,entity_type_id,source_name,source_hash,status,imported_count,raw_rows_json,created_by) VALUES (?,?,?,?,?,?,?,?)',[batchId,entity.id,fileName,sourceHash, 'COMPLETED',0,JSON.stringify({sheet:parsed.sheet,headers:parsed.headers,rows:parsed.rows}),actor.id]);
+      this.db.run('INSERT INTO dynamic_import_batches (id,entity_type_id,source_name,source_hash,status,imported_count,raw_rows_json,created_by) VALUES (?,?,?,?,?,?,?,?)',[batchId,entity.id,fileName,sourceHash, 'COMPLETED',0,JSON.stringify({sheet:parsed.sheet,headers:parsed.headers,rowCount:parsed.rows.length}),actor.id]);
       parsed.rows.forEach((raw,index)=>{
         try {
           const values:Record<string,unknown>={};
           for(const header of parsed.headers){const field=entity.fields.find(f=>clean(f.originalHeader||f.label)===clean(header)||clean(f.label)===clean(header));if(field)values[field.key]=raw[header];}
           const validatedValues = this.validateRecordValues(entity.id, entity.fields, entity.relations, values);
-          // Retain every source value even when a header collides or its inferred type is uncertain.
-          validatedValues.__source = raw;
+          // Do not retain a second copy of the raw row: the batch keeps only
+          // source metadata, and rollback uses source_batch_id.
           const searchText=Object.values(validatedValues).map(v=>typeof v==='object'?JSON.stringify(v):String(v??'')).join(' ').toLocaleLowerCase();
           this.db.run('INSERT INTO dynamic_records (id,entity_type_id,values_json,search_text,source_batch_id,created_by) VALUES (?,?,?,?,?,?)',[id('drec'),entity.id,JSON.stringify(validatedValues),searchText,batchId,actor.id]); imported++;
         } catch(e:any){errors.push({row:index+2,message:e?.message||'تعذر حفظ الصف'});}
@@ -144,6 +155,18 @@ export class DynamicDataService {
     const rows=this.db.query<any>("SELECT * FROM dynamic_records WHERE entity_type_id=? AND (? = '' OR search_text LIKE ?) ORDER BY created_at DESC LIMIT ? OFFSET ?",[entityId,rawSearch,term,safeSize,offset]);
     const total=this.db.query<any>("SELECT COUNT(*) AS count FROM dynamic_records WHERE entity_type_id=? AND (? = '' OR search_text LIKE ?)",[entityId,rawSearch,term])[0]?.count||0;
     return {rows:rows.map(r=>({id:r.id,entityTypeId:r.entityTypeId,values:asJSON(r.valuesJson,{}),searchText:r.searchText,sourceBatchId:r.sourceBatchId,createdAt:r.createdAt,updatedAt:r.updatedAt})),total};
+  }
+
+  private static readonly MAX_EXPORT_ROWS = 100_000;
+
+  listAllRecords(entityId: string): DynamicRecord[] {
+    this.requireExport();
+    const total = Number(this.db.query<any>('SELECT COUNT(*) AS count FROM dynamic_records WHERE entity_type_id=?',[entityId])[0]?.count ?? 0);
+    if (total > DynamicDataService.MAX_EXPORT_ROWS) {
+      throw new Error(`عدد السجلات (${total}) يتجاوز الحد الأقصى للتصدير (${DynamicDataService.MAX_EXPORT_ROWS}). صدّر نطاقًا أصغر.`);
+    }
+    const rows = this.db.query<any>('SELECT * FROM dynamic_records WHERE entity_type_id=? ORDER BY created_at DESC',[entityId]);
+    return rows.map(r=>({id:r.id,entityTypeId:r.entityTypeId,values:asJSON(r.valuesJson,{}),searchText:r.searchText,sourceBatchId:r.sourceBatchId,createdAt:r.createdAt,updatedAt:r.updatedAt}));
   }
 
   updateRecord(recordId: string, values: Record<string, unknown>): void {
@@ -195,7 +218,7 @@ export class DynamicDataService {
 
   getBatches(entityId: string): Array<{id:string;sourceName:string;status:string;importedCount:number;createdAt:string}> {this.requireView();return this.db.query<any>('SELECT id,source_name,status,imported_count,created_at FROM dynamic_import_batches WHERE entity_type_id=? ORDER BY created_at DESC',[entityId]);}
 
-  rollbackBatch(batchId: string): number {const actor=this.requireManage();const batch=this.db.query<any>('SELECT * FROM dynamic_import_batches WHERE id=?',[batchId])[0];if(!batch)throw new Error('دفعة الاستيراد غير موجودة.');if(batch.status==='ROLLED_BACK')return 0;let removed=0;this.db.executeTransaction(()=>{removed=this.db.query<any>('SELECT COUNT(*) AS count FROM dynamic_records WHERE source_batch_id=?',[batchId])[0]?.count||0;this.db.run('DELETE FROM dynamic_records WHERE source_batch_id=?',[batchId]);this.db.run("UPDATE dynamic_import_batches SET status='ROLLED_BACK',imported_count=0 WHERE id=?",[batchId]);this.audit(actor.id,'تراجع عن استيراد بيانات ديناميكية',batchId,{removed});});return removed;}
+  rollbackBatch(batchId: string): number {const actor=this.requireManage();const batch=this.db.query<any>('SELECT * FROM dynamic_import_batches WHERE id=?',[batchId])[0];if(!batch)throw new Error('دفعة الاستيراد غير موجودة.');if(batch.status==='ROLLED_BACK')return 0;let removed=0;this.db.executeTransaction(()=>{removed=this.db.query<any>('SELECT COUNT(*) AS count FROM dynamic_records WHERE source_batch_id=?',[batchId])[0]?.count||0;this.db.run('DELETE FROM dynamic_records WHERE source_batch_id=?',[batchId]);this.db.run("UPDATE dynamic_import_batches SET status='ROLLED_BACK',imported_count=0,raw_rows_json='[]' WHERE id=?",[batchId]);this.audit(actor.id,'تراجع عن استيراد بيانات ديناميكية',batchId,{removed});});return removed;}
 
   deleteEntity(entityId: string): void {const actor=this.requireManage();const row=this.db.query<any>('SELECT name FROM dynamic_entity_types WHERE id=?',[entityId])[0];if(!row)throw new Error('نوع البيانات غير موجود.');this.db.executeTransaction(()=>{this.db.run('DELETE FROM dynamic_entity_types WHERE id=?',[entityId]);this.audit(actor.id,'حذف نوع بيانات ديناميكي',entityId,{name:row.name});});}
 

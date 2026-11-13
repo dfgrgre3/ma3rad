@@ -230,6 +230,7 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'settings.view', name: 'عرض الإعدادات', module: 'SETTINGS' },
   { code: 'settings.update', name: 'تعديل الإعدادات', module: 'SETTINGS' },
   { code: 'settings.backup', name: 'النسخ الاحتياطي والاستعادة', module: 'SETTINGS' },
+  { code: 'settings.backup.restore', name: 'استعادة نسخة احتياطية كاملة', module: 'SETTINGS' },
   { code: 'settings.maintenance', name: 'صيانة قاعدة البيانات', module: 'SETTINGS' },
   { code: 'settings.health.view', name: 'عرض صحة النظام', module: 'SETTINGS' },
   { code: 'audit.view', name: 'عرض سجل التدقيق', module: 'AUDIT' },
@@ -238,6 +239,7 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'admin.navigation', name: 'تخصيص قوائم التنقل', module: 'ADMIN' },
   { code: 'admin.data', name: 'أدوات البيانات والصيانة', module: 'ADMIN' },
   { code: 'admin.data.export', name: 'تصدير بيانات النظام', module: 'ADMIN' },
+  { code: 'admin.data.import', name: 'استيراد جداول بيانات النظام', module: 'ADMIN' },
   { code: 'admin.data.delete', name: 'حذف بيانات النظام', module: 'ADMIN' },
   { code: 'admin.license.manage', name: 'إدارة ترخيص المنصة المركزية', module: 'ADMIN' },
 
@@ -521,6 +523,7 @@ const BASE_PERMISSIONS: PermissionDef[] = [
 
   // Employees / operations
   { code: 'employees.attendance.view', name: 'عرض الحضور والانصراف', module: 'EMPLOYEES' },
+  { code: 'employees.attendance.export', name: 'تصدير تقارير الحضور والانصراف', module: 'EMPLOYEES' },
   { code: 'employees.attendance.manage', name: 'إدارة الحضور والانصراف', module: 'EMPLOYEES' },
   { code: 'employees.attendance.approve', name: 'اعتماد تصحيحات الحضور والعمل الإضافي', module: 'EMPLOYEES' },
   { code: 'employees.commissions.view', name: 'عرض عمولات المبيعات', module: 'EMPLOYEES' },
@@ -571,6 +574,7 @@ const BASE_PERMISSIONS: PermissionDef[] = [
   { code: 'settings.import.view', name: 'عرض مركز استيراد البيانات', module: 'SETTINGS' },
   { code: 'settings.import.execute', name: 'تنفيذ استيراد البيانات', module: 'SETTINGS' },
   { code: 'settings.dynamic_data.view', name: 'عرض أنواع البيانات الديناميكية', module: 'SETTINGS' },
+  { code: 'settings.dynamic_data.export', name: 'تصدير سجلات البيانات الديناميكية', module: 'SETTINGS' },
   { code: 'settings.dynamic_data.manage', name: 'إدارة أنواع البيانات الديناميكية', module: 'SETTINGS' },
   { code: 'settings.health.manage', name: 'إدارة صحة النظام', module: 'SETTINGS' },
   { code: 'settings.license_mode.view', name: 'عرض وضع الترخيص', module: 'SETTINGS' },

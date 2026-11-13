@@ -73,6 +73,7 @@ export { AttendanceDevicesPage } from './lazyPages_part02';
 export { HrAlertsPage } from './lazyPages_part02';
 export { PayslipsPage } from './lazyPages_part02';
 export { PayrollCalendarPage } from './lazyPages_part02';
+export { PayrollNotificationSettingsPage } from './lazyPages_part02';
 export { CustomersView } from './lazyPages_part02';
 export { CRMHubPage } from './lazyPages_part02';
 export { CustomerDetailPage } from './lazyPages_part02';

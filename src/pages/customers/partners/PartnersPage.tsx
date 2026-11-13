@@ -9,6 +9,7 @@ import { PageHeader } from '../../../components/ui/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import { Modal } from '../../../components/ui/Modal';
 import { localDateString } from '../../../utils/shared/date';
+import { csvCell } from '../../../utils/export/csv';
 import {
   PartnerService,
   type BusinessPartner,
@@ -90,11 +91,6 @@ const emptyOverview: PartnerOverview = {
   totalExpensesPaid: 0, totalExpensesForPartner: 0, totalLoansReceived: 0, totalLoansRepaid: 0,
   totalDrawings: 0, totalAdjustments: 0, totalNetBalance: 0,
 };
-
-function csvCell(value: string | number | null | undefined): string {
-  const text = String(value ?? '');
-  return `"${text.replace(/"/g, '""')}"`;
-}
 
 function downloadCsv(fileName: string, rows: Array<Array<string | number | null | undefined>>): void {
   const csv = '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\n');

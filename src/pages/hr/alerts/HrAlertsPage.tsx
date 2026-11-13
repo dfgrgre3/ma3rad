@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, RefreshCw, Loader2, AlertTriangle, Clock, FileText, CheckCircle2, ChevronRight } from 'lucide-react';
 import { HrAlertsService } from '../../../services/domains/hr/HrAlertsService';
 import { NotificationService } from '../../../services/domains/notifications/NotificationService';
@@ -11,6 +11,8 @@ const TYPE_LABELS: Record<string, { label: string; color: string; bg: string }> 
   HR_DOCUMENT_EXPIRY: { label: 'انتهاء مستند', color: 'text-violet-700', bg: 'bg-violet-50' },
   HR_LEAVE_BALANCE: { label: 'رصيد إجازات', color: 'text-emerald-700', bg: 'bg-emerald-50' },
   HR_LOAN_DUE: { label: 'قسط قرض', color: 'text-sky-700', bg: 'bg-sky-50' },
+  HR_PAYROLL_DUE: { label: 'صرف رواتب قريب', color: 'text-sky-700', bg: 'bg-sky-50' },
+  HR_PAYROLL_OVERDUE: { label: 'صرف رواتب متأخر', color: 'text-rose-700', bg: 'bg-rose-50' },
   SYSTEM: { label: 'نظام', color: 'text-slate-700', bg: 'bg-slate-50' },
 };
 
@@ -43,11 +45,22 @@ export const HrAlertsPage: React.FC = () => {
       setAlerts(hrAlerts);
       setError(null);
     } catch (e: any) {
+      console.error('HrAlertsPage load error:', e);
       setError(e?.message || 'تعذر تحميل التنبيهات.');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      load();
+    } catch (e: any) {
+      console.error('HrAlertsPage useEffect error:', e);
+      setError(e?.message || 'خطأ غير متوقع في تحميل الصفحة.');
+      setLoading(false);
+    }
+  }, [load]);
 
   const runChecks = useCallback(() => {
     setLoading(true);
@@ -62,6 +75,7 @@ export const HrAlertsPage: React.FC = () => {
         window.alert('لا توجد تنبيهات جديدة للموارد البشرية في الوقت الحالي.');
       }
     } catch (e: any) {
+      console.error('HrAlertsPage runChecks error:', e);
       setError(e?.message || 'تعذر تشغيل فحص التنبيهات.');
     } finally {
       setLoading(false);
@@ -89,7 +103,7 @@ export const HrAlertsPage: React.FC = () => {
           </div>
           <div>
             <h1 className="text-base font-black text-slate-900">تنبيهات الموارد البشرية</h1>
-            <p className="text-xs text-slate-400">عقود، فترات اختبار، مستندات، إجازات، أقساط قروض</p>
+            <p className="text-xs text-slate-400">عقود، فترات اختبار، مستندات، إجازات، أقساط قروض، صرف الرواتب</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -171,7 +185,7 @@ export const HrAlertsPage: React.FC = () => {
       </div>
 
       <div className="mx-6 text-xs text-slate-500">
-        يتم تشغيل الفحص التلقائي لهذه التنبيهات كل 30 ثانية عند تشغيل النظام، ويشمل: العقود المنتهية أو القريبة من الانتهاء، فترات الاختبار، مستندات الموظفين المنتهية الصلاحية، أرصدة الإجازات المنخفضة، وأقساط القروض المستحقة.
+        يتم تشغيل الفحص التلقائي لهذه التنبيهات كل 30 ثانية عند تشغيل النظام، ويشمل: العقود المنتهية أو القريبة من الانتهاء، فترات الاختبار، مستندات الموظفين المنتهية الصلاحية، أرصدة الإجازات المنخفضة، وأقساط القروض المستحقة، ومواعيد صرف الرواتب.
       </div>
     </div>
   );

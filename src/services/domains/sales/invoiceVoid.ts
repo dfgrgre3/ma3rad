@@ -118,7 +118,7 @@ function restoreInvoiceItem(
   }
 
   if (SettingsService.getSettings().costingMethod === 'FIFO') {
-    InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2);
+    InventoryCostingService.restoreInvoiceIssue(sqliteDb, invoiceId, item.productId, item.quantityM2, item.id);
   }
   sqliteDb.run(`
     UPDATE warehouse_stock

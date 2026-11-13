@@ -28,6 +28,9 @@ export interface DeleteResult {
   tables: TableCount[];
 }
 
+/** How rows whose primary key already exists are handled during a data import. */
+export type DataImportConflictPolicy = 'overwrite' | 'skip';
+
 export interface DataImportSheet {
   name: string;
   columns: string[];

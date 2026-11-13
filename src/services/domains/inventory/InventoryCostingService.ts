@@ -102,9 +102,10 @@ export class InventoryCostingService {
     }
   }
 
-  static restoreIssue(db: DatabaseManager, outboundTransactionId: string, quantityToRestore?: number): number {
+  static restoreIssue(db: DatabaseManager, outboundTransactionId: string, quantityToRestore?: number, legacyOnly = false): number {
     const allocs = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost AS unitCost
-      FROM inventory_cost_allocations WHERE outbound_transaction_id=? ORDER BY allocation_order,created_at,id`, [outboundTransactionId]);
+      FROM inventory_cost_allocations WHERE outbound_transaction_id=? AND (?=0 OR invoice_item_id IS NULL)
+      ORDER BY allocation_order,created_at,id`, [outboundTransactionId, legacyOnly ? 1 : 0]);
     let remaining = quantityToRestore === undefined
       ? round2(allocs.reduce((sum, row) => sum + Number(row.quantity) - Number(row.quantityRestored), 0))
       : round2(quantityToRestore);
@@ -122,9 +123,10 @@ export class InventoryCostingService {
     return round2(requested - remaining);
   }
 
-  static previewRestoreCost(db: DatabaseManager, outboundTransactionId: string, quantityToRestore: number): number {
+  static previewRestoreCost(db: DatabaseManager, outboundTransactionId: string, quantityToRestore: number, legacyOnly = false): number {
     const rows = db.query<CostAllocation>(`SELECT id,layer_id AS layerId,quantity,quantity_restored AS quantityRestored,unit_cost AS unitCost
-      FROM inventory_cost_allocations WHERE outbound_transaction_id=? ORDER BY allocation_order,created_at,id`, [outboundTransactionId]);
+      FROM inventory_cost_allocations WHERE outbound_transaction_id=? AND (?=0 OR invoice_item_id IS NULL)
+      ORDER BY allocation_order,created_at,id`, [outboundTransactionId, legacyOnly ? 1 : 0]);
     let needed = round2(quantityToRestore);
     let cost = 0;
     for (const row of rows) {
@@ -146,21 +148,27 @@ export class InventoryCostingService {
           ) GROUP BY outbound_transaction_id ORDER BY MIN(allocation_order),MIN(created_at),outbound_transaction_id`,
         [invoiceItemId, invoiceId, productId])
       : [];
-    // Older allocations have no invoice-line key. Preserve their legacy product-level
-    // restoration path only when no line-linked allocation exists for the return.
+    // Older allocations have no invoice-line key. Restore from them only when
+    // the return cannot be matched to a line-linked allocation: an invoice that
+    // already records line identities must never borrow another line's cost.
+    const legacyOnly = lineIssues.length === 0;
     const issues = lineIssues.length ? lineIssues : db.query<{ id: string }>(`SELECT id FROM inventory_transactions
-          WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE' ORDER BY created_at,rowid`,
+          WHERE reference_type='INVOICE' AND reference_id=? AND product_id=? AND type='SALE'
+            AND EXISTS (SELECT 1 FROM inventory_cost_allocations a
+                        WHERE a.outbound_transaction_id = inventory_transactions.id AND a.invoice_item_id IS NULL)
+          ORDER BY created_at,rowid`,
         [invoiceId, productId]);
     let needed = round2(quantity);
     let cost = 0;
     for (const issue of issues) {
       if (needed <= 0.009) break;
       const available = db.query<{ quantity: number }>(`SELECT COALESCE(SUM(quantity-quantity_restored),0) AS quantity
-        FROM inventory_cost_allocations WHERE outbound_transaction_id=?`, [issue.id])[0]?.quantity || 0;
+        FROM inventory_cost_allocations WHERE outbound_transaction_id=? AND (?=0 OR invoice_item_id IS NULL)`,
+        [issue.id, legacyOnly ? 1 : 0])[0]?.quantity || 0;
       const restoreQuantity = round2(Math.min(needed, Number(available)));
       if (restoreQuantity <= 0) continue;
-      cost = round2(cost + this.previewRestoreCost(db, issue.id, restoreQuantity));
-      this.restoreIssue(db, issue.id, restoreQuantity);
+      cost = round2(cost + this.previewRestoreCost(db, issue.id, restoreQuantity, legacyOnly));
+      this.restoreIssue(db, issue.id, restoreQuantity, legacyOnly);
       needed = round2(needed - restoreQuantity);
     }
     if (needed > 0.009) throw new Error(`FIFO sale allocations are short by ${needed} m² for this return.`);

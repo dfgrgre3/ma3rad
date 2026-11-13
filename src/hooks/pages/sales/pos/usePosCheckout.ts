@@ -5,6 +5,7 @@ import { ApprovalService } from '../../../../services/domains/approvals/Approval
 import type { CashierService } from '../../../../services/domains/finance/CashierService';
 import type { LoyaltyService } from '../../../../services/domains/sales/LoyaltyService';
 import type { AppliedPromotion } from '../../../../services/domains/sales/PricingService';
+import { evaluateManualDiscountPolicy } from '../../../../services/domains/sales/discountPolicy';
 import type { SalesService } from '../../../../services/domains/sales/SalesService';
 import type { CashShift, Customer, PaymentType, SystemSettings, ToneMixingConflict } from '../../../../types';
 import { formatProductQuantity } from '../../../../utils/products/productUnits';
@@ -141,6 +142,8 @@ export const usePosCheckout = ({
   // قفل متزامن داخل الذاكرة: يمنع فاتورة مكررة عند الضغط المزدوج أو F9 في اللحظة نفسها
   // (isProcessing وحده لا يكفي لأن تحديث الحالة لا يتم فورياً).
   const inFlightRef = useRef(false);
+  // اعتماد خصم معتمد مسبقاً يُمرَّر للخدمة لتستهلكه مع الفاتورة نفسها.
+  const discountApprovalRef = useRef<{ id: string; amount: number } | null>(null);
 
   const validateCartAndPermissions = useCallback(() => {
     if (!Number.isFinite(discountAmount) || discountAmount < 0
@@ -254,12 +257,30 @@ export const usePosCheckout = ({
       return false;
     }
     if (approvalDiscount > 0) {
-      const discountPercent = lineSubtotal > 0 ? (approvalDiscount / lineSubtotal) * 100 : 0;
       const configuredThreshold = settings?.discountApprovalThresholdPercent ?? 10;
       const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', configuredThreshold);
-      if (discountPercent > threshold && !can('sales.approve')) {
+      const policy = evaluateManualDiscountPolicy({
+        grossSubtotal: lineSubtotal,
+        totalDiscount: approvalDiscount,
+        thresholdPercent: threshold,
+      });
+      const discountPercent = policy.percent;
+      if (policy.requiresApproval && !can('sales.approve')) {
         try {
-          const request = new ApprovalService().createRequest({
+          const approvalService = new ApprovalService();
+          const cached = discountApprovalRef.current;
+          if (cached && Math.abs(cached.amount - approvalDiscount) > 0.01) {
+            discountApprovalRef.current = null;
+          } else if (cached) {
+            return true;
+          }
+          const existing = approvalService.findApprovedDiscountRequest(selectedCustomer?.id, approvalDiscount);
+          if (existing) {
+            discountApprovalRef.current = { id: existing.id, amount: approvalDiscount };
+            return true;
+          }
+          discountApprovalRef.current = null;
+          const request = approvalService.createRequest({
             requestType: 'DISCOUNT',
             title: `اعتماد خصم ${discountPercent.toFixed(1)}% على فاتورة بيع`,
             description: `العميل: ${selectedCustomer?.name ?? ''} — قيمة الخصم ${approvalDiscount} ج.م من إجمالي ${lineSubtotal} ج.م (الحد المسموح ${threshold}%).`,
@@ -267,6 +288,7 @@ export const usePosCheckout = ({
             currentValue: lineSubtotal,
             priority: 'HIGH',
             referenceType: 'POS',
+            referenceId: selectedCustomer?.id,
           });
           notify(`الخصم يتجاوز الحد المسموح (${threshold}%). تم إرسال طلب اعتماد رقم ${request.requestNumber}`, 'warning');
         } catch (error: any) {
@@ -401,8 +423,14 @@ export const usePosCheckout = ({
         performedBy,
         loyaltyRedemption: redeemPoints > 0 ? { points: redeemPoints, discountAmount: loyaltyDiscount } : undefined,
         promotionUsage: appliedPromotion ? { promotionId: appliedPromotion.promotionId, couponCode: couponCode || undefined, discountAmount: appliedPromotion.discountAmount } : undefined,
+        discountApprovalId: discountApprovalRef.current
+          && Math.abs(discountApprovalRef.current.amount - round2(discountAmount + lineDiscountTotal)) <= 0.01
+          ? discountApprovalRef.current.id
+          : undefined,
       });
       onInvoiceCreated(invoice.id);
+
+      discountApprovalRef.current = null;
 
       setSuccessInvoice(invoice);
       setCart([]);

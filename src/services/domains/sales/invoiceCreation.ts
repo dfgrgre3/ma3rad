@@ -23,6 +23,7 @@ import type { SalesInvoice, PaymentType } from '../../../types';
 import type { SalesContext } from './context';
 import type { CreateSaleDTO } from '../../../types/sales/serviceTypes';
 import { PricingService } from './PricingService';
+import { evaluateManualDiscountPolicy } from './discountPolicy';
 import { AppConfigService } from '../config/AppConfigService';
 import { basePriceFromUnitPrice } from '../../../utils/products/uom';
 
@@ -364,25 +365,104 @@ function prepareSaleItems(
   return { preparedItems, totalLineDiscount };
 }
 
+type DiscountApprovalRow = {
+  id: string;
+  branchId: string | null;
+  requestedValue: number | null;
+  requestedBy: string;
+};
+
+/**
+ * A manual discount above the policy threshold must be backed by an approved
+ * DISCOUNT request. Requests that are already approved by a manager are
+ * reusable, but each one can authorise exactly one invoice: consuming it
+ * rewrites its reference to the invoice, so a retry cannot silently create a
+ * second request or reuse the same authorisation.
+ */
+function resolveDiscountApproval(
+  sqliteDb: any,
+  dto: CreateSaleDTO,
+  actor: any,
+  approvalDiscount: number,
+  branchId: string,
+  invoiceId: string
+): void {
+  const candidates = (dto.discountApprovalId
+    ? sqliteDb.query(
+        `SELECT id, branch_id AS branchId, requested_value AS requestedValue, requested_by AS requestedBy
+         FROM approval_requests
+         WHERE id = ? AND request_type = 'DISCOUNT' AND status = 'APPROVED'
+           AND (reference_type IS NULL OR reference_type IN ('POS', 'MANUAL'))
+           AND (reference_id IS NULL OR reference_id = ?)`,
+        [dto.discountApprovalId, dto.customerId]
+      )
+    : sqliteDb.query(
+        `SELECT id, branch_id AS branchId, requested_value AS requestedValue, requested_by AS requestedBy
+         FROM approval_requests
+         WHERE request_type = 'DISCOUNT' AND status = 'APPROVED'
+           AND requested_by = ?
+           AND ABS(COALESCE(requested_value, 0) - ?) <= 0.01
+           AND (reference_type IS NULL OR reference_type IN ('POS', 'MANUAL'))
+           AND (reference_id IS NULL OR reference_id = ?)
+         ORDER BY decided_at DESC, created_at DESC LIMIT 1`,
+        [actor.id, approvalDiscount, dto.customerId]
+      )) as DiscountApprovalRow[];
+  const approval = candidates[0];
+  if (!approval) {
+    throw new Error('الخصم يتجاوز الحد المسموح ولا يوجد اعتماد خصم ساري لهذه الفاتورة. اطلب اعتماد المسؤول ثم أعد المحاولة.');
+  }
+  if (approval.requestedBy !== actor.id) {
+    throw new Error('طلب اعتماد الخصم لا يخص المستخدم الحالي.');
+  }
+  if (approval.branchId && approval.branchId !== branchId) {
+    throw new Error('طلب اعتماد الخصم يخص فرعاً آخر غير فرع الفاتورة.');
+  }
+  if (Math.abs(Number(approval.requestedValue || 0) - approvalDiscount) > 0.01) {
+    throw new Error('قيمة الاعتماد لا تطابق قيمة الخصم المطلوبة على هذه الفاتورة.');
+  }
+  sqliteDb.run(
+    `UPDATE approval_requests SET reference_type = 'SALES_INVOICE', reference_id = ?
+     WHERE id = ? AND request_type = 'DISCOUNT' AND status = 'APPROVED'
+       AND (reference_type IS NULL OR reference_type IN ('POS', 'MANUAL'))`,
+    [invoiceId, approval.id]
+  );
+  if ((sqliteDb.getDatabase() as any).getRowsModified() !== 1) {
+    throw new Error('تم استهلاك اعتماد الخصم من عملية بيع أخرى؛ اطلب اعتماداً جديداً.');
+  }
+}
+
 function validateDiscountAndCredit(
   sqliteDb: any,
   dto: CreateSaleDTO,
   actor: any,
   totals: ReturnType<typeof computeSaleTotals>,
   totalLineDiscount: number,
-  discountApprovalThresholdPercent: number
+  discountApprovalThresholdPercent: number,
+  invoiceId: string,
+  branchId: string
 ): void {
   const headerDiscount = dto.discountAmount || 0;
   if (!Number.isFinite(headerDiscount) || headerDiscount < 0) throw new Error('مبلغ الخصم غير صحيح.');
   if (headerDiscount > totals.subtotal) {
     throw new Error('إجمالي الخصم يتجاوز صافي قيمة الأصناف في الفاتورة.');
   }
+  const promotionDiscount = round2(Number(dto.promotionUsage?.discountAmount || 0));
+  const loyaltyDiscount = round2(Number(dto.loyaltyRedemption?.discountAmount || 0));
+  const manualHeaderDiscount = round2(Math.max(0, headerDiscount - promotionDiscount - loyaltyDiscount));
+  const approvalDiscount = round2(totalLineDiscount + manualHeaderDiscount);
   if (totalLineDiscount + headerDiscount > 0) {
     PermissionService.require(actor, 'ui.sales.invoices.discount');
-    const discountBase = Number(totals.subtotal || 0);
-    const discountPercent = discountBase > 0 ? ((totalLineDiscount + headerDiscount) / discountBase) * 100 : 0;
     const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', discountApprovalThresholdPercent);
-    if (discountPercent > threshold) PermissionService.require(actor, 'ui.sales.invoices.approve');
+    // same gross-subtotal basis the POS and quick-sale screens use, so one
+    // policy decision holds from cart validation through invoice posting.
+    const policy = evaluateManualDiscountPolicy({
+      grossSubtotal: round2(Number(totals.subtotal || 0) + totalLineDiscount),
+      totalDiscount: approvalDiscount,
+      thresholdPercent: threshold,
+    });
+    if (policy.requiresApproval && !PermissionService.can(actor, 'ui.sales.invoices.approve')) {
+      resolveDiscountApproval(sqliteDb, dto, actor, approvalDiscount, branchId, invoiceId);
+    }
   }
 
   if (totals.remainingAmount > 0 && !PermissionService.can(actor, 'ui.sales.invoices.credit')) {
@@ -412,9 +492,9 @@ function validatePromotionEligibility(
 ): void {
   if (!dto.promotionUsage) return;
   const cart = preparedItems.map((item) => {
-    const product = sqliteDb.query<{ categoryId: string | null; brandId: string | null }>(
+    const product = sqliteDb.query(
       'SELECT category_id AS categoryId, brand_id AS brandId FROM products WHERE id = ?', [item.productId]
-    )[0];
+    )[0] as { categoryId: string | null; brandId: string | null } | undefined;
     const quantity = Number(item.quantityM2);
     const unitPrice = Number(item.unitPrice);
     return {
@@ -685,6 +765,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     const allowNegativeStock = sysSettings.enableNegativeStock === true;
     const trackInventory = ModuleRegistryService.isInventoryTracked();
     const { preparedItems, totalLineDiscount } = prepareSaleItems(sqliteDb, dto, actor, costingMethod, trackInventory, allowNegativeStock);
+    const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
     validatePromotionEligibility(sqliteDb, dto, preparedItems);
     const headerDiscount = dto.discountAmount || 0;
     const totals = computeSaleTotals({
@@ -699,7 +780,7 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
     });
 
     validateDiscountAndCredit(sqliteDb, dto, actor, totals, totalLineDiscount,
-      Number(sysSettings.discountApprovalThresholdPercent ?? 10));
+      Number(sysSettings.discountApprovalThresholdPercent ?? 10), invoiceId, branchId);
 
     // Without inventory tracking there is no inventory asset to relieve, so the
     // invoice-level cost and margin stay at zero. Line costs are still stored so
@@ -708,7 +789,6 @@ export function createSalesInvoice(ctx: SalesContext, dto: CreateSaleDTO): Sales
       ? totals
       : { ...totals, totalCost: 0, grossProfit: round2(totals.subtotal - totals.discountAmount) };
 
-    const invoiceId = `inv_${uuidv4().substring(0, 8)}`;
     const invoiceNumber = sqliteDb.nextNumber('INV');
     const today = localDateString();
 

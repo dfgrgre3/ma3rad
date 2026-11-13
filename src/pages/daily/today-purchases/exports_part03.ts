@@ -22,6 +22,7 @@ export const exportSupplierPayments = ({ date, payments, toast }: PurchaseExport
         paymentTypeLabel: PAY_LABEL[payment.paymentType] || payment.paymentType,
       })),
       fileName: `daily-supplier-payments-${date}`,
+      permission: 'purchases.export',
     });
     toast.success('تم تصدير سداد الموردين');
   } catch (e: any) {
@@ -58,6 +59,7 @@ export const printPurchaseStatement = ({ date, data, rows, plain, fmt, toast }: 
         status: PAY_LABEL[row.paymentStatus] || row.paymentStatus,
       })),
       fileName: `daily-purchases-${date}`,
+      permission: 'purchases.export',
     });
     toast.success('تم تجهيز كشف الطباعة');
   } catch (e: any) {

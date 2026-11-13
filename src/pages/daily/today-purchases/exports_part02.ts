@@ -26,6 +26,7 @@ export const exportPurchaseItems = ({ date, items, plain, toast }: PurchaseExpor
         unit: getProductUnitLabel(item),
       })) as unknown as Array<Record<string, unknown>>,
       fileName: `daily-purchases-items-${date}`,
+      permission: 'purchases.export',
     });
     toast.success('تم تصدير أصناف التوريد');
   } catch (e: any) {
@@ -50,6 +51,7 @@ export const exportPurchaseSuppliers = ({ date, supplierStats, toast }: Purchase
       ],
       rows: supplierStats as unknown as Array<Record<string, unknown>>,
       fileName: `daily-purchases-suppliers-${date}`,
+      permission: 'purchases.export',
     });
     toast.success('تم تصدير الموردين');
   } catch (e: any) {

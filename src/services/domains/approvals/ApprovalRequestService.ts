@@ -73,6 +73,26 @@ export class ApprovalRequestService {
     });
   }
 
+  /**
+   * An approved discount authorisation that has not yet been consumed by an
+   * invoice. The cashier can retry the same sale without raising a duplicate
+   * request; the sales service still re-validates and consumes it atomically.
+   */
+  findApprovedDiscountRequest(customerId: string | null | undefined, amount: number): { id: string } | null {
+    const actor = AuthService.requireAuth();
+    const row = this.db.query<{ id: string }>(
+      `SELECT id FROM approval_requests
+       WHERE request_type = 'DISCOUNT' AND status = 'APPROVED'
+         AND requested_by = ?
+         AND ABS(COALESCE(requested_value, 0) - ?) <= 0.01
+         AND (reference_type IS NULL OR reference_type IN ('POS', 'MANUAL'))
+         AND (reference_id IS NULL OR reference_id = ?)
+       ORDER BY decided_at DESC, created_at DESC LIMIT 1`,
+      [actor.id, Number(amount) || 0, customerId || null]
+    )[0];
+    return row || null;
+  }
+
   private resolveReferenceBranch(referenceType?: string, referenceId?: string): string | null {
     if (!referenceType || !referenceId) return null;
     switch (referenceType.toUpperCase()) {

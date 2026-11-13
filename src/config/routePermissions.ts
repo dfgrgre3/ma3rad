@@ -12,6 +12,9 @@ export interface RoutePermissionRule {
 }
 
 export const DATA_IMPORT_ACCESS_PERMISSIONS = [
+  'settings.import.view',
+  'settings.import.execute',
+  'admin.data.import',
   'admin.data',
   'customers.create',
   'suppliers.create',

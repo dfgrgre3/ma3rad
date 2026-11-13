@@ -57,7 +57,7 @@ export const ReportsView: React.FC = () => {
     switch (activeTab) {
       case 'sales':
         return {
-          title: 'تقرير المبيعات', subtitle: period, fileName: 'sales-report',
+          title: 'تقرير المبيعات', subtitle: period, fileName: 'sales-report', permission: 'reports.export',
           columns: [
             { key: 'invoiceNumber', label: 'رقم الفاتورة' }, { key: 'date', label: 'التاريخ' },
             { key: 'customerName', label: 'العميل' }, { key: 'totalAmount', label: 'الإجمالي' },
@@ -67,7 +67,7 @@ export const ReportsView: React.FC = () => {
         };
       case 'purchases':
         return {
-          title: 'تقرير المشتريات', subtitle: period, fileName: 'purchases-report',
+          title: 'تقرير المشتريات', subtitle: period, fileName: 'purchases-report', permission: 'reports.export',
           columns: [
             { key: 'invoiceNumber', label: 'رقم الفاتورة' }, { key: 'date', label: 'التاريخ' },
             { key: 'supplierName', label: 'المورد' }, { key: 'totalAmount', label: 'الإجمالي' },
@@ -77,7 +77,7 @@ export const ReportsView: React.FC = () => {
         };
       case 'expenses':
         return {
-          title: 'تقرير المصروفات', subtitle: period, fileName: 'expenses-report',
+          title: 'تقرير المصروفات', subtitle: period, fileName: 'expenses-report', permission: 'reports.export',
           columns: [
             { key: 'date', label: 'التاريخ' }, { key: 'category', label: 'الفئة' },
             { key: 'description', label: 'البيان' }, { key: 'amount', label: 'المبلغ' },
@@ -86,7 +86,7 @@ export const ReportsView: React.FC = () => {
         };
       case 'inventory':
         return {
-          title: 'تقرير تقييم المخزون', subtitle: period, fileName: 'inventory-valuation',
+          title: 'تقرير تقييم المخزون', subtitle: period, fileName: 'inventory-valuation', permission: 'reports.export',
           columns: [
             { key: 'warehouseName', label: 'المخزن' }, { key: 'items', label: 'عدد الأصناف' },
             { key: 'costValue', label: 'قيمة التكلفة' }, { key: 'saleValue', label: 'قيمة البيع' },
@@ -95,7 +95,7 @@ export const ReportsView: React.FC = () => {
         };
       case 'category':
         return {
-          title: 'تقرير المبيعات حسب الفئة', subtitle: period, fileName: 'category-sales',
+          title: 'تقرير المبيعات حسب الفئة', subtitle: period, fileName: 'category-sales', permission: 'reports.export',
           columns: [
             { key: 'categoryName', label: 'الفئة' }, { key: 'quantityM2', label: 'الكمية' }, { key: 'unitLabel', label: 'الوحدة' },
             { key: 'totalRevenue', label: 'الإيراد' }, { key: 'profit', label: 'الربح' },
@@ -104,7 +104,7 @@ export const ReportsView: React.FC = () => {
         };
       case 'brand':
         return {
-          title: 'تقرير المبيعات حسب الماركة', subtitle: period, fileName: 'brand-sales',
+          title: 'تقرير المبيعات حسب الماركة', subtitle: period, fileName: 'brand-sales', permission: 'reports.export',
           columns: [
             { key: 'brandName', label: 'الماركة' }, { key: 'quantityM2', label: 'الكمية' }, { key: 'unitLabel', label: 'الوحدة' },
             { key: 'totalRevenue', label: 'الإيراد' }, { key: 'profit', label: 'الربح' },

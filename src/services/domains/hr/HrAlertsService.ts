@@ -5,6 +5,7 @@ import { PermissionService } from '../auth/PermissionService';
 import { BranchAccessService } from '../auth/BranchAccessService';
 import { EmployeeDepartmentAccessService } from '../auth/EmployeeDepartmentAccessService';
 import { ModuleRegistryService } from '../config/ModuleRegistryService';
+import { PayrollNotificationSettingsService } from './PayrollNotificationSettingsService';
 import { localDateString, addLocalDays } from '../../../utils/shared/date';
 import type { User } from '../../../types/auth/identity';
 import type { NotificationType } from '../../../types/notifications';
@@ -341,6 +342,69 @@ export class HrAlertsService {
     return { created };
   }
 
+  /** إشعارات مواعيد استحقاق صرف الرواتب (مستحقة قريباً أو متأخرة) */
+  private checkPayrollDues(actor: User, horizon: string): { created: number } {
+    let created = 0;
+    const scope = this.branchAccess.sqlScope('fce.branch_id', undefined, actor);
+
+    // استعلام أحداث الرواتب من التقويم المالي (event_type = 'PAYROLL')
+    const rows = this.db.query<any>(`
+      SELECT fce.id, fce.title, fce.due_date AS dueDate, fce.amount, fce.paid_amount AS paidAmount,
+             fce.status, fce.reference, fce.branch_id AS branchId, b.name AS branchName
+      FROM financial_calendar_events fce
+      JOIN branches b ON b.id = fce.branch_id
+      WHERE fce.event_type = 'PAYROLL'
+        AND fce.status NOT IN ('PAID', 'COLLECTED', 'CANCELLED')
+        AND fce.amount > fce.paid_amount
+        AND fce.due_date <= ?
+        AND ${scope.clause}
+      ORDER BY fce.due_date ASC
+    `, [...scope.params, horizon]);
+
+    for (const row of rows) {
+      const overdue = row.dueDate < localDateString();
+      const referenceType = 'HR_PAYROLL';
+      const referenceId = row.id;
+
+      // التحقق من إعدادات الفرع
+      if (overdue && !PayrollNotificationSettingsService.shouldNotifyOverdue(row.branchId)) continue;
+      if (!overdue && !PayrollNotificationSettingsService.shouldNotifyDue(row.branchId)) continue;
+
+      const exists = this.db.query<any>(
+        `SELECT id FROM notifications WHERE type IN ('HR_PAYROLL_DUE', 'HR_PAYROLL_OVERDUE') AND reference_type = ? AND reference_id = ? AND is_read = 0`,
+        [referenceType, referenceId]
+      );
+      if (exists.length > 0) continue;
+
+      const remaining = Number(row.amount) - Number(row.paidAmount || 0);
+      const daysLeft = Math.round(
+        (new Date(`${row.dueDate}T00:00:00Z`).getTime() - new Date(`${localDateString()}T00:00:00Z`).getTime()) / 86_400_000
+      );
+
+      // استخدام فترة التنبيه المخصصة للفرع
+      const dueHorizonDays = PayrollNotificationSettingsService.getDueHorizonDays(row.branchId);
+      const isDueSoon = !overdue && daysLeft <= dueHorizonDays;
+
+      if (overdue) {
+        this.createNotification(
+          'HR_PAYROLL_OVERDUE',
+          'صرف رواتب متأخر',
+          `صرف رواتب ${row.branchName} (${row.title}) متأخر منذ ${Math.abs(daysLeft)} يوماً. المتبقي للصرف: ${remaining.toLocaleString('ar-EG')} ج.م. تاريخ الاستحقاق كان ${row.dueDate}.`,
+          actor.id, referenceType, referenceId
+        );
+      } else if (isDueSoon) {
+        this.createNotification(
+          'HR_PAYROLL_DUE',
+          'صرف رواتب مستحق قريباً',
+          `صرف رواتب ${row.branchName} (${row.title}) مستحق خلال ${daysLeft} يوماً (${row.dueDate}). المبلغ المتبقي: ${remaining.toLocaleString('ar-EG')} ج.م.`,
+          actor.id, referenceType, referenceId
+        );
+      }
+      created += 1;
+    }
+    return { created };
+  }
+
   private createNotification(
     type: NotificationType,
     title: string,
@@ -378,7 +442,10 @@ export class HrAlertsService {
     const loans = this.checkLoanInstallments(actor, horizon);
     if (loans.created > 0) details.push(`أقساط القروض: ${loans.created} تنبيه`);
 
-    const total = contracts.created + probation.created + documents.created + leaves.created + loans.created;
+    const payroll = this.checkPayrollDues(actor, horizon);
+    if (payroll.created > 0) details.push(`مواعيد صرف الرواتب: ${payroll.created} تنبيه`);
+
+    const total = contracts.created + probation.created + documents.created + leaves.created + loans.created + payroll.created;
     return { created: total, details };
   }
 }

@@ -1,5 +1,6 @@
 import type {
   ColumnInfo,
+  DataImportConflictPolicy,
   DataImportPreview,
   DataImportResult,
   DataImportSheet,
@@ -53,12 +54,12 @@ export class DataAdminService {
     return this.exportService.exportAllData();
   }
 
-  previewDataImport(sheets: DataImportSheet[]): DataImportPreview {
-    return this.transfer.previewDataImport(sheets);
+  previewDataImport(sheets: DataImportSheet[], conflictPolicy: DataImportConflictPolicy = 'overwrite'): DataImportPreview {
+    return this.transfer.previewDataImport(sheets, conflictPolicy);
   }
 
-  importData(sheets: DataImportSheet[]): Promise<DataImportResult> {
-    return this.transfer.importData(sheets);
+  importData(sheets: DataImportSheet[], conflictPolicy: DataImportConflictPolicy = 'overwrite'): Promise<DataImportResult> {
+    return this.transfer.importData(sheets, conflictPolicy);
   }
 
   deleteTableData(tables: string[], reason: string): Promise<DeleteResult> {

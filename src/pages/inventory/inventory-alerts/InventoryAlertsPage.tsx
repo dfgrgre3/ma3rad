@@ -135,6 +135,7 @@ export const InventoryAlertsPage: React.FC = () => {
       columns,
       rows,
       fileName: 'تنبيهات_المخزون_منخفض',
+      permission: 'inventory.export',
     });
   };
 

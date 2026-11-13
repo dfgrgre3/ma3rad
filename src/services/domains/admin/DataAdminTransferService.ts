@@ -1,4 +1,5 @@
 import type {
+  DataImportConflictPolicy,
   DataImportPreview,
   DataImportResult,
   DataImportSheet,
@@ -6,14 +7,7 @@ import type {
 } from '../../../types/admin/dataAdmin';
 import { AuditService } from '../security/AuditService';
 import { DataAdminBaseService } from './DataAdminBaseService';
-import { CORE_PROTECTED_TABLES, IDENTIFIER } from './dataAdminConstants';
-
-const IMPORT_PROTECTED_TABLES = new Set([
-  ...CORE_PROTECTED_TABLES,
-  'audit_logs',
-  'backup_history',
-  'sequence_counters',
-]);
+import { IMPORT_PROTECTED_TABLES, IDENTIFIER } from './dataAdminConstants';
 
 function queryColumnName(column: string): string {
   return column.replace(/_([a-z0-9])/g, (_match, character: string) => character.toUpperCase());
@@ -26,8 +20,11 @@ type PreparedSheet = {
 };
 
 export class DataAdminTransferService extends DataAdminBaseService {
-  previewDataImport(sheets: DataImportSheet[]): DataImportPreview {
-    this.require('admin.data.delete');
+  previewDataImport(
+    sheets: DataImportSheet[],
+    conflictPolicy: DataImportConflictPolicy = 'overwrite',
+  ): DataImportPreview {
+    this.require('admin.data.import');
     const prepared = this.validateImportSheets(sheets);
     const tables: DataImportTablePreview[] = prepared.map(({ sheet, columns, primaryKeys }) => {
       if (IMPORT_PROTECTED_TABLES.has(sheet.name)) {
@@ -85,6 +82,7 @@ export class DataAdminTransferService extends DataAdminBaseService {
         }
 
         conflictRows++;
+        if (conflictPolicy === 'skip') skippedRows++;
         if (sampleConflicts.length < 5) {
           const changes = columns
             .filter((column) => !primaryKeys.some((keyColumn) => keyColumn.name === column.name))
@@ -123,8 +121,11 @@ export class DataAdminTransferService extends DataAdminBaseService {
     };
   }
 
-  async importData(sheets: DataImportSheet[]): Promise<DataImportResult> {
-    const user = this.require('admin.data.delete');
+  async importData(
+    sheets: DataImportSheet[],
+    conflictPolicy: DataImportConflictPolicy = 'overwrite',
+  ): Promise<DataImportResult> {
+    const user = this.require('admin.data.import');
     const prepared = this.validateImportSheets(sheets);
     const tables = this.db.executeTransaction((manager) => {
       manager.run('PRAGMA defer_foreign_keys = ON');
@@ -172,8 +173,15 @@ export class DataAdminTransferService extends DataAdminBaseService {
               `SELECT 1 AS found FROM "${sheet.name}" WHERE ${where} LIMIT 1`,
               primaryKeys.map((column) => row[column.name]),
             ).length > 0;
-            if (exists) updatedRows++;
-            else insertedRows++;
+            if (exists) {
+              if (conflictPolicy === 'skip') {
+                skippedRows++;
+                continue;
+              }
+              updatedRows++;
+            } else {
+              insertedRows++;
+            }
           }
           manager.run(
             `INSERT INTO "${sheet.name}" (${columnNames}) VALUES (${placeholders})${conflictClause}`,
@@ -197,7 +205,7 @@ export class DataAdminTransferService extends DataAdminBaseService {
       userName: user.fullName,
       action: 'استيراد بيانات من ملف Excel',
       module: 'ADMIN',
-      newValues: JSON.stringify(result),
+      newValues: JSON.stringify({ ...result, conflictPolicy, importedAt: new Date().toISOString() }),
     });
     await this.db.flush();
     return result;

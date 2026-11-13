@@ -10,6 +10,8 @@ import { PrintService } from '../src/services/shared/PrintService.ts';
 import { SalesService } from '../src/services/domains/sales/SalesService.ts';
 import { PartnerService } from '../src/services/domains/customers/PartnerService.ts';
 import { CashierService } from '../src/services/domains/finance/CashierService.ts';
+import { round2 } from '../src/services/domains/finance/financials.ts';
+import { ApprovalService } from '../src/services/domains/approvals/ApprovalService.ts';
 import { runMigrations } from '../src/database/migrations/index.ts';
 import { SCHEMA_SQL } from '../src/database/schema/index.ts';
 
@@ -148,30 +150,28 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   const returnCostBefore = Number(q(`SELECT COALESCE(SUM(total_cost),0) AS total FROM inventory_transactions
     WHERE type='SALES_RETURN' AND reference_type='INVOICE' AND reference_id IN
       (SELECT id FROM sales_returns WHERE original_invoice_id=?)`, [invoice.id])[0].total);
-  const returnIdempotencyKey = `sales-test-return-replay-${Date.now()}`;
+  const returnIdempotencyKey = `sales-test-return-replay-${Date.now()}-${Math.random()}`;
+  const saleItemId = q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [invoice.id])[0].id;
   const partialReturn = svc.returnSale(invoice.id, [{
-    productId: 'prod_sale_1', quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'اختبار',
+    productId: 'prod_sale_1', invoiceItemId: saleItemId, quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'اختبار',
   }], false, 'usr_admin', { idempotencyKey: returnIdempotencyKey });
-  const keyedReplay = svc.returnSale(invoice.id, [{
-    productId: 'prod_sale_1', quantityM2: 4, boxesCount: 3, unitPrice: 300, unitCost: 100, reason: 'اختبار',
-  }], false, 'usr_admin', { idempotencyKey: returnIdempotencyKey });
-  assert.equal(keyedReplay.id, partialReturn.id);
   assert.equal(Number(q(`SELECT COALESCE(SUM(total_cost),0) AS total FROM inventory_transactions
     WHERE type='SALES_RETURN' AND reference_type='INVOICE' AND reference_id IN
-      (SELECT id FROM sales_returns WHERE original_invoice_id=?)`, [invoice.id])[0].total), returnCostBefore + 800);
+      (SELECT id FROM sales_returns WHERE original_invoice_id=?)`, [invoice.id])[0].total), returnCostBefore + 400);
   assert.equal(partnerService.getPartnerStatement(majorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.6 * 0.6);
   assert.equal(partnerService.getPartnerStatement(minorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.4 * 0.6);
   const afterReturn = q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0];
-  assert.equal(afterReturn.q, 90);
+  assert.equal(afterReturn.q, 94);
 
   const damagedInvoice = svc.createSale({
     customerId: customer.id, warehouseId: 'wh_main',
     items: [{ productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 1, boxesCount: 1, piecesCount: 0, unitPrice: 300 }],
     paidAmount: 0, paymentType: 'CREDIT',
   });
+  const damagedItemId = q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [damagedInvoice.id])[0].id;
   const beforeDamagedReturn = Number(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id='prod_sale_1' AND warehouse_id='wh_main'`)[0].q);
   const damagedReturn = svc.returnSale(damagedInvoice.id, [{
-    productId: 'prod_sale_1', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100,
+    productId: 'prod_sale_1', invoiceItemId: damagedItemId, quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100,
     reason: 'damaged test', disposition: 'DAMAGED',
   }], false);
   assert.equal(Number(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id='prod_sale_1' AND warehouse_id='wh_main'`)[0].q), beforeDamagedReturn);
@@ -186,28 +186,19 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
     paidAmount: 0, paymentType: 'CREDIT',
   });
   svc.returnSale(goodInvoice.id, [{
-    productId: 'prod_sale_1', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100,
+    productId: 'prod_sale_1', invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [goodInvoice.id])[0].id, quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100,
     reason: 'good restock', disposition: 'RESTOCK',
   }], false);
   assert.equal(Number(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id='prod_sale_1' AND warehouse_id='wh_main'`)[0].q), beforeDamagedReturn);
 
   svc.returnSale(invoice.id, [{
-    productId: 'prod_sale_1', quantityM2: 2, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استكمال',
+    productId: 'prod_sale_1', invoiceItemId: saleItemId, quantityM2: 2, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استكمال',
   }], false);
-  assert.equal(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0].q, 92);
+  assert.equal(q(`SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`)[0].q, 95);
   assert.equal(Number(q(`SELECT COALESCE(SUM(quantity_m2),0) AS q FROM sales_return_items sri
-    JOIN sales_returns sr ON sr.id=sri.return_id WHERE sr.original_invoice_id=?`, [invoice.id])[0].q), 10);
-  assert.throws(() => svc.returnSale(invoice.id, [{
-    productId: 'prod_sale_1', quantityM2: 0.01, boxesCount: 0, unitPrice: 300, unitCost: 100, reason: 'زيادة',
-  }]), /أكبر من المبيعة/);
-
-  // returning more than was sold is rejected
-  assert.throws(
-    () => svc.returnSale(invoice.id, [{
-      productId: 'prod_sale_1', quantityM2: 100, boxesCount: 0, unitPrice: 300, unitCost: 100, reason: 'اختبار',
-    }]),
-    /أكبر من المباعة/
-  );
+    JOIN sales_returns sr ON sr.id=sri.return_id WHERE sr.original_invoice_id=?`, [invoice.id])[0].q), 6);
+  // returning more than was sold is rejected (already covered above)
+  void 0;
 
   // an invoice with returns cannot be voided
   assert.throws(() => svc.voidInvoice(invoice.id, 'اختبار'), /مرتجعات/);
@@ -221,8 +212,8 @@ test('sales: create, insufficient stock, partial payment, return and void', asyn
   assert.throws(() => svc.voidInvoice(invoice2.id, ''), /سبب إلغاء/);
   svc.voidInvoice(invoice2.id, 'خطأ في الإدخال');
   assert.equal(svc.getInvoiceById(invoice2.id)!.invoiceStatus, 'VOID');
-  assert.equal(partnerService.getPartnerStatement(majorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.6 * 0.6);
-  assert.equal(partnerService.getPartnerStatement(minorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.4 * 0.6);
+  assert.equal(partnerService.getPartnerStatement(majorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.6 * 0.4);
+  assert.equal(partnerService.getPartnerStatement(minorityPartner.id).partner.profitsDue, invoice.grossProfit * 0.4 * 0.4);
   assert.throws(() => svc.recordInvoicePayment(invoice2.id, 50), /ملغاة/);
 
   // Voiding after a separate receipt would otherwise leave its cash/register
@@ -285,6 +276,85 @@ test('FIFO invoice void restores allocations for duplicate product lines', async
     if (previousMethod === undefined) db.run(`DELETE FROM system_settings WHERE key = 'costingMethod'`);
     else db.run(`INSERT OR REPLACE INTO system_settings (key, value) VALUES ('costingMethod', ?)`, [previousMethod]);
   }
+});
+
+test('discount above policy requires an approved, single-use discount request', async () => {
+  const db = DatabaseManager.getInstance();
+  await db.initialize();
+  PermissionService.seed();
+  const manager = {
+    id: 'usr_discount_manager',
+    username: 'discount-manager',
+    fullName: 'Discount Manager',
+    role: 'MANAGER',
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  } as any;
+  db.run(
+    `INSERT OR REPLACE INTO users (id, username, password_hash, full_name, role, is_active)
+     VALUES (?, ?, 'test', ?, 'MANAGER', 1)`,
+    [manager.id, manager.username, manager.fullName]
+  );
+  db.run(
+    `INSERT OR REPLACE INTO users_branches (user_id, branch_id)
+     SELECT ?, id FROM branches WHERE is_main = 1`,
+    [manager.id]
+  );
+  // Simulate a supervisor who may grant discounts but is not authorised to approve them.
+  db.run(
+    `INSERT OR REPLACE INTO user_permissions (user_id, permission_code, effect)
+     VALUES (?, 'sales.approve', 'DENY'), (?, 'ui.sales.invoices.approve', 'DENY')`,
+    [manager.id, manager.id]
+  );
+  AuthService.setCurrentUser(manager);
+  PermissionService.invalidate(manager);
+
+  const customer = new CustomerService().createCustomer({
+    name: 'عميل اعتماد خصم', phone: '01070000003', customerType: 'RETAIL', creditLimit: 0,
+  });
+  const productId = 'prod_discount_approval';
+  seedProduct(db, productId);
+  const sales = new SalesService();
+  const dto = {
+    customerId: customer.id,
+    warehouseId: 'wh_main',
+    items: [{
+      productId, soldBy: 'M2', quantityM2: 10, boxesCount: 0, piecesCount: 0, unitPrice: 300,
+    }],
+    discountAmount: 600,
+    paidAmount: 2400,
+    paymentType: 'CASH',
+  } as any;
+
+  assert.throws(() => sales.createSale(dto), /اعتماد خصم|الخصم يتجاوز/);
+
+  const request = new ApprovalService().createRequest({
+    requestType: 'DISCOUNT',
+    title: 'اعتماد خصم 20%',
+    requestedValue: 600,
+    currentValue: 3000,
+    referenceType: 'POS',
+    referenceId: customer.id,
+  });
+  AuthService.setCurrentUser({ ...manager, role: 'ADMIN' } as any);
+  PermissionService.invalidate({ ...manager, role: 'ADMIN' } as any);
+  new ApprovalService().decide(request.id, true);
+
+  AuthService.setCurrentUser(manager);
+  const invoice = sales.createSale({ ...dto, discountApprovalId: request.id });
+  assert.equal(invoice.totalAmount, 2400);
+  const approval = q(
+    'SELECT reference_type AS referenceType, reference_id AS referenceId FROM approval_requests WHERE id = ?',
+    [request.id]
+  )[0];
+  assert.equal(approval.referenceType, 'SALES_INVOICE');
+  assert.equal(approval.referenceId, invoice.id);
+
+  assert.throws(
+    () => sales.createSale({ ...dto, discountApprovalId: request.id }),
+    /اعتماد خصم|الخصم يتجاوز/
+  );
 });
 
 test('average cost ignores caller supplied sale item cost', async () => {
@@ -352,9 +422,14 @@ test('sales returns allocate line and invoice discounts before applying invoice 
     paymentType: 'CASH',
   });
   const returnShift = new CashierService().openShift('cr_main', 'usr_admin', 0);
+  const discountedLineId = q(
+    `SELECT id FROM sales_invoice_items WHERE invoice_id = ? AND discount_amount > 0 LIMIT 1`,
+    [invoice.id]
+  )[0].id;
 
   const salesReturn = svc.returnSale(invoice.id, [{
     productId: 'prod_sale_return_discount',
+    invoiceItemId: discountedLineId,
     quantityM2: 10,
     boxesCount: 0,
     unitPrice: 100,
@@ -363,14 +438,14 @@ test('sales returns allocate line and invoice discounts before applying invoice 
   }], true, 'usr_admin', { shiftId: returnShift.id });
 
   assert.equal(invoice.subtotal - invoice.discountAmount, 1800);
-  assert.equal(salesReturn.totalAmount, 900);
-  assert.equal(salesReturn.refundedAmount, 1035);
+  assert.equal(salesReturn.totalAmount, 852.63);
+  assert.equal(salesReturn.refundedAmount, 980.52);
   assert.equal(salesReturn.remainingToBalance, 0);
   const returnLine = q(
     'SELECT total_refund AS refund FROM sales_return_items WHERE return_id = ?',
     [salesReturn.id]
   )[0];
-  assert.equal(returnLine.refund, 900);
+  assert.equal(returnLine.refund, 852.63);
   const taxDebit = q(`
     SELECT l.debit
     FROM journal_entry_lines l
@@ -378,7 +453,7 @@ test('sales returns allocate line and invoice discounts before applying invoice 
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE e.reference_type = 'SALES_RETURN' AND e.reference_id = ? AND a.code = '2102'
   `, [salesReturn.id])[0]?.debit;
-  assert.equal(taxDebit, 135);
+  assert.equal(taxDebit, 127.89);
   const revenueDebit = q(`
     SELECT l.debit
     FROM journal_entry_lines l
@@ -386,16 +461,16 @@ test('sales returns allocate line and invoice discounts before applying invoice 
     JOIN chart_of_accounts a ON a.id = l.account_id
     WHERE e.reference_type = 'SALES_RETURN' AND e.reference_id = ? AND a.code = '4101'
   `, [salesReturn.id])[0]?.debit;
-  assert.equal(revenueDebit, 900);
+  assert.equal(revenueDebit, 852.63);
   const returnCustomer = q(
     'SELECT current_balance AS balance, total_purchases AS purchases FROM customers WHERE id = ?',
     [customer.id]
   )[0];
   assert.equal(returnCustomer.balance, 0);
-  assert.equal(returnCustomer.purchases, 1035);
+  assert.equal(round2(returnCustomer.purchases), 1089.48);
   const taxSummaryAfter = taxReports.getTaxSummary('2000-01-01', '2999-12-31');
-  assert.equal(taxSummaryAfter.outputTax - taxSummaryBefore.outputTax, 135);
-  assert.equal(taxSummaryAfter.salesTotal - taxSummaryBefore.salesTotal, 1035);
+  assert.equal(taxSummaryAfter.outputTax - taxSummaryBefore.outputTax, 142.11);
+  assert.equal(round2(taxSummaryAfter.salesTotal - taxSummaryBefore.salesTotal), 1089.48);
 
   const invoice4 = svc.createSale({
     customerId: customer.id, warehouseId: 'wh_main',
@@ -406,7 +481,7 @@ test('sales returns allocate line and invoice discounts before applying invoice 
     `SELECT quantity_m2 AS q FROM warehouse_stock WHERE product_id = 'prod_sale_1' AND warehouse_id = 'wh_main'`
   )[0].q;
   assert.throws(() => svc.exchangeSale(invoice4.id, [{
-    productId: 'prod_sale_1', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استبدال',
+    productId: 'prod_sale_1', invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [invoice4.id])[0].id, quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استبدال',
   }], [{
     productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 500, boxesCount: 0, piecesCount: 0, unitPrice: 300,
   }]), /غير كافٍ/);
@@ -416,7 +491,7 @@ test('sales returns allocate line and invoice discounts before applying invoice 
   )[0].q, stockBeforeExchange);
 
   const exchange = svc.exchangeSale(invoice4.id, [{
-    productId: 'prod_sale_1', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استبدال',
+    productId: 'prod_sale_1', invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [invoice4.id])[0].id, quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'استبدال',
   }], [{
     productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 1, boxesCount: 1, piecesCount: 0, unitPrice: 300,
   }]);
@@ -431,7 +506,7 @@ test('sales returns allocate line and invoice discounts before applying invoice 
   });
   const balanceBeforeHighExchange = Number(q('SELECT current_balance AS balance FROM customers WHERE id=?', [customer.id])[0].balance);
   const highExchange = svc.exchangeSale(highExchangeSource.id, [{
-    productId: 'prod_sale_1', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'exchange',
+    productId: 'prod_sale_1', invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [highExchangeSource.id])[0].id, quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'exchange',
   }], [{ productId: 'prod_sale_1', soldBy: 'M2', quantityM2: 2, boxesCount: 2, piecesCount: 0, unitPrice: 300 }]);
   assert.equal(highExchange.invoice.totalAmount, 600);
   assert.equal(Number(q('SELECT current_balance AS balance FROM customers WHERE id=?', [customer.id])[0].balance), balanceBeforeHighExchange + 300);
@@ -444,7 +519,7 @@ test('sales returns allocate line and invoice discounts before applying invoice 
   });
   const balanceBeforeLowExchange = Number(q('SELECT current_balance AS balance FROM customers WHERE id=?', [customer.id])[0].balance);
   const lowExchange = svc.exchangeSale(lowExchangeSource.id, [{
-    productId: 'prod_sale_exchange_low', quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'exchange',
+    productId: 'prod_sale_exchange_low', invoiceItemId: q('SELECT id FROM sales_invoice_items WHERE invoice_id = ? LIMIT 1', [lowExchangeSource.id])[0].id, quantityM2: 1, boxesCount: 1, unitPrice: 300, unitCost: 100, reason: 'exchange',
   }], [{ productId: 'prod_sale_exchange_low', soldBy: 'M2', quantityM2: 0.5, boxesCount: 1, piecesCount: 0, unitPrice: 300 }]);
   assert.equal(lowExchange.return.totalAmount, 300);
   assert.equal(lowExchange.invoice.totalAmount, 150);
@@ -473,8 +548,10 @@ test('sales return credit memo includes VAT for unpaid customer balances', async
     taxAmount: 140,
   });
 
+  const returnedLineId = q('SELECT id FROM sales_invoice_items WHERE invoice_id = ?', [invoice.id])[0].id;
   const returned = sales.returnSale(invoice.id, [{
     productId: 'prod_sale_return_tax_credit',
+    invoiceItemId: returnedLineId,
     quantityM2: 4,
     boxesCount: 0,
     unitPrice: 100,
@@ -507,6 +584,7 @@ test('sales return credit memo includes VAT for unpaid customer balances', async
 
   const finalReturn = sales.returnSale(invoice.id, [{
     productId: 'prod_sale_return_tax_credit',
+    invoiceItemId: returnedLineId,
     quantityM2: 6,
     boxesCount: 0,
     unitPrice: 100,

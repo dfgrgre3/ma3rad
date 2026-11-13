@@ -101,6 +101,7 @@ export const APP_ROUTE_PATHS = [
   "employees/payroll",
   "employees/payroll/payslips",
   "employees/payroll/calendar",
+  "employees/payroll/notification-settings",
   "employees/commissions",
   "employees/leave",
   "employees/contracts",

@@ -6,6 +6,7 @@ import { AuthService } from '../src/services/domains/auth/AuthService.ts';
 import { PermissionService } from '../src/services/domains/auth/PermissionService.ts';
 import { ExportService } from '../src/services/shared/ExportService.ts';
 import { buildExportHtml, exportToExcel, exportToPdf } from '../src/utils/export/export.ts';
+import { csvCell } from '../src/utils/export/csv.ts';
 import type { User } from '../src/types/auth/identity.ts';
 
 const doc = {
@@ -56,12 +57,13 @@ test('exports that declare a permission are refused without it', async () => {
   assert.throws(() => exportToPdf(doc), /صلاحية/);
 });
 
-test('legacy documents without a declared export permission keep building', async () => {
+test('documents without a declared export permission are refused', async () => {
   await boot();
   AuthService.setCurrentUser(limited);
   PermissionService.invalidate(limited);
-  const legacy = { ...doc, permission: undefined };
-  assert.match(buildExportHtml(legacy), /<table>/);
+  const legacy = { ...doc, permission: undefined as unknown as string };
+  assert.throws(() => buildExportHtml(legacy), /صلاحية/);
+  assert.throws(() => exportToExcel(legacy), /صلاحية/);
 });
 
 test('an authorized user passes the export guard', async () => {
@@ -70,6 +72,17 @@ test('an authorized user passes the export guard', async () => {
   assert.equal(ExportService.canExport('reports.export', admin), true);
   ExportService.assertAllowed('reports.export', admin);
   assert.match(buildExportHtml(doc), /تقرير اختبار/);
+});
+
+test('CSV cells neutralise spreadsheet formulas', () => {
+  assert.equal(csvCell('=SUM(1,2)'), `"'=SUM(1,2)"`);
+  assert.equal(csvCell('  +cmd'), `"'  +cmd"`);
+  assert.equal(csvCell('-1'), `"'-1"`);
+  assert.equal(csvCell('@import'), `"'@import"`);
+  assert.equal(csvCell('سعر عادي'), `"سعر عادي"`);
+  assert.equal(csvCell('say "hi"'), `"say ""hi"""`);
+  assert.equal(csvCell(42), '"42"');
+  assert.equal(csvCell(null), '""');
 });
 
 test('new export permissions follow the domains a role can already view', async () => {

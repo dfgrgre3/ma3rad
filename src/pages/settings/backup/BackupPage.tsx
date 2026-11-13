@@ -9,6 +9,7 @@ import { usePermission } from '../../../hooks/domains/auth/usePermission';
 
 export const BackupPage: React.FC = () => {
   const canManage = usePermission()('settings.backup');
+  const canRestore = usePermission()('settings.backup.restore');
   const [history, setHistory] = useState<any[]>([]);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -157,7 +158,7 @@ export const BackupPage: React.FC = () => {
     keyFile?: File,
     keyPassword?: string
   ) => {
-    if (!canManage) return;
+    if (!canRestore) return;
     setIsRestoring(true);
     setRestoreError(null);
     setMessage(null);
@@ -180,7 +181,7 @@ export const BackupPage: React.FC = () => {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canManage) return;
+    if (!canRestore) return;
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
@@ -208,7 +209,7 @@ export const BackupPage: React.FC = () => {
 
   const handleConfirmRestore = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canManage || !selectedFile) return;
+    if (!canRestore || !selectedFile) return;
     const isLocalDatabaseBackup = selectedFile.name.toLowerCase().endsWith('.sqlite.enc');
     if (!restorePassword && !isLocalDatabaseBackup) {
       setRestoreError('يرجى إدخال كلمة مرور النسخة الاحتياطية.');
@@ -329,7 +330,7 @@ export const BackupPage: React.FC = () => {
             </p>
           </div>
 
-          {canManage && (
+          {canRestore && (
             <div className="space-y-2">
               <label className="w-full py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition">
                 <Upload className="w-4 h-4" />

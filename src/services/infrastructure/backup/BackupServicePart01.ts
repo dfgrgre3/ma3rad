@@ -23,6 +23,12 @@ private require(): { id: string; fullName: string } {
     return user;
   }
 
+private requireRestore(): { id: string; fullName: string } {
+    const user = AuthService.requireAuth();
+    PermissionService.require(user, 'settings.backup.restore');
+    return user;
+  }
+
 public async exportBackupFile(password?: string): Promise<void> {
     const user = this.require();
     let pwd: string | undefined = password;
@@ -218,7 +224,7 @@ public async restoreBackupFromFile(
     customersCount: number;
     journalEntriesCount: number;
   }> {
-    const user = this.require();
+    const user = this.requireRestore();
     const bytes = await this.readBackupBytes(file, password, recoveryKeyFile, recoveryPassword);
 
     // Validate integrity and inspect contents before replacing live database

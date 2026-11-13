@@ -80,6 +80,14 @@ export class ApprovalDecisionService {
       return null;
     }
 
+    if (row.requestType === 'DISCOUNT') {
+      // The commercial effect is applied atomically when the pending sale is
+      // posted: the sales service matches this approval to the invoice and
+      // consumes it (reference_type becomes SALES_INVOICE). Approving here only
+      // authorises that next invoice.
+      return 'تم اعتماد الخصم؛ سيُستهلك الاعتماد عند إصدار الفاتورة المرتبطة.';
+    }
+
     if (!row.referenceId || row.requestedValue == null) return null;
     const value = Number(row.requestedValue);
     if (!Number.isFinite(value) || value < 0) return null;

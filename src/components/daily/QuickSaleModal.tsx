@@ -11,6 +11,7 @@ import { useToast } from '../ui/Toast';
 import { getProductUnitLabel } from '../../utils/products/productUnits';
 import type { PaymentType } from '../../types';
 import { round2 } from '../../services/domains/finance/financials';
+import { evaluateManualDiscountPolicy } from '../../services/domains/sales/discountPolicy';
 import { LoadErrorNotice, ModalShell } from './DailyModalShared';
 import { useLists } from '../../hooks/domains/daily/useLists';
 import { fmt, input, label } from './DailyModalUtils';
@@ -141,28 +142,42 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
     }
     if (!Number.isFinite(total) || total <= 0) { toast.error('إجمالي الفاتورة غير صحيح'); return; }
     if (discount > subtotal) { toast.error('الخصم لا يمكن أن يتجاوز قيمة الأصناف'); return; }
+    let discountApprovalId: string | undefined;
     if (discount > 0) {
       const configuredThreshold = SettingsService.getSettings().discountApprovalThresholdPercent ?? 10;
       const threshold = AppConfigService.getPolicyNumber('sales.discountApprovalThreshold', configuredThreshold);
-      const discountPercent = subtotal > 0 ? discount / subtotal * 100 : 0;
-      if (discountPercent > threshold) {
+      const policy = evaluateManualDiscountPolicy({
+        grossSubtotal: subtotal,
+        totalDiscount: discount,
+        thresholdPercent: threshold,
+      });
+      const discountPercent = policy.percent;
+      if (policy.requiresApproval) {
         const actor = AuthService.getCurrentUser();
         if (!PermissionService.can(actor, 'ui.sales.invoices.approve')) {
           try {
-            const request = new ApprovalService().createRequest({
-              requestType: 'DISCOUNT',
-              title: `اعتماد خصم ${discountPercent.toFixed(1)}% على فاتورة بيع سريعة`,
-              description: `العميل: ${customerId} — الخصم ${discount} من إجمالي ${subtotal} ج.م (الحد ${threshold}%).`,
-              requestedValue: discount,
-              currentValue: subtotal,
-              priority: 'HIGH',
-              referenceType: 'MANUAL',
-            });
-            toast.error(`الخصم يتجاوز الحد (${threshold}%). أُرسل طلب اعتماد ${request.requestNumber}؛ أعد البيع بعد الاعتماد.`);
+            const approvalService = new ApprovalService();
+            const existing = approvalService.findApprovedDiscountRequest(customerId, discount);
+            if (existing) {
+              discountApprovalId = existing.id;
+            } else {
+              const request = approvalService.createRequest({
+                requestType: 'DISCOUNT',
+                title: `اعتماد خصم ${discountPercent.toFixed(1)}% على فاتورة بيع سريعة`,
+                description: `العميل: ${customerId} — الخصم ${discount} من إجمالي ${subtotal} ج.م (الحد ${threshold}%).`,
+                requestedValue: discount,
+                currentValue: subtotal,
+                priority: 'HIGH',
+                referenceType: 'MANUAL',
+                referenceId: customerId,
+              });
+              toast.error(`الخصم يتجاوز الحد (${threshold}%). أُرسل طلب اعتماد ${request.requestNumber}؛ أعد البيع بعد الاعتماد.`);
+              return;
+            }
           } catch (error: any) {
             toast.error(error?.message || 'الخصم يتجاوز الحد ويلزم اعتماد المسؤول');
+            return;
           }
-          return;
         }
       }
     }
@@ -200,6 +215,7 @@ export const QuickSaleModal: React.FC<{ onClose: () => void; onSaved: () => void
         taxAmount: tax,
         shippingCost: shipping,
         notes: notes || undefined,
+        discountApprovalId,
       });
       toast.success('تم تسجيل فاتورة البيع');
       onSaved();

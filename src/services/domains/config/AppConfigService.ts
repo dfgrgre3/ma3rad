@@ -34,6 +34,8 @@ import {
   type ConfigurationScopeType,
 } from '../../../config/configurationScopes';
 
+export const MAX_APP_CONFIG_IMPORT_LENGTH = 2_000_000;
+
 export interface ScopedAppConfigEntry extends AppConfigEntry {
   scopeType: ConfigurationScopeType;
   scopeId: string;
@@ -908,7 +910,7 @@ export class AppConfigService {
   }
 
   public static importJson(raw: string, actor?: User | null): AppConfigSnapshot {
-    if (typeof raw !== 'string' || raw.length > 2_000_000) {
+    if (typeof raw !== 'string' || raw.length > MAX_APP_CONFIG_IMPORT_LENGTH) {
       throw new Error('ملف التكوين كبير جدًا أو غير صالح.');
     }
     const snapshot = parseAppConfigSnapshot(raw);
